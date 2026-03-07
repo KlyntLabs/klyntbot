@@ -35,6 +35,10 @@ use tokio_stream::wrappers::UnboundedReceiverStream;
 use tokio_util::sync::CancellationToken;
 use tracing::info;
 
+use bus::DomainEventBus;
+use cognitive::situation::UserSituation;
+use feature_coaching::{FeedbackTracker, InterventionRouter, PatternDetector, SignalAccumulator};
+
 /// App state — storage, config, agent, and productivity.
 struct DevState {
     repos: Repos,
@@ -52,6 +56,14 @@ struct DevState {
     focus_manager: Option<Arc<FocusManager>>,
     aggregator: Option<Arc<DailyAggregator>>,
     distraction_interceptor: Option<Arc<Mutex<DistractionInterceptor>>>,
+    domain_event_bus: Arc<DomainEventBus>,
+    signal_accumulator: Arc<Mutex<SignalAccumulator>>,
+    pattern_detector: Arc<Mutex<PatternDetector>>,
+    intervention_router: Arc<Mutex<InterventionRouter>>,
+    feedback_tracker: Arc<Mutex<FeedbackTracker>>,
+    user_situation: Arc<Mutex<UserSituation>>,
+    has_cognitive_provider: bool,
+    cognitive_sse_senders: Mutex<Vec<tokio::sync::mpsc::UnboundedSender<SseEvent>>>,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -131,11 +143,25 @@ async fn main() {
     cron_service.start().await.expect("cron start failed");
     let cron_service = Arc::new(cron_service);
 
-    // 6. Build AgentLoop
+    // 6. Build AgentLoop with DomainEventBus + cognitive provider
+    let domain_event_bus = Arc::new(DomainEventBus::new(256));
+    let cognitive_provider = providers::create_cognitive_provider(&config).ok().flatten();
+    let has_cognitive_provider = cognitive_provider.is_some();
+    if has_cognitive_provider {
+        info!("cognitive provider created — using LLM handlers");
+    } else {
+        info!("no cognitive provider — using heuristic handlers");
+    }
+
     let vector_store = storage::VectorStore::connect(&data_dir).await.ok();
+    let (pipeline_tx, mut pipeline_rx) =
+        tokio::sync::mpsc::unbounded_channel::<cognitive::PipelineEvent>();
     let mut builder = agent::AgentLoop::builder(bus.clone(), provider, config.clone())
         .with_pool(pool.inner().clone())
-        .with_cron_service(cron_service.clone());
+        .with_cron_service(cron_service.clone())
+        .with_domain_bus(Arc::clone(&domain_event_bus))
+        .with_cognitive_provider(cognitive_provider.clone())
+        .with_pipeline_tx(pipeline_tx);
 
     if let Some(vs) = vector_store {
         builder = builder.with_vector_store(vs);
@@ -147,6 +173,55 @@ async fn main() {
         .expect("inbound rx already taken");
     let agent = Arc::new(agent_loop_raw);
     info!("agent loop initialized");
+
+    // 6b. Initialize coaching engine state + start CoachingService
+    let signal_accumulator = Arc::new(Mutex::new(SignalAccumulator::new()));
+    let pattern_detector = Arc::new(Mutex::new(PatternDetector::new()));
+    let intervention_router = Arc::new(Mutex::new(InterventionRouter::new(Default::default())));
+    let feedback_tracker = Arc::new(Mutex::new(FeedbackTracker::new()));
+    let user_situation = Arc::new(Mutex::new(UserSituation {
+        energy_level: 0.7,
+        focus_state: 0.5,
+        coaching_receptivity: 0.7,
+        ..Default::default()
+    }));
+
+    let coaching_reasoner: Arc<dyn feature_coaching::CoachingReasonerHandler> =
+        if let Some(ref cp) = cognitive_provider {
+            let params = providers::cognitive_chat_params(&config, 1024);
+            Arc::new(agent::cognitive_handlers::LlmCoachingReasonerHandler::new(
+                cp.clone(),
+                params,
+            ))
+        } else {
+            Arc::new(agent::cognitive_handlers::HeuristicCoachingReasonerHandler)
+        };
+
+    let coaching_cancel = CancellationToken::new();
+    let (intervention_tx, mut intervention_rx) =
+        tokio::sync::mpsc::channel::<feature_coaching::router::DeliveredIntervention>(64);
+    let _coaching_service = feature_coaching::CoachingService::start(
+        domain_event_bus.subscribe(),
+        signal_accumulator.clone(),
+        pattern_detector.clone(),
+        intervention_router.clone(),
+        feedback_tracker.clone(),
+        user_situation.clone(),
+        coaching_reasoner,
+        intervention_tx,
+        coaching_cancel,
+    );
+    info!("coaching service started");
+
+    // Log interventions in dev mode
+    tokio::spawn(async move {
+        while let Some(intervention) = intervention_rx.recv().await {
+            info!(
+                "coaching intervention: {} (type: {:?}, trigger: {})",
+                intervention.message, intervention.intervention_type, intervention.trigger_name
+            );
+        }
+    });
 
     // 7. Initialize productivity (optional)
     let (prod_repos, focus_mgr, aggregator, interceptor) = if config.productivity.enabled {
@@ -192,6 +267,14 @@ async fn main() {
         focus_manager: focus_mgr,
         aggregator,
         distraction_interceptor: interceptor,
+        domain_event_bus,
+        signal_accumulator,
+        pattern_detector,
+        intervention_router,
+        feedback_tracker,
+        user_situation,
+        has_cognitive_provider,
+        cognitive_sse_senders: Mutex::new(Vec::new()),
     });
 
     // 8. Build axum router
@@ -200,8 +283,92 @@ async fn main() {
         tracing::error!(path = ?attachments_dir, error = %e, "failed to create attachments directory");
     }
 
+    // Spawn domain event → SSE forwarder for the debug dashboard
+    {
+        let st = state.clone();
+        let mut event_rx = state.domain_event_bus.subscribe();
+        tokio::spawn(async move {
+            loop {
+                match event_rx.recv().await {
+                    Ok(event) => {
+                        let salience = cognitive::salience::evaluate_salience(&event);
+                        let domain = match &event {
+                            bus::DomainEvent::TaskCreated { .. }
+                            | bus::DomainEvent::TaskCompleted { .. }
+                            | bus::DomainEvent::TaskDeferred { .. }
+                            | bus::DomainEvent::GoalProgress { .. } => "work",
+                            bus::DomainEvent::ActivitySessionCompleted { .. }
+                            | bus::DomainEvent::FocusSessionEnded { .. }
+                            | bus::DomainEvent::DistractionDetected { .. }
+                            | bus::DomainEvent::ProductivityScoreComputed { .. } => "energy",
+                            bus::DomainEvent::TransactionRecorded { .. }
+                            | bus::DomainEvent::BudgetAlert { .. } => "finance",
+                            bus::DomainEvent::UserStatedFact { domain, .. } => domain.as_str(),
+                            bus::DomainEvent::UserCorrectedAI { .. } => "learning",
+                            bus::DomainEvent::CoachingFeedback { .. } => "coaching",
+                        };
+                        let salience_str = match salience {
+                            cognitive::types::SalienceVerdict::Extract => "extract",
+                            cognitive::types::SalienceVerdict::Accumulate => "accumulate",
+                            cognitive::types::SalienceVerdict::Discard => "discard",
+                        };
+                        let payload = desktop_shared::cognitive_commands::DomainEventPayload {
+                            event_type: format!("{:?}", event)
+                                .split('{')
+                                .next()
+                                .unwrap_or("Unknown")
+                                .trim()
+                                .to_string(),
+                            salience: salience_str.to_string(),
+                            domain: domain.to_string(),
+                            timestamp: chrono::Utc::now().to_rfc3339(),
+                            payload: serde_json::to_value(&event).unwrap_or_default(),
+                        };
+                        let sse_event = SseEvent {
+                            event: "cognitive:domain_event".to_string(),
+                            data: serde_json::to_value(&payload).unwrap_or_default(),
+                        };
+                        let mut txs = st.cognitive_sse_senders.lock().await;
+                        txs.retain(|tx| tx.send(sse_event.clone()).is_ok());
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                        tracing::warn!("cognitive SSE forwarder lagged by {n} events");
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                }
+            }
+        });
+    }
+
+    // Spawn pipeline event → SSE forwarder (extraction + consolidation events)
+    {
+        let st = state.clone();
+        tokio::spawn(async move {
+            while let Some(pe) = pipeline_rx.recv().await {
+                let (event_name, data) = match &pe {
+                    cognitive::PipelineEvent::Extraction { .. } => {
+                        ("cognitive:extraction", serde_json::to_value(&pe).unwrap_or_default())
+                    }
+                    cognitive::PipelineEvent::Consolidation { .. } => {
+                        ("cognitive:consolidation", serde_json::to_value(&pe).unwrap_or_default())
+                    }
+                };
+                let sse_event = SseEvent {
+                    event: event_name.to_string(),
+                    data,
+                };
+                let mut txs = st.cognitive_sse_senders.lock().await;
+                txs.retain(|tx| tx.send(sse_event.clone()).is_ok());
+            }
+        });
+    }
+
     let app = Router::new()
         .route("/api/events/{session_key}", axum::routing::get(events_sse))
+        .route(
+            "/api/cognitive/stream",
+            axum::routing::get(cognitive_stream_sse),
+        )
         .route("/api/{cmd}", post(dispatch))
         .nest_service(
             "/attachments",
@@ -234,6 +401,29 @@ async fn events_sse(
 
     // Register this SSE sender
     core.sse_channels.entry(session_key).or_default().push(tx);
+
+    let stream = UnboundedReceiverStream::new(rx).map(|sse_event| {
+        Ok(Event::default()
+            .event(sse_event.event)
+            .json_data(sse_event.data)
+            .unwrap_or_else(|_| Event::default()))
+    });
+
+    Sse::new(stream).keep_alive(KeepAlive::default())
+}
+
+// ── Cognitive SSE endpoint (global, not session-keyed) ────────────────────
+
+async fn cognitive_stream_sse(
+    State(core): State<AppState>,
+) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
+    let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<SseEvent>();
+
+    // Register this sender with the cognitive forwarder
+    {
+        let mut senders = core.cognitive_sse_senders.lock().await;
+        senders.push(tx);
+    }
 
     let stream = UnboundedReceiverStream::new(rx).map(|sse_event| {
         Ok(Event::default()
@@ -2880,14 +3070,34 @@ async fn dispatch(
                 ComponentStatusResponse {
                     name: "Extraction".into(),
                     status: "wired".into(),
-                    handler_type: "heuristic".into(),
-                    notes: "HeuristicExtractionHandler in agent crate".into(),
+                    handler_type: if core.has_cognitive_provider {
+                        "llm"
+                    } else {
+                        "heuristic"
+                    }
+                    .into(),
+                    notes: if core.has_cognitive_provider {
+                        "LlmExtractionHandler in agent crate"
+                    } else {
+                        "HeuristicExtractionHandler in agent crate"
+                    }
+                    .into(),
                 },
                 ComponentStatusResponse {
                     name: "Consolidation".into(),
                     status: "wired".into(),
-                    handler_type: "heuristic".into(),
-                    notes: "HeuristicConsolidationHandler in agent crate".into(),
+                    handler_type: if core.has_cognitive_provider {
+                        "llm"
+                    } else {
+                        "heuristic"
+                    }
+                    .into(),
+                    notes: if core.has_cognitive_provider {
+                        "LlmConsolidationHandler in agent crate"
+                    } else {
+                        "HeuristicConsolidationHandler in agent crate"
+                    }
+                    .into(),
                 },
                 ComponentStatusResponse {
                     name: "FSRS Decay".into(),
@@ -2903,9 +3113,14 @@ async fn dispatch(
                 },
                 ComponentStatusResponse {
                     name: "Reflection".into(),
-                    status: "built".into(),
-                    handler_type: "heuristic".into(),
-                    notes: "ReflectionHandler trait defined, needs scheduling".into(),
+                    status: "wired".into(),
+                    handler_type: if core.has_cognitive_provider {
+                        "llm"
+                    } else {
+                        "heuristic"
+                    }
+                    .into(),
+                    notes: "Scheduled via CronService (Monday 9am)".into(),
                 },
                 ComponentStatusResponse {
                     name: "Context Source".into(),
@@ -2945,27 +3160,67 @@ async fn dispatch(
                 },
                 ComponentStatusResponse {
                     name: "LLM Extraction".into(),
-                    status: "stub".into(),
+                    status: if core.has_cognitive_provider {
+                        "wired"
+                    } else {
+                        "built"
+                    }
+                    .into(),
                     handler_type: "llm".into(),
-                    notes: "Trait defined, not yet implemented".into(),
+                    notes: if core.has_cognitive_provider {
+                        "LlmExtractionHandler active"
+                    } else {
+                        "Built, using heuristic fallback (no cognitive provider)"
+                    }
+                    .into(),
                 },
                 ComponentStatusResponse {
                     name: "LLM Consolidation".into(),
-                    status: "stub".into(),
+                    status: if core.has_cognitive_provider {
+                        "wired"
+                    } else {
+                        "built"
+                    }
+                    .into(),
                     handler_type: "llm".into(),
-                    notes: "Trait defined, not yet implemented".into(),
+                    notes: if core.has_cognitive_provider {
+                        "LlmConsolidationHandler active"
+                    } else {
+                        "Built, using heuristic fallback (no cognitive provider)"
+                    }
+                    .into(),
                 },
                 ComponentStatusResponse {
                     name: "LLM Reflection".into(),
-                    status: "stub".into(),
+                    status: if core.has_cognitive_provider {
+                        "wired"
+                    } else {
+                        "built"
+                    }
+                    .into(),
                     handler_type: "llm".into(),
-                    notes: "ReflectionHandler trait, not yet implemented".into(),
+                    notes: if core.has_cognitive_provider {
+                        "LlmReflectionHandler active"
+                    } else {
+                        "Built, using heuristic fallback (no cognitive provider)"
+                    }
+                    .into(),
                 },
                 ComponentStatusResponse {
                     name: "LLM Coaching Reasoner".into(),
-                    status: "stub".into(),
+                    status: if core.has_cognitive_provider {
+                        "wired"
+                    } else {
+                        "built"
+                    }
+                    .into(),
                     handler_type: "llm".into(),
-                    notes: "CoachingReasonerHandler trait, heuristic fallback exists".into(),
+                    notes: if core.has_cognitive_provider {
+                        "LlmCoachingReasonerHandler active"
+                    } else {
+                        "Built, using heuristic fallback (no cognitive provider)"
+                    }
+                    .into(),
                 },
                 ComponentStatusResponse {
                     name: "Background Consolidation".into(),
@@ -2976,9 +3231,9 @@ async fn dispatch(
             ];
 
             ok(SystemStatusResponse {
-                domain_bus_subscribers: 0,
+                domain_bus_subscribers: core.domain_event_bus.subscriber_count(),
                 domain_bus_published: 0,
-                background_service_running: false,
+                background_service_running: true,
                 background_events_processed: 0,
                 active_facts,
                 episodic_count: 0,
@@ -2986,31 +3241,240 @@ async fn dispatch(
                 components,
             })
         }
-        "coaching_situation" => ok(UserSituationResponse {
-            energy_level: 0.0,
-            focus_state: 0.0,
-            deadline_pressure: 0.0,
-            distraction_risk: 0.0,
-            coaching_receptivity: 0.0,
-            task_avoidance_detected: false,
-            hours_active_today: 0.0,
-            mins_since_break: 0.0,
-            hour_of_day: Local::now().hour(),
-            recent_context_switches: 0,
-        }),
-        "coaching_signals" => ok(SignalWindowResponse {
-            window_size: 0,
-            signals: vec![],
-            triggers: vec![],
-        }),
-        "coaching_patterns" => ok(Vec::<DetectedPatternResponse>::new()),
-        "coaching_feedback_stats" => ok(Vec::<StrategyFeedbackResponse>::new()),
-        "coaching_router_status" => ok(RouterStatusResponse {
-            hourly_count: 0,
-            hourly_limit: 3,
-            daily_count: 0,
-            daily_limit: 10,
-        }),
+        "coaching_situation" => {
+            let sit = core.user_situation.lock().await;
+            ok(UserSituationResponse {
+                energy_level: sit.energy_level,
+                focus_state: sit.focus_state,
+                deadline_pressure: sit.deadline_pressure,
+                distraction_risk: sit.distraction_risk,
+                coaching_receptivity: sit.coaching_receptivity,
+                task_avoidance_detected: sit.task_avoidance_detected,
+                hours_active_today: sit.hours_active_today,
+                mins_since_break: sit.mins_since_break,
+                hour_of_day: Local::now().hour(),
+                recent_context_switches: sit.recent_context_switches,
+            })
+        }
+        "coaching_signals" => {
+            let acc = core.signal_accumulator.lock().await;
+            let last_fired = acc.last_fired();
+            let signals: Vec<SignalResponse> = acc
+                .signals()
+                .iter()
+                .map(|s| SignalResponse {
+                    event_type: s.event_type.clone(),
+                    timestamp: s.timestamp.to_rfc3339(),
+                    metadata: format!(
+                        "app={} task={} cat={}",
+                        s.metadata.app.as_deref().unwrap_or("-"),
+                        s.metadata.task_id.as_deref().unwrap_or("-"),
+                        s.metadata.category.as_deref().unwrap_or("-"),
+                    ),
+                })
+                .collect();
+            let triggers: Vec<TriggerConditionResponse> = acc
+                .condition_names()
+                .iter()
+                .map(|name| {
+                    let last = last_fired.get(*name);
+                    let cooldown_remaining = last
+                        .map(|t| {
+                            let elapsed = (Utc::now() - *t).num_seconds();
+                            (300 - elapsed).max(0) // 300s default cooldown
+                        })
+                        .unwrap_or(0);
+                    TriggerConditionResponse {
+                        name: name.to_string(),
+                        cooldown_remaining_secs: cooldown_remaining,
+                        last_fired: last.map(|t| t.to_rfc3339()),
+                    }
+                })
+                .collect();
+            ok(SignalWindowResponse {
+                window_size: signals.len(),
+                signals,
+                triggers,
+            })
+        }
+        "coaching_patterns" => {
+            let det = core.pattern_detector.lock().await;
+            let patterns: Vec<DetectedPatternResponse> = det
+                .detect_patterns()
+                .iter()
+                .map(|p| DetectedPatternResponse {
+                    name: p.name.clone(),
+                    description: p.description.clone(),
+                    confidence: p.confidence,
+                    signal_count: p.signal_count,
+                    domain: p.domain.clone(),
+                })
+                .collect();
+            ok(patterns)
+        }
+        "coaching_feedback_stats" => {
+            let fb = core.feedback_tracker.lock().await;
+            let stats: Vec<StrategyFeedbackResponse> = fb
+                .all_strategies()
+                .iter()
+                .map(|s| StrategyFeedbackResponse {
+                    strategy_type: s.strategy_type.clone(),
+                    domain: s.domain.clone(),
+                    times_used: s.times_used,
+                    acceptance_rate: s.acceptance_rate(),
+                    effectiveness: s.effectiveness(),
+                    behavioral_positive: s.behavioral_positive,
+                    behavioral_negative: s.behavioral_negative,
+                })
+                .collect();
+            ok(stats)
+        }
+        "coaching_router_status" => {
+            let router = core.intervention_router.lock().await;
+            let (hourly_limit, daily_limit) = router.limits();
+            ok(RouterStatusResponse {
+                hourly_count: router.hourly_count(),
+                hourly_limit,
+                daily_count: router.daily_count(),
+                daily_limit,
+            })
+        }
+        // ── Dev testing endpoints ──────────────────────────────────
+        "coaching_set_situation" => {
+            let mut sit = core.user_situation.lock().await;
+            if let Some(v) = body.get("energy_level").and_then(|v| v.as_f64()) {
+                sit.energy_level = v;
+            }
+            if let Some(v) = body.get("focus_state").and_then(|v| v.as_f64()) {
+                sit.focus_state = v;
+            }
+            if let Some(v) = body.get("coaching_receptivity").and_then(|v| v.as_f64()) {
+                sit.coaching_receptivity = v;
+            }
+            if let Some(v) = body.get("deadline_pressure").and_then(|v| v.as_f64()) {
+                sit.deadline_pressure = v;
+            }
+            if let Some(v) = body.get("distraction_risk").and_then(|v| v.as_f64()) {
+                sit.distraction_risk = v;
+            }
+            if let Some(v) = body.get("hours_active_today").and_then(|v| v.as_f64()) {
+                sit.hours_active_today = v;
+            }
+            ok(serde_json::json!({ "updated": true }))
+        }
+        "cognitive_inject_event" => {
+            let event_type: String = match get_str(&body, "event_type") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let event = match event_type.as_str() {
+                "DistractionDetected" => bus::DomainEvent::DistractionDetected {
+                    app: body
+                        .get("app")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("test-app")
+                        .to_string(),
+                    duration_secs: body
+                        .get("duration_secs")
+                        .and_then(|v| v.as_i64()),
+                    context: body
+                        .get("context")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("dev-api test")
+                        .to_string(),
+                },
+                "FocusSessionEnded" => bus::DomainEvent::FocusSessionEnded {
+                    quality: body
+                        .get("quality")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(0.5),
+                    duration_secs: body
+                        .get("duration_secs")
+                        .and_then(|v| v.as_i64())
+                        .unwrap_or(1500),
+                    interruptions: body
+                        .get("interruptions")
+                        .and_then(|v| v.as_i64())
+                        .unwrap_or(0) as i32,
+                },
+                "TaskDeferred" => bus::DomainEvent::TaskDeferred {
+                    task_id: body
+                        .get("task_id")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("test-task")
+                        .to_string(),
+                    times_deferred: body
+                        .get("times_deferred")
+                        .and_then(|v| v.as_i64())
+                        .unwrap_or(1) as i32,
+                },
+                "BudgetAlert" => bus::DomainEvent::BudgetAlert {
+                    category: body
+                        .get("category")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("general")
+                        .to_string(),
+                    spent: body
+                        .get("spent")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(900.0),
+                    limit: body
+                        .get("limit")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(1000.0),
+                },
+                "ActivitySessionCompleted" => bus::DomainEvent::ActivitySessionCompleted {
+                    date: body
+                        .get("date")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or(&Utc::now().format("%Y-%m-%d").to_string())
+                        .to_string(),
+                    total_active_secs: body
+                        .get("total_active_secs")
+                        .and_then(|v| v.as_i64())
+                        .unwrap_or(300),
+                    productive_secs: body
+                        .get("productive_secs")
+                        .and_then(|v| v.as_i64())
+                        .unwrap_or(240),
+                    distracting_secs: body
+                        .get("distracting_secs")
+                        .and_then(|v| v.as_i64())
+                        .unwrap_or(60),
+                },
+                "ProductivityScoreComputed" => bus::DomainEvent::ProductivityScoreComputed {
+                    date: body
+                        .get("date")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or(&Utc::now().format("%Y-%m-%d").to_string())
+                        .to_string(),
+                    score: body
+                        .get("score")
+                        .and_then(|v| v.as_f64())
+                        .unwrap_or(0.5),
+                },
+                "UserStatedFact" => bus::DomainEvent::UserStatedFact {
+                    domain: body
+                        .get("domain")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("general")
+                        .to_string(),
+                    fact: body
+                        .get("fact")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string(),
+                },
+                other => {
+                    return err(ApiError::new(
+                        "VALIDATION",
+                        format!("unknown event type: {other}. Supported: DistractionDetected, FocusSessionEnded, TaskDeferred, BudgetAlert, ActivitySessionCompleted, ProductivityScoreComputed, UserStatedFact"),
+                    ))
+                }
+            };
+            core.domain_event_bus.publish(event);
+            ok(serde_json::json!({ "injected": true, "event_type": event_type }))
+        }
         "cognitive_fact_create" => {
             let pool = core.repos.pool();
             let fact_repo = cognitive::repos::SemanticFactRepo::new(pool.clone());

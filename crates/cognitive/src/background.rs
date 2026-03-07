@@ -8,6 +8,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use chrono::Utc;
+use serde::Serialize;
 use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
@@ -20,6 +21,23 @@ use crate::extraction::{extract_from_observation, ExtractionHandler};
 use crate::repos::SemanticFactRepo;
 use crate::salience::evaluate_salience;
 use crate::types::{Observation, SalienceVerdict};
+
+/// Debug events emitted by the pipeline for the debug dashboard.
+#[derive(Debug, Clone, Serialize)]
+#[serde(tag = "type")]
+pub enum PipelineEvent {
+    /// An extraction step completed.
+    Extraction {
+        observation: String,
+        #[serde(rename = "factsExtracted")]
+        facts_extracted: usize,
+    },
+    /// A consolidation operation was performed.
+    Consolidation {
+        operation: String,
+        fact: String,
+    },
+}
 
 /// Minimum occurrences of an accumulated event type before promoting to extraction.
 const ACCUMULATE_PROMOTE_THRESHOLD: usize = 5;
@@ -73,6 +91,7 @@ impl BackgroundConsolidationService {
         consolidation: Arc<dyn ConsolidationHandler>,
         repo: SemanticFactRepo,
         cancel: CancellationToken,
+        pipeline_tx: Option<tokio::sync::mpsc::UnboundedSender<PipelineEvent>>,
     ) -> Self {
         let cancel_clone = cancel.clone();
         let handle = tokio::spawn(async move {
@@ -102,12 +121,29 @@ impl BackgroundConsolidationService {
                                         extraction.as_ref(),
                                         &obs,
                                     ).await;
+
+                                    if let Some(tx) = &pipeline_tx {
+                                        let _ = tx.send(PipelineEvent::Extraction {
+                                            observation: obs.content.clone(),
+                                            facts_extracted: facts.len(),
+                                        });
+                                    }
+
                                     if !facts.is_empty() {
-                                        consolidate_batch(
+                                        let ops = consolidate_batch(
                                             &facts,
                                             &repo,
                                             consolidation.as_ref(),
                                         ).await;
+
+                                        if let Some(tx) = &pipeline_tx {
+                                            for (fact, op) in facts.iter().zip(ops.iter()) {
+                                                let _ = tx.send(PipelineEvent::Consolidation {
+                                                    operation: op_to_string(op),
+                                                    fact: format!("{}.{} = {}", fact.subject, fact.predicate, fact.object),
+                                                });
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -135,12 +171,29 @@ impl BackgroundConsolidationService {
                                             extraction.as_ref(),
                                             &summary,
                                         ).await;
+
+                                        if let Some(tx) = &pipeline_tx {
+                                            let _ = tx.send(PipelineEvent::Extraction {
+                                                observation: summary.content.clone(),
+                                                facts_extracted: facts.len(),
+                                            });
+                                        }
+
                                         if !facts.is_empty() {
-                                            consolidate_batch(
+                                            let ops = consolidate_batch(
                                                 &facts,
                                                 &repo,
                                                 consolidation.as_ref(),
                                             ).await;
+
+                                            if let Some(tx) = &pipeline_tx {
+                                                for (fact, op) in facts.iter().zip(ops.iter()) {
+                                                    let _ = tx.send(PipelineEvent::Consolidation {
+                                                        operation: op_to_string(op),
+                                                        fact: format!("{}.{} = {}", fact.subject, fact.predicate, fact.object),
+                                                    });
+                                                }
+                                            }
                                         }
                                         accumulator.remove(&key);
                                     }
@@ -309,6 +362,16 @@ fn event_type_key(event: &DomainEvent) -> String {
         DomainEvent::UserStatedFact { .. } => "UserStatedFact".into(),
         DomainEvent::UserCorrectedAI { .. } => "UserCorrectedAI".into(),
         DomainEvent::CoachingFeedback { .. } => "CoachingFeedback".into(),
+    }
+}
+
+/// Convert a MemoryOp to a string label for the debug dashboard.
+fn op_to_string(op: &crate::types::MemoryOp) -> String {
+    match op {
+        crate::types::MemoryOp::Add { .. } => "ADD".into(),
+        crate::types::MemoryOp::Update { .. } => "UPDATE".into(),
+        crate::types::MemoryOp::Delete { .. } => "DELETE".into(),
+        crate::types::MemoryOp::Noop => "NOOP".into(),
     }
 }
 

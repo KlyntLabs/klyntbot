@@ -1,10 +1,17 @@
 import { Activity, Brain, Cpu, GitBranch, Radio } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { isTauri } from "../../lib/utils";
 import { CoachingTab } from "./tabs/CoachingTab";
 import { EventsTab } from "./tabs/EventsTab";
 import { MemoryTab } from "./tabs/MemoryTab";
 import { PipelineTab } from "./tabs/PipelineTab";
 import { SystemTab } from "./tabs/SystemTab";
+
+const COGNITIVE_SSE_EVENTS = [
+  "cognitive:domain_event",
+  "cognitive:extraction",
+  "cognitive:consolidation",
+];
 
 type DebugTab = "memory" | "coaching" | "events" | "pipeline" | "system";
 
@@ -18,6 +25,25 @@ const tabs: { id: DebugTab; label: string; icon: typeof Brain }[] = [
 
 export function DebugDashboard() {
   const [activeTab, setActiveTab] = useState<DebugTab>("memory");
+
+  // In browser dev mode, connect to cognitive SSE stream and bridge to CustomEvents
+  // so useEvent listeners in child tabs receive domain events.
+  useEffect(() => {
+    if (isTauri) return;
+
+    const es = new EventSource("/api/cognitive/stream");
+    for (const eventName of COGNITIVE_SSE_EVENTS) {
+      es.addEventListener(eventName, (e: MessageEvent) => {
+        try {
+          const payload = JSON.parse(e.data);
+          window.dispatchEvent(new CustomEvent(eventName, { detail: payload }));
+        } catch {
+          // skip malformed events
+        }
+      });
+    }
+    return () => es.close();
+  }, []);
 
   return (
     <div className="flex-1 min-w-0 flex flex-col gap-2 overflow-hidden">

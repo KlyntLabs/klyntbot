@@ -269,7 +269,7 @@ fn consolidation_schema() -> serde_json::Value {
             "reasoning": { "type": "string" },
             "confidence": { "type": "number" }
         },
-        "required": ["action", "reasoning", "confidence"],
+        "required": ["action", "target_id", "reasoning", "confidence"],
         "additionalProperties": false
     })
 }
@@ -593,7 +593,7 @@ fn coaching_schema() -> serde_json::Value {
             "reasoning": { "type": "string" },
             "observations": { "type": "array", "items": { "type": "string" } }
         },
-        "required": ["should_intervene", "confidence", "intervention_type", "reasoning", "observations"],
+        "required": ["should_intervene", "confidence", "message", "intervention_type", "reasoning", "observations"],
         "additionalProperties": false
     })
 }

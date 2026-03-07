@@ -70,6 +70,10 @@ pub struct AppCore {
     feedback_tracker: Option<Arc<Mutex<FeedbackTracker>>>,
     /// Cached user situation.
     user_situation: Option<Arc<Mutex<UserSituation>>>,
+    /// Coaching service — processes domain events through coaching pipeline.
+    coaching_service: Option<Arc<Mutex<feature_coaching::CoachingService>>>,
+    /// Whether a cognitive LLM provider is active (affects component status reporting).
+    pub has_cognitive_provider: bool,
 }
 
 impl AppCore {
@@ -151,12 +155,24 @@ impl AppCore {
         // 7. DomainEventBus for cross-feature communication (cognitive + coaching)
         let domain_event_bus = Arc::new(DomainEventBus::new(256));
 
+        // 7b. Create cognitive provider for LLM-backed handlers
+        let cognitive_provider = providers::create_cognitive_provider(&config).ok().flatten();
+        if cognitive_provider.is_some() {
+            info!("cognitive provider created — using LLM handlers");
+        } else {
+            info!("no cognitive provider — using heuristic handlers");
+        }
+
         // 8. Build AgentLoop
+        let (pipeline_tx, mut pipeline_rx) =
+            tokio::sync::mpsc::unbounded_channel::<cognitive::PipelineEvent>();
         let mut builder = AgentLoop::builder(bus.clone(), provider, config.clone())
             .with_pool(storage_pool.inner().clone())
             .with_cron_service(cron_service.clone())
             .with_notification_handle(notification_dispatcher.last_active_handle())
-            .with_domain_bus(Arc::clone(&domain_event_bus));
+            .with_domain_bus(Arc::clone(&domain_event_bus))
+            .with_cognitive_provider(cognitive_provider.clone())
+            .with_pipeline_tx(pipeline_tx);
 
         if let Some(vs) = vector_store {
             builder = builder.with_vector_store(vs);
@@ -350,7 +366,54 @@ impl AppCore {
         let pattern_detector = Arc::new(Mutex::new(PatternDetector::new()));
         let intervention_router = Arc::new(Mutex::new(InterventionRouter::new(Default::default())));
         let feedback_tracker = Arc::new(Mutex::new(FeedbackTracker::new()));
-        let user_situation = Arc::new(Mutex::new(UserSituation::default()));
+        let user_situation = Arc::new(Mutex::new(UserSituation {
+            energy_level: 0.7,
+            focus_state: 0.5,
+            coaching_receptivity: 0.7,
+            ..Default::default()
+        }));
+
+        // Start CoachingService — processes domain events through coaching pipeline
+        let coaching_reasoner: Arc<dyn feature_coaching::CoachingReasonerHandler> =
+            if let Some(ref cp) = cognitive_provider {
+                let params = providers::cognitive_chat_params(&config, 1024);
+                Arc::new(agent::cognitive_handlers::LlmCoachingReasonerHandler::new(
+                    cp.clone(),
+                    params,
+                ))
+            } else {
+                Arc::new(agent::cognitive_handlers::HeuristicCoachingReasonerHandler)
+            };
+
+        let coaching_cancel = shutdown_token.child_token();
+        let (intervention_tx, intervention_rx) =
+            mpsc::channel::<feature_coaching::router::DeliveredIntervention>(64);
+        let coaching_service = feature_coaching::CoachingService::start(
+            domain_event_bus.subscribe(),
+            signal_accumulator.clone(),
+            pattern_detector.clone(),
+            intervention_router.clone(),
+            feedback_tracker.clone(),
+            user_situation.clone(),
+            coaching_reasoner,
+            intervention_tx,
+            coaching_cancel,
+        );
+        info!("coaching service started");
+
+        // Forward coaching interventions to Tauri frontend
+        Self::spawn_channel_forwarder(
+            intervention_rx,
+            &app_handle,
+            &shutdown_token,
+            |handle, intervention| {
+                if let Err(e) =
+                    handle.emit(desktop_shared::events::COACHING_INTERVENTION, &intervention)
+                {
+                    warn!("failed to emit coaching intervention: {e}");
+                }
+            },
+        );
 
         // Forward domain events to frontend for debug dashboard
         {
@@ -404,6 +467,20 @@ impl AppCore {
             });
         }
 
+        // Forward pipeline events (extraction + consolidation) to frontend
+        {
+            let app_handle_clone = app_handle.clone();
+            tokio::spawn(async move {
+                while let Some(pe) = pipeline_rx.recv().await {
+                    let event_name = match &pe {
+                        cognitive::PipelineEvent::Extraction { .. } => "cognitive:extraction",
+                        cognitive::PipelineEvent::Consolidation { .. } => "cognitive:consolidation",
+                    };
+                    let _ = app_handle_clone.emit(event_name, &pe);
+                }
+            });
+        }
+
         let core = Self {
             repos,
             agent: Arc::clone(&agent),
@@ -428,6 +505,8 @@ impl AppCore {
             intervention_router: Some(intervention_router),
             feedback_tracker: Some(feedback_tracker),
             user_situation: Some(user_situation),
+            coaching_service: Some(Arc::new(Mutex::new(coaching_service))),
+            has_cognitive_provider: cognitive_provider.is_some(),
         };
 
         // Spawn background services immediately
@@ -569,6 +648,10 @@ impl AppCore {
         if let Some(ref nudge) = self.nudge_service {
             nudge.lock().await.stop().await;
         }
+        // Stop coaching service.
+        if let Some(ref coaching) = self.coaching_service {
+            coaching.lock().await.stop().await;
+        }
         if let Err(e) = self.agent.shutdown().await {
             error!("agent shutdown error: {}", e);
         }
@@ -698,6 +781,10 @@ impl AppCore {
                                 "__klyntbot_finance_health_check" => {
                                     ("finance_health_check", "Run finance data health check")
                                 }
+                                "__klyntbot_cognitive_weekly_reflection" => (
+                                    "cognitive_reflection",
+                                    "Run weekly cognitive reflection and consolidate learnings",
+                                ),
                                 _ => return Ok(None),
                             };
                             let msg = bus::InboundMessage::new(
@@ -785,6 +872,23 @@ impl AppCore {
                     "Generate daily planning notification"
                 );
             }
+        }
+
+        // Weekly cognitive reflection
+        {
+            let reflection_schedule = config
+                .cognitive
+                .reflection_schedule
+                .as_deref()
+                .unwrap_or("0 9 * * 1"); // Monday 9am default
+            ensure_job!(
+                "__klyntbot_cognitive_weekly_reflection",
+                scheduling::CronSchedule::Cron {
+                    expr: reflection_schedule.to_string(),
+                    tz: Some(config.timezone.clone()),
+                },
+                "Weekly cognitive reflection"
+            );
         }
 
         // Finance cron jobs

@@ -284,6 +284,7 @@ pub struct NudgePayload {
     pub message: String,
 }
 
+pub const COACHING_INTERVENTION: &str = "coaching:intervention";
 pub const DISTRACTION_INTERVENTION: &str = "distraction:intervention";
 pub const DISTRACTION_VERDICT: &str = "distraction:verdict";
 

@@ -197,6 +197,20 @@ impl InterventionRouter {
             .filter(|d| d.delivered_at > hour_ago)
             .count()
     }
+
+    /// Get the count of interventions delivered in the last 24 hours.
+    pub fn daily_count(&self) -> usize {
+        let day_ago = Utc::now() - chrono::Duration::hours(24);
+        self.recent_deliveries
+            .iter()
+            .filter(|d| d.delivered_at > day_ago)
+            .count()
+    }
+
+    /// Get the configured rate limits.
+    pub fn limits(&self) -> (usize, usize) {
+        (self.config.max_per_hour, self.config.max_per_day)
+    }
 }
 
 impl Default for InterventionRouter {

@@ -252,6 +252,7 @@ fn main() {
             commands::cognitive::cognitive_run_compaction,
             commands::cognitive::coaching_reset_dismissals,
             commands::cognitive::coaching_clear_signals,
+            commands::cognitive::cognitive_inject_event,
             // Status
             commands::status::agent_status,
             // Window

@@ -58,6 +58,7 @@ pub struct AgentLoopBuilder {
     notification_handle: Option<LastActiveChannel>,
     domain_event_bus: Option<Arc<bus::DomainEventBus>>,
     cognitive_provider: Option<DynProvider>,
+    pipeline_tx: Option<tokio::sync::mpsc::UnboundedSender<cognitive::PipelineEvent>>,
 }
 
 impl AgentLoopBuilder {
@@ -72,6 +73,7 @@ impl AgentLoopBuilder {
             notification_handle: None,
             domain_event_bus: None,
             cognitive_provider: None,
+            pipeline_tx: None,
         }
     }
 
@@ -105,8 +107,16 @@ impl AgentLoopBuilder {
         self
     }
 
+    pub fn with_pipeline_tx(
+        mut self,
+        tx: tokio::sync::mpsc::UnboundedSender<cognitive::PipelineEvent>,
+    ) -> Self {
+        self.pipeline_tx = Some(tx);
+        self
+    }
+
     /// Consume the builder and construct an [`AgentLoop`].
-    pub async fn build(self) -> Result<AgentLoop> {
+    pub async fn build(mut self) -> Result<AgentLoop> {
         let bus = self.bus;
         let provider = self.provider;
         let config = self.config;
@@ -267,6 +277,7 @@ impl AgentLoopBuilder {
                         consolidation,
                         fact_repo,
                         cancel.clone(),
+                        self.pipeline_tx.take(),
                     );
                     info!("Cognitive background consolidation service started");
                     Some(bg_service)

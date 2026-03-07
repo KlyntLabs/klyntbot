@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use bus;
+use chrono::Timelike;
 use cognitive::decay::retrievability;
 use cognitive::repos::{load_user_model, SemanticFactRepo, RULE_DOMAINS, USER_MODEL_DOMAINS};
 use cognitive::types::{ProceduralRule, SemanticFact};
@@ -62,10 +64,6 @@ fn rule_to_response(r: &ProceduralRule) -> ProceduralRuleResponse {
         created_at: r.created_at.clone(),
         updated_at: r.updated_at.clone(),
     }
-}
-
-fn active_fact_count(model: &cognitive::types::UserModel) -> usize {
-    model.active_fact_count()
 }
 
 fn fact_preview(fact: &SemanticFact) -> String {
@@ -202,7 +200,7 @@ pub async fn cognitive_memory_stats(
     let rule_repo = cognitive::repos::ProceduralRuleRepo::new(pool.clone());
 
     let model = load_user_model(&fact_repo).await;
-    let active_facts = active_fact_count(&model);
+    let active_facts = model.active_fact_count();
 
     // TODO: add a `count_archived()` query to SemanticFactRepo — archive_superseded() is
     // a destructive mutation and must NOT be used for reads.
@@ -247,7 +245,7 @@ pub async fn coaching_situation(
         task_avoidance_detected: sit.task_avoidance_detected,
         hours_active_today: sit.hours_active_today,
         mins_since_break: sit.mins_since_break,
-        hour_of_day: sit.hour_of_day,
+        hour_of_day: chrono::Local::now().hour(),
         recent_context_switches: sit.recent_context_switches,
     })
 }
@@ -257,11 +255,43 @@ pub async fn coaching_signals(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<SignalWindowResponse, ApiError> {
     let acc = state.signal_accumulator()?.lock().await;
-
+    let last_fired = acc.last_fired();
+    let signals: Vec<SignalResponse> = acc
+        .signals()
+        .iter()
+        .map(|s| SignalResponse {
+            event_type: s.event_type.clone(),
+            timestamp: s.timestamp.to_rfc3339(),
+            metadata: format!(
+                "app={} task={} cat={}",
+                s.metadata.app.as_deref().unwrap_or("-"),
+                s.metadata.task_id.as_deref().unwrap_or("-"),
+                s.metadata.category.as_deref().unwrap_or("-"),
+            ),
+        })
+        .collect();
+    let triggers: Vec<TriggerConditionResponse> = acc
+        .condition_names()
+        .iter()
+        .map(|name| {
+            let last = last_fired.get(*name);
+            let cooldown_remaining = last
+                .map(|t| {
+                    let elapsed = (chrono::Utc::now() - *t).num_seconds();
+                    (300 - elapsed).max(0)
+                })
+                .unwrap_or(0);
+            TriggerConditionResponse {
+                name: name.to_string(),
+                cooldown_remaining_secs: cooldown_remaining,
+                last_fired: last.map(|t| t.to_rfc3339()),
+            }
+        })
+        .collect();
     Ok(SignalWindowResponse {
-        window_size: acc.window_size(),
-        signals: vec![],
-        triggers: vec![],
+        window_size: signals.len(),
+        signals,
+        triggers,
     })
 }
 
@@ -310,12 +340,13 @@ pub async fn coaching_router_status(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<RouterStatusResponse, ApiError> {
     let router = state.intervention_router()?.lock().await;
+    let (hourly_limit, daily_limit) = router.limits();
 
     Ok(RouterStatusResponse {
         hourly_count: router.hourly_count(),
-        hourly_limit: 3,
-        daily_count: 0, // TODO: expose daily_count on InterventionRouter
-        daily_limit: 10,
+        hourly_limit,
+        daily_count: router.daily_count(),
+        daily_limit,
     })
 }
 
@@ -328,7 +359,8 @@ pub async fn cognitive_system_status(
     let pool = state.repos.pool();
     let fact_repo = SemanticFactRepo::new(pool.clone());
     let model = load_user_model(&fact_repo).await;
-    let active_facts = active_fact_count(&model);
+    let active_facts = model.active_fact_count();
+    let has_llm = state.has_cognitive_provider;
 
     let components = vec![
         ComponentStatusResponse {
@@ -346,14 +378,24 @@ pub async fn cognitive_system_status(
         ComponentStatusResponse {
             name: "Extraction".into(),
             status: "wired".into(),
-            handler_type: "heuristic".into(),
-            notes: "HeuristicExtractionHandler in agent crate".into(),
+            handler_type: if has_llm { "llm" } else { "heuristic" }.into(),
+            notes: if has_llm {
+                "LlmExtractionHandler in agent crate"
+            } else {
+                "HeuristicExtractionHandler in agent crate"
+            }
+            .into(),
         },
         ComponentStatusResponse {
             name: "Consolidation".into(),
             status: "wired".into(),
-            handler_type: "heuristic".into(),
-            notes: "HeuristicConsolidationHandler in agent crate".into(),
+            handler_type: if has_llm { "llm" } else { "heuristic" }.into(),
+            notes: if has_llm {
+                "LlmConsolidationHandler in agent crate"
+            } else {
+                "HeuristicConsolidationHandler in agent crate"
+            }
+            .into(),
         },
         ComponentStatusResponse {
             name: "FSRS Decay".into(),
@@ -369,9 +411,9 @@ pub async fn cognitive_system_status(
         },
         ComponentStatusResponse {
             name: "Reflection".into(),
-            status: "built".into(),
-            handler_type: "heuristic".into(),
-            notes: "ReflectionHandler trait defined, needs scheduling".into(),
+            status: "wired".into(),
+            handler_type: if has_llm { "llm" } else { "heuristic" }.into(),
+            notes: "Scheduled via CronService (Monday 9am)".into(),
         },
         ComponentStatusResponse {
             name: "Context Source".into(),
@@ -411,27 +453,47 @@ pub async fn cognitive_system_status(
         },
         ComponentStatusResponse {
             name: "LLM Extraction".into(),
-            status: "stub".into(),
+            status: if has_llm { "wired" } else { "built" }.into(),
             handler_type: "llm".into(),
-            notes: "Trait defined, not yet implemented".into(),
+            notes: if has_llm {
+                "LlmExtractionHandler active"
+            } else {
+                "Built, using heuristic fallback (no cognitive provider)"
+            }
+            .into(),
         },
         ComponentStatusResponse {
             name: "LLM Consolidation".into(),
-            status: "stub".into(),
+            status: if has_llm { "wired" } else { "built" }.into(),
             handler_type: "llm".into(),
-            notes: "Trait defined, not yet implemented".into(),
+            notes: if has_llm {
+                "LlmConsolidationHandler active"
+            } else {
+                "Built, using heuristic fallback (no cognitive provider)"
+            }
+            .into(),
         },
         ComponentStatusResponse {
             name: "LLM Reflection".into(),
-            status: "stub".into(),
+            status: if has_llm { "wired" } else { "built" }.into(),
             handler_type: "llm".into(),
-            notes: "ReflectionHandler trait, not yet implemented".into(),
+            notes: if has_llm {
+                "LlmReflectionHandler active"
+            } else {
+                "Built, using heuristic fallback (no cognitive provider)"
+            }
+            .into(),
         },
         ComponentStatusResponse {
             name: "LLM Coaching Reasoner".into(),
-            status: "stub".into(),
+            status: if has_llm { "wired" } else { "built" }.into(),
             handler_type: "llm".into(),
-            notes: "CoachingReasonerHandler trait, heuristic fallback exists".into(),
+            notes: if has_llm {
+                "LlmCoachingReasonerHandler active"
+            } else {
+                "Built, using heuristic fallback (no cognitive provider)"
+            }
+            .into(),
         },
         ComponentStatusResponse {
             name: "Background Consolidation".into(),
@@ -441,8 +503,13 @@ pub async fn cognitive_system_status(
         },
     ];
 
+    let bus_subscribers = state
+        .domain_event_bus()
+        .map(|b| b.subscriber_count())
+        .unwrap_or(0);
+
     Ok(SystemStatusResponse {
-        domain_bus_subscribers: 0, // TODO: expose subscriber_count on DomainEventBus
+        domain_bus_subscribers: bus_subscribers,
         domain_bus_published: 0,
         background_service_running: true,
         background_events_processed: 0,
@@ -621,5 +688,70 @@ pub async fn coaching_reset_dismissals(
 pub async fn coaching_clear_signals(state: State<'_, Arc<AppCore>>) -> Result<bool, ApiError> {
     let mut acc = state.signal_accumulator()?.lock().await;
     *acc = feature_coaching::SignalAccumulator::new();
+    Ok(true)
+}
+
+#[tauri::command]
+pub async fn cognitive_inject_event(
+    state: State<'_, Arc<AppCore>>,
+    event_type: String,
+    payload: serde_json::Value,
+) -> Result<bool, ApiError> {
+    let bus = state.domain_event_bus()?;
+    let event = match event_type.as_str() {
+        "UserStatedFact" => bus::DomainEvent::UserStatedFact {
+            fact: payload["fact"].as_str().unwrap_or("").to_string(),
+            domain: payload["domain"].as_str().unwrap_or("general").to_string(),
+        },
+        "UserCorrectedAI" => bus::DomainEvent::UserCorrectedAI {
+            original: payload["original"].as_str().unwrap_or("").to_string(),
+            correction: payload["correction"].as_str().unwrap_or("").to_string(),
+        },
+        "BudgetAlert" => bus::DomainEvent::BudgetAlert {
+            category: payload["category"].as_str().unwrap_or("general").to_string(),
+            spent: payload["spent"].as_f64().unwrap_or(0.0),
+            limit: payload["limit"].as_f64().unwrap_or(0.0),
+        },
+        "DistractionDetected" => bus::DomainEvent::DistractionDetected {
+            app: payload["app"].as_str().unwrap_or("unknown").to_string(),
+            duration_secs: payload["duration_secs"].as_i64(),
+            context: payload["context"].as_str().unwrap_or("").to_string(),
+        },
+        "FocusSessionEnded" => bus::DomainEvent::FocusSessionEnded {
+            quality: payload["quality"].as_f64().unwrap_or(0.5),
+            duration_secs: payload["duration_secs"].as_i64().unwrap_or(1500),
+            interruptions: payload["interruptions"].as_i64().unwrap_or(0) as i32,
+        },
+        "TaskDeferred" => bus::DomainEvent::TaskDeferred {
+            task_id: payload["task_id"]
+                .as_str()
+                .unwrap_or("test-task")
+                .to_string(),
+            times_deferred: payload["times_deferred"].as_i64().unwrap_or(1) as i32,
+        },
+        "ActivitySessionCompleted" => bus::DomainEvent::ActivitySessionCompleted {
+            date: payload["date"]
+                .as_str()
+                .unwrap_or(&chrono::Utc::now().format("%Y-%m-%d").to_string())
+                .to_string(),
+            total_active_secs: payload["total_active_secs"].as_i64().unwrap_or(300),
+            productive_secs: payload["productive_secs"].as_i64().unwrap_or(240),
+            distracting_secs: payload["distracting_secs"].as_i64().unwrap_or(60),
+        },
+        "ProductivityScoreComputed" => bus::DomainEvent::ProductivityScoreComputed {
+            date: payload["date"]
+                .as_str()
+                .unwrap_or(&chrono::Utc::now().format("%Y-%m-%d").to_string())
+                .to_string(),
+            score: payload["score"].as_f64().unwrap_or(0.0),
+        },
+        other => {
+            return Err(ApiError::new(
+                "VALIDATION",
+                format!("unknown event type: {other}"),
+            ));
+        }
+    };
+    bus.publish(event);
     Ok(true)
 }
