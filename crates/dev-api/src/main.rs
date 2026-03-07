@@ -447,6 +447,7 @@ fn action_to_task(
         subtask_completed_count,
         status_label_id: row.status_label_id.clone(),
         status_label: None,
+        group_id: row.group_id.clone(),
     }
 }
 
@@ -665,20 +666,17 @@ async fn dispatch(
             // Auto-assign status_label_id if not provided
             let status_label_id = match params.status_label_id {
                 Some(id) => Some(id),
-                None => {
-                    match core.repos.status_workflows.get_global_default().await {
-                        Ok(Some(wf)) => {
-                            core.repos
-                                .status_workflows
-                                .find_label_by_group(&wf.id, "not_started")
-                                .await
-                                .ok()
-                                .flatten()
-                                .map(|l| l.id)
-                        }
-                        _ => None,
-                    }
-                }
+                None => match core.repos.status_workflows.get_global_default().await {
+                    Ok(Some(wf)) => core
+                        .repos
+                        .status_workflows
+                        .find_label_by_group(&wf.id, "not_started")
+                        .await
+                        .ok()
+                        .flatten()
+                        .map(|l| l.id),
+                    _ => None,
+                },
             };
             let row = storage::ActionRow {
                 id: id.clone(),
@@ -708,6 +706,7 @@ async fn dispatch(
                 next_instance_date: None,
                 status_label_id,
                 position: 0,
+                group_id: params.group_id,
             };
             match core.repos.actions.add(&row).await {
                 Ok(created) => ok(action_to_task(&created, 0, 0)),
@@ -732,6 +731,7 @@ async fn dispatch(
                 project_id: params.project_id,
                 key_result_id: params.key_result_id,
                 status_label_id: params.status_label_id,
+                group_id: params.group_id,
                 ..Default::default()
             };
             match core.repos.actions.update(&patch).await {
@@ -967,15 +967,18 @@ async fn dispatch(
         "workflow_get_effective" => {
             let project_id: Option<String> = get(&body, "projectId");
             let project_workflow_id = match project_id {
-                Some(ref pid) => {
-                    match core.repos.projects.get(pid).await {
-                        Ok(Some(proj)) => proj.workflow_id,
-                        _ => None,
-                    }
-                }
+                Some(ref pid) => match core.repos.projects.get(pid).await {
+                    Ok(Some(proj)) => proj.workflow_id,
+                    _ => None,
+                },
                 None => None,
             };
-            match core.repos.status_workflows.get_effective_labels(project_workflow_id.as_deref()).await {
+            match core
+                .repos
+                .status_workflows
+                .get_effective_labels(project_workflow_id.as_deref())
+                .await
+            {
                 Ok(labels) => ok(labels
                     .into_iter()
                     .map(label_to_response)
@@ -1106,6 +1109,131 @@ async fn dispatch(
                 .repos
                 .status_workflows
                 .reorder_labels(&workflow_id, &label_ids)
+                .await
+            {
+                Ok(()) => ok(()),
+                Err(e) => err(storage_err(e)),
+            }
+        }
+
+        // ── Task Groups ──────────────────────────────────────
+        "group_list" => {
+            let project_id: Option<String> = get(&body, "projectId");
+            match core.repos.task_groups.list(project_id.as_deref()).await {
+                Ok(rows) => {
+                    let mut results = Vec::new();
+                    for row in &rows {
+                        let count = core
+                            .repos
+                            .task_groups
+                            .count_tasks(&row.id)
+                            .await
+                            .unwrap_or(0);
+                        results.push(TaskGroupResponse {
+                            id: row.id.clone(),
+                            project_id: row.project_id.clone(),
+                            name: row.name.clone(),
+                            color: row.color.clone(),
+                            position: row.position,
+                            task_count: count,
+                        });
+                    }
+                    ok(results)
+                }
+                Err(e) => err(storage_err(e)),
+            }
+        }
+        "group_create" => {
+            let params: TaskGroupCreateParams =
+                match serde_json::from_value(body.get("params").cloned().unwrap_or(body.clone())) {
+                    Ok(p) => p,
+                    Err(e) => return err(ApiError::new("VALIDATION", e.to_string())),
+                };
+            let existing = core
+                .repos
+                .task_groups
+                .list(params.project_id.as_deref())
+                .await
+                .unwrap_or_default();
+            let position = existing.len() as i32;
+            match core
+                .repos
+                .task_groups
+                .create(
+                    params.project_id.as_deref(),
+                    &params.name,
+                    params.color.as_deref(),
+                    position,
+                )
+                .await
+            {
+                Ok(row) => ok(TaskGroupResponse {
+                    id: row.id,
+                    project_id: row.project_id,
+                    name: row.name,
+                    color: row.color,
+                    position: row.position,
+                    task_count: 0,
+                }),
+                Err(e) => err(storage_err(e)),
+            }
+        }
+        "group_update" => {
+            let params: TaskGroupUpdateParams =
+                match serde_json::from_value(body.get("params").cloned().unwrap_or(body.clone())) {
+                    Ok(p) => p,
+                    Err(e) => return err(ApiError::new("VALIDATION", e.to_string())),
+                };
+            match core
+                .repos
+                .task_groups
+                .update(
+                    &params.id,
+                    params.name.as_deref(),
+                    params.color.as_deref(),
+                    params.position,
+                )
+                .await
+            {
+                Ok(row) => {
+                    let count = core
+                        .repos
+                        .task_groups
+                        .count_tasks(&row.id)
+                        .await
+                        .unwrap_or(0);
+                    ok(TaskGroupResponse {
+                        id: row.id,
+                        project_id: row.project_id,
+                        name: row.name,
+                        color: row.color,
+                        position: row.position,
+                        task_count: count,
+                    })
+                }
+                Err(e) => err(storage_err(e)),
+            }
+        }
+        "group_delete" => {
+            let id = match get_str(&body, "id") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            match core.repos.task_groups.delete(&id).await {
+                Ok(deleted) => ok(deleted),
+                Err(e) => err(storage_err(e)),
+            }
+        }
+        "group_reorder" => {
+            let params: TaskGroupReorderParams =
+                match serde_json::from_value(body.get("params").cloned().unwrap_or(body.clone())) {
+                    Ok(p) => p,
+                    Err(e) => return err(ApiError::new("VALIDATION", e.to_string())),
+                };
+            match core
+                .repos
+                .task_groups
+                .reorder(params.project_id.as_deref(), &params.group_ids)
                 .await
             {
                 Ok(()) => ok(()),
@@ -2915,6 +3043,213 @@ async fn dispatch(
             };
             match core.note_repo.delete_notebook(&id).await {
                 Ok(d) => ok(d),
+                Err(e) => err(storage_err(e)),
+            }
+        }
+
+        // ── Custom Columns ─────────────────────────────────────
+        "custom_column_list" => {
+            let project_id = match get_str(&body, "projectId") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            match core.repos.custom_columns.list_columns(&project_id).await {
+                Ok(rows) => {
+                    let results: Vec<CustomColumnResponse> = rows
+                        .iter()
+                        .map(|r| {
+                            let options: Option<Vec<String>> = r
+                                .options_json
+                                .as_deref()
+                                .and_then(|s| serde_json::from_str(s).ok());
+                            CustomColumnResponse {
+                                id: r.id.clone(),
+                                project_id: r.project_id.clone(),
+                                name: r.name.clone(),
+                                column_type: r.column_type.clone(),
+                                options,
+                                position: r.position,
+                                width: r.width.unwrap_or(150),
+                            }
+                        })
+                        .collect();
+                    ok(results)
+                }
+                Err(e) => err(storage_err(e)),
+            }
+        }
+        "custom_column_create" => {
+            let params: ColumnCreateParams =
+                match serde_json::from_value(body.get("params").cloned().unwrap_or(body.clone())) {
+                    Ok(p) => p,
+                    Err(e) => return err(ApiError::new("VALIDATION", e.to_string())),
+                };
+            let existing = core
+                .repos
+                .custom_columns
+                .list_columns(&params.project_id)
+                .await
+                .unwrap_or_default();
+            let position = existing.len() as i32;
+            let id = format!("cc_{}", &uuid::Uuid::new_v4().to_string()[..8]);
+            let options_json = params
+                .options
+                .as_ref()
+                .map(|opts| serde_json::to_string(opts).unwrap_or_default());
+            let row = storage::CustomColumnRow {
+                id,
+                project_id: params.project_id,
+                name: params.name,
+                column_type: params.column_type,
+                options_json: options_json.clone(),
+                position,
+                width: params.width.or(Some(150)),
+                created_at: Utc::now(),
+            };
+            match core.repos.custom_columns.create_column(&row).await {
+                Ok(created) => {
+                    let options: Option<Vec<String>> = created
+                        .options_json
+                        .as_deref()
+                        .and_then(|s| serde_json::from_str(s).ok());
+                    ok(CustomColumnResponse {
+                        id: created.id,
+                        project_id: created.project_id,
+                        name: created.name,
+                        column_type: created.column_type,
+                        options,
+                        position: created.position,
+                        width: created.width.unwrap_or(150),
+                    })
+                }
+                Err(e) => err(storage_err(e)),
+            }
+        }
+        "custom_column_update" => {
+            let params: ColumnUpdateParams =
+                match serde_json::from_value(body.get("params").cloned().unwrap_or(body.clone())) {
+                    Ok(p) => p,
+                    Err(e) => return err(ApiError::new("VALIDATION", e.to_string())),
+                };
+            let serialized_options = params
+                .options
+                .as_ref()
+                .map(|opt| opt.as_ref().map(|v| serde_json::to_string(v).unwrap_or_default()));
+            let options_json: Option<Option<&str>> = serialized_options
+                .as_ref()
+                .map(|opt| opt.as_deref());
+            match core
+                .repos
+                .custom_columns
+                .update_column(
+                    &params.id,
+                    params.name.as_deref(),
+                    options_json,
+                    params.width,
+                )
+                .await
+            {
+                Ok(updated) => {
+                    let options: Option<Vec<String>> = updated
+                        .options_json
+                        .as_deref()
+                        .and_then(|s| serde_json::from_str(s).ok());
+                    ok(CustomColumnResponse {
+                        id: updated.id,
+                        project_id: updated.project_id,
+                        name: updated.name,
+                        column_type: updated.column_type,
+                        options,
+                        position: updated.position,
+                        width: updated.width.unwrap_or(150),
+                    })
+                }
+                Err(e) => err(storage_err(e)),
+            }
+        }
+        "custom_column_delete" => {
+            let id = match get_str(&body, "id") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            match core.repos.custom_columns.delete_column(&id).await {
+                Ok(deleted) => ok(deleted),
+                Err(e) => err(storage_err(e)),
+            }
+        }
+        "custom_column_reorder" => {
+            let params: ColumnReorderParams =
+                match serde_json::from_value(body.get("params").cloned().unwrap_or(body.clone())) {
+                    Ok(p) => p,
+                    Err(e) => return err(ApiError::new("VALIDATION", e.to_string())),
+                };
+            match core
+                .repos
+                .custom_columns
+                .reorder_columns(&params.project_id, &params.ids)
+                .await
+            {
+                Ok(()) => ok(()),
+                Err(e) => err(storage_err(e)),
+            }
+        }
+        "custom_column_values" => {
+            let task_id = match get_str(&body, "taskId") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            match core.repos.custom_columns.get_values(&task_id).await {
+                Ok(rows) => {
+                    let results: Vec<CustomColumnValueResponse> = rows
+                        .iter()
+                        .map(|r| {
+                            let value: serde_json::Value =
+                                serde_json::from_str(&r.value_json).unwrap_or(serde_json::Value::Null);
+                            CustomColumnValueResponse {
+                                task_id: r.task_id.clone(),
+                                column_id: r.column_id.clone(),
+                                value,
+                            }
+                        })
+                        .collect();
+                    ok(results)
+                }
+                Err(e) => err(storage_err(e)),
+            }
+        }
+        "custom_column_value_set" => {
+            let params: ColumnValueSetParams =
+                match serde_json::from_value(body.get("params").cloned().unwrap_or(body.clone())) {
+                    Ok(p) => p,
+                    Err(e) => return err(ApiError::new("VALIDATION", e.to_string())),
+                };
+            let value_json = serde_json::to_string(&params.value).unwrap_or_default();
+            match core
+                .repos
+                .custom_columns
+                .set_value(&params.task_id, &params.column_id, &value_json)
+                .await
+            {
+                Ok(()) => ok(()),
+                Err(e) => err(storage_err(e)),
+            }
+        }
+        "custom_column_value_delete" => {
+            let task_id = match get_str(&body, "taskId") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let column_id = match get_str(&body, "columnId") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            match core
+                .repos
+                .custom_columns
+                .delete_value(&task_id, &column_id)
+                .await
+            {
+                Ok(deleted) => ok(deleted),
                 Err(e) => err(storage_err(e)),
             }
         }

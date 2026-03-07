@@ -1,7 +1,9 @@
 pub mod areas;
 pub mod chat;
+pub mod columns;
 pub mod distraction;
 pub mod finance;
+pub mod groups;
 pub mod key_results;
 pub mod notes;
 pub mod objectives;

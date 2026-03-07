@@ -242,6 +242,21 @@ fn main() {
             commands::workflows::label_update,
             commands::workflows::label_delete,
             commands::workflows::label_reorder,
+            // Groups
+            commands::groups::group_list,
+            commands::groups::group_create,
+            commands::groups::group_update,
+            commands::groups::group_delete,
+            commands::groups::group_reorder,
+            // Custom Columns
+            commands::columns::custom_column_list,
+            commands::columns::custom_column_create,
+            commands::columns::custom_column_update,
+            commands::columns::custom_column_delete,
+            commands::columns::custom_column_reorder,
+            commands::columns::custom_column_values,
+            commands::columns::custom_column_value_set,
+            commands::columns::custom_column_value_delete,
             // Status
             commands::status::agent_status,
             // Window

@@ -697,6 +697,64 @@ export type InsightPayload = Pick<InsightCard, "id" | "insightType" | "title" | 
 
 export type ProductivityPeriod = "day" | "week" | "month";
 
+// ── Custom Columns ──────────────────────────────────────────────────────
+
+export type ColumnType =
+  | "text"
+  | "number"
+  | "date"
+  | "dropdown"
+  | "multi_select"
+  | "checkbox"
+  | "tags"
+  | "link"
+  | "rating"
+  | "progress"
+  | "duration"
+  | "currency";
+
+export interface CustomColumn {
+  id: string;
+  projectId: string;
+  name: string;
+  columnType: ColumnType;
+  options: string[] | null;
+  position: number;
+  width: number;
+}
+
+export interface CustomColumnValue {
+  taskId: string;
+  columnId: string;
+  value: unknown;
+}
+
+export interface ColumnCreateParams {
+  projectId: string;
+  name: string;
+  columnType: ColumnType;
+  options?: string[];
+  width?: number;
+}
+
+export interface ColumnUpdateParams {
+  id: string;
+  name?: string;
+  options?: string[] | null;
+  width?: number;
+}
+
+export interface ColumnReorderParams {
+  projectId: string;
+  ids: string[];
+}
+
+export interface ColumnValueSetParams {
+  taskId: string;
+  columnId: string;
+  value: unknown;
+}
+
 export type Tab = "All" | string;
 export type SidebarItem =
   | "Chat"

@@ -24,6 +24,7 @@ pub struct TaskResponse {
     pub subtask_completed_count: u32,
     pub status_label_id: Option<String>,
     pub status_label: Option<StatusLabelResponse>,
+    pub group_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -37,6 +38,7 @@ pub struct TaskCreateParams {
     pub tags: Option<Vec<String>>,
     pub parent_id: Option<String>,
     pub status_label_id: Option<String>,
+    pub group_id: Option<String>,
 }
 
 // ── Today Task (tray view) ──────────────────────────────────────────────
@@ -149,6 +151,43 @@ pub struct LabelUpdateParams {
 pub struct LabelReorderParams {
     pub workflow_id: String,
     pub label_ids: Vec<String>,
+}
+
+// ── Task Groups ─────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TaskGroupResponse {
+    pub id: String,
+    pub project_id: Option<String>,
+    pub name: String,
+    pub color: Option<String>,
+    pub position: i32,
+    pub task_count: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TaskGroupCreateParams {
+    pub project_id: Option<String>,
+    pub name: String,
+    pub color: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TaskGroupUpdateParams {
+    pub id: String,
+    pub name: Option<String>,
+    pub color: Option<String>,
+    pub position: Option<i32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TaskGroupReorderParams {
+    pub project_id: Option<String>,
+    pub group_ids: Vec<String>,
 }
 
 // ── Area ────────────────────────────────────────────────────────────────
@@ -275,6 +314,7 @@ pub struct TaskUpdateParams {
     pub key_result_id: Option<Option<String>>,
     pub status_label_id: Option<Option<String>>,
     pub position: Option<i32>,
+    pub group_id: Option<Option<String>>,
 }
 
 // ── Area Params ────────────────────────────────────────────────────────
@@ -663,6 +703,62 @@ pub struct NotebookCreateParams {
     pub title: String,
     pub parent_id: Option<String>,
     pub icon: Option<String>,
+}
+
+// ── Custom Columns ──────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CustomColumnResponse {
+    pub id: String,
+    pub project_id: String,
+    pub name: String,
+    pub column_type: String,
+    pub options: Option<Vec<String>>,
+    pub position: i32,
+    pub width: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CustomColumnValueResponse {
+    pub task_id: String,
+    pub column_id: String,
+    pub value: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ColumnCreateParams {
+    pub project_id: String,
+    pub name: String,
+    pub column_type: String,
+    pub options: Option<Vec<String>>,
+    pub width: Option<i32>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ColumnUpdateParams {
+    pub id: String,
+    pub name: Option<String>,
+    pub options: Option<Option<Vec<String>>>,
+    pub width: Option<i32>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ColumnReorderParams {
+    pub project_id: String,
+    pub ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ColumnValueSetParams {
+    pub task_id: String,
+    pub column_id: String,
+    pub value: serde_json::Value,
 }
 
 // ── Key Result Params ──────────────────────────────────────────────────
