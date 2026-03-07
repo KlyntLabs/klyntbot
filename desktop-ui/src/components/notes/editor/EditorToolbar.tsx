@@ -21,9 +21,14 @@ import {
   Table,
   Underline as UnderlineIcon,
 } from "lucide-react";
+import { VimStatusLine } from "./VimStatusLine";
+import type { VimMode } from "./vim/VimState";
 
 interface EditorToolbarProps {
   editor: Editor | null;
+  vimEnabled: boolean;
+  vimMode: VimMode;
+  onToggleVim: () => void;
 }
 
 interface ToolbarButton {
@@ -173,8 +178,40 @@ const groups: ToolbarButton[][] = [
   ],
 ];
 
-export function EditorToolbar({ editor }: EditorToolbarProps) {
+function VimToggleButton({
+  vimEnabled,
+  onToggleVim,
+}: {
+  vimEnabled: boolean;
+  onToggleVim: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggleVim}
+      title={vimEnabled ? "Disable Vim mode" : "Enable Vim mode"}
+      className={`px-2 h-7 rounded-lg font-mono text-xs font-bold transition-all ${
+        vimEnabled
+          ? "bg-brand/15 text-brand shadow-[0_0_8px_rgba(249,115,22,0.12)]"
+          : "text-muted hover:text-primary hover:bg-white/[0.08]"
+      }`}
+    >
+      Vi
+    </button>
+  );
+}
+
+export function EditorToolbar({ editor, vimEnabled, vimMode, onToggleVim }: EditorToolbarProps) {
   if (!editor) return null;
+
+  if (vimEnabled) {
+    return (
+      <div className="glass-toolbar rounded-lg px-2 py-1 flex items-center justify-between">
+        <VimStatusLine mode={vimMode} />
+        <VimToggleButton vimEnabled={vimEnabled} onToggleVim={onToggleVim} />
+      </div>
+    );
+  }
 
   return (
     <div className="glass-toolbar rounded-lg px-2 py-1 flex items-center gap-0.5 flex-wrap">
@@ -202,6 +239,8 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
           })}
         </div>
       ))}
+      <div className="w-px h-4 bg-white/[0.08] mx-1.5" />
+      <VimToggleButton vimEnabled={vimEnabled} onToggleVim={onToggleVim} />
     </div>
   );
 }

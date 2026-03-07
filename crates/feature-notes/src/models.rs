@@ -105,26 +105,48 @@ impl From<NotebookRow> for Notebook {
             title: r.title,
             icon: r.icon,
             sort_order: r.sort_order,
-            created_at: r.created_at.parse().unwrap_or_default(),
-            updated_at: r.updated_at.parse().unwrap_or_default(),
+            created_at: r.created_at.parse().unwrap_or_else(|e| {
+                tracing::warn!(raw = %r.created_at, error = %e, "failed to parse notebook created_at");
+                Default::default()
+            }),
+            updated_at: r.updated_at.parse().unwrap_or_else(|e| {
+                tracing::warn!(raw = %r.updated_at, error = %e, "failed to parse notebook updated_at");
+                Default::default()
+            }),
         }
     }
 }
 
+impl Note {
+    /// Create a Note from a database row with its associated tags.
+    /// Prefer this over `From<NoteRow>` which leaves tags empty.
+    pub fn from_row(row: NoteRow, tags: Vec<String>) -> Self {
+        Self {
+            id: row.id,
+            notebook_id: row.notebook_id,
+            title: row.title,
+            body: row.body,
+            body_html: row.body_html,
+            pinned: row.pinned != 0,
+            archived: row.archived != 0,
+            tags,
+            created_at: row.created_at.parse().unwrap_or_else(|e| {
+                tracing::warn!(raw = %row.created_at, error = %e, "failed to parse note created_at");
+                Default::default()
+            }),
+            updated_at: row.updated_at.parse().unwrap_or_else(|e| {
+                tracing::warn!(raw = %row.updated_at, error = %e, "failed to parse note updated_at");
+                Default::default()
+            }),
+        }
+    }
+}
+
+/// Warning: tags are NOT populated (set to empty vec).
+/// Use `Note::from_row(row, tags)` for complete conversion.
 impl From<NoteRow> for Note {
     fn from(r: NoteRow) -> Self {
-        Self {
-            id: r.id,
-            notebook_id: r.notebook_id,
-            title: r.title,
-            body: r.body,
-            body_html: r.body_html,
-            pinned: r.pinned != 0,
-            archived: r.archived != 0,
-            tags: vec![], // populated separately
-            created_at: r.created_at.parse().unwrap_or_default(),
-            updated_at: r.updated_at.parse().unwrap_or_default(),
-        }
+        Self::from_row(r, vec![])
     }
 }
 
@@ -134,7 +156,10 @@ impl From<NoteVersionRow> for NoteVersion {
             id: r.id,
             note_id: r.note_id,
             body: r.body,
-            created_at: r.created_at.parse().unwrap_or_default(),
+            created_at: r.created_at.parse().unwrap_or_else(|e| {
+                tracing::warn!(raw = %r.created_at, error = %e, "failed to parse version created_at");
+                Default::default()
+            }),
         }
     }
 }

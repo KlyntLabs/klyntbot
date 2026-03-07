@@ -86,6 +86,9 @@ type MentionMenuState = {
   query: string;
 } | null;
 
+// Module-level callback bridge: ProseMirror plugins run outside React's
+// lifecycle, so we use a module-scoped callback to notify the React
+// autocomplete menu component of state changes (position, query text).
 let mentionMenuCallback:
   | ((state: MentionMenuState, coords: { x: number; y: number }) => void)
   | null = null;
@@ -227,7 +230,8 @@ export function EntityMentionMenu({ editor }: EntityMentionMenuProps) {
           ]);
           if (cancelled) return;
           cacheRef.current = { tasks, projects };
-        } catch {
+        } catch (e) {
+          console.warn("Entity mention search failed:", e);
           if (!cancelled) setResults([]);
           return;
         }

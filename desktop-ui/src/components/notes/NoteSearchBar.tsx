@@ -33,7 +33,8 @@ export function NoteSearchBar({ onResults, ref }: NoteSearchBarProps) {
         try {
           const results = await ipc<Note[]>("note_search", { query: q.trim() });
           onResults(results);
-        } catch {
+        } catch (e) {
+          console.warn("Note search failed:", e);
           onResults(null);
         }
       }, 200);

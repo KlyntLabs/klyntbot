@@ -19,7 +19,7 @@
   font-size: 1.75rem;
   font-weight: 700;
   margin: 1.5rem 0 0.75rem;
-  color: #fff;
+  color: var(--color-primary);
   letter-spacing: -0.025em;
   padding-bottom: 0.5rem;
   border-bottom: 2px solid transparent;
@@ -36,9 +36,9 @@
   font-size: 1.375rem;
   font-weight: 600;
   margin: 1.25rem 0 0.5rem;
-  color: #fff;
+  color: var(--color-primary);
   letter-spacing: -0.02em;
-  background: linear-gradient(135deg, #fff 0%, var(--color-info) 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-info) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -48,9 +48,9 @@
   font-size: 1.125rem;
   font-weight: 600;
   margin: 1rem 0 0.5rem;
-  color: #fff;
+  color: var(--color-primary);
   letter-spacing: -0.015em;
-  background: linear-gradient(135deg, #fff 0%, var(--color-purple) 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-purple) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -59,7 +59,7 @@
 /* Strong & emphasis */
 .editor-content strong {
   font-weight: 700;
-  color: #fff;
+  color: var(--color-primary);
 }
 
 .editor-content em {
@@ -303,7 +303,7 @@
   background: linear-gradient(135deg, rgba(249, 115, 22, 0.3) 0%, rgba(251, 146, 60, 0.2) 100%);
   border-radius: 3px;
   padding: 1px 4px;
-  color: #fff;
+  color: var(--color-primary);
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
 }
@@ -339,7 +339,7 @@
 .wiki-link:hover {
   text-decoration-style: solid;
   text-decoration-color: var(--color-info);
-  color: color-mix(in srgb, var(--color-info) 80%, #fff);
+  color: color-mix(in srgb, var(--color-info) 80%, var(--color-primary));
 }
 
 /* Unresolved wiki link — note doesn't exist */
@@ -414,4 +414,36 @@
   padding: 0 3px;
   vertical-align: baseline;
   color: var(--color-purple);
+}
+
+/* ── Vim Mode ────────────────────────────────────────────────────────── */
+
+/* Block cursor */
+.vim-block-cursor {
+  background: color-mix(in srgb, var(--brand) 50%, transparent);
+}
+
+.vim-block-cursor--eol {
+  display: inline-block;
+  width: 0.6em;
+  background: color-mix(in srgb, var(--brand) 50%, transparent);
+}
+
+/* Hide native caret in vim normal/visual mode */
+.vim-normal .editor-content,
+.vim-visual .editor-content,
+.vim-visual-line .editor-content {
+  caret-color: transparent;
+}
+
+/* Restore caret in insert mode */
+.vim-insert .editor-content {
+  caret-color: var(--brand);
+}
+
+/* Search highlights */
+.vim-search-match {
+  background: rgba(249, 115, 22, 0.25);
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(249, 115, 22, 0.3);
 }

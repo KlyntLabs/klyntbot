@@ -26,7 +26,7 @@ impl NotesFeature {
         vec![FeatureMigration {
             feature_name: "notes".to_string(),
             version: 1,
-            description: "Create notes core tables (notebooks, notes, tags, links, versions)"
+            description: "Create notes core tables (notebooks, notes, tags, links, entity_mentions, versions)"
                 .to_string(),
             sql: Self::migration_sql().to_string(),
         }]

@@ -24,6 +24,7 @@ import { isTauri } from "../../../lib/utils";
 import { EntityMentionAutocomplete, EntityMentionMark } from "./EntityMention";
 import { MathBlock, MathInline } from "./MathNode";
 import { SlashCommandsExtension } from "./SlashCommandMenu";
+import { VimModeExtension, type VimModeOptions } from "./vim";
 import { WikiLinkAutocomplete, WikiLinkMark } from "./WikiLinkNode";
 
 // ── Entity Resolution Hook ──────────────────────────────────────────────
@@ -92,7 +93,8 @@ export function useEntityResolution(editor: ReturnType<typeof useEditor>) {
             );
           }
           await Promise.all(promises);
-        } catch {
+        } catch (e) {
+          console.warn("Entity resolution failed:", e);
           return;
         }
       }
@@ -135,10 +137,11 @@ interface EditorExtensionOptions {
   extra?: Extensions;
   onNavigateNote?: (noteId: string) => void;
   onNavigateEntity?: (entityType: string, entityId: string) => void;
+  vimOptions?: VimModeOptions;
 }
 
 export function getEditorExtensions(opts: EditorExtensionOptions = {}): Extensions {
-  const { extra = [], onNavigateNote, onNavigateEntity } = opts;
+  const { extra = [], onNavigateNote, onNavigateEntity, vimOptions } = opts;
   return [
     StarterKit.configure({ codeBlock: false }),
     Placeholder.configure({
@@ -181,6 +184,7 @@ export function getEditorExtensions(opts: EditorExtensionOptions = {}): Extensio
     MathBlock,
     MathInline,
     SlashCommandsExtension,
+    VimModeExtension.configure(vimOptions ?? {}),
     ...extra,
   ];
 }
@@ -191,6 +195,7 @@ interface UseNoteEditorOptions {
   extensions?: Extensions;
   onNavigateNote?: (noteId: string) => void;
   onNavigateEntity?: (entityType: string, entityId: string) => void;
+  vimOptions?: VimModeOptions;
 }
 
 /** Convert a file to base64 string. */
@@ -213,15 +218,23 @@ export function useNoteEditor({
   extensions = EMPTY_EXTENSIONS,
   onNavigateNote,
   onNavigateEntity,
+  vimOptions,
 }: UseNoteEditorOptions) {
   return useEditor({
-    extensions: getEditorExtensions({ extra: extensions, onNavigateNote, onNavigateEntity }),
+    extensions: getEditorExtensions({
+      extra: extensions,
+      onNavigateNote,
+      onNavigateEntity,
+      vimOptions,
+    }),
     content,
     onUpdate: ({ editor: ed }) => {
       onUpdate(ed.getHTML(), ed.getText());
     },
     editorProps: {
       attributes: { class: "editor-content" },
+      scrollThreshold: { top: 80, bottom: 80, left: 0, right: 0 },
+      scrollMargin: { top: 80, bottom: 80, left: 0, right: 0 },
       handlePaste: (view, event) => {
         const items = event.clipboardData?.files;
         if (!items || items.length === 0) return false;
@@ -233,20 +246,24 @@ export function useNoteEditor({
 
         // Save async — insert image once backend returns the URL
         (async () => {
-          const base64 = await fileToBase64(imageFile);
-          const ext = imageFile.type.split("/")[1] || "png";
-          const savedPath = await ipc<string>("note_save_attachment", {
-            data: base64,
-            filename: `paste.${ext}`,
-          });
+          try {
+            const base64 = await fileToBase64(imageFile);
+            const ext = imageFile.type.split("/")[1] || "png";
+            const savedPath = await ipc<string>("note_save_attachment", {
+              data: base64,
+              filename: `paste.${ext}`,
+            });
 
-          // Tauri returns absolute path → convert to asset URL
-          // Dev-api returns relative URL like /attachments/uuid.png
-          const src = isTauri ? convertFileSrc(savedPath) : savedPath;
+            // Tauri returns absolute path → convert to asset URL
+            // Dev-api returns relative URL like /attachments/uuid.png
+            const src = isTauri ? convertFileSrc(savedPath) : savedPath;
 
-          const { tr } = view.state;
-          const imageNode = view.state.schema.nodes.image.create({ src });
-          view.dispatch(tr.replaceSelectionWith(imageNode));
+            const { tr } = view.state;
+            const imageNode = view.state.schema.nodes.image.create({ src });
+            view.dispatch(tr.replaceSelectionWith(imageNode));
+          } catch (e) {
+            console.error("Failed to paste image:", e);
+          }
         })();
 
         return true;
@@ -257,8 +274,11 @@ export function useNoteEditor({
 
 interface EditorContentWrapperProps {
   editor: ReturnType<typeof useEditor>;
+  className?: string;
 }
 
-export function EditorContentWrapper({ editor }: EditorContentWrapperProps) {
-  return <EditorContent editor={editor} className="flex-1 min-h-0 overflow-y-auto" />;
+export function EditorContentWrapper({ editor, className }: EditorContentWrapperProps) {
+  return (
+    <EditorContent editor={editor} className={className ?? "flex-1 min-h-0 overflow-y-auto"} />
+  );
 }

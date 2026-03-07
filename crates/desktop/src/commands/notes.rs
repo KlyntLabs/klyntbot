@@ -38,6 +38,17 @@ async fn note_with_tags(core: &AppCore, row: &NoteRow) -> Result<NoteResponse, A
     Ok(note_row_to_response(row, tags))
 }
 
+fn notebook_row_to_response(row: &NotebookRow, note_count: i64) -> NotebookResponse {
+    NotebookResponse {
+        id: row.id.clone(),
+        parent_id: row.parent_id.clone(),
+        title: row.title.clone(),
+        icon: row.icon.clone(),
+        sort_order: row.sort_order,
+        note_count,
+    }
+}
+
 /// Convert a list of NoteRows to NoteResponses with batch-fetched tags (single query).
 async fn notes_with_tags_batch(
     core: &AppCore,
@@ -60,7 +71,7 @@ async fn notes_with_tags_batch(
 
 /// Extract wiki-links and entity mentions from note content, updating the
 /// `note_links` and `note_entity_mentions` tables.
-/// Skips DB writes entirely when no links or mentions are found.
+/// Always writes to DB (even with empty vecs) to clear stale rows.
 async fn extract_links_and_mentions(
     core: &AppCore,
     note_id: &str,
@@ -93,28 +104,19 @@ async fn extract_links_and_mentions(
     // 3. Extract entity mentions (@task:id, @project:id)
     let mentions = link_parser::extract_entity_mentions(&row.body);
 
-    // Skip DB writes if nothing was extracted
-    if target_ids.is_empty() && mentions.is_empty() {
-        return Ok(());
-    }
+    core.note_repo
+        .set_links(note_id, &target_ids)
+        .await
+        .map_err(super::map_storage_err)?;
 
-    if !target_ids.is_empty() {
-        core.note_repo
-            .set_links(note_id, &target_ids)
-            .await
-            .map_err(super::map_storage_err)?;
-    }
-
-    if !mentions.is_empty() {
-        let mention_tuples: Vec<(String, String)> = mentions
-            .into_iter()
-            .map(|m| (m.entity_type, m.entity_id))
-            .collect();
-        core.note_repo
-            .set_entity_mentions(note_id, &mention_tuples)
-            .await
-            .map_err(super::map_storage_err)?;
-    }
+    let mention_tuples: Vec<(String, String)> = mentions
+        .into_iter()
+        .map(|m| (m.entity_type, m.entity_id))
+        .collect();
+    core.note_repo
+        .set_entity_mentions(note_id, &mention_tuples)
+        .await
+        .map_err(super::map_storage_err)?;
 
     Ok(())
 }
@@ -155,6 +157,9 @@ pub async fn note_create(
     app: tauri::AppHandle,
     params: NoteCreateParams,
 ) -> Result<NoteResponse, ApiError> {
+    if params.title.trim().is_empty() {
+        return Err(ApiError::new("VALIDATION", "title must not be empty"));
+    }
     let id = uuid::Uuid::new_v4().to_string();
     let now = utc_now_str();
 
@@ -215,8 +220,10 @@ pub async fn note_update(
             .map_err(super::map_storage_err)?;
     }
 
-    // Extract wiki-links and entity mentions from content
-    extract_links_and_mentions(&state, &params.id, &updated).await?;
+    // Extract wiki-links and entity mentions only when body content changed
+    if params.body.is_some() || params.body_html.is_some() {
+        extract_links_and_mentions(&state, &params.id, &updated).await?;
+    }
 
     super::emit_entity_updated(&app, EntityKind::Note, &params.id);
     note_with_tags(&state, &updated).await
@@ -342,7 +349,9 @@ pub async fn note_version_create(
         .map_err(super::map_storage_err)?;
 
     // Prune old versions (keep max 50)
-    let _ = state.note_repo.prune_versions(&note_id, 50).await;
+    if let Err(e) = state.note_repo.prune_versions(&note_id, 50).await {
+        tracing::warn!(note_id = %note_id, error = %e, "failed to prune old versions");
+    }
 
     Ok(version_row_to_response(&created))
 }
@@ -376,7 +385,7 @@ pub async fn note_version_restore(
         body: current_note.body,
         created_at: utc_now_str(),
     };
-    let _ = state.note_repo.create_version(&snapshot).await;
+    state.note_repo.create_version(&snapshot).await.map_err(super::map_storage_err)?;
 
     // Restore the version body
     let updated = state
@@ -406,10 +415,12 @@ pub async fn note_save_attachment(
         .map_err(|e| ApiError::new("IO_ERROR", format!("failed to create attachments dir: {e}")))?;
 
     // Determine extension from filename
+    const ALLOWED_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp"];
     let ext = std::path::Path::new(&filename)
         .extension()
         .and_then(|e| e.to_str())
         .unwrap_or("png");
+    let ext = if ALLOWED_EXTENSIONS.contains(&ext) { ext } else { "png" };
 
     let id = uuid::Uuid::new_v4();
     let file_name = format!("{id}.{ext}");
@@ -448,14 +459,7 @@ pub async fn notebook_list(
 
     Ok(rows
         .iter()
-        .map(|row| NotebookResponse {
-            id: row.id.clone(),
-            parent_id: row.parent_id.clone(),
-            title: row.title.clone(),
-            icon: row.icon.clone(),
-            sort_order: row.sort_order,
-            note_count: counts.get(&row.id).copied().unwrap_or(0),
-        })
+        .map(|row| notebook_row_to_response(row, counts.get(&row.id).copied().unwrap_or(0)))
         .collect())
 }
 
@@ -465,6 +469,9 @@ pub async fn notebook_create(
     app: tauri::AppHandle,
     params: NotebookCreateParams,
 ) -> Result<NotebookResponse, ApiError> {
+    if params.title.trim().is_empty() {
+        return Err(ApiError::new("VALIDATION", "notebook title must not be empty"));
+    }
     let id = uuid::Uuid::new_v4().to_string();
     let now = utc_now_str();
 
@@ -486,14 +493,7 @@ pub async fn notebook_create(
 
     super::emit_entity_updated(&app, EntityKind::Notebook, &id);
 
-    Ok(NotebookResponse {
-        id: created.id,
-        parent_id: created.parent_id,
-        title: created.title,
-        icon: created.icon,
-        sort_order: created.sort_order,
-        note_count: 0,
-    })
+    Ok(notebook_row_to_response(&created, 0))
 }
 
 #[tauri::command]
@@ -502,6 +502,20 @@ pub async fn notebook_update(
     app: tauri::AppHandle,
     params: NotebookUpdateParams,
 ) -> Result<NotebookResponse, ApiError> {
+    // Check for cycles when changing parent
+    if let Some(Some(new_parent_id)) = &params.parent_id {
+        if state
+            .note_repo
+            .would_create_cycle(&params.id, new_parent_id)
+            .await
+            .map_err(super::map_storage_err)?
+        {
+            return Err(ApiError::new(
+                "VALIDATION",
+                "cannot set parent: would create a cycle",
+            ));
+        }
+    }
     let parent_id_ref = params.parent_id.as_ref().map(|o| o.as_deref());
     let updated = state
         .note_repo
@@ -517,14 +531,7 @@ pub async fn notebook_update(
 
     super::emit_entity_updated(&app, EntityKind::Notebook, &params.id);
 
-    Ok(NotebookResponse {
-        id: updated.id,
-        parent_id: updated.parent_id,
-        title: updated.title,
-        icon: updated.icon,
-        sort_order: updated.sort_order,
-        note_count: count,
-    })
+    Ok(notebook_row_to_response(&updated, count))
 }
 
 #[tauri::command]

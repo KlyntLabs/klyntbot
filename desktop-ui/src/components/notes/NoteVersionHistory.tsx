@@ -24,6 +24,8 @@ export function NoteVersionHistory({ noteId, onRestore }: NoteVersionHistoryProp
         onRestore(restored);
         refetch();
         setPreviewId(null);
+      } catch (e) {
+        console.error("Failed to restore version:", e);
       } finally {
         setRestoring(false);
       }

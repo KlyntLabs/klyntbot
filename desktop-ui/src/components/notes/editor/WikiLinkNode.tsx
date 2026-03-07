@@ -84,6 +84,9 @@ type WikiLinkMenuState = {
   query: string;
 } | null;
 
+// Module-level callback bridge: ProseMirror plugins run outside React's
+// lifecycle, so we use a module-scoped callback to notify the React
+// autocomplete menu component of state changes (position, query text).
 let wikiLinkMenuCallback:
   | ((state: WikiLinkMenuState, coords: { x: number; y: number }) => void)
   | null = null;
@@ -195,7 +198,8 @@ export function WikiLinkMenu({ editor }: WikiLinkMenuProps) {
         const notes = await ipc<Note[]>("note_search", { query: state.query });
         setResults(notes.slice(0, 8));
         setSelectedIndex(0);
-      } catch {
+      } catch (e) {
+        console.warn("Wiki-link search failed:", e);
         setResults([]);
       }
     }, 150);

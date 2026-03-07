@@ -129,6 +129,9 @@ impl NoteRepo {
         Ok(())
     }
 
+    /// Search notes by title, body, and tags using LIKE matching.
+    /// Results are ranked by a weighted score: title matches (3) > tag matches (2) > body matches (1).
+    /// Only non-archived notes with score > 0 are returned.
     pub async fn search_notes(&self, query: &str) -> Result<Vec<NoteRow>, StorageError> {
         let escaped = query
             .replace('\\', "\\\\")
@@ -305,6 +308,36 @@ impl NoteRepo {
             .execute(&self.pool)
             .await?;
         Ok(result.rows_affected() > 0)
+    }
+
+    /// Check if setting `notebook_id`'s parent to `proposed_parent_id` would create a cycle.
+    /// Returns `true` if a cycle would be created.
+    pub async fn would_create_cycle(
+        &self,
+        notebook_id: &str,
+        proposed_parent_id: &str,
+    ) -> Result<bool, StorageError> {
+        // Trivial self-cycle
+        if notebook_id == proposed_parent_id {
+            return Ok(true);
+        }
+        // Walk up the ancestor chain from proposed_parent_id.
+        // If we encounter notebook_id, setting it as parent would create a cycle.
+        let result = sqlx::query_scalar::<_, i32>(
+            "WITH RECURSIVE ancestors(nid) AS (
+                SELECT parent_id FROM notebooks WHERE id = ?1
+                UNION ALL
+                SELECT nb.parent_id FROM notebooks nb JOIN ancestors a ON nb.id = a.nid
+                WHERE nb.parent_id IS NOT NULL
+            )
+            SELECT 1 FROM ancestors WHERE nid = ?2 LIMIT 1",
+        )
+        .bind(proposed_parent_id)
+        .bind(notebook_id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(result.is_some())
     }
 
     // ── Entity Mentions ──────────────────────────

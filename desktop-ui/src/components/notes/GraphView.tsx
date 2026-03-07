@@ -46,7 +46,9 @@ const NODE_BASE_RADIUS = 4;
 const NODE_SCALE_FACTOR = 1.5;
 const LABEL_FONT_SIZE = 10;
 
-// Node color palette — cycles through these for non-active nodes
+// Node color palette — hardcoded rgba values required for SVG canvas rendering.
+// CSS variables cannot be directly used in SVG attributes; extracting them via
+// getComputedStyle would add significant complexity for minimal theming benefit.
 const NODE_COLORS = [
   "rgba(96, 165, 250, 0.85)", // blue
   "rgba(167, 139, 250, 0.85)", // purple
@@ -307,6 +309,9 @@ export function GraphView({ notes, activeNoteId, onSelectNote }: GraphViewProps)
         <div className="text-muted text-sm">No notes to graph</div>
       ) : (
         <>
+          {/* SVG rendering — hardcoded rgba/hex color values below are required because
+              CSS variables cannot be directly used in SVG attributes; extracting them via
+              getComputedStyle would add significant complexity for minimal theming benefit. */}
           <svg
             ref={svgRef}
             className="w-full h-full"

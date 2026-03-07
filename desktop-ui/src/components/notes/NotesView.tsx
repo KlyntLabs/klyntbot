@@ -18,6 +18,32 @@ import { NoteSearchBar, type NoteSearchBarHandle } from "./NoteSearchBar";
 
 type NotesViewMode = "editor" | "graph";
 
+function ViewModeToggle({
+  viewMode,
+  onChange,
+}: { viewMode: NotesViewMode; onChange: (mode: NotesViewMode) => void }) {
+  return (
+    <div className="flex items-center gap-1">
+      <button
+        type="button"
+        aria-label="Editor view"
+        onClick={() => onChange("editor")}
+        className={`p-1.5 rounded-md transition-colors ${viewMode === "editor" ? "bg-white/10 text-primary" : "text-muted hover:text-secondary"}`}
+      >
+        <PenLine size={16} />
+      </button>
+      <button
+        type="button"
+        aria-label="Graph view"
+        onClick={() => onChange("graph")}
+        className={`p-1.5 rounded-md transition-colors ${viewMode === "graph" ? "bg-white/10 text-primary" : "text-muted hover:text-secondary"}`}
+      >
+        <GitGraph size={16} />
+      </button>
+    </div>
+  );
+}
+
 export default function NotesView() {
   const { data: notebooks, refetch: refetchNotebooks } = useQuery<Notebook[]>(
     "notebook_list",
@@ -70,7 +96,6 @@ export default function NotesView() {
     }
   }, [searchParams, setSearchParams]);
 
-  // O(1) note lookup via Map
   const noteMap = useMemo(() => {
     const map = new Map<string, Note>();
     for (const n of notes) map.set(n.id, n);
@@ -242,24 +267,7 @@ export default function NotesView() {
           <>
             {/* Minimal toggle bar for graph/empty views */}
             <div className="flex justify-end shrink-0 px-3 pt-3">
-              <div className="flex gap-0.5">
-                <button
-                  type="button"
-                  onClick={() => setNotesViewMode("editor")}
-                  className="p-1.5 rounded-lg transition-all text-dim hover:text-secondary hover:bg-white/[0.04]"
-                  aria-label="Editor view"
-                >
-                  <PenLine className="w-4 h-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setNotesViewMode("graph")}
-                  className="p-1.5 rounded-lg transition-all bg-white/[0.1] text-primary"
-                  aria-label="Graph view"
-                >
-                  <GitGraph className="w-4 h-4" />
-                </button>
-              </div>
+              <ViewModeToggle viewMode={viewMode} onChange={setNotesViewMode} />
             </div>
             <GraphView
               notes={notes}
@@ -278,24 +286,7 @@ export default function NotesView() {
           <>
             {/* Minimal toggle bar for empty state */}
             <div className="flex justify-end shrink-0 px-3 pt-3">
-              <div className="flex gap-0.5">
-                <button
-                  type="button"
-                  onClick={() => setNotesViewMode("editor")}
-                  className="p-1.5 rounded-lg transition-all bg-white/[0.1] text-primary"
-                  aria-label="Editor view"
-                >
-                  <PenLine className="w-4 h-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setNotesViewMode("graph")}
-                  className="p-1.5 rounded-lg transition-all text-dim hover:text-secondary hover:bg-white/[0.04]"
-                  aria-label="Graph view"
-                >
-                  <GitGraph className="w-4 h-4" />
-                </button>
-              </div>
+              <ViewModeToggle viewMode={viewMode} onChange={setNotesViewMode} />
             </div>
             <div className="flex-1 flex flex-col items-center justify-center gap-3">
               <div className="w-12 h-12 rounded-2xl bg-white/[0.04] flex items-center justify-center">

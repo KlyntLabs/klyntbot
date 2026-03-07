@@ -2,7 +2,7 @@
 CREATE TABLE IF NOT EXISTS notebooks (
     id          TEXT PRIMARY KEY,
     parent_id   TEXT REFERENCES notebooks(id) ON DELETE SET NULL,
-    title       TEXT NOT NULL,
+    title       TEXT NOT NULL CHECK(length(trim(title)) > 0),
     icon        TEXT,
     sort_order  INTEGER NOT NULL DEFAULT 0,
     created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
@@ -14,7 +14,7 @@ CREATE INDEX IF NOT EXISTS idx_notebooks_parent_id ON notebooks(parent_id);
 CREATE TABLE IF NOT EXISTS notes (
     id          TEXT PRIMARY KEY,
     notebook_id TEXT REFERENCES notebooks(id) ON DELETE SET NULL,
-    title       TEXT NOT NULL,
+    title       TEXT NOT NULL CHECK(length(trim(title)) > 0),
     body        TEXT NOT NULL DEFAULT '',
     body_html   TEXT,
     pinned      INTEGER NOT NULL DEFAULT 0,

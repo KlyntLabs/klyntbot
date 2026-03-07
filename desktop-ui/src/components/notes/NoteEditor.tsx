@@ -7,11 +7,15 @@ import { EditorContentWrapper, useEntityResolution, useNoteEditor } from "./edit
 import { EditorToolbar } from "./editor/EditorToolbar";
 import { EntityMentionMenu } from "./editor/EntityMention";
 import { SlashMenu } from "./editor/SlashCommandMenu";
+import { VimCommandLine } from "./editor/VimCommandLine";
+import { getVimPlugin } from "./editor/vim";
+import { VIM_SAVE_EVENT } from "./editor/vim/VimPlugin";
+import type { VimMode } from "./editor/vim/VimState";
 import { WikiLinkMenu } from "./editor/WikiLinkNode";
 import { NoteTags, type NoteTagsHandle } from "./NoteTags";
 import { NoteVersionHistory } from "./NoteVersionHistory";
 
-const VERSION_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+const VERSION_INTERVAL_MS = 5 * 60 * 1000; // Minimum interval between auto-saving version snapshots
 
 type NotesViewMode = "editor" | "graph";
 
@@ -35,14 +39,43 @@ export function NoteEditor({ note, onSave, viewMode, onViewModeChange }: NoteEdi
   const lastVersionTimeRef = useRef(0);
   const [showHistory, setShowHistory] = useState(false);
 
+  // Vim state
+  const [vimEnabled, setVimEnabled] = useState(
+    () => localStorage.getItem("klyntbot:notes:vimMode") === "true",
+  );
+  const [vimMode, setVimMode] = useState<VimMode>("normal");
+  const [commandLine, setCommandLine] = useState<{ prefix: string } | null>(null);
+
+  // Stable ref for the enabled callback so the ProseMirror plugin always reads
+  // the latest value without needing to recreate the editor.
+  const vimEnabledRef = useRef(vimEnabled);
+  vimEnabledRef.current = vimEnabled;
+
+  const toggleVim = useCallback(() => {
+    setVimEnabled((prev) => {
+      const next = !prev;
+      localStorage.setItem("klyntbot:notes:vimMode", String(next));
+      return next;
+    });
+    // Reset to normal mode when toggling
+    setVimMode("normal");
+  }, []);
+
+  // Stable vim callbacks — never change identity
+  const vimCallbacks = useRef({
+    onStateChange: (state: { mode: VimMode }) => setVimMode(state.mode),
+    onOpenCommandLine: (prefix: string) => setCommandLine({ prefix }),
+    enabled: () => vimEnabledRef.current,
+  }).current;
+
   const maybeCreateVersion = useCallback(async (noteId: string) => {
     const now = Date.now();
     if (now - lastVersionTimeRef.current < VERSION_INTERVAL_MS) return;
     lastVersionTimeRef.current = now;
     try {
       await ipc("note_version_create", { noteId });
-    } catch {
-      // non-critical — version snapshot failure should not block saves
+    } catch (e) {
+      console.warn("Failed to create version snapshot:", e);
     }
   }, []);
 
@@ -91,6 +124,7 @@ export function NoteEditor({ note, onSave, viewMode, onViewModeChange }: NoteEdi
     onUpdate: handleUpdate,
     onNavigateNote: handleNavigateNote,
     onNavigateEntity: handleNavigateEntity,
+    vimOptions: vimCallbacks,
   });
 
   // Resolve entity mentions and wiki links — grays out non-existent references
@@ -137,10 +171,55 @@ export function NoteEditor({ note, onSave, viewMode, onViewModeChange }: NoteEdi
     return () => document.removeEventListener("keydown", handler);
   }, [flushSave]);
 
+  // vim:save event → force save (dispatched by VimPlugin on :w command)
+  useEffect(() => {
+    const handler = () => flushSave();
+    document.addEventListener(VIM_SAVE_EVENT, handler);
+    return () => document.removeEventListener(VIM_SAVE_EVENT, handler);
+  }, [flushSave]);
+
   // Flush on unmount
   useEffect(() => {
     return () => flushSave();
   }, [flushSave]);
+
+  // Command line handlers
+  const handleCommandLineSubmit = useCallback(
+    (value: string) => {
+      if (!commandLine) return;
+
+      if (commandLine.prefix === "/") {
+        // Search — set pattern on the vim plugin
+        if (editor && value) {
+          const vim = getVimPlugin(editor);
+          vim?.setSearchPattern(value, "forward");
+        }
+      } else if (commandLine.prefix === ":") {
+        // Ex command
+        if (value === "w" || value === "write") {
+          flushSave();
+        } else if (editor) {
+          const vim = getVimPlugin(editor);
+          vim?.executeCommand(value);
+        }
+      }
+
+      setCommandLine(null);
+      // Return focus to editor
+      editor?.commands.focus();
+    },
+    [commandLine, editor, flushSave],
+  );
+
+  const handleCommandLineCancel = useCallback(() => {
+    setCommandLine(null);
+    editor?.commands.focus();
+  }, [editor]);
+
+  // Build editor content class — add vim mode class when vim is enabled
+  const editorContentClass = vimEnabled
+    ? `flex-1 min-h-0 overflow-y-auto vim-${vimMode}`
+    : "flex-1 min-h-0 overflow-y-auto";
 
   return (
     <div className="flex-1 flex gap-2 min-w-0 min-h-0">
@@ -148,7 +227,12 @@ export function NoteEditor({ note, onSave, viewMode, onViewModeChange }: NoteEdi
         {/* Controls bar */}
         <div className="px-2 pb-0 shrink-0 flex flex-col gap-2">
           {/* Row 1: Formatting toolbar */}
-          <EditorToolbar editor={editor} />
+          <EditorToolbar
+            editor={editor}
+            vimEnabled={vimEnabled}
+            vimMode={vimMode}
+            onToggleVim={toggleVim}
+          />
 
           {/* Row 2: Title + tags + toggles */}
           <div className="flex items-center gap-2.5">
@@ -219,8 +303,18 @@ export function NoteEditor({ note, onSave, viewMode, onViewModeChange }: NoteEdi
         />
 
         {/* Content: body */}
-        <div className="flex-1 overflow-y-auto min-h-0">
-          <EditorContentWrapper editor={editor} />
+        <div className="flex-1 overflow-y-auto min-h-0 relative">
+          <EditorContentWrapper editor={editor} className={editorContentClass} />
+          {/* Vim command line at bottom of editor area */}
+          {vimEnabled && commandLine && (
+            <div className="absolute bottom-0 left-0 right-0">
+              <VimCommandLine
+                prefix={commandLine.prefix}
+                onSubmit={handleCommandLineSubmit}
+                onCancel={handleCommandLineCancel}
+              />
+            </div>
+          )}
         </div>
         {editor && <SlashMenu editor={editor} />}
         {editor && <WikiLinkMenu editor={editor} />}
