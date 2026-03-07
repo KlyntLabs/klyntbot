@@ -5,6 +5,7 @@ import { useMutation } from "../../hooks/useMutation";
 import { useQuery } from "../../hooks/useQuery";
 import { useSetToggle } from "../../hooks/useSetToggle";
 import { useSubtasks } from "../../hooks/useSubtasks";
+import { useEffectiveLabels } from "../../hooks/useWorkflows";
 import type {
   Area,
   Objective,
@@ -70,6 +71,7 @@ export function MainApp() {
   );
   const { data: objectives } = useQuery<Objective[]>("objective_list", undefined, []);
   const { data: areas, refetch: refetchAreas } = useQuery<Area[]>("area_list", undefined, []);
+  const { data: statusLabels } = useEffectiveLabels(null);
 
   const areaMap = useMemo(() => new Map(areas.map((a) => [a.id, a])), [areas]);
   const projectMap = useMemo(() => new Map(projects.map((p) => [p.id, p])), [projects]);
@@ -232,6 +234,7 @@ export function MainApp() {
             projectMap={projectMap}
             areaMap={areaMap}
             completedTasks={completedTasks}
+            statusLabels={statusLabels}
           />
         ) : (
           <TaskTable
@@ -249,6 +252,7 @@ export function MainApp() {
             onToggleExpandTask={toggleExpandTask}
             onUpdate={handleUpdateTask}
             onCreateSubtask={handleCreateSubtask}
+            statusLabels={statusLabels}
           />
         )}
         {filteredTasks.length === 0 && !addingTask && (

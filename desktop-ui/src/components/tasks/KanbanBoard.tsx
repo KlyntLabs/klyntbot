@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router";
 import { formatDate } from "../../lib/dates";
-import type { Area, Project, Task } from "../../lib/types";
+import type { Area, Project, StatusLabel, Task } from "../../lib/types";
 import { Badge } from "../ui/Badge";
 
 interface KanbanBoardProps {
@@ -9,6 +9,7 @@ interface KanbanBoardProps {
   projectMap: Map<string, Project>;
   areaMap: Map<string, Area>;
   completedTasks: Set<string>;
+  statusLabels?: StatusLabel[];
 }
 
 const COLUMNS = [

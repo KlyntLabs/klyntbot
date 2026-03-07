@@ -34,11 +34,30 @@ const defaultColor = "bg-white/[0.04] text-muted border-white/[0.06]";
 interface BadgeProps {
   variant: BadgeVariant;
   value: string;
+  color?: string;
   className?: string;
 }
 
-export function Badge({ variant, value, className }: BadgeProps) {
+export function Badge({ variant, value, color, className }: BadgeProps) {
   const key = value.toLowerCase();
+
+  // If a dynamic color is provided, use inline styles
+  if (color) {
+    return (
+      <span
+        className={cn("px-2 py-0.5 text-[11px] font-light rounded-full border", className)}
+        style={{
+          backgroundColor: `${color}1a`,
+          color: color,
+          borderColor: `${color}26`,
+        }}
+      >
+        {value}
+      </span>
+    );
+  }
+
+  // Original behavior for non-dynamic badges
   const map = colorMaps[variant];
   const colorClass = map?.[value] ?? map?.[key] ?? defaultColor;
   const label = labelMaps[variant]?.[key] ?? value;

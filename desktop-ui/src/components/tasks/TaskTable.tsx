@@ -1,6 +1,14 @@
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useMemo } from "react";
-import type { Area, Objective, Project, Tab, Task, TaskUpdateParams } from "../../lib/types";
+import type {
+  Area,
+  Objective,
+  Project,
+  StatusLabel,
+  Tab,
+  Task,
+  TaskUpdateParams,
+} from "../../lib/types";
 import { AddSubtaskRow } from "./AddSubtaskRow";
 import { ProjectHeader } from "./ProjectHeader";
 import { RootTaskRow, SubtaskRow } from "./TaskRow";
@@ -21,6 +29,7 @@ interface TaskTableProps {
   onToggleExpandTask: (taskId: string) => void;
   onUpdate: (params: TaskUpdateParams) => void;
   onCreateSubtask: (parentId: string, title: string) => void;
+  statusLabels: StatusLabel[];
 }
 
 const UNASSIGNED = "_unassigned";
@@ -40,6 +49,7 @@ export function TaskTable({
   onToggleExpandTask,
   onUpdate,
   onCreateSubtask,
+  statusLabels,
 }: TaskTableProps) {
   const showArea = activeTab === "All";
 
@@ -80,6 +90,7 @@ export function TaskTable({
       childrenCache,
       projects,
       areas,
+      statusLabels,
       showArea,
       onToggleTask,
       onToggleExpandTask,
@@ -92,6 +103,7 @@ export function TaskTable({
       childrenCache,
       projects,
       areas,
+      statusLabels,
       showArea,
       onToggleTask,
       onToggleExpandTask,

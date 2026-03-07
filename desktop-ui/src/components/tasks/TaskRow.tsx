@@ -17,12 +17,6 @@ const PRIORITY_OPTIONS = [
   { value: null, label: "None" },
 ] as const;
 
-const STATUS_OPTIONS = [
-  { value: "todo", label: "To Do" },
-  { value: "doing", label: "In Progress" },
-  { value: "done", label: "Done" },
-] as const;
-
 import { useTaskTable } from "./TaskTableContext";
 
 interface RootTaskRowProps {
@@ -40,7 +34,12 @@ export function RootTaskRow({
   onToggle,
   onUpdate,
 }: RootTaskRowProps) {
-  const { projects, areas, showArea, onToggleExpandTask } = useTaskTable();
+  const { projects, areas, showArea, onToggleExpandTask, statusLabels } = useTaskTable();
+
+  const statusOptions = statusLabels.map((sl) => ({
+    value: sl.id,
+    label: sl.name,
+  }));
   const navigate = useNavigate();
   const hasSubtasks = task.subtaskCount > 0;
 
@@ -180,12 +179,16 @@ export function RootTaskRow({
         onKeyDown={(e) => e.stopPropagation()}
       >
         <InlineSelect
-          value={task.status}
-          options={STATUS_OPTIONS}
+          value={task.statusLabelId}
+          options={statusOptions}
           onSelect={(val) => {
-            if (val) onUpdate({ id: task.id, status: val });
+            if (val) onUpdate({ id: task.id, statusLabelId: val });
           }}
-          renderDisplay={(val) => <Badge variant="status" value={val ?? "todo"} />}
+          renderDisplay={(val) => {
+            const label = statusLabels.find((sl) => sl.id === val);
+            if (!label) return <Badge variant="status" value={task.status ?? "todo"} />;
+            return <Badge variant="status" value={label.name} color={label.color} />;
+          }}
         />
       </td>
 
@@ -219,7 +222,12 @@ interface SubtaskRowProps {
 }
 
 export function SubtaskRow({ task, isCompleted, onToggle, onUpdate }: SubtaskRowProps) {
-  const { showArea } = useTaskTable();
+  const { showArea, statusLabels } = useTaskTable();
+
+  const statusOptions = statusLabels.map((sl) => ({
+    value: sl.id,
+    label: sl.name,
+  }));
   const navigate = useNavigate();
 
   return (
@@ -295,12 +303,16 @@ export function SubtaskRow({ task, isCompleted, onToggle, onUpdate }: SubtaskRow
         onKeyDown={(e) => e.stopPropagation()}
       >
         <InlineSelect
-          value={task.status}
-          options={STATUS_OPTIONS}
+          value={task.statusLabelId}
+          options={statusOptions}
           onSelect={(val) => {
-            if (val) onUpdate({ id: task.id, status: val });
+            if (val) onUpdate({ id: task.id, statusLabelId: val });
           }}
-          renderDisplay={(val) => <Badge variant="status" value={val ?? "todo"} />}
+          renderDisplay={(val) => {
+            const label = statusLabels.find((sl) => sl.id === val);
+            if (!label) return <Badge variant="status" value={task.status ?? "todo"} />;
+            return <Badge variant="status" value={label.name} color={label.color} />;
+          }}
         />
       </td>
 

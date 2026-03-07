@@ -712,6 +712,7 @@ export interface TaskUpdateParams {
   areaId?: string;
   tags?: string[];
   keyResultId?: string | null;
+  statusLabelId?: string | null;
 }
 
 export interface TaskCreateParams {
