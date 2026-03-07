@@ -22,6 +22,7 @@ pub mod outcome;
 pub mod project_repo;
 pub mod session;
 pub mod session_context;
+pub mod status_workflow;
 pub mod strategy;
 pub mod usage;
 pub mod user_profile;
@@ -51,6 +52,7 @@ pub use outcome::OutcomeRepo;
 pub use project_repo::{ProjectFilter, ProjectPatch, ProjectRepo, ProjectWithStats};
 pub use session::SessionRepo;
 pub use session_context::SessionContextRepo;
+pub use status_workflow::StatusWorkflowRepo;
 pub use strategy::{OverallStats, StrategyRepo, ToolStatsRow};
 pub use usage::UsageRepo;
 pub use user_profile::UserProfileRepo;
@@ -81,6 +83,7 @@ pub struct Repos {
     pub behavioral_patterns: BehavioralPatternRepo,
     pub agent_adaptations: AgentAdaptationRepo,
     pub interaction_log: InteractionLogRepo,
+    pub status_workflows: StatusWorkflowRepo,
 }
 
 impl Repos {
@@ -108,6 +111,7 @@ impl Repos {
             behavioral_patterns: BehavioralPatternRepo::new(db.clone()),
             agent_adaptations: AgentAdaptationRepo::new(db.clone()),
             interaction_log: InteractionLogRepo::new(db.clone()),
+            status_workflows: StatusWorkflowRepo::new(db.clone()),
             pool: db,
         }
     }
