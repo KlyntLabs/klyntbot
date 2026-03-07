@@ -92,13 +92,20 @@ pub async fn workflow_get_effective(
     project_id: Option<String>,
     state: State<'_, Arc<AppCore>>,
 ) -> Result<Vec<StatusLabelResponse>, ApiError> {
-    // ProjectRow does not have workflow_id yet, so we always pass None
-    // (returns the global default workflow labels).
-    let _project_id = project_id;
+    // Look up project's workflow_id if a project_id is provided.
+    let project_workflow_id = match project_id {
+        Some(ref pid) => {
+            match state.repos.projects.get(pid).await.map_err(super::map_storage_err)? {
+                Some(proj) => proj.workflow_id,
+                None => None,
+            }
+        }
+        None => None,
+    };
     let labels = state
         .repos
         .status_workflows
-        .get_effective_labels(None)
+        .get_effective_labels(project_workflow_id.as_deref())
         .await
         .map_err(super::map_storage_err)?;
 

@@ -538,7 +538,7 @@ async fn build_project_response(
         } else {
             Some(objective_ids)
         },
-        workflow_id: None,
+        workflow_id: row.workflow_id.clone(),
     })
 }
 
@@ -662,6 +662,24 @@ async fn dispatch(
                 },
                 (None, None) => "default".to_string(),
             };
+            // Auto-assign status_label_id if not provided
+            let status_label_id = match params.status_label_id {
+                Some(id) => Some(id),
+                None => {
+                    match core.repos.status_workflows.get_global_default().await {
+                        Ok(Some(wf)) => {
+                            core.repos
+                                .status_workflows
+                                .find_label_by_group(&wf.id, "not_started")
+                                .await
+                                .ok()
+                                .flatten()
+                                .map(|l| l.id)
+                        }
+                        _ => None,
+                    }
+                }
+            };
             let row = storage::ActionRow {
                 id: id.clone(),
                 title: params.title,
@@ -688,7 +706,7 @@ async fn dispatch(
                 recurrence_parent_id: None,
                 is_template: false,
                 next_instance_date: None,
-                status_label_id: None,
+                status_label_id,
                 position: 0,
             };
             match core.repos.actions.add(&row).await {
@@ -713,6 +731,7 @@ async fn dispatch(
                 area_id: params.area_id,
                 project_id: params.project_id,
                 key_result_id: params.key_result_id,
+                status_label_id: params.status_label_id,
                 ..Default::default()
             };
             match core.repos.actions.update(&patch).await {
@@ -946,9 +965,17 @@ async fn dispatch(
             }
         }
         "workflow_get_effective" => {
-            // ProjectRow does not have workflow_id yet, so we always pass None
-            let _project_id: Option<String> = get(&body, "projectId");
-            match core.repos.status_workflows.get_effective_labels(None).await {
+            let project_id: Option<String> = get(&body, "projectId");
+            let project_workflow_id = match project_id {
+                Some(ref pid) => {
+                    match core.repos.projects.get(pid).await {
+                        Ok(Some(proj)) => proj.workflow_id,
+                        _ => None,
+                    }
+                }
+                None => None,
+            };
+            match core.repos.status_workflows.get_effective_labels(project_workflow_id.as_deref()).await {
                 Ok(labels) => ok(labels
                     .into_iter()
                     .map(label_to_response)

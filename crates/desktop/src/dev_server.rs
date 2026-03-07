@@ -154,6 +154,24 @@ async fn dispatch(
                 },
                 (None, None) => "default".to_string(),
             };
+            // Auto-assign status_label_id if not provided
+            let status_label_id = match params.status_label_id {
+                Some(id) => Some(id),
+                None => {
+                    match core.repos.status_workflows.get_global_default().await {
+                        Ok(Some(wf)) => {
+                            core.repos
+                                .status_workflows
+                                .find_label_by_group(&wf.id, "not_started")
+                                .await
+                                .ok()
+                                .flatten()
+                                .map(|l| l.id)
+                        }
+                        _ => None,
+                    }
+                }
+            };
             let row = storage::ActionRow {
                 id: id.clone(),
                 title: params.title,
@@ -182,7 +200,7 @@ async fn dispatch(
                 recurrence_parent_id: None,
                 is_template: false,
                 next_instance_date: None,
-                status_label_id: None,
+                status_label_id,
                 position: 0,
             };
             match core.repos.actions.add(&row).await {
@@ -209,6 +227,7 @@ async fn dispatch(
                 area_id: params.area_id,
                 project_id: params.project_id,
                 key_result_id: params.key_result_id,
+                status_label_id: params.status_label_id,
                 ..Default::default()
             };
             match core.repos.actions.update(&patch).await {
@@ -350,6 +369,7 @@ async fn dispatch(
                 status: "active".to_string(),
                 created_at: now,
                 updated_at: now,
+                workflow_id: None,
             };
             match core.repos.projects.create(&row).await {
                 Ok(created) => ok(crate::commands::projects::project_to_response(
@@ -390,6 +410,7 @@ async fn dispatch(
                 description: params.description,
                 tags: params.tags,
                 status: params.status,
+                workflow_id: params.workflow_id,
             };
             match core.repos.projects.update(&patch).await {
                 Ok(updated) => {

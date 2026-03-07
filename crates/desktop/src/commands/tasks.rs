@@ -175,7 +175,13 @@ pub async fn task_get(
     state: State<'_, Arc<AppCore>>,
     id: String,
 ) -> Result<Option<TaskResponse>, ApiError> {
-    match state.repos.actions.get(&id).await.map_err(super::map_storage_err)? {
+    match state
+        .repos
+        .actions
+        .get(&id)
+        .await
+        .map_err(super::map_storage_err)?
+    {
         Some(row) => Ok(Some(row_to_task(&state.repos, &row).await?)),
         None => Ok(None),
     }
@@ -325,6 +331,26 @@ pub async fn task_create(
         (None, None) => "default".to_string(),
     };
 
+    // Auto-assign status_label_id if not provided
+    let status_label_id = match params.status_label_id {
+        Some(id) => Some(id),
+        None => {
+            match state.repos.status_workflows.get_global_default().await {
+                Ok(Some(wf)) => {
+                    state
+                        .repos
+                        .status_workflows
+                        .find_label_by_group(&wf.id, "not_started")
+                        .await
+                        .ok()
+                        .flatten()
+                        .map(|l| l.id)
+                }
+                _ => None,
+            }
+        }
+    };
+
     let row = ActionRow {
         id: id.clone(),
         title: params.title,
@@ -351,7 +377,7 @@ pub async fn task_create(
         recurrence_parent_id: None,
         is_template: false,
         next_instance_date: None,
-        status_label_id: None,
+        status_label_id,
         position: 0,
     };
 
@@ -387,6 +413,7 @@ pub async fn task_update(
         area_id: params.area_id,
         project_id: params.project_id,
         key_result_id: params.key_result_id,
+        status_label_id: params.status_label_id,
         ..Default::default()
     };
 

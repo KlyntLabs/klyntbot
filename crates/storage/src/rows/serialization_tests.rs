@@ -94,6 +94,7 @@ mod tests {
             status: "active".to_string(),
             created_at: Utc::now(),
             updated_at: Utc::now(),
+            workflow_id: None,
         }
     }
 

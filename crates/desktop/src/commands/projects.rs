@@ -25,7 +25,7 @@ pub(crate) fn project_to_response(
         } else {
             Some(objective_ids)
         },
-        workflow_id: None, // TODO: populate when ProjectRow gains workflow_id
+        workflow_id: row.workflow_id.clone(),
     }
 }
 
@@ -77,6 +77,7 @@ pub async fn project_create(
         status: "active".to_string(),
         created_at: now,
         updated_at: now,
+        workflow_id: None,
     };
 
     let created = state
@@ -120,6 +121,7 @@ pub async fn project_update(
         description: params.description,
         tags: params.tags,
         status: params.status,
+        workflow_id: params.workflow_id,
     };
 
     let updated = state
