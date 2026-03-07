@@ -28,6 +28,7 @@ use feature_productivity::{DailyAggregator, FocusManager};
 use futures_util::stream::Stream;
 use futures_util::StreamExt;
 use serde_json::Value;
+use storage::rows::status::{StatusLabelRow, StatusWorkflowRow};
 use storage::{ActionFilter, ActionPatch, ProjectFilter, Repos, StoragePool};
 use tokio::sync::{oneshot, Mutex, RwLock};
 use tokio_stream::wrappers::UnboundedReceiverStream;
@@ -384,6 +385,47 @@ fn priority_label(p: Option<i16>) -> Option<String> {
     p.map(|v| format!("P{v}"))
 }
 
+fn workflow_to_response(
+    wf: StatusWorkflowRow,
+    labels: Vec<StatusLabelRow>,
+) -> StatusWorkflowResponse {
+    StatusWorkflowResponse {
+        id: wf.id,
+        name: wf.name,
+        is_template: wf.is_template,
+        is_global_default: wf.is_global_default,
+        labels: labels.into_iter().map(label_to_response).collect(),
+    }
+}
+
+fn label_to_response(l: StatusLabelRow) -> StatusLabelResponse {
+    StatusLabelResponse {
+        id: l.id,
+        workflow_id: l.workflow_id,
+        name: l.name,
+        color: l.color,
+        status_group: l.status_group,
+        position: l.position,
+    }
+}
+
+async fn resolve_status_label(
+    repos: &Repos,
+    row: &storage::ActionRow,
+) -> Result<Option<StatusLabelResponse>, ApiError> {
+    match &row.status_label_id {
+        Some(label_id) => {
+            let label = repos
+                .status_workflows
+                .get_label(label_id)
+                .await
+                .map_err(storage_err)?;
+            Ok(label.map(label_to_response))
+        }
+        None => Ok(None),
+    }
+}
+
 fn action_to_task(
     row: &storage::ActionRow,
     subtask_count: u32,
@@ -415,7 +457,9 @@ async fn row_to_task(repos: &Repos, row: &storage::ActionRow) -> Result<TaskResp
         .count_children(&row.id)
         .await
         .map_err(storage_err)?;
-    Ok(action_to_task(row, total as u32, completed as u32))
+    let mut task = action_to_task(row, total as u32, completed as u32);
+    task.status_label = resolve_status_label(repos, row).await?;
+    Ok(task)
 }
 
 async fn rows_to_tasks(
@@ -428,13 +472,14 @@ async fn rows_to_tasks(
         .count_children_bulk(&ids)
         .await
         .map_err(storage_err)?;
-    Ok(rows
-        .iter()
-        .map(|row| {
-            let (total, completed) = counts.get(&row.id).copied().unwrap_or((0, 0));
-            action_to_task(row, total as u32, completed as u32)
-        })
-        .collect())
+    let mut tasks = Vec::with_capacity(rows.len());
+    for row in rows {
+        let (total, completed) = counts.get(&row.id).copied().unwrap_or((0, 0));
+        let mut task = action_to_task(row, total as u32, completed as u32);
+        task.status_label = resolve_status_label(repos, row).await?;
+        tasks.push(task);
+    }
+    Ok(tasks)
 }
 
 fn kr_to_response(row: &storage::KeyResultRow) -> KeyResultResponse {
@@ -872,6 +917,152 @@ async fn dispatch(
             }
             Err(e) => err(storage_err(e)),
         },
+
+        // ── Workflows / Labels ─────────────────────────────────
+        "workflow_list" => {
+            match core.repos.status_workflows.list_all().await {
+                Ok(workflows) => {
+                    let mut results = Vec::with_capacity(workflows.len());
+                    for wf in workflows {
+                        match core.repos.status_workflows.get_labels(&wf.id).await {
+                            Ok(labels) => results.push(workflow_to_response(wf, labels)),
+                            Err(e) => return err(storage_err(e)),
+                        }
+                    }
+                    ok(results)
+                }
+                Err(e) => err(storage_err(e)),
+            }
+        }
+        "workflow_get" => {
+            let id = match get_str(&body, "id") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            match core.repos.status_workflows.get(&id).await {
+                Ok(Some(wf)) => {
+                    match core.repos.status_workflows.get_labels(&wf.id).await {
+                        Ok(labels) => ok(Some(workflow_to_response(wf, labels))),
+                        Err(e) => err(storage_err(e)),
+                    }
+                }
+                Ok(None) => ok(None::<StatusWorkflowResponse>),
+                Err(e) => err(storage_err(e)),
+            }
+        }
+        "workflow_get_effective" => {
+            // ProjectRow does not have workflow_id yet, so we always pass None
+            let _project_id: Option<String> = get(&body, "projectId");
+            match core.repos.status_workflows.get_effective_labels(None).await {
+                Ok(labels) => ok(labels.into_iter().map(label_to_response).collect::<Vec<_>>()),
+                Err(e) => err(storage_err(e)),
+            }
+        }
+        "workflow_create" => {
+            let name = match get_str(&body, "name") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let is_template: Option<bool> = get(&body, "isTemplate");
+            let source_workflow_id: Option<String> = get(&body, "sourceWorkflowId");
+
+            let wf_result = match source_workflow_id {
+                Some(source_id) => {
+                    core.repos.status_workflows.duplicate(&source_id, &name).await
+                }
+                None => {
+                    core.repos.status_workflows.create(&name, is_template.unwrap_or(false)).await
+                }
+            };
+            match wf_result {
+                Ok(wf) => {
+                    match core.repos.status_workflows.get_labels(&wf.id).await {
+                        Ok(labels) => ok(workflow_to_response(wf, labels)),
+                        Err(e) => err(storage_err(e)),
+                    }
+                }
+                Err(e) => err(storage_err(e)),
+            }
+        }
+        "workflow_delete" => {
+            let id = match get_str(&body, "id") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            match core.repos.status_workflows.delete(&id).await {
+                Ok(deleted) => ok(deleted),
+                Err(e) => err(storage_err(e)),
+            }
+        }
+        "label_create" => {
+            let workflow_id = match get_str(&body, "workflowId") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let name = match get_str(&body, "name") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let color = match get_str(&body, "color") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let status_group = match get_str(&body, "statusGroup") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let position: i32 = get(&body, "position").unwrap_or(0);
+
+            match core.repos.status_workflows.add_label(&workflow_id, &name, &color, &status_group, position).await {
+                Ok(label) => ok(label_to_response(label)),
+                Err(e) => err(storage_err(e)),
+            }
+        }
+        "label_update" => {
+            let id = match get_str(&body, "id") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let name: Option<String> = get(&body, "name");
+            let color: Option<String> = get(&body, "color");
+            let status_group: Option<String> = get(&body, "statusGroup");
+            let position: Option<i32> = get(&body, "position");
+
+            match core.repos.status_workflows.update_label(
+                &id,
+                name.as_deref(),
+                color.as_deref(),
+                status_group.as_deref(),
+                position,
+            ).await {
+                Ok(label) => ok(label_to_response(label)),
+                Err(e) => err(storage_err(e)),
+            }
+        }
+        "label_delete" => {
+            let id = match get_str(&body, "id") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            match core.repos.status_workflows.delete_label(&id).await {
+                Ok(deleted) => ok(deleted),
+                Err(e) => err(storage_err(e)),
+            }
+        }
+        "label_reorder" => {
+            let workflow_id = match get_str(&body, "workflowId") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let label_ids: Vec<String> = match get(&body, "labelIds") {
+                Some(v) => v,
+                None => return err(ApiError::new("VALIDATION", "missing required field: labelIds")),
+            };
+            match core.repos.status_workflows.reorder_labels(&workflow_id, &label_ids).await {
+                Ok(()) => ok(()),
+                Err(e) => err(storage_err(e)),
+            }
+        }
 
         // ── Objectives ────────────────────────────────────────
         "objective_list" => {
