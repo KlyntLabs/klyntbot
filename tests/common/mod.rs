@@ -178,6 +178,8 @@ pub fn create_test_todo(title: &str) -> Todo {
         next_instance_date: None,
         blocked_by: Vec::new(),
         blocks: Vec::new(),
+        status_label_id: None,
+        position: 0,
     }
 }
 

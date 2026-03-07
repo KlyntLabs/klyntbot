@@ -275,7 +275,10 @@ fn ok(v: impl serde::Serialize) -> ApiResult {
         Ok(val) => ApiResult::Ok(val),
         Err(e) => {
             tracing::error!(error = %e, "response serialization failed");
-            ApiResult::Err(ApiError::new("INTERNAL", format!("serialization error: {e}")))
+            ApiResult::Err(ApiError::new(
+                "INTERNAL",
+                format!("serialization error: {e}"),
+            ))
         }
     }
 }
@@ -297,15 +300,14 @@ fn prod_err(e: common::KlyntbotError) -> ApiError {
 }
 
 fn get<T: serde::de::DeserializeOwned>(body: &Value, key: &str) -> Option<T> {
-    body.get(key).and_then(|v| {
-        match serde_json::from_value(v.clone()) {
+    body.get(key)
+        .and_then(|v| match serde_json::from_value(v.clone()) {
             Ok(val) => Some(val),
             Err(e) => {
                 tracing::warn!(field = key, error = %e, "ignoring malformed optional field");
                 None
             }
-        }
-    })
+        })
 }
 
 fn note_row_to_resp(row: &NoteRow, tags: Vec<String>) -> NoteResponse {
@@ -340,10 +342,7 @@ async fn notes_with_tags_batch(
     rows: &[NoteRow],
 ) -> Result<Vec<NoteResponse>, ApiError> {
     let ids: Vec<String> = rows.iter().map(|r| r.id.clone()).collect();
-    let mut tag_map = repo
-        .get_tags_batch(&ids)
-        .await
-        .map_err(storage_err)?;
+    let mut tag_map = repo.get_tags_batch(&ids).await.map_err(storage_err)?;
     Ok(rows
         .iter()
         .map(|row| {
@@ -919,33 +918,29 @@ async fn dispatch(
         },
 
         // ── Workflows / Labels ─────────────────────────────────
-        "workflow_list" => {
-            match core.repos.status_workflows.list_all().await {
-                Ok(workflows) => {
-                    let mut results = Vec::with_capacity(workflows.len());
-                    for wf in workflows {
-                        match core.repos.status_workflows.get_labels(&wf.id).await {
-                            Ok(labels) => results.push(workflow_to_response(wf, labels)),
-                            Err(e) => return err(storage_err(e)),
-                        }
+        "workflow_list" => match core.repos.status_workflows.list_all().await {
+            Ok(workflows) => {
+                let mut results = Vec::with_capacity(workflows.len());
+                for wf in workflows {
+                    match core.repos.status_workflows.get_labels(&wf.id).await {
+                        Ok(labels) => results.push(workflow_to_response(wf, labels)),
+                        Err(e) => return err(storage_err(e)),
                     }
-                    ok(results)
                 }
-                Err(e) => err(storage_err(e)),
+                ok(results)
             }
-        }
+            Err(e) => err(storage_err(e)),
+        },
         "workflow_get" => {
             let id = match get_str(&body, "id") {
                 Ok(v) => v,
                 Err(e) => return err(e),
             };
             match core.repos.status_workflows.get(&id).await {
-                Ok(Some(wf)) => {
-                    match core.repos.status_workflows.get_labels(&wf.id).await {
-                        Ok(labels) => ok(Some(workflow_to_response(wf, labels))),
-                        Err(e) => err(storage_err(e)),
-                    }
-                }
+                Ok(Some(wf)) => match core.repos.status_workflows.get_labels(&wf.id).await {
+                    Ok(labels) => ok(Some(workflow_to_response(wf, labels))),
+                    Err(e) => err(storage_err(e)),
+                },
                 Ok(None) => ok(None::<StatusWorkflowResponse>),
                 Err(e) => err(storage_err(e)),
             }
@@ -954,7 +949,10 @@ async fn dispatch(
             // ProjectRow does not have workflow_id yet, so we always pass None
             let _project_id: Option<String> = get(&body, "projectId");
             match core.repos.status_workflows.get_effective_labels(None).await {
-                Ok(labels) => ok(labels.into_iter().map(label_to_response).collect::<Vec<_>>()),
+                Ok(labels) => ok(labels
+                    .into_iter()
+                    .map(label_to_response)
+                    .collect::<Vec<_>>()),
                 Err(e) => err(storage_err(e)),
             }
         }
@@ -968,19 +966,23 @@ async fn dispatch(
 
             let wf_result = match source_workflow_id {
                 Some(source_id) => {
-                    core.repos.status_workflows.duplicate(&source_id, &name).await
+                    core.repos
+                        .status_workflows
+                        .duplicate(&source_id, &name)
+                        .await
                 }
                 None => {
-                    core.repos.status_workflows.create(&name, is_template.unwrap_or(false)).await
+                    core.repos
+                        .status_workflows
+                        .create(&name, is_template.unwrap_or(false))
+                        .await
                 }
             };
             match wf_result {
-                Ok(wf) => {
-                    match core.repos.status_workflows.get_labels(&wf.id).await {
-                        Ok(labels) => ok(workflow_to_response(wf, labels)),
-                        Err(e) => err(storage_err(e)),
-                    }
-                }
+                Ok(wf) => match core.repos.status_workflows.get_labels(&wf.id).await {
+                    Ok(labels) => ok(workflow_to_response(wf, labels)),
+                    Err(e) => err(storage_err(e)),
+                },
                 Err(e) => err(storage_err(e)),
             }
         }
@@ -1013,7 +1015,12 @@ async fn dispatch(
             };
             let position: i32 = get(&body, "position").unwrap_or(0);
 
-            match core.repos.status_workflows.add_label(&workflow_id, &name, &color, &status_group, position).await {
+            match core
+                .repos
+                .status_workflows
+                .add_label(&workflow_id, &name, &color, &status_group, position)
+                .await
+            {
                 Ok(label) => ok(label_to_response(label)),
                 Err(e) => err(storage_err(e)),
             }
@@ -1028,13 +1035,18 @@ async fn dispatch(
             let status_group: Option<String> = get(&body, "statusGroup");
             let position: Option<i32> = get(&body, "position");
 
-            match core.repos.status_workflows.update_label(
-                &id,
-                name.as_deref(),
-                color.as_deref(),
-                status_group.as_deref(),
-                position,
-            ).await {
+            match core
+                .repos
+                .status_workflows
+                .update_label(
+                    &id,
+                    name.as_deref(),
+                    color.as_deref(),
+                    status_group.as_deref(),
+                    position,
+                )
+                .await
+            {
                 Ok(label) => ok(label_to_response(label)),
                 Err(e) => err(storage_err(e)),
             }
@@ -1056,9 +1068,19 @@ async fn dispatch(
             };
             let label_ids: Vec<String> = match get(&body, "labelIds") {
                 Some(v) => v,
-                None => return err(ApiError::new("VALIDATION", "missing required field: labelIds")),
+                None => {
+                    return err(ApiError::new(
+                        "VALIDATION",
+                        "missing required field: labelIds",
+                    ))
+                }
             };
-            match core.repos.status_workflows.reorder_labels(&workflow_id, &label_ids).await {
+            match core
+                .repos
+                .status_workflows
+                .reorder_labels(&workflow_id, &label_ids)
+                .await
+            {
                 Ok(()) => ok(()),
                 Err(e) => err(storage_err(e)),
             }
@@ -2561,7 +2583,11 @@ async fn dispatch(
                         .into_iter()
                         .map(|m| (m.entity_type, m.entity_id))
                         .collect();
-                    if let Err(e) = core.note_repo.set_entity_mentions(&updated.id, &mention_tuples).await {
+                    if let Err(e) = core
+                        .note_repo
+                        .set_entity_mentions(&updated.id, &mention_tuples)
+                        .await
+                    {
                         return err(storage_err(e));
                     }
 
@@ -2617,10 +2643,8 @@ async fn dispatch(
             };
             match core.note_repo.list_versions(&note_id).await {
                 Ok(rows) => {
-                    let results: Vec<NoteVersionResponse> = rows
-                        .iter()
-                        .map(version_row_to_resp)
-                        .collect();
+                    let results: Vec<NoteVersionResponse> =
+                        rows.iter().map(version_row_to_resp).collect();
                     ok(results)
                 }
                 Err(e) => err(storage_err(e)),
@@ -2649,7 +2673,10 @@ async fn dispatch(
                         Err(e) => err(storage_err(e)),
                     }
                 }
-                Ok(None) => err(ApiError::new("NOT_FOUND", format!("note '{note_id}' not found"))),
+                Ok(None) => err(ApiError::new(
+                    "NOT_FOUND",
+                    format!("note '{note_id}' not found"),
+                )),
                 Err(e) => err(storage_err(e)),
             }
         }
@@ -2676,7 +2703,11 @@ async fn dispatch(
                             return err(storage_err(e));
                         }
                     }
-                    match core.note_repo.update_note(&note_id, None, Some(&version.body), None, None, None).await {
+                    match core
+                        .note_repo
+                        .update_note(&note_id, None, Some(&version.body), None, None, None)
+                        .await
+                    {
                         Ok(updated) => {
                             let tags = match core.note_repo.get_tags(&note_id).await {
                                 Ok(t) => t,
@@ -2687,7 +2718,10 @@ async fn dispatch(
                         Err(e) => err(storage_err(e)),
                     }
                 }
-                Ok(None) => err(ApiError::new("NOT_FOUND", format!("version '{version_id}' not found"))),
+                Ok(None) => err(ApiError::new(
+                    "NOT_FOUND",
+                    format!("version '{version_id}' not found"),
+                )),
                 Err(e) => err(storage_err(e)),
             }
         }
@@ -2700,7 +2734,11 @@ async fn dispatch(
                 Ok(v) => v,
                 Err(e) => return err(e),
             };
-            match core.note_repo.list_notes_by_entity(&entity_type, &entity_id).await {
+            match core
+                .note_repo
+                .list_notes_by_entity(&entity_type, &entity_id)
+                .await
+            {
                 Ok(rows) => match notes_with_tags_batch(&core.note_repo, &rows).await {
                     Ok(results) => ok(results),
                     Err(e) => err(e),
@@ -2719,14 +2757,22 @@ async fn dispatch(
             };
             let attachments_dir = core.data_dir.join("attachments");
             if let Err(e) = tokio::fs::create_dir_all(&attachments_dir).await {
-                return err(ApiError::new("IO_ERROR", format!("failed to create dir: {e}")));
+                return err(ApiError::new(
+                    "IO_ERROR",
+                    format!("failed to create dir: {e}"),
+                ));
             }
-            const ALLOWED_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp"];
+            const ALLOWED_EXTENSIONS: &[&str] =
+                &["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp"];
             let ext = std::path::Path::new(&filename)
                 .extension()
                 .and_then(|e| e.to_str())
                 .unwrap_or("png");
-            let ext = if ALLOWED_EXTENSIONS.contains(&ext) { ext } else { "png" };
+            let ext = if ALLOWED_EXTENSIONS.contains(&ext) {
+                ext
+            } else {
+                "png"
+            };
             let id = uuid::Uuid::new_v4();
             let file_name = format!("{id}.{ext}");
             let file_path = attachments_dir.join(&file_name);
@@ -2734,7 +2780,12 @@ async fn dispatch(
             use base64::Engine;
             let bytes = match base64::engine::general_purpose::STANDARD.decode(&data_str) {
                 Ok(b) => b,
-                Err(e) => return err(ApiError::new("DECODE_ERROR", format!("invalid base64: {e}"))),
+                Err(e) => {
+                    return err(ApiError::new(
+                        "DECODE_ERROR",
+                        format!("invalid base64: {e}"),
+                    ))
+                }
             };
             if let Err(e) = tokio::fs::write(&file_path, &bytes).await {
                 return err(ApiError::new("IO_ERROR", format!("failed to write: {e}")));
@@ -2763,7 +2814,10 @@ async fn dispatch(
                     Err(e) => return err(ApiError::new("VALIDATION", e.to_string())),
                 };
             if params.title.trim().is_empty() {
-                return err(ApiError::new("VALIDATION", "notebook title must not be empty"));
+                return err(ApiError::new(
+                    "VALIDATION",
+                    "notebook title must not be empty",
+                ));
             }
             let id = uuid::Uuid::new_v4().to_string();
             let now = utc_now_str();
@@ -2789,7 +2843,11 @@ async fn dispatch(
                 };
             // Check for cycles when changing parent
             if let Some(Some(new_parent_id)) = &params.parent_id {
-                match core.note_repo.would_create_cycle(&params.id, new_parent_id).await {
+                match core
+                    .note_repo
+                    .would_create_cycle(&params.id, new_parent_id)
+                    .await
+                {
                     Ok(true) => {
                         return err(ApiError::new(
                             "VALIDATION",
@@ -2804,13 +2862,18 @@ async fn dispatch(
             let parent_id_ref = params.parent_id.as_ref().map(|o| o.as_deref());
             match core
                 .note_repo
-                .update_notebook(id, params.title.as_deref(), params.icon.as_deref(), parent_id_ref)
+                .update_notebook(
+                    id,
+                    params.title.as_deref(),
+                    params.icon.as_deref(),
+                    parent_id_ref,
+                )
                 .await
             {
                 Ok(updated) => {
                     let count = core
                         .note_repo
-                        .count_notes_in_notebook(&id)
+                        .count_notes_in_notebook(id)
                         .await
                         .unwrap_or(0);
                     ok(notebook_row_to_resp(&updated, count))

@@ -111,22 +111,18 @@ pub async fn workflow_create(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<StatusWorkflowResponse, ApiError> {
     let wf = match params.source_workflow_id {
-        Some(source_id) => {
-            state
-                .repos
-                .status_workflows
-                .duplicate(&source_id, &params.name)
-                .await
-                .map_err(super::map_storage_err)?
-        }
-        None => {
-            state
-                .repos
-                .status_workflows
-                .create(&params.name, params.is_template.unwrap_or(false))
-                .await
-                .map_err(super::map_storage_err)?
-        }
+        Some(source_id) => state
+            .repos
+            .status_workflows
+            .duplicate(&source_id, &params.name)
+            .await
+            .map_err(super::map_storage_err)?,
+        None => state
+            .repos
+            .status_workflows
+            .create(&params.name, params.is_template.unwrap_or(false))
+            .await
+            .map_err(super::map_storage_err)?,
     };
 
     let labels = state
@@ -140,10 +136,7 @@ pub async fn workflow_create(
 }
 
 #[tauri::command]
-pub async fn workflow_delete(
-    id: String,
-    state: State<'_, Arc<AppCore>>,
-) -> Result<bool, ApiError> {
+pub async fn workflow_delete(id: String, state: State<'_, Arc<AppCore>>) -> Result<bool, ApiError> {
     state
         .repos
         .status_workflows
@@ -157,10 +150,7 @@ pub async fn label_create(
     params: LabelCreateParams,
     state: State<'_, Arc<AppCore>>,
 ) -> Result<StatusLabelResponse, ApiError> {
-    let position = params.position.unwrap_or_else(|| {
-        // Default position will be set; caller should provide it ideally.
-        0
-    });
+    let position = params.position.unwrap_or(0);
 
     let label = state
         .repos
@@ -200,10 +190,7 @@ pub async fn label_update(
 }
 
 #[tauri::command]
-pub async fn label_delete(
-    id: String,
-    state: State<'_, Arc<AppCore>>,
-) -> Result<bool, ApiError> {
+pub async fn label_delete(id: String, state: State<'_, Arc<AppCore>>) -> Result<bool, ApiError> {
     state
         .repos
         .status_workflows
