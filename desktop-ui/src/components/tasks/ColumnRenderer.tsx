@@ -165,9 +165,9 @@ function ProgressDisplay({ value }: { value: unknown }) {
 
 function DurationDisplay({ value }: { value: unknown }) {
   if (typeof value === "number") {
-    const totalMinutes = value;
-    const h = Math.floor(totalMinutes / 60);
-    const m = totalMinutes % 60;
+    const totalSeconds = value;
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
     const parts: string[] = [];
     if (h > 0) parts.push(`${h}h`);
     if (m > 0 || h === 0) parts.push(`${m}m`);
