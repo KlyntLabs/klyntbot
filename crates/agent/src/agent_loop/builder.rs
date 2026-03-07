@@ -57,6 +57,8 @@ pub struct AgentLoopBuilder {
     cron_service: Option<Arc<scheduling::CronService>>,
     notification_handle: Option<LastActiveChannel>,
     domain_event_bus: Option<Arc<bus::DomainEventBus>>,
+    cognitive_provider: Option<DynProvider>,
+    pipeline_tx: Option<tokio::sync::mpsc::UnboundedSender<cognitive::PipelineEvent>>,
 }
 
 impl AgentLoopBuilder {
@@ -70,6 +72,8 @@ impl AgentLoopBuilder {
             cron_service: None,
             notification_handle: None,
             domain_event_bus: None,
+            cognitive_provider: None,
+            pipeline_tx: None,
         }
     }
 
@@ -98,8 +102,21 @@ impl AgentLoopBuilder {
         self
     }
 
+    pub fn with_cognitive_provider(mut self, provider: Option<DynProvider>) -> Self {
+        self.cognitive_provider = provider;
+        self
+    }
+
+    pub fn with_pipeline_tx(
+        mut self,
+        tx: tokio::sync::mpsc::UnboundedSender<cognitive::PipelineEvent>,
+    ) -> Self {
+        self.pipeline_tx = Some(tx);
+        self
+    }
+
     /// Consume the builder and construct an [`AgentLoop`].
-    pub async fn build(self) -> Result<AgentLoop> {
+    pub async fn build(mut self) -> Result<AgentLoop> {
         let bus = self.bus;
         let provider = self.provider;
         let config = self.config;
@@ -232,10 +249,27 @@ impl AgentLoopBuilder {
                 // Start background consolidation service if we have a DomainEventBus
                 if let Some(ref domain_bus) = self.domain_event_bus {
                     let event_rx = domain_bus.subscribe();
-                    let extraction: Arc<dyn cognitive::ExtractionHandler> =
-                        Arc::new(crate::cognitive_handlers::HeuristicExtractionHandler);
-                    let consolidation: Arc<dyn cognitive::ConsolidationHandler> =
-                        Arc::new(crate::cognitive_handlers::HeuristicConsolidationHandler);
+                    let (extraction, consolidation): (
+                        Arc<dyn cognitive::ExtractionHandler>,
+                        Arc<dyn cognitive::ConsolidationHandler>,
+                    ) = if let Some(ref cp) = self.cognitive_provider {
+                        let params = providers::cognitive_chat_params(&config, 1024);
+                        (
+                            Arc::new(crate::cognitive_handlers::LlmExtractionHandler::new(
+                                cp.clone(),
+                                params.clone(),
+                            )),
+                            Arc::new(crate::cognitive_handlers::LlmConsolidationHandler::new(
+                                cp.clone(),
+                                params,
+                            )),
+                        )
+                    } else {
+                        (
+                            Arc::new(crate::cognitive_handlers::HeuristicExtractionHandler),
+                            Arc::new(crate::cognitive_handlers::HeuristicConsolidationHandler),
+                        )
+                    };
                     let cancel = CancellationToken::new();
                     let bg_service = cognitive::background::BackgroundConsolidationService::start(
                         event_rx,
@@ -243,6 +277,7 @@ impl AgentLoopBuilder {
                         consolidation,
                         fact_repo,
                         cancel.clone(),
+                        self.pipeline_tx.take(),
                     );
                     info!("Cognitive background consolidation service started");
                     Some(bg_service)

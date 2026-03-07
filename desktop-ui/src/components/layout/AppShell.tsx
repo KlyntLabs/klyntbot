@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Outlet, useLocation } from "react-router";
 import { useEvent } from "../../hooks/useEvent";
 import type { SidebarItem } from "../../lib/types";
@@ -9,6 +9,13 @@ export function AppShell() {
   const location = useLocation();
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [openSessionKey, setOpenSessionKey] = useState<string | null>(null);
+
+  const isOnChatPage = location.pathname.startsWith("/chat");
+
+  // Auto-close sidebar chat when navigating to the full /chat page
+  useEffect(() => {
+    if (isOnChatPage) setIsChatOpen(false);
+  }, [isOnChatPage]);
 
   // Derive active sidebar item from current route
   const activeSidebarItem = useMemo((): SidebarItem => {
@@ -49,15 +56,21 @@ export function AppShell() {
 
   return (
     <div className="h-screen w-screen bg-background text-primary flex gap-2 p-2 overflow-hidden">
-      <Sidebar active={activeSidebarItem} isChatOpen={isChatOpen} onToggleChat={toggleChat} />
-      <Outlet />
-      <SidebarChat
-        isOpen={isChatOpen}
-        onClose={closeChat}
-        viewContext={viewContext}
-        openSessionKey={openSessionKey}
-        onSessionKeyUsed={clearSessionKey}
+      <Sidebar
+        active={activeSidebarItem}
+        isChatOpen={isChatOpen}
+        onToggleChat={isOnChatPage ? undefined : toggleChat}
       />
+      <Outlet />
+      {!isOnChatPage && (
+        <SidebarChat
+          isOpen={isChatOpen}
+          onClose={closeChat}
+          viewContext={viewContext}
+          openSessionKey={openSessionKey}
+          onSessionKeyUsed={clearSessionKey}
+        />
+      )}
     </div>
   );
 }

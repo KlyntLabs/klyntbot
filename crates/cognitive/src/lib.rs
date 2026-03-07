@@ -14,6 +14,7 @@ pub mod salience;
 pub mod situation;
 pub mod types;
 
+pub use background::PipelineEvent;
 pub use compaction::CompactionResult;
 pub use consolidation::ConsolidationHandler;
 pub use context_source::CognitiveContextSource;

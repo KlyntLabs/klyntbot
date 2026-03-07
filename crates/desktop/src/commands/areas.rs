@@ -1,46 +1,13 @@
 use desktop_shared::commands::{AreaCreateParams, AreaResponse, AreaUpdateParams};
 use desktop_shared::errors::ApiError;
-use desktop_shared::types::EntityKind;
 use std::sync::Arc;
-use storage::AreaRow;
 use tauri::State;
 
 use crate::app_core::AppCore;
 
-pub(crate) async fn build_area_response(
-    state: &AppCore,
-    row: &AreaRow,
-) -> Result<AreaResponse, ApiError> {
-    let (project_count, task_count) = tokio::try_join!(
-        state.repos.areas.count_projects(&row.id),
-        state.repos.areas.count_actions(&row.id),
-    )
-    .map_err(super::map_storage_err)?;
-
-    Ok(AreaResponse {
-        id: row.id.clone(),
-        name: row.name.clone(),
-        color: row.color.clone(),
-        icon: row.icon.clone(),
-        project_count,
-        task_count,
-    })
-}
-
 #[tauri::command]
 pub async fn area_list(state: State<'_, Arc<AppCore>>) -> Result<Vec<AreaResponse>, ApiError> {
-    let areas = state
-        .repos
-        .areas
-        .list(Some("active"))
-        .await
-        .map_err(super::map_storage_err)?;
-
-    let mut results = Vec::with_capacity(areas.len());
-    for a in &areas {
-        results.push(build_area_response(&state, a).await?);
-    }
-    Ok(results)
+    state.area_list().await
 }
 
 #[tauri::command]
@@ -49,38 +16,9 @@ pub async fn area_create(
     app: tauri::AppHandle,
     params: AreaCreateParams,
 ) -> Result<AreaResponse, ApiError> {
-    let id = uuid::Uuid::new_v4().to_string();
-    let now = chrono::Utc::now();
-
-    let row = AreaRow {
-        id: id.clone(),
-        name: params.name,
-        description: None,
-        color: params.color.unwrap_or_else(|| "blue".to_string()),
-        icon: params.icon,
-        position: 0,
-        status: "active".to_string(),
-        created_at: now,
-        updated_at: now,
-    };
-
-    state
-        .repos
-        .areas
-        .create(&row)
-        .await
-        .map_err(super::map_storage_err)?;
-
-    super::emit_entity_updated(&app, EntityKind::Area, &id);
-
-    Ok(AreaResponse {
-        id: row.id,
-        name: row.name,
-        color: row.color,
-        icon: row.icon,
-        project_count: 0,
-        task_count: 0,
-    })
+    let (result, updates) = state.area_create(params).await?;
+    super::emit_updates(&app, &updates);
+    Ok(result)
 }
 
 #[tauri::command]
@@ -89,23 +27,9 @@ pub async fn area_update(
     app: tauri::AppHandle,
     params: AreaUpdateParams,
 ) -> Result<AreaResponse, ApiError> {
-    let updated = state
-        .repos
-        .areas
-        .update(
-            &params.id,
-            params.name.as_deref(),
-            None,
-            params.color.as_deref(),
-            params.icon.as_ref().map(|o| o.as_deref()),
-            None,
-        )
-        .await
-        .map_err(super::map_storage_err)?;
-
-    super::emit_entity_updated(&app, EntityKind::Area, &params.id);
-
-    build_area_response(&state, &updated).await
+    let (result, updates) = state.area_update(params).await?;
+    super::emit_updates(&app, &updates);
+    Ok(result)
 }
 
 #[tauri::command]
@@ -114,18 +38,9 @@ pub async fn area_delete(
     app: tauri::AppHandle,
     id: String,
 ) -> Result<bool, ApiError> {
-    let deleted = state
-        .repos
-        .areas
-        .delete(&id)
-        .await
-        .map_err(super::map_storage_err)?;
-
-    if deleted {
-        super::emit_entity_updated(&app, EntityKind::Area, &id);
-    }
-
-    Ok(deleted)
+    let (result, updates) = state.area_delete(id).await?;
+    super::emit_updates(&app, &updates);
+    Ok(result)
 }
 
 #[tauri::command]
@@ -135,14 +50,7 @@ pub async fn area_reorder(
     id: String,
     position: i32,
 ) -> Result<AreaResponse, ApiError> {
-    let updated = state
-        .repos
-        .areas
-        .reorder(&id, position)
-        .await
-        .map_err(super::map_storage_err)?;
-
-    super::emit_entity_updated(&app, EntityKind::Area, &id);
-
-    build_area_response(&state, &updated).await
+    let (result, updates) = state.area_reorder(id, position).await?;
+    super::emit_updates(&app, &updates);
+    Ok(result)
 }

@@ -244,6 +244,21 @@ impl SignalAccumulator {
     pub fn window_size(&self) -> usize {
         self.window.len()
     }
+
+    /// Get a snapshot of signals in the current window.
+    pub fn signals(&self) -> &VecDeque<Signal> {
+        &self.window
+    }
+
+    /// Get the trigger condition names and their cooldown state.
+    pub fn condition_names(&self) -> Vec<&str> {
+        self.conditions.iter().map(|c| c.name.as_str()).collect()
+    }
+
+    /// Get last fired timestamps for trigger conditions.
+    pub fn last_fired(&self) -> &std::collections::HashMap<String, DateTime<Utc>> {
+        &self.last_fired
+    }
 }
 
 impl Default for SignalAccumulator {

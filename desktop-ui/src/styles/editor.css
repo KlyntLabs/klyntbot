@@ -441,6 +441,74 @@
   caret-color: var(--brand);
 }
 
+/* ── Syntax highlighting tokens (shared with prose.css) ─────────────── */
+
+.editor-content .hljs-comment,
+.editor-content .hljs-quote {
+  color: color-mix(in srgb, var(--color-muted) 80%, transparent);
+  font-style: italic;
+}
+
+.editor-content .hljs-keyword,
+.editor-content .hljs-selector-tag,
+.editor-content .hljs-type {
+  color: var(--color-purple, #c084fc);
+}
+
+.editor-content .hljs-string,
+.editor-content .hljs-addition {
+  color: var(--color-success, #4ade80);
+}
+
+.editor-content .hljs-number,
+.editor-content .hljs-literal,
+.editor-content .hljs-symbol,
+.editor-content .hljs-bullet {
+  color: var(--color-brand, #f97316);
+}
+
+.editor-content .hljs-title,
+.editor-content .hljs-section,
+.editor-content .hljs-built_in {
+  color: var(--color-info, #60a5fa);
+}
+
+.editor-content .hljs-attr,
+.editor-content .hljs-attribute {
+  color: var(--color-brand-hover, #fb923c);
+}
+
+.editor-content .hljs-name,
+.editor-content .hljs-tag {
+  color: var(--color-info, #60a5fa);
+}
+
+.editor-content .hljs-variable,
+.editor-content .hljs-template-variable {
+  color: var(--color-primary);
+}
+
+.editor-content .hljs-regexp,
+.editor-content .hljs-link {
+  color: var(--color-brand, #f97316);
+}
+
+.editor-content .hljs-deletion {
+  color: var(--color-destructive, #f43f5e);
+}
+
+.editor-content .hljs-meta {
+  color: var(--color-muted);
+}
+
+.editor-content .hljs-emphasis {
+  font-style: italic;
+}
+
+.editor-content .hljs-strong {
+  font-weight: 700;
+}
+
 /* Search highlights */
 .vim-search-match {
   background: rgba(249, 115, 22, 0.25);

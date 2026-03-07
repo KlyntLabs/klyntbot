@@ -27,7 +27,7 @@ members = [
     "crates/feature-productivity",
     "crates/cognitive",
     "crates/feature-coaching",
-    "crates/dev-api",
+    "crates/app-core",
 ]
 
 [workspace.package]
@@ -62,6 +62,7 @@ cognitive = { path = "crates/cognitive" }
 feature-coaching = { path = "crates/feature-coaching" }
 desktop-shared = { path = "crates/desktop-shared" }
 desktop = { path = "crates/desktop" }
+app-core = { path = "crates/app-core" }
 extism = "1"
 mcp = { path = "crates/mcp" }
 rmcp = { version = "0.17", default-features = false }

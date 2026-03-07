@@ -57,6 +57,9 @@ const FinanceGoals = lazy(() =>
 const FinanceLiabilities = lazy(() =>
   import("./components/views/FinanceLiabilities").then((m) => ({ default: m.FinanceLiabilities })),
 );
+const DebugDashboard = lazy(() =>
+  import("./components/debug/DebugDashboard").then((m) => ({ default: m.DebugDashboard })),
+);
 const SettingsLayout = lazy(() =>
   import("./components/settings/SettingsLayout").then((m) => ({ default: m.SettingsLayout })),
 );
@@ -130,6 +133,7 @@ const router = createHashRouter([
       { path: "/finance/investments", element: <FinanceInvestments /> },
       { path: "/finance/goals", element: <FinanceGoals /> },
       { path: "/finance/liabilities", element: <FinanceLiabilities /> },
+      { path: "/debug", element: <DebugDashboard /> },
       { path: "/settings", element: <Navigate to="/settings/general" replace /> },
       {
         path: "/settings/general",

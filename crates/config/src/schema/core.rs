@@ -7,6 +7,7 @@ use std::path::PathBuf;
 use super::agents::AgentsConfig;
 
 use super::channels::ChannelsConfig;
+use super::cognitive::CognitiveConfig;
 use super::confidence::ConfidenceConfig;
 use super::conversation::ConversationConfig;
 use super::finance::FinanceConfig;
@@ -138,6 +139,10 @@ pub struct Config {
     /// Plugin system configuration.
     #[serde(default)]
     pub plugins: PluginsConfig,
+
+    /// Cognitive memory & coaching configuration.
+    #[serde(default)]
+    pub cognitive: CognitiveConfig,
 
     /// MCP (Model Context Protocol) server connections and server settings.
     #[serde(default)]

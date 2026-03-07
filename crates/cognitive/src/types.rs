@@ -91,3 +91,30 @@ pub struct UserModel {
     pub learning: Vec<SemanticFact>,
     pub preferences: Vec<SemanticFact>,
 }
+
+impl UserModel {
+    /// Total number of active facts across all domains.
+    pub fn active_fact_count(&self) -> usize {
+        self.identity.len()
+            + self.energy.len()
+            + self.work.len()
+            + self.finance.len()
+            + self.learning.len()
+            + self.preferences.len()
+    }
+
+    /// Number of domains that have at least one fact.
+    pub fn non_empty_domain_count(&self) -> usize {
+        [
+            !self.identity.is_empty(),
+            !self.energy.is_empty(),
+            !self.work.is_empty(),
+            !self.finance.is_empty(),
+            !self.learning.is_empty(),
+            !self.preferences.is_empty(),
+        ]
+        .iter()
+        .filter(|&&has| has)
+        .count()
+    }
+}

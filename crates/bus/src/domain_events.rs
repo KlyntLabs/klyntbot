@@ -114,6 +114,11 @@ impl DomainEventBus {
     pub fn subscribe(&self) -> broadcast::Receiver<DomainEvent> {
         self.tx.subscribe()
     }
+
+    /// Number of active subscribers.
+    pub fn subscriber_count(&self) -> usize {
+        self.tx.receiver_count()
+    }
 }
 
 #[cfg(test)]

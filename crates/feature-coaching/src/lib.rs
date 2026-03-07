@@ -5,10 +5,12 @@ pub mod feedback;
 pub mod pattern_detector;
 pub mod reasoner;
 pub mod router;
+pub mod service;
 pub mod signal_accumulator;
 
 pub use feedback::FeedbackTracker;
 pub use pattern_detector::PatternDetector;
 pub use reasoner::{CoachingDecision, CoachingReasonerHandler};
 pub use router::{InterventionChannel, InterventionRouter};
+pub use service::CoachingService;
 pub use signal_accumulator::{SignalAccumulator, TriggerCondition};

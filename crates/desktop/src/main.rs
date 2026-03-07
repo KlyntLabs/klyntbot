@@ -8,7 +8,6 @@ mod oauth;
 
 use std::sync::Arc;
 
-use app_core::AppCore;
 use commands::window::{WINDOW_LAUNCHER, WINDOW_TRAY};
 use tauri::image::Image;
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
@@ -51,7 +50,7 @@ fn main() {
         .setup(|app| {
             let handle = app.handle().clone();
             let core = Arc::new(
-                tauri::async_runtime::block_on(AppCore::init(handle))
+                tauri::async_runtime::block_on(app_core::init(handle))
                     .expect("failed to initialize app core"),
             );
 
@@ -257,6 +256,27 @@ fn main() {
             commands::columns::custom_column_values,
             commands::columns::custom_column_value_set,
             commands::columns::custom_column_value_delete,
+            // Cognitive Debug
+            commands::cognitive::cognitive_user_model,
+            commands::cognitive::cognitive_facts_list,
+            commands::cognitive::cognitive_episodic_list,
+            commands::cognitive::cognitive_rules_list,
+            commands::cognitive::cognitive_memory_stats,
+            commands::cognitive::coaching_situation,
+            commands::cognitive::coaching_signals,
+            commands::cognitive::coaching_patterns,
+            commands::cognitive::coaching_feedback_stats,
+            commands::cognitive::coaching_router_status,
+            commands::cognitive::cognitive_system_status,
+            commands::cognitive::cognitive_fact_create,
+            commands::cognitive::cognitive_fact_update,
+            commands::cognitive::cognitive_fact_delete,
+            commands::cognitive::cognitive_rule_create,
+            commands::cognitive::cognitive_rule_deactivate,
+            commands::cognitive::cognitive_run_compaction,
+            commands::cognitive::coaching_reset_dismissals,
+            commands::cognitive::coaching_clear_signals,
+            commands::cognitive::cognitive_inject_event,
             // Status
             commands::status::agent_status,
             // Window
