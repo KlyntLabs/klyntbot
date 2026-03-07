@@ -232,6 +232,16 @@ fn main() {
             // OAuth
             oauth::commands::mcp_oauth_start,
             oauth::commands::mcp_oauth_disconnect,
+            // Workflows
+            commands::workflows::workflow_list,
+            commands::workflows::workflow_get,
+            commands::workflows::workflow_get_effective,
+            commands::workflows::workflow_create,
+            commands::workflows::workflow_delete,
+            commands::workflows::label_create,
+            commands::workflows::label_update,
+            commands::workflows::label_delete,
+            commands::workflows::label_reorder,
             // Status
             commands::status::agent_status,
             // Window

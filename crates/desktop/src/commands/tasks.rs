@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use desktop_shared::commands::{
-    KeyResultResponse, ObjectiveResponse, ProjectResponse, TaskCreateParams, TaskResponse,
-    TaskUpdateParams, TodayTaskResponse,
+    KeyResultResponse, ObjectiveResponse, ProjectResponse, StatusLabelResponse, TaskCreateParams,
+    TaskResponse, TaskUpdateParams, TodayTaskResponse,
 };
 use desktop_shared::errors::ApiError;
 use desktop_shared::types::EntityKind;
@@ -118,13 +118,39 @@ pub(crate) async fn rows_to_tasks(
         .await
         .map_err(super::map_storage_err)?;
 
-    Ok(rows
-        .iter()
-        .map(|row| {
-            let (total, completed) = counts.get(&row.id).copied().unwrap_or((0, 0));
-            action_to_task(row, total as u32, completed as u32)
-        })
-        .collect())
+    let mut tasks = Vec::with_capacity(rows.len());
+    for row in rows {
+        let (total, completed) = counts.get(&row.id).copied().unwrap_or((0, 0));
+        let mut task = action_to_task(row, total as u32, completed as u32);
+        task.status_label = resolve_status_label(repos, row).await?;
+        tasks.push(task);
+    }
+    Ok(tasks)
+}
+
+/// Look up the status label for an action row, if it has one.
+async fn resolve_status_label(
+    repos: &storage::Repos,
+    row: &ActionRow,
+) -> Result<Option<StatusLabelResponse>, ApiError> {
+    match &row.status_label_id {
+        Some(label_id) => {
+            let label = repos
+                .status_workflows
+                .get_label(label_id)
+                .await
+                .map_err(super::map_storage_err)?;
+            Ok(label.map(|l| StatusLabelResponse {
+                id: l.id,
+                workflow_id: l.workflow_id,
+                name: l.name,
+                color: l.color,
+                status_group: l.status_group,
+                position: l.position,
+            }))
+        }
+        None => Ok(None),
+    }
 }
 
 /// Fetch subtask counts for a single row and convert to TaskResponse.
@@ -137,7 +163,9 @@ pub(crate) async fn row_to_task(
         .count_children(&row.id)
         .await
         .map_err(super::map_storage_err)?;
-    Ok(action_to_task(row, total as u32, completed as u32))
+    let mut task = action_to_task(row, total as u32, completed as u32);
+    task.status_label = resolve_status_label(repos, row).await?;
+    Ok(task)
 }
 
 // ── Commands ────────────────────────────────────────────────────────────

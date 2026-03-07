@@ -12,6 +12,7 @@ pub mod settings;
 pub mod status;
 pub mod tasks;
 pub mod window;
+pub mod workflows;
 
 use chrono::{DateTime, Utc};
 use desktop_shared::commands::{McpConfigResponse, McpServerResponse};
