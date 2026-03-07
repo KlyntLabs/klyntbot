@@ -12,7 +12,10 @@ pub mod objective;
 pub mod project;
 pub mod session;
 pub mod session_context;
+pub mod status;
 pub mod usage;
+
+pub use status::{StatusLabelRow, StatusWorkflowRow};
 
 #[cfg(test)]
 mod serialization_tests;
