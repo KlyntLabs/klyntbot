@@ -256,6 +256,7 @@ mod tests {
             blocks: Vec::new(),
             status_label_id: None,
             position: 0,
+            group_id: None,
         }
     }
 

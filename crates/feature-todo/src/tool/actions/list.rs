@@ -35,6 +35,7 @@ impl TaskTool {
             templates_only: false,
             root_only: false,
             status_group: None,
+            group_id: None,
         };
 
         let rows = self.repo.list(&filter).await?;

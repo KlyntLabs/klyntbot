@@ -149,7 +149,9 @@ export function createVimPlugin(opts: VimPluginOptions): VimPluginInstance {
         }
       }
 
-      const tr = view.state.tr.setSelection(TextSelection.create(view.state.doc, selFrom, selTo)).scrollIntoView();
+      const tr = view.state.tr
+        .setSelection(TextSelection.create(view.state.doc, selFrom, selTo))
+        .scrollIntoView();
       view.dispatch(tr);
       updateState({ ...resetOperatorState(vim), visualAnchor: anchor });
       return;
@@ -157,7 +159,9 @@ export function createVimPlugin(opts: VimPluginOptions): VimPluginInstance {
 
     // Normal mode: just move cursor
     const clamped = clampPos(view.state, targetPos);
-    const tr = view.state.tr.setSelection(TextSelection.create(view.state.doc, clamped)).scrollIntoView();
+    const tr = view.state.tr
+      .setSelection(TextSelection.create(view.state.doc, clamped))
+      .scrollIntoView();
     view.dispatch(tr);
     updateState(resetOperatorState(vim));
   }
@@ -568,7 +572,9 @@ export function createVimPlugin(opts: VimPluginOptions): VimPluginInstance {
         if (vim.mode === "visual" || vim.mode === "visual-line") {
           // Collapse selection to cursor head
           const head = cursorPos(view.state);
-          const tr = view.state.tr.setSelection(TextSelection.create(view.state.doc, head)).scrollIntoView();
+          const tr = view.state.tr
+            .setSelection(TextSelection.create(view.state.doc, head))
+            .scrollIntoView();
           view.dispatch(tr);
         }
         updateState(enterNormalMode(vim));

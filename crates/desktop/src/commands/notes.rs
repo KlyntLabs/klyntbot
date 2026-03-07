@@ -385,7 +385,11 @@ pub async fn note_version_restore(
         body: current_note.body,
         created_at: utc_now_str(),
     };
-    state.note_repo.create_version(&snapshot).await.map_err(super::map_storage_err)?;
+    state
+        .note_repo
+        .create_version(&snapshot)
+        .await
+        .map_err(super::map_storage_err)?;
 
     // Restore the version body
     let updated = state
@@ -403,8 +407,8 @@ pub async fn note_version_restore(
 #[tauri::command]
 pub async fn note_save_attachment(
     state: State<'_, Arc<AppCore>>,
-    data: String,        // base64-encoded image bytes
-    filename: String,    // e.g. "paste.png"
+    data: String,     // base64-encoded image bytes
+    filename: String, // e.g. "paste.png"
 ) -> Result<String, ApiError> {
     let config = state.config.read().await;
     let attachments_dir = config.data_dir_path().join("attachments");
@@ -420,7 +424,11 @@ pub async fn note_save_attachment(
         .extension()
         .and_then(|e| e.to_str())
         .unwrap_or("png");
-    let ext = if ALLOWED_EXTENSIONS.contains(&ext) { ext } else { "png" };
+    let ext = if ALLOWED_EXTENSIONS.contains(&ext) {
+        ext
+    } else {
+        "png"
+    };
 
     let id = uuid::Uuid::new_v4();
     let file_name = format!("{id}.{ext}");
@@ -470,7 +478,10 @@ pub async fn notebook_create(
     params: NotebookCreateParams,
 ) -> Result<NotebookResponse, ApiError> {
     if params.title.trim().is_empty() {
-        return Err(ApiError::new("VALIDATION", "notebook title must not be empty"));
+        return Err(ApiError::new(
+            "VALIDATION",
+            "notebook title must not be empty",
+        ));
     }
     let id = uuid::Uuid::new_v4().to_string();
     let now = utc_now_str();
@@ -519,7 +530,12 @@ pub async fn notebook_update(
     let parent_id_ref = params.parent_id.as_ref().map(|o| o.as_deref());
     let updated = state
         .note_repo
-        .update_notebook(&params.id, params.title.as_deref(), params.icon.as_deref(), parent_id_ref)
+        .update_notebook(
+            &params.id,
+            params.title.as_deref(),
+            params.icon.as_deref(),
+            parent_id_ref,
+        )
         .await
         .map_err(super::map_storage_err)?;
 

@@ -542,6 +542,7 @@ mod tests {
             next_instance_date: None,
             status_label_id: Some(todo_label.id.clone()),
             position: 0,
+            group_id: None,
         };
         let inserted = repos.actions.add(&action_row).await.unwrap();
         assert_eq!(inserted.status_label_id, Some(todo_label.id.clone()));

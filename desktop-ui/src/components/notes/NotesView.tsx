@@ -21,7 +21,10 @@ type NotesViewMode = "editor" | "graph";
 function ViewModeToggle({
   viewMode,
   onChange,
-}: { viewMode: NotesViewMode; onChange: (mode: NotesViewMode) => void }) {
+}: {
+  viewMode: NotesViewMode;
+  onChange: (mode: NotesViewMode) => void;
+}) {
   return (
     <div className="flex items-center gap-1">
       <button

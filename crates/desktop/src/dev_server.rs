@@ -157,20 +157,17 @@ async fn dispatch(
             // Auto-assign status_label_id if not provided
             let status_label_id = match params.status_label_id {
                 Some(id) => Some(id),
-                None => {
-                    match core.repos.status_workflows.get_global_default().await {
-                        Ok(Some(wf)) => {
-                            core.repos
-                                .status_workflows
-                                .find_label_by_group(&wf.id, "not_started")
-                                .await
-                                .ok()
-                                .flatten()
-                                .map(|l| l.id)
-                        }
-                        _ => None,
-                    }
-                }
+                None => match core.repos.status_workflows.get_global_default().await {
+                    Ok(Some(wf)) => core
+                        .repos
+                        .status_workflows
+                        .find_label_by_group(&wf.id, "not_started")
+                        .await
+                        .ok()
+                        .flatten()
+                        .map(|l| l.id),
+                    _ => None,
+                },
             };
             let row = storage::ActionRow {
                 id: id.clone(),
@@ -202,6 +199,7 @@ async fn dispatch(
                 next_instance_date: None,
                 status_label_id,
                 position: 0,
+                group_id: params.group_id,
             };
             match core.repos.actions.add(&row).await {
                 Ok(created) => ok(action_to_task(&created, 0, 0)),
@@ -228,6 +226,7 @@ async fn dispatch(
                 project_id: params.project_id,
                 key_result_id: params.key_result_id,
                 status_label_id: params.status_label_id,
+                group_id: params.group_id,
                 ..Default::default()
             };
             match core.repos.actions.update(&patch).await {
@@ -1590,6 +1589,131 @@ async fn dispatch(
                         .collect();
                     ok(resp)
                 }
+                Err(e) => err(storage_err(e)),
+            }
+        }
+
+        // ── Task Groups ──────────────────────────────────────
+        "group_list" => {
+            let project_id: Option<String> = get(&body, "projectId");
+            match core.repos.task_groups.list(project_id.as_deref()).await {
+                Ok(rows) => {
+                    let mut results = Vec::new();
+                    for row in &rows {
+                        let count = core
+                            .repos
+                            .task_groups
+                            .count_tasks(&row.id)
+                            .await
+                            .unwrap_or(0);
+                        results.push(TaskGroupResponse {
+                            id: row.id.clone(),
+                            project_id: row.project_id.clone(),
+                            name: row.name.clone(),
+                            color: row.color.clone(),
+                            position: row.position,
+                            task_count: count,
+                        });
+                    }
+                    ok(results)
+                }
+                Err(e) => err(storage_err(e)),
+            }
+        }
+        "group_create" => {
+            let params: TaskGroupCreateParams =
+                match serde_json::from_value(body.get("params").cloned().unwrap_or(body.clone())) {
+                    Ok(p) => p,
+                    Err(e) => return err(ApiError::new("VALIDATION", e.to_string())),
+                };
+            let existing = core
+                .repos
+                .task_groups
+                .list(params.project_id.as_deref())
+                .await
+                .unwrap_or_default();
+            let position = existing.len() as i32;
+            match core
+                .repos
+                .task_groups
+                .create(
+                    params.project_id.as_deref(),
+                    &params.name,
+                    params.color.as_deref(),
+                    position,
+                )
+                .await
+            {
+                Ok(row) => ok(TaskGroupResponse {
+                    id: row.id,
+                    project_id: row.project_id,
+                    name: row.name,
+                    color: row.color,
+                    position: row.position,
+                    task_count: 0,
+                }),
+                Err(e) => err(storage_err(e)),
+            }
+        }
+        "group_update" => {
+            let params: TaskGroupUpdateParams =
+                match serde_json::from_value(body.get("params").cloned().unwrap_or(body.clone())) {
+                    Ok(p) => p,
+                    Err(e) => return err(ApiError::new("VALIDATION", e.to_string())),
+                };
+            match core
+                .repos
+                .task_groups
+                .update(
+                    &params.id,
+                    params.name.as_deref(),
+                    params.color.as_deref(),
+                    params.position,
+                )
+                .await
+            {
+                Ok(row) => {
+                    let count = core
+                        .repos
+                        .task_groups
+                        .count_tasks(&row.id)
+                        .await
+                        .unwrap_or(0);
+                    ok(TaskGroupResponse {
+                        id: row.id,
+                        project_id: row.project_id,
+                        name: row.name,
+                        color: row.color,
+                        position: row.position,
+                        task_count: count,
+                    })
+                }
+                Err(e) => err(storage_err(e)),
+            }
+        }
+        "group_delete" => {
+            let id = match get_str(&body, "id") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            match core.repos.task_groups.delete(&id).await {
+                Ok(deleted) => ok(deleted),
+                Err(e) => err(storage_err(e)),
+            }
+        }
+        "group_reorder" => {
+            let params: TaskGroupReorderParams =
+                match serde_json::from_value(body.get("params").cloned().unwrap_or(body.clone())) {
+                    Ok(p) => p,
+                    Err(e) => return err(ApiError::new("VALIDATION", e.to_string())),
+                };
+            match core
+                .repos
+                .task_groups
+                .reorder(params.project_id.as_deref(), &params.group_ids)
+                .await
+            {
+                Ok(()) => ok(()),
                 Err(e) => err(storage_err(e)),
             }
         }

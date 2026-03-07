@@ -78,6 +78,7 @@ impl TodoPatch {
             key_result_id: self.key_result_id.clone(),
             status_label_id: None,
             position: None,
+            group_id: None,
         }
     }
 }
@@ -99,6 +100,7 @@ impl TodoFilter {
             templates_only: self.include_templates,
             root_only: false,
             status_group: None,
+            group_id: None,
         }
     }
 }

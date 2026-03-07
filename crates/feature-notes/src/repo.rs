@@ -17,9 +17,7 @@ fn nullable_to_sentinel(v: Option<Option<&str>>) -> Option<&str> {
 
 /// UTC "now" as an ISO-8601 string (`YYYY-MM-DDTHH:MM:SSZ`).
 pub fn utc_now_str() -> String {
-    chrono::Utc::now()
-        .format("%Y-%m-%dT%H:%M:%SZ")
-        .to_string()
+    chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string()
 }
 
 #[derive(Debug, Clone)]
@@ -241,11 +239,10 @@ impl NoteRepo {
     }
 
     pub async fn list_notebooks(&self) -> Result<Vec<NotebookRow>, StorageError> {
-        let rows = sqlx::query_as::<_, NotebookRow>(
-            "SELECT * FROM notebooks ORDER BY sort_order, title",
-        )
-        .fetch_all(&self.pool)
-        .await?;
+        let rows =
+            sqlx::query_as::<_, NotebookRow>("SELECT * FROM notebooks ORDER BY sort_order, title")
+                .fetch_all(&self.pool)
+                .await?;
         Ok(rows)
     }
 
@@ -279,16 +276,12 @@ impl NoteRepo {
         Ok(row)
     }
 
-    pub async fn count_notes_in_notebook(
-        &self,
-        notebook_id: &str,
-    ) -> Result<i64, StorageError> {
-        let count: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM notes WHERE notebook_id = ?1 AND archived = 0",
-        )
-        .bind(notebook_id)
-        .fetch_one(&self.pool)
-        .await?;
+    pub async fn count_notes_in_notebook(&self, notebook_id: &str) -> Result<i64, StorageError> {
+        let count: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM notes WHERE notebook_id = ?1 AND archived = 0")
+                .bind(notebook_id)
+                .fetch_one(&self.pool)
+                .await?;
         Ok(count.0)
     }
 
@@ -394,7 +387,11 @@ impl NoteRepo {
             return Ok(vec![]);
         }
         // Build dynamic IN clause
-        let placeholders: Vec<String> = titles.iter().enumerate().map(|(i, _)| format!("LOWER(?{})", i + 1)).collect();
+        let placeholders: Vec<String> = titles
+            .iter()
+            .enumerate()
+            .map(|(i, _)| format!("LOWER(?{})", i + 1))
+            .collect();
         let sql = format!(
             "SELECT title, id FROM notes WHERE LOWER(title) IN ({}) AND archived = 0",
             placeholders.join(", ")
@@ -430,10 +427,7 @@ impl NoteRepo {
         Ok(())
     }
 
-    pub async fn get_links_from(
-        &self,
-        source_id: &str,
-    ) -> Result<Vec<NoteLinkRow>, StorageError> {
+    pub async fn get_links_from(&self, source_id: &str) -> Result<Vec<NoteLinkRow>, StorageError> {
         let rows =
             sqlx::query_as::<_, NoteLinkRow>("SELECT * FROM note_links WHERE source_id = ?1")
                 .bind(source_id)
@@ -479,19 +473,14 @@ impl NoteRepo {
     }
 
     pub async fn get_version(&self, id: &str) -> Result<Option<NoteVersionRow>, StorageError> {
-        let row = sqlx::query_as::<_, NoteVersionRow>(
-            "SELECT * FROM note_versions WHERE id = ?1",
-        )
-        .bind(id)
-        .fetch_optional(&self.pool)
-        .await?;
+        let row = sqlx::query_as::<_, NoteVersionRow>("SELECT * FROM note_versions WHERE id = ?1")
+            .bind(id)
+            .fetch_optional(&self.pool)
+            .await?;
         Ok(row)
     }
 
-    pub async fn list_versions(
-        &self,
-        note_id: &str,
-    ) -> Result<Vec<NoteVersionRow>, StorageError> {
+    pub async fn list_versions(&self, note_id: &str) -> Result<Vec<NoteVersionRow>, StorageError> {
         let rows = sqlx::query_as::<_, NoteVersionRow>(
             "SELECT * FROM note_versions WHERE note_id = ?1 ORDER BY created_at DESC",
         )
@@ -565,9 +554,7 @@ mod tests {
     #[tokio::test]
     async fn test_list_notes() {
         let repo = setup().await;
-        repo.create_note(&sample_note("n1", "First"))
-            .await
-            .unwrap();
+        repo.create_note(&sample_note("n1", "First")).await.unwrap();
         repo.create_note(&sample_note("n2", "Second"))
             .await
             .unwrap();
@@ -607,9 +594,7 @@ mod tests {
     async fn test_health_check() {
         let repo = setup().await;
         repo.check_health().await.unwrap();
-        repo.create_note(&sample_note("n1", "One"))
-            .await
-            .unwrap();
+        repo.create_note(&sample_note("n1", "One")).await.unwrap();
         repo.check_health().await.unwrap();
     }
 

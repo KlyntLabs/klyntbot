@@ -37,6 +37,7 @@ pub struct ActionRow {
     pub next_instance_date: Option<DateTime<Utc>>,
     pub status_label_id: Option<String>,
     pub position: i32,
+    pub group_id: Option<String>,
 }
 
 /// Row struct for the `action_attachments` table.

@@ -87,9 +87,7 @@ pub fn extract_entity_mentions(text: &str) -> Vec<EntityMention> {
         if let Some(colon) = after_at.find(':') {
             let entity_type = &after_at[..colon];
             // Validate entity type is alphanumeric/underscore
-            if entity_type
-                .chars()
-                .all(|c| c.is_alphanumeric() || c == '_')
+            if entity_type.chars().all(|c| c.is_alphanumeric() || c == '_')
                 && !entity_type.is_empty()
             {
                 let id_start = colon + 1;

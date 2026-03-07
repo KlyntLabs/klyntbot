@@ -36,7 +36,12 @@ impl ExtractionHandler for HeuristicExtractionHandler {
                 vec![fact(od, "pattern", 0.7, "inferred")]
             }
             _ if observation.importance >= 0.7 => {
-                vec![fact(od, "observation", observation.importance * 0.8, "observed")]
+                vec![fact(
+                    od,
+                    "observation",
+                    observation.importance * 0.8,
+                    "observed",
+                )]
             }
             _ => vec![],
         };

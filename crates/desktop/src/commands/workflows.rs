@@ -95,7 +95,13 @@ pub async fn workflow_get_effective(
     // Look up project's workflow_id if a project_id is provided.
     let project_workflow_id = match project_id {
         Some(ref pid) => {
-            match state.repos.projects.get(pid).await.map_err(super::map_storage_err)? {
+            match state
+                .repos
+                .projects
+                .get(pid)
+                .await
+                .map_err(super::map_storage_err)?
+            {
                 Some(proj) => proj.workflow_id,
                 None => None,
             }

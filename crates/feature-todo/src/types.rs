@@ -63,6 +63,8 @@ pub struct Action {
     pub status_label_id: Option<String>,
     #[serde(default)]
     pub position: i32,
+    #[serde(default)]
+    pub group_id: Option<String>,
 }
 
 impl Action {
@@ -106,6 +108,7 @@ impl Action {
             blocks: Vec::new(),
             status_label_id: None,
             position: 0,
+            group_id: None,
         }
     }
 }
@@ -264,6 +267,7 @@ impl From<ActionRow> for Action {
             blocks: Vec::new(),
             status_label_id: row.status_label_id,
             position: row.position,
+            group_id: row.group_id,
         }
     }
 }
@@ -298,6 +302,7 @@ impl From<&Action> for ActionRow {
             next_instance_date: action.next_instance_date,
             status_label_id: action.status_label_id.clone(),
             position: action.position,
+            group_id: action.group_id.clone(),
         }
     }
 }

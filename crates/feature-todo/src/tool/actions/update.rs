@@ -47,6 +47,7 @@ impl TaskTool {
                 .optional_str("status_label_id")?
                 .map(|s| Some(s.to_string())),
             position: p.optional_u64("position")?.map(|v| v as i32),
+            group_id: p.optional_str("group_id")?.map(|s| Some(s.to_string())),
         };
 
         match self.repo.update(&patch).await {

@@ -39,6 +39,7 @@ pub(crate) fn action_to_task(
         subtask_completed_count,
         status_label_id: row.status_label_id.clone(),
         status_label: None,
+        group_id: row.group_id.clone(),
     }
 }
 
@@ -334,21 +335,17 @@ pub async fn task_create(
     // Auto-assign status_label_id if not provided
     let status_label_id = match params.status_label_id {
         Some(id) => Some(id),
-        None => {
-            match state.repos.status_workflows.get_global_default().await {
-                Ok(Some(wf)) => {
-                    state
-                        .repos
-                        .status_workflows
-                        .find_label_by_group(&wf.id, "not_started")
-                        .await
-                        .ok()
-                        .flatten()
-                        .map(|l| l.id)
-                }
-                _ => None,
-            }
-        }
+        None => match state.repos.status_workflows.get_global_default().await {
+            Ok(Some(wf)) => state
+                .repos
+                .status_workflows
+                .find_label_by_group(&wf.id, "not_started")
+                .await
+                .ok()
+                .flatten()
+                .map(|l| l.id),
+            _ => None,
+        },
     };
 
     let row = ActionRow {
@@ -379,6 +376,7 @@ pub async fn task_create(
         next_instance_date: None,
         status_label_id,
         position: 0,
+        group_id: params.group_id,
     };
 
     let created = state
@@ -414,6 +412,7 @@ pub async fn task_update(
         project_id: params.project_id,
         key_result_id: params.key_result_id,
         status_label_id: params.status_label_id,
+        group_id: params.group_id,
         ..Default::default()
     };
 
