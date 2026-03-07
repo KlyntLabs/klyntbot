@@ -352,6 +352,58 @@ impl AppCore {
         let feedback_tracker = Arc::new(Mutex::new(FeedbackTracker::new()));
         let user_situation = Arc::new(Mutex::new(UserSituation::default()));
 
+        // Forward domain events to frontend for debug dashboard
+        {
+            let mut event_rx = domain_event_bus.subscribe();
+            let app_handle_clone = app_handle.clone();
+            tokio::spawn(async move {
+                loop {
+                    match event_rx.recv().await {
+                        Ok(event) => {
+                            let salience = cognitive::salience::evaluate_salience(&event);
+                            let domain = match &event {
+                                bus::DomainEvent::TaskCreated { .. }
+                                | bus::DomainEvent::TaskCompleted { .. }
+                                | bus::DomainEvent::TaskDeferred { .. }
+                                | bus::DomainEvent::GoalProgress { .. } => "work",
+                                bus::DomainEvent::ActivitySessionCompleted { .. }
+                                | bus::DomainEvent::FocusSessionEnded { .. }
+                                | bus::DomainEvent::DistractionDetected { .. }
+                                | bus::DomainEvent::ProductivityScoreComputed { .. } => "energy",
+                                bus::DomainEvent::TransactionRecorded { .. }
+                                | bus::DomainEvent::BudgetAlert { .. } => "finance",
+                                bus::DomainEvent::UserStatedFact { domain, .. } => domain.as_str(),
+                                bus::DomainEvent::UserCorrectedAI { .. } => "learning",
+                                bus::DomainEvent::CoachingFeedback { .. } => "coaching",
+                            };
+                            let salience_str = match salience {
+                                cognitive::types::SalienceVerdict::Extract => "extract",
+                                cognitive::types::SalienceVerdict::Accumulate => "accumulate",
+                                cognitive::types::SalienceVerdict::Discard => "discard",
+                            };
+                            let payload = desktop_shared::cognitive_commands::DomainEventPayload {
+                                event_type: format!("{:?}", event)
+                                    .split('{')
+                                    .next()
+                                    .unwrap_or("Unknown")
+                                    .trim()
+                                    .to_string(),
+                                salience: salience_str.to_string(),
+                                domain: domain.to_string(),
+                                timestamp: chrono::Utc::now().to_rfc3339(),
+                                payload: serde_json::to_value(&event).unwrap_or_default(),
+                            };
+                            let _ = app_handle_clone.emit("cognitive:domain_event", &payload);
+                        }
+                        Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                            warn!("debug event forwarder lagged by {n} events");
+                        }
+                        Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                    }
+                }
+            });
+        }
+
         let core = Self {
             repos,
             agent: Arc::clone(&agent),

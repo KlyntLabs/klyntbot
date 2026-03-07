@@ -2672,28 +2672,26 @@ async fn dispatch(
                 }
             }
             let now = chrono::Utc::now();
-            let resp: Vec<SemanticFactResponse> = all.iter().map(|f| {
-                let elapsed_days = now
-                    .signed_duration_since(
-                        f.last_accessed.as_deref()
-                            .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+            let resp: Vec<SemanticFactResponse> = all.into_iter().map(|f| {
+                let last_ts = f.last_accessed.as_deref()
+                    .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+                    .map(|dt| dt.with_timezone(&chrono::Utc))
+                    .unwrap_or_else(|| {
+                        chrono::DateTime::parse_from_rfc3339(&f.recorded_at)
                             .map(|dt| dt.with_timezone(&chrono::Utc))
-                            .unwrap_or_else(|| {
-                                chrono::DateTime::parse_from_rfc3339(&f.recorded_at)
-                                    .map(|dt| dt.with_timezone(&chrono::Utc))
-                                    .unwrap_or(now)
-                            }),
-                    )
-                    .num_seconds() as f64 / 86400.0;
+                            .unwrap_or(now)
+                    });
+                let elapsed_days = now.signed_duration_since(last_ts).num_seconds() as f64 / 86400.0;
+                let retrievability = cognitive::decay::retrievability(elapsed_days, f.stability);
+                let status = if f.superseded_at.is_some() { "superseded".into() } else { "active".into() };
                 SemanticFactResponse {
-                    id: f.id.clone(), domain: f.domain.clone(), subject: f.subject.clone(),
-                    predicate: f.predicate.clone(), object: f.object.clone(),
-                    confidence: f.confidence, source: f.source.clone(),
-                    valid_from: f.valid_from.clone(), valid_until: f.valid_until.clone(),
-                    stability: f.stability,
-                    retrievability: cognitive::decay::retrievability(elapsed_days, f.stability),
-                    last_accessed: f.last_accessed.clone(), access_count: f.access_count,
-                    status: if f.superseded_at.is_some() { "superseded".into() } else { "active".into() },
+                    id: f.id, domain: f.domain, subject: f.subject,
+                    predicate: f.predicate, object: f.object,
+                    confidence: f.confidence, source: f.source,
+                    valid_from: f.valid_from, valid_until: f.valid_until,
+                    stability: f.stability, retrievability,
+                    last_accessed: f.last_accessed, access_count: f.access_count,
+                    status,
                 }
             }).collect();
             ok(resp)
@@ -2719,14 +2717,14 @@ async fn dispatch(
             };
             match memories {
                 Ok(mems) => {
-                    let resp: Vec<EpisodicMemoryResponse> = mems.iter().map(|m| EpisodicMemoryResponse {
-                        id: m.id.clone(),
-                        domain: m.domain.clone(),
-                        content: m.content.clone(),
-                        summary: m.summary.clone(),
+                    let resp: Vec<EpisodicMemoryResponse> = mems.into_iter().map(|m| EpisodicMemoryResponse {
+                        id: m.id,
+                        domain: m.domain,
+                        content: m.content,
+                        summary: m.summary,
                         importance: m.importance,
-                        occurred_at: m.occurred_at.clone(),
-                        recorded_at: m.recorded_at.clone(),
+                        occurred_at: m.occurred_at,
+                        recorded_at: m.recorded_at,
                         stability: m.stability,
                         access_count: m.access_count,
                     }).collect();
@@ -2741,7 +2739,7 @@ async fn dispatch(
             let domain: Option<String> = get(&body, "domain");
             let domains: Vec<&str> = match domain.as_deref() {
                 Some(d) => vec![d],
-                None => cognitive::repos::USER_MODEL_DOMAINS.to_vec(),
+                None => cognitive::repos::RULE_DOMAINS.to_vec(),
             };
             let mut all = Vec::new();
             for d in &domains {
@@ -2750,12 +2748,12 @@ async fn dispatch(
                     Err(e) => return err(ApiError::new("STORAGE_ERROR", e.to_string())),
                 }
             }
-            let resp: Vec<ProceduralRuleResponse> = all.iter().map(|r| ProceduralRuleResponse {
-                id: r.id.clone(), domain: r.domain.clone(),
-                rule_text: r.rule_text.clone(), confidence: r.confidence,
-                source: r.source.clone(), signal_count: r.signal_count,
-                active: r.active, created_at: r.created_at.clone(),
-                updated_at: r.updated_at.clone(),
+            let resp: Vec<ProceduralRuleResponse> = all.into_iter().map(|r| ProceduralRuleResponse {
+                id: r.id, domain: r.domain,
+                rule_text: r.rule_text, confidence: r.confidence,
+                source: r.source, signal_count: r.signal_count,
+                active: r.active, created_at: r.created_at,
+                updated_at: r.updated_at,
             }).collect();
             ok(resp)
         }
@@ -2779,7 +2777,7 @@ async fn dispatch(
                 episodic_count += episodic_repo.list_by_domain(d, 10000).await.map(|v| v.len()).unwrap_or(0);
             }
             let mut rules_count = 0;
-            for d in cognitive::repos::USER_MODEL_DOMAINS {
+            for d in cognitive::repos::RULE_DOMAINS {
                 rules_count += rule_repo.list_active(d).await.map(|v| v.len()).unwrap_or(0);
             }
             ok(MemoryStatsResponse {

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use cognitive::decay::retrievability;
-use cognitive::repos::{load_user_model, SemanticFactRepo, USER_MODEL_DOMAINS};
+use cognitive::repos::{load_user_model, SemanticFactRepo, RULE_DOMAINS, USER_MODEL_DOMAINS};
 use cognitive::types::{ProceduralRule, SemanticFact};
 use desktop_shared::cognitive_commands::*;
 use desktop_shared::errors::ApiError;
@@ -182,7 +182,7 @@ pub async fn cognitive_rules_list(
 
     let domains: Vec<&str> = match domain.as_deref() {
         Some(d) => vec![d],
-        None => USER_MODEL_DOMAINS.to_vec(),
+        None => RULE_DOMAINS.to_vec(),
     };
 
     let mut all_rules = Vec::new();
@@ -223,7 +223,7 @@ pub async fn cognitive_memory_stats(
     }
 
     let mut rules_count = 0;
-    for d in USER_MODEL_DOMAINS {
+    for d in RULE_DOMAINS {
         rules_count += rule_repo
             .list_active(d)
             .await

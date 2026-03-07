@@ -1,7 +1,7 @@
 import type { Node as PMNode } from "@tiptap/pm/model";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
-import { type FlatTextMap, buildFlatTextMap } from "./positions";
+import { buildFlatTextMap, type FlatTextMap } from "./positions";
 
 export const vimSearchPluginKey = new PluginKey("vimSearch");
 

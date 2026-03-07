@@ -1,4 +1,12 @@
-import { Activity, CheckSquare, FileText, MessageSquare, Settings, Wallet } from "lucide-react";
+import {
+  Activity,
+  Bug,
+  CheckSquare,
+  FileText,
+  MessageSquare,
+  Settings,
+  Wallet,
+} from "lucide-react";
 import { useNavigate } from "react-router";
 import type { SidebarItem } from "../../lib/types";
 import { KlyntLogo } from "../ui/KlyntLogo";
@@ -15,6 +23,7 @@ const items: { key: SidebarItem; icon: typeof MessageSquare; path?: string; bott
   { key: "Notes", icon: FileText, path: "/notes" },
   { key: "Finance", icon: Wallet, path: "/finance" },
   { key: "Productivity", icon: Activity, path: "/productivity" },
+  { key: "Debug", icon: Bug, path: "/debug", bottom: true },
   { key: "Settings", icon: Settings, path: "/settings", bottom: true },
 ];
 
