@@ -94,7 +94,7 @@ export function ObjectiveDetail() {
 
   if (!objective) {
     return (
-      <div className="h-screen w-screen bg-background text-primary flex items-center justify-center">
+      <div className="flex-1 flex items-center justify-center">
         <p className="text-muted text-sm font-light">Objective not found</p>
       </div>
     );
@@ -103,7 +103,7 @@ export function ObjectiveDetail() {
   const krs = objective.keyResults ?? [];
 
   return (
-    <div className="h-screen w-screen bg-background text-primary flex flex-col gap-2 p-2 overflow-hidden">
+    <div className="flex-1 flex flex-col gap-2 overflow-hidden">
       {/* Header */}
       <div className="h-12 flex items-center px-6 gap-3 shrink-0">
         <button

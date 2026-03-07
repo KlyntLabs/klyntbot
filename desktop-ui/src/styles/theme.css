@@ -134,11 +134,11 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     background-image:
-      radial-gradient(ellipse 70% 50% at 5% 95%, rgba(120, 80, 220, 0.18) 0%, transparent 70%),
-      radial-gradient(ellipse 55% 45% at 95% 5%, rgba(40, 120, 200, 0.15) 0%, transparent 65%),
-      radial-gradient(ellipse 60% 50% at 50% 50%, rgba(80, 60, 160, 0.08) 0%, transparent 55%),
-      radial-gradient(ellipse 45% 35% at 80% 80%, rgba(60, 140, 180, 0.1) 0%, transparent 55%),
-      radial-gradient(ellipse 40% 30% at 20% 20%, rgba(100, 60, 180, 0.12) 0%, transparent 50%);
+      radial-gradient(ellipse 70% 50% at 5% 95%, rgba(120, 80, 220, 0.22) 0%, transparent 70%),
+      radial-gradient(ellipse 55% 45% at 95% 5%, rgba(40, 120, 200, 0.18) 0%, transparent 65%),
+      radial-gradient(ellipse 60% 50% at 50% 50%, rgba(80, 60, 160, 0.1) 0%, transparent 55%),
+      radial-gradient(ellipse 45% 35% at 80% 80%, rgba(60, 140, 180, 0.13) 0%, transparent 55%),
+      radial-gradient(ellipse 40% 30% at 20% 20%, rgba(100, 60, 180, 0.15) 0%, transparent 50%);
     background-attachment: fixed;
   }
 
@@ -310,6 +310,18 @@
     border-radius: var(--radius-2xl);
   }
 
+  /* Context menu — macOS-native dark frosted glass */
+  .context-menu {
+    @apply backdrop-blur-[80px] backdrop-saturate-[1.8];
+    background: rgba(22, 22, 24, 0.88);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 10px;
+    box-shadow:
+      0 8px 40px rgba(0, 0, 0, 0.55),
+      0 2px 8px rgba(0, 0, 0, 0.3),
+      inset 0 0.5px 0 rgba(255, 255, 255, 0.06);
+  }
+
   /* Badge glass — small pill elements */
   .glass-badge {
     @apply backdrop-blur-[20px];
@@ -332,6 +344,94 @@
 
   .tabular-nums {
     font-variant-numeric: tabular-nums;
+  }
+
+  /* Note card — interactive card with hover lift */
+  /* Kill expensive backdrop-filter during panel resize for smooth drag */
+  .resizing .glass-panel,
+  .resizing .glass-input {
+    @apply backdrop-blur-none backdrop-saturate-100;
+  }
+
+  .resizing * {
+    pointer-events: none;
+  }
+
+  .note-card {
+    border-radius: var(--radius-lg);
+    transition:
+      background 0.18s ease,
+      transform 0.18s ease,
+      box-shadow 0.18s ease;
+  }
+
+  .note-card:hover {
+    background: rgba(255, 255, 255, 0.04);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+  }
+
+  .note-card-active {
+    background: rgba(255, 255, 255, 0.07);
+    box-shadow:
+      inset 3px 0 0 0 var(--brand),
+      0 2px 12px rgba(0, 0, 0, 0.12);
+  }
+
+  /* Tag pill — colored glass badge for tags */
+  .tag-pill {
+    @apply backdrop-blur-[10px];
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    font-size: 10px;
+    padding: 1px 8px;
+    border-radius: var(--radius-pill);
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    color: var(--text-muted);
+    transition:
+      background 0.15s ease,
+      color 0.15s ease;
+  }
+
+  .tag-pill:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-secondary);
+  }
+
+  .tag-pill-active {
+    background: color-mix(in srgb, var(--brand) 18%, transparent);
+    border-color: color-mix(in srgb, var(--brand) 25%, transparent);
+    color: var(--brand);
+  }
+
+  /* Version timeline dot */
+  .version-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.12);
+    border: 1.5px solid rgba(255, 255, 255, 0.2);
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+  }
+
+  .version-dot-active {
+    background: var(--brand);
+    border-color: var(--brand);
+    box-shadow: 0 0 8px color-mix(in srgb, var(--brand) 40%, transparent);
+  }
+
+  /* Version timeline line */
+  .version-line {
+    width: 1.5px;
+    flex-shrink: 0;
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.1) 0%,
+      rgba(255, 255, 255, 0.04) 100%
+    );
   }
 }
 
@@ -368,6 +468,17 @@
   }
   50% {
     opacity: 0.12;
+  }
+}
+
+@keyframes menu-appear {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
   }
 }
 

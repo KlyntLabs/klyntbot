@@ -23,6 +23,7 @@ members = [
     "crates/mcp",
     "crates/desktop-shared",
     "crates/desktop",
+    "crates/feature-notes",
     "crates/feature-productivity",
     "crates/cognitive",
     "crates/feature-coaching",
@@ -53,6 +54,7 @@ storage = { path = "crates/storage" }
 tools-core = { path = "crates/tools-core" }
 tools-core-macros = { path = "crates/tools-core-macros" }
 feature-finance = { path = "crates/feature-finance" }
+feature-notes = { path = "crates/feature-notes" }
 feature-todo = { path = "crates/feature-todo" }
 feature-productivity = { path = "crates/feature-productivity" }
 plugin-runtime = { path = "crates/plugin-runtime" }
@@ -97,7 +99,7 @@ url = "2.5.4"
 which = "7.0.0"
 mime_guess = "2.0.5"
 axum = { version = "0.8", features = ["ws", "macros"] }
-tower-http = { version = "0.6", features = ["cors", "compression-gzip"] }
+tower-http = { version = "0.6", features = ["cors", "compression-gzip", "fs"] }
 tower = { version = "0.5", features = ["util"] }
 include_dir = { version = "0.7", features = ["glob"] }
 urlencoding = "2.1"

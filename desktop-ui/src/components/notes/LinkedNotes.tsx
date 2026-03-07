@@ -1,0 +1,42 @@
+import { FileText } from "lucide-react";
+import { useNavigate } from "react-router";
+import { useQuery } from "../../hooks/useQuery";
+import type { Note } from "../../lib/types";
+
+interface LinkedNotesProps {
+  entityType: string;
+  entityId: string;
+}
+
+export function LinkedNotes({ entityType, entityId }: LinkedNotesProps) {
+  const navigate = useNavigate();
+  const { data: notes } = useQuery<Note[]>("note_list_by_entity", { entityType, entityId }, []);
+
+  if (notes.length === 0) return null;
+
+  return (
+    <div>
+      <h3 className="text-[12px] font-light text-muted uppercase tracking-wider mb-3">
+        Linked Notes
+      </h3>
+      <div className="glass-card overflow-hidden">
+        {notes.map((note) => (
+          <button
+            key={note.id}
+            type="button"
+            onClick={() => navigate(`/notes?noteId=${note.id}`)}
+            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left hover:bg-white/[0.04] transition-colors border-b border-white/[0.04] last:border-b-0"
+          >
+            <FileText className="w-3.5 h-3.5 text-brand shrink-0" strokeWidth={1.5} />
+            <span className="text-[13px] font-light text-secondary truncate">{note.title}</span>
+            {note.tags.length > 0 && (
+              <span className="text-[10px] text-dim ml-auto shrink-0">
+                {note.tags.slice(0, 2).join(", ")}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}

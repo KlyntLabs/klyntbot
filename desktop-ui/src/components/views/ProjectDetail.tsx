@@ -11,10 +11,9 @@ import type {
   ObjectiveCreateParams,
   Project,
   ProjectUpdateParams,
-  SidebarItem,
   Task,
 } from "../../lib/types";
-import { Sidebar } from "../layout/Sidebar";
+import { LinkedNotes } from "../notes/LinkedNotes";
 import { Badge } from "../ui/Badge";
 import { Checkbox } from "../ui/Checkbox";
 import { Progress } from "../ui/Progress";
@@ -32,7 +31,6 @@ const PROJECT_COLORS = [
 export function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [activeSidebar, setActiveSidebar] = useState<SidebarItem>("Tasks");
   const [expandedOkrs, toggleOkr] = useSetToggle();
 
   const { data: allProjects, refetch: refetchProjects } = useQuery<Project[]>(
@@ -129,7 +127,7 @@ export function ProjectDetail() {
 
   if (!project) {
     return (
-      <div className="h-screen w-screen bg-background text-primary flex items-center justify-center">
+      <div className="flex-1 flex items-center justify-center">
         <p className="text-muted text-sm font-light">Project not found</p>
       </div>
     );
@@ -154,358 +152,347 @@ export function ProjectDetail() {
   ];
 
   return (
-    <div className="h-screen w-screen bg-background text-primary flex gap-2 p-2 overflow-hidden">
-      <Sidebar
-        active={activeSidebar}
-        onNavigate={(item) => {
-          setActiveSidebar(item);
-          if (item === "Tasks") navigate("/");
-          if (item === "Chat") navigate("/chat");
-        }}
-      />
+    <div className="flex-1 flex flex-col gap-2 overflow-hidden">
+      {/* Breadcrumb Header */}
+      <div className="h-12 flex items-center px-6 gap-3 shrink-0">
+        <button
+          type="button"
+          onClick={() => navigate("/")}
+          className="text-muted hover:text-secondary transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" strokeWidth={1.5} />
+        </button>
 
-      <div className="flex-1 flex flex-col gap-2 overflow-hidden">
-        {/* Breadcrumb Header */}
-        <div className="h-12 flex items-center px-6 gap-3 shrink-0">
+        {/* Color dot — clickable to open picker */}
+        <div className="relative">
           <button
             type="button"
-            onClick={() => navigate("/")}
-            className="text-muted hover:text-secondary transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" strokeWidth={1.5} />
-          </button>
-
-          {/* Color dot — clickable to open picker */}
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setShowColorPicker(!showColorPicker)}
-              className="w-2.5 h-2.5 rounded-full cursor-pointer hover:ring-2 hover:ring-brand/30 transition-shadow"
-              style={{ backgroundColor: project.color }}
-            />
-            {showColorPicker && (
-              <div className="absolute top-6 left-0 z-50 glass-panel flex gap-1.5">
-                {PROJECT_COLORS.map((c) => (
-                  <button
-                    type="button"
-                    key={c}
-                    onClick={() => {
-                      handleUpdateProject({ color: c });
-                      setShowColorPicker(false);
-                    }}
-                    className={`w-5 h-5 rounded-full hover:ring-2 hover:ring-brand/30 transition-shadow ${project.color === c ? "ring-2 ring-brand" : ""}`}
-                    style={{ backgroundColor: c }}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Project name — click to edit */}
-          {editingName ? (
-            <input
-              value={nameDraft}
-              onChange={(e) => setNameDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  handleUpdateProject({ name: nameDraft });
-                  setEditingName(false);
-                }
-                if (e.key === "Escape") setEditingName(false);
-              }}
-              onBlur={() => {
-                if (nameDraft !== project.name) handleUpdateProject({ name: nameDraft });
-                setEditingName(false);
-              }}
-              className="text-[14px] font-light text-primary bg-transparent border-b border-brand outline-none"
-            />
-          ) : (
-            <button
-              type="button"
-              onClick={() => {
-                setNameDraft(project.name);
-                setEditingName(true);
-              }}
-              className="text-[14px] font-light text-primary cursor-text hover:text-secondary transition-colors"
-            >
-              {project.name}
-            </button>
+            onClick={() => setShowColorPicker(!showColorPicker)}
+            className="w-2.5 h-2.5 rounded-full cursor-pointer hover:ring-2 hover:ring-brand/30 transition-shadow"
+            style={{ backgroundColor: project.color }}
+          />
+          {showColorPicker && (
+            <div className="absolute top-6 left-0 z-50 glass-panel flex gap-1.5">
+              {PROJECT_COLORS.map((c) => (
+                <button
+                  type="button"
+                  key={c}
+                  onClick={() => {
+                    handleUpdateProject({ color: c });
+                    setShowColorPicker(false);
+                  }}
+                  className={`w-5 h-5 rounded-full hover:ring-2 hover:ring-brand/30 transition-shadow ${project.color === c ? "ring-2 ring-brand" : ""}`}
+                  style={{ backgroundColor: c }}
+                />
+              ))}
+            </div>
           )}
-
-          <span className="text-[12px] text-muted font-light">{tasks.length} tasks</span>
-
-          <div className="flex-1" />
-
-          {/* Archive button */}
-          <button
-            type="button"
-            onClick={handleArchive}
-            onBlur={() => setConfirmArchive(false)}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-light transition-colors ${
-              confirmArchive
-                ? "bg-destructive text-white"
-                : "text-muted hover:text-secondary hover:bg-white/[0.04]"
-            }`}
-          >
-            <Archive className="w-3.5 h-3.5" strokeWidth={1.5} />
-            {confirmArchive ? "Click again" : "Archive"}
-          </button>
         </div>
 
-        {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {/* Stats Row */}
-          <div className="grid grid-cols-4 gap-3">
-            {stats.map((stat) => (
-              <div key={stat.label} className="glass-card p-4">
-                <p className="text-[11px] text-muted font-light mb-1">{stat.label}</p>
-                <p className="text-[22px] font-light text-primary">{stat.value}</p>
-                <p className="text-[11px] text-muted font-light mt-0.5">{stat.sub}</p>
-              </div>
-            ))}
+        {/* Project name — click to edit */}
+        {editingName ? (
+          <input
+            value={nameDraft}
+            onChange={(e) => setNameDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                handleUpdateProject({ name: nameDraft });
+                setEditingName(false);
+              }
+              if (e.key === "Escape") setEditingName(false);
+            }}
+            onBlur={() => {
+              if (nameDraft !== project.name) handleUpdateProject({ name: nameDraft });
+              setEditingName(false);
+            }}
+            className="text-[14px] font-light text-primary bg-transparent border-b border-brand outline-none"
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => {
+              setNameDraft(project.name);
+              setEditingName(true);
+            }}
+            className="text-[14px] font-light text-primary cursor-text hover:text-secondary transition-colors"
+          >
+            {project.name}
+          </button>
+        )}
+
+        <span className="text-[12px] text-muted font-light">{tasks.length} tasks</span>
+
+        <div className="flex-1" />
+
+        {/* Archive button */}
+        <button
+          type="button"
+          onClick={handleArchive}
+          onBlur={() => setConfirmArchive(false)}
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-light transition-colors ${
+            confirmArchive
+              ? "bg-destructive text-white"
+              : "text-muted hover:text-secondary hover:bg-white/[0.04]"
+          }`}
+        >
+          <Archive className="w-3.5 h-3.5" strokeWidth={1.5} />
+          {confirmArchive ? "Click again" : "Archive"}
+        </button>
+      </div>
+
+      {/* Scrollable Content */}
+      <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        {/* Stats Row */}
+        <div className="grid grid-cols-4 gap-3">
+          {stats.map((stat) => (
+            <div key={stat.label} className="glass-card p-4">
+              <p className="text-[11px] text-muted font-light mb-1">{stat.label}</p>
+              <p className="text-[22px] font-light text-primary">{stat.value}</p>
+              <p className="text-[11px] text-muted font-light mt-0.5">{stat.sub}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* OKR Section */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-[12px] font-light text-muted uppercase tracking-wider">
+              Objectives & Key Results
+            </h3>
+            <button
+              type="button"
+              onClick={() => setAddingObjective(true)}
+              className="flex items-center gap-1 text-[12px] text-brand hover:text-brand-hover transition-colors font-light"
+            >
+              <Plus className="w-3.5 h-3.5" strokeWidth={1.5} />
+              New Objective
+            </button>
           </div>
 
-          {/* OKR Section */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-[12px] font-light text-muted uppercase tracking-wider">
-                Objectives & Key Results
-              </h3>
-              <button
-                type="button"
-                onClick={() => setAddingObjective(true)}
-                className="flex items-center gap-1 text-[12px] text-brand hover:text-brand-hover transition-colors font-light"
-              >
-                <Plus className="w-3.5 h-3.5" strokeWidth={1.5} />
-                New Objective
-              </button>
-            </div>
-
-            <div className="space-y-2">
-              {objectives.map((objective) => {
-                const isExpanded = expandedOkrs.has(objective.id);
-                return (
-                  <div key={objective.id} className="glass-card overflow-hidden">
-                    <div className="flex items-center">
-                      <button
-                        type="button"
-                        onClick={() => toggleOkr(objective.id)}
-                        className="flex items-center gap-3 px-4 py-3.5 hover:bg-white/[0.02] transition-colors text-left flex-1"
-                      >
-                        {isExpanded ? (
-                          <ChevronDown
-                            className="w-3.5 h-3.5 text-muted flex-shrink-0"
-                            strokeWidth={1.5}
-                          />
-                        ) : (
-                          <ChevronRight
-                            className="w-3.5 h-3.5 text-muted flex-shrink-0"
-                            strokeWidth={1.5}
-                          />
-                        )}
-                        <Target
-                          className="w-3.5 h-3.5 text-brand flex-shrink-0"
+          <div className="space-y-2">
+            {objectives.map((objective) => {
+              const isExpanded = expandedOkrs.has(objective.id);
+              return (
+                <div key={objective.id} className="glass-card overflow-hidden">
+                  <div className="flex items-center">
+                    <button
+                      type="button"
+                      onClick={() => toggleOkr(objective.id)}
+                      className="flex items-center gap-3 px-4 py-3.5 hover:bg-white/[0.02] transition-colors text-left flex-1"
+                    >
+                      {isExpanded ? (
+                        <ChevronDown
+                          className="w-3.5 h-3.5 text-muted flex-shrink-0"
                           strokeWidth={1.5}
                         />
-                        <span className="text-[13px] font-light text-secondary flex-1">
-                          {objective.title}
-                        </span>
-                        <span className="text-[12px] text-muted font-light mr-3">
-                          {objective.progress}%
-                        </span>
-                        <div className="w-24">
-                          <Progress value={objective.progress} />
-                        </div>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => navigate(`/objective/${objective.id}`)}
-                        className="px-3 py-3.5 text-[11px] text-muted hover:text-brand transition-colors font-light"
-                      >
-                        Open
-                      </button>
-                    </div>
-                    {isExpanded && objective.keyResults && (
-                      <div className="px-4 pb-3 space-y-2 ml-10">
-                        {objective.keyResults.map((kr) => (
-                          <div key={kr.id} className="flex items-center gap-3">
-                            <span className="text-[12px] font-light text-muted flex-1">
-                              {kr.title}
-                            </span>
-                            <span className="text-[11px] text-dim font-light">
-                              {kr.current}
-                              {kr.unit === "$" ? "" : ` ${kr.unit}`} / {kr.target}
-                              {kr.unit === "$" ? "" : ` ${kr.unit}`}
-                            </span>
-                            <div className="w-20">
-                              <Progress value={kr.progress} />
-                            </div>
-                            <span className="text-[11px] text-muted font-light w-8 text-right">
-                              {kr.progress}%
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-
-              {objectives.length === 0 && !addingObjective && (
-                <div className="text-center py-6">
-                  <p className="text-[13px] text-muted font-light">No objectives yet</p>
-                </div>
-              )}
-
-              {/* Add Objective inline row */}
-              {addingObjective && (
-                <div className="glass-card px-4 py-3">
-                  <input
-                    value={newObjTitle}
-                    onChange={(e) => setNewObjTitle(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleAddObjective();
-                      if (e.key === "Escape") {
-                        setAddingObjective(false);
-                        setNewObjTitle("");
-                      }
-                    }}
-                    onBlur={() => {
-                      if (!newObjTitle.trim()) {
-                        setAddingObjective(false);
-                        setNewObjTitle("");
-                      }
-                    }}
-                    placeholder="Objective title\u2026"
-                    className="w-full bg-transparent text-[13px] font-light text-primary outline-none placeholder:text-dim"
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Task Table */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-[12px] font-light text-muted uppercase tracking-wider">Tasks</h3>
-              <button
-                type="button"
-                onClick={() => setAddingTask(true)}
-                className="flex items-center gap-1 text-[12px] text-brand hover:text-brand-hover transition-colors font-light"
-              >
-                <Plus className="w-3.5 h-3.5" strokeWidth={1.5} />
-                New Task
-              </button>
-            </div>
-            <div className="glass-card overflow-hidden">
-              {/* Table Header */}
-              <div className="grid grid-cols-[40px_1fr_80px_100px_120px_140px] gap-4 border-b border-white/[0.08] text-[11px] text-muted font-light px-6 py-3">
-                <div></div>
-                <div>Task</div>
-                <div>Priority</div>
-                <div>Status</div>
-                <div>Due Date</div>
-                <div>Tags</div>
-              </div>
-
-              {/* Add Task inline row */}
-              {addingTask && (
-                <div className="grid grid-cols-[40px_1fr_80px_100px_120px_140px] gap-4 px-6 py-3 border-b border-white/[0.04]">
-                  <div />
-                  <div className="flex items-center">
-                    <input
-                      value={newTaskTitle}
-                      onChange={(e) => setNewTaskTitle(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") handleAddTask();
-                        if (e.key === "Escape") {
-                          setAddingTask(false);
-                          setNewTaskTitle("");
-                        }
-                      }}
-                      onBlur={() => {
-                        if (!newTaskTitle.trim()) {
-                          setAddingTask(false);
-                          setNewTaskTitle("");
-                        }
-                      }}
-                      placeholder="Task title\u2026"
-                      className="w-full bg-transparent text-[13px] font-light text-primary outline-none placeholder:text-dim"
-                    />
-                  </div>
-                  <div />
-                  <div />
-                  <div />
-                  <div />
-                </div>
-              )}
-
-              {/* Task Rows */}
-              {tasks.map((task) => {
-                const isCompleted = completedTasks.has(task.id);
-                return (
-                  // biome-ignore lint/a11y/useSemanticElements: row contains interactive children (checkbox) preventing button usage
-                  <div
-                    key={task.id}
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => navigate(`/task/${task.id}`)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") navigate(`/task/${task.id}`);
-                    }}
-                    className="grid grid-cols-[40px_1fr_80px_100px_120px_140px] gap-4 px-6 py-3 hover:bg-white/[0.06] transition-colors border-b border-white/[0.04] last:border-b-0 cursor-pointer"
-                  >
-                    <fieldset
-                      className="flex items-center border-none p-0 m-0"
-                      onClick={(e) => e.stopPropagation()}
-                      onKeyDown={(e) => e.stopPropagation()}
-                    >
-                      <Checkbox
-                        checked={isCompleted}
-                        onCheckedChange={() => handleToggleTask(task.id)}
-                      />
-                    </fieldset>
-                    <div className="flex items-center gap-1.5">
-                      {task.objectiveId && (
-                        <Target
-                          className="w-[10px] h-[10px] text-brand flex-shrink-0"
+                      ) : (
+                        <ChevronRight
+                          className="w-3.5 h-3.5 text-muted flex-shrink-0"
                           strokeWidth={1.5}
                         />
                       )}
-                      <span
-                        className={`text-[13px] font-light truncate ${isCompleted ? "text-muted line-through" : "text-secondary"}`}
-                      >
-                        {task.title}
+                      <Target className="w-3.5 h-3.5 text-brand flex-shrink-0" strokeWidth={1.5} />
+                      <span className="text-[13px] font-light text-secondary flex-1">
+                        {objective.title}
                       </span>
-                    </div>
-                    <div className="flex items-center">
-                      <Badge variant="priority" value={task.priority ?? ""} />
-                    </div>
-                    <div className="flex items-center">
-                      <Badge variant="status" value={task.status} />
-                    </div>
-                    <div className="flex items-center">
-                      <span className="text-[12px] text-muted font-light">
-                        {task.dueDate ? formatDate(task.dueDate) : null}
+                      <span className="text-[12px] text-muted font-light mr-3">
+                        {objective.progress}%
                       </span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      {task.tags.map((tag) => (
-                        <Badge key={tag} variant="tag" value={tag} />
+                      <div className="w-24">
+                        <Progress value={objective.progress} />
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/objective/${objective.id}`)}
+                      className="px-3 py-3.5 text-[11px] text-muted hover:text-brand transition-colors font-light"
+                    >
+                      Open
+                    </button>
+                  </div>
+                  {isExpanded && objective.keyResults && (
+                    <div className="px-4 pb-3 space-y-2 ml-10">
+                      {objective.keyResults.map((kr) => (
+                        <div key={kr.id} className="flex items-center gap-3">
+                          <span className="text-[12px] font-light text-muted flex-1">
+                            {kr.title}
+                          </span>
+                          <span className="text-[11px] text-dim font-light">
+                            {kr.current}
+                            {kr.unit === "$" ? "" : ` ${kr.unit}`} / {kr.target}
+                            {kr.unit === "$" ? "" : ` ${kr.unit}`}
+                          </span>
+                          <div className="w-20">
+                            <Progress value={kr.progress} />
+                          </div>
+                          <span className="text-[11px] text-muted font-light w-8 text-right">
+                            {kr.progress}%
+                          </span>
+                        </div>
                       ))}
                     </div>
-                  </div>
-                );
-              })}
-
-              {tasks.length === 0 && !addingTask && (
-                <div className="px-6 py-8 text-center">
-                  <p className="text-[13px] text-muted font-light">No tasks yet</p>
+                  )}
                 </div>
-              )}
-            </div>
+              );
+            })}
+
+            {objectives.length === 0 && !addingObjective && (
+              <div className="text-center py-6">
+                <p className="text-[13px] text-muted font-light">No objectives yet</p>
+              </div>
+            )}
+
+            {/* Add Objective inline row */}
+            {addingObjective && (
+              <div className="glass-card px-4 py-3">
+                <input
+                  value={newObjTitle}
+                  onChange={(e) => setNewObjTitle(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleAddObjective();
+                    if (e.key === "Escape") {
+                      setAddingObjective(false);
+                      setNewObjTitle("");
+                    }
+                  }}
+                  onBlur={() => {
+                    if (!newObjTitle.trim()) {
+                      setAddingObjective(false);
+                      setNewObjTitle("");
+                    }
+                  }}
+                  placeholder="Objective title\u2026"
+                  className="w-full bg-transparent text-[13px] font-light text-primary outline-none placeholder:text-dim"
+                />
+              </div>
+            )}
           </div>
         </div>
+
+        {/* Task Table */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-[12px] font-light text-muted uppercase tracking-wider">Tasks</h3>
+            <button
+              type="button"
+              onClick={() => setAddingTask(true)}
+              className="flex items-center gap-1 text-[12px] text-brand hover:text-brand-hover transition-colors font-light"
+            >
+              <Plus className="w-3.5 h-3.5" strokeWidth={1.5} />
+              New Task
+            </button>
+          </div>
+          <div className="glass-card overflow-hidden">
+            {/* Table Header */}
+            <div className="grid grid-cols-[40px_1fr_80px_100px_120px_140px] gap-4 border-b border-white/[0.08] text-[11px] text-muted font-light px-6 py-3">
+              <div></div>
+              <div>Task</div>
+              <div>Priority</div>
+              <div>Status</div>
+              <div>Due Date</div>
+              <div>Tags</div>
+            </div>
+
+            {/* Add Task inline row */}
+            {addingTask && (
+              <div className="grid grid-cols-[40px_1fr_80px_100px_120px_140px] gap-4 px-6 py-3 border-b border-white/[0.04]">
+                <div />
+                <div className="flex items-center">
+                  <input
+                    value={newTaskTitle}
+                    onChange={(e) => setNewTaskTitle(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleAddTask();
+                      if (e.key === "Escape") {
+                        setAddingTask(false);
+                        setNewTaskTitle("");
+                      }
+                    }}
+                    onBlur={() => {
+                      if (!newTaskTitle.trim()) {
+                        setAddingTask(false);
+                        setNewTaskTitle("");
+                      }
+                    }}
+                    placeholder="Task title\u2026"
+                    className="w-full bg-transparent text-[13px] font-light text-primary outline-none placeholder:text-dim"
+                  />
+                </div>
+                <div />
+                <div />
+                <div />
+                <div />
+              </div>
+            )}
+
+            {/* Task Rows */}
+            {tasks.map((task) => {
+              const isCompleted = completedTasks.has(task.id);
+              return (
+                // biome-ignore lint/a11y/useSemanticElements: row contains interactive children (checkbox) preventing button usage
+                <div
+                  key={task.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => navigate(`/task/${task.id}`)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") navigate(`/task/${task.id}`);
+                  }}
+                  className="grid grid-cols-[40px_1fr_80px_100px_120px_140px] gap-4 px-6 py-3 hover:bg-white/[0.06] transition-colors border-b border-white/[0.04] last:border-b-0 cursor-pointer"
+                >
+                  <fieldset
+                    className="flex items-center border-none p-0 m-0"
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => e.stopPropagation()}
+                  >
+                    <Checkbox
+                      checked={isCompleted}
+                      onCheckedChange={() => handleToggleTask(task.id)}
+                    />
+                  </fieldset>
+                  <div className="flex items-center gap-1.5">
+                    {task.objectiveId && (
+                      <Target
+                        className="w-[10px] h-[10px] text-brand flex-shrink-0"
+                        strokeWidth={1.5}
+                      />
+                    )}
+                    <span
+                      className={`text-[13px] font-light truncate ${isCompleted ? "text-muted line-through" : "text-secondary"}`}
+                    >
+                      {task.title}
+                    </span>
+                  </div>
+                  <div className="flex items-center">
+                    <Badge variant="priority" value={task.priority ?? ""} />
+                  </div>
+                  <div className="flex items-center">
+                    <Badge variant="status" value={task.status} />
+                  </div>
+                  <div className="flex items-center">
+                    <span className="text-[12px] text-muted font-light">
+                      {task.dueDate ? formatDate(task.dueDate) : null}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {task.tags.map((tag) => (
+                      <Badge key={tag} variant="tag" value={tag} />
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+
+            {tasks.length === 0 && !addingTask && (
+              <div className="px-6 py-8 text-center">
+                <p className="text-[13px] text-muted font-light">No tasks yet</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Linked Notes */}
+        {id && <LinkedNotes entityType="project" entityId={id} />}
       </div>
     </div>
   );

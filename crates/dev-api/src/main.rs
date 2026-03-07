@@ -19,6 +19,9 @@ use chrono::Utc;
 use desktop_shared::commands::*;
 use desktop_shared::errors::ApiError;
 use desktop_shared::events as ev;
+use feature_notes::link_parser;
+use feature_notes::models::{NoteRow, NotebookRow};
+use feature_notes::repo::{utc_now_str, NoteRepo};
 use feature_productivity::distraction::DistractionInterceptor;
 use feature_productivity::repos::ProductivityRepos;
 use feature_productivity::{DailyAggregator, FocusManager};
@@ -34,7 +37,9 @@ use tracing::info;
 /// App state — storage, config, agent, and productivity.
 struct DevState {
     repos: Repos,
+    note_repo: NoteRepo,
     config: RwLock<config::Config>,
+    data_dir: std::path::PathBuf,
     agent: Arc<agent::AgentLoop>,
     /// Active SSE senders keyed by session_key.
     sse_channels: dashmap::DashMap<String, Vec<tokio::sync::mpsc::UnboundedSender<SseEvent>>>,
@@ -101,6 +106,16 @@ async fn main() {
     let repos = Repos::from_pool(&pool);
     info!("storage connected");
 
+    // 2b. Initialize notes feature
+    let notes_pool = pool.inner().clone();
+    StoragePool::run_feature_migrations(
+        &notes_pool,
+        &feature_notes::NotesFeature::migrations_static(),
+    )
+    .await
+    .expect("notes migration failed");
+    let note_repo = NoteRepo::new(notes_pool);
+
     // 3. Create LLM provider
     let (provider, resolved_model) =
         providers::create_provider(&config).expect("failed to create provider");
@@ -165,7 +180,9 @@ async fn main() {
 
     let state = Arc::new(DevState {
         repos,
+        note_repo,
         config: RwLock::new(config),
+        data_dir: data_dir.clone(),
         agent,
         sse_channels: dashmap::DashMap::new(),
         active_streams: dashmap::DashMap::new(),
@@ -177,9 +194,18 @@ async fn main() {
     });
 
     // 8. Build axum router
+    let attachments_dir = data_dir.join("attachments");
+    if let Err(e) = std::fs::create_dir_all(&attachments_dir) {
+        tracing::error!(path = ?attachments_dir, error = %e, "failed to create attachments directory");
+    }
+
     let app = Router::new()
         .route("/api/events/{session_key}", axum::routing::get(events_sse))
         .route("/api/{cmd}", post(dispatch))
+        .nest_service(
+            "/attachments",
+            tower_http::services::ServeDir::new(&attachments_dir),
+        )
         .with_state(state);
 
     let app = app.layer(
@@ -244,7 +270,13 @@ impl IntoResponse for ApiResult {
 }
 
 fn ok(v: impl serde::Serialize) -> ApiResult {
-    ApiResult::Ok(serde_json::to_value(v).unwrap_or(Value::Null))
+    match serde_json::to_value(v) {
+        Ok(val) => ApiResult::Ok(val),
+        Err(e) => {
+            tracing::error!(error = %e, "response serialization failed");
+            ApiResult::Err(ApiError::new("INTERNAL", format!("serialization error: {e}")))
+        }
+    }
 }
 
 fn err(e: ApiError) -> ApiResult {
@@ -264,8 +296,69 @@ fn prod_err(e: common::KlyntbotError) -> ApiError {
 }
 
 fn get<T: serde::de::DeserializeOwned>(body: &Value, key: &str) -> Option<T> {
-    body.get(key)
-        .and_then(|v| serde_json::from_value(v.clone()).ok())
+    body.get(key).and_then(|v| {
+        match serde_json::from_value(v.clone()) {
+            Ok(val) => Some(val),
+            Err(e) => {
+                tracing::warn!(field = key, error = %e, "ignoring malformed optional field");
+                None
+            }
+        }
+    })
+}
+
+fn note_row_to_resp(row: &NoteRow, tags: Vec<String>) -> NoteResponse {
+    NoteResponse {
+        id: row.id.clone(),
+        notebook_id: row.notebook_id.clone(),
+        title: row.title.clone(),
+        body: row.body.clone(),
+        body_html: row.body_html.clone(),
+        pinned: row.pinned != 0,
+        archived: row.archived != 0,
+        tags,
+        created_at: row.created_at.clone(),
+        updated_at: row.updated_at.clone(),
+    }
+}
+
+fn notebook_row_to_resp(row: &NotebookRow, note_count: i64) -> NotebookResponse {
+    NotebookResponse {
+        id: row.id.clone(),
+        parent_id: row.parent_id.clone(),
+        title: row.title.clone(),
+        icon: row.icon.clone(),
+        sort_order: row.sort_order,
+        note_count,
+    }
+}
+
+/// Convert a list of NoteRows to NoteResponses with batch-fetched tags (single query).
+async fn notes_with_tags_batch(
+    repo: &NoteRepo,
+    rows: &[NoteRow],
+) -> Result<Vec<NoteResponse>, ApiError> {
+    let ids: Vec<String> = rows.iter().map(|r| r.id.clone()).collect();
+    let mut tag_map = repo
+        .get_tags_batch(&ids)
+        .await
+        .map_err(storage_err)?;
+    Ok(rows
+        .iter()
+        .map(|row| {
+            let tags = tag_map.remove(&row.id).unwrap_or_default();
+            note_row_to_resp(row, tags)
+        })
+        .collect())
+}
+
+fn version_row_to_resp(row: &feature_notes::models::NoteVersionRow) -> NoteVersionResponse {
+    NoteVersionResponse {
+        id: row.id.clone(),
+        note_id: row.note_id.clone(),
+        body: row.body.clone(),
+        created_at: row.created_at.clone(),
+    }
 }
 
 fn get_str(body: &Value, key: &str) -> Result<String, ApiError> {
@@ -476,6 +569,20 @@ async fn dispatch(
 ) -> ApiResult {
     match cmd.as_str() {
         // ── Tasks ──────────────────────────────────────────────
+        "task_get" => {
+            let id = match get_str(&body, "id") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            match core.repos.actions.get(&id).await {
+                Ok(Some(row)) => match row_to_task(&core.repos, &row).await {
+                    Ok(task) => ok(task),
+                    Err(e) => err(e),
+                },
+                Ok(None) => ok(serde_json::Value::Null),
+                Err(e) => err(storage_err(e)),
+            }
+        }
         "task_list" => {
             let filter = ActionFilter {
                 area_id: get(&body, "area_id"),
@@ -2137,6 +2244,393 @@ async fn dispatch(
         "permissions_open_accessibility" => {
             desktop_shared::permissions::open_accessibility_settings();
             ok(())
+        }
+
+        // ── Notes ──────────────────────────────────────────────
+        "note_list" => {
+            let notebook_id: Option<String> = get(&body, "notebookId");
+            match core.note_repo.list_notes(notebook_id.as_deref()).await {
+                Ok(rows) => match notes_with_tags_batch(&core.note_repo, &rows).await {
+                    Ok(results) => ok(results),
+                    Err(e) => err(e),
+                },
+                Err(e) => err(storage_err(e)),
+            }
+        }
+        "note_get" => {
+            let id = match get_str(&body, "id") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            match core.note_repo.get_note(&id).await {
+                Ok(Some(row)) => {
+                    let tags = match core.note_repo.get_tags(&id).await {
+                        Ok(t) => t,
+                        Err(e) => return err(storage_err(e)),
+                    };
+                    ok(note_row_to_resp(&row, tags))
+                }
+                Ok(None) => err(ApiError::new("NOT_FOUND", format!("note '{id}' not found"))),
+                Err(e) => err(storage_err(e)),
+            }
+        }
+        "note_create" => {
+            let params: NoteCreateParams =
+                match serde_json::from_value(body.get("params").cloned().unwrap_or(body.clone())) {
+                    Ok(p) => p,
+                    Err(e) => return err(ApiError::new("VALIDATION", e.to_string())),
+                };
+            if params.title.trim().is_empty() {
+                return err(ApiError::new("VALIDATION", "title must not be empty"));
+            }
+            let id = uuid::Uuid::new_v4().to_string();
+            let now = utc_now_str();
+            let row = NoteRow {
+                id: id.clone(),
+                notebook_id: params.notebook_id,
+                title: params.title,
+                body: params.body.unwrap_or_default(),
+                body_html: None,
+                pinned: 0,
+                archived: 0,
+                created_at: now.clone(),
+                updated_at: now,
+            };
+            match core.note_repo.create_note(&row).await {
+                Ok(created) => {
+                    if let Some(tags) = params.tags {
+                        if let Err(e) = core.note_repo.set_tags(&id, &tags).await {
+                            return err(storage_err(e));
+                        }
+                    }
+                    let tags = match core.note_repo.get_tags(&id).await {
+                        Ok(t) => t,
+                        Err(e) => return err(storage_err(e)),
+                    };
+                    ok(note_row_to_resp(&created, tags))
+                }
+                Err(e) => err(storage_err(e)),
+            }
+        }
+        "note_update" => {
+            let params: NoteUpdateParams =
+                match serde_json::from_value(body.get("params").cloned().unwrap_or(body.clone())) {
+                    Ok(p) => p,
+                    Err(e) => return err(ApiError::new("VALIDATION", e.to_string())),
+                };
+            match core
+                .note_repo
+                .update_note(
+                    &params.id,
+                    params.title.as_deref(),
+                    params.body.as_deref(),
+                    params.body_html.as_deref(),
+                    params.pinned,
+                    params.notebook_id.as_ref().map(|o| o.as_deref()),
+                )
+                .await
+            {
+                Ok(updated) => {
+                    if let Some(tags) = params.tags {
+                        if let Err(e) = core.note_repo.set_tags(&params.id, &tags).await {
+                            return err(storage_err(e));
+                        }
+                    }
+
+                    // Extract wiki-links and entity mentions from content
+                    let mut target_ids: Vec<String> = Vec::new();
+                    if let Some(html) = &updated.body_html {
+                        target_ids.extend(link_parser::extract_wiki_link_ids(html));
+                    }
+                    let titles = link_parser::extract_wiki_link_titles(&updated.body);
+                    if !titles.is_empty() {
+                        match core.note_repo.resolve_titles_to_ids(&titles).await {
+                            Ok(resolved) => {
+                                for (_title, id) in resolved {
+                                    if !target_ids.contains(&id) {
+                                        target_ids.push(id);
+                                    }
+                                }
+                            }
+                            Err(e) => return err(storage_err(e)),
+                        }
+                    }
+                    target_ids.retain(|id| id != &updated.id);
+                    let mentions = link_parser::extract_entity_mentions(&updated.body);
+
+                    if let Err(e) = core.note_repo.set_links(&updated.id, &target_ids).await {
+                        return err(storage_err(e));
+                    }
+                    let mention_tuples: Vec<(String, String)> = mentions
+                        .into_iter()
+                        .map(|m| (m.entity_type, m.entity_id))
+                        .collect();
+                    if let Err(e) = core.note_repo.set_entity_mentions(&updated.id, &mention_tuples).await {
+                        return err(storage_err(e));
+                    }
+
+                    let tags = match core.note_repo.get_tags(&params.id).await {
+                        Ok(t) => t,
+                        Err(e) => return err(storage_err(e)),
+                    };
+                    ok(note_row_to_resp(&updated, tags))
+                }
+                Err(e) => err(storage_err(e)),
+            }
+        }
+        "note_delete" => {
+            let id = match get_str(&body, "id") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            match core.note_repo.delete_note(&id).await {
+                Ok(d) => ok(d),
+                Err(e) => err(storage_err(e)),
+            }
+        }
+        "note_search" => {
+            let query = match get_str(&body, "query") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            match core.note_repo.search_notes(&query).await {
+                Ok(rows) => match notes_with_tags_batch(&core.note_repo, &rows).await {
+                    Ok(results) => ok(results),
+                    Err(e) => err(e),
+                },
+                Err(e) => err(storage_err(e)),
+            }
+        }
+        "note_links_all" => match core.note_repo.get_all_links().await {
+            Ok(rows) => {
+                let results: Vec<NoteLinkResponse> = rows
+                    .into_iter()
+                    .map(|r| NoteLinkResponse {
+                        source_id: r.source_id,
+                        target_id: r.target_id,
+                    })
+                    .collect();
+                ok(results)
+            }
+            Err(e) => err(storage_err(e)),
+        },
+        "note_version_list" => {
+            let note_id = match get_str(&body, "noteId") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            match core.note_repo.list_versions(&note_id).await {
+                Ok(rows) => {
+                    let results: Vec<NoteVersionResponse> = rows
+                        .iter()
+                        .map(version_row_to_resp)
+                        .collect();
+                    ok(results)
+                }
+                Err(e) => err(storage_err(e)),
+            }
+        }
+        "note_version_create" => {
+            let note_id = match get_str(&body, "noteId") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            match core.note_repo.get_note(&note_id).await {
+                Ok(Some(note)) => {
+                    let row = feature_notes::models::NoteVersionRow {
+                        id: uuid::Uuid::new_v4().to_string(),
+                        note_id: note_id.clone(),
+                        body: note.body,
+                        created_at: utc_now_str(),
+                    };
+                    match core.note_repo.create_version(&row).await {
+                        Ok(created) => {
+                            if let Err(e) = core.note_repo.prune_versions(&note_id, 50).await {
+                                tracing::warn!(note_id = %note_id, error = %e, "failed to prune old versions");
+                            }
+                            ok(version_row_to_resp(&created))
+                        }
+                        Err(e) => err(storage_err(e)),
+                    }
+                }
+                Ok(None) => err(ApiError::new("NOT_FOUND", format!("note '{note_id}' not found"))),
+                Err(e) => err(storage_err(e)),
+            }
+        }
+        "note_version_restore" => {
+            let version_id = match get_str(&body, "versionId") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let note_id = match get_str(&body, "noteId") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            match core.note_repo.get_version(&version_id).await {
+                Ok(Some(version)) => {
+                    // Snapshot current before restoring
+                    if let Ok(Some(current)) = core.note_repo.get_note(&note_id).await {
+                        let snap = feature_notes::models::NoteVersionRow {
+                            id: uuid::Uuid::new_v4().to_string(),
+                            note_id: note_id.clone(),
+                            body: current.body,
+                            created_at: utc_now_str(),
+                        };
+                        if let Err(e) = core.note_repo.create_version(&snap).await {
+                            return err(storage_err(e));
+                        }
+                    }
+                    match core.note_repo.update_note(&note_id, None, Some(&version.body), None, None, None).await {
+                        Ok(updated) => {
+                            let tags = match core.note_repo.get_tags(&note_id).await {
+                                Ok(t) => t,
+                                Err(e) => return err(storage_err(e)),
+                            };
+                            ok(note_row_to_resp(&updated, tags))
+                        }
+                        Err(e) => err(storage_err(e)),
+                    }
+                }
+                Ok(None) => err(ApiError::new("NOT_FOUND", format!("version '{version_id}' not found"))),
+                Err(e) => err(storage_err(e)),
+            }
+        }
+        "note_list_by_entity" => {
+            let entity_type = match get_str(&body, "entityType") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let entity_id = match get_str(&body, "entityId") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            match core.note_repo.list_notes_by_entity(&entity_type, &entity_id).await {
+                Ok(rows) => match notes_with_tags_batch(&core.note_repo, &rows).await {
+                    Ok(results) => ok(results),
+                    Err(e) => err(e),
+                },
+                Err(e) => err(storage_err(e)),
+            }
+        }
+        "note_save_attachment" => {
+            let data_str = match get_str(&body, "data") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let filename = match get_str(&body, "filename") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let attachments_dir = core.data_dir.join("attachments");
+            if let Err(e) = tokio::fs::create_dir_all(&attachments_dir).await {
+                return err(ApiError::new("IO_ERROR", format!("failed to create dir: {e}")));
+            }
+            const ALLOWED_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp"];
+            let ext = std::path::Path::new(&filename)
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("png");
+            let ext = if ALLOWED_EXTENSIONS.contains(&ext) { ext } else { "png" };
+            let id = uuid::Uuid::new_v4();
+            let file_name = format!("{id}.{ext}");
+            let file_path = attachments_dir.join(&file_name);
+
+            use base64::Engine;
+            let bytes = match base64::engine::general_purpose::STANDARD.decode(&data_str) {
+                Ok(b) => b,
+                Err(e) => return err(ApiError::new("DECODE_ERROR", format!("invalid base64: {e}"))),
+            };
+            if let Err(e) = tokio::fs::write(&file_path, &bytes).await {
+                return err(ApiError::new("IO_ERROR", format!("failed to write: {e}")));
+            }
+            // In dev mode, serve via the /attachments static route
+            ok(format!("/attachments/{file_name}"))
+        }
+        "notebook_list" => match core.note_repo.list_notebooks().await {
+            Ok(rows) => {
+                let counts = match core.note_repo.count_notes_by_notebook().await {
+                    Ok(c) => c,
+                    Err(e) => return err(storage_err(e)),
+                };
+                let results: Vec<_> = rows
+                    .iter()
+                    .map(|row| notebook_row_to_resp(row, counts.get(&row.id).copied().unwrap_or(0)))
+                    .collect();
+                ok(results)
+            }
+            Err(e) => err(storage_err(e)),
+        },
+        "notebook_create" => {
+            let params: NotebookCreateParams =
+                match serde_json::from_value(body.get("params").cloned().unwrap_or(body.clone())) {
+                    Ok(p) => p,
+                    Err(e) => return err(ApiError::new("VALIDATION", e.to_string())),
+                };
+            if params.title.trim().is_empty() {
+                return err(ApiError::new("VALIDATION", "notebook title must not be empty"));
+            }
+            let id = uuid::Uuid::new_v4().to_string();
+            let now = utc_now_str();
+            let row = NotebookRow {
+                id: id.clone(),
+                parent_id: params.parent_id,
+                title: params.title,
+                icon: params.icon,
+                sort_order: 0,
+                created_at: now.clone(),
+                updated_at: now,
+            };
+            match core.note_repo.create_notebook(&row).await {
+                Ok(created) => ok(notebook_row_to_resp(&created, 0)),
+                Err(e) => err(storage_err(e)),
+            }
+        }
+        "notebook_update" => {
+            let params: NotebookUpdateParams =
+                match serde_json::from_value(body.get("params").cloned().unwrap_or(body.clone())) {
+                    Ok(p) => p,
+                    Err(e) => return err(ApiError::new("VALIDATION", e.to_string())),
+                };
+            // Check for cycles when changing parent
+            if let Some(Some(new_parent_id)) = &params.parent_id {
+                match core.note_repo.would_create_cycle(&params.id, new_parent_id).await {
+                    Ok(true) => {
+                        return err(ApiError::new(
+                            "VALIDATION",
+                            "cannot set parent: would create a cycle",
+                        ));
+                    }
+                    Ok(false) => {}
+                    Err(e) => return err(storage_err(e)),
+                }
+            }
+            let id = &params.id;
+            let parent_id_ref = params.parent_id.as_ref().map(|o| o.as_deref());
+            match core
+                .note_repo
+                .update_notebook(id, params.title.as_deref(), params.icon.as_deref(), parent_id_ref)
+                .await
+            {
+                Ok(updated) => {
+                    let count = core
+                        .note_repo
+                        .count_notes_in_notebook(&id)
+                        .await
+                        .unwrap_or(0);
+                    ok(notebook_row_to_resp(&updated, count))
+                }
+                Err(e) => err(storage_err(e)),
+            }
+        }
+        "notebook_delete" => {
+            let id = match get_str(&body, "id") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            match core.note_repo.delete_notebook(&id).await {
+                Ok(d) => ok(d),
+                Err(e) => err(storage_err(e)),
+            }
         }
 
         _ => err(ApiError::new(

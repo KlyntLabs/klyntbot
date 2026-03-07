@@ -9,7 +9,6 @@ import {
   Wrench,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router";
-import { Sidebar } from "../layout/Sidebar";
 
 interface SettingsLayoutProps {
   children: React.ReactNode;
@@ -31,17 +30,7 @@ export function SettingsLayout({ children }: SettingsLayoutProps) {
   const currentPath = location.pathname;
 
   return (
-    <div className="h-screen w-screen bg-background text-primary flex gap-2 p-2 overflow-hidden">
-      <Sidebar
-        active="Settings"
-        onNavigate={(item) => {
-          if (item === "Tasks") navigate("/");
-          if (item === "Chat") navigate("/chat");
-          if (item === "Finance") navigate("/finance");
-          if (item === "Settings") navigate("/settings");
-        }}
-      />
-
+    <>
       {/* Settings sidebar — floating glass panel */}
       <div className="w-56 glass-sidebar flex flex-col py-3">
         <button
@@ -86,6 +75,6 @@ export function SettingsLayout({ children }: SettingsLayoutProps) {
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-3xl mx-auto p-8">{children}</div>
       </div>
-    </div>
+    </>
   );
 }

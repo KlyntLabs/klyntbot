@@ -121,6 +121,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             // Tasks
             commands::tasks::today_tasks,
+            commands::tasks::task_get,
             commands::tasks::task_list,
             commands::tasks::task_create,
             commands::tasks::task_update,
@@ -129,6 +130,23 @@ fn main() {
             commands::tasks::task_list_children,
             commands::tasks::project_list,
             commands::tasks::objective_list,
+            // Notes
+            commands::notes::note_list,
+            commands::notes::note_get,
+            commands::notes::note_create,
+            commands::notes::note_update,
+            commands::notes::note_delete,
+            commands::notes::note_search,
+            commands::notes::note_links_all,
+            commands::notes::note_list_by_entity,
+            commands::notes::note_version_list,
+            commands::notes::note_version_create,
+            commands::notes::note_version_restore,
+            commands::notes::note_save_attachment,
+            commands::notes::notebook_list,
+            commands::notes::notebook_create,
+            commands::notes::notebook_update,
+            commands::notes::notebook_delete,
             // Areas
             commands::areas::area_list,
             commands::areas::area_create,

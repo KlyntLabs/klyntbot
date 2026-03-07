@@ -3,6 +3,7 @@ pub mod chat;
 pub mod distraction;
 pub mod finance;
 pub mod key_results;
+pub mod notes;
 pub mod objectives;
 pub mod permissions;
 pub mod productivity;

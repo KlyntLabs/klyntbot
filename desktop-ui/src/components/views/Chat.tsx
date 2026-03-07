@@ -1,17 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router";
+import { useSearchParams } from "react-router";
 import { useChatSession } from "../../hooks/useChatSession";
 import { ipc } from "../../hooks/useIpc";
 import { useQuery } from "../../hooks/useQuery";
 import { useSetToggle } from "../../hooks/useSetToggle";
-import type { ChatThread, SidebarItem } from "../../lib/types";
+import type { ChatThread } from "../../lib/types";
 import { ChatInput } from "../chat/ChatInput";
 import { MessageList } from "../chat/MessageList";
 import { ThreadContextMenu } from "../chat/ThreadContextMenu";
 import { type AreaGroup, featurePrefix, ThreadList } from "../chat/ThreadList";
 import { TransparencyPanel } from "../chat/TransparencyPanel";
 import { TransparencyToggle } from "../chat/TransparencyToggle";
-import { Sidebar } from "../layout/Sidebar";
 
 interface GroupedThreads {
   areas: AreaGroup[];
@@ -20,9 +19,7 @@ interface GroupedThreads {
 }
 
 export function Chat() {
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [activeSidebar, setActiveSidebar] = useState<SidebarItem>("Chat");
   const [selectedThread, setSelectedThreadState] = useState(
     () => searchParams.get("thread") || `chat:${crypto.randomUUID()}`,
   );
@@ -218,15 +215,7 @@ export function Chat() {
   );
 
   return (
-    <div className="h-screen w-screen bg-background text-primary flex gap-2 p-2 overflow-hidden">
-      <Sidebar
-        active={activeSidebar}
-        onNavigate={(item) => {
-          setActiveSidebar(item);
-          if (item === "Tasks") navigate("/");
-        }}
-      />
-
+    <>
       <ThreadList
         threads={threads}
         grouped={grouped}
@@ -307,6 +296,6 @@ export function Chat() {
           </div>
         )}
       </div>
-    </div>
+    </>
   );
 }
