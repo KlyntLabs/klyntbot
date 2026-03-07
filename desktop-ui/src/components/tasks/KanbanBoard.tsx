@@ -9,42 +9,61 @@ interface KanbanBoardProps {
   projectMap: Map<string, Project>;
   areaMap: Map<string, Area>;
   completedTasks: Set<string>;
-  statusLabels?: StatusLabel[];
+  statusLabels: StatusLabel[];
 }
 
-const COLUMNS = [
-  { key: "todo", label: "To Do", accent: "bg-info" },
-  { key: "doing", label: "In Progress", accent: "bg-brand" },
-  { key: "done", label: "Done", accent: "bg-success" },
-] as const;
-
-export function KanbanBoard({ tasks, projectMap, areaMap, completedTasks }: KanbanBoardProps) {
+export function KanbanBoard({
+  tasks,
+  projectMap,
+  areaMap,
+  completedTasks,
+  statusLabels,
+}: KanbanBoardProps) {
   const navigate = useNavigate();
 
   const columns = useMemo(() => {
-    const grouped: Record<string, Task[]> = { todo: [], doing: [], done: [] };
+    // Build column structure from labels
+    const cols = statusLabels.map((sl) => ({
+      key: sl.id,
+      label: sl.name,
+      color: sl.color,
+      tasks: [] as Task[],
+    }));
+
+    // Create a map for fast lookup
+    const colMap = new Map(cols.map((c) => [c.key, c]));
+
+    // Group tasks by statusLabelId
     for (const task of tasks) {
-      const status = task.status?.toLowerCase() ?? "todo";
-      if (status in grouped) grouped[status].push(task);
-      else grouped.todo.push(task);
+      const col = task.statusLabelId ? colMap.get(task.statusLabelId) : undefined;
+      if (col) {
+        col.tasks.push(task);
+      } else if (cols.length > 0) {
+        // Fallback: put in first column
+        cols[0].tasks.push(task);
+      }
     }
-    return grouped;
-  }, [tasks]);
+
+    return cols;
+  }, [tasks, statusLabels]);
 
   return (
     <div className="flex gap-3 mb-10 min-h-0">
-      {COLUMNS.map(({ key, label, accent }) => (
-        <div key={key} className="flex-1 min-w-[240px] flex flex-col min-h-0">
+      {columns.map((col) => (
+        <div key={col.key} className="flex-1 min-w-[240px] flex flex-col min-h-0">
           {/* Column header */}
           <div className="flex items-center gap-2.5 px-3 py-2.5 mb-2">
-            <div className={`w-1.5 h-1.5 rounded-full ${accent}`} />
-            <span className="text-[12px] font-light text-secondary">{label}</span>
-            <span className="text-[11px] font-light text-dim">{columns[key].length}</span>
+            <div
+              className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+              style={{ backgroundColor: col.color }}
+            />
+            <span className="text-[12px] font-light text-secondary">{col.label}</span>
+            <span className="text-[11px] font-light text-dim">{col.tasks.length}</span>
           </div>
 
           {/* Cards container */}
           <div className="flex-1 overflow-y-auto space-y-2 pr-0.5">
-            {columns[key].map((task) => {
+            {col.tasks.map((task) => {
               const project = task.projectId ? projectMap.get(task.projectId) : undefined;
               const area = areaMap.get(task.areaId);
               const isCompleted = completedTasks.has(task.id);
@@ -99,7 +118,7 @@ export function KanbanBoard({ tasks, projectMap, areaMap, completedTasks }: Kanb
               );
             })}
 
-            {columns[key].length === 0 && (
+            {col.tasks.length === 0 && (
               <div className="flex items-center justify-center py-8">
                 <p className="text-[11px] text-dim font-light">No tasks</p>
               </div>
