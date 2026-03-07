@@ -22,12 +22,12 @@ use storage::{ActionFilter, ActionPatch, ProjectFilter};
 use tracing::{error, info};
 
 use crate::app_core::AppCore;
-use crate::commands::areas::build_area_response;
-use crate::commands::productivity::{
+use app_core::handlers::areas::build_area_response;
+use app_core::handlers::productivity::{
     event_to_timeline, insight_to_response, project_to_response, session_to_response,
     summary_to_response,
 };
-use crate::commands::tasks::{
+use app_core::handlers::tasks::{
     action_to_task, action_to_today_task, kr_to_response, objective_to_response, row_to_task,
     rows_to_tasks,
 };
@@ -321,7 +321,7 @@ async fn dispatch(
                 Ok(projects) => {
                     let futs = projects
                         .iter()
-                        .map(|p| crate::commands::projects::build_project_response(&core, p));
+                        .map(|p| app_core::handlers::projects::build_project_response(&core, p));
                     match futures_util::future::try_join_all(futs).await {
                         Ok(results) => ok(results),
                         Err(e) => err(e),
@@ -350,7 +350,7 @@ async fn dispatch(
                 updated_at: now,
             };
             match core.repos.projects.create(&row).await {
-                Ok(created) => ok(crate::commands::projects::project_to_response(
+                Ok(created) => ok(app_core::handlers::projects::project_to_response(
                     &created,
                     0,
                     0,
@@ -366,7 +366,7 @@ async fn dispatch(
             };
             match core.repos.projects.get_or_err(&id).await {
                 Ok(row) => {
-                    match crate::commands::projects::build_project_response(&core, &row).await {
+                    match app_core::handlers::projects::build_project_response(&core, &row).await {
                         Ok(resp) => ok(resp),
                         Err(e) => err(e),
                     }
@@ -391,7 +391,7 @@ async fn dispatch(
             };
             match core.repos.projects.update(&patch).await {
                 Ok(updated) => {
-                    match crate::commands::projects::build_project_response(&core, &updated).await {
+                    match app_core::handlers::projects::build_project_response(&core, &updated).await {
                         Ok(resp) => ok(resp),
                         Err(e) => err(e),
                     }
@@ -416,7 +416,7 @@ async fn dispatch(
             };
             match core.repos.projects.archive(&id).await {
                 Ok(archived) => {
-                    match crate::commands::projects::build_project_response(&core, &archived).await
+                    match app_core::handlers::projects::build_project_response(&core, &archived).await
                     {
                         Ok(resp) => ok(resp),
                         Err(e) => err(e),
@@ -1454,7 +1454,7 @@ async fn dispatch(
         // ── Settings (MCP) ────────────────────────────────────
         "mcp_get_config" => {
             let cfg = core.config.read().await;
-            ok(crate::commands::build_mcp_response(&cfg))
+            ok(::app_core::handlers::settings::build_mcp_response(&cfg))
         }
 
         // ── Chat (read-only in browser) ───────────────────────

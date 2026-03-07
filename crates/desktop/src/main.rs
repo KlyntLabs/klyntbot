@@ -8,7 +8,6 @@ mod oauth;
 
 use std::sync::Arc;
 
-use app_core::AppCore;
 use commands::window::{WINDOW_LAUNCHER, WINDOW_TRAY};
 use tauri::image::Image;
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
@@ -51,7 +50,7 @@ fn main() {
         .setup(|app| {
             let handle = app.handle().clone();
             let core = Arc::new(
-                tauri::async_runtime::block_on(AppCore::init(handle))
+                tauri::async_runtime::block_on(app_core::init(handle))
                     .expect("failed to initialize app core"),
             );
 

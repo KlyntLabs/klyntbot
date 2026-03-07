@@ -193,6 +193,37 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5f0e0fee31ef5ed1ba1316088939cea399010ed7731dba877ed44aeb407a75ea"
 
 [[package]]
+name = "app-core"
+version = "0.1.0"
+dependencies = [
+ "agent",
+ "base64 0.22.1",
+ "bus",
+ "channels",
+ "chrono",
+ "cognitive",
+ "common",
+ "config",
+ "dashmap",
+ "desktop-shared",
+ "feature-coaching",
+ "feature-notes",
+ "feature-productivity",
+ "futures-util",
+ "providers",
+ "scheduling",
+ "serde",
+ "serde_json",
+ "session",
+ "storage",
+ "tokio",
+ "tokio-util",
+ "tools-core",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "approx"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2869,6 +2900,7 @@ version = "0.1.0"
 dependencies = [
  "agent",
  "anyhow",
+ "app-core",
  "axum",
  "base64 0.22.1",
  "bus",

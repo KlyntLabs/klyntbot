@@ -10,8 +10,9 @@ use rand::Rng;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tracing::{info, warn};
 
+use ::app_core::handlers::settings::build_mcp_response;
+
 use crate::app_core::AppCore;
-use crate::commands::build_mcp_response;
 
 use super::flow;
 use super::registry;
@@ -243,13 +244,14 @@ pub async fn mcp_oauth_disconnect(
 ) -> Result<McpConfigResponse, ApiError> {
     let mut cfg = state.config.write().await;
 
-    let server = crate::commands::find_server_mut(&mut cfg.mcp.servers, &server_name)?;
+    let server =
+        ::app_core::handlers::settings::find_server_mut(&mut cfg.mcp.servers, &server_name)?;
 
     server.oauth = None;
 
     config::save(&cfg)
         .await
-        .map_err(crate::commands::map_config_save_err)?;
+        .map_err(::app_core::errors::map_config_save_err)?;
 
     Ok(build_mcp_response(&cfg))
 }
