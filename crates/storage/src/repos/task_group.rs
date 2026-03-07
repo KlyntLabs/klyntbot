@@ -149,6 +149,26 @@ impl TaskGroupRepo {
             .await?;
         Ok(count.0 as u32)
     }
+
+    /// Count tasks for all groups in a single query (avoids N+1).
+    pub async fn count_tasks_bulk(
+        &self,
+        group_ids: &[&str],
+    ) -> Result<std::collections::HashMap<String, u32>, StorageError> {
+        if group_ids.is_empty() {
+            return Ok(std::collections::HashMap::new());
+        }
+        let mut qb = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
+            "SELECT group_id, COUNT(*) as cnt FROM actions WHERE group_id IN (",
+        );
+        let mut sep = qb.separated(", ");
+        for id in group_ids {
+            sep.push_bind(*id);
+        }
+        sep.push_unseparated(") GROUP BY group_id");
+        let rows: Vec<(String, i64)> = qb.build_query_as().fetch_all(&self.pool).await?;
+        Ok(rows.into_iter().map(|(id, cnt)| (id, cnt as u32)).collect())
+    }
 }
 
 #[cfg(test)]

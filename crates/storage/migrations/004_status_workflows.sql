@@ -95,4 +95,5 @@ INSERT INTO status_labels (id, workflow_id, name, color, status_group, position)
 UPDATE actions SET status_label_id = 'sl_todo'        WHERE status = 'todo';
 UPDATE actions SET status_label_id = 'sl_in_progress' WHERE status = 'doing';
 UPDATE actions SET status_label_id = 'sl_done'        WHERE status = 'done';
-UPDATE actions SET status_label_id = 'sl_backlog'     WHERE status NOT IN ('todo', 'doing', 'done');
+UPDATE actions SET status_label_id = 'sl_done'        WHERE status = 'archived';
+UPDATE actions SET status_label_id = 'sl_backlog'     WHERE status NOT IN ('todo', 'doing', 'done', 'archived');

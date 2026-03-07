@@ -112,69 +112,69 @@ export function FinanceGoals() {
           {filteredGoals.length === 0 ? (
             <div className="py-8 text-center text-[11px] text-dim font-light">No {tab} goals</div>
           ) : (
-          <div className="space-y-3">
-            {filteredGoals.map((g, i) => {
-              const p = pct(g.currentAmount, g.targetAmount);
-              const Icon = GOAL_ICONS[g.goalType] ?? Target;
-              const remaining = g.targetAmount - g.currentAmount;
-              const monthsLeft =
-                g.monthlyContribution && g.monthlyContribution > 0
-                  ? Math.ceil(remaining / g.monthlyContribution)
-                  : null;
-              return (
-                <Card key={g.id} className="p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                        style={{ backgroundColor: `${COLORS[i % COLORS.length]}20` }}
-                      >
-                        <Icon
-                          className="w-4 h-4"
-                          style={{ color: COLORS[i % COLORS.length] }}
-                          strokeWidth={1.5}
-                        />
+            <div className="space-y-3">
+              {filteredGoals.map((g, i) => {
+                const p = pct(g.currentAmount, g.targetAmount);
+                const Icon = GOAL_ICONS[g.goalType] ?? Target;
+                const remaining = g.targetAmount - g.currentAmount;
+                const monthsLeft =
+                  g.monthlyContribution && g.monthlyContribution > 0
+                    ? Math.ceil(remaining / g.monthlyContribution)
+                    : null;
+                return (
+                  <Card key={g.id} className="p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                          style={{ backgroundColor: `${COLORS[i % COLORS.length]}20` }}
+                        >
+                          <Icon
+                            className="w-4 h-4"
+                            style={{ color: COLORS[i % COLORS.length] }}
+                            strokeWidth={1.5}
+                          />
+                        </div>
+                        <div>
+                          <p className="text-[13px] font-light text-secondary">{g.name}</p>
+                          <p className="text-[9px] text-dim font-light">{g.goalType}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-[13px] font-light text-secondary">{g.name}</p>
-                        <p className="text-[9px] text-dim font-light">{g.goalType}</p>
+                      <div className="text-right">
+                        <p className="text-[14px] font-light text-primary tabular-nums">
+                          {fmtMoney(g.currentAmount, g.currency)}{" "}
+                          <span className="text-dim text-[10px]">
+                            / {fmtMoney(g.targetAmount, g.currency)}
+                          </span>
+                        </p>
+                        <p className="text-[11px] font-light text-brand tabular-nums">{p}%</p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-[14px] font-light text-primary tabular-nums">
-                        {fmtMoney(g.currentAmount, g.currency)}{" "}
-                        <span className="text-dim text-[10px]">
-                          / {fmtMoney(g.targetAmount, g.currency)}
+                    <Progress value={p} />
+                    <div className="flex items-center gap-4 mt-2">
+                      {g.deadline && (
+                        <span className="text-[10px] text-dim font-light">
+                          Deadline: {g.deadline}
                         </span>
-                      </p>
-                      <p className="text-[11px] font-light text-brand tabular-nums">{p}%</p>
+                      )}
+                      {g.monthlyContribution && (
+                        <span className="text-[10px] text-dim font-light">
+                          Contributing: {fmtMoney(g.monthlyContribution, g.currency)}/mo
+                        </span>
+                      )}
+                      {monthsLeft != null && (
+                        <span className="text-[10px] text-muted font-light">
+                          ~{monthsLeft} months to go
+                        </span>
+                      )}
+                      <span className="text-[10px] text-dim font-light">
+                        {fmtMoney(remaining, g.currency)} remaining
+                      </span>
                     </div>
-                  </div>
-                  <Progress value={p} />
-                  <div className="flex items-center gap-4 mt-2">
-                    {g.deadline && (
-                      <span className="text-[10px] text-dim font-light">
-                        Deadline: {g.deadline}
-                      </span>
-                    )}
-                    {g.monthlyContribution && (
-                      <span className="text-[10px] text-dim font-light">
-                        Contributing: {fmtMoney(g.monthlyContribution, g.currency)}/mo
-                      </span>
-                    )}
-                    {monthsLeft != null && (
-                      <span className="text-[10px] text-muted font-light">
-                        ~{monthsLeft} months to go
-                      </span>
-                    )}
-                    <span className="text-[10px] text-dim font-light">
-                      {fmtMoney(remaining, g.currency)} remaining
-                    </span>
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
+                  </Card>
+                );
+              })}
+            </div>
           )}
         </div>
 

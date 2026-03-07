@@ -114,11 +114,10 @@ impl FinanceGoalRepo {
 
     /// Return all goals regardless of status, ordered by creation date.
     pub async fn list_all(&self) -> Result<Vec<FinanceGoalRow>, crate::error::StorageError> {
-        let rows = sqlx::query_as::<_, FinanceGoalRow>(
-            "SELECT * FROM finance_goals ORDER BY created_at",
-        )
-        .fetch_all(&self.pool)
-        .await?;
+        let rows =
+            sqlx::query_as::<_, FinanceGoalRow>("SELECT * FROM finance_goals ORDER BY created_at")
+                .fetch_all(&self.pool)
+                .await?;
         Ok(rows)
     }
 

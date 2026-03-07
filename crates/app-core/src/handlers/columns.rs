@@ -4,6 +4,7 @@ use desktop_shared::commands::{
 };
 use desktop_shared::errors::ApiError;
 use storage::rows::custom_column::CustomColumnRow;
+use tracing::warn;
 
 use crate::errors::map_storage_err;
 use crate::state::AppCore;
@@ -11,10 +12,16 @@ use crate::state::AppCore;
 // ── Row → Response converters ───────────────────────────────────────────
 
 fn column_to_response(row: &CustomColumnRow) -> CustomColumnResponse {
-    let options: Option<Vec<String>> = row
-        .options_json
-        .as_deref()
-        .and_then(|s| serde_json::from_str(s).ok());
+    let options: Option<Vec<String>> = match row.options_json.as_deref() {
+        Some(s) => match serde_json::from_str(s) {
+            Ok(v) => Some(v),
+            Err(e) => {
+                warn!(column_id = %row.id, error = %e, "failed to parse options_json");
+                None
+            }
+        },
+        None => None,
+    };
 
     CustomColumnResponse {
         id: row.id.clone(),
@@ -30,8 +37,16 @@ fn column_to_response(row: &CustomColumnRow) -> CustomColumnResponse {
 fn value_to_response(
     row: &storage::rows::custom_column::CustomColumnValueRow,
 ) -> CustomColumnValueResponse {
-    let value: serde_json::Value =
-        serde_json::from_str(&row.value_json).unwrap_or(serde_json::Value::Null);
+    let value: serde_json::Value = match serde_json::from_str(&row.value_json) {
+        Ok(v) => v,
+        Err(e) => {
+            warn!(
+                task_id = %row.task_id, column_id = %row.column_id,
+                error = %e, "failed to parse custom column value_json"
+            );
+            serde_json::Value::Null
+        }
+    };
 
     CustomColumnValueResponse {
         task_id: row.task_id.clone(),
@@ -73,7 +88,11 @@ impl AppCore {
         let options_json = params
             .options
             .as_ref()
-            .map(|opts| serde_json::to_string(opts).unwrap_or_default());
+            .map(serde_json::to_string)
+            .transpose()
+            .map_err(|e| {
+                ApiError::new("VALIDATION", format!("failed to serialize options: {e}"))
+            })?;
 
         let row = CustomColumnRow {
             id,
@@ -105,7 +124,9 @@ impl AppCore {
             None => None,
             Some(None) => Some(None),
             Some(Some(opts)) => {
-                serialized = serde_json::to_string(opts).unwrap_or_default();
+                serialized = serde_json::to_string(opts).map_err(|e| {
+                    ApiError::new("VALIDATION", format!("failed to serialize options: {e}"))
+                })?;
                 Some(Some(serialized.as_str()))
             }
         };
@@ -155,7 +176,10 @@ impl AppCore {
         Ok(rows.iter().map(value_to_response).collect())
     }
 
-    pub async fn custom_column_value_set(&self, params: ColumnValueSetParams) -> Result<(), ApiError> {
+    pub async fn custom_column_value_set(
+        &self,
+        params: ColumnValueSetParams,
+    ) -> Result<(), ApiError> {
         let value_json = serde_json::to_string(&params.value)
             .map_err(|e| ApiError::new("VALIDATION", format!("invalid value: {e}")))?;
 

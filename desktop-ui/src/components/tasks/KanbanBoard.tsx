@@ -355,6 +355,8 @@ export function KanbanBoard({
             });
           }
         }
+      } catch (e) {
+        console.error("Failed to update task position:", e);
       } finally {
         onRefetch();
       }

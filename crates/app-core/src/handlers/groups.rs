@@ -29,17 +29,21 @@ impl AppCore {
             .await
             .map_err(map_storage_err)?;
 
-        let mut results = Vec::with_capacity(rows.len());
-        for row in &rows {
-            let count = self
-                .repos
-                .task_groups
-                .count_tasks(&row.id)
-                .await
-                .map_err(map_storage_err)?;
-            results.push(group_row_to_response(row, count));
-        }
-        Ok(results)
+        let group_ids: Vec<&str> = rows.iter().map(|r| r.id.as_str()).collect();
+        let counts = self
+            .repos
+            .task_groups
+            .count_tasks_bulk(&group_ids)
+            .await
+            .map_err(map_storage_err)?;
+
+        Ok(rows
+            .iter()
+            .map(|row| {
+                let count = counts.get(&row.id).copied().unwrap_or(0);
+                group_row_to_response(row, count)
+            })
+            .collect())
     }
 
     pub async fn group_create(

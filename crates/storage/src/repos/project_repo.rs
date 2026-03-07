@@ -113,13 +113,7 @@ impl ProjectRepo {
         .bind(patch.tags.as_ref().map(sqlx::types::Json))
         .bind(&patch.status)
         .bind(patch.workflow_id.is_some())
-        .bind(
-            patch
-                .workflow_id
-                .as_ref()
-                .and_then(|w| w.as_deref())
-                .unwrap_or_default(),
-        )
+        .bind(patch.workflow_id.as_ref().and_then(|w| w.as_deref()))
         .fetch_optional(&self.pool)
         .await?
         .ok_or_not_found(&format!("project {}", patch.id))?;

@@ -111,8 +111,17 @@ function TagsDisplay({ value }: { value: unknown }) {
 }
 
 function LinkDisplay({ value }: { value: unknown }) {
+  const isValidUrl = (url: string) => /^https?:\/\//i.test(url);
+
   if (typeof value === "object" && value !== null && "url" in value) {
     const v = value as { url: string; label?: string };
+    if (!isValidUrl(v.url)) {
+      return (
+        <span className="text-[11px] font-light text-muted truncate block max-w-[160px]">
+          {v.label || v.url}
+        </span>
+      );
+    }
     return (
       <a
         href={v.url}
@@ -126,6 +135,13 @@ function LinkDisplay({ value }: { value: unknown }) {
     );
   }
   if (typeof value === "string") {
+    if (!isValidUrl(value)) {
+      return (
+        <span className="text-[11px] font-light text-muted truncate block max-w-[160px]">
+          {value}
+        </span>
+      );
+    }
     return (
       <a
         href={value}

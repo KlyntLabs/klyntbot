@@ -206,18 +206,13 @@ impl CustomColumnRepo {
     }
 
     /// Delete a custom column value for a task. Returns true if deleted.
-    pub async fn delete_value(
-        &self,
-        task_id: &str,
-        column_id: &str,
-    ) -> Result<bool, StorageError> {
-        let result = sqlx::query(
-            "DELETE FROM custom_column_values WHERE task_id = ?1 AND column_id = ?2",
-        )
-        .bind(task_id)
-        .bind(column_id)
-        .execute(&self.pool)
-        .await?;
+    pub async fn delete_value(&self, task_id: &str, column_id: &str) -> Result<bool, StorageError> {
+        let result =
+            sqlx::query("DELETE FROM custom_column_values WHERE task_id = ?1 AND column_id = ?2")
+                .bind(task_id)
+                .bind(column_id)
+                .execute(&self.pool)
+                .await?;
         Ok(result.rows_affected() > 0)
     }
 }

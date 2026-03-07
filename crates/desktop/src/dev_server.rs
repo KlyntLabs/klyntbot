@@ -774,9 +774,7 @@ async fn dispatch(
             };
             r(core.workflow_get(id).await)
         }
-        "workflow_get_effective" => r(core
-            .workflow_get_effective(get(&body, "project_id"))
-            .await),
+        "workflow_get_effective" => r(core.workflow_get_effective(get(&body, "projectId")).await),
         "workflow_create" => r(core
             .workflow_create(match parse_params(&body) {
                 Ok(p) => p,
@@ -818,7 +816,7 @@ async fn dispatch(
 
         // ── Custom Columns ───────────────────────────────────
         "custom_column_list" => {
-            let project_id = match get_str(&body, "project_id") {
+            let project_id = match get_str(&body, "projectId") {
                 Ok(v) => v,
                 Err(e) => return err(e),
             };
@@ -850,7 +848,7 @@ async fn dispatch(
             })
             .await),
         "custom_column_values" => {
-            let task_id = match get_str(&body, "task_id") {
+            let task_id = match get_str(&body, "taskId") {
                 Ok(v) => v,
                 Err(e) => return err(e),
             };
@@ -863,11 +861,11 @@ async fn dispatch(
             })
             .await),
         "custom_column_value_delete" => {
-            let task_id = match get_str(&body, "task_id") {
+            let task_id = match get_str(&body, "taskId") {
                 Ok(v) => v,
                 Err(e) => return err(e),
             };
-            let column_id = match get_str(&body, "column_id") {
+            let column_id = match get_str(&body, "columnId") {
                 Ok(v) => v,
                 Err(e) => return err(e),
             };

@@ -267,6 +267,28 @@ impl StatusWorkflowRepo {
         }
     }
 
+    /// Fetch labels by a list of IDs (batch load to avoid N+1).
+    pub async fn get_labels_by_ids(
+        &self,
+        ids: &[&str],
+    ) -> Result<Vec<StatusLabelRow>, StorageError> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let mut qb =
+            sqlx::QueryBuilder::<sqlx::Sqlite>::new("SELECT * FROM status_labels WHERE id IN (");
+        let mut sep = qb.separated(", ");
+        for id in ids {
+            sep.push_bind(*id);
+        }
+        sep.push_unseparated(")");
+        let rows = qb
+            .build_query_as::<StatusLabelRow>()
+            .fetch_all(&self.pool)
+            .await?;
+        Ok(rows)
+    }
+
     /// Find the first label matching a status group within a workflow.
     pub async fn find_label_by_group(
         &self,
