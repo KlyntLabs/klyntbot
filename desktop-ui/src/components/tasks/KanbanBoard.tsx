@@ -17,7 +17,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { formatDate } from "../../lib/dates";
 import type { Area, Project, StatusLabel, Task, TaskUpdateParams } from "../../lib/types";
@@ -124,12 +124,14 @@ function SortableKanbanCard({
   areaMap,
   isCompleted,
   onNavigate,
+  dragJustEnded,
 }: {
   task: Task;
   projectMap: Map<string, Project>;
   areaMap: Map<string, Area>;
   isCompleted: boolean;
   onNavigate: (id: string) => void;
+  dragJustEnded: React.RefObject<boolean>;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
@@ -150,7 +152,7 @@ function SortableKanbanCard({
       {...attributes}
       {...listeners}
       onClick={() => {
-        if (!isDragging) onNavigate(task.id);
+        if (!isDragging && !dragJustEnded.current) onNavigate(task.id);
       }}
       className="bg-white/[0.04] hover:bg-white/[0.06] rounded-lg px-4 py-3 cursor-grab active:cursor-grabbing transition-colors border border-white/[0.04] text-left w-full"
     >
@@ -206,6 +208,7 @@ export function KanbanBoard({
   const navigate = useNavigate();
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [overColumnId, setOverColumnId] = useState<string | null>(null);
+  const dragJustEnded = useRef(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -286,6 +289,12 @@ export function KanbanBoard({
       setActiveTask(null);
       setOverColumnId(null);
 
+      // Suppress click events that fire immediately after drag release
+      dragJustEnded.current = true;
+      requestAnimationFrame(() => {
+        dragJustEnded.current = false;
+      });
+
       const { active, over } = event;
       if (!over) return;
 
@@ -308,48 +317,49 @@ export function KanbanBoard({
         return;
       }
 
-      // Moving between columns
-      if (sourceColumnId !== targetColumnId) {
-        // Find position in target column
-        const targetCol = columns.find((c) => c.key === targetColumnId);
-        let newPosition = 0;
-        if (targetCol && targetTaskId) {
-          const targetIdx = targetCol.tasks.findIndex((t) => t.id === targetTaskId);
-          newPosition = targetIdx >= 0 ? targetIdx : targetCol.tasks.length;
-        } else if (targetCol) {
-          newPosition = targetCol.tasks.length;
-        }
-
-        await onUpdateTask({
-          id: activeId,
-          statusLabelId: targetColumnId,
-          position: newPosition,
-        });
-        onRefetch();
-        return;
-      }
-
-      // Reordering within the same column
-      if (targetTaskId && targetTaskId !== activeId) {
-        const col = columns.find((c) => c.key === sourceColumnId);
-        if (!col) return;
-
-        const oldIndex = col.tasks.findIndex((t) => t.id === activeId);
-        const newIndex = col.tasks.findIndex((t) => t.id === targetTaskId);
-
-        if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
-          const reordered = arrayMove(col.tasks, oldIndex, newIndex);
-          const finalIndex = reordered.findIndex((t) => t.id === activeId);
+      try {
+        // Moving between columns
+        if (sourceColumnId !== targetColumnId) {
+          const targetCol = columns.find((c) => c.key === targetColumnId);
+          let newPosition = 0;
+          if (targetCol && targetTaskId) {
+            const targetIdx = targetCol.tasks.findIndex((t) => t.id === targetTaskId);
+            newPosition = targetIdx >= 0 ? targetIdx : targetCol.tasks.length;
+          } else if (targetCol) {
+            newPosition = targetCol.tasks.length;
+          }
 
           await onUpdateTask({
             id: activeId,
-            position: finalIndex,
+            statusLabelId: targetColumnId,
+            position: newPosition,
           });
-          onRefetch();
+          return;
         }
+
+        // Reordering within the same column
+        if (targetTaskId && targetTaskId !== activeId) {
+          const col = columns.find((c) => c.key === sourceColumnId);
+          if (!col) return;
+
+          const oldIndex = col.tasks.findIndex((t) => t.id === activeId);
+          const newIndex = col.tasks.findIndex((t) => t.id === targetTaskId);
+
+          if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
+            const reordered = arrayMove(col.tasks, oldIndex, newIndex);
+            const finalIndex = reordered.findIndex((t) => t.id === activeId);
+
+            await onUpdateTask({
+              id: activeId,
+              position: finalIndex,
+            });
+          }
+        }
+      } finally {
+        onRefetch();
       }
     },
-    [columns, findColumnForTask, onUpdateTask, onRefetch],
+    [columns, findColumnForTask, onUpdateTask, onRefetch, dragJustEnded],
   );
 
   const handleNavigate = useCallback(
@@ -394,6 +404,7 @@ export function KanbanBoard({
                       areaMap={areaMap}
                       isCompleted={completedTasks.has(task.id)}
                       onNavigate={handleNavigate}
+                      dragJustEnded={dragJustEnded}
                     />
                   ))}
 
