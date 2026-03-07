@@ -83,6 +83,8 @@ impl TaskTool {
                             area_id: None,
                             project_id: None,
                             key_result_id: None,
+                            status_label_id: None,
+                            position: None,
                         };
                         if self.repo.update(&patch).await.is_ok() {
                             enriched_info = format!(" (enriched: {})", applied.join(", "));

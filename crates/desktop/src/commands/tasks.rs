@@ -321,6 +321,8 @@ pub async fn task_create(
         recurrence_parent_id: None,
         is_template: false,
         next_instance_date: None,
+        status_label_id: None,
+        position: 0,
     };
 
     let created = state

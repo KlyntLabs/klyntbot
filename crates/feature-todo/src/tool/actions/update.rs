@@ -43,6 +43,8 @@ impl TaskTool {
             key_result_id: p
                 .optional_str("key_result_id")?
                 .map(|s| Some(s.to_string())),
+            status_label_id: None,
+            position: None,
         };
 
         match self.repo.update(&patch).await {

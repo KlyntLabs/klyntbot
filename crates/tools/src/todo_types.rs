@@ -76,6 +76,8 @@ impl TodoPatch {
             area_id: self.area_id.clone(),
             project_id: None,
             key_result_id: self.key_result_id.clone(),
+            status_label_id: None,
+            position: None,
         }
     }
 }
@@ -96,6 +98,7 @@ impl TodoFilter {
             due_before: None,
             templates_only: self.include_templates,
             root_only: false,
+            status_group: None,
         }
     }
 }

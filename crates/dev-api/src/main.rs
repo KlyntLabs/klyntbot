@@ -641,6 +641,8 @@ async fn dispatch(
                 recurrence_parent_id: None,
                 is_template: false,
                 next_instance_date: None,
+                status_label_id: None,
+                position: 0,
             };
             match core.repos.actions.add(&row).await {
                 Ok(created) => ok(action_to_task(&created, 0, 0)),

@@ -278,6 +278,8 @@ impl From<&Action> for ActionRow {
             recurrence_parent_id: action.recurrence_parent_id.clone(),
             is_template: action.is_template,
             next_instance_date: action.next_instance_date,
+            status_label_id: None,
+            position: 0,
         }
     }
 }
