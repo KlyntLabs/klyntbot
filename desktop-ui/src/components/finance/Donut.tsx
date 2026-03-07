@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+
 export function Donut({
   segments,
   label,
@@ -5,12 +7,20 @@ export function Donut({
   size = 140,
 }: {
   segments: { name: string; value: number; color: string }[];
-  label: string;
-  value: string;
+  label?: string;
+  value?: string;
   size?: number;
 }) {
+  const [animated, setAnimated] = useState(false);
+
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setAnimated(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+
   const total = segments.reduce((s, seg) => s + seg.value, 0);
   if (total === 0) return null;
+
   const r = size / 2 - 12;
   const cx = size / 2;
   const cy = size / 2;
@@ -21,7 +31,7 @@ export function Donut({
   return (
     <div className="flex flex-col items-center">
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
-        {segments.map((seg) => {
+        {segments.map((seg, i) => {
           const frac = seg.value / total;
           const dash = frac * circ;
           const rot = (off / total) * 360 - 90;
@@ -36,28 +46,37 @@ export function Donut({
               stroke={seg.color}
               strokeWidth={sw}
               strokeDasharray={`${dash} ${circ - dash}`}
+              strokeDashoffset={animated ? 0 : dash}
               transform={`rotate(${rot} ${cx} ${cy})`}
+              style={{
+                transition: `stroke-dashoffset 700ms ease-out ${i * 80}ms`,
+                filter: `drop-shadow(0 0 4px ${seg.color}40)`,
+              }}
             />
           );
         })}
-        <text
-          x={cx}
-          y={cy - 5}
-          textAnchor="middle"
-          className="fill-dim text-[9px]"
-          style={{ fontWeight: 300 }}
-        >
-          {label}
-        </text>
-        <text
-          x={cx}
-          y={cy + 10}
-          textAnchor="middle"
-          className="fill-primary text-[13px]"
-          style={{ fontWeight: 300 }}
-        >
-          {value}
-        </text>
+        {label && (
+          <text
+            x={cx}
+            y={cy - 5}
+            textAnchor="middle"
+            className="fill-dim text-[9px]"
+            style={{ fontWeight: 300 }}
+          >
+            {label}
+          </text>
+        )}
+        {value && (
+          <text
+            x={cx}
+            y={cy + 10}
+            textAnchor="middle"
+            className="fill-primary text-[13px]"
+            style={{ fontWeight: 300 }}
+          >
+            {value}
+          </text>
+        )}
       </svg>
       <div className="flex flex-wrap gap-x-3 gap-y-0.5 justify-center mt-2">
         {segments.map((seg) => (

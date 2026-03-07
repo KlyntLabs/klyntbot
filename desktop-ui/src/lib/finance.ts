@@ -81,13 +81,18 @@ export const GOAL_ICONS: Record<string, typeof Wallet> = {
   custom: Target,
 };
 
-export const COLORS = [
-  "#F97316",
-  "#3B82F6",
-  "#22C55E",
-  "#8B5CF6",
-  "#EF4444",
-  "#06B6D4",
-  "#F59E0B",
-  "#EC4899",
+// Semantic chart colors — CSS variables for theme adaptability,
+// with hex fallbacks for SVG fill/stroke where CSS vars don't work.
+export const CHART_COLORS = [
+  { var: "var(--brand)", hex: "#f97316" },
+  { var: "var(--info)", hex: "#3b82f6" },
+  { var: "var(--success)", hex: "#22c55e" },
+  { var: "var(--purple)", hex: "#8b5cf6" },
+  { var: "var(--destructive)", hex: "#f43f5e" },
+  { var: "var(--color-cyan-400)", hex: "#06b6d4" },
+  { var: "var(--color-amber-500)", hex: "#f59e0b" },
+  { var: "var(--color-pink-500)", hex: "#ec4899" },
 ];
+
+// Keep COLORS for backward compat during migration
+export const COLORS = CHART_COLORS.map((c) => c.hex);

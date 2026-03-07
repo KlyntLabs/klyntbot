@@ -26,6 +26,7 @@ import {
 import type {
   FinanceAccount,
   FinanceBudgetUsage,
+  FinanceCategoryReport,
   FinanceGoal,
   FinanceInvestment,
   FinanceLiability,
@@ -34,18 +35,21 @@ import type {
   FinanceTransaction,
 } from "../../lib/types";
 import { cn } from "../../lib/utils";
-import { Card, SectionLabel } from "../finance/Card";
+import { Card, CardHeader } from "../finance/Card";
 import { Donut } from "../finance/Donut";
 import { FinanceLayout } from "../finance/FinanceLayout";
+import { FinanceSkeleton } from "../finance/FinanceSkeleton";
 import { Progress } from "../ui/Progress";
+
 export function Finance() {
   const navigate = useNavigate();
 
-  const { data: accounts, refetch: rA } = useQuery<FinanceAccount[]>(
-    "finance_accounts",
-    undefined,
-    [],
-  );
+  const {
+    data: accounts,
+    loading,
+    error,
+    refetch: rA,
+  } = useQuery<FinanceAccount[]>("finance_accounts", undefined, []);
   const { data: transactions, refetch: rT } = useQuery<FinanceTransaction[]>(
     "finance_transactions",
     { limit: 8 },
@@ -78,6 +82,11 @@ export function Finance() {
     { totalsByCurrency: [] },
   );
   const { data: rates } = useQuery<Record<string, number>>("finance_exchange_rates", undefined, {});
+  const { data: spendingReport } = useQuery<FinanceCategoryReport>(
+    "finance_report_spending",
+    undefined,
+    { total: 0, breakdown: [] },
+  );
 
   const refetchAll = useCallback(() => {
     rA();
@@ -109,20 +118,17 @@ export function Finance() {
     [netWorth, rates],
   );
 
-  const spendingSegs = useMemo(() => {
-    const m = new Map<string, number>();
-    transactions
-      .filter((t) => t.txType === "expense")
-      .forEach((t) => {
-        const c = t.category ?? "Other";
-        m.set(c, (m.get(c) ?? 0) + toVnd(t.amount, t.currency, rates));
-      });
-    return Array.from(m.entries())
-      .sort((a, b) => b[1] - a[1])
-      .map(([name, value], i) => ({ name, value, color: COLORS[i % COLORS.length] }));
-  }, [transactions, rates]);
+  const spendingSegs = useMemo(
+    () =>
+      spendingReport.breakdown.map((b, i) => ({
+        name: b.category,
+        value: b.amount,
+        color: COLORS[i % COLORS.length],
+      })),
+    [spendingReport],
+  );
 
-  const totalSpend = useMemo(() => spendingSegs.reduce((s, c) => s + c.value, 0), [spendingSegs]);
+  const totalSpend = spendingReport.total;
   const totalIncome = useMemo(
     () =>
       transactions
@@ -145,17 +151,39 @@ export function Finance() {
   const accountMap = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts]);
   const active = useMemo(() => accounts.filter((a) => !a.isArchived), [accounts]);
 
+  if (loading && accounts.length === 0) {
+    return (
+      <FinanceLayout onRefresh={refetchAll}>
+        <FinanceSkeleton rows={6} />
+      </FinanceLayout>
+    );
+  }
+
+  if (error && accounts.length === 0) {
+    return (
+      <FinanceLayout onRefresh={refetchAll}>
+        <Card className="p-6 text-center">
+          <p className="text-[12px] text-destructive mb-2">{error.message}</p>
+          <button
+            type="button"
+            onClick={refetchAll}
+            className="text-[11px] text-brand hover:text-brand-hover transition-colors"
+          >
+            Retry
+          </button>
+        </Card>
+      </FinanceLayout>
+    );
+  }
+
   return (
     <FinanceLayout onRefresh={refetchAll}>
-      <div className="grid grid-cols-12 gap-3 auto-rows-min">
+      <div className="grid grid-cols-12 gap-4 auto-rows-min">
         {/* ── ROW 1: Net Worth (3col) + Accounts (9col) ────── */}
         <div className="col-span-3">
-          <SectionLabel>&nbsp;</SectionLabel>
           <Card className="p-4">
-            <p className="text-[10px] text-dim font-light uppercase tracking-wider mb-1">
-              Net Worth
-            </p>
-            <p className="text-[24px] font-light text-primary tracking-tight leading-tight mb-3 tabular-nums">
+            <CardHeader title="Net Worth" />
+            <p className="text-[28px] font-light text-primary tracking-tight leading-none mb-3 tabular-nums">
               {fmtCompact(totalNet)}đ
             </p>
             <div className="space-y-1.5">
@@ -190,44 +218,55 @@ export function Finance() {
         </div>
 
         <div className="col-span-9">
-          <SectionLabel>Accounts</SectionLabel>
-          <div className="grid grid-cols-5 gap-3">
-            {active.slice(0, 5).map((acct) => {
-              const Icon = ACCT_ICONS[acct.accountType] ?? Wallet;
-              const vnd = toVnd(acct.balance, acct.currency, rates);
-              return (
-                <Card
-                  key={acct.id}
-                  className="p-3.5 cursor-pointer hover:bg-white/[0.06] transition-colors"
-                  onClick={() => navigate(`/finance/accounts?id=${acct.id}`)}
-                >
-                  <div className="flex items-center gap-2 mb-2.5">
-                    <div className="w-7 h-7 rounded-lg bg-white/[0.08] flex items-center justify-center flex-shrink-0">
-                      <Icon className="w-3.5 h-3.5 text-muted" strokeWidth={1.5} />
+          <Card className="p-4">
+            <CardHeader title="Accounts" />
+            <div className="grid grid-cols-5 gap-3">
+              {active.slice(0, 5).map((acct) => {
+                const Icon = ACCT_ICONS[acct.accountType] ?? Wallet;
+                const vnd = toVnd(acct.balance, acct.currency, rates);
+                return (
+                  <div
+                    key={acct.id}
+                    className="glass-card p-3.5 cursor-pointer hover:bg-white/[0.06] transition-colors"
+                    onClick={() => navigate(`/finance/accounts?id=${acct.id}`)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") navigate(`/finance/accounts?id=${acct.id}`);
+                    }}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    <div className="flex items-center gap-2 mb-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-white/[0.08] flex items-center justify-center flex-shrink-0">
+                        <Icon className="w-3.5 h-3.5 text-muted" strokeWidth={1.5} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-medium text-secondary truncate">
+                          {acct.name}
+                        </p>
+                        <p className="text-[9px] text-dim font-light">
+                          {acct.accountType.replaceAll("_", " ")}
+                        </p>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-[11px] font-light text-secondary truncate">{acct.name}</p>
-                      <p className="text-[9px] text-dim font-light">
-                        {acct.accountType.replace("_", " ")}
-                      </p>
-                    </div>
+                    <p className="text-[14px] font-light text-primary tabular-nums">
+                      {fmtMoney(acct.balance, acct.currency)}
+                    </p>
+                    {acct.currency !== "VND" && (
+                      <p className="text-[9px] text-dim font-light mt-0.5">≈ {fmtVnd(vnd)}</p>
+                    )}
                   </div>
-                  <p className="text-[14px] font-light text-primary tabular-nums">
-                    {fmtMoney(acct.balance, acct.currency)}
-                  </p>
-                  {acct.currency !== "VND" && (
-                    <p className="text-[9px] text-dim font-light mt-0.5">≈ {fmtVnd(vnd)}</p>
-                  )}
-                </Card>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          </Card>
         </div>
 
         {/* ── ROW 2: Spending table (9col) + Donut (3col) ──── */}
         <div className="col-span-9 flex flex-col">
-          <SectionLabel>Spending by Category</SectionLabel>
           <Card className="overflow-hidden flex-1">
+            <div className="px-4 pt-4">
+              <CardHeader title="Spending by Category" />
+            </div>
             <div className="grid grid-cols-[1fr_100px_100px_100px_50px] gap-3 border-b border-white/[0.08] text-[10px] text-dim font-light px-4 py-2">
               <div>Category</div>
               <div className="text-right">Budget</div>
@@ -250,7 +289,7 @@ export function Finance() {
                         className="w-2 h-2 rounded-full flex-shrink-0"
                         style={{ backgroundColor: COLORS[i % COLORS.length] }}
                       />
-                      <span className="text-[12px] font-light text-secondary">{b.name}</span>
+                      <span className="text-[12px] font-medium text-secondary">{b.name}</span>
                     </div>
                     <div className="text-right text-[12px] font-light text-muted tabular-nums">
                       {fmtMoney(b.amount, b.currency)}
@@ -286,8 +325,7 @@ export function Finance() {
         </div>
 
         <div className="col-span-3">
-          <SectionLabel>&nbsp;</SectionLabel>
-          <Card className="p-4 flex items-center justify-center h-[calc(100%-20px)]">
+          <Card className="p-4 flex items-center justify-center h-full">
             <Donut
               segments={spendingSegs}
               label="Total spending"
@@ -298,8 +336,10 @@ export function Finance() {
 
         {/* ── ROW 3: Transactions (9col) + Summary+Invest (3col) */}
         <div className="col-span-9 flex flex-col">
-          <SectionLabel>Transactions</SectionLabel>
           <Card className="overflow-hidden flex-1">
+            <div className="px-4 pt-4">
+              <CardHeader title="Transactions" />
+            </div>
             {transactions.map((tx) => {
               const acct = accountMap.get(tx.accountId);
               const TxI =
@@ -348,10 +388,10 @@ export function Finance() {
           </Card>
         </div>
 
-        <div className="col-span-3 space-y-3">
-          <div>
-            <SectionLabel>Summary</SectionLabel>
-            <Card className="p-4 space-y-2">
+        <div className="col-span-3 space-y-4">
+          <Card className="p-4">
+            <CardHeader title="Summary" />
+            <div className="space-y-2">
               <div className="flex justify-between">
                 <span className="text-[10px] text-muted font-light">Transactions</span>
                 <span className="text-[10px] text-primary font-light">{transactions.length}</span>
@@ -374,90 +414,95 @@ export function Finance() {
                   {totalIncome > 0 ? pct(totalIncome - totalSpend, totalIncome) : 0}%
                 </span>
               </div>
-            </Card>
-          </div>
-          <div>
-            <SectionLabel>Investments</SectionLabel>
-            <Card className="p-4">
-              <Donut
-                segments={investSegs}
-                label="Portfolio"
-                value={`${fmtCompact(totalInvest)}đ`}
-                size={130}
-              />
-              <div className="mt-3 pt-2.5 border-t border-white/[0.04] space-y-1.5">
-                {portfolios.map((p) => {
-                  const r = retPct(p.totalValue, p.totalCostBasis);
-                  return (
-                    <div key={p.id} className="flex justify-between">
-                      <span className="text-[10px] text-muted font-light truncate">{p.name}</span>
-                      <span
-                        className={cn(
-                          "text-[10px] font-light",
-                          r >= 0 ? "text-success" : "text-destructive",
-                        )}
-                      >
-                        {r >= 0 ? "+" : ""}
-                        {r}%
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </Card>
-          </div>
+            </div>
+          </Card>
+
+          <Card className="p-4">
+            <CardHeader title="Investments" />
+            <Donut
+              segments={investSegs}
+              label="Portfolio"
+              value={`${fmtCompact(totalInvest)}đ`}
+              size={130}
+            />
+            <div className="mt-3 pt-2.5 border-t border-white/[0.04] space-y-1.5">
+              {portfolios.map((p) => {
+                const r = retPct(p.totalValue, p.totalCostBasis);
+                return (
+                  <div key={p.id} className="flex justify-between">
+                    <span className="text-[10px] text-muted font-light truncate">{p.name}</span>
+                    <span
+                      className={cn(
+                        "text-[10px] font-light",
+                        r >= 0 ? "text-success" : "text-destructive",
+                      )}
+                    >
+                      {r >= 0 ? "+" : ""}
+                      {r}%
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
         </div>
 
         {/* ── ROW 4: Goals (6col) + Liabilities (6col) ─────── */}
         <div className="col-span-6">
-          <SectionLabel>Goals</SectionLabel>
-          <Card className="overflow-hidden divide-y divide-border-subtle">
-            {goals.map((g) => {
-              const p = pct(g.currentAmount, g.targetAmount);
-              const Icon = GOAL_ICONS[g.goalType] ?? Target;
-              return (
-                <div key={g.id} className="px-4 py-3 hover:bg-white/[0.06] transition-colors">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <div className="flex items-center gap-2">
-                      <Icon
-                        className={cn(
-                          "w-3.5 h-3.5",
-                          g.goalType === "fire" ? "text-brand" : "text-muted",
-                        )}
-                        strokeWidth={1.5}
-                      />
-                      <span className="text-[12px] font-light text-secondary">{g.name}</span>
-                      <span className="px-1.5 py-0.5 text-[9px] font-light rounded bg-white/[0.06] text-dim">
-                        {g.goalType}
-                      </span>
+          <Card className="overflow-hidden">
+            <div className="px-4 pt-4">
+              <CardHeader title="Goals" />
+            </div>
+            <div className="divide-y divide-border-subtle">
+              {goals.map((g) => {
+                const p = pct(g.currentAmount, g.targetAmount);
+                const Icon = GOAL_ICONS[g.goalType] ?? Target;
+                return (
+                  <div key={g.id} className="px-4 py-3 hover:bg-white/[0.06] transition-colors">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <Icon
+                          className={cn(
+                            "w-3.5 h-3.5",
+                            g.goalType === "fire" ? "text-brand" : "text-muted",
+                          )}
+                          strokeWidth={1.5}
+                        />
+                        <span className="text-[12px] font-medium text-secondary">{g.name}</span>
+                        <span className="px-1.5 py-0.5 text-[9px] font-light rounded bg-white/[0.06] text-dim">
+                          {g.goalType}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-dim font-light">
+                          {fmtCompact(g.currentAmount)} / {fmtCompact(g.targetAmount)}đ
+                        </span>
+                        <span className="text-[10px] text-brand font-light">{p}%</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] text-dim font-light">
-                        {fmtCompact(g.currentAmount)} / {fmtCompact(g.targetAmount)}đ
-                      </span>
-                      <span className="text-[10px] text-brand font-light">{p}%</span>
+                    <Progress value={p} />
+                    <div className="flex gap-3 mt-1">
+                      {g.deadline && (
+                        <span className="text-[9px] text-dim font-light">Due {g.deadline}</span>
+                      )}
+                      {g.monthlyContribution && (
+                        <span className="text-[9px] text-dim font-light">
+                          {fmtCompact(g.monthlyContribution)}đ/mo
+                        </span>
+                      )}
                     </div>
                   </div>
-                  <Progress value={p} />
-                  <div className="flex gap-3 mt-1">
-                    {g.deadline && (
-                      <span className="text-[9px] text-dim font-light">Due {g.deadline}</span>
-                    )}
-                    {g.monthlyContribution && (
-                      <span className="text-[9px] text-dim font-light">
-                        {fmtCompact(g.monthlyContribution)}đ/mo
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </Card>
         </div>
 
         <div className="col-span-6">
-          <SectionLabel>Liabilities</SectionLabel>
           <Card className="overflow-hidden">
+            <div className="px-4 pt-4">
+              <CardHeader title="Liabilities" />
+            </div>
             {liabilities.map((l) => {
               const Icon = LIAB_ICONS[l.liabilityType] ?? Wallet;
               const paid = pct(l.principal - l.remaining, l.principal);
@@ -469,9 +514,9 @@ export function Finance() {
                   <div className="flex items-center justify-between mb-1.5">
                     <div className="flex items-center gap-2">
                       <Icon className="w-3.5 h-3.5 text-destructive/60" strokeWidth={1.5} />
-                      <span className="text-[12px] font-light text-secondary">{l.name}</span>
+                      <span className="text-[12px] font-medium text-secondary">{l.name}</span>
                       <span className="px-1.5 py-0.5 text-[9px] font-light rounded bg-white/[0.06] text-dim">
-                        {l.liabilityType.replace("_", " ")}
+                        {l.liabilityType.replaceAll("_", " ")}
                       </span>
                     </div>
                     <span className="text-[12px] font-light text-destructive tabular-nums">

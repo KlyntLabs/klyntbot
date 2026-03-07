@@ -1,5 +1,7 @@
 //! Finance system configuration and sub-structs.
 
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 
 use super::core::default_true;
@@ -29,6 +31,10 @@ pub struct FinanceConfig {
     pub scheduling: FinanceSchedulingConfig,
     #[serde(default)]
     pub categories: FinanceCategoryConfig,
+    /// Manual exchange rates mapping currency codes to their VND equivalent.
+    /// E.g. `{"USD": 25500, "USDT": 25500}`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exchange_rates: Option<HashMap<String, f64>>,
 }
 
 impl Default for FinanceConfig {
@@ -43,6 +49,7 @@ impl Default for FinanceConfig {
             price_refresh: Default::default(),
             scheduling: Default::default(),
             categories: Default::default(),
+            exchange_rates: None,
         }
     }
 }

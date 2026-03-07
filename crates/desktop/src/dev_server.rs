@@ -316,16 +316,147 @@ async fn dispatch(
         // ── Status ────────────────────────────────────────────
         "agent_status" => r(core.agent_status().await),
 
-        // ── Finance ───────────────────────────────────────────
+        // ── Finance — queries ─────────────────────────────────
         "finance_accounts" => r(core.finance_accounts().await),
         "finance_transactions" => r(core.finance_transactions(get(&body, "limit")).await),
+        "finance_transactions_filtered" => r(core
+            .finance_transactions_filtered(match parse_params(&body) {
+                Ok(p) => p,
+                Err(e) => return err(e),
+            })
+            .await),
         "finance_budget_usage" => r(core.finance_budget_usage().await),
         "finance_portfolios" => r(core.finance_portfolios().await),
         "finance_investments" => r(core.finance_investments().await),
+        "finance_investments_filtered" => {
+            r(core.finance_investments_filtered(get(&body, "portfolio_id")).await)
+        }
         "finance_goals" => r(core.finance_goals().await),
         "finance_liabilities" => r(core.finance_liabilities().await),
         "finance_net_worth" => r(core.finance_net_worth().await),
         "finance_exchange_rates" => r(core.finance_exchange_rates().await),
+        // ── Finance — mutations ──────────────────────────────
+        "finance_account_create" => rh(core
+            .finance_account_create(match parse_params(&body) {
+                Ok(p) => p,
+                Err(e) => return err(e),
+            })
+            .await),
+        "finance_account_update" => rh(core
+            .finance_account_update(match parse_params(&body) {
+                Ok(p) => p,
+                Err(e) => return err(e),
+            })
+            .await),
+        "finance_account_delete" => {
+            let id = match get_str(&body, "id") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            rh(core.finance_account_delete(id).await)
+        }
+        "finance_transaction_create" => rh(core
+            .finance_transaction_create(match parse_params(&body) {
+                Ok(p) => p,
+                Err(e) => return err(e),
+            })
+            .await),
+        "finance_transaction_delete" => {
+            let id = match get_str(&body, "id") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            rh(core.finance_transaction_delete(id).await)
+        }
+        "finance_budget_create" => rh(core
+            .finance_budget_create(match parse_params(&body) {
+                Ok(p) => p,
+                Err(e) => return err(e),
+            })
+            .await),
+        "finance_budget_update" => rh(core
+            .finance_budget_update(match parse_params(&body) {
+                Ok(p) => p,
+                Err(e) => return err(e),
+            })
+            .await),
+        "finance_budget_delete" => {
+            let id = match get_str(&body, "id") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            rh(core.finance_budget_delete(id).await)
+        }
+        "finance_goal_create" => rh(core
+            .finance_goal_create(match parse_params(&body) {
+                Ok(p) => p,
+                Err(e) => return err(e),
+            })
+            .await),
+        "finance_goal_update" => rh(core
+            .finance_goal_update(match parse_params(&body) {
+                Ok(p) => p,
+                Err(e) => return err(e),
+            })
+            .await),
+        "finance_goal_delete" => {
+            let id = match get_str(&body, "id") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            rh(core.finance_goal_delete(id).await)
+        }
+        "finance_liability_create" => rh(core
+            .finance_liability_create(match parse_params(&body) {
+                Ok(p) => p,
+                Err(e) => return err(e),
+            })
+            .await),
+        "finance_liability_update" => rh(core
+            .finance_liability_update(match parse_params(&body) {
+                Ok(p) => p,
+                Err(e) => return err(e),
+            })
+            .await),
+        "finance_liability_delete" => {
+            let id = match get_str(&body, "id") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            rh(core.finance_liability_delete(id).await)
+        }
+        "finance_portfolio_create" => rh(core
+            .finance_portfolio_create(match parse_params(&body) {
+                Ok(p) => p,
+                Err(e) => return err(e),
+            })
+            .await),
+        "finance_investment_create" => rh(core
+            .finance_investment_create(match parse_params(&body) {
+                Ok(p) => p,
+                Err(e) => return err(e),
+            })
+            .await),
+        "finance_investment_update" => rh(core
+            .finance_investment_update(match parse_params(&body) {
+                Ok(p) => p,
+                Err(e) => return err(e),
+            })
+            .await),
+        // ── Finance — reports ────────────────────────────────
+        "finance_report_spending" => {
+            r(core.finance_report_spending(get(&body, "date_from"), get(&body, "date_to")).await)
+        }
+        "finance_report_income" => {
+            r(core.finance_report_income(get(&body, "date_from"), get(&body, "date_to")).await)
+        }
+        "finance_report_trends" => {
+            let metric = match get_str(&body, "metric") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            r(core.finance_report_trends(metric, get(&body, "periods")).await)
+        }
 
         // ── Notes ─────────────────────────────────────────────
         "note_list" => r(core.note_list(get(&body, "notebook_id")).await),

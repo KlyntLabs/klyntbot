@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use desktop_shared::errors::ApiError;
 
 /// Convert a `KlyntbotError` into a productivity-flavored `ApiError`.
@@ -31,6 +31,11 @@ pub fn parse_date(s: &str) -> Option<DateTime<Utc>> {
 /// Parse a "YYYY-MM-DD" string or return a validation `ApiError`.
 pub fn parse_date_or_err(s: &str) -> Result<DateTime<Utc>, ApiError> {
     parse_date(s).ok_or_else(|| ApiError::new("VALIDATION", format!("invalid date: {s}")))
+}
+
+/// Parse a "YYYY-MM-DD" string into a `NaiveDate`.
+pub fn parse_naive_date(s: &str) -> Option<NaiveDate> {
+    NaiveDate::parse_from_str(s, "%Y-%m-%d").ok()
 }
 
 /// Convert a config save error into an `ApiError`.

@@ -1,56 +1,121 @@
 import { Plus } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useEvent } from "../../hooks/useEvent";
+import { useMutation } from "../../hooks/useMutation";
 import { useQuery } from "../../hooks/useQuery";
-import { COLORS, fmtCompact, fmtMoney, pct } from "../../lib/finance";
-import type { FinanceBudgetUsage } from "../../lib/types";
+import { COLORS, fmtCompact, fmtMoney, pct, toVnd } from "../../lib/finance";
+import type { FinanceBudgetCreateParams, FinanceBudgetUsage } from "../../lib/types";
 import { cn } from "../../lib/utils";
-import { Card, SectionLabel } from "../finance/Card";
+import { Card, CardHeader } from "../finance/Card";
 import { Donut } from "../finance/Donut";
 import { FinanceLayout } from "../finance/FinanceLayout";
+import { FinanceSkeleton } from "../finance/FinanceSkeleton";
+import { FormField, FormModal, fieldClass } from "../finance/FormModal";
 import { Progress } from "../ui/Progress";
+
 export function FinanceBudgets() {
-  const { data: budgets, refetch } = useQuery<FinanceBudgetUsage[]>(
-    "finance_budget_usage",
-    undefined,
-    [],
-  );
+  const {
+    data: budgets,
+    loading,
+    error,
+    refetch,
+  } = useQuery<FinanceBudgetUsage[]>("finance_budget_usage", undefined, []);
+  const { data: rates } = useQuery<Record<string, number>>("finance_exchange_rates", undefined, {});
   useEvent<{ entityKind: string }>("entity:updated", refetch);
 
-  const activeBudgets = budgets.filter((b) => b.isActive);
+  const activeBudgets = useMemo(() => budgets.filter((b) => b.isActive), [budgets]);
+
+  // Convert to VND before summing to handle multi-currency
   const totalBudget = useMemo(
-    () => activeBudgets.reduce((s, b) => s + b.amount, 0),
-    [activeBudgets],
+    () => activeBudgets.reduce((s, b) => s + toVnd(b.amount, b.currency, rates), 0),
+    [activeBudgets, rates],
   );
-  const totalSpent = useMemo(() => activeBudgets.reduce((s, b) => s + b.spent, 0), [activeBudgets]);
+  const totalSpent = useMemo(
+    () => activeBudgets.reduce((s, b) => s + toVnd(b.spent, b.currency, rates), 0),
+    [activeBudgets, rates],
+  );
   const overBudget = activeBudgets.filter((b) => b.spent > b.amount);
 
   const spentSegs = useMemo(
     () =>
       activeBudgets.map((b, i) => ({
         name: b.name,
-        value: b.spent,
+        value: toVnd(b.spent, b.currency, rates),
         color: COLORS[i % COLORS.length],
       })),
-    [activeBudgets],
+    [activeBudgets, rates],
   );
   const budgetSegs = useMemo(
     () =>
       activeBudgets.map((b, i) => ({
         name: b.name,
-        value: b.amount,
+        value: toVnd(b.amount, b.currency, rates),
         color: COLORS[i % COLORS.length],
       })),
-    [activeBudgets],
+    [activeBudgets, rates],
   );
+
+  // ── Add Budget modal ──
+  const [modalOpen, setModalOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [amount, setAmount] = useState("");
+  const [period, setPeriod] = useState("monthly");
+  const [currency, setCurrency] = useState("VND");
+  const [category, setCategory] = useState("");
+
+  const { mutate: createBudget } = useMutation<FinanceBudgetUsage, FinanceBudgetCreateParams>(
+    "finance_budget_create",
+    "params",
+  );
+
+  const handleCreate = async () => {
+    const result = await createBudget({
+      name,
+      amount: Math.round(Number(amount) * 100),
+      period,
+      currency,
+      category: category || undefined,
+    });
+    if (!result) return;
+    setModalOpen(false);
+    setName("");
+    setAmount("");
+    setCategory("");
+    refetch();
+  };
+
+  if (loading && budgets.length === 0) {
+    return (
+      <FinanceLayout onRefresh={refetch}>
+        <FinanceSkeleton />
+      </FinanceLayout>
+    );
+  }
+
+  if (error && budgets.length === 0) {
+    return (
+      <FinanceLayout onRefresh={refetch}>
+        <Card className="p-6 text-center">
+          <p className="text-[12px] text-destructive mb-2">{error.message}</p>
+          <button
+            type="button"
+            onClick={refetch}
+            className="text-[11px] text-brand hover:text-brand-hover transition-colors"
+          >
+            Retry
+          </button>
+        </Card>
+      </FinanceLayout>
+    );
+  }
 
   return (
     <FinanceLayout onRefresh={refetch}>
-      <div className="grid grid-cols-12 gap-3 auto-rows-min">
+      <div className="grid grid-cols-12 gap-4 auto-rows-min">
         {/* ── Stats row ─────────────────────────────────── */}
-        <div className="col-span-12 grid grid-cols-4 gap-3">
+        <div className="col-span-12 grid grid-cols-4 gap-4">
           <Card className="p-4">
-            <p className="text-[10px] text-dim font-light uppercase tracking-wider mb-1">
+            <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">
               Total Budget
             </p>
             <p className="text-[20px] font-light text-primary tabular-nums">
@@ -58,7 +123,7 @@ export function FinanceBudgets() {
             </p>
           </Card>
           <Card className="p-4">
-            <p className="text-[10px] text-dim font-light uppercase tracking-wider mb-1">
+            <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">
               Total Spent
             </p>
             <p className="text-[20px] font-light text-destructive tabular-nums">
@@ -66,7 +131,7 @@ export function FinanceBudgets() {
             </p>
           </Card>
           <Card className="p-4">
-            <p className="text-[10px] text-dim font-light uppercase tracking-wider mb-1">
+            <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">
               Remaining
             </p>
             <p
@@ -79,7 +144,7 @@ export function FinanceBudgets() {
             </p>
           </Card>
           <Card className="p-4">
-            <p className="text-[10px] text-dim font-light uppercase tracking-wider mb-1">
+            <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">
               Over Budget
             </p>
             <p
@@ -95,103 +160,162 @@ export function FinanceBudgets() {
 
         {/* ── Budget cards (8col) + Charts (4col) ─────── */}
         <div className="col-span-8">
-          <div className="flex items-center justify-between mb-2">
-            <SectionLabel>Active Budgets</SectionLabel>
-            <button
-              type="button"
-              className="flex items-center gap-1 text-[10px] text-brand font-light hover:text-brand-hover transition-colors"
-            >
-              <Plus className="w-3 h-3" strokeWidth={1.5} /> Add Budget
-            </button>
-          </div>
-          <div className="space-y-3">
-            {activeBudgets.map((b, i) => {
-              const p = pct(b.spent, b.amount);
-              const rem = b.amount - b.spent;
-              const isOver = rem < 0;
-              return (
-                <Card key={b.id} className="p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="w-2.5 h-2.5 rounded-full"
-                        style={{ backgroundColor: COLORS[i % COLORS.length] }}
-                      />
-                      <span className="text-[13px] font-light text-secondary">{b.name}</span>
-                      <span className="px-1.5 py-0.5 text-[9px] font-light rounded bg-white/[0.06] text-dim">
-                        {b.period}
-                      </span>
-                      {b.category && (
+          <Card className="p-4">
+            <CardHeader
+              title="Active Budgets"
+              action={
+                <button
+                  type="button"
+                  onClick={() => setModalOpen(true)}
+                  className="flex items-center gap-1 text-[10px] text-brand font-light hover:text-brand-hover transition-colors"
+                >
+                  <Plus className="w-3 h-3" strokeWidth={1.5} /> Add Budget
+                </button>
+              }
+            />
+            <div className="space-y-3">
+              {activeBudgets.map((b, i) => {
+                const p = pct(b.spent, b.amount);
+                const rem = b.amount - b.spent;
+                const isOver = rem < 0;
+                return (
+                  <div key={b.id} className="glass-card p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-2.5 h-2.5 rounded-full"
+                          style={{ backgroundColor: COLORS[i % COLORS.length] }}
+                        />
+                        <span className="text-[13px] font-medium text-secondary">{b.name}</span>
                         <span className="px-1.5 py-0.5 text-[9px] font-light rounded bg-white/[0.06] text-dim">
-                          {b.category}
+                          {b.period}
                         </span>
-                      )}
+                        {b.category && (
+                          <span className="px-1.5 py-0.5 text-[9px] font-light rounded bg-white/[0.06] text-dim">
+                            {b.category}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-[11px] text-muted font-light tabular-nums">
+                          {fmtMoney(b.spent, b.currency)} / {fmtMoney(b.amount, b.currency)}
+                        </span>
+                        <span
+                          className={cn(
+                            "text-[11px] font-light tabular-nums",
+                            p >= b.alertThreshold
+                              ? "text-destructive"
+                              : p >= 60
+                                ? "text-brand"
+                                : "text-success",
+                          )}
+                        >
+                          {p}%
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-[11px] text-muted font-light tabular-nums">
-                        {fmtMoney(b.spent, b.currency)} / {fmtMoney(b.amount, b.currency)}
-                      </span>
+                    <Progress value={Math.min(p, 100)} />
+                    <div className="flex items-center justify-between mt-1.5">
                       <span
                         className={cn(
-                          "text-[11px] font-light tabular-nums",
-                          p >= b.alertThreshold
-                            ? "text-destructive"
-                            : p >= 60
-                              ? "text-brand"
-                              : "text-success",
+                          "text-[10px] font-light",
+                          isOver ? "text-destructive" : "text-success",
                         )}
                       >
-                        {p}%
+                        {isOver
+                          ? `${fmtMoney(Math.abs(rem), b.currency)} over budget`
+                          : `${fmtMoney(rem, b.currency)} remaining`}
                       </span>
+                      {p >= b.alertThreshold && !isOver && (
+                        <span className="text-[9px] text-brand font-light">Approaching limit</span>
+                      )}
                     </div>
                   </div>
-                  <Progress value={Math.min(p, 100)} />
-                  <div className="flex items-center justify-between mt-1.5">
-                    <span
-                      className={cn(
-                        "text-[10px] font-light",
-                        isOver ? "text-destructive" : "text-success",
-                      )}
-                    >
-                      {isOver
-                        ? `${fmtMoney(Math.abs(rem), b.currency)} over budget`
-                        : `${fmtMoney(rem, b.currency)} remaining`}
-                    </span>
-                    {p >= b.alertThreshold && !isOver && (
-                      <span className="text-[9px] text-brand font-light">Approaching limit</span>
-                    )}
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          </Card>
         </div>
 
-        <div className="col-span-4 space-y-3">
-          <div>
-            <SectionLabel>Spending Distribution</SectionLabel>
-            <Card className="p-4 flex items-center justify-center">
+        <div className="col-span-4 space-y-4">
+          <Card className="p-4">
+            <CardHeader title="Spending Distribution" />
+            <div className="flex items-center justify-center">
               <Donut
                 segments={spentSegs}
                 label="Spent"
                 value={`${fmtCompact(totalSpent)}đ`}
                 size={150}
               />
-            </Card>
-          </div>
-          <div>
-            <SectionLabel>Budget Allocation</SectionLabel>
-            <Card className="p-4 flex items-center justify-center">
+            </div>
+          </Card>
+          <Card className="p-4">
+            <CardHeader title="Budget Allocation" />
+            <div className="flex items-center justify-center">
               <Donut
                 segments={budgetSegs}
                 label="Allocated"
                 value={`${fmtCompact(totalBudget)}đ`}
                 size={150}
               />
-            </Card>
-          </div>
+            </div>
+          </Card>
         </div>
       </div>
+
+      {/* ── Add Budget Modal ──────────────────────────── */}
+      <FormModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title="Add Budget"
+        onSubmit={handleCreate}
+        canSubmit={name.trim().length > 0 && Number(amount) > 0}
+      >
+        <FormField label="Budget Name">
+          <input
+            className={fieldClass}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Food & Dining"
+            autoFocus
+          />
+        </FormField>
+        <FormField label="Amount">
+          <input
+            className={fieldClass}
+            type="number"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="0"
+          />
+        </FormField>
+        <FormField label="Period">
+          <select className={fieldClass} value={period} onChange={(e) => setPeriod(e.target.value)}>
+            <option value="monthly">Monthly</option>
+            <option value="weekly">Weekly</option>
+            <option value="yearly">Yearly</option>
+          </select>
+        </FormField>
+        <FormField label="Currency">
+          <select
+            className={fieldClass}
+            value={currency}
+            onChange={(e) => setCurrency(e.target.value)}
+          >
+            <option value="VND">VND</option>
+            <option value="USD">USD</option>
+            <option value="USDT">USDT</option>
+          </select>
+        </FormField>
+        <FormField label="Category (optional)">
+          <input
+            className={fieldClass}
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            placeholder="e.g. food, transport"
+          />
+        </FormField>
+      </FormModal>
     </FinanceLayout>
   );
 }

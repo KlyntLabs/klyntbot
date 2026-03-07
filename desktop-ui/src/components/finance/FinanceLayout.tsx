@@ -1,3 +1,4 @@
+import { RefreshCw } from "lucide-react";
 import { useLocation, useNavigate } from "react-router";
 
 interface FinanceLayoutProps {
@@ -15,7 +16,7 @@ const subNav = [
   { label: "Liabilities", path: "/finance/liabilities" },
 ];
 
-export function FinanceLayout({ children }: FinanceLayoutProps) {
+export function FinanceLayout({ children, onRefresh }: FinanceLayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -46,6 +47,15 @@ export function FinanceLayout({ children }: FinanceLayoutProps) {
             );
           })}
         </div>
+        {onRefresh && (
+          <button
+            type="button"
+            onClick={onRefresh}
+            className="ml-2 p-2 rounded-lg text-muted hover:text-secondary hover:bg-white/[0.06] transition-colors"
+          >
+            <RefreshCw className="w-3.5 h-3.5" strokeWidth={1.5} />
+          </button>
+        )}
       </div>
 
       {/* Content — no glass wrapper, cards float on background */}

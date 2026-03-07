@@ -1,13 +1,22 @@
 import { ArrowDownRight, ArrowLeftRight, ArrowUpRight, Plus, Search } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useEvent } from "../../hooks/useEvent";
+import { useMutation } from "../../hooks/useMutation";
 import { useQuery } from "../../hooks/useQuery";
+import { todayISO } from "../../lib/dates";
 import { COLORS, fmtCompact, fmtMoney, toVnd } from "../../lib/finance";
-import type { FinanceAccount, FinanceTransaction } from "../../lib/types";
+import type {
+  FinanceAccount,
+  FinanceTransaction,
+  FinanceTransactionCreateParams,
+} from "../../lib/types";
 import { cn } from "../../lib/utils";
-import { Card, SectionLabel } from "../finance/Card";
+import { Card, CardHeader } from "../finance/Card";
 import { Donut } from "../finance/Donut";
 import { FinanceLayout } from "../finance/FinanceLayout";
+import { FinanceSkeleton } from "../finance/FinanceSkeleton";
+import { FormField, fieldClass } from "../finance/FormModal";
+import { SlidePanel } from "../finance/SlidePanel";
 
 type TxFilter = "all" | "income" | "expense" | "transfer";
 
@@ -17,46 +26,61 @@ export function FinanceTransactions() {
     undefined,
     [],
   );
-  const { data: transactions, refetch: rT } = useQuery<FinanceTransaction[]>(
-    "finance_transactions",
-    undefined,
-    [],
-  );
   const { data: rates } = useQuery<Record<string, number>>("finance_exchange_rates", undefined, {});
 
-  const refetchAll = () => {
+  // ── Server-side filter state ──
+  const [filter, setFilter] = useState<TxFilter>("all");
+  const [acctFilter, setAcctFilter] = useState<string | undefined>(undefined);
+  const [searchQ, setSearchQ] = useState("");
+  const [debouncedQ, setDebouncedQ] = useState("");
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+
+  const handleSearch = (value: string) => {
+    setSearchQ(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => setDebouncedQ(value), 300);
+  };
+
+  useEffect(
+    () => () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    },
+    [],
+  );
+
+  const filterParams = useMemo(
+    () => ({
+      params: {
+        txType: filter === "all" ? undefined : filter,
+        accountId: acctFilter,
+        query: debouncedQ || undefined,
+        limit: 100,
+      },
+    }),
+    [filter, acctFilter, debouncedQ],
+  );
+
+  const {
+    data: transactions,
+    loading,
+    error,
+    refetch: rT,
+  } = useQuery<FinanceTransaction[]>("finance_transactions_filtered", filterParams, []);
+
+  const refetchAll = useCallback(() => {
     rA();
     rT();
-  };
+  }, [rA, rT]);
   useEvent<{ entityKind: string }>("entity:updated", refetchAll);
 
   const accountMap = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts]);
-  const [filter, setFilter] = useState<TxFilter>("all");
-  const [searchQ, setSearchQ] = useState("");
-  const [acctFilter, setAcctFilter] = useState<string>("all");
-
-  const filtered = useMemo(() => {
-    let txs = transactions;
-    if (filter !== "all") txs = txs.filter((t) => t.txType === filter);
-    if (acctFilter !== "all") txs = txs.filter((t) => t.accountId === acctFilter);
-    if (searchQ) {
-      const q = searchQ.toLowerCase();
-      txs = txs.filter(
-        (t) =>
-          t.counterparty?.toLowerCase().includes(q) ||
-          t.notes?.toLowerCase().includes(q) ||
-          t.category?.toLowerCase().includes(q),
-      );
-    }
-    return txs;
-  }, [transactions, filter, acctFilter, searchQ]);
 
   const { totalIncome, totalExpense, catSegs } = useMemo(() => {
     let income = 0;
     let expense = 0;
     const catMap = new Map<string, number>();
 
-    for (const t of filtered) {
+    for (const t of transactions) {
       const vnd = toVnd(t.amount, t.currency, rates);
       if (t.txType === "income") {
         income += vnd;
@@ -72,7 +96,42 @@ export function FinanceTransactions() {
       .map(([name, value], i) => ({ name, value, color: COLORS[i % COLORS.length] }));
 
     return { totalIncome: income, totalExpense: expense, catSegs: segments };
-  }, [filtered, rates]);
+  }, [transactions, rates]);
+
+  // ── Add Transaction slide panel ──
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [txAccountId, setTxAccountId] = useState("");
+  const [txType, setTxType] = useState<"income" | "expense" | "transfer">("expense");
+  const [txAmount, setTxAmount] = useState("");
+  const [txCategory, setTxCategory] = useState("");
+  const [txCounterparty, setTxCounterparty] = useState("");
+  const [txDate, setTxDate] = useState(todayISO);
+  const [txNotes, setTxNotes] = useState("");
+
+  const { mutate: createTx } = useMutation<FinanceTransaction, FinanceTransactionCreateParams>(
+    "finance_transaction_create",
+    "params",
+  );
+
+  const handleCreateTx = async () => {
+    if (!txAccountId || !txAmount) return;
+    const result = await createTx({
+      accountId: txAccountId,
+      txType,
+      amount: Math.round(Number(txAmount) * 100),
+      category: txCategory || undefined,
+      counterparty: txCounterparty || undefined,
+      txDate: txDate || undefined,
+      notes: txNotes || undefined,
+    });
+    if (!result) return;
+    setPanelOpen(false);
+    setTxAmount("");
+    setTxCategory("");
+    setTxCounterparty("");
+    setTxNotes("");
+    refetchAll();
+  };
 
   const filters: { key: TxFilter; label: string }[] = [
     { key: "all", label: "All" },
@@ -81,25 +140,52 @@ export function FinanceTransactions() {
     { key: "transfer", label: "Transfer" },
   ];
 
+  const activeAccounts = useMemo(() => accounts.filter((a) => !a.isArchived), [accounts]);
+
+  if (loading && transactions.length === 0) {
+    return (
+      <FinanceLayout onRefresh={refetchAll}>
+        <FinanceSkeleton rows={5} />
+      </FinanceLayout>
+    );
+  }
+
+  if (error && transactions.length === 0) {
+    return (
+      <FinanceLayout onRefresh={refetchAll}>
+        <Card className="p-6 text-center">
+          <p className="text-[12px] text-destructive mb-2">{error.message}</p>
+          <button
+            type="button"
+            onClick={refetchAll}
+            className="text-[11px] text-brand hover:text-brand-hover transition-colors"
+          >
+            Retry
+          </button>
+        </Card>
+      </FinanceLayout>
+    );
+  }
+
   return (
     <FinanceLayout onRefresh={refetchAll}>
-      <div className="grid grid-cols-12 gap-3 auto-rows-min">
+      <div className="grid grid-cols-12 gap-4 auto-rows-min">
         {/* ── Stats row ─────────────────────────────────── */}
-        <div className="col-span-12 grid grid-cols-4 gap-3">
+        <div className="col-span-12 grid grid-cols-4 gap-4">
           <Card className="p-4">
-            <p className="text-[10px] text-dim font-light uppercase tracking-wider mb-1">
+            <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">
               Total Transactions
             </p>
-            <p className="text-[20px] font-light text-primary">{filtered.length}</p>
+            <p className="text-[20px] font-light text-primary">{transactions.length}</p>
           </Card>
           <Card className="p-4">
-            <p className="text-[10px] text-dim font-light uppercase tracking-wider mb-1">Income</p>
+            <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">Income</p>
             <p className="text-[20px] font-light text-success tabular-nums">
               {fmtCompact(totalIncome)}đ
             </p>
           </Card>
           <Card className="p-4">
-            <p className="text-[10px] text-dim font-light uppercase tracking-wider mb-1">
+            <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">
               Expenses
             </p>
             <p className="text-[20px] font-light text-destructive tabular-nums">
@@ -107,7 +193,7 @@ export function FinanceTransactions() {
             </p>
           </Card>
           <Card className="p-4">
-            <p className="text-[10px] text-dim font-light uppercase tracking-wider mb-1">Net</p>
+            <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">Net</p>
             <p
               className={cn(
                 "text-[20px] font-light tabular-nums",
@@ -140,18 +226,16 @@ export function FinanceTransactions() {
             ))}
           </div>
           <select
-            value={acctFilter}
-            onChange={(e) => setAcctFilter(e.target.value)}
-            className="bg-white/[0.04] border border-white/[0.08] rounded-md px-2 py-1 text-[11px] font-light text-secondary"
+            value={acctFilter ?? "all"}
+            onChange={(e) => setAcctFilter(e.target.value === "all" ? undefined : e.target.value)}
+            className="glass-input border border-white/[0.08] rounded-md px-2 py-1 text-[11px] font-light text-secondary"
           >
             <option value="all">All Accounts</option>
-            {accounts
-              .filter((a) => !a.isArchived)
-              .map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name}
-                </option>
-              ))}
+            {activeAccounts.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
           </select>
           <div className="flex-1" />
           <div className="relative">
@@ -162,13 +246,17 @@ export function FinanceTransactions() {
             <input
               type="text"
               value={searchQ}
-              onChange={(e) => setSearchQ(e.target.value)}
-              placeholder="Search\u2026"
-              className="bg-white/[0.04] border border-white/[0.08] rounded-md pl-6 pr-2 py-1 text-[11px] font-light text-secondary placeholder:text-dim w-48"
+              onChange={(e) => handleSearch(e.target.value)}
+              placeholder="Search…"
+              className="glass-input border border-white/[0.08] rounded-md pl-6 pr-2 py-1 text-[11px] font-light text-secondary placeholder:text-dim w-48"
             />
           </div>
           <button
             type="button"
+            onClick={() => {
+              if (activeAccounts.length > 0 && !txAccountId) setTxAccountId(activeAccounts[0].id);
+              setPanelOpen(true);
+            }}
             className="flex items-center gap-1 text-[10px] text-brand font-light hover:text-brand-hover transition-colors"
           >
             <Plus className="w-3 h-3" strokeWidth={1.5} /> Add
@@ -177,22 +265,24 @@ export function FinanceTransactions() {
 
         {/* ── Transaction list (9col) + Category breakdown (3col) ── */}
         <div className="col-span-9">
-          <SectionLabel>Transactions ({filtered.length})</SectionLabel>
           <Card className="overflow-hidden">
+            <div className="px-4 pt-4">
+              <CardHeader title={`Transactions (${transactions.length})`} />
+            </div>
             <div className="grid grid-cols-[70px_24px_1fr_80px_100px_120px] gap-2 border-b border-white/[0.08] text-[10px] text-dim font-light px-4 py-2">
               <div>Date</div>
-              <div></div>
+              <div />
               <div>Description</div>
               <div>Category</div>
               <div>Account</div>
               <div className="text-right">Amount</div>
             </div>
-            {filtered.length === 0 ? (
+            {transactions.length === 0 ? (
               <div className="p-6 text-center text-[11px] text-dim font-light">
                 No transactions match your filters
               </div>
             ) : (
-              filtered.map((tx) => {
+              transactions.map((tx) => {
                 const acct = accountMap.get(tx.accountId);
                 const TxI =
                   tx.txType === "income"
@@ -242,8 +332,8 @@ export function FinanceTransactions() {
         </div>
 
         <div className="col-span-3">
-          <SectionLabel>By Category</SectionLabel>
           <Card className="p-4">
+            <CardHeader title="By Category" />
             {catSegs.length > 0 ? (
               <>
                 <Donut
@@ -275,6 +365,99 @@ export function FinanceTransactions() {
           </Card>
         </div>
       </div>
+
+      {/* ── Add Transaction SlidePanel ──────────────── */}
+      <SlidePanel open={panelOpen} onClose={() => setPanelOpen(false)} title="Add Transaction">
+        <div className="space-y-3">
+          <FormField label="Account">
+            <select
+              className={fieldClass}
+              value={txAccountId}
+              onChange={(e) => setTxAccountId(e.target.value)}
+            >
+              <option value="" disabled>
+                Select account
+              </option>
+              {activeAccounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+          </FormField>
+          <FormField label="Type">
+            <div className="flex gap-2">
+              {(["expense", "income", "transfer"] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setTxType(t)}
+                  className={cn(
+                    "flex-1 py-1.5 text-[12px] rounded-md border transition-colors capitalize",
+                    txType === t
+                      ? "border-brand/50 text-brand bg-brand/5"
+                      : "border-white/[0.08] text-muted bg-white/[0.06] hover:bg-white/[0.08]",
+                  )}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          </FormField>
+          <FormField label="Amount">
+            <input
+              className={fieldClass}
+              type="number"
+              value={txAmount}
+              onChange={(e) => setTxAmount(e.target.value)}
+              placeholder="0"
+              autoFocus
+            />
+          </FormField>
+          <FormField label="Category">
+            <input
+              className={fieldClass}
+              value={txCategory}
+              onChange={(e) => setTxCategory(e.target.value)}
+              placeholder="e.g. Food, Transport"
+            />
+          </FormField>
+          <FormField label="Counterparty">
+            <input
+              className={fieldClass}
+              value={txCounterparty}
+              onChange={(e) => setTxCounterparty(e.target.value)}
+              placeholder="e.g. Grab, Shopee"
+            />
+          </FormField>
+          <FormField label="Date">
+            <input
+              className={fieldClass}
+              type="date"
+              value={txDate}
+              onChange={(e) => setTxDate(e.target.value)}
+            />
+          </FormField>
+          <FormField label="Notes">
+            <input
+              className={fieldClass}
+              value={txNotes}
+              onChange={(e) => setTxNotes(e.target.value)}
+              placeholder="Optional notes"
+            />
+          </FormField>
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={handleCreateTx}
+              disabled={!txAccountId || !txAmount}
+              className="w-full py-2 text-[12px] rounded-lg bg-brand text-white hover:bg-brand-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Add Transaction
+            </button>
+          </div>
+        </div>
+      </SlidePanel>
     </FinanceLayout>
   );
 }

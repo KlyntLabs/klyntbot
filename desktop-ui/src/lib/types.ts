@@ -497,6 +497,90 @@ export interface FinanceNetWorth {
   }[];
 }
 
+// ── Finance Mutation Params ──────────────────────────────────────────
+
+export interface FinanceAccountCreateParams {
+  name: string;
+  accountType: string;
+  currency?: string;
+  balance?: number;
+  institution?: string;
+  notes?: string;
+}
+
+export interface FinanceTransactionCreateParams {
+  accountId: string;
+  txType: "income" | "expense" | "transfer";
+  amount: number;
+  currency?: string;
+  category?: string;
+  subcategory?: string;
+  counterparty?: string;
+  txDate?: string;
+  notes?: string;
+}
+
+export interface FinanceBudgetCreateParams {
+  name: string;
+  amount: number;
+  period: string;
+  currency?: string;
+  category?: string;
+  alertThreshold?: number;
+}
+
+export interface FinanceGoalCreateParams {
+  name: string;
+  goalType: string;
+  targetAmount: number;
+  currency?: string;
+  currentAmount?: number;
+  deadline?: string;
+  monthlyContribution?: number;
+  notes?: string;
+}
+
+export interface FinanceLiabilityCreateParams {
+  name: string;
+  liabilityType: string;
+  principal: number;
+  currency?: string;
+  remaining?: number;
+  interestRate?: number;
+  monthlyPayment?: number;
+  dueDate?: string;
+  notes?: string;
+}
+
+export interface FinancePortfolioCreateParams {
+  name: string;
+  description?: string;
+  currency?: string;
+}
+
+export interface FinanceInvestmentCreateParams {
+  portfolioId: string;
+  assetType: string;
+  costBasis: number;
+  quantity: number;
+  symbol?: string;
+  name?: string;
+  currency?: string;
+}
+
+// ── Finance Report Types ────────────────────────────────────────────
+
+export interface FinanceCategoryReport {
+  total: number;
+  breakdown: { category: string; amount: number; pct: number }[];
+}
+
+export interface FinanceTrendPoint {
+  period: string;
+  value: number;
+  changePct: number | null;
+}
+
 // ── Productivity ─────────────────────────────────────────────────────
 
 export interface ProductivitySummary {

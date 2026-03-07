@@ -1,18 +1,29 @@
 import { ArrowDownRight, ArrowLeftRight, ArrowUpRight, Plus, Wallet } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router";
 import { useEvent } from "../../hooks/useEvent";
+import { useMutation } from "../../hooks/useMutation";
 import { useQuery } from "../../hooks/useQuery";
 import { ACCT_ICONS, fmtMoney, fmtVnd, toVnd } from "../../lib/finance";
-import type { FinanceAccount, FinanceTransaction } from "../../lib/types";
+import type {
+  FinanceAccount,
+  FinanceAccountCreateParams,
+  FinanceTransaction,
+} from "../../lib/types";
 import { cn } from "../../lib/utils";
-import { Card, SectionLabel } from "../finance/Card";
+import { Card, CardHeader } from "../finance/Card";
 import { FinanceLayout } from "../finance/FinanceLayout";
+import { FinanceSkeleton } from "../finance/FinanceSkeleton";
+import { FormField, FormModal, fieldClass } from "../finance/FormModal";
+
 export function FinanceAccounts() {
-  const { data: accounts, refetch: rA } = useQuery<FinanceAccount[]>(
-    "finance_accounts",
-    undefined,
-    [],
-  );
+  const [searchParams] = useSearchParams();
+  const {
+    data: accounts,
+    loading,
+    error,
+    refetch: rA,
+  } = useQuery<FinanceAccount[]>("finance_accounts", undefined, []);
   const { data: transactions, refetch: rT } = useQuery<FinanceTransaction[]>(
     "finance_transactions",
     undefined,
@@ -27,32 +38,97 @@ export function FinanceAccounts() {
   useEvent<{ entityKind: string }>("entity:updated", refetchAll);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const active = accounts.filter((a) => !a.isArchived);
-  const archived = accounts.filter((a) => a.isArchived);
-  const selected = accounts.find((a) => a.id === selectedId);
-  const acctTxs = selectedId ? transactions.filter((t) => t.accountId === selectedId) : [];
+  const [modalOpen, setModalOpen] = useState(false);
 
-  const totalVnd = active.reduce((s, a) => s + toVnd(a.balance, a.currency, rates), 0);
+  // Read ?id= from URL for click-through from Dashboard
+  useEffect(() => {
+    const id = searchParams.get("id");
+    if (id) setSelectedId(id);
+  }, [searchParams]);
+
+  const active = useMemo(() => accounts.filter((a) => !a.isArchived), [accounts]);
+  const archived = useMemo(() => accounts.filter((a) => a.isArchived), [accounts]);
+  const selected = useMemo(() => accounts.find((a) => a.id === selectedId), [accounts, selectedId]);
+  const acctTxs = useMemo(
+    () => (selectedId ? transactions.filter((t) => t.accountId === selectedId) : []),
+    [transactions, selectedId],
+  );
+  const totalVnd = useMemo(
+    () => active.reduce((s, a) => s + toVnd(a.balance, a.currency, rates), 0),
+    [active, rates],
+  );
+
+  // ── Add Account form state ──
+  const [name, setName] = useState("");
+  const [accountType, setAccountType] = useState("bank");
+  const [currency, setCurrency] = useState("VND");
+  const [balance, setBalance] = useState("");
+  const [institution, setInstitution] = useState("");
+  const { mutate: createAccount } = useMutation<FinanceAccount, FinanceAccountCreateParams>(
+    "finance_account_create",
+    "params",
+  );
+
+  const handleCreate = async () => {
+    const result = await createAccount({
+      name,
+      accountType,
+      currency,
+      balance: balance ? Math.round(Number(balance) * 100) : undefined,
+      institution: institution || undefined,
+    });
+    if (!result) return;
+    setModalOpen(false);
+    setName("");
+    setBalance("");
+    setInstitution("");
+    refetchAll();
+  };
+
+  if (loading && accounts.length === 0) {
+    return (
+      <FinanceLayout onRefresh={refetchAll}>
+        <FinanceSkeleton rows={3} />
+      </FinanceLayout>
+    );
+  }
+
+  if (error && accounts.length === 0) {
+    return (
+      <FinanceLayout onRefresh={refetchAll}>
+        <Card className="p-6 text-center">
+          <p className="text-[12px] text-destructive mb-2">{error.message}</p>
+          <button
+            type="button"
+            onClick={refetchAll}
+            className="text-[11px] text-brand hover:text-brand-hover transition-colors"
+          >
+            Retry
+          </button>
+        </Card>
+      </FinanceLayout>
+    );
+  }
 
   return (
     <FinanceLayout onRefresh={refetchAll}>
-      <div className="grid grid-cols-12 gap-3 auto-rows-min">
+      <div className="grid grid-cols-12 gap-4 auto-rows-min">
         {/* ── Header stats ────────────────────────────────── */}
-        <div className="col-span-12 grid grid-cols-3 gap-3">
+        <div className="col-span-12 grid grid-cols-3 gap-4">
           <Card className="p-4">
-            <p className="text-[10px] text-dim font-light uppercase tracking-wider mb-1">
+            <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">
               Total Balance
             </p>
             <p className="text-[20px] font-light text-primary">{fmtVnd(totalVnd)}</p>
           </Card>
           <Card className="p-4">
-            <p className="text-[10px] text-dim font-light uppercase tracking-wider mb-1">
+            <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">
               Active Accounts
             </p>
             <p className="text-[20px] font-light text-primary">{active.length}</p>
           </Card>
           <Card className="p-4">
-            <p className="text-[10px] text-dim font-light uppercase tracking-wider mb-1">
+            <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">
               Currencies
             </p>
             <p className="text-[20px] font-light text-primary">
@@ -63,62 +139,74 @@ export function FinanceAccounts() {
 
         {/* ── Account grid (left 8col) + Detail (right 4col) ── */}
         <div className="col-span-8">
-          <div className="flex items-center justify-between mb-2">
-            <SectionLabel>Accounts</SectionLabel>
-            <button
-              type="button"
-              className="flex items-center gap-1 text-[10px] text-brand font-light hover:text-brand-hover transition-colors"
-            >
-              <Plus className="w-3 h-3" strokeWidth={1.5} /> Add Account
-            </button>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            {active.map((acct) => {
-              const Icon = ACCT_ICONS[acct.accountType] ?? Wallet;
-              const vnd = toVnd(acct.balance, acct.currency, rates);
-              const isSelected = acct.id === selectedId;
-              return (
-                <Card
-                  key={acct.id}
-                  className={cn(
-                    "p-4 cursor-pointer transition-colors",
-                    isSelected ? "ring-1 ring-brand bg-white/[0.06]" : "hover:bg-white/[0.06]",
-                  )}
-                  onClick={() => setSelectedId(isSelected ? null : acct.id)}
+          <Card className="p-4">
+            <CardHeader
+              title="Accounts"
+              action={
+                <button
+                  type="button"
+                  onClick={() => setModalOpen(true)}
+                  className="flex items-center gap-1 text-[10px] text-brand font-light hover:text-brand-hover transition-colors"
                 >
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-9 h-9 rounded-lg bg-white/[0.08] flex items-center justify-center flex-shrink-0">
-                      <Icon className="w-4 h-4 text-muted" strokeWidth={1.5} />
+                  <Plus className="w-3 h-3" strokeWidth={1.5} /> Add Account
+                </button>
+              }
+            />
+            <div className="grid grid-cols-2 gap-4">
+              {active.map((acct) => {
+                const Icon = ACCT_ICONS[acct.accountType] ?? Wallet;
+                const vnd = toVnd(acct.balance, acct.currency, rates);
+                const isSelected = acct.id === selectedId;
+                return (
+                  <div
+                    key={acct.id}
+                    className={cn(
+                      "glass-card p-4 cursor-pointer transition-colors",
+                      isSelected ? "ring-1 ring-brand bg-white/[0.06]" : "hover:bg-white/[0.06]",
+                    )}
+                    onClick={() => setSelectedId(isSelected ? null : acct.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") setSelectedId(isSelected ? null : acct.id);
+                    }}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-9 h-9 rounded-lg bg-white/[0.08] flex items-center justify-center flex-shrink-0">
+                        <Icon className="w-4 h-4 text-muted" strokeWidth={1.5} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[12px] font-medium text-secondary truncate">
+                          {acct.name}
+                        </p>
+                        <p className="text-[9px] text-dim font-light">
+                          {acct.institution ?? acct.accountType.replaceAll("_", " ")}
+                        </p>
+                      </div>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[12px] font-light text-secondary truncate">{acct.name}</p>
-                      <p className="text-[9px] text-dim font-light">
-                        {acct.institution ?? acct.accountType.replace("_", " ")}
-                      </p>
-                    </div>
+                    <p className="text-[18px] font-light text-primary tabular-nums">
+                      {fmtMoney(acct.balance, acct.currency)}
+                    </p>
+                    {acct.currency !== "VND" && (
+                      <p className="text-[10px] text-dim font-light mt-0.5">≈ {fmtVnd(vnd)}</p>
+                    )}
+                    {acct.notes && (
+                      <p className="text-[9px] text-dim font-light mt-2">{acct.notes}</p>
+                    )}
                   </div>
-                  <p className="text-[18px] font-light text-primary tabular-nums">
-                    {fmtMoney(acct.balance, acct.currency)}
-                  </p>
-                  {acct.currency !== "VND" && (
-                    <p className="text-[10px] text-dim font-light mt-0.5">≈ {fmtVnd(vnd)}</p>
-                  )}
-                  {acct.notes && (
-                    <p className="text-[9px] text-dim font-light mt-2">{acct.notes}</p>
-                  )}
-                </Card>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          </Card>
 
           {archived.length > 0 && (
-            <div className="mt-4">
-              <SectionLabel>Archived</SectionLabel>
-              <div className="grid grid-cols-2 gap-3">
+            <Card className="p-4 mt-4">
+              <CardHeader title="Archived" />
+              <div className="grid grid-cols-2 gap-4">
                 {archived.map((acct) => {
                   const Icon = ACCT_ICONS[acct.accountType] ?? Wallet;
                   return (
-                    <Card key={acct.id} className="p-4 opacity-50">
+                    <div key={acct.id} className="glass-card p-4 opacity-50">
                       <div className="flex items-center gap-3">
                         <Icon className="w-4 h-4 text-dim" strokeWidth={1.5} />
                         <div className="min-w-0 flex-1">
@@ -128,22 +216,24 @@ export function FinanceAccounts() {
                           </p>
                         </div>
                       </div>
-                    </Card>
+                    </div>
                   );
                 })}
               </div>
-            </div>
+            </Card>
           )}
         </div>
 
         {/* ── Right sidebar: selected account transactions ── */}
         <div className="col-span-4">
-          <SectionLabel>
-            {selected ? `${selected.name} Transactions` : "Select an account"}
-          </SectionLabel>
-          {selected ? (
-            <Card className="overflow-hidden">
-              {acctTxs.length === 0 ? (
+          <Card className="overflow-hidden">
+            <div className="px-4 pt-4">
+              <CardHeader
+                title={selected ? `${selected.name} Transactions` : "Select an account"}
+              />
+            </div>
+            {selected ? (
+              acctTxs.length === 0 ? (
                 <div className="p-6 text-center text-[11px] text-dim font-light">
                   No transactions
                 </div>
@@ -183,17 +273,77 @@ export function FinanceAccounts() {
                     </div>
                   );
                 })
-              )}
-            </Card>
-          ) : (
-            <Card className="p-8 flex items-center justify-center">
-              <p className="text-[11px] text-dim font-light">
-                Click an account to view its transactions
-              </p>
-            </Card>
-          )}
+              )
+            ) : (
+              <div className="p-8 flex items-center justify-center">
+                <p className="text-[11px] text-dim font-light">
+                  Click an account to view its transactions
+                </p>
+              </div>
+            )}
+          </Card>
         </div>
       </div>
+
+      {/* ── Add Account Modal ──────────────────────────── */}
+      <FormModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title="Add Account"
+        onSubmit={handleCreate}
+        canSubmit={name.trim().length > 0}
+      >
+        <FormField label="Account Name">
+          <input
+            className={fieldClass}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Vietcombank Checking"
+            autoFocus
+          />
+        </FormField>
+        <FormField label="Account Type">
+          <select
+            className={fieldClass}
+            value={accountType}
+            onChange={(e) => setAccountType(e.target.value)}
+          >
+            <option value="bank">Bank</option>
+            <option value="ewallet">E-Wallet</option>
+            <option value="crypto_wallet">Crypto Wallet</option>
+            <option value="cash">Cash</option>
+            <option value="brokerage">Brokerage</option>
+          </select>
+        </FormField>
+        <FormField label="Currency">
+          <select
+            className={fieldClass}
+            value={currency}
+            onChange={(e) => setCurrency(e.target.value)}
+          >
+            <option value="VND">VND</option>
+            <option value="USD">USD</option>
+            <option value="USDT">USDT</option>
+          </select>
+        </FormField>
+        <FormField label="Initial Balance">
+          <input
+            className={fieldClass}
+            type="number"
+            value={balance}
+            onChange={(e) => setBalance(e.target.value)}
+            placeholder="0"
+          />
+        </FormField>
+        <FormField label="Institution (optional)">
+          <input
+            className={fieldClass}
+            value={institution}
+            onChange={(e) => setInstitution(e.target.value)}
+            placeholder="e.g. Vietcombank"
+          />
+        </FormField>
+      </FormModal>
     </FinanceLayout>
   );
 }

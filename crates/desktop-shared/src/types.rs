@@ -55,6 +55,7 @@ pub enum EntityKind {
     Productivity,
     Note,
     Notebook,
+    Finance,
 }
 
 impl EntityKind {
@@ -70,6 +71,9 @@ impl EntityKind {
             "productivity" => Some(Self::Productivity),
             "note" => Some(Self::Note),
             "notebook" => Some(Self::Notebook),
+            "finance" | "finance_account" | "finance_transaction" | "finance_budget"
+            | "finance_goal" | "finance_liability" | "finance_portfolio"
+            | "finance_investment" => Some(Self::Finance),
             _ => None,
         }
     }
