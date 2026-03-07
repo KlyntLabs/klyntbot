@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "identifier": "com.klynt.app",
   "build": {
-    "beforeDevCommand": "npm run dev --prefix ../../desktop-ui",
+    "beforeDevCommand": "",
     "beforeBuildCommand": "npm run build --prefix ../../desktop-ui",
     "devUrl": "http://localhost:1420",
     "frontendDist": "../../desktop-ui/dist"

@@ -1,6 +1,9 @@
 import { Archive } from "lucide-react";
 
 export function ArchivedSettings() {
+  // TODO: Wire to chat_threads with archive filter when backend supports thread archiving.
+  // For now, show a placeholder empty state.
+
   return (
     <div>
       <div className="mb-8">
@@ -10,7 +13,10 @@ export function ArchivedSettings() {
 
       <div className="bg-white/[0.04] rounded-lg border border-white/[0.08] p-8 flex flex-col items-center text-center">
         <Archive className="w-8 h-8 text-dim mb-3" strokeWidth={1.5} />
-        <p className="text-[13px] text-muted">No archived threads</p>
+        <p className="text-[13px] text-muted mb-1">No archived threads</p>
+        <p className="text-[11px] text-dim">
+          Archived conversations will appear here. Thread archiving is coming soon.
+        </p>
       </div>
     </div>
   );

@@ -46,16 +46,15 @@ export function ProviderStep() {
     setError(null);
 
     try {
-      await Promise.all([
-        ipc("config_update_section", {
-          section: "providers",
-          patch: { [provider]: { apiKey: apiKey.trim() } },
-        }),
-        ipc("config_update_section", {
-          section: "agents",
-          patch: { defaults: { model, provider } },
-        }),
-      ]);
+      // Sequential to avoid race — both write to the same config file
+      await ipc("config_update_section", {
+        section: "providers",
+        patch: { [provider]: { apiKey: apiKey.trim() } },
+      });
+      await ipc("config_update_section", {
+        section: "agents",
+        patch: { defaults: { model, provider } },
+      });
 
       next();
     } catch (e) {

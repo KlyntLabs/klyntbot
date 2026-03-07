@@ -391,4 +391,114 @@ mod tests {
         assert!(!loaded.enabled);
         assert_eq!(loaded.planning_time, "09:30");
     }
+
+    // ── FIRE config tests ────────────────────────────────────────────
+
+    #[test]
+    fn test_fire_config_default() {
+        let config = FireConfig::default();
+        assert!(!config.enabled);
+        assert_eq!(config.safe_withdrawal_rate, 4.0);
+        assert_eq!(config.fire_type, "regular");
+        assert!(config.current_age.is_none());
+        assert!(config.target_retirement_age.is_none());
+        assert!(config.annual_expenses.is_none());
+        assert!(config.target_number.is_none());
+        assert!(config.monthly_savings_rate.is_none());
+        assert!(config.current_net_worth.is_none());
+    }
+
+    #[test]
+    fn test_fire_config_serde_roundtrip() {
+        let config = FireConfig {
+            enabled: true,
+            current_age: Some(30),
+            target_retirement_age: Some(45),
+            annual_expenses: Some(3_000_000),
+            safe_withdrawal_rate: 3.5,
+            fire_type: "lean".to_string(),
+            target_number: Some(85_714_285),
+            monthly_savings_rate: Some(500_000),
+            current_net_worth: Some(10_000_000),
+        };
+        let json = serde_json::to_string(&config).unwrap();
+        let loaded: FireConfig = serde_json::from_str(&json).unwrap();
+        assert_eq!(loaded.current_age, Some(30));
+        assert_eq!(loaded.target_retirement_age, Some(45));
+        assert_eq!(loaded.annual_expenses, Some(3_000_000));
+        assert_eq!(loaded.safe_withdrawal_rate, 3.5);
+        assert_eq!(loaded.fire_type, "lean");
+        assert_eq!(loaded.target_number, Some(85_714_285));
+        assert_eq!(loaded.monthly_savings_rate, Some(500_000));
+        assert_eq!(loaded.current_net_worth, Some(10_000_000));
+    }
+
+    #[test]
+    fn test_fire_config_camel_case() {
+        let config = FireConfig {
+            enabled: true,
+            current_age: Some(30),
+            safe_withdrawal_rate: 4.0,
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&config).unwrap();
+        assert!(json.contains("currentAge"));
+        assert!(json.contains("safeWithdrawalRate"));
+        assert!(json.contains("fireType"));
+    }
+
+    #[test]
+    fn test_fire_config_skip_serializing_none() {
+        let config = FireConfig::default();
+        let json = serde_json::to_string(&config).unwrap();
+        // None fields should be skipped
+        assert!(!json.contains("currentAge"));
+        assert!(!json.contains("targetRetirementAge"));
+        assert!(!json.contains("annualExpenses"));
+        assert!(!json.contains("targetNumber"));
+    }
+
+    #[test]
+    fn test_setup_completed_default_false() {
+        let config = Config::default();
+        assert!(!config.setup_completed);
+    }
+
+    #[test]
+    fn test_setup_completed_serde() {
+        let json = r#"{"setupCompleted": true}"#;
+        let config: Config = serde_json::from_str(json).unwrap();
+        assert!(config.setup_completed);
+    }
+
+    #[test]
+    fn test_default_finance_categories_count() {
+        let cats = default_finance_categories();
+        assert!(cats.len() >= 25);
+        assert!(cats.iter().any(|c| c.name == "Salary"));
+        assert!(cats.iter().any(|c| c.name == "Housing"));
+        assert!(cats.iter().any(|c| c.name == "Charity"));
+        // Check group diversity
+        assert!(cats.iter().any(|c| c.group == "income"));
+        assert!(cats.iter().any(|c| c.group == "essential"));
+        assert!(cats.iter().any(|c| c.group == "lifestyle"));
+        assert!(cats.iter().any(|c| c.group == "savings"));
+        assert!(cats.iter().any(|c| c.group == "giving"));
+    }
+
+    #[test]
+    fn test_finance_config_includes_fire() {
+        let config = Config::default();
+        assert!(!config.finance.fire.enabled);
+        assert_eq!(config.finance.fire.safe_withdrawal_rate, 4.0);
+    }
+
+    #[test]
+    fn test_fire_config_deserializes_from_empty() {
+        // Existing config without FIRE section should deserialize fine
+        let json = r#"{"finance": {}}"#;
+        let config: Config = serde_json::from_str(json).unwrap();
+        assert!(!config.finance.fire.enabled);
+        assert_eq!(config.finance.fire.fire_type, "regular");
+    }
 }

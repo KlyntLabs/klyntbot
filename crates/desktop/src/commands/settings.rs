@@ -69,8 +69,6 @@ pub async fn config_update_section(
 }
 
 #[tauri::command]
-pub async fn config_mark_setup_completed(
-    state: State<'_, Arc<AppCore>>,
-) -> Result<(), ApiError> {
+pub async fn config_mark_setup_completed(state: State<'_, Arc<AppCore>>) -> Result<(), ApiError> {
     state.config_mark_setup_completed().await
 }

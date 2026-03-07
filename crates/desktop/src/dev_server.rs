@@ -328,9 +328,9 @@ async fn dispatch(
         "finance_budget_usage" => r(core.finance_budget_usage().await),
         "finance_portfolios" => r(core.finance_portfolios().await),
         "finance_investments" => r(core.finance_investments().await),
-        "finance_investments_filtered" => {
-            r(core.finance_investments_filtered(get(&body, "portfolio_id")).await)
-        }
+        "finance_investments_filtered" => r(core
+            .finance_investments_filtered(get(&body, "portfolio_id"))
+            .await),
         "finance_goals" => r(core.finance_goals().await),
         "finance_liabilities" => r(core.finance_liabilities().await),
         "finance_net_worth" => r(core.finance_net_worth().await),
@@ -444,18 +444,20 @@ async fn dispatch(
             })
             .await),
         // ── Finance — reports ────────────────────────────────
-        "finance_report_spending" => {
-            r(core.finance_report_spending(get(&body, "date_from"), get(&body, "date_to")).await)
-        }
-        "finance_report_income" => {
-            r(core.finance_report_income(get(&body, "date_from"), get(&body, "date_to")).await)
-        }
+        "finance_report_spending" => r(core
+            .finance_report_spending(get(&body, "date_from"), get(&body, "date_to"))
+            .await),
+        "finance_report_income" => r(core
+            .finance_report_income(get(&body, "date_from"), get(&body, "date_to"))
+            .await),
         "finance_report_trends" => {
             let metric = match get_str(&body, "metric") {
                 Ok(v) => v,
                 Err(e) => return err(e),
             };
-            r(core.finance_report_trends(metric, get(&body, "periods")).await)
+            r(core
+                .finance_report_trends(metric, get(&body, "periods"))
+                .await)
         }
 
         // ── Notes ─────────────────────────────────────────────

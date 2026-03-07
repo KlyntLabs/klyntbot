@@ -2,6 +2,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 import { useOutletContext } from "react-router";
 import { ipc } from "../../../hooks/useIpc";
+import { Toggle } from "../../shared/Toggle";
 import type { SetupContext } from "../steps";
 
 interface ChannelDef {
@@ -104,19 +105,10 @@ export function ChannelsStep() {
             <div key={ch.key} className="bg-surface-lowest rounded-lg border border-border p-3">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[13px] font-medium text-secondary">{ch.label}</span>
-                <button
-                  type="button"
-                  onClick={() => updateChannel(ch.key, { enabled: !state.enabled })}
-                  className={`relative w-9 h-5 rounded-full transition-colors ${
-                    state.enabled ? "bg-brand" : "bg-white/[0.1]"
-                  }`}
-                >
-                  <span
-                    className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
-                      state.enabled ? "translate-x-4" : ""
-                    }`}
-                  />
-                </button>
+                <Toggle
+                  checked={state.enabled}
+                  onChange={(v) => updateChannel(ch.key, { enabled: v })}
+                />
               </div>
 
               {state.enabled && (

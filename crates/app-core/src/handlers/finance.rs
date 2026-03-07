@@ -178,11 +178,7 @@ impl AppCore {
 
     pub async fn finance_exchange_rates(&self) -> Result<HashMap<String, f64>, ApiError> {
         let config = self.config.read().await;
-        Ok(config
-            .finance
-            .exchange_rates
-            .clone()
-            .unwrap_or_default())
+        Ok(config.finance.exchange_rates.clone().unwrap_or_default())
     }
 
     // ── Mutations ────────────────────────────────────────────────
@@ -714,9 +710,7 @@ impl AppCore {
         let from = date_from
             .and_then(|d| parse_naive_date(&d))
             .unwrap_or_else(|| now.with_day(1).unwrap_or(now));
-        let to = date_to
-            .and_then(|d| parse_naive_date(&d))
-            .unwrap_or(now);
+        let to = date_to.and_then(|d| parse_naive_date(&d)).unwrap_or(now);
 
         let rows = self
             .repos
