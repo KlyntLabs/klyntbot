@@ -1,6 +1,8 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { createHashRouter, Navigate, RouterProvider } from "react-router";
+import { ipc } from "./hooks/useIpc";
 import { todayISO } from "./lib/dates";
+import type { AppInfoResponse } from "./lib/types";
 
 const AppShell = lazy(() =>
   import("./components/layout/AppShell").then((m) => ({ default: m.AppShell })),
@@ -108,8 +110,52 @@ const DistractionOverlay = lazy(() =>
   })),
 );
 
+// ── Setup Wizard ──────────────────────────────────────────────────────
+const SetupLayout = lazy(() =>
+  import("./components/setup/SetupLayout").then((m) => ({ default: m.SetupLayout })),
+);
+const WelcomeStep = lazy(() =>
+  import("./components/setup/pages/WelcomeStep").then((m) => ({ default: m.WelcomeStep })),
+);
+const ProviderStep = lazy(() =>
+  import("./components/setup/pages/ProviderStep").then((m) => ({ default: m.ProviderStep })),
+);
+const ChannelsStep = lazy(() =>
+  import("./components/setup/pages/ChannelsStep").then((m) => ({ default: m.ChannelsStep })),
+);
+const AreasStep = lazy(() =>
+  import("./components/setup/pages/AreasStep").then((m) => ({ default: m.AreasStep })),
+);
+const ProductivityStep = lazy(() =>
+  import("./components/setup/pages/ProductivityStep").then((m) => ({
+    default: m.ProductivityStep,
+  })),
+);
+const FinanceStep = lazy(() =>
+  import("./components/setup/pages/FinanceStep").then((m) => ({ default: m.FinanceStep })),
+);
+const McpStep = lazy(() =>
+  import("./components/setup/pages/McpStep").then((m) => ({ default: m.McpStep })),
+);
+const CompleteStep = lazy(() =>
+  import("./components/setup/pages/CompleteStep").then((m) => ({ default: m.CompleteStep })),
+);
+
 function ProductivityRedirect() {
   return <Navigate to={`/productivity/day/${todayISO()}`} replace />;
+}
+
+function SetupRedirect() {
+  const [target, setTarget] = useState<string | null>(null);
+
+  useEffect(() => {
+    ipc<AppInfoResponse>("app_info")
+      .then((info) => setTarget(info.setupCompleted ? "/" : "/setup/welcome"))
+      .catch(() => setTarget("/"));
+  }, []);
+
+  if (!target) return null;
+  return <Navigate to={target} replace />;
 }
 
 const router = createHashRouter([
@@ -193,10 +239,25 @@ const router = createHashRouter([
       },
     ],
   },
+  {
+    path: "/setup",
+    element: <SetupLayout />,
+    children: [
+      { index: true, element: <Navigate to="/setup/welcome" replace /> },
+      { path: "welcome", element: <WelcomeStep /> },
+      { path: "provider", element: <ProviderStep /> },
+      { path: "channels", element: <ChannelsStep /> },
+      { path: "areas", element: <AreasStep /> },
+      { path: "productivity", element: <ProductivityStep /> },
+      { path: "finance", element: <FinanceStep /> },
+      { path: "mcp", element: <McpStep /> },
+      { path: "complete", element: <CompleteStep /> },
+    ],
+  },
   { path: "/launcher", element: <Launcher /> },
   { path: "/tray", element: <SystemTray /> },
   { path: "/distraction-overlay", element: <DistractionOverlay /> },
-  { path: "*", element: <Navigate to="/" replace /> },
+  { path: "*", element: <SetupRedirect /> },
 ]);
 
 export default function App() {

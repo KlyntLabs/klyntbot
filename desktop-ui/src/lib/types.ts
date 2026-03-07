@@ -998,3 +998,11 @@ export interface OAuthStartParams {
   provider: string;
   serverName: string;
 }
+
+// ── App Info ─────────────────────────────────────────────────────────────
+
+export interface AppInfoResponse {
+  version: string;
+  dataDir: string;
+  setupCompleted: boolean;
+}
