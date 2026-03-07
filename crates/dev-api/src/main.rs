@@ -63,7 +63,7 @@ struct DevState {
     feedback_tracker: Arc<Mutex<FeedbackTracker>>,
     user_situation: Arc<Mutex<UserSituation>>,
     has_cognitive_provider: bool,
-    cognitive_sse_senders: Mutex<Vec<tokio::sync::mpsc::UnboundedSender<SseEvent>>>,
+    cognitive_sse_senders: Arc<Mutex<Vec<tokio::sync::mpsc::UnboundedSender<SseEvent>>>>,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -274,7 +274,7 @@ async fn main() {
         feedback_tracker,
         user_situation,
         has_cognitive_provider,
-        cognitive_sse_senders: Mutex::new(Vec::new()),
+        cognitive_sse_senders: Arc::new(Mutex::new(Vec::new())),
     });
 
     // 8. Build axum router
@@ -285,7 +285,7 @@ async fn main() {
 
     // Spawn domain event → SSE forwarder for the debug dashboard
     {
-        let st = state.clone();
+        let senders = state.cognitive_sse_senders.clone();
         let mut event_rx = state.domain_event_bus.subscribe();
         tokio::spawn(async move {
             loop {
@@ -328,7 +328,7 @@ async fn main() {
                             event: "cognitive:domain_event".to_string(),
                             data: serde_json::to_value(&payload).unwrap_or_default(),
                         };
-                        let mut txs = st.cognitive_sse_senders.lock().await;
+                        let mut txs = senders.lock().await;
                         txs.retain(|tx| tx.send(sse_event.clone()).is_ok());
                     }
                     Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
@@ -342,7 +342,7 @@ async fn main() {
 
     // Spawn pipeline event → SSE forwarder (extraction + consolidation events)
     {
-        let st = state.clone();
+        let senders = state.cognitive_sse_senders.clone();
         tokio::spawn(async move {
             while let Some(pe) = pipeline_rx.recv().await {
                 let (event_name, data) = match &pe {
@@ -357,7 +357,7 @@ async fn main() {
                     event: event_name.to_string(),
                     data,
                 };
-                let mut txs = st.cognitive_sse_senders.lock().await;
+                let mut txs = senders.lock().await;
                 txs.retain(|tx| tx.send(sse_event.clone()).is_ok());
             }
         });
