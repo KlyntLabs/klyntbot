@@ -91,6 +91,23 @@ function CardContent({
         </div>
       )}
 
+      {/* Subtask progress */}
+      {task.subtaskCount > 0 && (
+        <div className="flex items-center gap-1.5 mt-2">
+          <div className="w-12 h-1 rounded-full bg-white/[0.08] overflow-hidden">
+            <div
+              className="h-full rounded-full bg-brand"
+              style={{
+                width: `${(task.subtaskCompletedCount / task.subtaskCount) * 100}%`,
+              }}
+            />
+          </div>
+          <span className="text-[10px] text-dim font-light">
+            {task.subtaskCompletedCount}/{task.subtaskCount}
+          </span>
+        </div>
+      )}
+
       {/* Due date */}
       {task.dueDate && (
         <p className="text-[10px] text-dim font-light mt-2">{formatDate(task.dueDate)}</p>
