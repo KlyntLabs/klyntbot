@@ -1,18 +1,25 @@
 import { Plus, Target } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useEvent } from "../../hooks/useEvent";
 import { useQuery } from "../../hooks/useQuery";
 import { COLORS, fmtCompact, fmtMoney, GOAL_ICONS, pct } from "../../lib/finance";
 import type { FinanceGoal } from "../../lib/types";
+import { cn } from "../../lib/utils";
 import { Card, SectionLabel } from "../finance/Card";
 import { Donut } from "../finance/Donut";
 import { FinanceLayout } from "../finance/FinanceLayout";
 import { Progress } from "../ui/Progress";
+
+type GoalTab = "active" | "achieved" | "abandoned";
+
 export function FinanceGoals() {
   const { data: goals, refetch } = useQuery<FinanceGoal[]>("finance_goals", undefined, []);
   useEvent<{ entityKind: string }>("entity:updated", refetch);
 
-  const activeGoals = goals.filter((g) => g.status === "active");
+  const [tab, setTab] = useState<GoalTab>("active");
+
+  const filteredGoals = useMemo(() => goals.filter((g) => g.status === tab), [goals, tab]);
+  const activeGoals = useMemo(() => goals.filter((g) => g.status === "active"), [goals]);
   const totalTarget = useMemo(
     () => activeGoals.reduce((s, g) => s + g.targetAmount, 0),
     [activeGoals],
@@ -84,8 +91,29 @@ export function FinanceGoals() {
               <Plus className="w-3 h-3" strokeWidth={1.5} /> Add Goal
             </button>
           </div>
+          {/* Status tabs */}
+          <div className="flex items-center gap-0.5 mb-3">
+            {(["active", "achieved", "abandoned"] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setTab(t)}
+                className={cn(
+                  "px-2.5 py-1 rounded-md text-[11px] font-light capitalize transition-colors",
+                  tab === t
+                    ? "bg-white/[0.12] text-brand"
+                    : "text-muted hover:text-secondary hover:bg-white/[0.06]",
+                )}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+          {filteredGoals.length === 0 ? (
+            <div className="py-8 text-center text-[11px] text-dim font-light">No {tab} goals</div>
+          ) : (
           <div className="space-y-3">
-            {activeGoals.map((g, i) => {
+            {filteredGoals.map((g, i) => {
               const p = pct(g.currentAmount, g.targetAmount);
               const Icon = GOAL_ICONS[g.goalType] ?? Target;
               const remaining = g.targetAmount - g.currentAmount;
@@ -147,6 +175,7 @@ export function FinanceGoals() {
               );
             })}
           </div>
+          )}
         </div>
 
         <div className="col-span-4 space-y-3">

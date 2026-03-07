@@ -102,10 +102,20 @@ impl FinanceGoalRepo {
     // Listing
     // -----------------------------------------------------------------------
 
-    /// Return all goals with `status = 'active'`, ordered by creation date.
+    /// Return goals with `status = 'active'`, ordered by creation date.
     pub async fn list_active(&self) -> Result<Vec<FinanceGoalRow>, crate::error::StorageError> {
         let rows = sqlx::query_as::<_, FinanceGoalRow>(
             "SELECT * FROM finance_goals WHERE status = 'active' ORDER BY created_at",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
+    }
+
+    /// Return all goals regardless of status, ordered by creation date.
+    pub async fn list_all(&self) -> Result<Vec<FinanceGoalRow>, crate::error::StorageError> {
+        let rows = sqlx::query_as::<_, FinanceGoalRow>(
+            "SELECT * FROM finance_goals ORDER BY created_at",
         )
         .fetch_all(&self.pool)
         .await?;

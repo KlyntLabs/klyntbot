@@ -96,7 +96,7 @@ impl AppCore {
         self.repos
             .finance
             .goals
-            .list_active()
+            .list_all()
             .await
             .map_err(map_storage_err)
     }
