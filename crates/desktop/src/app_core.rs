@@ -180,6 +180,39 @@ fn wire_event_channels(core: &AppCore, channels: EventChannels, app_handle: &tau
             }
         });
     }
+
+    // Session watcher → Tauri events (new sessions + status changes)
+    if let Some(session_watcher_rx) = channels.session_watcher_rx {
+        spawn_channel_forwarder(session_watcher_rx, app_handle, shutdown, |handle, event| {
+            match event {
+                app_core::services::session_watcher::SessionWatcherEvent::NewSession {
+                    session,
+                } => {
+                    let payload = events::SessionNewPayload {
+                        session_id: session.session_id,
+                        project_path: session.project_path,
+                        project_name: session.project_name,
+                        status: session.status.as_str().to_string(),
+                    };
+                    if let Err(e) = handle.emit(events::SESSION_NEW, payload) {
+                        warn!("failed to emit session:new event: {e}");
+                    }
+                }
+                app_core::services::session_watcher::SessionWatcherEvent::StatusChanged {
+                    session_id,
+                    status,
+                } => {
+                    let payload = events::SessionStatusChangedPayload {
+                        session_id,
+                        status: status.as_str().to_string(),
+                    };
+                    if let Err(e) = handle.emit(events::SESSION_STATUS, payload) {
+                        warn!("failed to emit session:status event: {e}");
+                    }
+                }
+            }
+        });
+    }
 }
 
 /// Spawn a background task that receives from a channel and emits Tauri events.

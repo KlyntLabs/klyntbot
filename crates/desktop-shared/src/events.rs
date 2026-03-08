@@ -300,6 +300,22 @@ pub struct SessionMessagePayload {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct SessionNewPayload {
+    pub session_id: String,
+    pub project_path: String,
+    pub project_name: String,
+    pub status: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionStatusChangedPayload {
+    pub session_id: String,
+    pub status: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct BrainstormTokenPayload {
     pub conversation_id: String,
     pub token: String,

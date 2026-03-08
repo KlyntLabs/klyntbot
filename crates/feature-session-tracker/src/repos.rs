@@ -57,6 +57,33 @@ impl SessionTrackerRepos {
         Ok(rows.into_iter().map(Into::into).collect())
     }
 
+    pub async fn list_sessions_by_status(
+        &self,
+        statuses: &[SessionStatus],
+    ) -> Result<Vec<TrackedSession>, StorageError> {
+        if statuses.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let placeholders: Vec<&str> = statuses.iter().map(|_| "?").collect();
+        let sql = format!(
+            "SELECT * FROM tracked_sessions WHERE status IN ({}) ORDER BY last_activity DESC",
+            placeholders.join(", ")
+        );
+
+        let mut query = sqlx::query_as::<_, TrackedSessionRow>(&sql);
+        for status in statuses {
+            query = query.bind(status.as_str());
+        }
+
+        let rows = query
+            .fetch_all(&self.pool)
+            .await
+            .map_err(StorageError::from)?;
+
+        Ok(rows.into_iter().map(Into::into).collect())
+    }
+
     pub async fn get_session(
         &self,
         session_id: &str,
@@ -77,15 +104,12 @@ impl SessionTrackerRepos {
         session_id: &str,
         status: &SessionStatus,
     ) -> Result<(), StorageError> {
-        sqlx::query(
-            "UPDATE tracked_sessions SET status = ?, last_activity = ? WHERE session_id = ?",
-        )
-        .bind(status.as_str())
-        .bind(Utc::now())
-        .bind(session_id)
-        .execute(&self.pool)
-        .await
-        .map_err(StorageError::from)?;
+        sqlx::query("UPDATE tracked_sessions SET status = ? WHERE session_id = ?")
+            .bind(status.as_str())
+            .bind(session_id)
+            .execute(&self.pool)
+            .await
+            .map_err(StorageError::from)?;
 
         Ok(())
     }
@@ -441,5 +465,80 @@ impl From<BrainstormMessageRow> for BrainstormMessage {
             sent_to_cc: row.sent_to_cc,
             created_at: row.created_at,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::SessionTrackerFeature;
+
+    async fn setup_repos() -> SessionTrackerRepos {
+        let pool = storage::StoragePool::connect_in_memory().await.unwrap();
+        storage::StoragePool::run_feature_migrations(
+            pool.inner(),
+            &SessionTrackerFeature::migrations_static(),
+        )
+        .await
+        .unwrap();
+        SessionTrackerRepos::new(pool.inner().clone())
+    }
+
+    fn make_session(id: &str, status: SessionStatus) -> TrackedSession {
+        TrackedSession {
+            session_id: id.to_string(),
+            project_path: "/test/project".to_string(),
+            project_name: "project".to_string(),
+            jsonl_path: format!("/test/{id}.jsonl"),
+            status,
+            first_message_preview: Some(format!("Preview for {id}")),
+            message_count: 1,
+            git_branch: None,
+            last_activity: Some(Utc::now()),
+            created_at: Utc::now(),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_list_sessions_by_status() {
+        let repos = setup_repos().await;
+
+        // Insert sessions with different statuses
+        repos
+            .upsert_session(&make_session("sess-active", SessionStatus::Active))
+            .await
+            .unwrap();
+        repos
+            .upsert_session(&make_session("sess-idle", SessionStatus::Idle))
+            .await
+            .unwrap();
+        repos
+            .upsert_session(&make_session("sess-done", SessionStatus::Completed))
+            .await
+            .unwrap();
+
+        // Query Active + Idle only
+        let results = repos
+            .list_sessions_by_status(&[SessionStatus::Active, SessionStatus::Idle])
+            .await
+            .unwrap();
+        assert_eq!(results.len(), 2);
+        assert!(results
+            .iter()
+            .all(|s| s.status == SessionStatus::Active || s.status == SessionStatus::Idle));
+        // Completed should not appear
+        assert!(!results.iter().any(|s| s.status == SessionStatus::Completed));
+
+        // Query single status
+        let active_only = repos
+            .list_sessions_by_status(&[SessionStatus::Active])
+            .await
+            .unwrap();
+        assert_eq!(active_only.len(), 1);
+        assert_eq!(active_only[0].session_id, "sess-active");
+
+        // Empty input returns empty vec
+        let empty = repos.list_sessions_by_status(&[]).await.unwrap();
+        assert!(empty.is_empty());
     }
 }

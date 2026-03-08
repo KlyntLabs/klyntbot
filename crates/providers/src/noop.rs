@@ -43,6 +43,8 @@ impl LlmProvider for NoopProvider {
     }
 
     async fn health_check(&self) -> Result<ProviderHealth> {
-        Ok(ProviderHealth::Unhealthy("No provider configured".to_string()))
+        Ok(ProviderHealth::Unhealthy(
+            "No provider configured".to_string(),
+        ))
     }
 }

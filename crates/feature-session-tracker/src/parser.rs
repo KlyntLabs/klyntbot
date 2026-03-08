@@ -115,8 +115,7 @@ fn convert_raw(raw: RawSessionLine) -> Option<SessionMessage> {
         } => {
             // Filter out noisy progress types that clutter the mirror view.
             // Keep only api_request progress (shows LLM call status).
-            let dominated =
-                data.get("type").and_then(|v| v.as_str()) != Some("api_request");
+            let dominated = data.get("type").and_then(|v| v.as_str()) != Some("api_request");
             if dominated {
                 return None;
             }
@@ -179,10 +178,7 @@ fn extract_text(content: &RawContent) -> String {
 /// becomes `/simplify`.
 fn strip_command_tags(text: &str) -> String {
     // Extract the command name if present
-    if let (Some(start), Some(end)) = (
-        text.find("<command-name>"),
-        text.find("</command-name>"),
-    ) {
+    if let (Some(start), Some(end)) = (text.find("<command-name>"), text.find("</command-name>")) {
         let name_start = start + "<command-name>".len();
         if name_start < end {
             return text[name_start..end].trim().to_string();
@@ -230,8 +226,12 @@ mod tests {
             SessionMessage::Assistant { uuid, content, .. } => {
                 assert_eq!(uuid, "msg-002");
                 assert_eq!(content.len(), 2);
-                assert!(matches!(&content[0], ContentBlock::Text { text } if text == "Let me read that file."));
-                assert!(matches!(&content[1], ContentBlock::ToolUse { name, .. } if name == "Read"));
+                assert!(
+                    matches!(&content[0], ContentBlock::Text { text } if text == "Let me read that file.")
+                );
+                assert!(
+                    matches!(&content[1], ContentBlock::ToolUse { name, .. } if name == "Read")
+                );
             }
             _ => panic!("Expected Assistant message"),
         }
@@ -244,9 +244,7 @@ mod tests {
         let msg = parse_line(line).unwrap();
         match msg {
             SessionMessage::QueueOperation {
-                operation,
-                content,
-                ..
+                operation, content, ..
             } => {
                 assert_eq!(operation, "enqueue");
                 assert_eq!(content.unwrap(), "Please implement this feature");
@@ -288,13 +286,19 @@ mod tests {
     #[test]
     fn parse_hook_progress_returns_none() {
         let line = r#"{"type":"progress","uuid":"prog-001","data":{"type":"hook_progress","hookEvent":"SessionStart","hookName":"clear"},"timestamp":"2026-03-08T10:00:00.000Z","toolUseID":"tool-99"}"#;
-        assert!(parse_line(line).is_none(), "hook_progress should be filtered out");
+        assert!(
+            parse_line(line).is_none(),
+            "hook_progress should be filtered out"
+        );
     }
 
     #[test]
     fn parse_bash_progress_returns_none() {
         let line = r#"{"type":"progress","uuid":"prog-002","data":{"type":"bash_progress","output":"running..."},"timestamp":"2026-03-08T10:00:00.000Z"}"#;
-        assert!(parse_line(line).is_none(), "bash_progress should be filtered out");
+        assert!(
+            parse_line(line).is_none(),
+            "bash_progress should be filtered out"
+        );
     }
 
     #[test]
@@ -319,18 +323,25 @@ invalid json line
     #[test]
     fn parse_empty_user_returns_none() {
         let line = r#"{"type":"user","uuid":"msg-empty","sessionId":"abc","message":{"role":"user","content":""},"isMeta":false,"timestamp":"2026-03-08T10:00:00.000Z"}"#;
-        assert!(parse_line(line).is_none(), "empty user text should be filtered");
+        assert!(
+            parse_line(line).is_none(),
+            "empty user text should be filtered"
+        );
     }
 
     #[test]
     fn parse_meta_user_returns_none() {
         let line = r#"{"type":"user","uuid":"msg-meta","sessionId":"abc","message":{"role":"user","content":"system prompt injection"},"isMeta":true,"timestamp":"2026-03-08T10:00:00.000Z"}"#;
-        assert!(parse_line(line).is_none(), "is_meta user should be filtered");
+        assert!(
+            parse_line(line).is_none(),
+            "is_meta user should be filtered"
+        );
     }
 
     #[test]
     fn strip_command_tags_extracts_name() {
-        let input = "<command-message>simplify</command-message>\n<command-name>/simplify</command-name>";
+        let input =
+            "<command-message>simplify</command-message>\n<command-name>/simplify</command-name>";
         assert_eq!(strip_command_tags(input), "/simplify");
     }
 

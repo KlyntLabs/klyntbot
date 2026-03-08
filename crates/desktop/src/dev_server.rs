@@ -1105,7 +1105,9 @@ async fn dispatch(
                 Ok(v) => v,
                 Err(e) => return err(e),
             };
-            r(core.get_session_messages(&session_id, get(&body, "limit")).await)
+            r(core
+                .get_session_messages(&session_id, get(&body, "limit"))
+                .await)
         }
         "sync_sessions" => r(core.sync_sessions().await),
         "pin_session_message" => {
@@ -1159,13 +1161,19 @@ async fn dispatch(
                 Ok(v) => v,
                 Err(e) => return err(e),
             };
-            let mode: feature_session_tracker::types::BrainstormMode =
-                match require(&body, "mode") {
-                    Ok(v) => v,
-                    Err(e) => return err(e),
-                };
+            let mode: feature_session_tracker::types::BrainstormMode = match require(&body, "mode")
+            {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
             r(core
-                .create_brainstorm(session_id, mode, get(&body, "modelKey"), get(&body, "agentProfile"), get(&body, "title"))
+                .create_brainstorm(
+                    session_id,
+                    mode,
+                    get(&body, "modelKey"),
+                    get(&body, "agentProfile"),
+                    get(&body, "title"),
+                )
                 .await)
         }
         "list_brainstorms" => {
@@ -1198,13 +1206,19 @@ async fn dispatch(
                 Ok(v) => v,
                 Err(e) => return err(e),
             };
-            match core.send_brainstorm_message(&conversation_id, &content).await {
+            match core
+                .send_brainstorm_message(&conversation_id, &content)
+                .await
+            {
                 Ok((mut token_rx, handle)) => {
                     // Drain tokens (dev server doesn't support SSE, so we wait for completion)
                     while token_rx.recv().await.is_some() {}
                     match handle.await {
                         Ok(result) => r(result),
-                        Err(e) => err(ApiError::new("INTERNAL", format!("brainstorm task panicked: {e}"))),
+                        Err(e) => err(ApiError::new(
+                            "INTERNAL",
+                            format!("brainstorm task panicked: {e}"),
+                        )),
                     }
                 }
                 Err(e) => err(e),
@@ -1219,7 +1233,9 @@ async fn dispatch(
                 Ok(v) => v,
                 Err(e) => return err(e),
             };
-            r(core.edit_brainstorm_message(&message_id, &edited_content).await)
+            r(core
+                .edit_brainstorm_message(&message_id, &edited_content)
+                .await)
         }
 
         // ── Unsupported ───────────────────────────────────────

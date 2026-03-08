@@ -29,7 +29,12 @@ impl ContextBuilder {
         mut all_messages: Vec<SessionMessage>,
     ) -> Result<SessionContext> {
         let (rolling_summary, pinned_messages) = tokio::try_join!(
-            async { self.repos.get_latest_summary(session_id).await.map(|s| s.unwrap_or_default()) },
+            async {
+                self.repos
+                    .get_latest_summary(session_id)
+                    .await
+                    .map(|s| s.unwrap_or_default())
+            },
             self.repos.list_pins(session_id),
         )?;
 
@@ -40,7 +45,8 @@ impl ContextBuilder {
             all_messages
         };
 
-        let estimated_tokens = estimate_tokens(&rolling_summary, &pinned_messages, &recent_messages);
+        let estimated_tokens =
+            estimate_tokens(&rolling_summary, &pinned_messages, &recent_messages);
 
         Ok(SessionContext {
             rolling_summary,
@@ -65,7 +71,9 @@ impl ContextBuilder {
         let prompt = build_summarization_prompt(&conversation_text, previous_summary);
 
         let llm_messages = vec![
-            Message::system("You are a precise technical summarizer. Output only the summary, no preamble."),
+            Message::system(
+                "You are a precise technical summarizer. Output only the summary, no preamble.",
+            ),
             Message::user(prompt),
         ];
 
@@ -77,7 +85,11 @@ impl ContextBuilder {
         let summary_text = response
             .content
             .filter(|s| !s.trim().is_empty())
-            .ok_or_else(|| common::KlyntbotError::Provider(common::ProviderError::InvalidResponse("LLM returned empty summary".into())))?;
+            .ok_or_else(|| {
+                common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(
+                    "LLM returned empty summary".into(),
+                ))
+            })?;
 
         let chunk = ChunkSummary {
             session_id: session_id.to_string(),
@@ -101,10 +113,7 @@ impl ContextBuilder {
         parts.push("## Active Development Session Context".to_string());
 
         if !context.rolling_summary.is_empty() {
-            parts.push(format!(
-                "### Session Summary\n{}",
-                context.rolling_summary
-            ));
+            parts.push(format!("### Session Summary\n{}", context.rolling_summary));
         }
 
         if !context.pinned_messages.is_empty() {
@@ -112,7 +121,14 @@ impl ContextBuilder {
                 .pinned_messages
                 .iter()
                 .enumerate()
-                .map(|(i, p)| format!("[Pin {}] ({}): {}", i + 1, p.message_role, p.message_content))
+                .map(|(i, p)| {
+                    format!(
+                        "[Pin {}] ({}): {}",
+                        i + 1,
+                        p.message_role,
+                        p.message_content
+                    )
+                })
                 .collect();
             parts.push(format!("### Pinned Messages\n{}", pins.join("\n")));
         }
@@ -135,38 +151,34 @@ impl ContextBuilder {
     }
 }
 
-fn estimate_tokens(
-    summary: &str,
-    pins: &[PinnedMessage],
-    recent: &[SessionMessage],
-) -> usize {
+fn estimate_tokens(summary: &str, pins: &[PinnedMessage], recent: &[SessionMessage]) -> usize {
     summary.len() / 4
-        + pins.iter().map(|p| p.message_content.len() / 4).sum::<usize>()
-        + recent.iter().map(|m| message_char_len(m) / 4).sum::<usize>()
+        + pins
+            .iter()
+            .map(|p| p.message_content.len() / 4)
+            .sum::<usize>()
+        + recent
+            .iter()
+            .map(|m| message_char_len(m) / 4)
+            .sum::<usize>()
 }
 
 fn message_char_len(msg: &SessionMessage) -> usize {
     match msg {
         SessionMessage::User { text, .. } => text.len(),
-        SessionMessage::Assistant { content, .. } => {
-            content
-                .iter()
-                .map(|b| match b {
-                    crate::types::ContentBlock::Text { text } => text.len(),
-                    crate::types::ContentBlock::ToolUse { name, input, .. } => {
-                        name.len() + input.to_string().len()
-                    }
-                    crate::types::ContentBlock::ToolResult { content, .. } => {
-                        content.to_string().len()
-                    }
-                })
-                .sum()
-        }
+        SessionMessage::Assistant { content, .. } => content
+            .iter()
+            .map(|b| match b {
+                crate::types::ContentBlock::Text { text } => text.len(),
+                crate::types::ContentBlock::ToolUse { name, input, .. } => {
+                    name.len() + input.to_string().len()
+                }
+                crate::types::ContentBlock::ToolResult { content, .. } => content.to_string().len(),
+            })
+            .sum(),
         SessionMessage::System { content, .. } => content.len(),
         SessionMessage::Progress { data, .. } => data.to_string().len(),
-        SessionMessage::QueueOperation { content, .. } => {
-            content.as_deref().map_or(0, |c| c.len())
-        }
+        SessionMessage::QueueOperation { content, .. } => content.as_deref().map_or(0, |c| c.len()),
     }
 }
 
@@ -215,9 +227,7 @@ fn build_summarization_prompt(conversation: &str, previous_summary: Option<&str>
     );
 
     if let Some(prev) = previous_summary {
-        prompt.push_str(&format!(
-            "Previous summary to merge with:\n{prev}\n\n"
-        ));
+        prompt.push_str(&format!("Previous summary to merge with:\n{prev}\n\n"));
     }
 
     prompt.push_str(&format!("Conversation chunk:\n{conversation}"));
@@ -262,9 +272,7 @@ mod tests {
     fn make_assistant_msg(text: &str) -> SessionMessage {
         SessionMessage::Assistant {
             uuid: "a1".into(),
-            content: vec![crate::types::ContentBlock::Text {
-                text: text.into(),
-            }],
+            content: vec![crate::types::ContentBlock::Text { text: text.into() }],
             timestamp: Utc::now(),
         }
     }

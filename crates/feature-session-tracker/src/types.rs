@@ -158,6 +158,22 @@ impl SessionStatus {
             _ => Self::Completed,
         }
     }
+
+    /// Classify status based on seconds since last activity.
+    pub fn from_idle_secs(idle_secs: i64) -> Self {
+        if idle_secs < Self::ACTIVE_THRESHOLD_SECS {
+            Self::Active
+        } else if idle_secs < Self::IDLE_THRESHOLD_SECS {
+            Self::Idle
+        } else {
+            Self::Completed
+        }
+    }
+
+    /// Seconds of inactivity before a session is no longer considered Active.
+    pub const ACTIVE_THRESHOLD_SECS: i64 = 60;
+    /// Seconds of inactivity before an Idle session becomes Completed.
+    pub const IDLE_THRESHOLD_SECS: i64 = 30 * 60;
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

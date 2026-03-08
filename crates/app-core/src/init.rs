@@ -6,11 +6,11 @@ use channels::ChannelManager;
 use cognitive::situation::UserSituation;
 use feature_coaching::{FeedbackTracker, InterventionRouter, PatternDetector, SignalAccumulator};
 use feature_notes::repo::NoteRepo;
-use feature_session_tracker::repos::SessionTrackerRepos;
 use feature_productivity::auto_focus::AutoFocusSession;
 use feature_productivity::repos::ProductivityRepos;
 use feature_productivity::tracker::categorizer::Categorizer;
 use feature_productivity::{DailyAggregator, FocusManager, NudgeService, ProductivityEngine};
+use feature_session_tracker::repos::SessionTrackerRepos;
 use scheduling::CronService;
 use storage::{Repos, StoragePool, VectorStore};
 use tokio::sync::{mpsc, Mutex, RwLock};
@@ -29,6 +29,8 @@ pub struct EventChannels {
     pub dashboard_tick_rx:
         Option<tokio::sync::broadcast::Receiver<feature_productivity::ActivityTick>>,
     pub dashboard_poll_interval_secs: u64,
+    pub session_watcher_rx:
+        Option<mpsc::Receiver<crate::services::session_watcher::SessionWatcherEvent>>,
 }
 
 impl AppCore {
@@ -176,6 +178,15 @@ impl AppCore {
         ));
 
         let shutdown_token = CancellationToken::new();
+
+        // Start session watcher service (optional — graceful if ~/.claude missing).
+        let session_watcher_rx = crate::services::session_watcher::start(
+            session_tracker_repos.clone(),
+            shutdown_token.clone(),
+        );
+        if session_watcher_rx.is_some() {
+            info!("session watcher service started");
+        }
 
         // Initialize productivity feature (optional — requires enabled config).
         let dashboard_poll_interval_secs = config.productivity.tracking.poll_interval_secs;
@@ -345,6 +356,7 @@ impl AppCore {
             nudge_rx,
             dashboard_tick_rx,
             dashboard_poll_interval_secs,
+            session_watcher_rx,
         };
 
         Ok((core, channels))

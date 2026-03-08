@@ -81,16 +81,7 @@ pub async fn discover_sessions(claude_dir: &Path) -> Vec<TrackedSession> {
             let preview = history.get(&session_id).map(|h| h.display.clone());
 
             let status = match &last_modified {
-                Some(t) => {
-                    let age = now - *t;
-                    if age.num_seconds() < 60 {
-                        SessionStatus::Active
-                    } else if age.num_minutes() < 30 {
-                        SessionStatus::Idle
-                    } else {
-                        SessionStatus::Completed
-                    }
-                }
+                Some(t) => SessionStatus::from_idle_secs((now - *t).num_seconds()),
                 None => SessionStatus::Completed,
             };
 

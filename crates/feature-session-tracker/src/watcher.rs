@@ -125,10 +125,7 @@ impl SessionWatcher {
 }
 
 /// Read new lines from a JSONL file starting at the stored offset.
-fn read_new_lines(
-    path: &Path,
-    offsets: &mut HashMap<PathBuf, u64>,
-) -> Option<Vec<SessionMessage>> {
+fn read_new_lines(path: &Path, offsets: &mut HashMap<PathBuf, u64>) -> Option<Vec<SessionMessage>> {
     let file = std::fs::File::open(path).ok()?;
     let file_len = file.metadata().ok()?.len();
 

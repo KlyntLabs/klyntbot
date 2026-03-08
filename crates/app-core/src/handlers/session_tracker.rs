@@ -52,8 +52,7 @@ impl AppCore {
         let claude_dir = feature_session_tracker::discovery::default_claude_dir()
             .ok_or_else(|| ApiError::new("CONFIG_ERROR", "cannot determine home directory"))?;
 
-        let discovered =
-            feature_session_tracker::discovery::discover_sessions(&claude_dir).await;
+        let discovered = feature_session_tracker::discovery::discover_sessions(&claude_dir).await;
 
         for session in &discovered {
             self.session_tracker_repos
@@ -220,7 +219,13 @@ impl AppCore {
         &self,
         conversation_id: &str,
         content: &str,
-    ) -> Result<(mpsc::Receiver<String>, tokio::task::JoinHandle<Result<BrainstormMessage, ApiError>>), ApiError> {
+    ) -> Result<
+        (
+            mpsc::Receiver<String>,
+            tokio::task::JoinHandle<Result<BrainstormMessage, ApiError>>,
+        ),
+        ApiError,
+    > {
         // 1. Load conversation
         let conv = self
             .session_tracker_repos
@@ -373,10 +378,7 @@ impl AppCore {
 
     // --- Context ---
 
-    pub async fn get_session_context(
-        &self,
-        session_id: &str,
-    ) -> Result<SessionContext, ApiError> {
+    pub async fn get_session_context(&self, session_id: &str) -> Result<SessionContext, ApiError> {
         let session = self.require_session(session_id).await?;
 
         let (rolling_summary, pinned_messages) = tokio::try_join!(
