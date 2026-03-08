@@ -49,8 +49,9 @@ impl NotificationDispatcher {
                                 chat_id.clone(),
                                 format!("{}\n\n{}", title, body),
                             );
-                            // Don't fail entire notification if one target fails
-                            let _ = self.outbound_tx.send(msg).await;
+                            if let Err(e) = self.outbound_tx.send(msg).await {
+                                warn!("Notification send to {} failed: {}", channel_name, e);
+                            }
                         }
                     }
                 }

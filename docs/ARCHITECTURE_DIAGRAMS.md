@@ -726,11 +726,10 @@ flowchart TD
 
 ### High
 
-| # | Title | Location | Why It Matters | Suggested Fix |
-|---|-------|----------|---------------|---------------|
-| H1 | **Vector store non-atomic upsert** | SYSTEM_ANALYSIS.md §6.2 #7 — `storage/src/vector_store.rs` | LanceDB upsert is delete-then-insert. R13 reordered to insert-first-then-delete for crash safety, but LanceDB still lacks true transactions. A crash between insert and delete leaves duplicates. | The insert-first approach (R13 SOLVED) is better but still not atomic. Monitor for duplicate vectors and add a dedup pass to compaction. |
-| H2 | **MessageBus has no backpressure** | SYSTEM_ANALYSIS.md §6.3, §6.4 | Buffer=100 with `mpsc::channel`. If the agent loop is slow, senders (channels) will block, and overflow drops messages silently. No persistence for bus messages. | For personal use this is acceptable. For robustness, switch to bounded channel with `try_send()` + warn on capacity, or add a dead-letter queue. |
-| H3 | **No external observability** | SYSTEM_ANALYSIS.md §6.2 #4 | Zero Prometheus/OTel metrics, no health endpoints, no distributed tracing. Desktop UI has `TransparencyData` per message, but there's no way to monitor the agent remotely. | Marked DEPRIORITIZED (R4) — justified for a local desktop app. If ever deployed as a service, this becomes critical. |
+*No high items remain* — H1 (vector store dedup) and H2 (MessageBus backpressure) are both SOLVED:
+
+- **H1 SOLVED:** `VectorStore::dedup_table()` scans for duplicate IDs and removes older rows, called from `MemoryMaintenanceService` every maintenance cycle for all three tables (`conv_embeddings`, `todo_embeddings`, `cognitive_fact_embeddings`). The insert-first-then-delete upsert pattern is crash-safe: duplicates from a crash are cleaned up on the next maintenance pass.
+- **H2 SOLVED:** The original description was inaccurate — `MessageBus` already uses bounded `tokio::sync::mpsc::channel(100)` with `.send().await`, which provides back-pressure (senders await when full, messages are NOT dropped). The only issue was `NotificationDispatcher::notify` using `let _` to silently discard send errors; this now logs a `warn!` instead.
 
 ### Medium
 

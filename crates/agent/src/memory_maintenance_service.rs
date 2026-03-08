@@ -87,6 +87,31 @@ impl MemoryMaintenanceService {
                             "MemoryMaintenanceService: pruned old conversation embeddings"
                         );
                     }
+
+                    // Dedup pass: remove duplicate rows (crash-recovery safety net).
+                    for (table, ts_col) in [
+                        ("conv_embeddings", "created_at"),
+                        ("todo_embeddings", "updated_at"),
+                        ("cognitive_fact_embeddings", "updated_at"),
+                    ] {
+                        match self.store.dedup_table(table, ts_col).await {
+                            Ok(n) if n > 0 => {
+                                info!(
+                                    deduped = n,
+                                    table,
+                                    "MemoryMaintenanceService: removed duplicate vectors"
+                                );
+                            }
+                            Err(e) => {
+                                warn!(
+                                    error = %e,
+                                    table,
+                                    "MemoryMaintenanceService: dedup failed"
+                                );
+                            }
+                            _ => {}
+                        }
+                    }
                 }
                 _ = self.token.cancelled() => {
                     info!("MemoryMaintenanceService: shutting down");

@@ -10,7 +10,7 @@ use arrow_schema::{ArrowError, DataType, Field, Schema, SchemaRef};
 use futures_util::TryStreamExt;
 use lancedb::index::vector::IvfPqIndexBuilder;
 use lancedb::index::Index;
-use lancedb::query::{ExecutableQuery, QueryBase};
+use lancedb::query::{ExecutableQuery, QueryBase, Select};
 use lancedb::Connection;
 
 use crate::error::StorageError;
@@ -515,6 +515,80 @@ impl VectorStore {
         }
         Ok(())
     }
+    /// Remove duplicate rows within a table, keeping only the newest row per ID.
+    ///
+    /// Performs a full table scan of the `id` and `ts_column` columns, groups by
+    /// ID in memory, and deletes older rows for any ID that appears more than
+    /// once. Returns the number of IDs that had duplicates removed.
+    ///
+    /// This is intended for background maintenance, not the hot path.
+    pub async fn dedup_table(&self, table: &str, ts_column: &str) -> Result<usize, StorageError> {
+        let tbl = match self.db.open_table(table).execute().await {
+            Ok(t) => t,
+            Err(_) => return Ok(0),
+        };
+
+        let results = tbl
+            .query()
+            .select(Select::columns(&["id", ts_column]))
+            .execute()
+            .await
+            .map_err(|e| StorageError::Vector(format!("dedup scan {table}: {e}")))?;
+
+        let batches: Vec<RecordBatch> = results
+            .try_collect()
+            .await
+            .map_err(|e| StorageError::Vector(format!("dedup collect {table}: {e}")))?;
+
+        // Group by id, track the latest timestamp for each.
+        let mut latest: std::collections::HashMap<String, String> =
+            std::collections::HashMap::new();
+        let mut duplicate_ids: Vec<String> = Vec::new();
+
+        for batch in &batches {
+            let id_col = batch
+                .column_by_name("id")
+                .and_then(|c| c.as_any().downcast_ref::<StringArray>());
+            let ts_col = batch
+                .column_by_name(ts_column)
+                .and_then(|c| c.as_any().downcast_ref::<StringArray>());
+            let (Some(ids), Some(timestamps)) = (id_col, ts_col) else {
+                continue;
+            };
+
+            for i in 0..batch.num_rows() {
+                let id = ids.value(i).to_string();
+                let ts = timestamps.value(i).to_string();
+                match latest.entry(id.clone()) {
+                    std::collections::hash_map::Entry::Vacant(e) => {
+                        e.insert(ts);
+                    }
+                    std::collections::hash_map::Entry::Occupied(mut e) => {
+                        // First time we see a duplicate for this id — record it.
+                        if !duplicate_ids.contains(&id) {
+                            duplicate_ids.push(id);
+                        }
+                        if ts > *e.get() {
+                            e.insert(ts);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Delete older rows for each duplicate ID.
+        for id in &duplicate_ids {
+            let max_ts = &latest[id];
+            let safe_id = sanitize_predicate_value(id)?;
+            let safe_ts = sanitize_predicate_value(max_ts)?;
+            let predicate = format!("id = '{safe_id}' AND {ts_column} < '{safe_ts}'");
+            tbl.delete(&predicate)
+                .await
+                .map_err(|e| StorageError::Vector(format!("dedup delete in {table}: {e}")))?;
+        }
+
+        Ok(duplicate_ids.len())
+    }
 }
 
 // ── Table schemas ─────────────────────────────────────────────────────────────
@@ -783,5 +857,72 @@ mod tests {
             .await
             .unwrap();
         assert!(results.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_dedup_removes_duplicates() {
+        let (store, _dir) = test_store().await;
+        let v = vec![0.3f32; 384];
+
+        // Simulate a crash scenario: manually insert two rows with the same ID
+        // by calling add() directly (bypassing the delete step of upsert).
+        let tbl = store
+            .db
+            .open_table("todo_embeddings")
+            .execute()
+            .await
+            .unwrap();
+
+        for ts in ["2024-01-01T00:00:00Z", "2024-01-02T00:00:00Z"] {
+            let schema = tbl.schema().await.unwrap();
+            let batch = RecordBatch::try_new(
+                schema.clone(),
+                vec![
+                    Arc::new(StringArray::from(vec!["dup-1"])) as ArrayRef,
+                    Arc::new(
+                        FixedSizeListArray::try_new(
+                            Arc::new(Field::new("item", DataType::Float32, true)),
+                            384,
+                            Arc::new(Float32Array::from(v.clone())) as ArrayRef,
+                            None,
+                        )
+                        .unwrap(),
+                    ) as ArrayRef,
+                    Arc::new(StringArray::from(vec!["test-model"])) as ArrayRef,
+                    Arc::new(StringArray::from(vec![ts])) as ArrayRef,
+                ],
+            )
+            .unwrap();
+            let reader = RecordBatchIterator::new(vec![Ok(batch)].into_iter(), schema);
+            tbl.add(Box::new(reader)).execute().await.unwrap();
+        }
+
+        assert_eq!(store.count("todo_embeddings").await.unwrap(), 2);
+
+        let deduped = store.dedup_table("todo_embeddings", "updated_at").await.unwrap();
+        assert_eq!(deduped, 1); // 1 ID had duplicates
+
+        assert_eq!(store.count("todo_embeddings").await.unwrap(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_dedup_no_duplicates_is_noop() {
+        let (store, _dir) = test_store().await;
+        let v = vec![0.5f32; 384];
+
+        store
+            .upsert_embedding("todo_embeddings", "a", &v, &[("model", "m")])
+            .await
+            .unwrap();
+        store
+            .upsert_embedding("todo_embeddings", "b", &v, &[("model", "m")])
+            .await
+            .unwrap();
+
+        assert_eq!(store.count("todo_embeddings").await.unwrap(), 2);
+
+        let deduped = store.dedup_table("todo_embeddings", "updated_at").await.unwrap();
+        assert_eq!(deduped, 0);
+        assert_eq!(store.count("todo_embeddings").await.unwrap(), 2);
     }
 }

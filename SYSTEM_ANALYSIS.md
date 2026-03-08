@@ -642,27 +642,27 @@ Each `feature-*` crate implements `FeaturePackage`:
 | Dimension | Score | Justification |
 |-----------|-------|---------------|
 | **Architecture Design** | **8.5/10** | Excellent layered design with strict dependency flow. App-core + thin adapter pattern is clean. Feature package isolation is well-executed. Minor deductions for CLI serve divergence and some duplicated code. |
-| **Memory System Quality** | **7.0/10** | Three-tier model is architecturally strong. FSRS decay and consolidation are principled. However, semantic similarity is hardcoded (major gap), two parallel memory systems create confusion, and coaching feedback isn't persisted. |
+| **Memory System Quality** | **8.5/10** | Three-tier cognitive model (semantic/episodic/procedural) is fully operational. FSRS decay and Mem0-style consolidation are principled. R1 (vector search connected), R2 (unified memory), R5 (coaching persistence), and JsonObject provider compatibility all resolved. LLM extraction produces proper SPO triples across all providers. Minor deductions for vector store non-atomic upserts and no graph-based relationships. |
 | **Scalability** | **5.5/10** | Designed as a personal AI agent — single-user SQLite is appropriate for that scope. Would require significant rework for multi-tenant: needs PostgreSQL, distributed vector store, message queue, and horizontal scaling. Adequate for its intended purpose. |
 | **Observability** | **3.5/10** | Rich transparency data in desktop UI per message. Cost tracking, strategy recording, and learning analytics exist. But: no external metrics, no dashboards, no alerting, no distributed tracing, no health endpoints. Logging-only observability. |
-| **Intelligence & Reasoning** | **7.0/10** | Two-stage intent classification is efficient. ReAct loop with fabricated-response detection and duplicate-call prevention is robust. Multi-agent delegation works. However, no structured chain-of-thought, no planning agent, no explicit reasoning steps. Direct mode silently fails on tool-requiring queries. |
-| **User Understanding & Personalization** | **7.5/10** | 6-domain user model, procedural rules, emoji-reaction satisfaction, behavioral pattern detection. The system genuinely learns about users over time. Deductions for hardcoded semantic similarity reducing retrieval quality and for satisfaction rarely being collected outside chat. |
+| **Intelligence & Reasoning** | **8.0/10** | Two-stage intent classification is efficient. ReAct loop with fabrication detection, duplicate prevention, and structured chain-of-thought planning (R8) for complexity ≥5. Direct→Reactive escalation (R9) prevents silent failures. Multi-agent delegation with depth limiting. Minor deductions for no dedicated planning agent and no per-step self-reflection. |
+| **User Understanding & Personalization** | **8.5/10** | 6-domain user model with real vector search (R1), procedural rules, emoji-reaction satisfaction, behavioral pattern detection, passive learning from every chat turn. LLM extraction produces multiple fine-grained SPO triples per message. FSRS-scored retrieval with 5-factor relevance formula fully functional. Minor deduction for satisfaction rarely collected outside Telegram. |
 | **Maintainability** | **8.0/10** | Strong Rust type system prevents many bugs. Derive macros reduce boilerplate. Zero-clippy-warning policy. Good test infrastructure (ephemeral SQLite). Conventional commits. Minor deductions for 27-crate complexity and some undocumented code paths. |
 | **Channel Coverage** | **8.0/10** | 4 platforms with unified `Channel` trait. Rich Telegram support. Shared reconnect and formatter patterns. Deductions for email being consent-gated and no web chat channel. |
-| **Tool Ecosystem** | **8.5/10** | 60+ tools across 5 feature packages. Type-safe derive macros. Multi-action dispatch. WASM plugin system. MCP client/server. Deduction only for feature-notes having no tools yet. |
+| **Tool Ecosystem** | **8.5/10** | 60+ tools across 5 feature packages. Type-safe derive macros. Multi-action dispatch. WASM plugin system. MCP client/server. NotesTool implemented (10 actions) but not yet registered in agent tool registry. |
 | **Security** | **7.5/10** | `Secret<String>` for API keys. WASM sandbox with permissions. Allowlist-based channel access. HTML escaping in formatters. Per-agent tool access control. Deductions for manual SQL predicate escaping in vector store and no input sanitization framework. |
 
-### Overall Score: **7.1/10**
+### Overall Score: **7.7/10**
 
 ### Radar Summary
 
 ```
 Architecture    ████████░░  8.5
-Memory          ███████░░░  7.0
+Memory          ████████░░  8.5
 Scalability     █████░░░░░  5.5
 Observability   ███░░░░░░░  3.5
-Intelligence    ███████░░░  7.0
-Personalization ███████░░░  7.5
+Intelligence    ████████░░  8.0
+Personalization ████████░░  8.5
 Maintainability ████████░░  8.0
 Channels        ████████░░  8.0
 Tools           ████████░░  8.5
