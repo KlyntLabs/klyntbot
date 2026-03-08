@@ -153,3 +153,17 @@ export function formatLongDuration(secs: number): string {
   if (h > 0) return `${h} hr`;
   return `${m} min`;
 }
+
+/** Format an ISO timestamp as a compact relative time (e.g. "now", "5m", "3h", "2d", "1w", "3mo"). */
+export function formatRelativeTime(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "now";
+  if (mins < 60) return `${mins}m`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d`;
+  if (days < 30) return `${Math.floor(days / 7)}w`;
+  return `${Math.floor(days / 30)}mo`;
+}

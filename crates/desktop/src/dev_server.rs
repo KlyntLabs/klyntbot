@@ -1101,7 +1101,7 @@ async fn dispatch(
         // ── Session Tracker ──────────────────────────────────
         "get_tracked_sessions" => r(core.get_tracked_sessions().await),
         "get_session_messages" => {
-            let session_id = match get_str(&body, "session_id") {
+            let session_id = match get_str(&body, "sessionId") {
                 Ok(v) => v,
                 Err(e) => return err(e),
             };
@@ -1109,19 +1109,19 @@ async fn dispatch(
         }
         "sync_sessions" => r(core.sync_sessions().await),
         "pin_session_message" => {
-            let session_id = match get_str(&body, "session_id") {
+            let session_id = match get_str(&body, "sessionId") {
                 Ok(v) => v,
                 Err(e) => return err(e),
             };
-            let message_uuid = match get_str(&body, "message_uuid") {
+            let message_uuid = match get_str(&body, "messageUuid") {
                 Ok(v) => v,
                 Err(e) => return err(e),
             };
-            let message_content = match get_str(&body, "message_content") {
+            let message_content = match get_str(&body, "messageContent") {
                 Ok(v) => v,
                 Err(e) => return err(e),
             };
-            let message_role = match get_str(&body, "message_role") {
+            let message_role = match get_str(&body, "messageRole") {
                 Ok(v) => v,
                 Err(e) => return err(e),
             };
@@ -1130,21 +1130,21 @@ async fn dispatch(
                 .await)
         }
         "unpin_session_message" => {
-            let pin_id: i64 = match require(&body, "pin_id") {
+            let pin_id: i64 = match require(&body, "pinId") {
                 Ok(v) => v,
                 Err(e) => return err(e),
             };
             r(core.unpin_session_message(pin_id).await)
         }
         "get_pinned_messages" => {
-            let session_id = match get_str(&body, "session_id") {
+            let session_id = match get_str(&body, "sessionId") {
                 Ok(v) => v,
                 Err(e) => return err(e),
             };
             r(core.get_pinned_messages(&session_id).await)
         }
         "send_to_claude_code" => {
-            let session_id = match get_str(&body, "session_id") {
+            let session_id = match get_str(&body, "sessionId") {
                 Ok(v) => v,
                 Err(e) => return err(e),
             };
@@ -1155,7 +1155,7 @@ async fn dispatch(
             r(core.send_to_claude_code(&session_id, &content).await)
         }
         "create_brainstorm" => {
-            let session_id = match get_str(&body, "session_id") {
+            let session_id = match get_str(&body, "sessionId") {
                 Ok(v) => v,
                 Err(e) => return err(e),
             };
@@ -1165,25 +1165,25 @@ async fn dispatch(
                     Err(e) => return err(e),
                 };
             r(core
-                .create_brainstorm(session_id, mode, get(&body, "model_key"), get(&body, "agent_profile"), get(&body, "title"))
+                .create_brainstorm(session_id, mode, get(&body, "modelKey"), get(&body, "agentProfile"), get(&body, "title"))
                 .await)
         }
         "list_brainstorms" => {
-            let session_id = match get_str(&body, "session_id") {
+            let session_id = match get_str(&body, "sessionId") {
                 Ok(v) => v,
                 Err(e) => return err(e),
             };
             r(core.list_brainstorms(&session_id).await)
         }
         "get_brainstorm_messages" => {
-            let conversation_id = match get_str(&body, "conversation_id") {
+            let conversation_id = match get_str(&body, "conversationId") {
                 Ok(v) => v,
                 Err(e) => return err(e),
             };
             r(core.get_brainstorm_messages(&conversation_id).await)
         }
         "get_session_context" => {
-            let session_id = match get_str(&body, "session_id") {
+            let session_id = match get_str(&body, "sessionId") {
                 Ok(v) => v,
                 Err(e) => return err(e),
             };
