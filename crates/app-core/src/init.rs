@@ -60,6 +60,15 @@ impl AppCore {
             .map_err(|e| format!("storage connect failed: {e}"))?;
         let repos = Repos::from_pool(&storage_pool);
         let vector_store = VectorStore::connect(&data_dir).await.ok();
+        // Create ANN indexes in the background (requires 256+ rows to train).
+        if let Some(vs) = &vector_store {
+            let vs_bg = vs.clone();
+            tokio::spawn(async move {
+                if let Err(e) = vs_bg.ensure_indexes(256).await {
+                    warn!("ANN index creation failed (non-fatal): {e}");
+                }
+            });
+        }
         info!("storage connected");
 
         // Run notes feature migrations and create repo.

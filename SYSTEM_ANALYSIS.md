@@ -542,7 +542,7 @@ Each `feature-*` crate implements `FeaturePackage`:
 
 7. **Vector store fragility.** LanceDB upsert is delete-then-insert (not atomic). A crash between delete and add loses the vector. Predicate interpolation uses manual `'` escaping, not parameterized queries.
 
-8. **Conversation decay not implemented.** `decay_factor` parameter accepted by `ConversationEmbeddingStore.search_similar()` but documented as unimplemented. Time-based conversation relevance is missing.
+8. ~~**Conversation decay not implemented.**~~ Fixed — `ConversationEmbeddingStore.search_similar()` now applies `score × decay_factor^days_old` using the `created_at` timestamp from LanceDB results.
 
 9. **`coaching_strategies` table orphaned.** Defined in migration SQL but has no Rust repo — never read or written.
 
@@ -567,7 +567,7 @@ Each `feature-*` crate implements `FeaturePackage`:
 | Concern | Current State | At Scale |
 |---------|--------------|----------|
 | SQLite concurrency | WAL mode, single-writer | Bottleneck at >100 concurrent sessions |
-| LanceDB indexing | No explicit ANN index | Slow at >100K vectors (no IVF/HNSW) |
+| LanceDB indexing | IVF-PQ indexes auto-created at 256+ rows | Good for personal use; may need tuning at >100K vectors |
 | Session memory | LRU eviction at 1000 | Good for personal use, not multi-tenant |
 | MessageBus buffer | 100 messages | Queue overflow drops messages |
 | Cognitive facts | 10K cap with compaction | Adequate for personal use |
@@ -710,10 +710,8 @@ Security        ███████░░░  7.5
 **Fix:** Add daily compaction for `strategy_records` (keep 90 days), `learning_outcomes` (keep 30 days), `interaction_log` (keep 60 days), `tool_usage` (keep 90 days).
 **Impact:** Prevents unbounded database growth.
 
-#### R7: Implement conversation memory decay
-**Current:** `decay_factor` accepted but documented as unimplemented.
-**Fix:** Apply time-based decay multiplier to conversation embedding similarity scores: `adjusted_score = score × decay_factor^days_old`
-**Impact:** Recent conversations rank higher in retrieval, improving context relevance.
+#### ~~R7: Implement conversation memory decay~~ — SOLVED
+**Fix:** `ConversationEmbeddingStore.search_similar()` now applies `score × decay_factor^days_old` using `created_at` from LanceDB. `search_conv_embeddings` updated to return timestamps.
 
 ### 9.3 Medium Priority
 
@@ -727,10 +725,8 @@ Security        ███████░░░  7.5
 **Fix:** Escalate to Reactive mode on tool-call detection in Direct mode.
 **Impact:** Eliminates a class of silent failures.
 
-#### R10: Create explicit ANN indexes in LanceDB
-**Current:** No explicit index creation. LanceDB auto-indexes at a threshold.
-**Fix:** Create IVF-PQ or HNSW index on each vector table after initial population.
-**Impact:** Faster vector search at scale (>10K vectors).
+#### ~~R10: Create explicit ANN indexes in LanceDB~~ — SOLVED
+**Fix:** Added `VectorStore::ensure_indexes(min_rows)` — creates IVF-PQ (cosine) indexes on tables with 256+ rows, called in background on boot via `AppCore::init()`.
 
 ### 9.4 Low Priority (Quality of Life)
 

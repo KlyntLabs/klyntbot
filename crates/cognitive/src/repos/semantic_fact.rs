@@ -115,6 +115,24 @@ impl SemanticFactRepo {
         Ok(())
     }
 
+    /// Fetch multiple facts by ID in a single query.
+    pub async fn get_batch(&self, ids: &[&str]) -> Result<Vec<SemanticFact>, sqlx::Error> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        // SQLite doesn't support array params — build IN clause with positional placeholders
+        let placeholders: Vec<String> = (1..=ids.len()).map(|i| format!("?{i}")).collect();
+        let sql = format!(
+            "SELECT * FROM semantic_facts WHERE id IN ({})",
+            placeholders.join(", ")
+        );
+        let mut query = sqlx::query_as::<_, SemanticFact>(&sql);
+        for id in ids {
+            query = query.bind(id);
+        }
+        query.fetch_all(&self.pool).await
+    }
+
     /// List facts with retrievability below a threshold (candidates for compaction).
     pub async fn list_low_stability(
         &self,
@@ -239,6 +257,33 @@ mod tests {
         let updated = repo.get("f1").await.unwrap().unwrap();
         assert!((updated.stability - 1.2).abs() < f64::EPSILON);
         assert_eq!(updated.access_count, 1);
+    }
+
+    #[tokio::test]
+    async fn test_get_batch_returns_matching_facts() {
+        let pool = setup().await;
+        let repo = SemanticFactRepo::new(pool);
+
+        let f1 = test_fact("batch1", "productivity", "pred1", "val1");
+        let f2 = test_fact("batch2", "productivity", "pred2", "val2");
+        let f3 = test_fact("batch3", "productivity", "pred3", "val3");
+        repo.upsert(&f1).await.unwrap();
+        repo.upsert(&f2).await.unwrap();
+        repo.upsert(&f3).await.unwrap();
+
+        let results = repo.get_batch(&["batch1", "batch3"]).await.unwrap();
+        assert_eq!(results.len(), 2);
+        let ids: Vec<&str> = results.iter().map(|f| f.id.as_str()).collect();
+        assert!(ids.contains(&"batch1"));
+        assert!(ids.contains(&"batch3"));
+    }
+
+    #[tokio::test]
+    async fn test_get_batch_empty_ids() {
+        let pool = setup().await;
+        let repo = SemanticFactRepo::new(pool);
+        let results = repo.get_batch(&[]).await.unwrap();
+        assert!(results.is_empty());
     }
 
     #[tokio::test]

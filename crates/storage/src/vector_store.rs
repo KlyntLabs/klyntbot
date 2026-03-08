@@ -8,6 +8,8 @@ use arrow_array::{
 };
 use arrow_schema::{ArrowError, DataType, Field, Schema, SchemaRef};
 use futures_util::TryStreamExt;
+use lancedb::index::vector::IvfPqIndexBuilder;
+use lancedb::index::Index;
 use lancedb::query::{ExecutableQuery, QueryBase};
 use lancedb::Connection;
 
@@ -15,12 +17,13 @@ use crate::error::StorageError;
 
 /// LanceDB-backed vector store for embedding similarity search.
 ///
-/// Manages three tables (all share the convention: `id` first, `vector` second,
+/// Manages four tables (all share the convention: `id` first, `vector` second,
 /// extra string fields, timestamp last):
 ///
-/// - `todo_embeddings`         — id, vector(384), model, updated_at
-/// - `conv_embeddings`         — id, vector(384), session_key, role, content_preview, full_content, created_at
-/// - `memory_note_embeddings`  — id, vector(384), updated_at
+/// - `todo_embeddings`              — id, vector(384), model, updated_at
+/// - `conv_embeddings`              — id, vector(384), session_key, role, content_preview, full_content, created_at
+/// - `memory_note_embeddings`       — id, vector(384), updated_at
+/// - `cognitive_fact_embeddings`    — id, vector(384), domain, text, importance, stability, confidence, updated_at
 #[derive(Clone)]
 pub struct VectorStore {
     db: Arc<Connection>,
@@ -50,6 +53,9 @@ impl VectorStore {
         store.ensure_table("conv_embeddings", conv_schema()).await?;
         store
             .ensure_table("memory_note_embeddings", memory_note_schema())
+            .await?;
+        store
+            .ensure_table("cognitive_fact_embeddings", cognitive_fact_schema())
             .await?;
         Ok(store)
     }
@@ -257,14 +263,14 @@ impl VectorStore {
 
     /// Search `conv_embeddings` by nearest-neighbor and return full row data.
     ///
-    /// Returns `(id, session_key, role, content_preview, full_content, score)` tuples
+    /// Returns `(id, session_key, role, content_preview, full_content, created_at, score)` tuples
     /// where `score = 1.0 - distance` and `score >= threshold`.
     pub async fn search_conv_embeddings(
         &self,
         query: &[f32],
         limit: usize,
         threshold: f64,
-    ) -> Result<Vec<(String, String, String, String, String, f64)>, StorageError> {
+    ) -> Result<Vec<(String, String, String, String, String, String, f64)>, StorageError> {
         let tbl = self
             .db
             .open_table("conv_embeddings")
@@ -303,12 +309,20 @@ impl VectorStore {
             let full_col = batch
                 .column_by_name("full_content")
                 .and_then(|c| c.as_any().downcast_ref::<StringArray>());
+            let created_col = batch
+                .column_by_name("created_at")
+                .and_then(|c| c.as_any().downcast_ref::<StringArray>());
             let dist_col = batch
                 .column_by_name("_distance")
                 .and_then(|c| c.as_any().downcast_ref::<Float32Array>());
 
-            let (Some(id_col), Some(sk_col), Some(role_col), Some(preview_col), Some(full_col)) =
-                (id_col, sk_col, role_col, preview_col, full_col)
+            let (
+                Some(id_col),
+                Some(sk_col),
+                Some(role_col),
+                Some(preview_col),
+                Some(full_col),
+            ) = (id_col, sk_col, role_col, preview_col, full_col)
             else {
                 continue; // skip malformed batch
             };
@@ -319,12 +333,16 @@ impl VectorStore {
                     None => 1.0,
                 };
                 if score >= threshold {
+                    let created_at = created_col
+                        .map(|c| c.value(i).to_string())
+                        .unwrap_or_default();
                     out.push((
                         id_col.value(i).to_string(),
                         sk_col.value(i).to_string(),
                         role_col.value(i).to_string(),
                         preview_col.value(i).to_string(),
                         full_col.value(i).to_string(),
+                        created_at,
                         score,
                     ));
                 }
@@ -346,6 +364,142 @@ impl VectorStore {
             .await
             .map_err(|e| StorageError::Vector(format!("count {table}: {e}")))?;
         Ok(n)
+    }
+    /// Upsert a cognitive fact embedding.
+    pub async fn upsert_cognitive_fact(
+        &self,
+        fact_id: &str,
+        vector: &[f32],
+        domain: &str,
+        text: &str,
+        importance: f32,
+        stability: f32,
+        confidence: f32,
+    ) -> Result<(), StorageError> {
+        self.upsert_embedding(
+            "cognitive_fact_embeddings",
+            fact_id,
+            vector,
+            &[
+                ("domain", domain),
+                ("text", text),
+                ("importance", &importance.to_string()),
+                ("stability", &stability.to_string()),
+                ("confidence", &confidence.to_string()),
+            ],
+        )
+        .await
+    }
+
+    /// Search cognitive fact embeddings by vector similarity with domain filtering.
+    ///
+    /// Returns `(fact_id, similarity_score)` pairs sorted by similarity desc.
+    pub async fn search_cognitive_facts(
+        &self,
+        query_vector: &[f32],
+        domains: &[&str],
+        top_k: usize,
+        min_similarity: f64,
+    ) -> Result<Vec<(String, f64)>, StorageError> {
+        let tbl = self
+            .db
+            .open_table("cognitive_fact_embeddings")
+            .execute()
+            .await
+            .map_err(|e| StorageError::Vector(format!("Open cognitive table: {e}")))?;
+
+        // Build domain filter: domain IN ('identity', 'energy', ...)
+        let mut query = tbl
+            .query()
+            .nearest_to(query_vector)
+            .map_err(|e| StorageError::Vector(format!("Vector search setup: {e}")))?
+            .limit(top_k);
+
+        if !domains.is_empty() {
+            let quoted: Vec<String> = domains
+                .iter()
+                .map(|d| format!("'{}'", d.replace('\'', "''")))
+                .collect();
+            let domain_filter = format!("domain IN ({})", quoted.join(", "));
+            query = query.only_if(domain_filter);
+        }
+
+        let results = query
+            .execute()
+            .await
+            .map_err(|e| StorageError::Vector(format!("Vector search: {e}")))?;
+
+        let batches: Vec<RecordBatch> = results
+            .try_collect()
+            .await
+            .map_err(|e| StorageError::Vector(format!("Collect results: {e}")))?;
+
+        let mut scored = Vec::new();
+        for batch in &batches {
+            let id_col = batch
+                .column_by_name("id")
+                .and_then(|c| c.as_any().downcast_ref::<StringArray>());
+            let dist_col = batch
+                .column_by_name("_distance")
+                .and_then(|c| c.as_any().downcast_ref::<Float32Array>());
+
+            if let (Some(ids), Some(dists)) = (id_col, dist_col) {
+                for i in 0..batch.num_rows() {
+                    let similarity = 1.0 - dists.value(i) as f64;
+                    if similarity >= min_similarity {
+                        scored.push((ids.value(i).to_string(), similarity));
+                    }
+                }
+            }
+        }
+        scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        Ok(scored)
+    }
+
+    /// Create IVF-PQ vector indexes on all tables that have enough rows.
+    ///
+    /// Skips tables that already have a vector index or have fewer than
+    /// `min_rows` rows (IVF-PQ needs data to train on). Safe to call
+    /// repeatedly — it is a no-op if indexes already exist.
+    pub async fn ensure_indexes(&self, min_rows: usize) -> Result<(), StorageError> {
+        let tables = ["todo_embeddings", "conv_embeddings", "memory_note_embeddings", "cognitive_fact_embeddings"];
+        for table_name in tables {
+            let tbl = match self.db.open_table(table_name).execute().await {
+                Ok(t) => t,
+                Err(_) => continue,
+            };
+
+            // Skip if not enough data to train an index.
+            let row_count = tbl
+                .count_rows(None)
+                .await
+                .map_err(|e| StorageError::Vector(format!("count {table_name}: {e}")))?;
+            if row_count < min_rows {
+                continue;
+            }
+
+            // Skip if a vector index already exists.
+            let indices = tbl
+                .list_indices()
+                .await
+                .map_err(|e| StorageError::Vector(format!("list indices {table_name}: {e}")))?;
+            let has_vector_index = indices.iter().any(|idx| idx.columns.contains(&"vector".to_string()));
+            if has_vector_index {
+                continue;
+            }
+
+            let ivf_pq = IvfPqIndexBuilder::default()
+                .distance_type(lancedb::DistanceType::Cosine);
+            tbl.create_index(&["vector"], Index::IvfPq(ivf_pq))
+                .execute()
+                .await
+                .map_err(|e| {
+                    StorageError::Vector(format!("create IVF-PQ index on {table_name}: {e}"))
+                })?;
+
+            tracing::info!("Created IVF-PQ index on {table_name} ({row_count} rows)");
+        }
+        Ok(())
     }
 }
 
@@ -390,6 +544,19 @@ fn memory_note_schema() -> Schema {
     Schema::new(vec![
         Field::new("id", DataType::Utf8, false),
         vector_field(),
+        Field::new("updated_at", DataType::Utf8, false),
+    ])
+}
+
+fn cognitive_fact_schema() -> Schema {
+    Schema::new(vec![
+        Field::new("id", DataType::Utf8, false),
+        vector_field(),
+        Field::new("domain", DataType::Utf8, false),
+        Field::new("text", DataType::Utf8, false),
+        Field::new("importance", DataType::Utf8, false),
+        Field::new("stability", DataType::Utf8, false),
+        Field::new("confidence", DataType::Utf8, false),
         Field::new("updated_at", DataType::Utf8, false),
     ])
 }
@@ -502,5 +669,84 @@ mod tests {
         // These should return 0 (empty tables exist) rather than error.
         assert_eq!(store.count("conv_embeddings").await.unwrap(), 0);
         assert_eq!(store.count("memory_note_embeddings").await.unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_cognitive_table_creation() {
+        let (store, _dir) = test_store().await;
+        // Table should exist after connect — empty search returns no results
+        let results = store
+            .search_cognitive_facts(&[0.1; 384], &["identity"], 5, 0.0)
+            .await
+            .unwrap();
+        assert!(results.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_cognitive_upsert_and_search() {
+        let (store, _dir) = test_store().await;
+
+        store
+            .upsert_cognitive_fact(
+                "fact1",
+                &[0.5; 384],
+                "identity",
+                "user name Jayden",
+                0.9,
+                1.0,
+                0.85,
+            )
+            .await
+            .unwrap();
+
+        let results = store
+            .search_cognitive_facts(&[0.5; 384], &["identity"], 5, 0.0)
+            .await
+            .unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].0, "fact1");
+        assert!(results[0].1 > 0.99); // Near-identical vector
+    }
+
+    #[tokio::test]
+    async fn test_cognitive_domain_filter() {
+        let (store, _dir) = test_store().await;
+
+        store
+            .upsert_cognitive_fact("f1", &[0.5; 384], "identity", "text1", 0.9, 1.0, 0.8)
+            .await
+            .unwrap();
+        store
+            .upsert_cognitive_fact("f2", &[0.5; 384], "finance", "text2", 0.8, 1.0, 0.7)
+            .await
+            .unwrap();
+
+        // Search only identity domain
+        let results = store
+            .search_cognitive_facts(&[0.5; 384], &["identity"], 5, 0.0)
+            .await
+            .unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].0, "f1");
+    }
+
+    #[tokio::test]
+    async fn test_cognitive_delete() {
+        let (store, _dir) = test_store().await;
+
+        store
+            .upsert_cognitive_fact("f1", &[0.5; 384], "identity", "text", 0.9, 1.0, 0.8)
+            .await
+            .unwrap();
+        store
+            .delete("cognitive_fact_embeddings", "f1")
+            .await
+            .unwrap();
+
+        let results = store
+            .search_cognitive_facts(&[0.5; 384], &["identity"], 5, 0.0)
+            .await
+            .unwrap();
+        assert!(results.is_empty());
     }
 }

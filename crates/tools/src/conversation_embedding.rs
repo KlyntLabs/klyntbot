@@ -82,39 +82,65 @@ impl ConversationEmbeddingStore {
 
     /// Search for similar embeddings. Returns `(record, score)` pairs.
     ///
-    /// `decay_factor` is accepted for API compatibility but is not applied —
-    /// LanceDB returns raw cosine similarity scores.
+    /// Applies time-decay scoring: `adjusted_score = similarity × decay_factor^days_old`.
+    /// Use `decay_factor = 1.0` to disable decay.
     pub async fn search_similar(
         &self,
         query_embedding: &[f32],
         limit: usize,
         threshold: f64,
-        _decay_factor: f64,
+        decay_factor: f64,
     ) -> Result<Vec<(ConversationEmbeddingRecord, f64)>> {
+        // Fetch extra results before decay filtering so we still return enough.
+        let fetch_limit = if decay_factor < 1.0 {
+            limit * 2
+        } else {
+            limit
+        };
         let hits = self
             .store
-            .search_conv_embeddings(query_embedding, limit, threshold)
+            .search_conv_embeddings(query_embedding, fetch_limit, threshold)
             .await
             .map_err(|e| common::ToolError::ExecutionFailed(e.to_string()))?;
 
-        let records = hits
+        let now = Utc::now();
+        let mut records: Vec<(ConversationEmbeddingRecord, f64)> = hits
             .into_iter()
             .map(
-                |(id, session_key, role, content_preview, full_content, score)| {
+                |(id, session_key, role, content_preview, full_content, created_at, score)| {
+                    let embedded_at = chrono::DateTime::parse_from_rfc3339(&created_at)
+                        .map(|dt| dt.with_timezone(&Utc))
+                        .unwrap_or(now);
+
+                    let adjusted_score = if decay_factor < 1.0 {
+                        let days_old = (now - embedded_at).num_seconds().max(0) as f64 / 86400.0;
+                        score * decay_factor.powf(days_old)
+                    } else {
+                        score
+                    };
+
                     let record = ConversationEmbeddingRecord {
                         id,
                         session_key,
                         role,
                         content_preview,
                         content_full: full_content,
-                        embedding: Vec::new(), // not re-hydrated from search results
+                        embedding: Vec::new(),
                         model: String::new(),
-                        embedded_at: Utc::now(), // approximate — not stored in search path
+                        embedded_at,
                     };
-                    (record, score)
+                    (record, adjusted_score)
                 },
             )
             .collect();
+
+        // Re-sort by decayed score, filter below-threshold, then apply limit.
+        if decay_factor < 1.0 {
+            records.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+            records.retain(|(_, score)| *score >= threshold);
+            records.truncate(limit);
+        }
+
         Ok(records)
     }
 
@@ -217,5 +243,38 @@ mod tests {
             embedded_at: chrono::Utc::now(),
         };
         assert_eq!(record.content_full, "Hello, how are you doing today?");
+    }
+
+    #[test]
+    fn test_decay_factor_math() {
+        // decay_factor = 0.995 should give ~50% weight at 138 days (half-life).
+        let decay_factor = 0.995_f64;
+        let days_old = 138.0_f64;
+        let weight = decay_factor.powf(days_old);
+        assert!(
+            (weight - 0.5).abs() < 0.01,
+            "Expected ~0.5 at 138-day half-life, got {weight}"
+        );
+
+        // A 1-day-old result should retain ~99.5% of its score.
+        let one_day = decay_factor.powf(1.0);
+        assert!(
+            (one_day - 0.995).abs() < 0.001,
+            "Expected ~0.995 at 1 day, got {one_day}"
+        );
+
+        // A 365-day-old result should be ~16% of its original score.
+        let one_year = decay_factor.powf(365.0);
+        assert!(
+            one_year < 0.20 && one_year > 0.10,
+            "Expected 10-20% at 365 days, got {one_year}"
+        );
+    }
+
+    #[test]
+    fn test_decay_factor_one_means_no_decay() {
+        let decay_factor = 1.0_f64;
+        let weight = decay_factor.powf(1000.0);
+        assert_eq!(weight, 1.0, "decay_factor=1.0 should mean no decay");
     }
 }
