@@ -8,8 +8,27 @@ use async_trait::async_trait;
 use storage::StorageError;
 use tracing::{debug, warn};
 
+use crate::embedder::SemanticFactEmbedder;
 use crate::repos::SemanticFactRepo;
 use crate::types::{MemoryOp, SemanticFact};
+
+/// Embed a fact into the vector store, logging on failure.
+async fn try_embed(embedder: Option<&dyn SemanticFactEmbedder>, fact: &SemanticFact) {
+    if let Some(emb) = embedder {
+        if let Err(e) = emb.embed_and_store_fact(fact).await {
+            warn!("Failed to embed fact '{}': {e}", fact.id);
+        }
+    }
+}
+
+/// Remove a fact's embedding from the vector store, logging on failure.
+async fn try_remove_embedding(embedder: Option<&dyn SemanticFactEmbedder>, fact_id: &str) {
+    if let Some(emb) = embedder {
+        if let Err(e) = emb.remove_embedding(fact_id).await {
+            warn!("Failed to remove embedding '{fact_id}': {e}");
+        }
+    }
+}
 
 /// Trait for LLM-backed consolidation decisions.
 ///
@@ -35,6 +54,7 @@ pub async fn consolidate_fact(
     candidate: &SemanticFact,
     repo: &SemanticFactRepo,
     handler: &dyn ConsolidationHandler,
+    embedder: Option<&dyn SemanticFactEmbedder>,
 ) -> common::Result<MemoryOp> {
     let existing = repo
         .find_similar(&candidate.subject, &candidate.predicate)
@@ -44,6 +64,7 @@ pub async fn consolidate_fact(
     if existing.is_empty() {
         // No similar facts — direct ADD
         repo.upsert(candidate).await.map_err(StorageError::from)?;
+        try_embed(embedder, candidate).await;
         debug!(
             "Consolidated: ADD fact '{}' ({}.{} = {})",
             candidate.id, candidate.subject, candidate.predicate, candidate.object
@@ -59,6 +80,7 @@ pub async fn consolidate_fact(
     match &op {
         MemoryOp::Add { .. } => {
             repo.upsert(candidate).await.map_err(StorageError::from)?;
+            try_embed(embedder, candidate).await;
             debug!("Consolidated: ADD (handler confirmed) '{}'", candidate.id);
         }
         MemoryOp::Update { id, old_id } => {
@@ -66,12 +88,15 @@ pub async fn consolidate_fact(
                 .await
                 .map_err(StorageError::from)?;
             repo.upsert(candidate).await.map_err(StorageError::from)?;
+            try_remove_embedding(embedder, old_id).await;
+            try_embed(embedder, candidate).await;
             debug!("Consolidated: UPDATE '{old_id}' → '{id}'");
         }
         MemoryOp::Delete { id, superseded_by } => {
             repo.supersede(id, superseded_by)
                 .await
                 .map_err(StorageError::from)?;
+            try_remove_embedding(embedder, id).await;
             debug!("Consolidated: DELETE '{id}' (superseded by '{superseded_by}')");
         }
         MemoryOp::Noop => {
@@ -87,10 +112,11 @@ pub async fn consolidate_batch(
     candidates: &[SemanticFact],
     repo: &SemanticFactRepo,
     handler: &dyn ConsolidationHandler,
+    embedder: Option<&dyn SemanticFactEmbedder>,
 ) -> Vec<MemoryOp> {
     let mut ops = Vec::with_capacity(candidates.len());
     for candidate in candidates {
-        match consolidate_fact(candidate, repo, handler).await {
+        match consolidate_fact(candidate, repo, handler, embedder).await {
             Ok(op) => ops.push(op),
             Err(e) => {
                 warn!("Consolidation failed for candidate '{}': {e}", candidate.id);
@@ -155,7 +181,9 @@ mod tests {
         };
 
         let candidate = test_fact("f1", "peak_hours", "10am-12pm");
-        let op = consolidate_fact(&candidate, &repo, &handler).await.unwrap();
+        let op = consolidate_fact(&candidate, &repo, &handler, None)
+            .await
+            .unwrap();
 
         assert!(matches!(op, MemoryOp::Add { ref id } if id == "f1"));
 
@@ -181,7 +209,9 @@ mod tests {
             },
         };
 
-        let op = consolidate_fact(&candidate, &repo, &handler).await.unwrap();
+        let op = consolidate_fact(&candidate, &repo, &handler, None)
+            .await
+            .unwrap();
         assert!(matches!(op, MemoryOp::Update { .. }));
 
         // Old fact should be superseded
@@ -207,7 +237,9 @@ mod tests {
             decision: MemoryOp::Noop,
         };
 
-        let op = consolidate_fact(&candidate, &repo, &handler).await.unwrap();
+        let op = consolidate_fact(&candidate, &repo, &handler, None)
+            .await
+            .unwrap();
         assert_eq!(op, MemoryOp::Noop);
 
         // Original fact unchanged
@@ -229,7 +261,7 @@ mod tests {
             test_fact("f2", "break_pattern", "every 90min"),
         ];
 
-        let ops = consolidate_batch(&candidates, &repo, &handler).await;
+        let ops = consolidate_batch(&candidates, &repo, &handler, None).await;
         assert_eq!(ops.len(), 2);
         assert!(matches!(ops[0], MemoryOp::Add { ref id } if id == "f1"));
         assert!(matches!(ops[1], MemoryOp::Add { ref id } if id == "f2"));

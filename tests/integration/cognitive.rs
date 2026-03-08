@@ -181,7 +181,9 @@ async fn test_consolidation_add_new_fact() {
     let handler = HeuristicConsolidationHandler;
 
     let candidate = test_fact("f1", "peak_hours", "10am-12pm");
-    let op = consolidate_fact(&candidate, &repo, &handler).await.unwrap();
+    let op = consolidate_fact(&candidate, &repo, &handler, None)
+        .await
+        .unwrap();
 
     assert!(matches!(op, MemoryOp::Add { ref id } if id == "f1"));
 
@@ -201,7 +203,9 @@ async fn test_consolidation_update_on_changed_value() {
 
     // Candidate with updated value
     let candidate = test_fact("f2", "peak_hours", "2pm-4pm");
-    let op = consolidate_fact(&candidate, &repo, &handler).await.unwrap();
+    let op = consolidate_fact(&candidate, &repo, &handler, None)
+        .await
+        .unwrap();
 
     assert!(matches!(op, MemoryOp::Update { .. }));
 
@@ -226,7 +230,9 @@ async fn test_consolidation_noop_on_duplicate() {
 
     // Same predicate + same object = NOOP
     let candidate = test_fact("f2", "peak_hours", "10am-12pm");
-    let op = consolidate_fact(&candidate, &repo, &handler).await.unwrap();
+    let op = consolidate_fact(&candidate, &repo, &handler, None)
+        .await
+        .unwrap();
 
     assert_eq!(op, MemoryOp::Noop);
 }
@@ -246,13 +252,23 @@ async fn test_full_pipeline_event_to_retrieval() {
     assert!(!facts.is_empty());
 
     // 2. Consolidate into storage
-    let ops = consolidate_batch(&facts, &repo, &consolidation).await;
+    let ops = consolidate_batch(&facts, &repo, &consolidation, None).await;
     assert!(ops.iter().any(|op| matches!(op, MemoryOp::Add { .. })));
 
     // 3. Retrieve the stored fact
-    let results = retrieve_relevant_facts(&repo, None, "", &["productivity"], &RetrievalParams { limit: 10, situational_boost: 0.5, ..RetrievalParams::new(0) })
-        .await
-        .unwrap();
+    let results = retrieve_relevant_facts(
+        &repo,
+        None,
+        "",
+        &["productivity"],
+        &RetrievalParams {
+            limit: 10,
+            situational_boost: 0.5,
+            ..RetrievalParams::new(0)
+        },
+    )
+    .await
+    .unwrap();
     assert!(!results.is_empty());
     assert!(results[0].fact.object.contains("10am"));
     assert!(results[0].score > 0.0);
@@ -268,20 +284,30 @@ async fn test_full_pipeline_update_replaces_old_fact() {
     // First fact
     let obs1 = test_observation("UserStatedFact", "I prefer mornings", 1.0);
     let facts1 = extract_from_observation(&extraction, &obs1).await;
-    consolidate_batch(&facts1, &repo, &consolidation).await;
+    consolidate_batch(&facts1, &repo, &consolidation, None).await;
 
     // Second fact (same predicate "stated" → triggers UPDATE in heuristic handler)
     let obs2 = test_observation("UserStatedFact", "Actually I prefer afternoons", 1.0);
     let facts2 = extract_from_observation(&extraction, &obs2).await;
-    let ops = consolidate_batch(&facts2, &repo, &consolidation).await;
+    let ops = consolidate_batch(&facts2, &repo, &consolidation, None).await;
 
     // Should be an UPDATE since the predicate "stated" matches
     assert!(ops.iter().any(|op| matches!(op, MemoryOp::Update { .. })));
 
     // Only the new fact should be active
-    let results = retrieve_relevant_facts(&repo, None, "", &["productivity"], &RetrievalParams { limit: 10, situational_boost: 0.5, ..RetrievalParams::new(0) })
-        .await
-        .unwrap();
+    let results = retrieve_relevant_facts(
+        &repo,
+        None,
+        "",
+        &["productivity"],
+        &RetrievalParams {
+            limit: 10,
+            situational_boost: 0.5,
+            ..RetrievalParams::new(0)
+        },
+    )
+    .await
+    .unwrap();
     assert_eq!(results.len(), 1);
     assert!(results[0].fact.object.contains("afternoons"));
 }

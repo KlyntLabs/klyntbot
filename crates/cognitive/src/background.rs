@@ -17,6 +17,7 @@ use tracing::{debug, warn};
 use bus::DomainEvent;
 
 use crate::consolidation::{consolidate_batch, ConsolidationHandler};
+use crate::embedder::SemanticFactEmbedder;
 use crate::extraction::{extract_from_observation, ExtractionHandler};
 use crate::repos::SemanticFactRepo;
 use crate::salience::evaluate_salience;
@@ -87,6 +88,7 @@ impl BackgroundConsolidationService {
         extraction: Arc<dyn ExtractionHandler>,
         consolidation: Arc<dyn ConsolidationHandler>,
         repo: SemanticFactRepo,
+        embedder: Option<Arc<dyn SemanticFactEmbedder>>,
         cancel: CancellationToken,
         pipeline_tx: Option<tokio::sync::mpsc::UnboundedSender<PipelineEvent>>,
     ) -> Self {
@@ -131,6 +133,7 @@ impl BackgroundConsolidationService {
                                             &facts,
                                             &repo,
                                             consolidation.as_ref(),
+                                            embedder.as_deref(),
                                         ).await;
 
                                         if let Some(tx) = &pipeline_tx {
@@ -181,6 +184,7 @@ impl BackgroundConsolidationService {
                                                 &facts,
                                                 &repo,
                                                 consolidation.as_ref(),
+                                                embedder.as_deref(),
                                             ).await;
 
                                             if let Some(tx) = &pipeline_tx {

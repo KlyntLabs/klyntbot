@@ -241,10 +241,34 @@ impl AgentLoopBuilder {
 
                 let fact_repo = cognitive::SemanticFactRepo::new(pool.clone());
                 let rule_repo = cognitive::ProceduralRuleRepo::new(pool.clone());
-                sources.push(Box::new(cognitive::CognitiveContextSource::new(
-                    fact_repo.clone(),
-                    rule_repo,
-                )));
+
+                // Create SemanticFactEmbedder if embedding engine + vector store available
+                let cognitive_embedder: Option<Arc<dyn cognitive::SemanticFactEmbedder>> =
+                    if let Some(ref vs) = self.vector_store {
+                        Some(Arc::new(
+                            crate::cognitive_embedder::SemanticFactEmbedderImpl::new(
+                                Arc::clone(&embedding_engine),
+                                vs.clone(),
+                            ),
+                        ))
+                    } else {
+                        None
+                    };
+
+                // Build retrieval config from app config
+                let retrieval_config = cognitive::CognitiveRetrievalConfig {
+                    dynamic_facts_enabled: config.cognitive.dynamic_facts_enabled,
+                    static_fact_limit: config.cognitive.static_fact_limit,
+                    dynamic_fact_limit: config.cognitive.dynamic_fact_limit,
+                    vector_top_k: config.cognitive.vector_top_k,
+                    min_similarity: config.cognitive.min_similarity,
+                };
+
+                sources.push(Box::new(
+                    cognitive::CognitiveContextSource::new(fact_repo.clone(), rule_repo)
+                        .with_embedder_opt(cognitive_embedder.clone())
+                        .with_config(retrieval_config),
+                ));
 
                 // Start background consolidation service if we have a DomainEventBus
                 if let Some(ref domain_bus) = self.domain_event_bus {
@@ -276,6 +300,7 @@ impl AgentLoopBuilder {
                         extraction,
                         consolidation,
                         fact_repo,
+                        cognitive_embedder,
                         cancel.clone(),
                         self.pipeline_tx.take(),
                     );

@@ -10,6 +10,7 @@ use storage::StorageError;
 use tracing::{debug, info, warn};
 
 use crate::consolidation::{consolidate_batch, ConsolidationHandler};
+use crate::embedder::SemanticFactEmbedder;
 use crate::repos::{
     load_user_model, EpisodicMemoryRepo, ProceduralRuleRepo, SemanticFactRepo, RULE_DOMAINS,
 };
@@ -59,6 +60,7 @@ pub async fn run_weekly_reflection(
     fact_repo: &SemanticFactRepo,
     episodic_repo: &EpisodicMemoryRepo,
     rule_repo: &ProceduralRuleRepo,
+    embedder: Option<&dyn SemanticFactEmbedder>,
 ) -> common::Result<ReflectionOutput> {
     let now = Utc::now();
     let week_ago = now - chrono::Duration::days(7);
@@ -109,7 +111,7 @@ pub async fn run_weekly_reflection(
             .collect();
 
         if !validated.is_empty() {
-            consolidate_batch(&validated, fact_repo, consolidation).await;
+            consolidate_batch(&validated, fact_repo, consolidation, embedder).await;
             debug!("Reflection: consolidated {} fact updates", validated.len());
         }
     }
@@ -204,6 +206,7 @@ mod tests {
             &fact_repo,
             &episodic_repo,
             &rule_repo,
+            None,
         )
         .await
         .unwrap();
@@ -255,6 +258,7 @@ mod tests {
             &fact_repo,
             &episodic_repo,
             &rule_repo,
+            None,
         )
         .await
         .unwrap();
@@ -301,6 +305,7 @@ mod tests {
             &fact_repo,
             &episodic_repo,
             &rule_repo,
+            None,
         )
         .await
         .unwrap();

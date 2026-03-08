@@ -78,12 +78,10 @@ pub async fn retrieve_relevant_facts(
             }
             Ok(hits) => {
                 // Too few vector results — merge with fallback
-                let mut vector_scored =
-                    vector_path(repo, &hits, params.situational_boost).await?;
+                let mut vector_scored = vector_path(repo, &hits, params.situational_boost).await?;
                 let vector_ids: std::collections::HashSet<String> =
                     vector_scored.iter().map(|s| s.fact.id.clone()).collect();
-                let mut fallback =
-                    fallback_path(repo, domains, params.situational_boost).await?;
+                let mut fallback = fallback_path(repo, domains, params.situational_boost).await?;
                 fallback.retain(|s| !vector_ids.contains(&s.fact.id));
                 vector_scored.append(&mut fallback);
                 vector_scored
@@ -357,10 +355,15 @@ mod tests {
             .await
             .unwrap();
 
-        let results =
-            retrieve_relevant_facts(&repo, None, "anything", &["productivity"], &default_params(10))
-                .await
-                .unwrap();
+        let results = retrieve_relevant_facts(
+            &repo,
+            None,
+            "anything",
+            &["productivity"],
+            &default_params(10),
+        )
+        .await
+        .unwrap();
 
         assert_eq!(results.len(), 2);
         // All should have similarity = None (fallback path)
@@ -378,10 +381,15 @@ mod tests {
 
         let embedder = MockEmbedder::new(vec![]);
 
-        let results =
-            retrieve_relevant_facts(&repo, Some(&embedder), "", &["productivity"], &default_params(10))
-                .await
-                .unwrap();
+        let results = retrieve_relevant_facts(
+            &repo,
+            Some(&embedder),
+            "",
+            &["productivity"],
+            &default_params(10),
+        )
+        .await
+        .unwrap();
 
         assert!(!results.is_empty());
         assert!(results[0].similarity.is_none());
@@ -470,9 +478,10 @@ mod tests {
                 .unwrap();
         }
 
-        let results = retrieve_relevant_facts(&repo, None, "", &["productivity"], &default_params(3))
-            .await
-            .unwrap();
+        let results =
+            retrieve_relevant_facts(&repo, None, "", &["productivity"], &default_params(3))
+                .await
+                .unwrap();
         assert_eq!(results.len(), 3);
     }
 
@@ -481,9 +490,10 @@ mod tests {
         let pool = setup().await;
         let repo = SemanticFactRepo::new(pool);
 
-        let results = retrieve_relevant_facts(&repo, None, "", &["nonexistent"], &default_params(10))
-            .await
-            .unwrap();
+        let results =
+            retrieve_relevant_facts(&repo, None, "", &["nonexistent"], &default_params(10))
+                .await
+                .unwrap();
         assert!(results.is_empty());
     }
 
