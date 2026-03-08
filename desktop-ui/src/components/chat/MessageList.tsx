@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type {
   ActiveInteraction,
   ChatMessage,
@@ -40,26 +40,56 @@ export function MessageList({
 }: MessageListProps) {
   const endRef = useRef<HTMLDivElement>(null);
   const [userScrolledUp, setUserScrolledUp] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const scrollParentRef = useRef<HTMLElement | null>(null);
 
-  // Auto-scroll on new messages/streaming unless user scrolled up
+  // Find the actual scrollable parent (the div with overflow-y-auto)
+  useEffect(() => {
+    let el = endRef.current?.parentElement ?? null;
+    while (el) {
+      const overflow = getComputedStyle(el).overflowY;
+      if (overflow === "auto" || overflow === "scroll") {
+        scrollParentRef.current = el;
+        break;
+      }
+      el = el.parentElement;
+    }
+  }, []);
+
+  // Listen for scroll events on the actual scrollable container
+  useEffect(() => {
+    const sp = scrollParentRef.current;
+    if (!sp) return;
+    const onScroll = () => {
+      const isNearBottom = sp.scrollHeight - sp.scrollTop - sp.clientHeight < 100;
+      setUserScrolledUp(!isNearBottom);
+    };
+    sp.addEventListener("scroll", onScroll, { passive: true });
+    return () => sp.removeEventListener("scroll", onScroll);
+  }, []);
+
+  // Auto-scroll on new messages/segments unless user scrolled up
   const messageCount = messages.length;
   const segmentCount = segments.length;
   useEffect(() => {
-    if (!userScrolledUp && (messageCount > 0 || segmentCount > 0 || isStreaming)) {
+    if (!userScrolledUp && (messageCount > 0 || segmentCount > 0)) {
       endRef.current?.scrollIntoView({ behavior: "smooth" });
     }
-  }, [messageCount, segmentCount, isStreaming, userScrolledUp]);
+  }, [messageCount, segmentCount, userScrolledUp]);
 
-  const handleScroll = useCallback(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
-    setUserScrolledUp(!isNearBottom);
-  }, []);
+  // Continuously scroll during streaming (content grows without count changes)
+  useEffect(() => {
+    if (!isStreaming || userScrolledUp) return;
+    const raf = { id: 0 };
+    const tick = () => {
+      endRef.current?.scrollIntoView({ behavior: "instant" });
+      raf.id = requestAnimationFrame(tick);
+    };
+    raf.id = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf.id);
+  }, [isStreaming, userScrolledUp]);
 
   return (
-    <div ref={containerRef} onScroll={handleScroll} className="space-y-6" aria-live="polite">
+    <div className="space-y-6" aria-live="polite">
       {messages.map((msg) => (
         <div
           key={msg.id}

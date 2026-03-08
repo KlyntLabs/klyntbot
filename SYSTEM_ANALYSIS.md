@@ -59,7 +59,7 @@ L0: common                — KlyntbotError, MessageRole, ChannelName, ChatId, S
 | `tools` | L4 | 20+ native tools (filesystem, web search, calculator, etc.) |
 | `feature-todo` | L4 | `TaskTool` with 26 actions, urgency/priority/age scoring, recursive subtasks |
 | `feature-finance` | L4 | `FinanceTool` with 40+ actions across 8 sub-modules, live market data |
-| `feature-notes` | L4 | Data layer complete (repo, models, migrations), tool not yet implemented |
+| `feature-notes` | L4 | NotesTool with 10 actions (CRUD, notebooks, tags, links, search), registered in task agent |
 | `feature-productivity` | L4 | Activity tracking, auto-focus detection, 0-100 productivity scoring |
 | `feature-coaching` | L4 | Proactive coaching pipeline: signals → patterns → LLM reasoning → interventions |
 | `plugin-runtime` | L4 | Extism-based WASM plugin host with permission model (network/storage/agent) |
@@ -645,14 +645,16 @@ Each `feature-*` crate implements `FeaturePackage`:
 | **Memory System Quality** | **8.5/10** | Three-tier cognitive model (semantic/episodic/procedural) is fully operational. FSRS decay and Mem0-style consolidation are principled. R1 (vector search connected), R2 (unified memory), R5 (coaching persistence), and JsonObject provider compatibility all resolved. LLM extraction produces proper SPO triples across all providers. Minor deductions for vector store non-atomic upserts and no graph-based relationships. |
 | **Scalability** | **5.5/10** | Designed as a personal AI agent — single-user SQLite is appropriate for that scope. Would require significant rework for multi-tenant: needs PostgreSQL, distributed vector store, message queue, and horizontal scaling. Adequate for its intended purpose. |
 | **Observability** | **3.5/10** | Rich transparency data in desktop UI per message. Cost tracking, strategy recording, and learning analytics exist. But: no external metrics, no dashboards, no alerting, no distributed tracing, no health endpoints. Logging-only observability. |
-| **Intelligence & Reasoning** | **8.0/10** | Two-stage intent classification is efficient. ReAct loop with fabrication detection, duplicate prevention, and structured chain-of-thought planning (R8) for complexity ≥5. Direct→Reactive escalation (R9) prevents silent failures. Multi-agent delegation with depth limiting. Minor deductions for no dedicated planning agent and no per-step self-reflection. |
-| **User Understanding & Personalization** | **8.5/10** | 6-domain user model with real vector search (R1), procedural rules, emoji-reaction satisfaction, behavioral pattern detection, passive learning from every chat turn. LLM extraction produces multiple fine-grained SPO triples per message. FSRS-scored retrieval with 5-factor relevance formula fully functional. Minor deduction for satisfaction rarely collected outside Telegram. |
+| **Intelligence & Reasoning** | **8.5/10** | Two-stage intent classification is efficient. ReAct loop with fabrication detection, duplicate prevention, and structured chain-of-thought planning (R8) for complexity ≥5 — verified: web research → trend analysis → task creation → summary note in one request. Direct→Reactive escalation (R9) prevents silent failures. Multi-agent delegation verified: task + finance agents in single request with unified synthesis. Self-correction via ReAct loop confirmed (finance tool parameter retry). Minor deduction for orchestrator misrouting reminders to task agent instead of automation agent. |
+| **User Understanding & Personalization** | **9.0/10** | 6-domain user model with real vector search (R1), procedural rules, emoji-reaction satisfaction, behavioral pattern detection, passive learning from every chat turn. LLM extraction produces multiple fine-grained SPO triples per message — verified: 13 facts from single message, cross-session recall confirmed, fact consolidation (UPDATE vs ADD) working. FSRS-scored retrieval with 5-factor relevance formula fully functional. Personalized responses reference user's background (TypeScript developer at startup). Minor deduction for satisfaction rarely collected outside Telegram. |
 | **Maintainability** | **8.0/10** | Strong Rust type system prevents many bugs. Derive macros reduce boilerplate. Zero-clippy-warning policy. Good test infrastructure (ephemeral SQLite). Conventional commits. Minor deductions for 27-crate complexity and some undocumented code paths. |
 | **Channel Coverage** | **8.0/10** | 4 platforms with unified `Channel` trait. Rich Telegram support. Shared reconnect and formatter patterns. Deductions for email being consent-gated and no web chat channel. |
-| **Tool Ecosystem** | **8.5/10** | 60+ tools across 5 feature packages. Type-safe derive macros. Multi-action dispatch. WASM plugin system. MCP client/server. NotesTool implemented (10 actions) but not yet registered in agent tool registry. |
+| **Tool Ecosystem** | **9.0/10** | 60+ tools across 5 feature packages. Type-safe derive macros. Multi-action dispatch. WASM plugin system. MCP client/server. NotesTool fully integrated (10 actions) with create, search, tag, link all verified via browser chat. All feature tools (task, finance, notes) confirmed working through agent runtime. |
 | **Security** | **7.5/10** | `Secret<String>` for API keys. WASM sandbox with permissions. Allowlist-based channel access. HTML escaping in formatters. Per-agent tool access control. Deductions for manual SQL predicate escaping in vector store and no input sanitization framework. |
 
-### Overall Score: **7.7/10**
+### Overall Score: **8.0/10**
+
+> Updated 2026-03-09 after browser integration testing (12/13 scenarios passed, 5 skipped)
 
 ### Radar Summary
 
@@ -661,11 +663,11 @@ Architecture    ████████░░  8.5
 Memory          ████████░░  8.5
 Scalability     █████░░░░░  5.5
 Observability   ███░░░░░░░  3.5
-Intelligence    ████████░░  8.0
-Personalization ████████░░  8.5
+Intelligence    ████████░░  8.5
+Personalization █████████░  9.0
 Maintainability ████████░░  8.0
 Channels        ████████░░  8.0
-Tools           ████████░░  8.5
+Tools           █████████░  9.0
 Security        ███████░░░  7.5
 ```
 

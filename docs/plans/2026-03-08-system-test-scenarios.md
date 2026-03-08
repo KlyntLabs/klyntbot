@@ -2,6 +2,37 @@
 
 > **Purpose:** Real-world test scenarios to verify all system layers connect properly.
 > Generated: 2026-03-08 | Based on: SYSTEM_ANALYSIS.md + ARCHITECTURE_DIAGRAMS.md + codebase audit
+> **Last tested:** 2026-03-09 via browser chat (Chrome automation)
+
+## Test Results Summary
+
+| Scenario | Status | Notes |
+|----------|--------|-------|
+| T1: Multi-Fact Extraction | ✅ PASS | 13 facts extracted via LLM, all with correct categories |
+| T2: Cross-Session Recall | ✅ PASS | Recalls name, languages across sessions |
+| T3: Fact Update / Consolidation | ✅ PASS | Age updated 25→26, editor Neovim→VS Code |
+| T4: Question Filtering | ✅ PASS | Zero facts from questions |
+| T5: Task Management | ✅ PASS | ReAct loop: create, list, complete tasks |
+| T6: Direct Mode + Escalation | ✅ PASS | Greeting → Direct mode, tool request → Reactive |
+| T7: Multi-Agent Delegation | ✅ PASS | Delegated to task (3 tasks) + finance (budget check) |
+| T8: Chain-of-Thought Planning | ✅ PASS | Web research → 3 trend tasks → summary note |
+| T9: Scheduling / Reminders | ⚠️ PARTIAL | Task created, but routed to task agent not automation/cron |
+| T10: Productivity Context | ⏭️ SKIP | Requires activity tracker (macOS accessibility) |
+| T11: Finance Operations | ✅ PASS | Account created, expense added, balance updated, spending summary |
+| T12: Conversation Persistence | ✅ PASS | Pronoun resolution + multi-turn summary correct |
+| T13: Adaptive Learning | ⏭️ SKIP | Requires 7+ days of data |
+| T14: Embedding Search | ⏭️ SKIP | Indirectly verified via notes search |
+| T15: Error Recovery | ⏭️ SKIP | Requires API key manipulation |
+| T16: Desktop UI Transparency | ✅ PASS | Tool calls visible with timing in execution panel |
+| T17: Concurrent Stress | ⏭️ SKIP | Requires multi-tab testing |
+| T18: Notes Management | ✅ PASS | Create, search, tag, link notes — all via notes tool |
+
+**Pass: 12 | Partial: 1 | Skip: 5 | Fail: 0**
+
+### Bugs Found & Fixed
+- **Notes tool not accessible to agents** — Added `notes` to task agent's tools list + triggers
+- **Auto-scroll broken** — Scroll handler was on non-scrollable div; fixed with parent detection + RAF streaming scroll
+- **T9 routing** — "remind me" routed to task agent instead of automation agent (known issue, LLM orchestrator routing)
 
 ---
 
