@@ -4,35 +4,66 @@
 //! the Tauri app, allowing the Vite dev server (localhost:1420) to be opened
 //! in Chrome with real API data via `fetch()` instead of Tauri's `invoke()`.
 //!
-//! Only compiled in debug builds. Chat streaming (chat_send) is not
-//! supported here — use the Tauri app for that.
+//! Only compiled in debug builds. Chat streaming is supported via SSE
+//! at `/api/events/{sessionKey}`.
 
+use std::convert::Infallible;
 use std::sync::Arc;
 
 use axum::extract::{Path, State};
 use axum::http::{HeaderValue, Method};
+use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::response::IntoResponse;
 use axum::routing::post;
 use axum::{Json, Router};
+use dashmap::DashMap;
 use desktop_shared::errors::ApiError;
+use futures_util::stream::Stream;
 use serde_json::Value;
+use tokio::sync::broadcast;
 use tracing::{error, info};
 
+use ::app_core::events::AppEventEmitter;
 use crate::app_core::AppCore;
 
-type AppState = Arc<AppCore>;
+type SseChannels = Arc<DashMap<String, broadcast::Sender<(String, Value)>>>;
+
+#[derive(Clone)]
+struct DevState {
+    core: Arc<AppCore>,
+    sse_channels: SseChannels,
+}
+
+/// Bridges `AppEventEmitter` to a tokio broadcast channel for SSE streaming.
+struct SseEmitter {
+    tx: broadcast::Sender<(String, Value)>,
+}
+
+impl AppEventEmitter for SseEmitter {
+    fn emit_event(&self, event_name: &str, payload: serde_json::Value) {
+        let _ = self.tx.send((event_name.to_string(), payload));
+    }
+}
 
 /// Start the dev HTTP server on port 3456.
 pub async fn start(core: Arc<AppCore>) {
+    let sse_channels: SseChannels = Arc::new(DashMap::new());
+
+    let state = DevState {
+        core,
+        sse_channels,
+    };
+
     let app = Router::new()
+        .route("/api/events/{sessionKey}", axum::routing::get(sse_handler))
         .route("/api/{cmd}", post(dispatch))
-        .with_state(core);
+        .with_state(state);
 
     // Add CORS headers for the Vite dev server
     let app = app.layer(
         tower_http::cors::CorsLayer::new()
             .allow_origin("http://localhost:1420".parse::<HeaderValue>().unwrap())
-            .allow_methods([Method::POST, Method::OPTIONS])
+            .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
             .allow_headers(tower_http::cors::Any),
     );
 
@@ -130,10 +161,11 @@ fn require<T: serde::de::DeserializeOwned>(body: &Value, key: &str) -> Result<T,
 // ── Dispatch ────────────────────────────────────────────────────────────
 
 async fn dispatch(
-    State(core): State<AppState>,
+    State(state): State<DevState>,
     Path(cmd): Path<String>,
     Json(body): Json<Value>,
 ) -> ApiResult {
+    let core = &state.core;
     match cmd.as_str() {
         // ── Tasks ──────────────────────────────────────────────
         "task_list" => r(core
@@ -874,6 +906,30 @@ async fn dispatch(
             };
             r(core.chat_cancel(session_key).await)
         }
+        "chat_send" => {
+            let content = match get_str(&body, "content") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let session_key = match get_str(&body, "sessionKey") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let context: Option<desktop_shared::commands::SessionContextInput> =
+                get(&body, "context");
+
+            match core.chat_send(content, session_key.clone(), context).await {
+                Ok((user_msg, stream_info)) => {
+                    let (tx, _) = broadcast::channel(256);
+                    state.sse_channels.insert(session_key, tx.clone());
+                    let emitter: Arc<dyn ::app_core::events::AppEventEmitter> =
+                        Arc::new(SseEmitter { tx });
+                    core.spawn_chat_relay(stream_info, emitter);
+                    ok(user_msg)
+                }
+                Err(e) => err(e),
+            }
+        }
         "chat_respond_interaction" => {
             let session_key = match get_str(&body, "sessionKey") {
                 Ok(v) => v,
@@ -1104,4 +1160,54 @@ async fn dispatch(
             format!("command '{cmd}' is not supported in browser dev mode"),
         )),
     }
+}
+
+/// SSE endpoint — streams agent events for a chat session.
+///
+/// The frontend (`useAgentStream.ts`) connects here in browser dev mode
+/// via `new EventSource("/api/events/{sessionKey}")`.
+async fn sse_handler(
+    State(state): State<DevState>,
+    Path(session_key): Path<String>,
+) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
+    let rx = state
+        .sse_channels
+        .get(&session_key)
+        .map(|entry| entry.value().subscribe())
+        .unwrap_or_else(|| {
+            let (tx, rx) = broadcast::channel(256);
+            state.sse_channels.insert(session_key.clone(), tx);
+            rx
+        });
+
+    let sse_channels = Arc::clone(&state.sse_channels);
+    let sk = session_key.clone();
+
+    let stream = futures_util::stream::unfold(
+        (rx, sse_channels, sk),
+        |(mut rx, channels, sk)| async move {
+            loop {
+                match rx.recv().await {
+                    Ok((event_name, payload)) => {
+                        let data = serde_json::to_string(&payload).unwrap_or_default();
+                        let event = Event::default().event(&event_name).data(data);
+                        if event_name == "agent:done" || event_name == "agent:error" {
+                            channels.remove(&sk);
+                        }
+                        return Some((Ok(event), (rx, channels, sk)));
+                    }
+                    Err(broadcast::error::RecvError::Lagged(n)) => {
+                        tracing::warn!("SSE stream for {sk} lagged by {n} events");
+                        continue;
+                    }
+                    Err(broadcast::error::RecvError::Closed) => {
+                        channels.remove(&sk);
+                        return None;
+                    }
+                }
+            }
+        },
+    );
+
+    Sse::new(stream).keep_alive(KeepAlive::default())
 }

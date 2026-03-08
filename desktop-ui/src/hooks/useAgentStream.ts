@@ -43,6 +43,7 @@ const SSE_AGENT_EVENTS = [
   "agent:delegation_started",
   "agent:delegation_completed",
   "agent:interaction_request",
+  "entity:updated",
 ] as const;
 
 interface AgentStream {
