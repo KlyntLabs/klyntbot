@@ -87,7 +87,12 @@ impl LearningHandlerImpl {
             strategy_accuracy: overall.accuracy,
             avg_response_time_ms: overall.avg_response_time_ms,
             avg_satisfaction: overall.avg_satisfaction,
-            suggested_threshold: adaptive.current_threshold(),
+            suggested_threshold: adaptive
+                .state()
+                .last_analysis
+                .as_ref()
+                .map(|a| a.suggested_threshold)
+                .unwrap_or_else(|| adaptive.current_threshold()),
             per_tool,
         })
     }
@@ -112,6 +117,60 @@ mod tests {
         let (handler, _) = make_handler().await;
         let status = handler.get_status().await.unwrap();
         assert!(status.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_suggested_threshold_differs_from_current() {
+        let (handler, repo) = make_handler().await;
+
+        // Insert a record so get_status returns Some
+        let row = storage::StrategyRecordRow {
+            id: uuid::Uuid::new_v4(),
+            timestamp: chrono::Utc::now(),
+            request_id: "req-st".to_string(),
+            predicted_strategy: "DirectResponse".to_string(),
+            actual_strategy: "DirectResponse".to_string(),
+            escalation_count: 0,
+            iterations_used: 1,
+            max_iterations: 1,
+            success: true,
+            user_satisfaction: Some(1.0),
+            response_time_ms: 500,
+            chat_id: None,
+            tool_name: None,
+            tool_success: None,
+            tool_duration_ms: None,
+            complexity_signals: serde_json::Value::Null,
+            execution_mode: None,
+        };
+        repo.create(&row).await.unwrap();
+
+        // Inject a mock analysis with a different suggested_threshold
+        {
+            use crate::learning::types::{AnalysisResult, EnrichmentStats};
+            let analysis = AnalysisResult {
+                computed_at: chrono::Utc::now(),
+                total_outcomes: 100,
+                per_tool_stats: std::collections::HashMap::new(),
+                suggested_threshold: 0.55, // Different from initial 0.7
+                threshold_confidence: 0.8,
+                enrichment_stats: EnrichmentStats::default(),
+            };
+            let mut adaptive = handler.adaptive.write().await;
+            adaptive.apply_analysis(&analysis);
+        }
+
+        let status = handler.get_status().await.unwrap().unwrap();
+        // suggested_threshold should be 0.55 from the analysis, NOT equal to current
+        assert!(
+            (status.suggested_threshold - 0.55).abs() < 0.01,
+            "suggested_threshold should come from analysis (0.55), got {}",
+            status.suggested_threshold
+        );
+        assert!(
+            (status.current_threshold - status.suggested_threshold).abs() > 0.01,
+            "current and suggested should differ"
+        );
     }
 
     #[tokio::test]

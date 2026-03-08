@@ -57,6 +57,8 @@ pub struct FeedbackTracker {
     pending_behavioral: Vec<PendingBehavioral>,
     /// Behavioral monitoring window in seconds.
     behavioral_window_secs: i64,
+    /// Optional SQL persistence for coaching strategies.
+    repo: Option<storage::CoachingStrategyRepo>,
 }
 
 #[derive(Debug, Clone)]
@@ -71,6 +73,64 @@ impl FeedbackTracker {
             strategies: HashMap::new(),
             pending_behavioral: Vec::new(),
             behavioral_window_secs: 120, // 2 minutes
+            repo: None,
+        }
+    }
+
+    pub fn with_repo(mut self, repo: storage::CoachingStrategyRepo) -> Self {
+        self.repo = Some(repo);
+        self
+    }
+
+    /// Persist all strategy feedback to SQL. No-op if no repo is configured.
+    pub async fn persist(&self) {
+        let repo = match &self.repo {
+            Some(r) => r,
+            None => return,
+        };
+        for feedback in self.strategies.values() {
+            let input = storage::UpsertCoachingStrategy {
+                strategy_type: &feedback.strategy_type,
+                domain: &feedback.domain,
+                times_used: feedback.times_used,
+                times_accepted: feedback.times_accepted,
+                times_led_to_improvement: feedback.times_led_to_improvement,
+                avg_improvement_magnitude: if feedback.avg_improvement_magnitude == 0.0 {
+                    None
+                } else {
+                    Some(feedback.avg_improvement_magnitude)
+                },
+                confidence: feedback.effectiveness().max(0.0),
+            };
+            if let Err(e) = repo.upsert(&input).await {
+                tracing::warn!("Failed to persist coaching strategy '{}': {e}", feedback.strategy_type);
+            }
+        }
+    }
+
+    /// Load previously persisted strategies from SQL. No-op if no repo.
+    pub async fn load_from_db(&mut self) {
+        let repo = match &self.repo {
+            Some(r) => r,
+            None => return,
+        };
+        match repo.list_all().await {
+            Ok(rows) => {
+                for row in rows {
+                    self.strategies.entry(row.strategy_type.clone()).or_insert_with(|| {
+                        StrategyFeedback {
+                            strategy_type: row.strategy_type,
+                            domain: row.domain,
+                            times_used: row.times_used,
+                            times_accepted: row.times_accepted,
+                            times_led_to_improvement: row.times_led_to_improvement,
+                            avg_improvement_magnitude: row.avg_improvement_magnitude.unwrap_or(0.0),
+                            ..Default::default()
+                        }
+                    });
+                }
+            }
+            Err(e) => tracing::warn!("Failed to load coaching strategies from DB: {e}"),
         }
     }
 

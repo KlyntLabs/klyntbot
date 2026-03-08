@@ -258,6 +258,10 @@ impl LlmProvider for ProviderManager {
         let (primary, _fallback) = self.check_health().await;
         Ok(primary)
     }
+
+    fn classifier_provider(&self) -> Option<DynProvider> {
+        self.classifier_provider.clone()
+    }
 }
 
 #[cfg(test)]

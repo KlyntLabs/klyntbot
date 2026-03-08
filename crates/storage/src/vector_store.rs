@@ -77,7 +77,7 @@ impl VectorStore {
         Ok(())
     }
 
-    /// Upsert an embedding vector (delete-then-insert).
+    /// Upsert an embedding vector (insert-then-delete-old for crash safety).
     ///
     /// `extra_fields` must be provided in **schema column order** (after `id` and
     /// `vector`), excluding the final timestamp column which is auto-populated.
@@ -102,9 +102,6 @@ impl VectorStore {
         vector: &[f32],
         extra_fields: &[(&str, &str)],
     ) -> Result<(), StorageError> {
-        // Delete existing row first (upsert = delete + insert).
-        self.delete(table, id).await?;
-
         let tbl = self
             .db
             .open_table(table)
@@ -132,6 +129,12 @@ impl VectorStore {
         ) as ArrayRef;
 
         let now = chrono::Utc::now().to_rfc3339();
+        // Extract timestamp column name before schema is consumed below.
+        let ts_col_name = schema
+            .fields()
+            .last()
+            .map(|f| f.name().clone())
+            .unwrap_or_else(|| "updated_at".into());
         let mut columns: Vec<ArrayRef> = vec![id_arr, vector_arr];
         for (_, v) in extra_fields {
             columns.push(Arc::new(StringArray::from(vec![*v])) as ArrayRef);
@@ -142,10 +145,23 @@ impl VectorStore {
             .map_err(|e| StorageError::Vector(format!("build record batch: {e}")))?;
 
         let reader = RecordBatchIterator::new(vec![Ok(batch)].into_iter(), schema);
+
+        // Insert new row FIRST (safe: crash here = no change).
         tbl.add(Box::new(reader))
             .execute()
             .await
             .map_err(|e| StorageError::Vector(format!("LanceDB add to {table}: {e}")))?;
+
+        // Delete old rows SECOND (safe: crash here = temporary duplicate,
+        // cleaned up on next upsert). We delete rows with matching ID that
+        // have an older timestamp than `now`.
+        let safe_id = id.replace('\'', "''");
+        let safe_now = now.replace('\'', "''");
+        let predicate = format!("id = '{safe_id}' AND {ts_col_name} < '{safe_now}'");
+        tbl.delete(&predicate)
+            .await
+            .map_err(|e| StorageError::Vector(format!("LanceDB cleanup old in {table}: {e}")))?;
+
         Ok(())
     }
 
@@ -449,6 +465,35 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(store.count("todo_embeddings").await.unwrap(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_upsert_inserts_before_deleting() {
+        let (store, _dir) = test_store().await;
+        let v1 = vec![0.1f32; 384];
+        let v2 = vec![0.9f32; 384];
+
+        // Insert initial
+        store
+            .upsert_embedding("todo_embeddings", "safe-1", &v1, &[("model", "m1")])
+            .await
+            .unwrap();
+        assert_eq!(store.count("todo_embeddings").await.unwrap(), 1);
+
+        // Upsert with new vector — should still have exactly 1 row after
+        store
+            .upsert_embedding("todo_embeddings", "safe-1", &v2, &[("model", "m2")])
+            .await
+            .unwrap();
+        assert_eq!(store.count("todo_embeddings").await.unwrap(), 1);
+
+        // Verify the new vector is searchable (v2 should match itself better)
+        let results = store
+            .search_similar("todo_embeddings", &v2, 5, 0.0)
+            .await
+            .unwrap();
+        assert!(!results.is_empty());
+        assert_eq!(results[0].0, "safe-1");
     }
 
     #[tokio::test]

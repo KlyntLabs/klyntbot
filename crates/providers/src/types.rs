@@ -212,6 +212,12 @@ pub trait LlmProvider: Send + Sync {
     async fn health_check(&self) -> Result<ProviderHealth> {
         Ok(ProviderHealth::Unknown)
     }
+
+    /// Optional dedicated provider for lightweight classification tasks.
+    /// Returns `None` by default (use self for classification).
+    fn classifier_provider(&self) -> Option<DynProvider> {
+        None
+    }
 }
 
 /// Type alias for dynamic provider

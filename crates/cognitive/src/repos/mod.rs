@@ -26,12 +26,20 @@ pub const RULE_DOMAINS: &[&str] = &["productivity", "tasks", "finance", "coachin
 
 /// Return cognitive feature migrations for use with `StoragePool::run_feature_migrations`.
 pub fn cognitive_migrations() -> Vec<FeatureMigration> {
-    vec![FeatureMigration {
-        feature_name: "cognitive".to_string(),
-        version: 1,
-        description: "Create cognitive memory tables".to_string(),
-        sql: include_str!("../../migrations/001_cognitive_tables.sql").to_string(),
-    }]
+    vec![
+        FeatureMigration {
+            feature_name: "cognitive".to_string(),
+            version: 1,
+            description: "Create cognitive memory tables".to_string(),
+            sql: include_str!("../../migrations/001_cognitive_tables.sql").to_string(),
+        },
+        FeatureMigration {
+            feature_name: "cognitive".to_string(),
+            version: 2,
+            description: "Add unique index on coaching_strategies(strategy_type, domain)".to_string(),
+            sql: include_str!("../../migrations/002_coaching_strategy_unique.sql").to_string(),
+        },
+    ]
 }
 
 /// Load the full `UserModel` from a `SemanticFactRepo`.

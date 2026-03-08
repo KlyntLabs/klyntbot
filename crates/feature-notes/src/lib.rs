@@ -3,6 +3,9 @@
 pub mod link_parser;
 pub mod models;
 pub mod repo;
+pub mod tool;
+
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use common::Result;
@@ -40,7 +43,7 @@ impl FeaturePackage for NotesFeature {
     }
 
     fn tools(&self) -> Vec<tools_core::DynTool> {
-        vec![] // Added in later tasks
+        vec![Arc::new(tool::NotesTool::new(self.repo.clone()))]
     }
 
     fn migrations(&self) -> Vec<FeatureMigration> {

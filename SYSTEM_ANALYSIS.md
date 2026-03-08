@@ -546,7 +546,7 @@ Each `feature-*` crate implements `FeaturePackage`:
 
 9. **`coaching_strategies` table orphaned.** Defined in migration SQL but has no Rust repo — never read or written.
 
-10. **Stale documentation.** CLAUDE.md states "escalates at 80% of max_iterations" but the code synthesizes at 100%. `escalation_count` is always written as `0`.
+10. ~~**Stale documentation.**~~ Fixed — CLAUDE.md no longer references 80% escalation. Code synthesizes at 100% of max_iterations. `escalation_count` field remains unused (always `0`) in `StrategyRecordRow`.
 
 ### 6.3 Design Decisions (Notable)
 
@@ -687,7 +687,7 @@ Security        ███████░░░  7.5
 **Fix:** Migrate `MemoryStore` entries into `semantic_facts` with `source=user_stated`. Remove the parallel system. Use the cognitive retrieval pipeline for all memory operations.
 **Impact:** Eliminates confusion, reduces maintenance, and strengthens the cognitive model.
 
-#### R3: Migrate CLI serve to AppCore::init()
+#### R3: Migrate CLI serve to AppCore::init() SOLVED
 **Current:** `cli/src/serve.rs` manually wires everything, missing cognitive/coaching/productivity features.
 **Fix:** Replace the manual setup with a single `AppCore::init(None)` call, discarding `EventChannels` (or logging them).
 **Impact:** Eliminates ~400 lines of duplicated code and ensures CLI mode has feature parity with desktop.
@@ -701,10 +701,10 @@ Security        ███████░░░  7.5
 - Health check HTTP endpoint
 **Impact:** Enables monitoring, alerting, and performance analysis without the desktop UI.
 
-#### R5: Persist coaching feedback to SQL
-**Current:** `FeedbackTracker` is in-memory only — all coaching effectiveness data lost on restart.
-**Fix:** Create `coaching_feedback` table (or use the orphaned `coaching_strategies` table) and persist all three feedback channels.
-**Impact:** Enables historical coaching effectiveness analysis and long-term improvement.
+#### R5: Persist coaching feedback to SQL — SOLVED (via R11)
+**Current:** ~~`FeedbackTracker` is in-memory only — all coaching effectiveness data lost on restart.~~
+**Fix:** `FeedbackTracker` now has `with_repo()`, `persist()`, and `load_from_db()` methods backed by the `coaching_strategies` table via `CoachingStrategyRepo`.
+**Impact:** Coaching effectiveness data survives restarts.
 
 #### R6: Add retention policies for analytics tables
 **Fix:** Add daily compaction for `strategy_records` (keep 90 days), `learning_outcomes` (keep 30 days), `interaction_log` (keep 60 days), `tool_usage` (keep 90 days).
@@ -736,13 +736,13 @@ Security        ███████░░░  7.5
 
 | # | Recommendation |
 |---|---------------|
-| R11 | Remove orphaned `coaching_strategies` table or wire it to the coaching pipeline |
-| R12 | Fix `learning_handler.rs` to pass through `suggested_threshold` from `AnalysisResult` |
-| R13 | Make vector store upsert atomic (begin transaction → delete → insert → commit) |
+| ~~R11~~ | ~~Remove orphaned `coaching_strategies` table or wire it to the coaching pipeline~~ — Done: wired `CoachingStrategyRepo` to `FeedbackTracker` with `persist()`/`load_from_db()` |
+| ~~R12~~ | ~~Fix `learning_handler.rs` to pass through `suggested_threshold` from `AnalysisResult`~~ — Done: reads from `last_analysis.suggested_threshold` |
+| ~~R13~~ | ~~Make vector store upsert atomic (begin transaction → delete → insert → commit)~~ — Done: reordered to insert-first-then-delete-old for crash safety |
 | R14 | Add web chat channel for browser-based interaction without desktop app |
-| R15 | Use dedicated cheaper model for intent classification (wire `classifier_provider` separately) |
-| R16 | Update CLAUDE.md to remove stale "80% escalation" documentation |
-| R17 | Implement `feature-notes` tools (data layer is complete) |
+| ~~R15~~ | ~~Use dedicated cheaper model for intent classification (wire `classifier_provider` separately)~~ — Done: added `classifier_provider()` to `LlmProvider` trait, wired in `IntentAnalyzer` |
+| ~~R16~~ | ~~Update CLAUDE.md to remove stale "80% escalation" documentation~~ — Done |
+| ~~R17~~ | ~~Implement `feature-notes` tools (data layer is complete)~~ — Done: `NotesTool` with 10 actions |
 
 ---
 
