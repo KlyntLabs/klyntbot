@@ -588,3 +588,45 @@ fn test_feedback_receptivity_adjustment() {
         "Mostly dismissed feedback should decrease receptivity"
     );
 }
+
+// ── Coaching: feedback persistence round-trip ─────────────────
+
+#[tokio::test]
+async fn test_feedback_tracker_persist_and_load() {
+    use storage::CoachingStrategyRepo;
+
+    let pool = test_pool().await;
+    // Run cognitive migrations so coaching_strategies table exists.
+    storage::StoragePool::run_feature_migrations(pool.inner(), &cognitive_migrations())
+        .await
+        .unwrap();
+
+    let repo = CoachingStrategyRepo::new(pool.inner().clone());
+
+    // 1. Create tracker with repo, record some feedback, persist.
+    {
+        let mut tracker = FeedbackTracker::new().with_repo(repo.clone());
+        let intervention = test_delivered_intervention("persist_test");
+        let id = intervention.id.clone();
+        tracker.record_delivery(&intervention);
+        tracker.record_explicit(&id, &FeedbackResponse::Helpful);
+        tracker.persist().await;
+    }
+
+    // 2. Create a fresh tracker, load from DB, verify state survived.
+    {
+        let mut tracker = FeedbackTracker::new().with_repo(repo);
+        assert!(
+            tracker.get_strategy("persist_test").is_none(),
+            "Fresh tracker should have no in-memory state"
+        );
+
+        tracker.load_from_db().await;
+
+        let strategy = tracker
+            .get_strategy("persist_test")
+            .expect("Strategy should be loaded from DB");
+        assert_eq!(strategy.times_used, 1);
+        assert_eq!(strategy.times_accepted, 1);
+    }
+}

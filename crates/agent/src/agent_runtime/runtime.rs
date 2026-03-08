@@ -36,7 +36,6 @@ const MAX_DELEGATION_DEPTH: u32 = 2;
 /// The agent used as orchestrator for multi-agent requests.
 const ORCHESTRATOR_AGENT: &str = "general";
 
-const CLARIFICATION_MODE: &str = "clarification";
 
 /// Tools allowed for the orchestrator (in addition to `delegate`, which is injected separately).
 const ORCHESTRATOR_ALLOWED_TOOLS: &[&str] = &[tools::ask_user::ASK_USER_TOOL_NAME, "memory"];
@@ -647,7 +646,7 @@ impl AgentRuntime {
             request_id: uuid::Uuid::new_v4().to_string(),
             predicted_strategy: analysis.mode.to_string(),
             actual_strategy: result.final_mode.clone(),
-            escalation_count: 0,
+            escalation_count: result.escalated as i32,
             iterations_used: result.iterations as i32,
             max_iterations: analysis.mode.max_iterations() as i32,
             success: validation.is_valid,
@@ -1148,8 +1147,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_runtime_clarification_on_low_confidence() {
-        let provider = MockProvider::new(vec![text_response("should not reach")]);
+    async fn test_runtime_downgrades_to_direct_on_low_confidence() {
+        let provider = MockProvider::new(vec![text_response("Hello! How can I help?")]);
         let runtime = make_runtime(provider)
             .await
             .with_confidence_evaluator(Arc::new(crate::confidence::ConfidenceEvaluator::new(0.99)));
@@ -1159,8 +1158,9 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(result.mode_used, CLARIFICATION_MODE);
-        assert!(result.content.contains("clarify"));
+        // Low confidence should downgrade to Direct mode, not block with clarification
+        assert_eq!(result.mode_used, "direct");
+        assert_eq!(result.content, "Hello! How can I help?");
     }
 
     /// Helper: build runtime with tool_registry and delegation_self_ref wired up.

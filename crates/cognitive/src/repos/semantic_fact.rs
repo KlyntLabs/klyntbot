@@ -76,6 +76,15 @@ impl SemanticFactRepo {
         .await
     }
 
+    /// List ALL active facts across all domains.
+    pub async fn list_all_active(&self) -> Result<Vec<SemanticFact>, sqlx::Error> {
+        sqlx::query_as::<_, SemanticFact>(
+            "SELECT * FROM semantic_facts WHERE valid_until IS NULL AND superseded_at IS NULL ORDER BY recorded_at DESC",
+        )
+        .fetch_all(&self.pool)
+        .await
+    }
+
     /// Find facts with matching subject and predicate (for consolidation).
     pub async fn find_similar(
         &self,

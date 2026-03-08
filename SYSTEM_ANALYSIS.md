@@ -544,9 +544,9 @@ Each `feature-*` crate implements `FeaturePackage`:
 
 8. ~~**Conversation decay not implemented.**~~ Fixed — `ConversationEmbeddingStore.search_similar()` now applies `score × decay_factor^days_old` using the `created_at` timestamp from LanceDB results.
 
-9. **`coaching_strategies` table orphaned.** Defined in migration SQL but has no Rust repo — never read or written.
+9. ~~**`coaching_strategies` table orphaned.**~~ Fixed — `FeedbackTracker` is now initialized with `CoachingStrategyRepo`, calls `load_from_db()` on boot and `persist()` on shutdown. Integration test verifies round-trip.
 
-10. ~~**Stale documentation.**~~ Fixed — CLAUDE.md no longer references 80% escalation. Code synthesizes at 100% of max_iterations. `escalation_count` field remains unused (always `0`) in `StrategyRecordRow`.
+10. ~~**Stale documentation.**~~ Fixed — CLAUDE.md no longer references 80% escalation. Code synthesizes at 100% of max_iterations. ~~`escalation_count` field remains unused.~~ Fixed — `RouterResult.escalated` now drives `escalation_count` in strategy records.
 
 ### 6.3 Design Decisions (Notable)
 
@@ -571,8 +571,8 @@ Each `feature-*` crate implements `FeaturePackage`:
 | Session memory | LRU eviction at 1000 | Good for personal use, not multi-tenant |
 | MessageBus buffer | 100 messages | Queue overflow drops messages |
 | Cognitive facts | 10K cap with compaction | Adequate for personal use |
-| Token counting | tiktoken-rs (accurate) | `CharTokenCounter` fallback loses accuracy |
-| Tool execution | Parallel with per-tool timeout | No global concurrency limit |
+| Token counting | tiktoken-rs (accurate) | `CharTokenCounter` fallback loses accuracy; `tracing::warn!` logged on fallback |
+| Tool execution | Parallel with `Semaphore(10)` | Bounded concurrency prevents runaway tool calls |
 
 ### 6.5 Reliability Considerations
 

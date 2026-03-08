@@ -27,6 +27,8 @@ pub struct RouterResult {
     pub tool_name: Option<String>,
     /// Reasoning traces from engine execution.
     pub traces: Vec<crate::execution::ReasoningTrace>,
+    /// Whether execution escalated from Direct to Reactive mode.
+    pub escalated: bool,
 }
 
 /// Dispatches execution to the appropriate engine based on `ExecutionMode`.
@@ -123,7 +125,8 @@ impl ExecutionRouter {
         };
 
         // If escalation happened, the final mode is "reactive" (via escalation).
-        let final_mode = if matches!(mode, ExecutionMode::Direct) && iterations > 1 {
+        let escalated = matches!(mode, ExecutionMode::Direct) && iterations > 1;
+        let final_mode = if escalated {
             "reactive(escalated)"
         } else {
             mode.short_name()
@@ -136,6 +139,7 @@ impl ExecutionRouter {
             iterations,
             tool_name,
             traces,
+            escalated,
         })
     }
 }

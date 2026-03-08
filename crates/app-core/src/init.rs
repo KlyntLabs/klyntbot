@@ -267,7 +267,10 @@ impl AppCore {
         let signal_accumulator = Arc::new(Mutex::new(SignalAccumulator::new()));
         let pattern_detector = Arc::new(Mutex::new(PatternDetector::new()));
         let intervention_router = Arc::new(Mutex::new(InterventionRouter::new(Default::default())));
-        let feedback_tracker = Arc::new(Mutex::new(FeedbackTracker::new()));
+        let coaching_repo = storage::CoachingStrategyRepo::new(storage_pool.inner().clone());
+        let mut tracker = FeedbackTracker::new().with_repo(coaching_repo);
+        tracker.load_from_db().await;
+        let feedback_tracker = Arc::new(Mutex::new(tracker));
         let user_situation = Arc::new(Mutex::new(UserSituation {
             energy_level: 0.7,
             focus_state: 0.5,

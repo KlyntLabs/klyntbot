@@ -147,6 +147,10 @@ impl AppCore {
         if let Some(ref nudge) = self.nudge_service {
             nudge.lock().await.stop().await;
         }
+        // Persist coaching feedback before stopping the service.
+        if let Some(ref tracker) = self.feedback_tracker {
+            tracker.lock().await.persist().await;
+        }
         // Stop coaching service.
         if let Some(ref coaching) = self.coaching_service {
             coaching.lock().await.stop().await;

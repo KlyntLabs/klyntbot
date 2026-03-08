@@ -135,7 +135,7 @@ impl IntentPipeline {
 
         // Step 1: Classify intent
         let classify_start = Instant::now();
-        let analysis = self.analyzer.analyze(message, tool_names).await;
+        let mut analysis = self.analyzer.analyze(message, tool_names).await;
         let classify_ms = classify_start.elapsed().as_millis() as u64;
         debug!(
             "IntentPipeline: classified as {:?} (source: {:?}, confidence: {:.2})",
@@ -325,7 +325,7 @@ impl IntentPipeline {
             request_id: uuid::Uuid::new_v4().to_string(),
             predicted_strategy: analysis.mode.to_string(),
             actual_strategy: result.final_mode.clone(),
-            escalation_count: 0,
+            escalation_count: result.escalated as i32,
             iterations_used: result.iterations as i32,
             max_iterations: analysis.mode.max_iterations() as i32,
             success: validation.is_valid,
@@ -589,12 +589,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn pipeline_returns_clarification_on_low_confidence() {
-        let provider = MockPipelineProvider::new(vec![text_response("should not reach this")]);
+    async fn pipeline_downgrades_to_direct_on_low_confidence() {
+        let provider = MockPipelineProvider::new(vec![text_response("Hello! How can I help?")]);
         let mut pipeline = make_pipeline(provider).await;
 
         // Set a very high threshold so the heuristic classifier's confidence (typically 0.85)
-        // falls below it, triggering the clarification path
+        // falls below it, downgrading to Direct mode
         let evaluator = crate::confidence::ConfidenceEvaluator::new(0.99);
         pipeline = pipeline.with_confidence_evaluator(Arc::new(evaluator));
 
@@ -603,12 +603,9 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(result.mode_used, "clarification");
-        assert!(
-            result.content.contains("clarify"),
-            "Should ask for clarification: {}",
-            result.content
-        );
+        // Low confidence should downgrade to Direct mode, not block with clarification
+        assert_eq!(result.mode_used, "direct");
+        assert_eq!(result.content, "Hello! How can I help?");
     }
 
     #[tokio::test]

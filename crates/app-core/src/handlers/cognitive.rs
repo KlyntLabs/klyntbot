@@ -99,16 +99,10 @@ impl AppCore {
         let pool = self.repos.pool();
         let fact_repo = SemanticFactRepo::new(pool.clone());
 
-        let domains: Vec<&str> = match domain.as_deref() {
-            Some(d) => vec![d],
-            None => USER_MODEL_DOMAINS.to_vec(),
+        let all_facts = match domain.as_deref() {
+            Some(d) => fact_repo.list_active(d).await.map_err(map_cognitive_err)?,
+            None => fact_repo.list_all_active().await.map_err(map_cognitive_err)?,
         };
-
-        let mut all_facts = Vec::new();
-        for d in &domains {
-            let facts = fact_repo.list_active(d).await.map_err(map_cognitive_err)?;
-            all_facts.extend(facts);
-        }
 
         Ok(all_facts.iter().map(fact_to_response).collect())
     }
