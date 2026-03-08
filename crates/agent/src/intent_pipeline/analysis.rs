@@ -604,7 +604,9 @@ impl IntentAnalyzer {
     pub fn new(provider: DynProvider, model: &str, config: &OrchestratorConfig) -> Self {
         let timeout = Duration::from_millis(config.llm_classifier_timeout);
         // Use dedicated classifier provider if available, otherwise use main provider
-        let classifier_provider = provider.classifier_provider().unwrap_or_else(|| provider.clone());
+        let classifier_provider = provider
+            .classifier_provider()
+            .unwrap_or_else(|| provider.clone());
         let classifier_model = config.llm_classifier_model.as_deref().unwrap_or(model);
         Self {
             classifier: IntentClassifier::new(classifier_provider, timeout),

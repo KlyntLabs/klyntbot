@@ -229,6 +229,7 @@ impl ContextEngine {
             channel: channel.to_string(),
             chat_id: chat_id.to_string(),
             message: message.map(|s| s.to_string()),
+            intent_summary: None,
         };
 
         let futures: Vec<_> = self.sources.iter().map(|s| s.provide(&ctx)).collect();

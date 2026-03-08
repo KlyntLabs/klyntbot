@@ -92,11 +92,7 @@ impl ConversationEmbeddingStore {
         decay_factor: f64,
     ) -> Result<Vec<(ConversationEmbeddingRecord, f64)>> {
         // Fetch extra results before decay filtering so we still return enough.
-        let fetch_limit = if decay_factor < 1.0 {
-            limit * 2
-        } else {
-            limit
-        };
+        let fetch_limit = if decay_factor < 1.0 { limit * 2 } else { limit };
         let hits = self
             .store
             .search_conv_embeddings(query_embedding, fetch_limit, threshold)

@@ -158,7 +158,10 @@ impl NotesTool {
             .await?;
         self.maybe_set_tags(p, id).await?;
 
-        Ok(format!("Updated note \"{}\" (id: {})", updated.title, updated.id))
+        Ok(format!(
+            "Updated note \"{}\" (id: {})",
+            updated.title, updated.id
+        ))
     }
 
     async fn handle_delete_note(&self, p: &ParamExtractor<'_>) -> Result<String> {
@@ -246,7 +249,10 @@ impl NotesTool {
             .ok_or_else(|| ToolError::InvalidParams(format!("Source note not found: {id}")))?;
 
         self.repo.set_links(id, &target_ids).await?;
-        Ok(format!("Linked note {id} to {} target(s)", target_ids.len()))
+        Ok(format!(
+            "Linked note {id} to {} target(s)",
+            target_ids.len()
+        ))
     }
 
     async fn handle_create_notebook(&self, p: &ParamExtractor<'_>) -> Result<String> {
@@ -344,7 +350,10 @@ mod tests {
         .unwrap();
 
         let result = tool
-            .execute(serde_json::json!({"action": "search_notes", "query": "Rust"}), &ctx())
+            .execute(
+                serde_json::json!({"action": "search_notes", "query": "Rust"}),
+                &ctx(),
+            )
             .await
             .unwrap();
         assert!(result.contains("Rust Tips"));

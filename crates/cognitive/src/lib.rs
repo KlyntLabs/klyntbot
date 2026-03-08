@@ -18,7 +18,7 @@ pub mod types;
 pub use background::PipelineEvent;
 pub use compaction::CompactionResult;
 pub use consolidation::ConsolidationHandler;
-pub use context_source::CognitiveContextSource;
+pub use context_source::{CognitiveContextSource, CognitiveRetrievalConfig};
 pub use embedder::SemanticFactEmbedder;
 pub use extraction::{ExtractedFact, ExtractionHandler};
 pub use reflection::ReflectionHandler;

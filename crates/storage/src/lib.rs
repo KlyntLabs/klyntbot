@@ -28,7 +28,6 @@ pub use repos::project_repo::{ProjectFilter, ProjectPatch, ProjectRepo, ProjectW
 pub use repos::AgentAdaptationRepo;
 pub use repos::AgentTaskRepo;
 pub use repos::BehavioralPatternRepo;
-pub use repos::{CoachingStrategyRepo, CoachingStrategyRow, UpsertCoachingStrategy};
 pub use repos::CronRepo;
 pub use repos::DecisionLogRepo;
 pub use repos::InteractionLogRepo;
@@ -38,6 +37,7 @@ pub use repos::OutcomeRepo;
 pub use repos::SessionRepo;
 pub use repos::UsageRepo;
 pub use repos::UserProfileRepo;
+pub use repos::{CoachingStrategyRepo, CoachingStrategyRow, UpsertCoachingStrategy};
 pub use repos::{OverallStats, StrategyRepo, ToolStatsRow};
 
 // Re-export finance types.

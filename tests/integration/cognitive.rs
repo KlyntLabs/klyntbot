@@ -11,7 +11,7 @@ use klyntbot::cognitive::consolidation::{consolidate_batch, consolidate_fact};
 use klyntbot::cognitive::context_source::CognitiveContextSource;
 use klyntbot::cognitive::extraction::extract_from_observation;
 use klyntbot::cognitive::repos::{cognitive_migrations, ProceduralRuleRepo, SemanticFactRepo};
-use klyntbot::cognitive::retrieval::retrieve_facts;
+use klyntbot::cognitive::retrieval::{retrieve_relevant_facts, RetrievalParams};
 use klyntbot::cognitive::salience::evaluate_salience;
 use klyntbot::cognitive::types::*;
 
@@ -250,7 +250,7 @@ async fn test_full_pipeline_event_to_retrieval() {
     assert!(ops.iter().any(|op| matches!(op, MemoryOp::Add { .. })));
 
     // 3. Retrieve the stored fact
-    let results = retrieve_facts(&repo, "productivity", 10, 0.5)
+    let results = retrieve_relevant_facts(&repo, None, "", &["productivity"], &RetrievalParams { limit: 10, situational_boost: 0.5, ..RetrievalParams::new(0) })
         .await
         .unwrap();
     assert!(!results.is_empty());
@@ -279,7 +279,7 @@ async fn test_full_pipeline_update_replaces_old_fact() {
     assert!(ops.iter().any(|op| matches!(op, MemoryOp::Update { .. })));
 
     // Only the new fact should be active
-    let results = retrieve_facts(&repo, "productivity", 10, 0.5)
+    let results = retrieve_relevant_facts(&repo, None, "", &["productivity"], &RetrievalParams { limit: 10, situational_boost: 0.5, ..RetrievalParams::new(0) })
         .await
         .unwrap();
     assert_eq!(results.len(), 1);
@@ -318,6 +318,7 @@ async fn test_cognitive_context_source_with_facts() {
         channel: "test".into(),
         chat_id: "c1".into(),
         message: None,
+        intent_summary: None,
     };
 
     let result = source.provide(&ctx).await;
@@ -339,6 +340,7 @@ async fn test_cognitive_context_source_empty_returns_none() {
         channel: "test".into(),
         chat_id: "c1".into(),
         message: None,
+        intent_summary: None,
     };
     assert!(source.provide(&ctx).await.is_none());
 }

@@ -69,10 +69,11 @@ impl CoachingStrategyRepo {
 
     /// Load all coaching strategies.
     pub async fn list_all(&self) -> Result<Vec<CoachingStrategyRow>, StorageError> {
-        let rows =
-            sqlx::query_as::<_, CoachingStrategyRow>("SELECT * FROM coaching_strategies ORDER BY times_used DESC")
-                .fetch_all(&self.pool)
-                .await?;
+        let rows = sqlx::query_as::<_, CoachingStrategyRow>(
+            "SELECT * FROM coaching_strategies ORDER BY times_used DESC",
+        )
+        .fetch_all(&self.pool)
+        .await?;
         Ok(rows)
     }
 }

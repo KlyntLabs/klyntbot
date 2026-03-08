@@ -36,7 +36,8 @@ pub fn cognitive_migrations() -> Vec<FeatureMigration> {
         FeatureMigration {
             feature_name: "cognitive".to_string(),
             version: 2,
-            description: "Add unique index on coaching_strategies(strategy_type, domain)".to_string(),
+            description: "Add unique index on coaching_strategies(strategy_type, domain)"
+                .to_string(),
             sql: include_str!("../../migrations/002_coaching_strategy_unique.sql").to_string(),
         },
     ]

@@ -316,13 +316,8 @@ impl VectorStore {
                 .column_by_name("_distance")
                 .and_then(|c| c.as_any().downcast_ref::<Float32Array>());
 
-            let (
-                Some(id_col),
-                Some(sk_col),
-                Some(role_col),
-                Some(preview_col),
-                Some(full_col),
-            ) = (id_col, sk_col, role_col, preview_col, full_col)
+            let (Some(id_col), Some(sk_col), Some(role_col), Some(preview_col), Some(full_col)) =
+                (id_col, sk_col, role_col, preview_col, full_col)
             else {
                 continue; // skip malformed batch
             };
@@ -462,7 +457,12 @@ impl VectorStore {
     /// `min_rows` rows (IVF-PQ needs data to train on). Safe to call
     /// repeatedly — it is a no-op if indexes already exist.
     pub async fn ensure_indexes(&self, min_rows: usize) -> Result<(), StorageError> {
-        let tables = ["todo_embeddings", "conv_embeddings", "memory_note_embeddings", "cognitive_fact_embeddings"];
+        let tables = [
+            "todo_embeddings",
+            "conv_embeddings",
+            "memory_note_embeddings",
+            "cognitive_fact_embeddings",
+        ];
         for table_name in tables {
             let tbl = match self.db.open_table(table_name).execute().await {
                 Ok(t) => t,
@@ -483,13 +483,14 @@ impl VectorStore {
                 .list_indices()
                 .await
                 .map_err(|e| StorageError::Vector(format!("list indices {table_name}: {e}")))?;
-            let has_vector_index = indices.iter().any(|idx| idx.columns.contains(&"vector".to_string()));
+            let has_vector_index = indices
+                .iter()
+                .any(|idx| idx.columns.contains(&"vector".to_string()));
             if has_vector_index {
                 continue;
             }
 
-            let ivf_pq = IvfPqIndexBuilder::default()
-                .distance_type(lancedb::DistanceType::Cosine);
+            let ivf_pq = IvfPqIndexBuilder::default().distance_type(lancedb::DistanceType::Cosine);
             tbl.create_index(&["vector"], Index::IvfPq(ivf_pq))
                 .execute()
                 .await

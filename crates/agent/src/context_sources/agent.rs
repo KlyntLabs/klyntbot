@@ -93,6 +93,7 @@ mod tests {
             channel: "test".into(),
             chat_id: "1".into(),
             message: None,
+            intent_summary: None,
         };
         let result = source.provide(&ctx).await;
 
@@ -115,6 +116,7 @@ mod tests {
             channel: "test".into(),
             chat_id: "1".into(),
             message: None,
+            intent_summary: None,
         };
         assert!(source.provide(&ctx).await.is_none());
     }
@@ -127,6 +129,7 @@ mod tests {
             channel: "test".into(),
             chat_id: "1".into(),
             message: None,
+            intent_summary: None,
         };
         assert!(source.provide(&ctx).await.is_none());
     }

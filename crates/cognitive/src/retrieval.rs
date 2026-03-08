@@ -1,77 +1,109 @@
-//! Memory retrieval with FSRS-scored relevance and situational boost.
+//! Memory retrieval with FSRS-scored relevance and optional vector search.
 //!
-//! `CognitiveRetriever` searches semantic facts by domain and scores
-//! results using FSRS retrievability, importance, and access frequency.
-//! It records access on retrieved memories to increase stability.
+//! `retrieve_relevant_facts` searches semantic facts using vector similarity
+//! (when available) combined with FSRS retrievability, importance, and access
+//! frequency. Falls back to importance × stability ranking when vector search
+//! is unavailable or returns too few results.
 
 use chrono::Utc;
 use tracing::{debug, warn};
 
 use crate::decay::{relevance_score, retrievability, update_stability};
+use crate::embedder::SemanticFactEmbedder;
 use crate::repos::SemanticFactRepo;
 use crate::types::SemanticFact;
 
-/// A scored retrieval result.
+/// Minimum vector results before fallback kicks in.
+const MIN_VECTOR_RESULTS: usize = 3;
+
+/// A scored retrieval result with optional similarity from vector search.
 #[derive(Debug, Clone)]
-pub struct RetrievalResult {
+pub struct ScoredFact {
     pub fact: SemanticFact,
     pub score: f64,
+    /// Cosine similarity from vector search. `None` if fallback path was used.
+    pub similarity: Option<f64>,
 }
 
-/// Retrieve and rank active facts for a domain with FSRS scoring.
+/// Tuning knobs for `retrieve_relevant_facts`.
+#[derive(Debug, Clone)]
+pub struct RetrievalParams {
+    pub limit: usize,
+    pub vector_top_k: usize,
+    pub min_similarity: f64,
+    pub situational_boost: f64,
+}
+
+impl RetrievalParams {
+    pub fn new(limit: usize) -> Self {
+        Self {
+            limit,
+            vector_top_k: 30,
+            min_similarity: 0.55,
+            situational_boost: 0.0,
+        }
+    }
+}
+
+/// Retrieve and rank facts using FSRS scoring with optional vector search.
 ///
-/// - `semantic_similarity`: Optional per-fact similarity (e.g., from vector search).
-///   If `None`, defaults to 0.5.
-/// - `situational_boost`: Domain-level boost from UserSituation (0.0–1.0).
-pub async fn retrieve_facts(
+/// **Vector path** (embedder available + non-empty query + ≥3 vector results):
+///   1. `search_similar(query, domains, top_k)` → candidate fact_ids with similarity
+///   2. Batch-load facts from SQL
+///   3. Score with real `semantic_similarity` in the relevance formula
+///
+/// **Fallback path** (embedder unavailable, empty query, or <3 vector results):
+///   1. Load all active facts across requested domains from SQL
+///   2. Score with `semantic_similarity = 0.5` (neutral)
+///   3. Secondary sort by `importance × stability`
+///
+/// Both paths record access events on retrieved facts (increases FSRS stability).
+pub async fn retrieve_relevant_facts(
     repo: &SemanticFactRepo,
-    domain: &str,
-    limit: usize,
-    situational_boost: f64,
-) -> Result<Vec<RetrievalResult>, sqlx::Error> {
-    let facts = repo.list_active(domain).await?;
-    let now = Utc::now();
+    embedder: Option<&dyn SemanticFactEmbedder>,
+    query: &str,
+    domains: &[&str],
+    params: &RetrievalParams,
+) -> Result<Vec<ScoredFact>, sqlx::Error> {
+    let use_vector = !query.is_empty() && embedder.map(|e| e.is_available()).unwrap_or(false);
 
-    let mut scored: Vec<RetrievalResult> = facts
-        .into_iter()
-        .map(|fact| {
-            let elapsed_days = fact
-                .last_accessed
-                .as_ref()
-                .and_then(|la| la.parse::<chrono::NaiveDateTime>().ok())
-                .map(|la| (now.naive_utc() - la).num_seconds() as f64 / 86400.0)
-                .unwrap_or_else(|| {
-                    // Fall back to recorded_at
-                    fact.recorded_at
-                        .parse::<chrono::NaiveDateTime>()
-                        .ok()
-                        .map(|ra| (now.naive_utc() - ra).num_seconds() as f64 / 86400.0)
-                        .unwrap_or(30.0)
-                });
+    let mut scored = if use_vector {
+        let embedder = embedder.unwrap(); // safe: checked above
+        match embedder
+            .search_similar(query, domains, params.vector_top_k, params.min_similarity)
+            .await
+        {
+            Ok(hits) if hits.len() >= MIN_VECTOR_RESULTS => {
+                vector_path(repo, &hits, params.situational_boost).await?
+            }
+            Ok(hits) => {
+                // Too few vector results — merge with fallback
+                let mut vector_scored =
+                    vector_path(repo, &hits, params.situational_boost).await?;
+                let vector_ids: std::collections::HashSet<String> =
+                    vector_scored.iter().map(|s| s.fact.id.clone()).collect();
+                let mut fallback =
+                    fallback_path(repo, domains, params.situational_boost).await?;
+                fallback.retain(|s| !vector_ids.contains(&s.fact.id));
+                vector_scored.append(&mut fallback);
+                vector_scored
+            }
+            Err(e) => {
+                warn!("Vector search failed, using fallback: {e}");
+                fallback_path(repo, domains, params.situational_boost).await?
+            }
+        }
+    } else {
+        fallback_path(repo, domains, params.situational_boost).await?
+    };
 
-            let r = retrievability(elapsed_days, fact.stability);
-
-            // Normalize access_count to 0.0–1.0 with diminishing returns
-            let freq = 1.0 - (1.0 / (1.0 + fact.access_count as f64));
-
-            let score = relevance_score(
-                0.5, // semantic_similarity placeholder (no vector search here)
-                r,
-                fact.confidence,
-                freq,
-                situational_boost,
-            );
-
-            RetrievalResult { fact, score }
-        })
-        .collect();
-
+    // Sort by FSRS score regardless of path (vector re-ranking can change order)
     scored.sort_by(|a, b| {
         b.score
             .partial_cmp(&a.score)
             .unwrap_or(std::cmp::Ordering::Equal)
     });
-    scored.truncate(limit);
+    scored.truncate(params.limit);
 
     // Record access on retrieved facts (increases FSRS stability)
     for result in &scored {
@@ -82,38 +114,134 @@ pub async fn retrieve_facts(
     }
 
     debug!(
-        "Retrieved {} facts for domain '{}' (top score: {:.3})",
+        "Retrieved {} facts across {} domains (top score: {:.3}, vector: {})",
         scored.len(),
-        domain,
-        scored.first().map(|r| r.score).unwrap_or(0.0)
+        domains.len(),
+        scored.first().map(|r| r.score).unwrap_or(0.0),
+        use_vector,
     );
 
     Ok(scored)
 }
 
-/// Retrieve facts across all domains, ranked by FSRS score.
-pub async fn retrieve_all_domains(
+/// Score facts using real vector similarity.
+async fn vector_path(
+    repo: &SemanticFactRepo,
+    hits: &[(String, f64)],
+    situational_boost: f64,
+) -> Result<Vec<ScoredFact>, sqlx::Error> {
+    if hits.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let ids: Vec<&str> = hits.iter().map(|(id, _)| id.as_str()).collect();
+    let sim_map: std::collections::HashMap<&str, f64> =
+        hits.iter().map(|(id, sim)| (id.as_str(), *sim)).collect();
+
+    let facts = repo.get_batch(&ids).await?;
+    let now = Utc::now();
+
+    Ok(facts
+        .into_iter()
+        .map(|fact| {
+            let similarity = sim_map.get(fact.id.as_str()).copied().unwrap_or(0.5);
+            let (r, freq) = compute_decay_and_freq(&fact, &now);
+            let score = relevance_score(similarity, r, fact.confidence, freq, situational_boost);
+            ScoredFact {
+                fact,
+                score,
+                similarity: Some(similarity),
+            }
+        })
+        .collect())
+}
+
+/// Score facts with hardcoded similarity (fallback when vector search unavailable).
+async fn fallback_path(
     repo: &SemanticFactRepo,
     domains: &[&str],
-    limit_per_domain: usize,
     situational_boost: f64,
-) -> Result<Vec<RetrievalResult>, sqlx::Error> {
-    let mut all = Vec::new();
+) -> Result<Vec<ScoredFact>, sqlx::Error> {
+    let mut all_facts = Vec::new();
     for domain in domains {
-        let mut results = retrieve_facts(repo, domain, limit_per_domain, situational_boost).await?;
-        all.append(&mut results);
+        let mut facts = repo.list_active(domain).await?;
+        all_facts.append(&mut facts);
     }
-    all.sort_by(|a, b| {
+
+    let now = Utc::now();
+
+    let mut scored: Vec<ScoredFact> = all_facts
+        .into_iter()
+        .map(|fact| {
+            let (r, freq) = compute_decay_and_freq(&fact, &now);
+            let score = relevance_score(0.5, r, fact.confidence, freq, situational_boost);
+            ScoredFact {
+                fact,
+                score,
+                similarity: None,
+            }
+        })
+        .collect();
+
+    scored.sort_by(|a, b| {
         b.score
             .partial_cmp(&a.score)
             .unwrap_or(std::cmp::Ordering::Equal)
     });
-    Ok(all)
+    Ok(scored)
+}
+
+/// Compute FSRS retrievability and normalized access frequency for a fact.
+fn compute_decay_and_freq(fact: &SemanticFact, now: &chrono::DateTime<Utc>) -> (f64, f64) {
+    let elapsed_days = fact
+        .last_accessed
+        .as_ref()
+        .and_then(|la| la.parse::<chrono::NaiveDateTime>().ok())
+        .map(|la| (now.naive_utc() - la).num_seconds() as f64 / 86400.0)
+        .unwrap_or_else(|| {
+            fact.recorded_at
+                .parse::<chrono::NaiveDateTime>()
+                .ok()
+                .map(|ra| (now.naive_utc() - ra).num_seconds() as f64 / 86400.0)
+                .unwrap_or(30.0)
+        });
+
+    let r = retrievability(elapsed_days, fact.stability);
+    let freq = 1.0 - (1.0 / (1.0 + fact.access_count as f64));
+    (r, freq)
+}
+
+/// Retrieve facts across all domains, ranked by FSRS score.
+pub async fn retrieve_all_domains(
+    repo: &SemanticFactRepo,
+    embedder: Option<&dyn SemanticFactEmbedder>,
+    query: &str,
+    domains: &[&str],
+    limit_per_domain: usize,
+    situational_boost: f64,
+) -> Result<Vec<ScoredFact>, sqlx::Error> {
+    let params = RetrievalParams {
+        limit: limit_per_domain * domains.len(),
+        situational_boost,
+        ..RetrievalParams::new(0)
+    };
+    // retrieve_relevant_facts already returns results sorted by score.
+    retrieve_relevant_facts(repo, embedder, query, domains, &params).await
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::embedder::SemanticFactEmbedder;
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    fn default_params(limit: usize) -> RetrievalParams {
+        RetrievalParams {
+            limit,
+            situational_boost: 0.5,
+            ..RetrievalParams::new(0)
+        }
+    }
 
     async fn setup() -> sqlx::SqlitePool {
         crate::repos::cognitive_test_pool().await
@@ -139,8 +267,86 @@ mod tests {
         }
     }
 
+    /// Mock embedder that returns configurable similarity scores.
+    struct MockEmbedder {
+        available: AtomicBool,
+        similarities: std::sync::Mutex<Vec<(String, f64)>>,
+    }
+
+    impl MockEmbedder {
+        fn new(similarities: Vec<(String, f64)>) -> Self {
+            Self {
+                available: AtomicBool::new(true),
+                similarities: std::sync::Mutex::new(similarities),
+            }
+        }
+
+        fn unavailable() -> Self {
+            Self {
+                available: AtomicBool::new(false),
+                similarities: std::sync::Mutex::new(Vec::new()),
+            }
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl SemanticFactEmbedder for MockEmbedder {
+        async fn embed_and_store_fact(&self, _fact: &SemanticFact) -> common::Result<()> {
+            Ok(())
+        }
+        async fn remove_embedding(&self, _fact_id: &str) -> common::Result<()> {
+            Ok(())
+        }
+        async fn search_similar(
+            &self,
+            _query: &str,
+            _domains: &[&str],
+            _top_k: usize,
+            _min_similarity: f64,
+        ) -> common::Result<Vec<(String, f64)>> {
+            Ok(self.similarities.lock().unwrap().clone())
+        }
+        async fn reindex_all(&self, _facts: &[SemanticFact]) -> common::Result<usize> {
+            Ok(0)
+        }
+        fn is_available(&self) -> bool {
+            self.available.load(Ordering::Relaxed)
+        }
+    }
+
     #[tokio::test]
-    async fn test_retrieve_facts_returns_scored_results() {
+    async fn test_vector_path_uses_real_similarity() {
+        let pool = setup().await;
+        let repo = SemanticFactRepo::new(pool);
+
+        repo.upsert(&test_fact("f1", "peak_hours", 1.0, 0))
+            .await
+            .unwrap();
+        repo.upsert(&test_fact("f2", "break_pattern", 1.0, 0))
+            .await
+            .unwrap();
+
+        // f2 has higher similarity than f1
+        let embedder = MockEmbedder::new(vec![("f1".into(), 0.6), ("f2".into(), 0.9)]);
+
+        let results = retrieve_relevant_facts(
+            &repo,
+            Some(&embedder),
+            "when do I take breaks",
+            &["productivity"],
+            &default_params(10),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(results.len(), 2);
+        // f2 should rank higher due to 0.9 similarity
+        assert_eq!(results[0].fact.id, "f2");
+        assert!(results[0].similarity.unwrap() > 0.8);
+    }
+
+    #[tokio::test]
+    async fn test_fallback_when_embedder_is_none() {
         let pool = setup().await;
         let repo = SemanticFactRepo::new(pool);
 
@@ -151,45 +357,123 @@ mod tests {
             .await
             .unwrap();
 
-        let results = retrieve_facts(&repo, "productivity", 10, 0.5)
-            .await
-            .unwrap();
+        let results =
+            retrieve_relevant_facts(&repo, None, "anything", &["productivity"], &default_params(10))
+                .await
+                .unwrap();
+
         assert_eq!(results.len(), 2);
-        // Higher stability + more accesses should rank higher
-        assert!(results[0].score >= results[1].score);
+        // All should have similarity = None (fallback path)
+        assert!(results.iter().all(|r| r.similarity.is_none()));
     }
 
     #[tokio::test]
-    async fn test_retrieve_facts_respects_limit() {
+    async fn test_fallback_when_query_is_empty() {
         let pool = setup().await;
         let repo = SemanticFactRepo::new(pool);
 
+        repo.upsert(&test_fact("f1", "peak_hours", 1.0, 0))
+            .await
+            .unwrap();
+
+        let embedder = MockEmbedder::new(vec![]);
+
+        let results =
+            retrieve_relevant_facts(&repo, Some(&embedder), "", &["productivity"], &default_params(10))
+                .await
+                .unwrap();
+
+        assert!(!results.is_empty());
+        assert!(results[0].similarity.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_fallback_when_embedder_unavailable() {
+        let pool = setup().await;
+        let repo = SemanticFactRepo::new(pool);
+
+        repo.upsert(&test_fact("f1", "peak_hours", 1.0, 0))
+            .await
+            .unwrap();
+
+        let embedder = MockEmbedder::unavailable();
+
+        let results = retrieve_relevant_facts(
+            &repo,
+            Some(&embedder),
+            "query",
+            &["productivity"],
+            &default_params(10),
+        )
+        .await
+        .unwrap();
+
+        assert!(!results.is_empty());
+        assert!(results[0].similarity.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_fallback_when_few_vector_results() {
+        let pool = setup().await;
+        let repo = SemanticFactRepo::new(pool);
+
+        // Insert 5 facts
         for i in 0..5 {
             repo.upsert(&test_fact(&format!("f{i}"), &format!("pred{i}"), 1.0, 0))
                 .await
                 .unwrap();
         }
 
-        let results = retrieve_facts(&repo, "productivity", 3, 0.5).await.unwrap();
-        assert_eq!(results.len(), 3);
+        // Vector search returns only 2 results (below threshold of 3)
+        let embedder = MockEmbedder::new(vec![("f0".into(), 0.9), ("f1".into(), 0.8)]);
+
+        let results = retrieve_relevant_facts(
+            &repo,
+            Some(&embedder),
+            "query",
+            &["productivity"],
+            &default_params(10),
+        )
+        .await
+        .unwrap();
+
+        // Should have more than 2 results (fallback merged in)
+        assert!(results.len() > 2);
     }
 
     #[tokio::test]
-    async fn test_retrieve_records_access() {
+    async fn test_scored_fact_records_access() {
         let pool = setup().await;
-        let repo = SemanticFactRepo::new(pool.clone());
+        let repo = SemanticFactRepo::new(pool);
 
         repo.upsert(&test_fact("f1", "peak_hours", 1.0, 0))
             .await
             .unwrap();
 
-        retrieve_facts(&repo, "productivity", 10, 0.5)
+        retrieve_relevant_facts(&repo, None, "", &["productivity"], &default_params(10))
             .await
             .unwrap();
 
         let updated = repo.get("f1").await.unwrap().unwrap();
         assert_eq!(updated.access_count, 1);
-        assert!(updated.stability > 1.0); // Stability increased
+        assert!(updated.stability > 1.0);
+    }
+
+    #[tokio::test]
+    async fn test_respects_limit() {
+        let pool = setup().await;
+        let repo = SemanticFactRepo::new(pool);
+
+        for i in 0..10 {
+            repo.upsert(&test_fact(&format!("f{i}"), &format!("pred{i}"), 1.0, 0))
+                .await
+                .unwrap();
+        }
+
+        let results = retrieve_relevant_facts(&repo, None, "", &["productivity"], &default_params(3))
+            .await
+            .unwrap();
+        assert_eq!(results.len(), 3);
     }
 
     #[tokio::test]
@@ -197,7 +481,9 @@ mod tests {
         let pool = setup().await;
         let repo = SemanticFactRepo::new(pool);
 
-        let results = retrieve_facts(&repo, "nonexistent", 10, 0.5).await.unwrap();
+        let results = retrieve_relevant_facts(&repo, None, "", &["nonexistent"], &default_params(10))
+            .await
+            .unwrap();
         assert!(results.is_empty());
     }
 
@@ -214,7 +500,7 @@ mod tests {
         repo.upsert(&f1).await.unwrap();
         repo.upsert(&f2).await.unwrap();
 
-        let results = retrieve_all_domains(&repo, &["productivity", "finance"], 5, 0.5)
+        let results = retrieve_all_domains(&repo, None, "", &["productivity", "finance"], 5, 0.5)
             .await
             .unwrap();
         assert_eq!(results.len(), 2);

@@ -103,7 +103,10 @@ impl FeedbackTracker {
                 confidence: feedback.effectiveness().max(0.0),
             };
             if let Err(e) = repo.upsert(&input).await {
-                tracing::warn!("Failed to persist coaching strategy '{}': {e}", feedback.strategy_type);
+                tracing::warn!(
+                    "Failed to persist coaching strategy '{}': {e}",
+                    feedback.strategy_type
+                );
             }
         }
     }
@@ -117,8 +120,9 @@ impl FeedbackTracker {
         match repo.list_all().await {
             Ok(rows) => {
                 for row in rows {
-                    self.strategies.entry(row.strategy_type.clone()).or_insert_with(|| {
-                        StrategyFeedback {
+                    self.strategies
+                        .entry(row.strategy_type.clone())
+                        .or_insert_with(|| StrategyFeedback {
                             strategy_type: row.strategy_type,
                             domain: row.domain,
                             times_used: row.times_used,
@@ -126,8 +130,7 @@ impl FeedbackTracker {
                             times_led_to_improvement: row.times_led_to_improvement,
                             avg_improvement_magnitude: row.avg_improvement_magnitude.unwrap_or(0.0),
                             ..Default::default()
-                        }
-                    });
+                        });
                 }
             }
             Err(e) => tracing::warn!("Failed to load coaching strategies from DB: {e}"),
