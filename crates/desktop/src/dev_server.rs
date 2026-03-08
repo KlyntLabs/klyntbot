@@ -920,8 +920,14 @@ async fn dispatch(
 
             match core.chat_send(content, session_key.clone(), context).await {
                 Ok((user_msg, stream_info)) => {
-                    let (tx, _) = broadcast::channel(256);
-                    state.sse_channels.insert(session_key, tx.clone());
+                    // Reuse existing channel if SSE handler already created one,
+                    // otherwise create a new one. This avoids a race where SSE
+                    // connects before chat_send and gets a different channel.
+                    let tx = state
+                        .sse_channels
+                        .entry(session_key)
+                        .or_insert_with(|| broadcast::channel(256).0)
+                        .clone();
                     let emitter: Arc<dyn ::app_core::events::AppEventEmitter> =
                         Arc::new(SseEmitter { tx });
                     core.spawn_chat_relay(stream_info, emitter);
@@ -1170,15 +1176,14 @@ async fn sse_handler(
     State(state): State<DevState>,
     Path(session_key): Path<String>,
 ) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
+    // Use atomic entry API to avoid TOCTOU race with chat_send:
+    // whichever handler runs first creates the channel, the other reuses it.
     let rx = state
         .sse_channels
-        .get(&session_key)
-        .map(|entry| entry.value().subscribe())
-        .unwrap_or_else(|| {
-            let (tx, rx) = broadcast::channel(256);
-            state.sse_channels.insert(session_key.clone(), tx);
-            rx
-        });
+        .entry(session_key.clone())
+        .or_insert_with(|| broadcast::channel(256).0)
+        .value()
+        .subscribe();
 
     let sse_channels = Arc::clone(&state.sse_channels);
     let sk = session_key.clone();
