@@ -14,6 +14,8 @@ import type {
   LearningEventPayload,
   MemoryAccessPayload,
   MessageSegment,
+  PlanGeneratedPayload,
+  PlanStepCompletedPayload,
   SkillLoadedPayload,
   SubagentSpawnedPayload,
   ToolEndPayload,
@@ -42,6 +44,8 @@ const SSE_AGENT_EVENTS = [
   "agent:subagent_spawned",
   "agent:delegation_started",
   "agent:delegation_completed",
+  "agent:plan_generated",
+  "agent:plan_step_completed",
   "agent:interaction_request",
   "entity:updated",
 ] as const;
@@ -396,6 +400,24 @@ export function useAgentStream(sessionKey: string, onDone?: () => void): AgentSt
             }
           : d,
       ),
+    }));
+  });
+
+  useEvent<PlanGeneratedPayload>("agent:plan_generated", (payload) => {
+    if (!isOurSession(payload)) return;
+    setTransparency((prev) => ({
+      ...prev,
+      plan: { steps: payload.steps, completedSteps: [] },
+    }));
+  });
+
+  useEvent<PlanStepCompletedPayload>("agent:plan_step_completed", (payload) => {
+    if (!isOurSession(payload)) return;
+    setTransparency((prev) => ({
+      ...prev,
+      plan: prev?.plan
+        ? { ...prev.plan, completedSteps: [...prev.plan.completedSteps, payload.stepIndex] }
+        : undefined,
     }));
   });
 

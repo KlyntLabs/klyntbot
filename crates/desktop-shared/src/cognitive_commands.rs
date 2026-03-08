@@ -227,3 +227,11 @@ pub struct CompactionResultResponse {
     pub archived_count: u64,
     pub deleted_episodic: u64,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReflectionResultResponse {
+    pub fact_updates: usize,
+    pub rule_updates: usize,
+    pub summary: String,
+}

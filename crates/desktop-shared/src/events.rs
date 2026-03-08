@@ -46,6 +46,8 @@ pub const AGENT_SUBAGENT_SPAWNED: &str = "agent:subagent_spawned";
 pub const AGENT_SELECTED: &str = "agent:agent_selected";
 pub const AGENT_DELEGATION_STARTED: &str = "agent:delegation_started";
 pub const AGENT_DELEGATION_COMPLETED: &str = "agent:delegation_completed";
+pub const AGENT_PLAN_GENERATED: &str = "agent:plan_generated";
+pub const AGENT_PLAN_STEP_COMPLETED: &str = "agent:plan_step_completed";
 pub const ENTITY_UPDATED: &str = "entity:updated";
 pub const MCP_OAUTH_COMPLETE: &str = "mcp:oauth_complete";
 pub const MCP_OAUTH_ERROR: &str = "mcp:oauth_error";
@@ -305,6 +307,23 @@ pub struct VerdictPayload {
     pub display_text: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlanGeneratedPayload {
+    pub session_key: String,
+    pub steps: Vec<String>,
+    pub raw_plan: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlanStepCompletedPayload {
+    pub session_key: String,
+    pub step_index: usize,
+    pub description: String,
+    pub tool_name: String,
+}
+
 /// Accumulated transparency data for an assistant message.
 /// Serialized into `SessionMessage.metadata.transparency`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -336,6 +355,8 @@ pub struct TransparencyData {
     pub learning: Vec<TransparencyLearning>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub delegations: Vec<TransparencyDelegation>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub plan: Option<TransparencyPlan>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -441,6 +462,13 @@ pub struct TransparencyDelegation {
     pub status: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub duration_ms: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TransparencyPlan {
+    pub steps: Vec<String>,
+    pub completed_steps: Vec<usize>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

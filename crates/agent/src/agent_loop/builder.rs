@@ -267,12 +267,15 @@ impl AgentLoopBuilder {
                             Arc::new(crate::cognitive_handlers::HeuristicConsolidationHandler),
                         )
                     };
+                    let episodic_repo =
+                        cognitive::EpisodicMemoryRepo::new(pool.clone());
                     let cancel = CancellationToken::new();
                     let bg_service = cognitive::background::BackgroundConsolidationService::start(
                         event_rx,
                         extraction,
                         consolidation,
                         fact_repo,
+                        Some(episodic_repo),
                         cognitive_embedder,
                         cancel.clone(),
                         self.pipeline_tx.take(),

@@ -303,6 +303,7 @@ fn main() {
             commands::cognitive::cognitive_rule_create,
             commands::cognitive::cognitive_rule_deactivate,
             commands::cognitive::cognitive_run_compaction,
+            commands::cognitive::cognitive_run_reflection,
             commands::cognitive::coaching_reset_dismissals,
             commands::cognitive::coaching_clear_signals,
             commands::cognitive::cognitive_inject_event,

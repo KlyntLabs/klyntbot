@@ -130,10 +130,20 @@ export function MemoryTab() {
   const { mutate: runCompaction, loading: compacting } = useMutation<CompactionResult>(
     "cognitive_run_compaction",
   );
+  const { mutate: runReflection, loading: reflecting } = useMutation<{
+    factUpdates: number;
+    ruleUpdates: number;
+    summary: string;
+  }>("cognitive_run_reflection");
   const { mutate: deleteFact } = useMutation<boolean>("cognitive_fact_delete");
 
   const handleCompact = async () => {
     await runCompaction({} as never);
+    invalidateQueries("cognitive_");
+  };
+
+  const handleReflection = async () => {
+    await runReflection({} as never);
     invalidateQueries("cognitive_");
   };
 
@@ -347,6 +357,15 @@ export function MemoryTab() {
           Rules: <span className="text-secondary">{stats.rulesCount}</span>
         </span>
         <div className="flex-1" />
+        <button
+          type="button"
+          onClick={handleReflection}
+          disabled={reflecting}
+          className="flex items-center gap-1 text-[11px] text-brand hover:text-brand/80 disabled:opacity-50"
+        >
+          <Play className="w-3 h-3" />
+          {reflecting ? "Reflecting..." : "Run Reflection"}
+        </button>
         <button
           type="button"
           onClick={handleCompact}

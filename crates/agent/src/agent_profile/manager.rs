@@ -160,32 +160,38 @@ impl AgentManager {
 
     /// Match a user message to an agent profile.
     /// Returns the best-matching agent, or the general fallback.
+    ///
+    /// Scoring: each matching trigger contributes its word count as weight,
+    /// so longer (more specific) triggers like "remind me" outscore shorter
+    /// ones like "schedule". Ties broken by hit count.
     pub fn match_agent(&self, message: &str) -> &Arc<AgentProfile> {
         let normalized = super::types::normalize_for_matching(message);
 
-        // Score each agent by number of trigger hits
-        let mut best: Option<(&str, usize)> = None;
+        let mut best: Option<(&str, usize, usize)> = None; // (name, score, hits)
         for (name, profile) in &self.agents {
             if profile.triggers.is_empty() {
                 continue;
             }
-            let hits = profile
-                .triggers
-                .iter()
-                .filter(|t| normalized.contains(t.as_str()))
-                .count();
+            let mut score: usize = 0;
+            let mut hits: usize = 0;
+            for t in &profile.triggers {
+                if normalized.contains(t.as_str()) {
+                    // Weight by word count so multi-word triggers score higher
+                    score += t.split_whitespace().count();
+                    hits += 1;
+                }
+            }
             if hits > 0 {
-                if let Some((_, best_hits)) = best {
-                    if hits > best_hits {
-                        best = Some((name.as_str(), hits));
-                    }
-                } else {
-                    best = Some((name.as_str(), hits));
+                let dominated = best.is_some_and(|(_, bs, bh)| {
+                    score < bs || (score == bs && hits < bh)
+                });
+                if !dominated {
+                    best = Some((name.as_str(), score, hits));
                 }
             }
         }
 
-        if let Some((name, _)) = best {
+        if let Some((name, _, _)) = best {
             &self.agents[name]
         } else {
             self.get_general()
@@ -256,6 +262,20 @@ mod tests {
         let matched = mgr.match_agent("create a task about my budget");
         // Both task and finance could match — should return one with more trigger hits
         assert!(matched.name == "task" || matched.name == "finance");
+    }
+
+    #[test]
+    fn test_match_agent_remind_routes_to_automation() {
+        let mgr = make_test_manager();
+        let matched = mgr.match_agent("remind me to buy groceries tomorrow");
+        assert_eq!(matched.name, "automation", "remind me should route to automation agent");
+    }
+
+    #[test]
+    fn test_match_agent_set_reminder_routes_to_automation() {
+        let mgr = make_test_manager();
+        let matched = mgr.match_agent("set a reminder for my meeting at 3pm");
+        assert_eq!(matched.name, "automation", "reminder should route to automation agent");
     }
 
     #[test]

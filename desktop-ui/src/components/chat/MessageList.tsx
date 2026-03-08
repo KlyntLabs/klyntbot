@@ -107,7 +107,7 @@ export function MessageList({
           ) : (
             <div className="max-w-[85%]">
               {msg.segments && msg.segments.length > 0 ? (
-                <SegmentedMessage segments={msg.segments} />
+                <SegmentedMessage segments={msg.segments} plan={msg.transparency?.plan} />
               ) : (
                 <MarkdownContent content={msg.content} />
               )}
@@ -128,6 +128,7 @@ export function MessageList({
               activeTools={activeTools}
               isStreaming={isStreaming}
               activeDelegateAgent={activeDelegateAgent}
+              plan={liveTransparency?.plan}
             />
             {showTransparency && liveTransparency && (
               <TokenBadge transparency={liveTransparency} isStreaming={isStreaming} />

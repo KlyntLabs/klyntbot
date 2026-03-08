@@ -1140,6 +1140,7 @@ async fn dispatch(
             r(core.cognitive_rule_deactivate(id).await)
         }
         "cognitive_run_compaction" => r(core.cognitive_run_compaction().await),
+        "cognitive_run_reflection" => r(core.cognitive_run_reflection().await),
         "cognitive_inject_event" => {
             let event_type = match get_str(&body, "event_type") {
                 Ok(v) => v,

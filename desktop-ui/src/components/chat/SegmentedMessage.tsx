@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import type { MessageSegment } from "../../lib/types";
 import { formatDuration, formatTokens, qualifiedToolName } from "../../lib/utils";
 import { MarkdownContent } from "./MarkdownContent";
+import { PlanProgress } from "./PlanProgress";
 
 interface SegmentedMessageProps {
   segments: MessageSegment[];
@@ -12,6 +13,8 @@ interface SegmentedMessageProps {
   isStreaming?: boolean;
   /** The agent currently being delegated to (between delegation_started and delegation_completed). */
   activeDelegateAgent?: string | null;
+  /** Live plan steps from the agent's chain-of-thought planning. */
+  plan?: { steps: string[]; completedSteps: number[] } | null;
 }
 
 // Rotate through accent colors for active tool spinners
@@ -209,6 +212,7 @@ export function SegmentedMessage({
   activeTools,
   isStreaming,
   activeDelegateAgent,
+  plan,
 }: SegmentedMessageProps) {
   const lastIsText = segments.length > 0 && segments[segments.length - 1].type === "text";
   const renderItems = useMemo(() => groupSegments(segments), [segments]);
@@ -267,6 +271,15 @@ export function SegmentedMessage({
           />
         );
       })}
+
+      {/* Plan progress display */}
+      {plan && plan.steps.length > 0 && (
+        <PlanProgress
+          steps={plan.steps}
+          completedSteps={plan.completedSteps}
+          isStreaming={isStreaming}
+        />
+      )}
 
       {/* Active tool spinners — normal case (no delegate) */}
       {activeTools &&

@@ -16,23 +16,26 @@
 | T6: Direct Mode + Escalation | ✅ PASS | Greeting → Direct mode, tool request → Reactive |
 | T7: Multi-Agent Delegation | ✅ PASS | Delegated to task (3 tasks) + finance (budget check) |
 | T8: Chain-of-Thought Planning | ✅ PASS | Web research → 3 trend tasks → summary note |
-| T9: Scheduling / Reminders | ⚠️ PARTIAL | Task created, but routed to task agent not automation/cron |
+| T9: Scheduling / Reminders | ✅ PASS | Routes to automation agent, cron tool creates reminder via ask_user |
 | T10: Productivity Context | ⏭️ SKIP | Requires activity tracker (macOS accessibility) |
 | T11: Finance Operations | ✅ PASS | Account created, expense added, balance updated, spending summary |
 | T12: Conversation Persistence | ✅ PASS | Pronoun resolution + multi-turn summary correct |
-| T13: Adaptive Learning | ⏭️ SKIP | Requires 7+ days of data |
-| T14: Embedding Search | ⏭️ SKIP | Indirectly verified via notes search |
+| T13: Adaptive Learning | ✅ PASS | 105 learning outcomes recorded across 10+ tools, success rates tracked (task: 95%, notes: 100%, finance: 76%) |
+| T14: Embedding Search | ✅ PASS | task.search_semantic used, similarity score 0.72 for "code review" → "Review pull requests" |
 | T15: Error Recovery | ⏭️ SKIP | Requires API key manipulation |
 | T16: Desktop UI Transparency | ✅ PASS | Tool calls visible with timing in execution panel |
-| T17: Concurrent Stress | ⏭️ SKIP | Requires multi-tab testing |
+| T17: Concurrent Stress | ✅ PASS | Session A: blue→blue, Session B: red→red. No cross-contamination. |
 | T18: Notes Management | ✅ PASS | Create, search, tag, link notes — all via notes tool |
 
-**Pass: 12 | Partial: 1 | Skip: 5 | Fail: 0**
+**Pass: 16 | Partial: 0 | Skip: 2 | Fail: 0**
 
 ### Bugs Found & Fixed
 - **Notes tool not accessible to agents** — Added `notes` to task agent's tools list + triggers
 - **Auto-scroll broken** — Scroll handler was on non-scrollable div; fixed with parent detection + RAF streaming scroll
-- **T9 routing** — "remind me" routed to task agent instead of automation agent (known issue, LLM orchestrator routing)
+- **T9 routing** — "remind me" routed to task agent instead of automation agent. Fixed: weighted trigger scoring (word count per trigger), added "set a reminder" to automation triggers, moved "remind"/"reminder" to automation trigger group in analysis.rs
+- **Episodic memories always 0** — Background consolidation service only created semantic facts. Fixed: now creates episodic memories for high-importance events (≥0.7). Also fixed stats/list queries to count all domains (was filtering to USER_MODEL_DOMAINS only)
+- **Plan UI not visible** — Plan events silenced in chat relay (empty match arms). Fixed: emit PlanGenerated/PlanStepCompleted events, added PlanProgress component, lowered complexity threshold to 4, fixed count_tool_indicators to count occurrences
+- **Weekly reflection cron broken** — `__klyntbot_cognitive_weekly_reflection` cron handler published a chat message instead of calling `run_weekly_reflection()`. Fixed: cron now directly creates LLM/heuristic handlers and calls the reflection function. Added `cognitive_run_reflection` API endpoint + "Run Reflection" button to debug page for manual testing.
 
 ---
 

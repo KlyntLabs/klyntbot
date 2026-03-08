@@ -19,9 +19,9 @@ use bus::DomainEvent;
 use crate::consolidation::{consolidate_batch, ConsolidationHandler};
 use crate::embedder::SemanticFactEmbedder;
 use crate::extraction::{extract_from_observation, ExtractionHandler};
-use crate::repos::SemanticFactRepo;
+use crate::repos::{EpisodicMemoryRepo, SemanticFactRepo};
 use crate::salience::evaluate_salience;
-use crate::types::{Observation, SalienceVerdict};
+use crate::types::{EpisodicMemory, Observation, SalienceVerdict};
 
 /// Debug events emitted by the pipeline for the debug dashboard.
 #[derive(Debug, Clone, Serialize)]
@@ -88,6 +88,7 @@ impl BackgroundConsolidationService {
         extraction: Arc<dyn ExtractionHandler>,
         consolidation: Arc<dyn ConsolidationHandler>,
         repo: SemanticFactRepo,
+        episodic_repo: Option<EpisodicMemoryRepo>,
         embedder: Option<Arc<dyn SemanticFactEmbedder>>,
         cancel: CancellationToken,
         pipeline_tx: Option<tokio::sync::mpsc::UnboundedSender<PipelineEvent>>,
@@ -142,6 +143,28 @@ impl BackgroundConsolidationService {
                                                     operation: op_to_string(op),
                                                     fact: format!("{}.{} = {}", fact.subject, fact.predicate, fact.object),
                                                 });
+                                            }
+                                        }
+                                    }
+
+                                    // Store high-importance observations as episodic memories
+                                    if obs.importance >= 0.7 {
+                                        if let Some(ep_repo) = &episodic_repo {
+                                            let now = Utc::now();
+                                            let mem = EpisodicMemory {
+                                                id: uuid::Uuid::new_v4().to_string(),
+                                                domain: obs.domain.clone(),
+                                                content: obs.content.clone(),
+                                                summary: None,
+                                                importance: obs.importance,
+                                                occurred_at: now.format("%Y-%m-%dT%H:%M:%S").to_string(),
+                                                recorded_at: now.format("%Y-%m-%dT%H:%M:%S").to_string(),
+                                                stability: 1.0,
+                                                last_accessed: None,
+                                                access_count: 0,
+                                            };
+                                            if let Err(e) = ep_repo.insert(&mem).await {
+                                                warn!("BackgroundConsolidation: failed to store episodic memory: {e}");
                                             }
                                         }
                                     }

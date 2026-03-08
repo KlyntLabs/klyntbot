@@ -98,7 +98,15 @@ impl AppCore {
         // 4. Message bus
         let bus = Arc::new(MessageBus::new(100));
 
-        // 5. Cron service — set callbacks BEFORE wrapping in Arc
+        // 5. Create cognitive provider for LLM-backed handlers (needed by cron + agent)
+        let cognitive_provider = providers::create_cognitive_provider(&config).ok().flatten();
+        if cognitive_provider.is_some() {
+            info!("cognitive provider created — using LLM handlers");
+        } else {
+            info!("no cognitive provider — using heuristic handlers");
+        }
+
+        // 6. Cron service — set callbacks BEFORE wrapping in Arc
         let mut cron_service = CronService::new(repos.cron.clone());
         cron_service
             .start()
@@ -116,6 +124,7 @@ impl AppCore {
             &notification_dispatcher,
             &config,
             &bus,
+            cognitive_provider.clone(),
         );
 
         let cron_service = Arc::new(cron_service);
@@ -124,23 +133,15 @@ impl AppCore {
             .map_err(|e| format!("cron job registration failed: {e}"))?;
         info!("cron service started");
 
-        // 6. Load personas
+        // 7. Load personas
         let personas_dir = data_dir.join("personas");
         let mut persona_manager = PersonaManager::load(&personas_dir).await;
         persona_manager.resolve_scopes(&repos).await;
         let persona_manager = Arc::new(RwLock::new(persona_manager));
         info!("persona manager loaded");
 
-        // 7. DomainEventBus for cross-feature communication (cognitive + coaching)
+        // 8. DomainEventBus for cross-feature communication (cognitive + coaching)
         let domain_event_bus = Arc::new(DomainEventBus::new(256));
-
-        // 7b. Create cognitive provider for LLM-backed handlers
-        let cognitive_provider = providers::create_cognitive_provider(&config).ok().flatten();
-        if cognitive_provider.is_some() {
-            info!("cognitive provider created — using LLM handlers");
-        } else {
-            info!("no cognitive provider — using heuristic handlers");
-        }
 
         // 8. Build AgentLoop
         let (pipeline_tx, pipeline_rx) =
@@ -415,11 +416,15 @@ fn register_cron_callbacks(
     notification_dispatcher: &Arc<agent::NotificationDispatcher>,
     config: &config::Config,
     bus: &Arc<MessageBus>,
+    cognitive_provider: Option<providers::DynProvider>,
 ) {
     let todo_repo = repos.actions.clone();
     let dispatcher = Arc::clone(notification_dispatcher);
     let config_focus = config.todo.focus.clone();
     let bus_for_cron = bus.clone();
+    let pool_for_cron = repos.pool().clone();
+    let config_for_cron = config.clone();
+    let cognitive_provider_for_cron = cognitive_provider;
     let rt = tokio::runtime::Handle::current();
 
     cron_service.set_callback(Arc::new(move |job: &scheduling::CronJob| {
@@ -428,6 +433,9 @@ fn register_cron_callbacks(
         let config_focus = config_focus.clone();
         let bus = Arc::clone(&bus_for_cron);
         let job_name = job.name.clone();
+        let pool = pool_for_cron.clone();
+        let cog_config = config_for_cron.clone();
+        let cog_provider = cognitive_provider_for_cron.clone();
 
         tokio::task::block_in_place(|| {
             rt.block_on(async move {
@@ -503,6 +511,68 @@ fn register_cron_callbacks(
                         }
                         Ok(Some("Overdue check complete".to_string()))
                     }
+                    "__klyntbot_cognitive_weekly_reflection" => {
+                        // Call run_weekly_reflection() directly instead of
+                        // routing through chat (which can't invoke the function).
+                        let fact_repo = cognitive::SemanticFactRepo::new(pool.clone());
+                        let episodic_repo = cognitive::EpisodicMemoryRepo::new(pool.clone());
+                        let rule_repo = cognitive::ProceduralRuleRepo::new(pool.clone());
+
+                        let reflection_handler: Box<dyn cognitive::ReflectionHandler> =
+                            if let Some(ref cp) = cog_provider {
+                                let params = providers::cognitive_chat_params(&cog_config, 2048);
+                                Box::new(agent::cognitive_handlers::LlmReflectionHandler::new(
+                                    cp.clone(),
+                                    params,
+                                ))
+                            } else {
+                                Box::new(agent::cognitive_handlers::HeuristicReflectionHandler)
+                            };
+
+                        let consolidation_handler: Box<dyn cognitive::ConsolidationHandler> =
+                            if let Some(ref cp) = cog_provider {
+                                let params = providers::cognitive_chat_params(&cog_config, 1024);
+                                Box::new(
+                                    agent::cognitive_handlers::LlmConsolidationHandler::new(
+                                        cp.clone(),
+                                        params,
+                                    ),
+                                )
+                            } else {
+                                Box::new(
+                                    agent::cognitive_handlers::HeuristicConsolidationHandler,
+                                )
+                            };
+
+                        match cognitive::reflection::run_weekly_reflection(
+                            reflection_handler.as_ref(),
+                            consolidation_handler.as_ref(),
+                            &fact_repo,
+                            &episodic_repo,
+                            &rule_repo,
+                            None, // embedder — not needed for reflection
+                        )
+                        .await
+                        {
+                            Ok(output) => {
+                                info!(
+                                    "Weekly reflection complete: {} facts, {} rules — {}",
+                                    output.fact_updates.len(),
+                                    output.rule_updates.len(),
+                                    output.summary,
+                                );
+                                Ok(Some(format!(
+                                    "Weekly reflection: {} fact updates, {} rule updates",
+                                    output.fact_updates.len(),
+                                    output.rule_updates.len(),
+                                )))
+                            }
+                            Err(e) => {
+                                error!("Weekly reflection failed: {e}");
+                                Ok(Some(format!("Weekly reflection failed: {e}")))
+                            }
+                        }
+                    }
                     name if name.starts_with("__klyntbot_") => {
                         let (channel, msg_text) = match name {
                             "__klyntbot_weekly_report" => (
@@ -524,10 +594,6 @@ fn register_cron_callbacks(
                             "__klyntbot_finance_health_check" => {
                                 ("finance_health_check", "Run finance data health check")
                             }
-                            "__klyntbot_cognitive_weekly_reflection" => (
-                                "cognitive_reflection",
-                                "Run weekly cognitive reflection and consolidate learnings",
-                            ),
                             _ => return Ok(None),
                         };
                         let msg = bus::InboundMessage::new(

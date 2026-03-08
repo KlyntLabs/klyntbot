@@ -80,6 +80,25 @@ impl EpisodicMemoryRepo {
         Ok(())
     }
 
+    /// Count all episodic memories.
+    pub async fn count_all(&self) -> Result<i64, sqlx::Error> {
+        let row: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM episodic_memories")
+                .fetch_one(&self.pool)
+                .await?;
+        Ok(row.0)
+    }
+
+    /// List recent episodic memories across all domains.
+    pub async fn list_recent(&self, limit: i64) -> Result<Vec<EpisodicMemory>, sqlx::Error> {
+        sqlx::query_as::<_, EpisodicMemory>(
+            "SELECT * FROM episodic_memories ORDER BY occurred_at DESC LIMIT ?1",
+        )
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+    }
+
     /// Delete old episodic memories with low access count (for archival).
     pub async fn delete_old(
         &self,

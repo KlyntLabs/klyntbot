@@ -1,7 +1,7 @@
 //! Cognitive memory handlers — reads, mutations, and system status.
 
 use cognitive::decay::retrievability;
-use cognitive::repos::{load_user_model, SemanticFactRepo, RULE_DOMAINS, USER_MODEL_DOMAINS};
+use cognitive::repos::{load_user_model, SemanticFactRepo, RULE_DOMAINS};
 use cognitive::types::{ProceduralRule, SemanticFact};
 use desktop_shared::cognitive_commands::*;
 use desktop_shared::errors::ApiError;
@@ -121,17 +121,10 @@ impl AppCore {
                 .list_by_domain(d, limit)
                 .await
                 .map_err(map_cognitive_err)?,
-            None => {
-                let mut all = Vec::new();
-                for d in USER_MODEL_DOMAINS {
-                    let mems = repo
-                        .list_by_domain(d, limit)
-                        .await
-                        .map_err(map_cognitive_err)?;
-                    all.extend(mems);
-                }
-                all
-            }
+            None => repo
+                .list_recent(limit)
+                .await
+                .map_err(map_cognitive_err)?,
         };
 
         Ok(memories
@@ -184,14 +177,10 @@ impl AppCore {
         // a destructive mutation and must NOT be used for reads.
         let archived = 0u64;
 
-        let mut episodic_count = 0;
-        for d in USER_MODEL_DOMAINS {
-            episodic_count += episodic_repo
-                .list_by_domain(d, 10000)
-                .await
-                .map(|v| v.len())
-                .unwrap_or(0);
-        }
+        let episodic_count = episodic_repo
+            .count_all()
+            .await
+            .unwrap_or(0) as usize;
 
         let mut rules_count = 0;
         for d in RULE_DOMAINS {
@@ -497,6 +486,62 @@ impl AppCore {
         Ok(CompactionResultResponse {
             archived_count: archived,
             deleted_episodic,
+        })
+    }
+
+    /// Trigger a weekly reflection cycle — creates procedural rules and
+    /// updates facts based on recent episodic memories.
+    pub async fn cognitive_run_reflection(&self) -> Result<ReflectionResultResponse, ApiError> {
+        let pool = self.repos.pool();
+        let fact_repo = SemanticFactRepo::new(pool.clone());
+        let episodic_repo = cognitive::repos::EpisodicMemoryRepo::new(pool.clone());
+        let rule_repo = cognitive::repos::ProceduralRuleRepo::new(pool.clone());
+
+        let config = self.config.read().await;
+        let cognitive_provider = providers::create_cognitive_provider(&config).ok().flatten();
+        drop(config);
+
+        let reflection_handler: Box<dyn cognitive::ReflectionHandler> =
+            if let Some(ref cp) = cognitive_provider {
+                let config = self.config.read().await;
+                let params = providers::cognitive_chat_params(&config, 2048);
+                drop(config);
+                Box::new(agent::cognitive_handlers::LlmReflectionHandler::new(
+                    cp.clone(),
+                    params,
+                ))
+            } else {
+                Box::new(agent::cognitive_handlers::HeuristicReflectionHandler)
+            };
+
+        let consolidation_handler: Box<dyn cognitive::ConsolidationHandler> =
+            if let Some(ref cp) = cognitive_provider {
+                let config = self.config.read().await;
+                let params = providers::cognitive_chat_params(&config, 1024);
+                drop(config);
+                Box::new(agent::cognitive_handlers::LlmConsolidationHandler::new(
+                    cp.clone(),
+                    params,
+                ))
+            } else {
+                Box::new(agent::cognitive_handlers::HeuristicConsolidationHandler)
+            };
+
+        let output = cognitive::reflection::run_weekly_reflection(
+            reflection_handler.as_ref(),
+            consolidation_handler.as_ref(),
+            &fact_repo,
+            &episodic_repo,
+            &rule_repo,
+            None,
+        )
+        .await
+        .map_err(|e| ApiError::new("REFLECTION_FAILED", &e.to_string()))?;
+
+        Ok(ReflectionResultResponse {
+            fact_updates: output.fact_updates.len(),
+            rule_updates: output.rule_updates.len(),
+            summary: output.summary,
         })
     }
 

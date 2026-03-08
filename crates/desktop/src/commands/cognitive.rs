@@ -143,6 +143,13 @@ pub async fn cognitive_run_compaction(
     state.cognitive_run_compaction().await
 }
 
+#[tauri::command]
+pub async fn cognitive_run_reflection(
+    state: State<'_, Arc<AppCore>>,
+) -> Result<ReflectionResultResponse, ApiError> {
+    state.cognitive_run_reflection().await
+}
+
 // ── Coaching Mutations ──────────────────────────────────────────────────
 
 #[tauri::command]

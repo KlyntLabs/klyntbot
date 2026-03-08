@@ -243,6 +243,21 @@ export interface AgentSelectedPayload {
   description: string;
 }
 
+// ── Plan Events ─────────────────────────────────────────────────────
+
+export interface PlanGeneratedPayload {
+  sessionKey: string;
+  steps: string[];
+  rawPlan: string;
+}
+
+export interface PlanStepCompletedPayload {
+  sessionKey: string;
+  stepIndex: number;
+  description: string;
+  toolName: string;
+}
+
 // ── Delegation Events ────────────────────────────────────────────────
 
 export interface DelegationStartedPayload {
@@ -298,6 +313,7 @@ export interface TransparencyData {
   subagents?: { label: string; profile: string }[];
   learning?: { eventType: string; detail: string }[];
   delegations?: DelegationInfo[];
+  plan?: { steps: string[]; completedSteps: number[] };
 }
 
 // ── Interaction (ask_user) ─────────────────────────────────────────────

@@ -398,7 +398,8 @@ impl AgentRuntime {
         *self.current_event_tx.write().await = event_tx.clone();
 
         // Step 7c: Chain-of-thought planning for complex tasks
-        const COT_COMPLEXITY_THRESHOLD: u8 = 5;
+        // Threshold 4: triggers for multi-step requests (3+ tools + sequential deps)
+        const COT_COMPLEXITY_THRESHOLD: u8 = 4;
 
         let planning_prompt = match analysis.mode {
             crate::intent_pipeline::types::ExecutionMode::Reactive { .. }

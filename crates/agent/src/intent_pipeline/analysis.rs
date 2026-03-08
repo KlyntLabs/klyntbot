@@ -268,16 +268,15 @@ fn has_complex_workflow_keyword(msg: &str) -> bool {
 }
 
 /// Count indicators of tool usage in the message.
+/// Counts each occurrence so "create X and create Y" = 2.
 fn count_tool_indicators(msg: &str) -> u8 {
     let mut count: u8 = 0;
     let indicators = [
         "search", "find", "list", "show", "create", "update", "delete", "add", "remove", "fetch",
-        "get", "read", "write", "send", "check", "look up", "set",
+        "get", "read", "write", "send", "check", "look up", "set", "organize", "review",
     ];
     for ind in &indicators {
-        if msg.contains(ind) {
-            count = count.saturating_add(1);
-        }
+        count = count.saturating_add(msg.matches(ind).count() as u8);
     }
     count
 }
@@ -320,7 +319,6 @@ fn has_multi_agent_triggers(msg: &str) -> bool {
             "meeting",
             "event",
             "appointment",
-            "remind",
         ],
         // finance agent triggers
         &[
@@ -335,7 +333,16 @@ fn has_multi_agent_triggers(msg: &str) -> bool {
             "investment",
         ],
         // automation agent triggers
-        &["cron", "automate", "schedule a", "every day", "recurring"],
+        &[
+            "cron",
+            "automate",
+            "schedule a",
+            "every day",
+            "recurring",
+            "remind",
+            "reminder",
+            "remind me",
+        ],
         // communication agent triggers
         &["send", "email", "message", "notify", "slack", "telegram"],
     ];

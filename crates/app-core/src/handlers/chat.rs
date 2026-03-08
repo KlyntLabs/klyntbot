@@ -1059,10 +1059,35 @@ pub async fn relay_chat_stream(
                             }
                         );
                     }
-                    // Planning events — logged for transparency but not emitted to UI yet
-                    AgentEvent::PlanningStarted { .. }
-                    | AgentEvent::PlanGenerated { .. }
-                    | AgentEvent::PlanStepCompleted { .. } => {}
+                    AgentEvent::PlanningStarted { .. } => {}
+                    AgentEvent::PlanGenerated { steps, raw_plan } => {
+                        transparency.plan = Some(events::TransparencyPlan {
+                            steps: steps.clone(),
+                            completed_steps: Vec::new(),
+                        });
+                        emit!(
+                            events::AGENT_PLAN_GENERATED,
+                            events::PlanGeneratedPayload {
+                                session_key: sk.to_string(),
+                                steps,
+                                raw_plan,
+                            }
+                        );
+                    }
+                    AgentEvent::PlanStepCompleted { step_index, description, tool_name } => {
+                        if let Some(ref mut plan) = transparency.plan {
+                            plan.completed_steps.push(step_index);
+                        }
+                        emit!(
+                            events::AGENT_PLAN_STEP_COMPLETED,
+                            events::PlanStepCompletedPayload {
+                                session_key: sk.to_string(),
+                                step_index,
+                                description,
+                                tool_name,
+                            }
+                        );
+                    }
                 }
             }
             else => break,
