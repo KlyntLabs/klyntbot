@@ -150,47 +150,23 @@ impl CoachingReasonerHandler for HeuristicCoachingReasonerHandler {
 
 // ── Extraction ──
 
-fn extraction_schema() -> serde_json::Value {
-    json!({
-        "type": "object",
-        "properties": {
-            "facts": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "domain": { "type": "string" },
-                        "subject": { "type": "string" },
-                        "predicate": { "type": "string" },
-                        "object": { "type": "string" },
-                        "confidence": { "type": "number" },
-                        "source": { "type": "string", "enum": ["observed", "inferred", "user_stated", "reflected"] }
-                    },
-                    "required": ["domain", "subject", "predicate", "object", "confidence", "source"],
-                    "additionalProperties": false
-                }
-            }
-        },
-        "required": ["facts"],
-        "additionalProperties": false
-    })
-}
-
 const EXTRACTION_SYSTEM_PROMPT: &str = "\
 You are a semantic memory extraction agent. Given an observation about a user, \
 extract structured facts as subject-predicate-object triples.\n\n\
 Domains: identity, energy, work, finance, learning, preferences, general\n\
 Subjects: usually \"user\", or \"project:<name>\", \"task:<id>\"\n\
-Predicates: descriptive relationship (e.g., \"peak_hours\", \"spending_pattern\", \"break_pattern\")\n\
-Object: the value (e.g., \"10am-12pm\", \"food delivery spikes during crunch\")\n\n\
+Predicates: descriptive relationship (e.g., \"name\", \"favorite_language\", \"peak_hours\", \"occupation\")\n\
+Object: the value (e.g., \"Jayden\", \"Rust\", \"10am-12pm\", \"software developer\")\n\n\
 Rules:\n\
-- Only extract facts clearly supported by the observation\n\
+- Extract EVERY distinct fact from the observation as a separate triple\n\
 - Set confidence based on certainty (user-stated = 1.0, inferred = 0.5-0.8)\n\
 - Use source \"user_stated\" for explicit statements, \"observed\" for behavioral data, \"inferred\" for patterns\n\
 - Return empty facts array if nothing meaningful can be extracted\n\
 - Questions (e.g., 'What is my name?') are NOT facts — return empty array for questions\n\
-- Be specific in predicates\n\
-- Be concise in objects";
+- Be specific in predicates — use snake_case names like \"name\", \"occupation\", \"favorite_language\"\n\
+- Be concise in objects — just the value, not the full sentence\n\n\
+Respond with JSON in this exact format:\n\
+{\"facts\": [{\"domain\": \"identity\", \"subject\": \"user\", \"predicate\": \"name\", \"object\": \"Jayden\", \"confidence\": 1.0, \"source\": \"user_stated\"}]}";
 
 /// LLM-backed fact extraction with heuristic fallback.
 pub struct LlmExtractionHandler {
@@ -203,10 +179,7 @@ impl LlmExtractionHandler {
     pub fn new(provider: DynProvider, params: ChatParams) -> Self {
         Self {
             provider,
-            params: params.with_response_format(ResponseFormat::JsonSchema {
-                name: "ExtractionResult".into(),
-                schema: extraction_schema(),
-            }),
+            params: params.with_response_format(ResponseFormat::JsonObject),
             fallback: HeuristicExtractionHandler,
         }
     }
@@ -277,29 +250,17 @@ impl ExtractionHandler for LlmExtractionHandler {
 
 // ── Consolidation ──
 
-fn consolidation_schema() -> serde_json::Value {
-    json!({
-        "type": "object",
-        "properties": {
-            "action": { "type": "string", "enum": ["add", "update", "delete", "noop"] },
-            "target_id": { "type": ["string", "null"] },
-            "reasoning": { "type": "string" },
-            "confidence": { "type": "number" }
-        },
-        "required": ["action", "target_id", "reasoning", "confidence"],
-        "additionalProperties": false
-    })
-}
-
 const CONSOLIDATION_SYSTEM_PROMPT: &str = "\
 You are a semantic memory consolidation agent. Given a candidate fact and existing \
 similar facts, decide the correct operation:\n\n\
-- ADD: The candidate is genuinely new information, no existing fact covers it.\n\
-- UPDATE: The candidate refines or corrects an existing fact. Provide the target_id of the fact to supersede.\n\
-- DELETE: The candidate contradicts an existing fact and the existing fact should be marked superseded. Provide the target_id to delete.\n\
-- NOOP: The candidate is already known.\n\n\
-Always prefer NOOP over ADD if the information is essentially the same.\n\
-Always prefer UPDATE over DELETE+ADD when the meaning is similar but the value changed.";
+- add: The candidate is genuinely new information, no existing fact covers it.\n\
+- update: The candidate refines or corrects an existing fact. Provide the target_id of the fact to supersede.\n\
+- delete: The candidate contradicts an existing fact and the existing fact should be marked superseded. Provide the target_id to delete.\n\
+- noop: The candidate is already known.\n\n\
+Always prefer noop over add if the information is essentially the same.\n\
+Always prefer update over delete+add when the meaning is similar but the value changed.\n\n\
+Respond with JSON in this exact format:\n\
+{\"action\": \"add\", \"target_id\": null, \"reasoning\": \"New fact not covered by existing facts\", \"confidence\": 0.9}";
 
 /// LLM-backed consolidation with heuristic fallback.
 pub struct LlmConsolidationHandler {
@@ -312,10 +273,7 @@ impl LlmConsolidationHandler {
     pub fn new(provider: DynProvider, params: ChatParams) -> Self {
         Self {
             provider,
-            params: params.with_response_format(ResponseFormat::JsonSchema {
-                name: "ConsolidationDecision".into(),
-                schema: consolidation_schema(),
-            }),
+            params: params.with_response_format(ResponseFormat::JsonObject),
             fallback: HeuristicConsolidationHandler,
         }
     }
@@ -407,46 +365,6 @@ impl ConsolidationHandler for LlmConsolidationHandler {
 
 // ── Reflection ──
 
-fn reflection_schema() -> serde_json::Value {
-    json!({
-        "type": "object",
-        "properties": {
-            "fact_updates": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "domain": { "type": "string" },
-                        "subject": { "type": "string" },
-                        "predicate": { "type": "string" },
-                        "object": { "type": "string" },
-                        "confidence": { "type": "number" },
-                        "source": { "type": "string" }
-                    },
-                    "required": ["domain", "subject", "predicate", "object", "confidence", "source"],
-                    "additionalProperties": false
-                }
-            },
-            "rule_updates": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "domain": { "type": "string" },
-                        "rule_text": { "type": "string" },
-                        "confidence": { "type": "number" }
-                    },
-                    "required": ["domain", "rule_text", "confidence"],
-                    "additionalProperties": false
-                }
-            },
-            "summary": { "type": "string" }
-        },
-        "required": ["fact_updates", "rule_updates", "summary"],
-        "additionalProperties": false
-    })
-}
-
 const REFLECTION_SYSTEM_PROMPT: &str = "\
 You are a cognitive reflection agent performing weekly self-review. Analyze the user's \
 episodic memories, current model, and procedural rules to identify:\n\n\
@@ -458,7 +376,9 @@ Output:\n\
 - fact_updates: New or updated semantic facts. Use source \"reflected\".\n\
 - rule_updates: New or updated procedural rules.\n\
 - summary: 2-3 sentence synthesis of the week's patterns.\n\n\
-Be conservative. Only propose changes with strong evidence.";
+Be conservative. Only propose changes with strong evidence.\n\n\
+Respond with JSON in this exact format:\n\
+{\"fact_updates\": [{\"domain\": \"energy\", \"subject\": \"user\", \"predicate\": \"pattern\", \"object\": \"value\", \"confidence\": 0.8, \"source\": \"reflected\"}], \"rule_updates\": [{\"domain\": \"productivity\", \"rule_text\": \"description\", \"confidence\": 0.7}], \"summary\": \"Brief synthesis\"}";
 
 /// LLM-backed weekly reflection.
 pub struct LlmReflectionHandler {
@@ -470,10 +390,7 @@ impl LlmReflectionHandler {
     pub fn new(provider: DynProvider, params: ChatParams) -> Self {
         Self {
             provider,
-            params: params.with_response_format(ResponseFormat::JsonSchema {
-                name: "ReflectionResult".into(),
-                schema: reflection_schema(),
-            }),
+            params: params.with_response_format(ResponseFormat::JsonObject),
         }
     }
 }
@@ -599,22 +516,6 @@ impl ReflectionHandler for LlmReflectionHandler {
 
 // ── Coaching Reasoner ──
 
-fn coaching_schema() -> serde_json::Value {
-    json!({
-        "type": "object",
-        "properties": {
-            "should_intervene": { "type": "boolean" },
-            "confidence": { "type": "number" },
-            "message": { "type": ["string", "null"] },
-            "intervention_type": { "type": "string", "enum": ["dashboard_card", "chat_message", "notification", "overlay", "none"] },
-            "reasoning": { "type": "string" },
-            "observations": { "type": "array", "items": { "type": "string" } }
-        },
-        "required": ["should_intervene", "confidence", "message", "intervention_type", "reasoning", "observations"],
-        "additionalProperties": false
-    })
-}
-
 const COACHING_SYSTEM_PROMPT: &str = "\
 You are a proactive coaching agent. Given the user's current situation, a triggered \
 condition, detected patterns, and relevant memories, decide whether and how to intervene.\n\n\
@@ -630,7 +531,9 @@ Intervention types (from least to most intrusive):\n\
 - notification: System notification\n\
 - overlay: Full-screen overlay (only for critical situations)\n\
 - none: No intervention\n\n\
-Set should_intervene to false if unsure or if the user would likely dismiss it.";
+Set should_intervene to false if unsure or if the user would likely dismiss it.\n\n\
+Respond with JSON in this exact format:\n\
+{\"should_intervene\": false, \"confidence\": 0.5, \"message\": null, \"intervention_type\": \"none\", \"reasoning\": \"explanation\", \"observations\": [\"obs1\"]}";
 
 /// LLM-backed coaching reasoner with heuristic fallback.
 pub struct LlmCoachingReasonerHandler {
@@ -642,10 +545,7 @@ impl LlmCoachingReasonerHandler {
     pub fn new(provider: DynProvider, params: ChatParams) -> Self {
         Self {
             provider,
-            params: params.with_response_format(ResponseFormat::JsonSchema {
-                name: "CoachingDecision".into(),
-                schema: coaching_schema(),
-            }),
+            params: params.with_response_format(ResponseFormat::JsonObject),
         }
     }
 }
