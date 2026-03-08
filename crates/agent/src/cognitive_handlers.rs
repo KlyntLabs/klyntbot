@@ -38,7 +38,22 @@ impl ExtractionHandler for HeuristicExtractionHandler {
         let facts = match observation.source_event.as_str() {
             "UserStatedFact" => vec![fact(od, "stated", 1.0, "user_stated")],
             "UserCorrectedAI" => vec![fact(od, "corrected", 1.0, "user_stated")],
-            "ChatTurnCompleted" => vec![fact(od, "chat_stated", 0.8, "user_stated")],
+            "ChatTurnCompleted" => {
+                let content = observation.content.trim();
+                // Skip questions and very short messages — no facts to extract
+                if content.ends_with('?') || content.len() < 10 {
+                    vec![]
+                } else {
+                    // Use a content-derived predicate to avoid supersession
+                    let predicate = format!("chat_stated_{:x}", {
+                        use std::hash::{Hash, Hasher};
+                        let mut h = std::collections::hash_map::DefaultHasher::new();
+                        content.hash(&mut h);
+                        h.finish() & 0xFFFF
+                    });
+                    vec![fact(od, &predicate, 0.8, "user_stated")]
+                }
+            }
             "BudgetAlert" => vec![fact("finance", "budget_pressure", 0.9, "observed")],
             "CoachingFeedback" => vec![fact("coaching", "coaching_response", 0.9, "observed")],
             source if source.starts_with("accumulated:") => {
@@ -164,7 +179,7 @@ fn extraction_schema() -> serde_json::Value {
 const EXTRACTION_SYSTEM_PROMPT: &str = "\
 You are a semantic memory extraction agent. Given an observation about a user, \
 extract structured facts as subject-predicate-object triples.\n\n\
-Domains: identity, energy, work, finance, learning, preferences\n\
+Domains: identity, energy, work, finance, learning, preferences, general\n\
 Subjects: usually \"user\", or \"project:<name>\", \"task:<id>\"\n\
 Predicates: descriptive relationship (e.g., \"peak_hours\", \"spending_pattern\", \"break_pattern\")\n\
 Object: the value (e.g., \"10am-12pm\", \"food delivery spikes during crunch\")\n\n\
@@ -173,6 +188,7 @@ Rules:\n\
 - Set confidence based on certainty (user-stated = 1.0, inferred = 0.5-0.8)\n\
 - Use source \"user_stated\" for explicit statements, \"observed\" for behavioral data, \"inferred\" for patterns\n\
 - Return empty facts array if nothing meaningful can be extracted\n\
+- Questions (e.g., 'What is my name?') are NOT facts — return empty array for questions\n\
 - Be specific in predicates\n\
 - Be concise in objects";
 

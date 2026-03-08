@@ -207,8 +207,18 @@ impl ContextSource for CognitiveContextSource {
             .unwrap_or("");
 
         if self.config.dynamic_facts_enabled && !query.is_empty() {
-            use crate::repos::USER_MODEL_DOMAINS;
             use crate::retrieval::retrieve_relevant_facts;
+
+            // Include "general" domain for chat-extracted facts alongside USER_MODEL_DOMAINS
+            const RETRIEVAL_DOMAINS: &[&str] = &[
+                "identity",
+                "energy",
+                "work",
+                "finance",
+                "learning",
+                "preferences",
+                "general",
+            ];
 
             let retrieval_params = crate::retrieval::RetrievalParams {
                 limit: self.config.dynamic_fact_limit,
@@ -220,7 +230,7 @@ impl ContextSource for CognitiveContextSource {
                 &self.fact_repo,
                 self.embedder.as_deref(),
                 query,
-                USER_MODEL_DOMAINS,
+                RETRIEVAL_DOMAINS,
                 &retrieval_params,
             )
             .await;

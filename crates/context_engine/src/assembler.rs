@@ -322,9 +322,10 @@ impl ContextEngine {
         allocator.allocate(Priority::ToolDefinitions, tool_tokens);
 
         // 3. Retrieve memories and allocate budget (Priority::RetrievedMemory)
-        // Skip memory retrieval for Direct and Clarification modes (no RAG needed)
+        // Skip memory retrieval only for Clarification mode (no RAG needed).
+        // DirectResponse still needs retrieval for personalized conversational answers.
         let memory_content = match &request.strategy {
-            ExecutionStrategy::DirectResponse | ExecutionStrategy::Clarification { .. } => None,
+            ExecutionStrategy::Clarification { .. } => None,
             _ => self.retrieve_memory(request).await,
         };
         let memory_tokens = memory_content
@@ -736,7 +737,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_direct_mode_skips_memory_retrieval() {
+    async fn test_direct_mode_includes_memory_retrieval() {
         let retriever = Arc::new(MockRetriever {
             entries: vec![
                 ("User likes Rust".into(), 0.95),
@@ -756,13 +757,14 @@ mod tests {
 
         let result = engine.assemble(request).await;
 
-        // Direct mode should NOT include memory — only system prompt
-        assert_eq!(result.messages.len(), 1);
-        assert!(result
+        // Direct mode should include memory for personalized conversational answers
+        assert_eq!(result.messages.len(), 2);
+        let mem_alloc = result
             .budget_report
             .per_priority
             .iter()
-            .all(|(p, _)| *p != Priority::RetrievedMemory));
+            .find(|(p, _)| *p == Priority::RetrievedMemory);
+        assert!(mem_alloc.is_some(), "RetrievedMemory should be allocated");
     }
 
     #[tokio::test]
