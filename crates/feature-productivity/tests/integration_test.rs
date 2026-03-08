@@ -652,12 +652,12 @@ async fn test_historical_comparison() {
     let yesterday_str = &yesterday_summary.date;
     let current = repos
         .summaries
-        .list_range(&today_str, &today_str)
+        .list_range(today_str, today_str)
         .await
         .unwrap();
     let previous = repos
         .summaries
-        .list_range(&yesterday_str, &yesterday_str)
+        .list_range(yesterday_str, yesterday_str)
         .await
         .unwrap();
 

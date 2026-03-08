@@ -210,7 +210,7 @@ fn find_agent_browser() -> Result<String> {
     }
 
     Err(ToolError::ExecutionFailed(
-        "Browser tool requires agent-browser. Run: klyntbot init --packs".to_string(),
+        "Browser tool requires agent-browser. Install it and ensure it is on your PATH.".to_string(),
     )
     .into())
 }

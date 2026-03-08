@@ -12,7 +12,6 @@ members = [
     "crates/tools",
     "crates/channels",
     "crates/agent",
-    "crates/cli",
     "crates/context_engine",
     "crates/storage",
     "crates/tools-core",
@@ -48,7 +47,6 @@ domain = { path = "crates/domain" }
 tools = { path = "crates/tools" }
 channels = { path = "crates/channels" }
 agent = { path = "crates/agent" }
-cli = { path = "crates/cli" }
 context_engine = { path = "crates/context_engine" }
 storage = { path = "crates/storage" }
 tools-core = { path = "crates/tools-core" }
@@ -89,7 +87,6 @@ chrono = { version = "0.4.43", features = ["serde"] }
 uuid = { version = "1.20.0", features = ["v4", "serde"] }
 dirs = "6.0.0"
 cron = "0.15.0"
-clap = { version = "4.5.57", features = ["derive"] }
 base64 = "0.22.1"
 regex = "1.11.2"
 shellexpand = "3.1.0"
@@ -155,20 +152,12 @@ domain.workspace = true
 tools.workspace = true
 channels.workspace = true
 agent.workspace = true
-cli.workspace = true
 cognitive.workspace = true
 context_engine.workspace = true
 feature-coaching.workspace = true
 storage.workspace = true
 plugin-runtime.workspace = true
 mcp.workspace = true
-
-# Binary-specific dependencies
-clap.workspace = true
-tokio.workspace = true
-anyhow.workspace = true
-tracing.workspace = true
-tracing-subscriber.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
@@ -178,7 +167,6 @@ serde_json.workspace = true
 chrono.workspace = true
 tokio.workspace = true
 uuid.workspace = true
-assert_cmd = "2.1.2"
 feature-todo.workspace = true
 feature-finance.workspace = true
 plugin-runtime.workspace = true

@@ -41,7 +41,7 @@ Browser-only dev: run `cargo run -p dev-api` + `cd desktop-ui && bun run dev` in
 
 Rust personal AI agent — single binary connecting 6+ chat platforms to LLMs with task/project management and persistent memory. All state in SQLite + LanceDB.
 
-### Workspace (27 crates, 9 layers)
+### Workspace (26 crates, 9 layers)
 
 ```
 L0: common                — KlyntbotError, MessageRole, ChannelName, ChatId, SessionKey
@@ -50,9 +50,9 @@ L2: storage, domain       — SqlitePool, migrations, *Repo structs, OKR+PARA do
 L3: providers, session, scheduling, context_engine — LLM clients, session persistence, cron, token budgets
 L4: tools, feature-todo, feature-finance, feature-notes, feature-productivity, feature-coaching, plugin-runtime — 20+ tools, feature packages, WASM plugins
 L5: channels, agent, cognitive — Platform integrations (Telegram/Discord/WhatsApp/Slack/Email/QQ), agent runtime, cognitive memory system
-L6: cli, mcp              — CLI (serve/init/status/plugin), MCP server
+L6: mcp                   — MCP server/client
 L7: app-core, desktop-shared, desktop — Application core (shared handlers), Tauri desktop app
-L8: klyntbot              — Re-export facade + binary entry point
+L8: klyntbot              — Re-export facade
 ```
 
 Dependencies flow strictly upward. `plugin-sdk` and `tests/fixtures/hello_plugin` excluded from workspace.
@@ -76,7 +76,7 @@ Five built-in agents in `agents/`: general, task, finance, automation, communica
 
 ### Agent runtime
 
-`AgentRuntime` → `AgentManager` → `IntentAnalyzer` → `ContextEngine` → `ExecutionRouter` → `CostTracker`. Two execution modes: **Direct** (single LLM call, no tools) and **Reactive** (ReAct loop with tool calls, escalates at 80% of max_iterations). Code in `crates/agent/src/agent_runtime/` and `crates/agent/src/intent_pipeline/`.
+`AgentRuntime` → `AgentManager` → `IntentAnalyzer` → `ContextEngine` → `ExecutionRouter` → `CostTracker`. Two execution modes: **Direct** (single LLM call, no tools) and **Reactive** (ReAct loop with tool calls, synthesizes at max_iterations). Code in `crates/agent/src/agent_runtime/` and `crates/agent/src/intent_pipeline/`.
 
 ## Conventions
 
@@ -90,7 +90,7 @@ Five built-in agents in `agents/`: general, task, finance, automation, communica
 
 - **`StoragePool::from_existing()` skips migrations** — only for already-migrated pools. Tests must use `connect_in_memory()`.
 
-- **Config changes require restart** of `klyntbot serve`.
+- **Config changes require restart** of the desktop app.
 - **Dependency inversion** — new tools needing agent context must inject via `Arc<dyn Trait>` to avoid circular deps.
 - **`email` feature** (on by default) gates IMAP/SMTP deps in `channels` crate.
 - **`tauri.conf.json` uses `npm` in `beforeDevCommand`** but project requires `bun`. `cargo tauri dev` may fail with ENOENT. Workaround: start Vite manually (`cd desktop-ui && bun run dev`) then run `cargo tauri dev`, or use browser-only dev mode.
