@@ -17,9 +17,30 @@ use providers::Message;
 use tools::RoutingContext;
 
 use super::{EngineResult, ExecutionEngine};
-use crate::execution::scratchpad::{ReasoningTrace, Scratchpad};
+use crate::execution::scratchpad::{ExecutionPlan, ReasoningTrace, Scratchpad};
 use crate::execution::types::{accumulate_usage, CycleOutcome, ExecutionParams};
 use crate::execution::ExecutionCore;
+
+/// Try to parse and store a plan from `plan_text`, emitting a `PlanGenerated` event if successful.
+async fn try_store_plan(
+    plan_text: &str,
+    scratchpad: &mut Scratchpad,
+    event_tx: &Option<tokio::sync::mpsc::Sender<crate::events::AgentEvent>>,
+) {
+    let plan = ExecutionPlan::parse(plan_text);
+    if plan.steps.is_empty() {
+        return;
+    }
+    if let Some(ref tx) = event_tx {
+        let _ = tx
+            .send(crate::events::AgentEvent::PlanGenerated {
+                steps: plan.step_descriptions(),
+                raw_plan: plan.raw_text.clone(),
+            })
+            .await;
+    }
+    scratchpad.set_plan(plan);
+}
 
 /// ReactiveEngine — ReAct loop that runs until completion or synthesizes at max iterations.
 pub struct ReactiveEngine {
@@ -60,6 +81,11 @@ impl ExecutionEngine for ReactiveEngine {
         let mut seen_tool_calls: HashSet<String> = HashSet::new();
         let mut last_tool_name: Option<String> = None;
 
+        // Planning: inject planning prompt before iteration 1
+        if let Some(ref prompt) = params.planning_prompt {
+            messages.push(Message::user(prompt));
+        }
+
         for iteration in 1..=max_iterations {
             // Check cancellation
             if let Some(ref token) = params.cancel_token {
@@ -96,8 +122,34 @@ impl ExecutionEngine for ReactiveEngine {
                 .await?;
             accumulate_usage(&mut accumulated_usage, &cycle_usage);
 
+            // Planning iteration: on iteration 1 with a planning prompt, try to parse
+            // the plan from LLM output before processing the outcome normally.
+            let is_planning_iteration = params.planning_prompt.is_some()
+                && iteration == 1
+                && scratchpad.plan().is_none();
+
             match outcome {
                 CycleOutcome::FinalResponse { content } => {
+                    // If this is the planning iteration, the LLM returned plan text
+                    // without tool calls. Parse the plan and continue the loop.
+                    if is_planning_iteration {
+                        try_store_plan(&content, &mut scratchpad, &event_tx).await;
+
+                        scratchpad.add(ReasoningTrace {
+                            cycle: iteration,
+                            thought: "Generated execution plan".to_string(),
+                            planned_actions: scratchpad
+                                .plan()
+                                .map(|p| p.step_descriptions())
+                                .unwrap_or_default(),
+                            actual_action: "plan_generated".to_string(),
+                            reflection: None,
+                            timestamp: Utc::now(),
+                            plan_step_index: None,
+                        });
+                        continue;
+                    }
+
                     scratchpad.add(ReasoningTrace {
                         cycle: iteration,
                         thought: "Received final response".to_string(),
@@ -105,6 +157,7 @@ impl ExecutionEngine for ReactiveEngine {
                         actual_action: "final_response".to_string(),
                         reflection: None,
                         timestamp: Utc::now(),
+                        plan_step_index: None,
                     });
 
                     return Ok(EngineResult::Complete {
@@ -151,6 +204,7 @@ impl ExecutionEngine for ReactiveEngine {
                                 .to_string(),
                         ),
                         timestamp: Utc::now(),
+                        plan_step_index: None,
                     });
                 }
 
@@ -159,6 +213,45 @@ impl ExecutionEngine for ReactiveEngine {
                         results.iter().map(|r| r.tool_name.clone()).collect();
                     if let Some(name) = tool_names.last() {
                         last_tool_name = Some(name.clone());
+                    }
+
+                    // Planning iteration 1: parse plan from the last assistant message
+                    if is_planning_iteration {
+                        let plan_text = messages
+                            .last()
+                            .and_then(|m| match m {
+                                Message::Assistant { content, .. } => content.as_deref(),
+                                // run_cycle appends tool results after the assistant message,
+                                // so fall back to reverse scan if last isn't assistant
+                                _ => None,
+                            })
+                            .or_else(|| {
+                                messages.iter().rev().find_map(|m| match m {
+                                    Message::Assistant { content, .. } => content.as_deref(),
+                                    _ => None,
+                                })
+                            })
+                            .unwrap_or("");
+                        try_store_plan(plan_text, &mut scratchpad, &event_tx).await;
+                    }
+
+                    // Track plan step completion
+                    let mut completed_step_index = None;
+                    for tool_name in &tool_names {
+                        if let Some((idx, desc, name)) =
+                            scratchpad.mark_step_completed(tool_name)
+                        {
+                            completed_step_index = Some(idx);
+                            if let Some(ref tx) = event_tx {
+                                let _ = tx
+                                    .send(crate::events::AgentEvent::PlanStepCompleted {
+                                        step_index: idx,
+                                        description: desc,
+                                        tool_name: name,
+                                    })
+                                    .await;
+                            }
+                        }
                     }
 
                     let had_failure = results.iter().any(|r| !r.success);
@@ -200,13 +293,20 @@ impl ExecutionEngine for ReactiveEngine {
                         reflection = Some(reflection_prompt);
                     }
 
+                    let actual_action = if params.planning_prompt.is_some() && iteration == 1 {
+                        "plan_and_execute".to_string()
+                    } else {
+                        "tools_executed".to_string()
+                    };
+
                     scratchpad.add(ReasoningTrace {
                         cycle: iteration,
                         thought: format!("Executed {} tool(s)", tool_names.len()),
                         planned_actions: tool_names,
-                        actual_action: "tools_executed".to_string(),
+                        actual_action,
                         reflection,
                         timestamp: Utc::now(),
+                        plan_step_index: completed_step_index,
                     });
                 }
 
@@ -218,6 +318,7 @@ impl ExecutionEngine for ReactiveEngine {
                         actual_action: "empty_response".to_string(),
                         reflection: None,
                         timestamp: Utc::now(),
+                        plan_step_index: None,
                     });
                 }
             }
@@ -229,11 +330,28 @@ impl ExecutionEngine for ReactiveEngine {
             max_iterations
         );
 
-        messages.push(Message::user(
+        let synthesis_prompt = if let Some((done, total)) = scratchpad.plan_progress() {
+            let remaining = scratchpad.remaining_step_descriptions();
+            format!(
+                "You've used all available iterations. Plan progress: {}/{} steps completed.{} \
+                 Based on the work completed so far, provide a complete response to the user's \
+                 original request. Summarize what you accomplished and any remaining steps.",
+                done,
+                total,
+                if remaining.is_empty() {
+                    String::new()
+                } else {
+                    format!(" Remaining: {}", remaining.join(", "))
+                }
+            )
+        } else {
             "You've used all available iterations. Based on the work completed so far, \
              provide a complete response to the user's original request. \
-             Summarize what you accomplished and any remaining steps.",
-        ));
+             Summarize what you accomplished and any remaining steps."
+                .to_string()
+        };
+
+        messages.push(Message::user(&synthesis_prompt));
 
         // One final LLM call with no tools — forces text response
         let (synthesis_outcome, synthesis_usage) = self
@@ -458,4 +576,123 @@ mod tests {
         let engine = ReactiveEngine::new(make_core(MockSequenceProvider::new(vec![])), 10);
         assert_eq!(engine.mode(), "reactive");
     }
+
+    // ── Planning-aware engine tests ─────────────────────────────────
+
+    #[tokio::test]
+    async fn planning_prompt_injected_and_plan_parsed() {
+        // First response: plan text + tool call. Second response: final text.
+        let provider = MockSequenceProvider::new(vec![
+            LlmResponse {
+                content: Some(
+                    "Here's my plan:\n1. Search the web [tool: ok_tool]\n2. Summarize results\n\nExecuting step 1..."
+                        .to_string(),
+                ),
+                tool_calls: vec![providers::ToolCall {
+                    id: "call_1".to_string(),
+                    name: "ok_tool".to_string(),
+                    arguments: serde_json::json!({}),
+                }],
+                finish_reason: "tool_calls".to_string(),
+                usage: providers::Usage::default(),
+                reasoning_content: None,
+            },
+            text_response("Here are the results."),
+        ]);
+        let core = Arc::new(ExecutionCore::new(provider, registry_with_ok_tool()));
+        let engine = ReactiveEngine::new(core, 10);
+
+        let params =
+            default_params().with_planning_prompt("Create a plan then execute step 1.".to_string());
+
+        let result = engine
+            .execute(
+                vec![Message::user("complex task")],
+                &[],
+                &params,
+                &routing_ctx(),
+                None,
+            )
+            .await
+            .unwrap();
+
+        let EngineResult::Complete {
+            content, traces, ..
+        } = result
+        else {
+            panic!("expected Complete");
+        };
+
+        assert!(content.contains("results"));
+        // Should have a planning trace + final trace
+        assert!(traces.len() >= 2);
+        // First trace should be the planning iteration
+        assert_eq!(traces[0].actual_action, "plan_and_execute");
+    }
+
+    #[tokio::test]
+    async fn planning_text_only_response_continues_loop() {
+        // LLM returns plan text without tool calls on iteration 1.
+        // Engine should continue to iteration 2 instead of returning early.
+        let provider = MockSequenceProvider::new(vec![
+            text_response("My plan:\n1. Do thing A [tool: ok_tool]\n2. Do thing B"),
+            tool_call_response("ok_tool"),
+            text_response("All done."),
+        ]);
+        let core = Arc::new(ExecutionCore::new(provider, registry_with_ok_tool()));
+        let engine = ReactiveEngine::new(core, 10);
+
+        let params = default_params().with_planning_prompt("Create a plan.".to_string());
+
+        let result = engine
+            .execute(
+                vec![Message::user("complex task")],
+                &[],
+                &params,
+                &routing_ctx(),
+                None,
+            )
+            .await
+            .unwrap();
+
+        let EngineResult::Complete {
+            content,
+            iterations,
+            ..
+        } = result
+        else {
+            panic!("expected Complete");
+        };
+
+        assert!(content.contains("done"));
+        // Should have gone past iteration 1 (plan-only) to iterations 2-3
+        assert!(iterations >= 2);
+    }
+
+    #[tokio::test]
+    async fn no_planning_prompt_behaves_normally() {
+        // Without planning_prompt, engine behaves exactly as before.
+        let provider =
+            MockSequenceProvider::new(vec![tool_call_response("ok_tool"), text_response("Done!")]);
+        let core = Arc::new(ExecutionCore::new(provider, registry_with_ok_tool()));
+        let engine = ReactiveEngine::new(core, 10);
+
+        let result = engine
+            .execute(
+                vec![Message::user("simple task")],
+                &[],
+                &default_params(),
+                &routing_ctx(),
+                None,
+            )
+            .await
+            .unwrap();
+
+        let EngineResult::Complete { content, .. } = result else {
+            panic!("expected Complete");
+        };
+        assert!(content.contains("Done"));
+    }
+
+    use providers::LlmResponse;
 }

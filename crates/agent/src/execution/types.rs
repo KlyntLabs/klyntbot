@@ -17,6 +17,9 @@ pub struct ExecutionParams {
     pub cancel_token: Option<tokio_util::sync::CancellationToken>,
     /// The original user message that triggered this execution.
     pub original_message: String,
+    /// Chain-of-thought planning prompt for complex tasks.
+    /// When set, the reactive engine injects this before iteration 1.
+    pub planning_prompt: Option<String>,
 }
 
 impl ExecutionParams {
@@ -28,6 +31,7 @@ impl ExecutionParams {
             max_fabrication_retries: 2,
             cancel_token: None,
             original_message: String::new(),
+            planning_prompt: None,
         }
     }
 
@@ -53,6 +57,11 @@ impl ExecutionParams {
 
     pub fn with_original_message(mut self, msg: String) -> Self {
         self.original_message = msg;
+        self
+    }
+
+    pub fn with_planning_prompt(mut self, prompt: String) -> Self {
+        self.planning_prompt = Some(prompt);
         self
     }
 }
@@ -119,5 +128,21 @@ mod tests {
         assert_eq!(params.max_iterations, 10);
         assert_eq!(params.max_fabrication_retries, 2);
         assert!(params.original_message.is_empty());
+    }
+
+    #[test]
+    fn execution_params_with_planning_prompt() {
+        let params = ExecutionParams::new("mock")
+            .with_planning_prompt("Create a step-by-step plan.".to_string());
+        assert_eq!(
+            params.planning_prompt.as_deref(),
+            Some("Create a step-by-step plan.")
+        );
+    }
+
+    #[test]
+    fn execution_params_default_no_planning() {
+        let params = ExecutionParams::new("mock");
+        assert!(params.planning_prompt.is_none());
     }
 }

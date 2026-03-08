@@ -162,4 +162,26 @@ pub enum AgentEvent {
         failed: usize,
         skipped: usize,
     },
+
+    /// Chain-of-thought planning has started for a complex task.
+    PlanningStarted {
+        #[serde(rename = "complexityScore")]
+        complexity_score: u8,
+    },
+
+    /// A structured execution plan was generated.
+    PlanGenerated {
+        steps: Vec<String>,
+        #[serde(rename = "rawPlan")]
+        raw_plan: String,
+    },
+
+    /// A plan step was completed during execution.
+    PlanStepCompleted {
+        #[serde(rename = "stepIndex")]
+        step_index: usize,
+        description: String,
+        #[serde(rename = "toolName")]
+        tool_name: String,
+    },
 }

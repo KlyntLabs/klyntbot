@@ -41,6 +41,7 @@ dependencies = [
  "mime_guess",
  "plugin-runtime",
  "providers",
+ "regex",
  "scheduling",
  "serde",
  "serde_json",

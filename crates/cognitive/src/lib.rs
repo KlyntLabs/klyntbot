@@ -19,7 +19,7 @@ pub use background::PipelineEvent;
 pub use compaction::CompactionResult;
 pub use consolidation::ConsolidationHandler;
 pub use context_source::{CognitiveContextSource, CognitiveRetrievalConfig};
-pub use embedder::SemanticFactEmbedder;
+pub use embedder::{SemanticFactEmbedder, TextEmbedder};
 pub use extraction::{ExtractedFact, ExtractionHandler};
 pub use reflection::ReflectionHandler;
 pub use repos::{cognitive_migrations, EpisodicMemoryRepo, ProceduralRuleRepo, SemanticFactRepo};

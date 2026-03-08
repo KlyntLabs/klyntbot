@@ -1049,6 +1049,10 @@ pub async fn relay_chat_stream(
                             }
                         );
                     }
+                    // Planning events — logged for transparency but not emitted to UI yet
+                    AgentEvent::PlanningStarted { .. }
+                    | AgentEvent::PlanGenerated { .. }
+                    | AgentEvent::PlanStepCompleted { .. } => {}
                 }
             }
             else => break,

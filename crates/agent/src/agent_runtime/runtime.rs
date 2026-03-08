@@ -408,6 +408,26 @@ impl AgentRuntime {
         // Store event_tx for delegation transparency events
         *self.current_event_tx.write().await = event_tx.clone();
 
+        // Step 7c: Chain-of-thought planning for complex tasks
+        const COT_COMPLEXITY_THRESHOLD: u8 = 5;
+
+        let planning_prompt = match analysis.mode {
+            crate::intent_pipeline::types::ExecutionMode::Reactive { .. }
+                if analysis.signals.complexity_score() >= COT_COMPLEXITY_THRESHOLD =>
+            {
+                let prompt = build_planning_prompt(message, &filtered_tools);
+                if let Some(ref tx) = event_tx {
+                    let _ = tx
+                        .send(AgentEvent::PlanningStarted {
+                            complexity_score: analysis.signals.complexity_score(),
+                        })
+                        .await;
+                }
+                Some(prompt)
+            }
+            _ => None,
+        };
+
         // Step 8: Execute via router
         if let Some(ref tx) = event_tx {
             let _ = tx
@@ -424,6 +444,9 @@ impl AgentRuntime {
 
         if let Some(token) = cancel_token {
             params = params.with_cancel_token(token);
+        }
+        if let Some(prompt) = planning_prompt {
+            params = params.with_planning_prompt(prompt);
         }
 
         let router_result = self
@@ -925,6 +948,25 @@ impl tools::DelegationHandler for AgentRuntime {
 
         result.map(|r| r.content)
     }
+}
+
+/// Build a chain-of-thought planning prompt for complex tasks.
+fn build_planning_prompt(user_message: &str, tools: &[serde_json::Value]) -> String {
+    let tool_names: Vec<&str> = tools.iter().filter_map(tool_def_name).collect();
+    format!(
+        "This is a complex request. Before executing, create a step-by-step plan.\n\
+         \n\
+         User request: {user_message}\n\
+         Available tools: [{}]\n\
+         \n\
+         Format each step as:\n\
+         1. <description> [tool: <tool_name>]\n\
+         2. <description> [tool: <tool_name>]\n\
+         ...\n\
+         \n\
+         Keep the plan concise (3-7 steps). Then execute step 1.",
+        tool_names.join(", ")
+    )
 }
 
 #[cfg(test)]

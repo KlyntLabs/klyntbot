@@ -8,6 +8,15 @@ use async_trait::async_trait;
 
 use crate::types::SemanticFact;
 
+/// Generic text-to-vector embedding.
+///
+/// Implemented in `agent` crate wrapping `EmbeddingEngine`.
+/// Used by `ConversationRecallService` and potentially `SemanticFactEmbedder` in the future.
+#[async_trait]
+pub trait TextEmbedder: Send + Sync {
+    async fn embed(&self, text: &str) -> common::Result<Vec<f32>>;
+}
+
 /// Embeds semantic facts into vector storage for similarity search.
 ///
 /// Implementations handle:

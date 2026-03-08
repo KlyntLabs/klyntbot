@@ -5,5 +5,5 @@ pub mod scratchpad;
 pub mod types;
 
 pub use core::ExecutionCore;
-pub use scratchpad::{ReasoningTrace, Scratchpad};
+pub use scratchpad::{ExecutionPlan, PlanStep, ReasoningTrace, Scratchpad};
 pub use types::{accumulate_usage, CycleOutcome, ExecutionParams, ToolExecutionResult};

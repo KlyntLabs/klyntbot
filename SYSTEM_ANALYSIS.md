@@ -714,10 +714,8 @@ Security        ███████░░░  7.5
 
 ### 9.3 Medium Priority
 
-#### R8: Add structured chain-of-thought
-**Current:** No explicit CoT. `Scratchpad`/`ReasoningTrace` is for transparency only.
-**Fix:** For complex tasks (complexity score ≥5), inject a planning step before tool execution: "Before executing, write a step-by-step plan." Parse and track plan completion.
-**Impact:** Improves success rate on multi-step tasks.
+#### ~~R8: Add structured chain-of-thought~~ — SOLVED
+**Fix:** ReactiveEngine now injects a planning prompt for tasks with complexity score >= 5. The LLM generates a structured plan (parsed into `ExecutionPlan` steps) on iteration 1, then executes against it. Plan progress is tracked in the `Scratchpad`, emitted via `AgentEvent::PlanGenerated`/`PlanStepCompleted`, and included in synthesis prompts when max iterations are reached. Advisory only — the LLM is free to deviate.
 
 #### ~~R9: Handle Direct mode tool-call overflow~~ — SOLVED
 **Fix:** `DirectEngine` now returns `EngineResult::Escalate` instead of empty. `ExecutionRouter` catches escalation, clones original messages, and transparently retries with `ReactiveEngine` + actual tools. Usage from the failed Direct attempt is accumulated.
