@@ -1,10 +1,10 @@
-//! Unified `CognitiveContextSource` — replaces `LearningContextSource` +
-//! `ProductivityContextSource` with a single cognitive-memory-backed source.
+//! Unified `CognitiveContextSource` — cognitive-memory-backed context source.
 //!
 //! Loads the structured `UserModel`, active procedural rules, and formats
 //! them as context for the LLM prompt. Optionally injects dynamic
 //! vector-searched facts relevant to the current query.
 
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -60,6 +60,7 @@ pub struct CognitiveContextSource {
     embedder: Option<Arc<dyn SemanticFactEmbedder>>,
     cache: Mutex<Option<CachedModel>>,
     config: CognitiveRetrievalConfig,
+    confidence_bits: Option<Arc<AtomicU32>>,
 }
 
 impl CognitiveContextSource {
@@ -70,6 +71,7 @@ impl CognitiveContextSource {
             embedder: None,
             cache: Mutex::new(None),
             config: CognitiveRetrievalConfig::default(),
+            confidence_bits: None,
         }
     }
 
@@ -85,6 +87,11 @@ impl CognitiveContextSource {
 
     pub fn with_config(mut self, config: CognitiveRetrievalConfig) -> Self {
         self.config = config;
+        self
+    }
+
+    pub fn with_confidence_threshold(mut self, bits: Arc<AtomicU32>) -> Self {
+        self.confidence_bits = Some(bits);
         self
     }
 
@@ -244,6 +251,16 @@ impl ContextSource for CognitiveContextSource {
                     ));
                 }
             }
+        }
+
+        // ── Confidence calibration ──
+        if let Some(ref bits) = self.confidence_bits {
+            let threshold = f32::from_bits(bits.load(Ordering::Relaxed));
+            sections.push(format!(
+                "## Confidence Calibration\n\
+                 Current confidence threshold: {threshold:.2}. \
+                 When uncertain about user intent, ask for clarification rather than guessing."
+            ));
         }
 
         let output = sections.join("\n\n");

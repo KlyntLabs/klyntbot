@@ -1,7 +1,7 @@
 //! Shared embedding utilities for test mocks.
 //!
 //! Provides deterministic embedding generation and cosine similarity
-//! used by both `MockEmbeddingHandler` and `MockConversationEmbeddingHandler`.
+//! used by both `MockEmbeddingHandler` and `MockConversationRecallHandler`.
 
 use tools::EMBEDDING_DIM;
 

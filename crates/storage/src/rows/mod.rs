@@ -8,7 +8,6 @@ pub mod custom_column;
 pub mod finance;
 pub mod key_result;
 pub mod learning;
-pub mod memory;
 pub mod objective;
 pub mod project;
 pub mod session;

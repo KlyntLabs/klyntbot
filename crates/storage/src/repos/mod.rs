@@ -18,7 +18,6 @@ pub mod finance_transaction_repo;
 pub mod interaction_log;
 pub mod key_result;
 pub mod learning_state;
-pub mod memory_note;
 pub mod objective;
 pub mod outcome;
 pub mod project_repo;
@@ -51,7 +50,6 @@ pub use finance_transaction_repo::FinanceTransactionRepo;
 pub use interaction_log::InteractionLogRepo;
 pub use key_result::KeyResultRepo;
 pub use learning_state::LearningStateRepo;
-pub use memory_note::MemoryNoteRepo;
 pub use objective::ObjectiveRepo;
 pub use outcome::OutcomeRepo;
 pub use project_repo::{ProjectFilter, ProjectPatch, ProjectRepo, ProjectWithStats};
@@ -80,7 +78,6 @@ pub struct Repos {
     pub strategies: StrategyRepo,
     pub usage: UsageRepo,
     pub cron: CronRepo,
-    pub memory_notes: MemoryNoteRepo,
     pub learning_state: LearningStateRepo,
     pub decision_log: DecisionLogRepo,
     pub session_context: SessionContextRepo,
@@ -110,7 +107,6 @@ impl Repos {
             strategies: StrategyRepo::new(db.clone()),
             usage: UsageRepo::new(db.clone()),
             cron: CronRepo::new(db.clone()),
-            memory_notes: MemoryNoteRepo::new(db.clone()),
             learning_state: LearningStateRepo::new(db.clone()),
             decision_log: DecisionLogRepo::new(db.clone()),
             session_context: SessionContextRepo::new(db.clone()),

@@ -27,7 +27,6 @@ mod tests {
         DecisionLogRow, EnrichmentFeedbackRow, LearningStateRow, OutcomeRow, StrategyRecordRow,
         StrategySummaryRow,
     };
-    use crate::rows::memory::MemoryNoteRow;
     use crate::rows::objective::ObjectiveRow;
     use crate::rows::project::ProjectRow;
     use crate::rows::session::{SessionListRow, SessionMessageRow, SessionRow};
@@ -531,16 +530,6 @@ mod tests {
                     assessment: serde_json::json!({}),
                     outcome: None,
                     created_at: now,
-                })
-                .unwrap(),
-            ),
-            (
-                "MemoryNoteRow",
-                serde_json::to_value(&MemoryNoteRow {
-                    note_key: "2026-02-24".to_string(),
-                    content: "notes".to_string(),
-                    created_at: now,
-                    updated_at: now,
                 })
                 .unwrap(),
             ),

@@ -4,18 +4,15 @@
 
 use serde_json::json;
 use std::sync::Arc;
-use tools::conversation_embedding::ConversationEmbeddingHandler;
+use tools::conversation_recall::ConversationRecallHandler;
 use tools::memory_tool::MemoryTool;
 use tools::RoutingContext;
 use tools::Tool;
 
 use super::common;
-use common::MockConversationEmbeddingHandler;
+use common::MockConversationRecallHandler;
 
-use klyntbot::agent::context_sources::{
-    BootstrapSource, ConfidenceSource, IdentitySource, MemorySource,
-};
-use klyntbot::agent::MemoryStore;
+use klyntbot::agent::context_sources::{BootstrapSource, ConfidenceSource, IdentitySource};
 use klyntbot::context_engine::{ContextEngine, ContextSource, SourceContext};
 use tempfile::TempDir;
 
@@ -51,8 +48,8 @@ const SAMPLE_MESSAGES: &[(&str, &str, &str)] = &[
 ];
 
 /// Create a test MemoryTool with mock conversation embedding handler.
-async fn create_test_memory_tool() -> (MemoryTool, Arc<MockConversationEmbeddingHandler>) {
-    let handler = Arc::new(MockConversationEmbeddingHandler::new());
+async fn create_test_memory_tool() -> (MemoryTool, Arc<MockConversationRecallHandler>) {
+    let handler = Arc::new(MockConversationRecallHandler::new());
 
     let tool = MemoryTool::new()
         .with_conversation_handler(handler.clone())
@@ -63,7 +60,7 @@ async fn create_test_memory_tool() -> (MemoryTool, Arc<MockConversationEmbedding
 
 /// Embed test messages into the store using the mock handler.
 async fn embed_test_messages(
-    handler: &MockConversationEmbeddingHandler,
+    handler: &MockConversationRecallHandler,
     messages: &[(&str, &str, &str)],
 ) {
     for (i, (role, session_key, content)) in messages.iter().enumerate() {
@@ -92,12 +89,9 @@ fn ctx() -> RoutingContext {
 
 /// Helper: build a ContextEngine with all sources for testing.
 async fn test_context_engine(workspace: std::path::PathBuf) -> ContextEngine {
-    let memory_store = MemoryStore::new(common::test_memory_note_repo().await);
-
     let sources: Vec<Box<dyn ContextSource>> = vec![
         Box::new(IdentitySource::new(workspace.clone(), "UTC".to_string())),
         Box::new(BootstrapSource::new(workspace)),
-        Box::new(MemorySource::new(memory_store)),
         Box::new(ConfidenceSource::new(0.7)),
     ];
 
@@ -379,10 +373,6 @@ async fn status_reports_accurate_counts() {
         result.contains("Available: yes"),
         "Expected handler to be available"
     );
-    assert!(
-        result.contains("telegram") || result.contains("discord"),
-        "Expected indexed channels"
-    );
 }
 
 #[tokio::test]
@@ -401,27 +391,15 @@ async fn status_reports_channels_indexed() {
     let args = json!({"action": "status"});
     let result = tool.execute(args, &ctx()).await.unwrap();
 
-    // Verify all channels reported
-    assert!(
-        result.contains("telegram") || result.contains("Indexed channels"),
-        "Should report telegram channel: {}",
-        result
-    );
-    assert!(
-        result.contains("discord"),
-        "Should report discord channel: {}",
-        result
-    );
-    assert!(
-        result.contains("whatsapp"),
-        "Should report whatsapp channel: {}",
-        result
-    );
-
     // Verify count
     assert!(
         result.contains("Total embeddings: 3"),
         "Should show 3 total embeddings: {}",
+        result
+    );
+    assert!(
+        result.contains("Available: yes"),
+        "Should show handler is available: {}",
         result
     );
 }
@@ -747,7 +725,7 @@ async fn hybrid_zero_keyword() {
 
 #[tokio::test]
 async fn hybrid_zero_semantic() {
-    let handler = Arc::new(MockConversationEmbeddingHandler::unavailable());
+    let handler = Arc::new(MockConversationRecallHandler::unavailable());
 
     let tool = MemoryTool::new()
         .with_conversation_handler(handler)

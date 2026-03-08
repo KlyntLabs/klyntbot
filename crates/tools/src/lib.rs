@@ -38,7 +38,7 @@ pub mod progress_handler;
 pub mod project_tool;
 
 // ── Embedding infrastructure ─────────────────────────────────────────────────
-pub mod conversation_embedding;
+pub mod conversation_recall;
 pub mod embedding_engine;
 pub mod embedding_store;
 
@@ -63,10 +63,9 @@ pub use area_tool::AreaTool;
 // Delegation
 pub use delegation::{DelegationHandler, DelegationTool};
 
-// Conversation embedding
-pub use conversation_embedding::{
-    ConversationEmbeddingHandler, ConversationEmbeddingRecord, ConversationEmbeddingStatus,
-    ConversationEmbeddingStore, PurgeFilter,
+// Conversation recall
+pub use conversation_recall::{
+    ConversationRecallHandler, ConversationRecallStatus, PurgeFilter, RecallSearchResult,
 };
 
 // Embedding engine

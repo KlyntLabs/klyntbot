@@ -30,8 +30,8 @@ use tools_core::FeaturePackage;
 
 use super::super::confidence::ConfidenceEvaluator;
 use super::super::context_sources::{
-    AgentContextSource, AreaSource, BootstrapSource, IdentitySource, LearningContextSource,
-    PageContextSource, PersonaContextSource, ProductivityContextSource, TodoSource,
+    AgentContextSource, AreaSource, BootstrapSource, IdentitySource, PageContextSource,
+    PersonaContextSource, ProductivityContextSource, TodoSource,
 };
 use super::super::{CronHandlerAdapter, SubagentManager};
 use super::{AgentLoop, LastActiveChannel};
@@ -165,40 +165,13 @@ impl AgentLoopBuilder {
             tokio::sync::RwLock<Option<Arc<crate::agent_profile::AgentProfile>>>,
         > = Arc::new(tokio::sync::RwLock::new(None));
 
-        // ── Shared embedding engine (created early for MemoryStore + later use) ──
+        // ── Shared embedding engine ──
         let embedding_engine = Arc::new(tools::EmbeddingEngine::new());
 
-        // ── Memory store (with optional embedding-based relevance filtering) ──
-        let memory_store = if let (true, Some(vs)) = (
-            config.conversation.embedding.enabled,
-            self.vector_store.clone(),
-        ) {
-            crate::memory::MemoryStore::with_embeddings(
-                repos.memory_notes.clone(),
-                vs,
-                Arc::clone(&embedding_engine),
-                config.conversation.search.semantic_threshold,
-            )
-        } else {
-            crate::memory::MemoryStore::new(repos.memory_notes.clone())
-        };
-
         // ── Context sources ───────────────────────────────────────────────
-        // LearningContextSource replaces MemorySource + ConfidenceSource with a
-        // single source that also provides user profile, behavioral patterns,
-        // and agent adaptations.
         let confidence_bits = Arc::new(std::sync::atomic::AtomicU32::new(
             config.confidence.threshold.to_bits(),
         ));
-        let learning_source = LearningContextSource::new(
-            repos.user_profile.clone(),
-            repos.behavioral_patterns.clone(),
-            repos.agent_adaptations.clone(),
-            Arc::clone(&confidence_bits),
-            Some(memory_store),
-            Arc::clone(&active_profile),
-        );
-        let confidence_threshold_handle = learning_source.threshold_handle();
 
         // Load persona manager for PersonaContextSource
         let personas_dir = workspace.join("personas");
@@ -212,7 +185,6 @@ impl AgentLoopBuilder {
                 config.timezone.clone(),
             )),
             Box::new(BootstrapSource::new(workspace.clone())),
-            Box::new(learning_source),
             Box::new(AreaSource::new(repos.areas.clone())),
             Box::new(TodoSource::new(repos.actions.clone())),
             Box::new(AgentContextSource::new(Arc::clone(&active_profile))),
@@ -267,7 +239,8 @@ impl AgentLoopBuilder {
                 sources.push(Box::new(
                     cognitive::CognitiveContextSource::new(fact_repo.clone(), rule_repo)
                         .with_embedder_opt(cognitive_embedder.clone())
-                        .with_config(retrieval_config),
+                        .with_config(retrieval_config)
+                        .with_confidence_threshold(Arc::clone(&confidence_bits)),
                 ));
 
                 // Start background consolidation service if we have a DomainEventBus
@@ -436,23 +409,33 @@ impl AgentLoopBuilder {
             None
         };
 
-        // ── Wire automatic memory retrieval (cross-channel LanceDB ANN) ─
-        let context_engine = if let (true, Some(vs)) = (
-            config.conversation.embedding.enabled,
-            self.vector_store.clone(),
-        ) {
-            let conv_store_for_retriever = tools::ConversationEmbeddingStore::new(vs);
-            // Compute per-day decay factor from configured half-life: factor = 0.5^(1/half_life)
-            let decay_factor =
-                0.5_f64.powf(1.0 / config.conversation.memory.decay_half_life_days as f64);
-            let retriever = Arc::new(
-                super::super::conversation_memory_retriever::ConversationMemoryRetriever::new(
+        // ── Create ConversationRecallService (shared by retriever + handler) ──
+        let recall_service: Option<Arc<cognitive::ConversationRecallService>> =
+            if let (true, Some(ref vs)) = (
+                config.conversation.embedding.enabled,
+                self.vector_store.clone(),
+            ) {
+                let text_embedder = Arc::new(crate::cognitive_embedder::TextEmbedderImpl::new(
                     Arc::clone(&embedding_engine),
-                    conv_store_for_retriever,
-                    config.conversation.search.semantic_threshold,
-                    decay_factor,
-                ),
-            );
+                ));
+                Some(Arc::new(cognitive::ConversationRecallService::new(
+                    vs.clone(),
+                    text_embedder,
+                    cognitive::RecallConfig {
+                        decay_half_life_days: config.conversation.memory.decay_half_life_days
+                            as f64,
+                        default_threshold: config.conversation.search.semantic_threshold as f32,
+                        ..cognitive::RecallConfig::default()
+                    },
+                )))
+            } else {
+                None
+            };
+
+        // ── Wire automatic memory retrieval (CognitiveMemoryRetriever) ───
+        let context_engine = if let Some(ref recall) = recall_service {
+            let retriever =
+                Arc::new(cognitive::CognitiveMemoryRetriever::new(Arc::clone(recall)));
             context_engine.with_memory_retriever(retriever)
         } else {
             context_engine
@@ -562,34 +545,31 @@ impl AgentLoopBuilder {
             repos.projects.clone(),
             repos.actions.clone(),
         ));
-        // ── Conversation embedding handler ────────────────────────────────
-        let conversation_embedding_handler = if let (true, Some(vs)) = (
-            config.conversation.embedding.enabled,
-            self.vector_store.clone(),
-        ) {
-            let conv_store = tools::ConversationEmbeddingStore::new(vs);
-            let handler = Arc::new(
-                super::super::conversation_embedding_handler::ConversationEmbeddingHandlerImpl::new(
-                    Arc::clone(&embedding_engine),
-                    conv_store,
-                ),
-            );
-            Some(handler as Arc<dyn tools::ConversationEmbeddingHandler>)
-        } else {
-            None
-        };
+        // ── Conversation recall handler ──────────────────────────────────
+        let conversation_recall_handler: Option<Arc<dyn tools::ConversationRecallHandler>> =
+            recall_service.as_ref().map(|service| {
+                Arc::new(
+                    super::super::conversation_recall_handler::ConversationRecallHandlerImpl::new(
+                        Arc::clone(service),
+                    ),
+                ) as Arc<dyn tools::ConversationRecallHandler>
+            });
 
         // ── Memory tool ───────────────────────────────────────────────────
         if config.conversation.search.enabled {
-            if let Some(ref handler) = conversation_embedding_handler {
+            if let Some(ref handler) = conversation_recall_handler {
                 let mut memory_tool = tools::MemoryTool::new()
                     .with_conversation_handler(Arc::clone(handler))
                     .with_todo_repo(repos.actions.clone())
                     .with_threshold(config.conversation.search.semantic_threshold)
                     .with_rrf_k(config.todo.search.rrf_k);
 
-                if let Some(ref h) = todo_embedding_handler {
-                    memory_tool = memory_tool.with_todo_embedding_handler(Arc::clone(h));
+                if let (Some(ref h), Some(ref vs)) =
+                    (&todo_embedding_handler, &self.vector_store)
+                {
+                    memory_tool = memory_tool
+                        .with_todo_embedding_handler(Arc::clone(h))
+                        .with_embedding_store(vs.clone());
                 }
 
                 tool_registry.register(memory_tool);
@@ -812,17 +792,17 @@ impl AgentLoopBuilder {
                 learning_handler as Arc<dyn LearningHandler>,
             )));
 
-            // Event bus: subscriber updates LearningContextSource threshold
+            // Event bus: subscriber updates cognitive confidence threshold
             let event_bus = Arc::new(bus::LearningEventBus::new(16));
 
-            let threshold_for_subscriber = confidence_threshold_handle.clone();
+            let threshold_for_subscriber = Arc::clone(&confidence_bits);
             let mut event_rx = event_bus.subscribe();
             tokio::spawn(async move {
                 while let Ok(event) = event_rx.recv().await {
                     if let bus::LearningEvent::ThresholdChanged { new_threshold, .. } = event {
                         threshold_for_subscriber.store(new_threshold.to_bits(), Ordering::Relaxed);
                         info!(
-                            "LearningContextSource threshold updated by LearningService: {:.3}",
+                            "Confidence threshold updated by LearningService: {:.3}",
                             new_threshold
                         );
                     }
@@ -986,7 +966,7 @@ impl AgentLoopBuilder {
             reminder_engine,
             recurring_task_spawner,
             _notification_dispatcher: notification_dispatcher,
-            conversation_embedding_handler,
+            conversation_recall_handler,
             learning_service,
             runtime,
             strategy_repo: Some(repos.strategies.clone()),

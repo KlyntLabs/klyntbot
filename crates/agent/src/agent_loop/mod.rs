@@ -52,8 +52,8 @@ pub struct AgentLoop {
     pub(crate) recurring_task_spawner: Option<Arc<RwLock<super::RecurringTaskSpawner>>>,
     /// Held for lifetime; shared with notification targets
     pub(crate) _notification_dispatcher: Option<Arc<super::NotificationDispatcher>>,
-    /// Conversation embedding handler for semantic memory (Phase 4.1)
-    pub(crate) conversation_embedding_handler: Option<Arc<dyn tools::ConversationEmbeddingHandler>>,
+    /// Conversation recall handler for semantic memory
+    pub(crate) conversation_recall_handler: Option<Arc<dyn tools::ConversationRecallHandler>>,
     /// Background learning service for adaptive threshold updates (None if learning disabled)
     pub(crate) learning_service: Option<Arc<RwLock<crate::learning::LearningService>>>,
     /// Agent runtime: agent-first pipeline replacing IntentPipeline.
@@ -456,7 +456,7 @@ impl AgentLoop {
     /// Spawns a background task to embed the message if a handler is configured
     /// and the session/role is not excluded.
     fn spawn_embed_message(&self, session_key: &str, role: &str, content: &str, msg_id: &str) {
-        if let Some(handler) = &self.conversation_embedding_handler {
+        if let Some(handler) = &self.conversation_recall_handler {
             if self.should_embed_conversation(session_key, role) {
                 let h = handler.clone();
                 let sk = session_key.to_string();

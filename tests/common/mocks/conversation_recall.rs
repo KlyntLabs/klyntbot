@@ -1,16 +1,14 @@
-//! Mock ConversationEmbeddingHandler for Phase 4.1 tests.
+//! Mock ConversationRecallHandler for integration tests.
 //!
-//! Provides a controllable mock following the 3-mode pattern from Sprint 5.
-//! Avoids loading the 420MB fastembed model in tests.
+//! Provides a controllable mock that avoids loading the 420MB fastembed model in tests.
 
 use super::embedding_utils::{cosine_similarity, deterministic_embedding};
 use async_trait::async_trait;
 use chrono::Utc;
 use std::collections::HashMap;
 use std::sync::Mutex;
-use tools::conversation_embedding::{
-    ConversationEmbeddingHandler, ConversationEmbeddingRecord, ConversationEmbeddingStatus,
-    PurgeFilter,
+use tools::conversation_recall::{
+    ConversationRecallHandler, ConversationRecallStatus, PurgeFilter, RecallSearchResult,
 };
 
 /// Record of an embed_message call for test assertions
@@ -22,8 +20,8 @@ pub struct EmbedCallRecord {
     pub message_id: String,
 }
 
-/// Mock conversation embedding handler for testing.
-pub struct MockConversationEmbeddingHandler {
+/// Mock conversation recall handler for testing.
+pub struct MockConversationRecallHandler {
     /// Pre-loaded embeddings keyed by message ID
     pub embeddings: Mutex<HashMap<String, Vec<f32>>>,
     /// Whether the mock should report as available
@@ -34,13 +32,13 @@ pub struct MockConversationEmbeddingHandler {
     pub search_calls: Mutex<Vec<String>>,
 }
 
-impl Default for MockConversationEmbeddingHandler {
+impl Default for MockConversationRecallHandler {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl MockConversationEmbeddingHandler {
+impl MockConversationRecallHandler {
     /// Create an available mock that generates deterministic embeddings.
     pub fn new() -> Self {
         Self {
@@ -83,7 +81,7 @@ impl MockConversationEmbeddingHandler {
 }
 
 #[async_trait]
-impl ConversationEmbeddingHandler for MockConversationEmbeddingHandler {
+impl ConversationRecallHandler for MockConversationRecallHandler {
     async fn embed_message(
         &self,
         session_key: &str,
@@ -121,12 +119,12 @@ impl ConversationEmbeddingHandler for MockConversationEmbeddingHandler {
         query: &str,
         limit: usize,
         threshold: f64,
-    ) -> ::common::Result<Vec<(ConversationEmbeddingRecord, f64)>> {
+    ) -> ::common::Result<Vec<RecallSearchResult>> {
         self.search_calls.lock().unwrap().push(query.to_string());
 
         if !self.available {
             return Err(::common::ToolError::ExecutionFailed(
-                "Mock conversation embedding handler unavailable".to_string(),
+                "Mock conversation recall handler unavailable".to_string(),
             )
             .into());
         }
@@ -134,26 +132,24 @@ impl ConversationEmbeddingHandler for MockConversationEmbeddingHandler {
         let embeddings = self.embeddings.lock().unwrap();
         let query_embedding = Self::deterministic_embedding(query);
 
-        let mut results: Vec<(ConversationEmbeddingRecord, f64)> = embeddings
+        let mut results: Vec<RecallSearchResult> = embeddings
             .iter()
             .map(|(id, emb)| {
                 let similarity = cosine_similarity(&query_embedding, emb);
-                let record = ConversationEmbeddingRecord {
+                RecallSearchResult {
                     id: id.clone(),
                     session_key: "mock:session".to_string(),
                     role: "user".to_string(),
                     content_preview: "Mock content".to_string(),
                     content_full: "Mock content".to_string(),
-                    embedding: emb.clone(),
-                    model: "mock-model".to_string(),
-                    embedded_at: Utc::now(),
-                };
-                (record, similarity)
+                    score: similarity,
+                    created_at: Utc::now(),
+                }
             })
-            .filter(|(_, score)| *score >= threshold)
+            .filter(|r| r.score >= threshold)
             .collect();
 
-        results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
         results.truncate(limit);
 
         Ok(results)
@@ -166,21 +162,9 @@ impl ConversationEmbeddingHandler for MockConversationEmbeddingHandler {
         Ok(count)
     }
 
-    async fn status(&self) -> ::common::Result<ConversationEmbeddingStatus> {
-        let calls = self.embed_message_calls.lock().unwrap();
-        let mut channels: Vec<String> = calls
-            .iter()
-            .filter_map(|c| c.session_key.split(':').next().map(String::from))
-            .collect::<std::collections::HashSet<_>>()
-            .into_iter()
-            .collect();
-        channels.sort();
-
-        Ok(ConversationEmbeddingStatus {
+    async fn status(&self) -> ::common::Result<ConversationRecallStatus> {
+        Ok(ConversationRecallStatus {
             total_embeddings: self.embeddings.lock().unwrap().len(),
-            indexed_channels: channels,
-            oldest_embedding: None,
-            newest_embedding: None,
             is_available: self.available,
         })
     }

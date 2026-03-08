@@ -97,3 +97,23 @@ impl SemanticFactEmbedder for SemanticFactEmbedderImpl {
         self.engine.is_available()
     }
 }
+
+/// Generic text-to-vector embedder wrapping `EmbeddingEngine`.
+///
+/// Used by `ConversationRecallService` in the cognitive crate.
+pub struct TextEmbedderImpl {
+    engine: Arc<EmbeddingEngine>,
+}
+
+impl TextEmbedderImpl {
+    pub fn new(engine: Arc<EmbeddingEngine>) -> Self {
+        Self { engine }
+    }
+}
+
+#[async_trait]
+impl cognitive::TextEmbedder for TextEmbedderImpl {
+    async fn embed(&self, text: &str) -> common::Result<Vec<f32>> {
+        self.engine.clone().embed_async(text.to_string()).await
+    }
+}

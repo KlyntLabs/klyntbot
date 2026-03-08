@@ -8,9 +8,7 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::conversation_embedding::{
-    ConversationEmbeddingHandler, ConversationEmbeddingRecord, PurgeFilter,
-};
+use crate::conversation_recall::{ConversationRecallHandler, PurgeFilter, RecallSearchResult};
 use crate::embedding_engine::EmbeddingHandler;
 use crate::todo_types::Action;
 use crate::{RoutingContext, Tool};
@@ -18,7 +16,7 @@ use common::Result;
 
 /// Tool for semantic search over conversation history.
 pub struct MemoryTool {
-    conversation_handler: Option<Arc<dyn ConversationEmbeddingHandler>>,
+    conversation_handler: Option<Arc<dyn ConversationRecallHandler>>,
     semantic_threshold: f64,
     /// RRF k parameter for hybrid search (from config)
     rrf_k: u32,
@@ -43,10 +41,10 @@ impl MemoryTool {
         }
     }
 
-    /// Inject conversation embedding handler for semantic search.
+    /// Inject conversation recall handler for semantic search.
     pub fn with_conversation_handler(
         mut self,
-        handler: Arc<dyn ConversationEmbeddingHandler>,
+        handler: Arc<dyn ConversationRecallHandler>,
     ) -> Self {
         self.conversation_handler = Some(handler);
         self
@@ -187,7 +185,7 @@ impl MemoryTool {
             .and_then(|v| v.as_f64())
             .unwrap_or(self.semantic_threshold);
 
-        let results: Vec<(ConversationEmbeddingRecord, f64)> =
+        let results: Vec<RecallSearchResult> =
             handler.search(query, limit, threshold).await?;
 
         if results.is_empty() {
@@ -199,10 +197,10 @@ impl MemoryTool {
 
         let mut output = format!("{} conversation(s) matching '{}':\n", results.len(), query);
 
-        for (record, similarity) in &results {
+        for result in &results {
             output.push_str(&format!(
                 "\n- [{}] {} said: \"{}\" (similarity: {:.3}, session: {})",
-                record.id, record.role, record.content_preview, similarity, record.session_key
+                result.id, result.role, result.content_preview, result.score, result.session_key
             ));
         }
 
@@ -235,9 +233,9 @@ impl MemoryTool {
             );
         }
 
-        // 1. Search conversations
-        let conversation_results: Vec<(ConversationEmbeddingRecord, f64)> =
-            handler.search(query, limit * 2, threshold).await?;
+        // 1. Search conversations (service already overfetches internally for decay filtering)
+        let conversation_results: Vec<RecallSearchResult> =
+            handler.search(query, limit, threshold).await?;
 
         // 2. Search todos (keyword + semantic if available)
         let todo_results: Vec<(Action, f64)> = if let Some(todo_repo) = &self.todo_repo {
@@ -322,7 +320,7 @@ impl MemoryTool {
         let conversation_search_results: Vec<crate::search_utils::SearchResult> =
             conversation_results
                 .iter()
-                .map(|(rec, _)| crate::search_utils::SearchResult::Conversation(rec.clone()))
+                .map(|r| crate::search_utils::SearchResult::Conversation(r.clone()))
                 .collect();
 
         let todo_search_results: Vec<crate::search_utils::SearchResult> = todo_results
@@ -332,10 +330,10 @@ impl MemoryTool {
 
         // Build ID lookup map for conversations
         let mut results_by_id: HashMap<String, crate::search_utils::SearchResult> = HashMap::new();
-        for (rec, _) in &conversation_results {
+        for r in &conversation_results {
             results_by_id.insert(
-                rec.id.clone(),
-                crate::search_utils::SearchResult::Conversation(rec.clone()),
+                r.id.clone(),
+                crate::search_utils::SearchResult::Conversation(r.clone()),
             );
         }
         for (todo, _) in &todo_results {
@@ -348,7 +346,7 @@ impl MemoryTool {
         // Prepare semantic results for RRF (both conversations and todos)
         let mut semantic_results: Vec<(String, f64)> = conversation_results
             .iter()
-            .map(|(rec, sim)| (rec.id.clone(), *sim))
+            .map(|r| (r.id.clone(), r.score))
             .collect();
         semantic_results.extend(
             todo_results
@@ -476,11 +474,11 @@ impl MemoryTool {
         ))
     }
 
-    /// Show conversation embedding store status.
+    /// Show conversation recall status.
     async fn show_status(&self) -> Result<String> {
         let handler = self.conversation_handler.as_ref().ok_or_else(|| {
             common::ToolError::InvalidParams(
-                "Conversation embedding handler not available".to_string(),
+                "Conversation recall handler not available".to_string(),
             )
         })?;
 
@@ -493,21 +491,6 @@ impl MemoryTool {
             if status.is_available { "yes" } else { "no" }
         ));
 
-        if !status.indexed_channels.is_empty() {
-            output.push_str(&format!(
-                "\nIndexed channels: {}",
-                status.indexed_channels.join(", ")
-            ));
-        }
-
-        if let Some(oldest) = status.oldest_embedding {
-            output.push_str(&format!("\nOldest: {}", oldest.format("%Y-%m-%d %H:%M")));
-        }
-
-        if let Some(newest) = status.newest_embedding {
-            output.push_str(&format!("\nNewest: {}", newest.format("%Y-%m-%d %H:%M")));
-        }
-
         Ok(output)
     }
 }
@@ -515,12 +498,8 @@ impl MemoryTool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::conversation_embedding::{ConversationEmbeddingRecord, ConversationEmbeddingStatus};
+    use crate::conversation_recall::ConversationRecallStatus;
     use chrono::Utc;
-
-    // ──────────────────────────────────────────────────────────────────────
-    // Section 3.3: MemoryTool Unit Tests
-    // ──────────────────────────────────────────────────────────────────────
 
     /// Mock handler for testing
     struct MockConversationHandler {
@@ -528,7 +507,7 @@ mod tests {
     }
 
     #[async_trait]
-    impl ConversationEmbeddingHandler for MockConversationHandler {
+    impl ConversationRecallHandler for MockConversationHandler {
         async fn embed_message(
             &self,
             _session_key: &str,
@@ -544,27 +523,24 @@ mod tests {
             query: &str,
             limit: usize,
             _threshold: f64,
-        ) -> Result<Vec<(ConversationEmbeddingRecord, f64)>> {
-            // Return mock results
+        ) -> Result<Vec<RecallSearchResult>> {
             if query == "test query" {
-                let record = ConversationEmbeddingRecord {
+                let result = RecallSearchResult {
                     id: "msg-1".to_string(),
                     session_key: "cli:test".to_string(),
                     role: "user".to_string(),
                     content_preview: "This is a test message".to_string(),
                     content_full: "This is a test message".to_string(),
-                    embedding: vec![0.1; 384],
-                    model: "test-model".to_string(),
-                    embedded_at: Utc::now(),
+                    score: 0.85,
+                    created_at: Utc::now(),
                 };
-                Ok(vec![(record, 0.85)].into_iter().take(limit).collect())
+                Ok(vec![result].into_iter().take(limit).collect())
             } else {
                 Ok(vec![])
             }
         }
 
         async fn purge(&self, filter: PurgeFilter) -> Result<usize> {
-            // Return mock count based on filter
             match filter {
                 PurgeFilter::All => Ok(10),
                 PurgeFilter::BySessionKey(_) => Ok(3),
@@ -572,12 +548,9 @@ mod tests {
             }
         }
 
-        async fn status(&self) -> Result<ConversationEmbeddingStatus> {
-            Ok(ConversationEmbeddingStatus {
+        async fn status(&self) -> Result<ConversationRecallStatus> {
+            Ok(ConversationRecallStatus {
                 total_embeddings: 42,
-                indexed_channels: vec!["cli:test".to_string(), "telegram:123".to_string()],
-                oldest_embedding: Some(Utc::now() - chrono::Duration::days(30)),
-                newest_embedding: Some(Utc::now()),
                 is_available: self.available,
             })
         }
@@ -706,7 +679,6 @@ mod tests {
         let result = tool.execute(args, &ctx).await.unwrap();
         assert!(result.contains("Total embeddings: 42"));
         assert!(result.contains("Available: yes"));
-        assert!(result.contains("Indexed channels: cli:test, telegram:123"));
     }
 
     #[tokio::test]

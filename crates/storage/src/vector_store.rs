@@ -17,12 +17,11 @@ use crate::error::StorageError;
 
 /// LanceDB-backed vector store for embedding similarity search.
 ///
-/// Manages four tables (all share the convention: `id` first, `vector` second,
+/// Manages three tables (all share the convention: `id` first, `vector` second,
 /// extra string fields, timestamp last):
 ///
 /// - `todo_embeddings`              — id, vector(384), model, updated_at
 /// - `conv_embeddings`              — id, vector(384), session_key, role, content_preview, full_content, created_at
-/// - `memory_note_embeddings`       — id, vector(384), updated_at
 /// - `cognitive_fact_embeddings`    — id, vector(384), domain, text, importance, stability, confidence, updated_at
 #[derive(Clone)]
 pub struct VectorStore {
@@ -51,9 +50,6 @@ impl VectorStore {
         let store = Self { db: Arc::new(db) };
         store.ensure_table("todo_embeddings", todo_schema()).await?;
         store.ensure_table("conv_embeddings", conv_schema()).await?;
-        store
-            .ensure_table("memory_note_embeddings", memory_note_schema())
-            .await?;
         store
             .ensure_table("cognitive_fact_embeddings", cognitive_fact_schema())
             .await?;
@@ -97,9 +93,6 @@ impl VectorStore {
     /// // conv_embeddings: extra = session_key, role, content_preview, full_content
     /// store.upsert_embedding("conv_embeddings", "msg-1", &vec,
     ///     &[("session_key", "sess"), ("role", "user"), ("content_preview", "Hi"), ("full_content", "Hi there")]).await?;
-    ///
-    /// // memory_note_embeddings: no extra fields
-    /// store.upsert_embedding("memory_note_embeddings", "note-7", &vec, &[]).await?;
     /// ```
     pub async fn upsert_embedding(
         &self,
@@ -460,7 +453,6 @@ impl VectorStore {
         let tables = [
             "todo_embeddings",
             "conv_embeddings",
-            "memory_note_embeddings",
             "cognitive_fact_embeddings",
         ];
         for table_name in tables {
@@ -538,14 +530,6 @@ fn conv_schema() -> Schema {
         Field::new("content_preview", DataType::Utf8, false),
         Field::new("full_content", DataType::Utf8, false),
         Field::new("created_at", DataType::Utf8, false),
-    ])
-}
-
-fn memory_note_schema() -> Schema {
-    Schema::new(vec![
-        Field::new("id", DataType::Utf8, false),
-        vector_field(),
-        Field::new("updated_at", DataType::Utf8, false),
     ])
 }
 
@@ -665,11 +649,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_conv_and_memory_note_tables_created() {
+    async fn test_conv_table_created() {
         let (store, _dir) = test_store().await;
-        // These should return 0 (empty tables exist) rather than error.
+        // Should return 0 (empty table exists) rather than error.
         assert_eq!(store.count("conv_embeddings").await.unwrap(), 0);
-        assert_eq!(store.count("memory_note_embeddings").await.unwrap(), 0);
     }
 
     #[tokio::test]

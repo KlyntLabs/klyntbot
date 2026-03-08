@@ -4,16 +4,16 @@
 //! global disable, error handling, and metadata correctness.
 
 use std::sync::Arc;
-use tools::conversation_embedding::ConversationEmbeddingHandler;
+use tools::conversation_recall::ConversationRecallHandler;
 
 use super::common;
-use common::MockConversationEmbeddingHandler;
+use common::MockConversationRecallHandler;
 
 // ── Embedding Generation ──────────────────────────────────────
 
 #[tokio::test]
 async fn user_assistant_messages_embedded_on_save() {
-    let handler = Arc::new(MockConversationEmbeddingHandler::new());
+    let handler = Arc::new(MockConversationRecallHandler::new());
 
     // Use Session directly (no DB needed — embedding tests don't require persistence)
     let mut session = session::Session::new("telegram:12345");
@@ -78,7 +78,7 @@ async fn user_assistant_messages_embedded_on_save() {
 
 #[tokio::test]
 async fn system_tool_messages_not_embedded() {
-    let handler = Arc::new(MockConversationEmbeddingHandler::new());
+    let handler = Arc::new(MockConversationRecallHandler::new());
 
     let mut session = session::Session::new("telegram:12345");
     let session_key = "telegram:12345";
@@ -124,7 +124,7 @@ async fn system_tool_messages_not_embedded() {
 
 #[tokio::test]
 async fn channel_exclusion_prevents_embedding() {
-    let handler = Arc::new(MockConversationEmbeddingHandler::new());
+    let handler = Arc::new(MockConversationRecallHandler::new());
 
     // Simulate config with excludeChannels: ["whatsapp"]
     // In production, AgentLoop checks config and skips embed_message for excluded channels
@@ -163,7 +163,7 @@ async fn channel_exclusion_prevents_embedding() {
 
 #[tokio::test]
 async fn global_disable_prevents_embedding() {
-    let handler = Arc::new(MockConversationEmbeddingHandler::new());
+    let handler = Arc::new(MockConversationRecallHandler::new());
 
     let mut session = session::Session::new("telegram:12345");
 
@@ -192,7 +192,7 @@ async fn global_disable_prevents_embedding() {
 #[tokio::test]
 async fn embedding_failure_non_blocking() {
     // Use unavailable() mode to simulate embedding failure
-    let handler = Arc::new(MockConversationEmbeddingHandler::unavailable());
+    let handler = Arc::new(MockConversationRecallHandler::unavailable());
 
     let mut session = session::Session::new("telegram:12345");
     let session_key = "telegram:12345";
@@ -236,7 +236,7 @@ async fn embedding_failure_non_blocking() {
 
 #[tokio::test]
 async fn role_prefix_included_in_embedding() {
-    let handler = Arc::new(MockConversationEmbeddingHandler::new());
+    let handler = Arc::new(MockConversationRecallHandler::new());
 
     handler
         .embed_message("telegram:12345", "user", "Test message", "msg1")
@@ -252,7 +252,7 @@ async fn role_prefix_included_in_embedding() {
     // The deterministic embedding should include the role prefix
     let expected_text = "user: Test message";
     let expected_embedding =
-        MockConversationEmbeddingHandler::deterministic_embedding(expected_text);
+        MockConversationRecallHandler::deterministic_embedding(expected_text);
 
     let embeddings = handler.embeddings.lock().unwrap();
     let stored_embedding = embeddings.get("msg1").unwrap();
@@ -263,7 +263,7 @@ async fn role_prefix_included_in_embedding() {
 
 #[tokio::test]
 async fn metadata_fields_populated() {
-    let handler = Arc::new(MockConversationEmbeddingHandler::new());
+    let handler = Arc::new(MockConversationRecallHandler::new());
 
     handler
         .embed_message(

@@ -15,8 +15,13 @@ use tools::RoutingContext;
 use tracing::{debug, warn};
 
 use crate::agent_profile::{AgentManager, AgentProfile};
-use crate::context_sources::learning::{PATTERN_MIN_SAMPLES, PROFILE_MIN_CONFIDENCE};
 use crate::events::AgentEvent;
+
+/// Minimum confidence for user profile entries to appear in context.
+const PROFILE_MIN_CONFIDENCE: f64 = 0.5;
+
+/// Minimum sample count for behavioral patterns to appear in context.
+const PATTERN_MIN_SAMPLES: i32 = 5;
 use crate::execution::ExecutionParams;
 use crate::intent_pipeline::analysis::IntentAnalyzer;
 use crate::intent_pipeline::pipeline::PipelineConfig;
@@ -526,7 +531,7 @@ impl AgentRuntime {
             return;
         };
 
-        // Run independent DB queries concurrently (matches LearningContextSource pattern)
+        // Run independent DB queries concurrently
         let (profile_result, patterns_result, adaptations_result) = tokio::join!(
             profile_repo.list_above_confidence(PROFILE_MIN_CONFIDENCE),
             pattern_repo.list_reliable(PATTERN_MIN_SAMPLES),

@@ -3,7 +3,7 @@
 //! Centralizes all mock implementations to avoid compiling them
 //! as separate (empty) test binaries.
 
-pub mod conversation_embedding;
+pub mod conversation_recall;
 pub mod embedding;
 pub mod embedding_utils;
 pub mod learning;
@@ -11,7 +11,7 @@ pub mod provider;
 
 // Re-exports for convenience (not all test binaries use every mock)
 #[allow(unused_imports)]
-pub use conversation_embedding::MockConversationEmbeddingHandler;
+pub use conversation_recall::MockConversationRecallHandler;
 #[allow(unused_imports)]
 pub use embedding::MockEmbeddingHandler;
 #[allow(unused_imports)]

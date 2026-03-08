@@ -202,12 +202,12 @@ score = 0.30 × semantic_similarity    // (currently hardcoded 0.5 — gap!)
 
 ### 2.6 Conversation Memory (Vector-Based)
 
-Separate from cognitive memory, this system embeds conversations for retrieval:
+Conversation recall is handled by the cognitive system's `ConversationRecallService`:
 
 - **Model:** `paraphrase-multilingual-MiniLM-L12-v2` (384 dimensions, ~420MB)
-- **Storage:** LanceDB with three tables: `todo_embeddings`, `conv_embeddings`, `memory_note_embeddings`
-- **Retrieval:** ANN nearest-neighbor with cosine similarity and configurable threshold
-- **Injection:** Retrieved memories added to LLM context at `Priority::RetrievedMemory`
+- **Storage:** LanceDB with two tables: `todo_embeddings`, `conv_embeddings`
+- **Retrieval:** ANN nearest-neighbor with cosine similarity, FSRS-weighted decay (138-day half-life)
+- **Injection:** Retrieved memories added to LLM context via `CognitiveContextSource`
 
 ### 2.7 Context Assembly (Token Budget Management)
 
@@ -530,7 +530,7 @@ Each `feature-*` crate implements `FeaturePackage`:
 
 1. **Semantic similarity is hardcoded to 0.5.** `cognitive/retrieval.rs:L57` uses a placeholder value for the largest weight factor (0.30) in the relevance formula. Vector search exists but is not connected to cognitive retrieval. This significantly degrades memory relevance ranking.
 
-2. **Two parallel memory systems.** `MemoryStore` (older vector-based) and `cognitive` (newer structured) coexist without cross-referencing. This creates confusion about which system is authoritative and doubles maintenance.
+2. ~~**Two parallel memory systems.**~~ Solved — `MemoryStore` removed. Cognitive system is the single memory owner (see R2).
 
 3. **CLI serve mode divergence.** `handle_serve` in `cli/src/serve.rs` doesn't use `AppCore::init()` — it manually wires everything, missing cognitive pipeline, coaching, and productivity features. ~400 lines of duplicated init code.
 
@@ -677,29 +677,19 @@ Security        ███████░░░  7.5
 
 ### 9.1 Critical (Highest Impact)
 
-#### R1: Connect vector search to cognitive retrieval
-**Current:** `cognitive/retrieval.rs:L57` hardcodes `semantic_similarity = 0.5`
-**Fix:** Embed semantic facts (SPO triples) into LanceDB on creation. When retrieving, embed the query and compute actual cosine similarity. This would make the 0.30 weight factor in the relevance formula functional.
-**Impact:** Memory retrieval relevance improves dramatically. The entire FSRS scoring system becomes meaningful.
+#### ~~R1: Connect vector search to cognitive retrieval~~ — SOLVED
+**Fix:** `SemanticFactEmbedder` now embeds semantic facts (SPO triples) into LanceDB on creation via the consolidation pipeline. Retrieval embeds the query and computes actual cosine similarity, replacing the hardcoded `0.5`. The 0.30 weight factor in the relevance formula is now functional.
 
-#### R2: Unify the two memory systems
-**Current:** `MemoryStore` (vector-based diary) and `cognitive` (structured three-tier) coexist independently.
-**Fix:** Migrate `MemoryStore` entries into `semantic_facts` with `source=user_stated`. Remove the parallel system. Use the cognitive retrieval pipeline for all memory operations.
-**Impact:** Eliminates confusion, reduces maintenance, and strengthens the cognitive model.
+#### ~~R2: Unify the two memory systems~~ — SOLVED
+**Fix:** Removed `MemoryStore`, `MemorySource`, `LearningContextSource`, `MemoryNoteRepo`, and `MemoryNoteRow`. Cognitive system is now the single memory owner. Confidence threshold absorbed into `CognitiveContextSource`. Migration `007_drop_memory_notes.sql` drops the legacy table. `memory_note_embeddings` vector table removed from schema.
 
-#### R3: Migrate CLI serve to AppCore::init() SOLVED
-**Current:** `cli/src/serve.rs` manually wires everything, missing cognitive/coaching/productivity features.
-**Fix:** Replace the manual setup with a single `AppCore::init(None)` call, discarding `EventChannels` (or logging them).
-**Impact:** Eliminates ~400 lines of duplicated code and ensures CLI mode has feature parity with desktop.
+#### ~~R3: Migrate CLI serve to AppCore::init()~~ — SOLVED
+**Fix:** CLI serve now uses `AppCore::init(None)`, eliminating ~400 lines of duplicated manual wiring and ensuring feature parity with desktop.
 
 ### 9.2 High Priority
 
-#### R4: Add external observability
-**Options:**
-- Prometheus metrics endpoint (request latency, tool success rates, memory stats, LLM costs)
-- OpenTelemetry integration for distributed tracing
-- Health check HTTP endpoint
-**Impact:** Enables monitoring, alerting, and performance analysis without the desktop UI.
+#### R4: Add external observability — DEPRIORITIZED
+**Reason:** Local-only desktop app already has tracing logs, AgentEvent streaming to UI, and queryable SQLite. Prometheus/OTel overhead not justified without a deployed service to monitor.
 
 #### R5: Persist coaching feedback to SQL — SOLVED (via R11)
 **Current:** ~~`FeedbackTracker` is in-memory only — all coaching effectiveness data lost on restart.~~
@@ -748,5 +738,5 @@ Security        ███████░░░  7.5
 ### Feature Migration Tables
 `_feature_migrations` (tracking), plus any tables added by feature crate migrations
 
-### Vector Tables (LanceDB, 3)
-`todo_embeddings`, `conv_embeddings`, `memory_note_embeddings`
+### Vector Tables (LanceDB, 2)
+`todo_embeddings`, `conv_embeddings`

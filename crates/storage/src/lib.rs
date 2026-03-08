@@ -32,7 +32,6 @@ pub use repos::CronRepo;
 pub use repos::DecisionLogRepo;
 pub use repos::InteractionLogRepo;
 pub use repos::LearningStateRepo;
-pub use repos::MemoryNoteRepo;
 pub use repos::OutcomeRepo;
 pub use repos::SessionRepo;
 pub use repos::UsageRepo;
@@ -60,7 +59,6 @@ pub use rows::learning::{
     InteractionLogRow, LearningStateRow, OutcomeRow, StrategyRecordRow, StrategySummaryRow,
     UserProfileRow,
 };
-pub use rows::memory::MemoryNoteRow;
 pub use rows::objective::ObjectiveRow;
 pub use rows::project::ProjectRow;
 pub use rows::session::{SessionListRow, SessionMessageRow, SessionRow};

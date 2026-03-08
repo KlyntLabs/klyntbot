@@ -3,7 +3,7 @@
 //! The generic `rrf_merge` algorithm lives in `tools-core`. This module provides
 //! the `SearchResult` enum (Action | Conversation) and its `Searchable` impl.
 
-use crate::conversation_embedding::ConversationEmbeddingRecord;
+use crate::conversation_recall::RecallSearchResult;
 use crate::todo_types::Action;
 use tools_core::Searchable;
 
@@ -16,7 +16,7 @@ pub enum SearchResult {
     /// Action/task search result (boxed to reduce enum size variance)
     Todo(Box<Action>),
     /// Conversation message search result
-    Conversation(ConversationEmbeddingRecord),
+    Conversation(RecallSearchResult),
 }
 
 impl SearchResult {
