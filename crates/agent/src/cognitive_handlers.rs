@@ -38,6 +38,7 @@ impl ExtractionHandler for HeuristicExtractionHandler {
         let facts = match observation.source_event.as_str() {
             "UserStatedFact" => vec![fact(od, "stated", 1.0, "user_stated")],
             "UserCorrectedAI" => vec![fact(od, "corrected", 1.0, "user_stated")],
+            "ChatTurnCompleted" => vec![fact(od, "chat_stated", 0.8, "user_stated")],
             "BudgetAlert" => vec![fact("finance", "budget_pressure", 0.9, "observed")],
             "CoachingFeedback" => vec![fact("coaching", "coaching_response", 0.9, "observed")],
             source if source.starts_with("accumulated:") => {

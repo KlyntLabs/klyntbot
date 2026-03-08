@@ -720,7 +720,7 @@ Security        ███████░░░  7.5
 | ~~R11~~ | ~~Remove orphaned `coaching_strategies` table or wire it to the coaching pipeline~~ — Done: wired `CoachingStrategyRepo` to `FeedbackTracker` with `persist()`/`load_from_db()` |
 | ~~R12~~ | ~~Fix `learning_handler.rs` to pass through `suggested_threshold` from `AnalysisResult`~~ — Done: reads from `last_analysis.suggested_threshold` |
 | ~~R13~~ | ~~Make vector store upsert atomic (begin transaction → delete → insert → commit)~~ — Done: reordered to insert-first-then-delete-old for crash safety |
-| R14 | Add web chat channel for browser-based interaction without desktop app |
+| R14 | Add web chat channel for browser-based interaction without desktop app — *In progress: SSE streaming added to dev server (`291f4dc4`)* |
 | ~~R15~~ | ~~Use dedicated cheaper model for intent classification (wire `classifier_provider` separately)~~ — Done: added `classifier_provider()` to `LlmProvider` trait, wired in `IntentAnalyzer` |
 | ~~R16~~ | ~~Update CLAUDE.md to remove stale "80% escalation" documentation~~ — Done |
 | ~~R17~~ | ~~Implement `feature-notes` tools (data layer is complete)~~ — Done: `NotesTool` with 10 actions |

@@ -1,6 +1,6 @@
 # Klyntbot Architecture Diagrams
 
-> Generated: 2026-03-08 | Scope: Full end-to-end workflow across 27 crates
+> Updated: 2026-03-08 | Scope: Full end-to-end workflow across 26 crates
 
 ---
 
@@ -132,6 +132,7 @@ sequenceDiagram
     participant LLM as LLM Provider<br/>(14 providers)
     participant Validator as ResponseValidator<br/>::validate
     participant CostTrack as CostTracker<br/>+ StrategyRepo
+    participant DEB as DomainEventBus<br/>(cognitive pipeline)
     participant BusOut as MessageBus<br/>(outbound)
 
     User->>Channel: Send message
@@ -188,6 +189,8 @@ sequenceDiagram
     Runtime-->>Loop: RuntimeResult{content, mode_used, agent_name}
 
     Loop->>Session: save(session + new messages)
+    Loop->>DEB: ChatTurnCompleted{user_message, session_key}
+    Note over DEB: Passive learning — every chat turn<br/>feeds cognitive extraction pipeline
     Loop->>BusOut: OutboundMessage{channel, chat_id, content}
     BusOut->>Channel: send(formatted_content)
     Channel->>User: Formatted response
@@ -271,6 +274,7 @@ flowchart TD
     subgraph "Event Sources"
         US["UserStatedFact<br/><i>'I prefer dark mode'</i>"]
         UC["UserCorrectedAI<br/><i>'No, I prefer mornings'</i>"]
+        CT["ChatTurnCompleted<br/><i>Every chat turn (passive learning)</i>"]
         BA["BudgetAlert<br/><i>threshold-crossing</i>"]
         CF["CoachingFeedback"]
         PS["ProductivityScoreComputed"]
@@ -278,11 +282,11 @@ flowchart TD
         TR["TransactionRecorded"]
     end
 
-    US & UC & BA & CF & PS & TC & TR --> DEB["DomainEventBus<br/>(mpsc, buf=256)"]
+    US & UC & CT & BA & CF & PS & TC & TR --> DEB["DomainEventBus<br/>(mpsc, buf=256)"]
 
     DEB --> Salience["evaluate_salience()<br/><i>cognitive/salience.rs</i>"]
 
-    Salience -->|Extract| Immediate["Immediate Processing<br/><i>UserStatedFact, UserCorrectedAI,<br/>BudgetAlert, CoachingFeedback,<br/>over-budget transactions</i>"]
+    Salience -->|Extract| Immediate["Immediate Processing<br/><i>UserStatedFact, UserCorrectedAI,<br/>ChatTurnCompleted, BudgetAlert,<br/>CoachingFeedback, over-budget transactions</i>"]
     Salience -->|Accumulate| Buffer["Accumulator Buffer<br/><i>TaskCreated, ProductivityScore,<br/>FocusSessionEnded, etc.</i>"]
     Salience -->|Discard| Drop["(no Discard events currently)"]
 
@@ -684,6 +688,7 @@ flowchart TD
 
     %% Cognitive pipeline
     ToolsExec -.-> DomainEvt
+    Step10 -.->|"ChatTurnCompleted<br/>(passive learning)"| DomainEvt
     DomainEvt --> SalienceFilter --> Extraction --> Consolidation
     Consolidation --> FactRepo --> Embedder --> VecStore
 
@@ -709,7 +714,7 @@ flowchart TD
 3. The **10-step AgentRuntime pipeline** performs: agent matching → profile-based filtering → two-stage intent classification (heuristics→LLM) → confidence gating → 8-priority context assembly → tool filtering + delegation injection → execution routing → validation → cost/strategy recording.
 4. **Direct mode** handles simple queries (single LLM call); **Reactive mode** runs a ReAct loop (1..max_iterations) with fabrication detection, duplicate prevention, failure reflection, and chain-of-thought planning for complexity >= 5.
 5. **Multi-agent delegation** allows the `general` orchestrator to dispatch to 4 specialized agents (task, finance, automation, communication) with max depth 2.
-6. **Cognitive memory** processes domain events through salience filtering → LLM extraction → Mem0-style consolidation → SemanticFactRepo (SQLite) + vector embedding (LanceDB, 384-dim MiniLM). Retrieval uses a 5-factor FSRS-scored relevance formula.
+6. **Cognitive memory** processes domain events through salience filtering → LLM extraction → Mem0-style consolidation → SemanticFactRepo (SQLite) + vector embedding (LanceDB, 384-dim MiniLM). Retrieval uses a 5-factor FSRS-scored relevance formula. **Passive learning** via `ChatTurnCompleted` events feeds every chat turn into the extraction pipeline (importance 0.8), enabling fact discovery from ordinary conversation.
 7. **Adaptive learning** records tool outcomes (privacy-safe), analyzes hourly, adjusts confidence thresholds (+/-0.05/cycle, lock-free `AtomicU32`), and feeds back into the confidence gate.
 8. Responses flow back through the `MessageBus` (outbound) → `ChannelFormatter` → platform-specific format → user.
 
@@ -734,10 +739,10 @@ flowchart TD
 
 | # | Title | Location | Why It Matters | Suggested Fix |
 |---|-------|----------|---------------|---------------|
-| M1 | **`escalation_count` field always 0** | SYSTEM_ANALYSIS.md §6.2 #10 | `StrategyRecordRow.escalation_count` is a dead field — never incremented since synthesis replaced escalation. Clutters the schema and confuses analysis. | Drop the column in a migration, or repurpose it to count Direct→Reactive escalations from R9. |
+| M1 | **`escalation_count` field always 0** | SYSTEM_ANALYSIS.md §6.2 #10 | `StrategyRecordRow.escalation_count` is a dead field — never incremented. R9 added Direct→Reactive escalation but doesn't write to this field. | Repurpose to count Direct→Reactive escalations (wire in `ExecutionRouter`), or drop the column. |
 | M2 | **`CharTokenCounter` fallback loses accuracy** | SYSTEM_ANALYSIS.md §6.4 | `chars / 4` is a rough approximation. When tiktoken-rs fails to load, context assembly may over- or under-allocate by 20-30%. | Log a warning when falling back. Consider bundling the tiktoken BPE data or using a more accurate character-based heuristic. |
 | M3 | **WhatsApp/QQ require external bridges** | SYSTEM_ANALYSIS.md §4.1 | WhatsApp needs `ws://localhost:3001` (Node.js Baileys bridge), QQ needs a similar bridge. These are external processes not managed by the klyntbot binary. | Document the bridge setup clearly. Consider embedding the bridge or providing a Docker Compose config. |
-| M4 | **No web chat channel** | SYSTEM_ANALYSIS.md §9.4 R14 | Users can only interact via 6 platform integrations or the desktop app. No browser-based fallback. | Add an R14 web chat channel — could reuse the Tauri IPC protocol over WebSocket for a browser UI. |
+| M4 | **No web chat channel** | SYSTEM_ANALYSIS.md §9.4 R14 | Users can only interact via 6 platform integrations or the desktop app. No browser-based fallback. | SSE streaming added to dev server (`291f4dc4`), enabling browser-based chat in dev mode. Full production web channel still needed. |
 | M5 | **Manual SQL predicate escaping in vector store** | SYSTEM_ANALYSIS.md §6.2 #7, §8 | `VectorStore` uses manual `'` escaping instead of parameterized queries for LanceDB filter predicates. Potential for injection if untrusted input reaches filter construction. | LanceDB may not support parameterized predicates natively. Add strict input validation/sanitization at the API boundary before values reach the vector store. |
 | M6 | **No global tool concurrency limit** | SYSTEM_ANALYSIS.md §6.4 | Parallel tool execution via `tokio::join!` has per-tool timeouts (30s) but no cap on how many tools run simultaneously. A malicious or buggy LLM could request 50 concurrent tool calls. | Add a `tokio::sync::Semaphore` in `ExecutionCore` to cap concurrent tool executions (e.g., 10). |
 | M7 | **Session LRU eviction at 1000** | SYSTEM_ANALYSIS.md §6.4 | `DashMap` in-memory cache evicts at 1000 sessions. For personal use this is fine, but multi-tenant would need per-user limits and smarter eviction. | Acceptable for single-user. Document the limit. |

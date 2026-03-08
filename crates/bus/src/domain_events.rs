@@ -67,6 +67,12 @@ pub enum DomainEvent {
         limit: f64,
     },
 
+    // -- Chat --
+    ChatTurnCompleted {
+        user_message: String,
+        session_key: String,
+    },
+
     // -- Cross-domain --
     UserStatedFact {
         fact: String,

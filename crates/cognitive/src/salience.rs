@@ -15,6 +15,9 @@ pub fn evaluate_salience(event: &DomainEvent) -> SalienceVerdict {
         DomainEvent::UserStatedFact { .. } => SalienceVerdict::Extract,
         DomainEvent::UserCorrectedAI { .. } => SalienceVerdict::Extract,
 
+        // Chat turns — extract facts from conversation content
+        DomainEvent::ChatTurnCompleted { .. } => SalienceVerdict::Extract,
+
         // Threshold-crossing events
         DomainEvent::BudgetAlert { .. } => SalienceVerdict::Extract,
         DomainEvent::TransactionRecorded {
@@ -120,6 +123,15 @@ mod tests {
             interruptions: 2,
         });
         assert_eq!(verdict, SalienceVerdict::Accumulate);
+    }
+
+    #[test]
+    fn test_chat_turn_completed_is_extract() {
+        let verdict = evaluate_salience(&DomainEvent::ChatTurnCompleted {
+            user_message: "My favorite language is Rust".into(),
+            session_key: "test-session".into(),
+        });
+        assert_eq!(verdict, SalienceVerdict::Extract);
     }
 
     #[test]

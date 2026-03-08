@@ -229,6 +229,13 @@ impl BackgroundConsolidationService {
 fn event_to_observation(event: &DomainEvent) -> Option<Observation> {
     let now = Utc::now();
     match event {
+        DomainEvent::ChatTurnCompleted { user_message, .. } => Some(Observation {
+            domain: "general".into(),
+            content: user_message.clone(),
+            importance: 0.8,
+            source_event: "ChatTurnCompleted".into(),
+            timestamp: now,
+        }),
         DomainEvent::UserStatedFact { fact, domain } => Some(Observation {
             domain: domain.clone(),
             content: fact.clone(),
@@ -360,6 +367,7 @@ fn event_type_key(event: &DomainEvent) -> String {
         DomainEvent::GoalProgress { .. } => "GoalProgress".into(),
         DomainEvent::TransactionRecorded { .. } => "TransactionRecorded".into(),
         DomainEvent::BudgetAlert { .. } => "BudgetAlert".into(),
+        DomainEvent::ChatTurnCompleted { .. } => "ChatTurnCompleted".into(),
         DomainEvent::UserStatedFact { .. } => "UserStatedFact".into(),
         DomainEvent::UserCorrectedAI { .. } => "UserCorrectedAI".into(),
         DomainEvent::CoachingFeedback { .. } => "CoachingFeedback".into(),
@@ -415,6 +423,19 @@ mod tests {
         assert_eq!(obs.domain, "productivity");
         assert_eq!(obs.importance, 1.0);
         assert_eq!(obs.content, "I work best in mornings");
+    }
+
+    #[test]
+    fn test_event_to_observation_chat_turn_completed() {
+        let event = DomainEvent::ChatTurnCompleted {
+            user_message: "I prefer dark mode in all editors".into(),
+            session_key: "session-1".into(),
+        };
+        let obs = event_to_observation(&event).unwrap();
+        assert_eq!(obs.domain, "general");
+        assert_eq!(obs.importance, 0.8);
+        assert_eq!(obs.content, "I prefer dark mode in all editors");
+        assert_eq!(obs.source_event, "ChatTurnCompleted");
     }
 
     #[test]

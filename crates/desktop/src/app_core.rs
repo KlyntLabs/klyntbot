@@ -137,6 +137,7 @@ fn wire_event_channels(core: &AppCore, channels: EventChannels, app_handle: &tau
                             bus::DomainEvent::UserStatedFact { domain, .. } => domain.as_str(),
                             bus::DomainEvent::UserCorrectedAI { .. } => "learning",
                             bus::DomainEvent::CoachingFeedback { .. } => "coaching",
+                            bus::DomainEvent::ChatTurnCompleted { .. } => "general",
                         };
                         let salience_str = match salience {
                             cognitive::types::SalienceVerdict::Extract => "extract",

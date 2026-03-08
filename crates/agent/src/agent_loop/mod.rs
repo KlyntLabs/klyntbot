@@ -353,6 +353,14 @@ impl AgentLoop {
         self.save_to_session(session_key.as_str(), &response_content)
             .await;
 
+        // Publish chat turn to cognitive consolidation pipeline
+        if let Some(bus) = &self._domain_event_bus {
+            bus.publish(bus::DomainEvent::ChatTurnCompleted {
+                user_message: msg.content.clone(),
+                session_key: session_key.to_string(),
+            });
+        }
+
         // Send response
         let out_msg = OutboundMessage::new(msg.channel, msg.chat_id, response_content);
         self.bus.publish_outbound(out_msg).await?;
