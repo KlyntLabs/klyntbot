@@ -49,7 +49,7 @@ L1: config, bus, tools-core, tools-core-macros — Config (camelCase JSON), mess
 L2: storage, domain       — SqlitePool, migrations, *Repo structs, OKR+PARA domain types
 L3: providers, session, scheduling, context_engine — LLM clients, session persistence, cron, token budgets
 L4: tools, feature-todo, feature-finance, feature-notes, feature-productivity, feature-coaching, plugin-runtime — 20+ tools, feature packages, WASM plugins
-L5: channels, agent, cognitive — Platform integrations (Telegram/Discord/WhatsApp/Slack/Email/QQ), agent runtime, cognitive memory system
+L5: channels, agent, cognitive — Platform integrations (Telegram/Discord/Slack/Email), agent runtime, cognitive memory system
 L6: mcp                   — MCP server/client
 L7: app-core, desktop-shared, desktop — Application core (shared handlers), Tauri desktop app
 L8: klyntbot              — Re-export facade

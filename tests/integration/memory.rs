@@ -383,7 +383,7 @@ async fn status_reports_channels_indexed() {
     let multi_channel_messages = &[
         ("user", "telegram:12345", "Message from Telegram"),
         ("user", "discord:67890", "Message from Discord"),
-        ("user", "whatsapp:11111", "Message from WhatsApp"),
+        ("user", "slack:11111", "Message from Slack"),
     ];
     embed_test_messages(&handler, multi_channel_messages).await;
 

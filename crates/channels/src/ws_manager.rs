@@ -1,7 +1,7 @@
 //! Shared WebSocket connection manager for channel implementations.
 //!
 //! Consolidates the connect → heartbeat → read loop → shutdown pattern
-//! that was duplicated across WhatsApp, QQ, Slack, and Discord channels.
+//! that was duplicated across Slack and Discord channels.
 
 use async_trait::async_trait;
 use common::{ChannelError, Result};
@@ -32,7 +32,7 @@ pub type WsStream = SplitStream<WebSocketStream<MaybeTlsStream<tokio::net::TcpSt
 /// How to keep the WebSocket connection alive.
 pub enum HeartbeatStrategy {
     /// Send a keepalive when no message is received within `timeout`.
-    /// Used by WhatsApp, QQ, and Slack.
+    /// Used by Slack.
     Timeout {
         timeout: Duration,
         build_payload: Box<dyn Fn() -> WsMessage + Send + Sync>,

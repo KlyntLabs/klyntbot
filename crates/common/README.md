@@ -51,9 +51,7 @@ pub enum ChannelName {
     Telegram,
     Discord,
     Slack,
-    WhatsApp,
     Email,
-    QQ,
     Cli,
 }
 

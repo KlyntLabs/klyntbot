@@ -17,22 +17,18 @@ pub mod discord;
 pub mod email;
 pub mod formatter;
 pub mod manager;
-pub mod qq;
 pub mod shared;
 pub mod slack;
 pub mod telegram;
 pub mod utils;
-pub mod whatsapp;
 pub mod ws_manager;
 
 pub use discord::DiscordChannel;
 #[cfg(feature = "email")]
 pub use email::EmailChannel;
 pub use manager::ChannelManager;
-pub use qq::QQChannel;
 pub use slack::SlackChannel;
 pub use telegram::TelegramChannel;
-pub use whatsapp::WhatsAppChannel;
 
 /// Channel trait - implemented by all chat platforms
 #[async_trait]

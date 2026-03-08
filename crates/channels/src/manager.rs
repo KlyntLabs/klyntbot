@@ -5,10 +5,7 @@ use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
 use tracing::{debug, error, info, warn};
 
-use crate::{
-    DiscordChannel, DynChannel, EmailChannel, QQChannel, SlackChannel, TelegramChannel,
-    WhatsAppChannel,
-};
+use crate::{DiscordChannel, DynChannel, EmailChannel, SlackChannel, TelegramChannel};
 use bus::{MessageBus, OutboundMessage};
 use common::{ChannelError, Result};
 use config::Config;
@@ -93,20 +90,6 @@ impl ChannelManager {
             self.config.channels.discord,
             "discord",
             DiscordChannel::new(self.config.channels.discord.clone())
-        );
-
-        init_channel!(
-            channels,
-            self.config.channels.whatsapp,
-            "whatsapp",
-            WhatsAppChannel::new(self.config.channels.whatsapp.clone())
-        );
-
-        init_channel!(
-            channels,
-            self.config.channels.qq,
-            "qq",
-            QQChannel::new(self.config.channels.qq.clone())
         );
 
         init_channel!(

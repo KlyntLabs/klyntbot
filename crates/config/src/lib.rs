@@ -14,7 +14,7 @@ pub use schema::{
     FinanceExpectedReturnsConfig, FinanceInflationConfig, FinancePriceRefreshConfig,
     FinanceSchedulingConfig, FireConfig, LearningConfig, McpConfig, McpOAuthCredentials,
     McpServerDef, McpServerSettings, McpTransport, OrchestratorConfig, PackTier, PacksConfig,
-    PermissionsConfig, ProviderManagerConfig, QQConfig, Secret, SixJarRatios, SlackConfig,
-    TelegramConfig, TodoEnrichmentConfig, TrustLevel, WhatsAppConfig, DEFAULT_STARTUP_TIMEOUT_SEC,
+    PermissionsConfig, ProviderManagerConfig, Secret, SixJarRatios, SlackConfig, TelegramConfig,
+    TodoEnrichmentConfig, TrustLevel, DEFAULT_STARTUP_TIMEOUT_SEC,
     DEFAULT_TOOL_TIMEOUT_SEC,
 };

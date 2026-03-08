@@ -253,7 +253,7 @@ mod tests {
         let json = serde_json::json!({
             "embedding": {
                 "enabled": false,
-                "excludeChannels": ["whatsapp", "telegram"],
+                "excludeChannels": ["email", "telegram"],
                 "excludeRoles": ["system"]
             },
             "search": {
@@ -270,7 +270,7 @@ mod tests {
         assert!(config
             .embedding
             .exclude_channels
-            .contains(&"whatsapp".to_string()));
+            .contains(&"email".to_string()));
         assert!(config
             .embedding
             .exclude_channels

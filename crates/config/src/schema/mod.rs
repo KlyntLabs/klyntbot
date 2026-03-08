@@ -177,7 +177,6 @@ mod tests {
         assert!(json.contains("maxTokens"));
         assert!(json.contains("maxToolIterations"));
         assert!(json.contains("allowFrom"));
-        assert!(json.contains("bridgeUrl"));
         assert!(json.contains("botToken"));
         assert!(json.contains("appToken"));
         assert!(json.contains("imapHost"));

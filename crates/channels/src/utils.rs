@@ -7,7 +7,6 @@ pub fn max_length(channel: &str) -> usize {
     match channel {
         "telegram" => 4096,
         "discord" => 2000,
-        "whatsapp" => 4000,
         "slack" => 8000,
         "email" => 8000,
         _ => 4000, // conservative default
@@ -184,10 +183,9 @@ mod tests {
     fn test_per_channel_limits() {
         assert_eq!(max_length("telegram"), 4096);
         assert_eq!(max_length("discord"), 2000);
-        assert_eq!(max_length("whatsapp"), 4000);
         assert_eq!(max_length("slack"), 8000);
         assert_eq!(max_length("email"), 8000);
-        assert_eq!(max_length("qq"), 4000);
+        assert_eq!(max_length("unknown"), 4000);
     }
 
     #[test]

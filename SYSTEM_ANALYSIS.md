@@ -63,7 +63,7 @@ L0: common                — KlyntbotError, MessageRole, ChannelName, ChatId, S
 | `feature-productivity` | L4 | Activity tracking, auto-focus detection, 0-100 productivity scoring |
 | `feature-coaching` | L4 | Proactive coaching pipeline: signals → patterns → LLM reasoning → interventions |
 | `plugin-runtime` | L4 | Extism-based WASM plugin host with permission model (network/storage/agent) |
-| `channels` | L5 | 6 platform integrations: Telegram, Discord, Slack, WhatsApp, Email, QQ |
+| `channels` | L5 | 4 platform integrations: Telegram, Discord, Slack, Email |
 | `agent` | L5 | `AgentRuntime`, `AgentLoop`, intent pipeline, ReAct engine, cost tracking, learning |
 | `cognitive` | L5 | Three-tier cognitive memory (semantic/episodic/procedural), FSRS decay, consolidation |
 | `cli` | L6 | Clap-based CLI: `serve`, `init`, `status`, `plugin` subcommands |
@@ -353,9 +353,7 @@ ConfidenceEvaluator (updated threshold → Proceed/Clarify/Skip)
 | **Telegram** | HTTP long-polling | Voice transcription (Groq), photo/document download, inline keyboards, typing indicators (4s auto-resend), reaction capture |
 | **Discord** | Raw WebSocket (no serenity) | Custom `WsHandler` via `WebSocketManager`, Gateway event handling |
 | **Slack** | Socket Mode WebSocket | Block Kit buttons, bot mention stripping, thread-aware replies, ACK envelopes |
-| **WhatsApp** | WebSocket bridge to Node.js Baileys | Requires external `ws://localhost:3001` bridge |
 | **Email** | IMAP polling + SMTP (lettre) | Consent-gated (`consent_granted` config flag), subject line parsing |
-| **QQ** | WebSocket bridge | Similar architecture to WhatsApp |
 
 **Shared patterns:**
 - All implement the `Channel` trait (name/start/stop/send/is_allowed)
@@ -650,7 +648,7 @@ Each `feature-*` crate implements `FeaturePackage`:
 | **Intelligence & Reasoning** | **7.0/10** | Two-stage intent classification is efficient. ReAct loop with fabricated-response detection and duplicate-call prevention is robust. Multi-agent delegation works. However, no structured chain-of-thought, no planning agent, no explicit reasoning steps. Direct mode silently fails on tool-requiring queries. |
 | **User Understanding & Personalization** | **7.5/10** | 6-domain user model, procedural rules, emoji-reaction satisfaction, behavioral pattern detection. The system genuinely learns about users over time. Deductions for hardcoded semantic similarity reducing retrieval quality and for satisfaction rarely being collected outside chat. |
 | **Maintainability** | **8.0/10** | Strong Rust type system prevents many bugs. Derive macros reduce boilerplate. Zero-clippy-warning policy. Good test infrastructure (ephemeral SQLite). Conventional commits. Minor deductions for 27-crate complexity and some undocumented code paths. |
-| **Channel Coverage** | **8.0/10** | 6 platforms with unified `Channel` trait. Rich Telegram support. Shared reconnect and formatter patterns. Deductions for WhatsApp/QQ requiring external bridges, email being consent-gated, and no web chat channel. |
+| **Channel Coverage** | **8.0/10** | 4 platforms with unified `Channel` trait. Rich Telegram support. Shared reconnect and formatter patterns. Deductions for email being consent-gated and no web chat channel. |
 | **Tool Ecosystem** | **8.5/10** | 60+ tools across 5 feature packages. Type-safe derive macros. Multi-action dispatch. WASM plugin system. MCP client/server. Deduction only for feature-notes having no tools yet. |
 | **Security** | **7.5/10** | `Secret<String>` for API keys. WASM sandbox with permissions. Allowlist-based channel access. HTML escaping in formatters. Per-agent tool access control. Deductions for manual SQL predicate escaping in vector store and no input sanitization framework. |
 

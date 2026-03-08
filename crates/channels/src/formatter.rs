@@ -4,7 +4,7 @@
 //! - Telegram: markdown -> HTML
 //! - Discord: passthrough (native markdown support)
 //! - Slack: standard markdown -> Slack mrkdwn
-//! - WhatsApp, Email, QQ: strip markdown to plain text
+//! - Email: strip markdown to plain text
 
 use regex::Regex;
 use std::sync::OnceLock;
@@ -25,7 +25,7 @@ pub fn formatter_for(channel: &str) -> &'static dyn ChannelFormatter {
         "telegram" => &TELEGRAM,
         "discord" => &PASSTHROUGH,
         "slack" => &SLACK,
-        "whatsapp" | "email" | "qq" => &PLAIN,
+        "email" => &PLAIN,
         _ => &PLAIN,
     }
 }
@@ -239,7 +239,7 @@ impl ChannelFormatter for SlackFormatter {
 }
 
 // ---------------------------------------------------------------------------
-// PlainText: strip all markdown (WhatsApp, Email, QQ)
+// PlainText: strip all markdown (Email, unknown channels)
 // ---------------------------------------------------------------------------
 
 struct PlainRegexes {
@@ -476,8 +476,6 @@ mod tests {
         assert!(formatter_for("telegram").format(input).contains("<b>"));
         assert_eq!(formatter_for("discord").format(input), input);
         assert!(formatter_for("slack").format(input).contains("*bold*"));
-        assert!(!formatter_for("whatsapp").format(input).contains("**"));
         assert!(!formatter_for("email").format(input).contains("**"));
-        assert!(!formatter_for("qq").format(input).contains("**"));
     }
 }

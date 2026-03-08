@@ -33,10 +33,8 @@ pub trait Channel: Send + Sync {
 |---------|-----------|:------:|----------|
 | **Telegram** | Bot API (long polling) | ✅ Ready | Voice transcription, markdown, typing indicators |
 | **Discord** | WebSocket Gateway v10 | ✅ Ready | Auto-reconnect, rate limits, attachments |
-| **WhatsApp** | WebSocket bridge | ✅ Ready | QR code auth, media download |
 | **Slack** | Socket Mode | ✅ Ready | DM/group policy, thread replies |
 | **Email** | IMAP + SMTP | ✅ Ready | HTML parsing, threading, consent gate |
-| **QQ** | WebSocket (botpy) | ✅ Ready | C2C private messages, sandbox mode |
 | **Feishu** | WebSocket | 🔧 Planned | Lark long connection |
 | **DingTalk** | Stream Mode | 🔧 Planned | OAuth2, batch send |
 | **Mochat** | Socket.IO | 🔧 Planned | Reply delay, cursor tracking |
@@ -156,23 +154,6 @@ groupPolicy = "mention"  # mention | open | allowlist
 dm = { enabled = true, policy = "open" }
 ```
 
-### WhatsApp
-
-**Transport**: WebSocket bridge (Baileys)
-**Features**:
-- QR code authentication
-- Media download
-- Group message handling
-
-**Requires**: Node.js bridge running on `ws://localhost:3001`
-
-```toml
-[channels.whatsapp]
-enabled = true
-bridgeUrl = "ws://localhost:3001"
-allowFrom = ["phone_number"]
-```
-
 ### Email
 
 **Transport**: IMAP (receive) + SMTP (send)
@@ -192,21 +173,6 @@ smtpHost = "smtp.gmail.com"
 smtpPort = 587
 fromAddress = "bot@example.com"
 allowFrom = ["allowed@example.com"]
-```
-
-### QQ
-
-**Transport**: WebSocket (botpy)
-**Features**:
-- C2C private messages
-- Sandbox mode support
-
-```toml
-[channels.qq]
-enabled = true
-appId = "your_app_id"
-secret = "your_secret"
-allowFrom = ["user_id"]
 ```
 
 ## Access Control
@@ -245,7 +211,7 @@ pub struct Attachment {
 
 ## Reconnection Logic
 
-WebSocket channels (Discord, Slack, QQ) auto-reconnect:
+WebSocket channels (Discord, Slack) auto-reconnect:
 
 ```rust
 async fn reconnect_loop<F>(connect_fn: F)

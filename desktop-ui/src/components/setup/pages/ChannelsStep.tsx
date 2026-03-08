@@ -32,12 +32,6 @@ const CHANNELS: ChannelDef[] = [
     tokenPlaceholder: "xoxb-...",
   },
   {
-    key: "whatsapp",
-    label: "WhatsApp",
-    tokenLabel: "Access Token",
-    tokenPlaceholder: "WhatsApp Cloud API token",
-  },
-  {
     key: "email",
     label: "Email (IMAP/SMTP)",
     tokenLabel: "IMAP Host",

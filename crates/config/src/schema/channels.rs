@@ -15,16 +15,10 @@ pub struct ChannelsConfig {
     pub discord: DiscordConfig,
 
     #[serde(default)]
-    pub whatsapp: WhatsAppConfig,
-
-    #[serde(default)]
     pub slack: SlackConfig,
 
     #[serde(default)]
     pub email: EmailConfig,
-
-    #[serde(default)]
-    pub qq: QQConfig,
 
     #[serde(default)]
     pub feishu: FeishuConfig,
@@ -94,34 +88,6 @@ fn default_discord_intents() -> u32 {
     // GUILD_MESSAGES (1<<9) | GUILD_MESSAGE_REACTIONS (1<<10) | DIRECT_MESSAGES (1<<12)
     // | DIRECT_MESSAGE_REACTIONS (1<<13) | MESSAGE_CONTENT (1<<15)
     46593
-}
-
-/// WhatsApp channel configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct WhatsAppConfig {
-    #[serde(default)]
-    pub enabled: bool,
-
-    #[serde(default = "default_bridge_url")]
-    pub bridge_url: String,
-
-    #[serde(default)]
-    pub allow_from: Vec<String>,
-}
-
-impl Default for WhatsAppConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            bridge_url: default_bridge_url(),
-            allow_from: Vec::new(),
-        }
-    }
-}
-
-fn default_bridge_url() -> String {
-    "ws://localhost:3001".to_string()
 }
 
 /// Slack channel configuration
@@ -323,24 +289,6 @@ fn default_subject_prefix() -> String {
     "Re: ".to_string()
 }
 
-/// QQ channel configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[derive(Default)]
-pub struct QQConfig {
-    #[serde(default)]
-    pub enabled: bool,
-
-    #[serde(default)]
-    pub app_id: String,
-
-    #[serde(default)]
-    pub secret: Secret<String>,
-
-    #[serde(default)]
-    pub allow_from: Vec<String>,
-}
-
 /// Feishu/Lark channel configuration
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -467,14 +415,6 @@ mod tests {
     }
 
     #[test]
-    fn test_whatsapp_config_default() {
-        let config = WhatsAppConfig::default();
-        assert!(!config.enabled);
-        assert_eq!(config.bridge_url, "ws://localhost:3001");
-        assert_eq!(config.allow_from.len(), 0);
-    }
-
-    #[test]
     fn test_slack_config_default() {
         let config = SlackConfig::default();
         assert!(!config.enabled);
@@ -493,22 +433,12 @@ mod tests {
     }
 
     #[test]
-    fn test_qq_config_default() {
-        let config = QQConfig::default();
-        assert!(!config.enabled);
-        assert_eq!(config.app_id, "");
-        assert_eq!(config.secret.expose(), "");
-    }
-
-    #[test]
     fn test_channels_config_default() {
         let config = ChannelsConfig::default();
         assert!(!config.telegram.enabled);
         assert!(!config.discord.enabled);
-        assert!(!config.whatsapp.enabled);
         assert!(!config.slack.enabled);
         assert!(!config.email.enabled);
-        assert!(!config.qq.enabled);
     }
 
     #[test]

@@ -39,7 +39,7 @@ graph TD
     end
 
     subgraph "L5 — Intelligence Layer"
-        channels["channels<br/><i>Telegram, Discord, Slack,<br/>WhatsApp, Email, QQ</i>"]
+        channels["channels<br/><i>Telegram, Discord, Slack, Email</i>"]
         agent["agent<br/><i>AgentRuntime, AgentLoop,<br/>ReAct, Learning, Confidence</i>"]
         cognitive["cognitive<br/><i>3-tier memory, FSRS,<br/>consolidation, embedding</i>"]
     end
@@ -497,7 +497,7 @@ sequenceDiagram
     Builder-->>AppCore: AgentLoop (with AgentRuntime inside)
 
     AppCore->>ChanMgr: new(config, bus)
-    Note over ChanMgr: Initialize enabled channels:<br/>Telegram, Discord, Slack,<br/>WhatsApp, Email, QQ
+    Note over ChanMgr: Initialize enabled channels:<br/>Telegram, Discord, Slack, Email
     ChanMgr-->>AppCore: Arc<Mutex<ChannelManager>>
 
     AppCore->>Coaching: start(domain_bus.subscribe(), ...)
@@ -527,9 +527,7 @@ flowchart TD
         Telegram["Telegram<br/><i>HTTP long-poll</i>"]
         Discord["Discord<br/><i>Raw WebSocket</i>"]
         Slack["Slack<br/><i>Socket Mode WS</i>"]
-        WhatsApp["WhatsApp<br/><i>WS → Baileys bridge</i>"]
         Email["Email<br/><i>IMAP + SMTP</i>"]
-        QQ["QQ<br/><i>WS bridge</i>"]
         Formatter["ChannelFormatter<br/><i>Markdown → platform format</i>"]
     end
 
@@ -633,8 +631,8 @@ flowchart TD
     end
 
     %% Main Flow
-    UserMsg --> Telegram & Discord & Slack & WhatsApp & Email & QQ
-    Telegram & Discord & Slack & WhatsApp & Email & QQ --> InboundQ
+    UserMsg --> Telegram & Discord & Slack & Email
+    Telegram & Discord & Slack & Email --> InboundQ
     InboundQ --> Receive
 
     Receive --> ReactionCheck
@@ -695,8 +693,8 @@ flowchart TD
     %% Output
     Step10 --> OutboundQ
     Clarify --> OutboundQ
-    OutboundQ --> Formatter --> Telegram & Discord & Slack & WhatsApp & Email & QQ
-    Telegram & Discord & Slack & WhatsApp & Email & QQ --> UserMsg
+    OutboundQ --> Formatter --> Telegram & Discord & Slack & Email
+    Telegram & Discord & Slack & Email --> UserMsg
 
     style RUNTIME fill:#1a1a2e,stroke:#4fd1c5,color:#fff
     style REACT_LOOP fill:#16213e,stroke:#e94560,color:#fff
@@ -709,7 +707,7 @@ flowchart TD
 
 ## 9. Summary of the Complete Workflow
 
-1. **User messages** arrive via 6 platform channels (Telegram, Discord, Slack, WhatsApp, Email, QQ) through the `MessageBus` (mpsc, buffer=100) into the `AgentLoop`.
+1. **User messages** arrive via 4 platform channels (Telegram, Discord, Slack, Email) through the `MessageBus` (mpsc, buffer=100) into the `AgentLoop`.
 2. **Session management** (`DashMap` + SQLite, LRU@1000) provides conversation context and history.
 3. The **10-step AgentRuntime pipeline** performs: agent matching → profile-based filtering → two-stage intent classification (heuristics→LLM) → confidence gating → 8-priority context assembly → tool filtering + delegation injection → execution routing → validation → cost/strategy recording.
 4. **Direct mode** handles simple queries (single LLM call); **Reactive mode** runs a ReAct loop (1..max_iterations) with fabrication detection, duplicate prevention, failure reflection, and chain-of-thought planning for complexity >= 5. Tool calls execute in bounded parallel (semaphore capped at 10, per-tool 30s timeout).
@@ -738,6 +736,5 @@ flowchart TD
 
 | # | Title | Location | Why It Matters | Suggested Fix |
 |---|-------|----------|---------------|---------------|
-| M1 | **WhatsApp/QQ require external bridges** | SYSTEM_ANALYSIS.md §4.1 | WhatsApp needs `ws://localhost:3001` (Node.js Baileys bridge), QQ needs a similar bridge. These are external processes not managed by the klyntbot binary. | Document the bridge setup clearly. Consider embedding the bridge or providing a Docker Compose config. |
-| M2 | **No web chat channel** | SYSTEM_ANALYSIS.md §9.4 R14 | Users can only interact via 6 platform integrations or the desktop app. No browser-based fallback. | SSE streaming added to dev server (`291f4dc4`), enabling browser-based chat in dev mode. Full production web channel still needed. |
-| M3 | **Session LRU eviction at 1000** | SYSTEM_ANALYSIS.md §6.4 | `DashMap` in-memory cache evicts at 1000 sessions. For personal use this is fine, but multi-tenant would need per-user limits and smarter eviction. | Acceptable for single-user. Document the limit. |
+| M1 | **No web chat channel** | SYSTEM_ANALYSIS.md §9.4 R14 | Users can only interact via 4 platform integrations or the desktop app. No browser-based fallback. | SSE streaming added to dev server (`291f4dc4`), enabling browser-based chat in dev mode. Full production web channel still needed. |
+| M2 | **Session LRU eviction at 1000** | SYSTEM_ANALYSIS.md §6.4 | `DashMap` in-memory cache evicts at 1000 sessions. For personal use this is fine, but multi-tenant would need per-user limits and smarter eviction. | Acceptable for single-user. Document the limit. |

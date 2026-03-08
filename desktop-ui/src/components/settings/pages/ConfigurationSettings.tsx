@@ -42,11 +42,6 @@ const CHANNEL_DEFS: ChannelDef[] = [
     ],
   },
   {
-    key: "whatsapp",
-    label: "WhatsApp",
-    fields: [{ key: "bridgeUrl", label: "Bridge URL", placeholder: "ws://localhost:3001" }],
-  },
-  {
     key: "email",
     label: "Email (IMAP/SMTP)",
     fields: [

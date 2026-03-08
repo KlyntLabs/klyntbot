@@ -2,7 +2,7 @@
 //! and channel start/send behaviour requiring async runtimes.
 
 use klyntbot::bus::{InboundMessage, MessageBus, OutboundMessage};
-use klyntbot::config::{EmailConfig, QQConfig, SlackConfig, WhatsAppConfig};
+use klyntbot::config::{EmailConfig, SlackConfig};
 use klyntbot::ChannelManager;
 use std::sync::Arc;
 
@@ -190,7 +190,7 @@ async fn multi_channel_broadcast() {
 
 #[tokio::test]
 async fn inbound_preserves_channel_identity() {
-    let channels = ["telegram", "discord", "slack", "whatsapp", "qq", "email"];
+    let channels = ["telegram", "discord", "slack", "email"];
     for channel in channels {
         let msg = InboundMessage::new(channel, "user", "chat", "Hello");
         assert_eq!(msg.channel.as_str(), channel);
@@ -200,7 +200,7 @@ async fn inbound_preserves_channel_identity() {
 
 #[tokio::test]
 async fn outbound_preserves_channel_identity() {
-    let channels = ["telegram", "discord", "slack", "whatsapp", "qq", "email"];
+    let channels = ["telegram", "discord", "slack", "email"];
     for channel in channels {
         let msg = OutboundMessage::new(channel, "chat", "Reply");
         assert_eq!(msg.channel.as_str(), channel);
@@ -242,30 +242,6 @@ async fn slack_start_rejects_empty_tokens() {
     assert!(result.is_err());
     let err_msg = format!("{}", result.unwrap_err());
     assert!(err_msg.contains("not configured"));
-}
-
-#[tokio::test]
-async fn qq_start_rejects_empty_credentials() {
-    use klyntbot::channels::{Channel, QQChannel};
-    let config = QQConfig::default();
-    let channel = QQChannel::new(config).unwrap();
-    let bus = common::test_message_bus();
-    let result = channel.start(bus).await;
-    assert!(result.is_err());
-    let err_msg = format!("{}", result.unwrap_err());
-    assert!(err_msg.contains("not configured"));
-}
-
-#[tokio::test]
-async fn whatsapp_send_fails_without_connection() {
-    use klyntbot::channels::{Channel, WhatsAppChannel};
-    let config = WhatsAppConfig::default();
-    let channel = WhatsAppChannel::new(config).unwrap();
-    let msg = OutboundMessage::new("whatsapp", "628123@s.whatsapp.net", "Hello");
-    let result = channel.send(&msg).await;
-    assert!(result.is_err());
-    let err_msg = format!("{}", result.unwrap_err());
-    assert!(err_msg.contains("not connected"));
 }
 
 #[tokio::test]

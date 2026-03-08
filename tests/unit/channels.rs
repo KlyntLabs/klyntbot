@@ -3,7 +3,7 @@
 
 use klyntbot::bus::{InboundMessage, OutboundMessage};
 use klyntbot::channels::check_allowlist;
-use klyntbot::config::{Config, DiscordConfig, EmailConfig, QQConfig, SlackConfig, WhatsAppConfig};
+use klyntbot::config::{Config, DiscordConfig, EmailConfig, SlackConfig};
 
 // ─────────────────────────────────────────────────────────────
 // check_allowlist core logic
@@ -66,30 +66,6 @@ fn slack_allowlist_filters() {
     let channel = SlackChannel::new(config).unwrap();
     assert!(channel.is_allowed("U12345"));
     assert!(!channel.is_allowed("U99999"));
-}
-
-#[test]
-fn qq_allowlist_filters() {
-    use klyntbot::channels::{Channel, QQChannel};
-    let config = QQConfig {
-        allow_from: vec!["openid_abc".to_string()],
-        ..Default::default()
-    };
-    let channel = QQChannel::new(config).unwrap();
-    assert!(channel.is_allowed("openid_abc"));
-    assert!(!channel.is_allowed("openid_xyz"));
-}
-
-#[test]
-fn whatsapp_allowlist_filters() {
-    use klyntbot::channels::{Channel, WhatsAppChannel};
-    let config = WhatsAppConfig {
-        allow_from: vec!["628123456789@s.whatsapp.net".to_string()],
-        ..Default::default()
-    };
-    let channel = WhatsAppChannel::new(config).unwrap();
-    assert!(channel.is_allowed("628123456789@s.whatsapp.net"));
-    assert!(!channel.is_allowed("other@s.whatsapp.net"));
 }
 
 #[test]

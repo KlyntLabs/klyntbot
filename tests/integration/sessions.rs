@@ -126,15 +126,15 @@ async fn system_tool_messages_not_embedded() {
 async fn channel_exclusion_prevents_embedding() {
     let handler = Arc::new(MockConversationRecallHandler::new());
 
-    // Simulate config with excludeChannels: ["whatsapp"]
+    // Simulate config with excludeChannels: ["email"]
     // In production, AgentLoop checks config and skips embed_message for excluded channels
-    let whatsapp_key = "whatsapp:67890";
+    let excluded_key = "email:67890";
     let telegram_key = "telegram:12345";
 
-    // Add message from excluded WhatsApp channel (DON'T call embed_message)
-    let mut whatsapp_session = session::Session::new(whatsapp_key);
-    whatsapp_session.add_message("user", "WhatsApp message");
-    // DON'T call embed_message for WhatsApp (simulating AgentLoop filtering)
+    // Add message from excluded email channel (DON'T call embed_message)
+    let mut excluded_session = session::Session::new(excluded_key);
+    excluded_session.add_message("user", "Email message");
+    // DON'T call embed_message for excluded channel (simulating AgentLoop filtering)
 
     // Add message from non-excluded Telegram channel (DO call embed_message)
     let mut telegram_session = session::Session::new(telegram_key);
@@ -147,7 +147,7 @@ async fn channel_exclusion_prevents_embedding() {
         .await
         .unwrap();
 
-    // Verify handler was NOT called for WhatsApp, but WAS called for Telegram
+    // Verify handler was NOT called for excluded channel, but WAS called for Telegram
     let calls = handler.embed_message_calls();
     assert_eq!(
         calls.len(),

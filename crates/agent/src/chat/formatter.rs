@@ -3,7 +3,6 @@
 //! Adapts LLM response content for each chat platform's constraints:
 //! - Telegram: preserve markdown, limit 4096 chars
 //! - Discord: code blocks supported, limit 2000 chars
-//! - WhatsApp: strip markdown, use emojis for emphasis
 //! - Default/CLI: pass through unchanged
 
 use common::utils::truncate_at_boundary;
@@ -12,14 +11,12 @@ use common::ChannelName;
 /// Maximum message length per channel.
 const TELEGRAM_MAX_CHARS: usize = 4096;
 const DISCORD_MAX_CHARS: usize = 2000;
-const WHATSAPP_MAX_CHARS: usize = 4000;
 
 /// Format content for a specific channel's constraints.
 pub fn format_for_channel(content: &str, channel: &ChannelName) -> String {
     match channel.as_str() {
         "telegram" => format_telegram(content),
         "discord" => format_discord(content),
-        "whatsapp" => format_whatsapp(content),
         _ => content.to_string(), // CLI and others: pass through
     }
 }
@@ -32,49 +29,6 @@ fn format_telegram(content: &str) -> String {
 fn format_discord(content: &str) -> String {
     // Discord supports markdown and code blocks — preserve them
     truncate_with_ellipsis(content, DISCORD_MAX_CHARS)
-}
-
-fn format_whatsapp(content: &str) -> String {
-    // WhatsApp: strip markdown formatting, use emojis for emphasis
-    let stripped = strip_markdown(content);
-    truncate_with_ellipsis(&stripped, WHATSAPP_MAX_CHARS)
-}
-
-/// Strip basic markdown formatting characters.
-fn strip_markdown(content: &str) -> String {
-    let mut result = String::with_capacity(content.len());
-    let mut chars = content.chars().peekable();
-
-    while let Some(ch) = chars.next() {
-        match ch {
-            // Bold **text** or __text__ → text
-            '*' | '_' => {
-                if chars.peek() == Some(&ch) {
-                    chars.next(); // skip second marker
-                }
-                // Skip the marker itself
-            }
-            // Inline code `text` → text
-            '`' => {
-                // Skip backticks (including triple ```)
-                while chars.peek() == Some(&'`') {
-                    chars.next();
-                }
-            }
-            // Headers # → skip the # and following space
-            '#' if result.is_empty() || result.ends_with('\n') => {
-                while chars.peek() == Some(&'#') {
-                    chars.next();
-                }
-                if chars.peek() == Some(&' ') {
-                    chars.next();
-                }
-            }
-            _ => result.push(ch),
-        }
-    }
-
-    result
 }
 
 /// Truncate content at a word boundary, appending "..." if truncated.
@@ -133,25 +87,6 @@ mod tests {
     }
 
     #[test]
-    fn test_whatsapp_strips_markdown() {
-        let content = "**Bold** and `code` and _italic_";
-        let result = format_for_channel(content, &ChannelName::new("whatsapp"));
-        assert!(!result.contains("**"));
-        assert!(!result.contains('`'));
-        assert!(result.contains("Bold"));
-        assert!(result.contains("code"));
-    }
-
-    #[test]
-    fn test_strip_markdown_headers() {
-        let content = "## Header\nSome text";
-        let stripped = strip_markdown(content);
-        assert!(!stripped.contains('#'));
-        assert!(stripped.contains("Header"));
-        assert!(stripped.contains("Some text"));
-    }
-
-    #[test]
     fn test_truncate_short_content() {
         let content = "short";
         assert_eq!(truncate_with_ellipsis(content, 100), "short");
@@ -169,7 +104,7 @@ mod tests {
     #[test]
     fn test_unknown_channel_passes_through() {
         let content = "**markdown** content";
-        let result = format_for_channel(content, &ChannelName::new("qq"));
+        let result = format_for_channel(content, &ChannelName::new("unknown"));
         assert_eq!(result, content);
     }
 }
