@@ -9,6 +9,42 @@ use desktop_shared::errors::ApiError;
 use crate::errors::map_cognitive_err;
 use crate::state::AppCore;
 
+/// Build reflection + consolidation handler pair from a cognitive provider and config.
+///
+/// Returns LLM-backed handlers when a provider is available, heuristic fallbacks otherwise.
+/// Used by both the manual "Run Reflection" API and the weekly cron job.
+pub(crate) fn build_reflection_handlers(
+    cognitive_provider: &Option<providers::DynProvider>,
+    config: &config::Config,
+) -> (
+    Box<dyn cognitive::ReflectionHandler>,
+    Box<dyn cognitive::ConsolidationHandler>,
+) {
+    let reflection: Box<dyn cognitive::ReflectionHandler> =
+        if let Some(ref cp) = cognitive_provider {
+            let params = providers::cognitive_chat_params(config, 2048);
+            Box::new(agent::cognitive_handlers::LlmReflectionHandler::new(
+                cp.clone(),
+                params,
+            ))
+        } else {
+            Box::new(agent::cognitive_handlers::HeuristicReflectionHandler)
+        };
+
+    let consolidation: Box<dyn cognitive::ConsolidationHandler> =
+        if let Some(ref cp) = cognitive_provider {
+            let params = providers::cognitive_chat_params(config, 1024);
+            Box::new(agent::cognitive_handlers::LlmConsolidationHandler::new(
+                cp.clone(),
+                params,
+            ))
+        } else {
+            Box::new(agent::cognitive_handlers::HeuristicConsolidationHandler)
+        };
+
+    (reflection, consolidation)
+}
+
 pub(crate) fn fact_to_response(f: &SemanticFact) -> SemanticFactResponse {
     let elapsed_days = chrono::Utc::now()
         .signed_duration_since(
@@ -182,10 +218,10 @@ impl AppCore {
             .await
             .unwrap_or(0) as usize;
 
-        let mut rules_count = 0;
-        for d in RULE_DOMAINS {
-            rules_count += rule_repo.list_active(d).await.map(|v| v.len()).unwrap_or(0);
-        }
+        let rules_count = rule_repo
+            .count_all_active()
+            .await
+            .unwrap_or(0) as usize;
 
         Ok(MemoryStatsResponse {
             active_facts,
@@ -499,33 +535,9 @@ impl AppCore {
 
         let config = self.config.read().await;
         let cognitive_provider = providers::create_cognitive_provider(&config).ok().flatten();
+        let (reflection_handler, consolidation_handler) =
+            build_reflection_handlers(&cognitive_provider, &config);
         drop(config);
-
-        let reflection_handler: Box<dyn cognitive::ReflectionHandler> =
-            if let Some(ref cp) = cognitive_provider {
-                let config = self.config.read().await;
-                let params = providers::cognitive_chat_params(&config, 2048);
-                drop(config);
-                Box::new(agent::cognitive_handlers::LlmReflectionHandler::new(
-                    cp.clone(),
-                    params,
-                ))
-            } else {
-                Box::new(agent::cognitive_handlers::HeuristicReflectionHandler)
-            };
-
-        let consolidation_handler: Box<dyn cognitive::ConsolidationHandler> =
-            if let Some(ref cp) = cognitive_provider {
-                let config = self.config.read().await;
-                let params = providers::cognitive_chat_params(&config, 1024);
-                drop(config);
-                Box::new(agent::cognitive_handlers::LlmConsolidationHandler::new(
-                    cp.clone(),
-                    params,
-                ))
-            } else {
-                Box::new(agent::cognitive_handlers::HeuristicConsolidationHandler)
-            };
 
         let output = cognitive::reflection::run_weekly_reflection(
             reflection_handler.as_ref(),

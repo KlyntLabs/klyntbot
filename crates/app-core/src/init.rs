@@ -518,31 +518,11 @@ fn register_cron_callbacks(
                         let episodic_repo = cognitive::EpisodicMemoryRepo::new(pool.clone());
                         let rule_repo = cognitive::ProceduralRuleRepo::new(pool.clone());
 
-                        let reflection_handler: Box<dyn cognitive::ReflectionHandler> =
-                            if let Some(ref cp) = cog_provider {
-                                let params = providers::cognitive_chat_params(&cog_config, 2048);
-                                Box::new(agent::cognitive_handlers::LlmReflectionHandler::new(
-                                    cp.clone(),
-                                    params,
-                                ))
-                            } else {
-                                Box::new(agent::cognitive_handlers::HeuristicReflectionHandler)
-                            };
-
-                        let consolidation_handler: Box<dyn cognitive::ConsolidationHandler> =
-                            if let Some(ref cp) = cog_provider {
-                                let params = providers::cognitive_chat_params(&cog_config, 1024);
-                                Box::new(
-                                    agent::cognitive_handlers::LlmConsolidationHandler::new(
-                                        cp.clone(),
-                                        params,
-                                    ),
-                                )
-                            } else {
-                                Box::new(
-                                    agent::cognitive_handlers::HeuristicConsolidationHandler,
-                                )
-                            };
+                        let (reflection_handler, consolidation_handler) =
+                            crate::handlers::cognitive::build_reflection_handlers(
+                                &cog_provider,
+                                &cog_config,
+                            );
 
                         match cognitive::reflection::run_weekly_reflection(
                             reflection_handler.as_ref(),

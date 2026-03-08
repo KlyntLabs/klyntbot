@@ -285,6 +285,11 @@ export interface DelegationInfo {
   durationMs?: number;
 }
 
+export interface PlanData {
+  steps: string[];
+  completedSteps: number[];
+}
+
 // ── Transparency Data (per-message) ───────────────────────────────────
 
 export interface TransparencyData {
@@ -313,7 +318,7 @@ export interface TransparencyData {
   subagents?: { label: string; profile: string }[];
   learning?: { eventType: string; detail: string }[];
   delegations?: DelegationInfo[];
-  plan?: { steps: string[]; completedSteps: number[] };
+  plan?: PlanData;
 }
 
 // ── Interaction (ask_user) ─────────────────────────────────────────────

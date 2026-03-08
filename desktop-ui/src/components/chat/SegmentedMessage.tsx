@@ -1,6 +1,6 @@
 import { Check, ChevronRight, X } from "lucide-react";
 import { useMemo, useState } from "react";
-import type { MessageSegment } from "../../lib/types";
+import type { MessageSegment, PlanData } from "../../lib/types";
 import { formatDuration, formatTokens, qualifiedToolName } from "../../lib/utils";
 import { MarkdownContent } from "./MarkdownContent";
 import { PlanProgress } from "./PlanProgress";
@@ -14,7 +14,7 @@ interface SegmentedMessageProps {
   /** The agent currently being delegated to (between delegation_started and delegation_completed). */
   activeDelegateAgent?: string | null;
   /** Live plan steps from the agent's chain-of-thought planning. */
-  plan?: { steps: string[]; completedSteps: number[] } | null;
+  plan?: PlanData | null;
 }
 
 // Rotate through accent colors for active tool spinners

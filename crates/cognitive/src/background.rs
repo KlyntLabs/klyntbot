@@ -150,15 +150,15 @@ impl BackgroundConsolidationService {
                                     // Store high-importance observations as episodic memories
                                     if obs.importance >= 0.7 {
                                         if let Some(ep_repo) = &episodic_repo {
-                                            let now = Utc::now();
+                                            let ts = Utc::now().format("%Y-%m-%dT%H:%M:%S").to_string();
                                             let mem = EpisodicMemory {
                                                 id: uuid::Uuid::new_v4().to_string(),
                                                 domain: obs.domain.clone(),
                                                 content: obs.content.clone(),
                                                 summary: None,
                                                 importance: obs.importance,
-                                                occurred_at: now.format("%Y-%m-%dT%H:%M:%S").to_string(),
-                                                recorded_at: now.format("%Y-%m-%dT%H:%M:%S").to_string(),
+                                                occurred_at: ts.clone(),
+                                                recorded_at: ts,
                                                 stability: 1.0,
                                                 last_accessed: None,
                                                 access_count: 0,

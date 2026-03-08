@@ -268,15 +268,29 @@ fn has_complex_workflow_keyword(msg: &str) -> bool {
 }
 
 /// Count indicators of tool usage in the message.
-/// Counts each occurrence so "create X and create Y" = 2.
+/// Counts each word-level occurrence so "create X and create Y" = 2.
+/// Uses word splitting instead of substring matching to avoid false positives
+/// (e.g. "forget" matching "get", "asset" matching "set").
 fn count_tool_indicators(msg: &str) -> u8 {
-    let mut count: u8 = 0;
-    let indicators = [
+    const INDICATORS: &[&str] = &[
         "search", "find", "list", "show", "create", "update", "delete", "add", "remove", "fetch",
-        "get", "read", "write", "send", "check", "look up", "set", "organize", "review",
+        "get", "read", "write", "send", "check", "set", "organize", "review",
     ];
-    for ind in &indicators {
-        count = count.saturating_add(msg.matches(ind).count() as u8);
+    let words: Vec<&str> = msg.split_whitespace().collect();
+    let mut count: u8 = 0;
+    for (i, word) in words.iter().enumerate() {
+        let clean = word.trim_matches(|c: char| !c.is_alphabetic());
+        if INDICATORS.contains(&clean) {
+            count = count.saturating_add(1);
+        }
+        // Multi-word: "look up"
+        if clean == "look" {
+            if let Some(next) = words.get(i + 1) {
+                if next.trim_matches(|c: char| !c.is_alphabetic()) == "up" {
+                    count = count.saturating_add(1);
+                }
+            }
+        }
     }
     count
 }

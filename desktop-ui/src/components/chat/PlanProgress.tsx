@@ -1,4 +1,5 @@
 import { Check, Circle, Loader2 } from "lucide-react";
+import { useMemo } from "react";
 
 interface PlanProgressProps {
   steps: string[];
@@ -7,9 +8,10 @@ interface PlanProgressProps {
 }
 
 export function PlanProgress({ steps, completedSteps, isStreaming }: PlanProgressProps) {
+  const completedSet = useMemo(() => new Set(completedSteps), [completedSteps]);
+
   if (steps.length === 0) return null;
 
-  const completedSet = new Set(completedSteps);
   const doneCount = completedSet.size;
   const totalCount = steps.length;
 
@@ -33,16 +35,17 @@ export function PlanProgress({ steps, completedSteps, isStreaming }: PlanProgres
           const isCompleted = completedSet.has(i);
           const isActive = i === activeIndex && isStreaming;
           return (
-            <div key={`step-${i}`} className="flex items-start gap-2">
-              <div className="mt-0.5 flex-shrink-0">
-                {isCompleted ? (
-                  <Check className="w-3 h-3 text-success" strokeWidth={2} />
-                ) : isActive ? (
-                  <Loader2 className="w-3 h-3 text-brand animate-spin" strokeWidth={2} />
-                ) : (
-                  <Circle className="w-3 h-3 text-dim" strokeWidth={1.5} />
-                )}
-              </div>
+            <div key={step} className="flex items-start gap-2">
+              {isCompleted ? (
+                <Check className="mt-0.5 w-3 h-3 flex-shrink-0 text-success" strokeWidth={2} />
+              ) : isActive ? (
+                <Loader2
+                  className="mt-0.5 w-3 h-3 flex-shrink-0 text-brand animate-spin"
+                  strokeWidth={2}
+                />
+              ) : (
+                <Circle className="mt-0.5 w-3 h-3 flex-shrink-0 text-dim" strokeWidth={1.5} />
+              )}
               <span
                 className={`text-[11px] font-light leading-snug ${
                   isCompleted ? "text-dim line-through" : isActive ? "text-secondary" : "text-muted"
