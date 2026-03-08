@@ -1189,6 +1189,38 @@ async fn dispatch(
             };
             r(core.get_session_context(&session_id).await)
         }
+        "send_brainstorm_message" => {
+            let conversation_id = match get_str(&body, "conversationId") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let content = match get_str(&body, "content") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            match core.send_brainstorm_message(&conversation_id, &content).await {
+                Ok((mut token_rx, handle)) => {
+                    // Drain tokens (dev server doesn't support SSE, so we wait for completion)
+                    while token_rx.recv().await.is_some() {}
+                    match handle.await {
+                        Ok(result) => r(result),
+                        Err(e) => err(ApiError::new("INTERNAL", format!("brainstorm task panicked: {e}"))),
+                    }
+                }
+                Err(e) => err(e),
+            }
+        }
+        "edit_brainstorm_message" => {
+            let message_id = match get_str(&body, "messageId") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let edited_content = match get_str(&body, "editedContent") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            r(core.edit_brainstorm_message(&message_id, &edited_content).await)
+        }
 
         // ── Unsupported ───────────────────────────────────────
         _ => err(ApiError::new(

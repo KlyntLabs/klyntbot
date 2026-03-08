@@ -265,6 +265,21 @@ impl SessionTrackerRepos {
         Ok(rows.into_iter().map(Into::into).collect())
     }
 
+    pub async fn update_brainstorm_message_edit(
+        &self,
+        message_id: &str,
+        edited_content: &str,
+    ) -> Result<(), StorageError> {
+        sqlx::query("UPDATE brainstorm_messages SET edited_content = ? WHERE id = ?")
+            .bind(edited_content)
+            .bind(message_id)
+            .execute(&self.pool)
+            .await
+            .map_err(StorageError::from)?;
+
+        Ok(())
+    }
+
     pub async fn mark_sent_to_cc(&self, message_id: &str) -> Result<(), StorageError> {
         sqlx::query("UPDATE brainstorm_messages SET sent_to_cc = 1 WHERE id = ?")
             .bind(message_id)

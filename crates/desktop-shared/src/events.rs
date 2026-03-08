@@ -284,6 +284,33 @@ pub struct NudgePayload {
     pub message: String,
 }
 
+// ── Session Tracker Events ──────────────────────────────────────────
+pub const SESSION_NEW: &str = "session:new";
+pub const SESSION_MESSAGE: &str = "session:message";
+pub const SESSION_STATUS: &str = "session:status";
+pub const BRAINSTORM_TOKEN: &str = "brainstorm:token";
+pub const BRAINSTORM_COMPLETE: &str = "brainstorm:complete";
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionMessagePayload {
+    pub session_id: String,
+    pub message: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrainstormTokenPayload {
+    pub conversation_id: String,
+    pub token: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrainstormCompletePayload {
+    pub conversation_id: String,
+}
+
 pub const COACHING_INTERVENTION: &str = "coaching:intervention";
 pub const DISTRACTION_INTERVENTION: &str = "distraction:intervention";
 pub const DISTRACTION_VERDICT: &str = "distraction:verdict";

@@ -115,10 +115,8 @@ fn convert_raw(raw: RawSessionLine) -> Option<SessionMessage> {
         } => {
             // Filter out noisy progress types that clutter the mirror view.
             // Keep only api_request progress (shows LLM call status).
-            let dominated = data
-                .get("type")
-                .and_then(|v| v.as_str())
-                .map_or(true, |dtype| dtype != "api_request");
+            let dominated =
+                data.get("type").and_then(|v| v.as_str()) != Some("api_request");
             if dominated {
                 return None;
             }
@@ -140,7 +138,7 @@ fn convert_raw(raw: RawSessionLine) -> Option<SessionMessage> {
             // and empty dequeue/remove operations
             let is_system = content
                 .as_deref()
-                .map_or(false, |c| c.starts_with("<task-notification>"));
+                .is_some_and(|c| c.starts_with("<task-notification>"));
             let is_empty_op =
                 (operation == "dequeue" || operation == "remove") && content.is_none();
             if is_system || is_empty_op {
