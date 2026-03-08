@@ -24,6 +24,9 @@ pub enum EngineResult {
         traces: Vec<ReasoningTrace>,
         tool_name: Option<String>,
     },
+    /// DirectEngine detected tool calls — signals the router to escalate to
+    /// Reactive mode with the original messages and tools.
+    Escalate { usage: Usage },
 }
 
 impl EngineResult {
@@ -61,6 +64,7 @@ impl std::fmt::Debug for EngineResult {
                 .field("iterations", iterations)
                 .field("tool_name", tool_name)
                 .finish(),
+            Self::Escalate { .. } => f.debug_struct("Escalate").finish(),
         }
     }
 }

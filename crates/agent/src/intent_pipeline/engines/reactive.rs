@@ -319,16 +319,16 @@ mod tests {
             .await
             .unwrap();
 
-        match result {
-            EngineResult::Complete {
-                content,
-                iterations,
-                ..
-            } => {
-                assert!(content.contains("Done"));
-                assert_eq!(iterations, 2);
-            }
-        }
+        let EngineResult::Complete {
+            content,
+            iterations,
+            ..
+        } = result
+        else {
+            panic!("expected Complete");
+        };
+        assert!(content.contains("Done"));
+        assert_eq!(iterations, 2);
     }
 
     #[tokio::test]
@@ -353,11 +353,10 @@ mod tests {
             .await
             .unwrap();
 
-        match result {
-            EngineResult::Complete { content, .. } => {
-                assert!(!content.is_empty(), "Should have synthesized a response");
-            }
-        }
+        let EngineResult::Complete { content, .. } = result else {
+            panic!("expected Complete");
+        };
+        assert!(!content.is_empty(), "Should have synthesized a response");
     }
 
     #[tokio::test]
@@ -381,13 +380,12 @@ mod tests {
             .await
             .unwrap();
 
-        match result {
-            EngineResult::Complete { traces, .. } => {
-                assert_eq!(traces.len(), 3); // 2 tools + final
-                assert_eq!(traces[0].actual_action, "tools_executed");
-                assert_eq!(traces[1].actual_action, "tools_executed");
-            }
-        }
+        let EngineResult::Complete { traces, .. } = result else {
+            panic!("expected Complete");
+        };
+        assert_eq!(traces.len(), 3); // 2 tools + final
+        assert_eq!(traces[0].actual_action, "tools_executed");
+        assert_eq!(traces[1].actual_action, "tools_executed");
     }
 
     #[tokio::test]
@@ -412,11 +410,10 @@ mod tests {
             .await
             .unwrap();
 
-        match result {
-            EngineResult::Complete { iterations, .. } => {
-                assert!(iterations <= 3, "should not exceed 3 iterations");
-            }
-        }
+        let EngineResult::Complete { iterations, .. } = result else {
+            panic!("expected Complete");
+        };
+        assert!(iterations <= 3, "should not exceed 3 iterations");
     }
 
     #[tokio::test]
@@ -445,7 +442,10 @@ mod tests {
             content,
             iterations,
             ..
-        } = result;
+        } = result
+        else {
+            panic!("expected Complete, got Escalate");
+        };
         assert!(
             content.is_empty() || content.contains("cancelled"),
             "content should be empty or mention cancelled"

@@ -490,6 +490,9 @@ async fn run_subagent_task(
 
     match outcome {
         EngineResult::Complete { content, .. } => Ok(("ok".to_string(), content)),
+        EngineResult::Escalate { .. } => {
+            unreachable!("subagents always use ReactiveEngine which never produces Escalate")
+        }
     }
 }
 

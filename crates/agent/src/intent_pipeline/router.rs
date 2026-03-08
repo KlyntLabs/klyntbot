@@ -41,6 +41,9 @@ impl ExecutionRouter {
     }
 
     /// Execute with the given mode.
+    ///
+    /// If Direct mode detects tool calls (misclassification), automatically
+    /// escalates to Reactive mode with the original messages and tools.
     pub async fn execute(
         &self,
         mode: ExecutionMode,
@@ -52,14 +55,50 @@ impl ExecutionRouter {
     ) -> Result<RouterResult> {
         use super::engines::ExecutionEngine;
 
-        let mode_name = mode.short_name();
-
         let result = match mode {
             ExecutionMode::Direct => {
                 debug!("ExecutionRouter: executing with Direct mode");
-                self.direct
-                    .execute(messages, tools, params, ctx, event_tx)
-                    .await?
+                // Clone messages so we can retry with Reactive on escalation.
+                let messages_backup = messages.clone();
+                let direct_result = self
+                    .direct
+                    .execute(messages, tools, params, ctx, event_tx.clone())
+                    .await?;
+
+                match direct_result {
+                    EngineResult::Escalate {
+                        usage: direct_usage,
+                    } => {
+                        debug!("ExecutionRouter: Direct mode escalated to Reactive (tool calls detected)");
+                        let reactive_result = self
+                            .reactive
+                            .execute(messages_backup, tools, params, ctx, event_tx)
+                            .await?;
+                        match reactive_result {
+                            EngineResult::Complete {
+                                content,
+                                mut usage,
+                                iterations,
+                                tool_name,
+                                traces,
+                            } => {
+                                // Combine usage from the failed Direct attempt.
+                                usage.prompt_tokens += direct_usage.prompt_tokens;
+                                usage.completion_tokens += direct_usage.completion_tokens;
+                                EngineResult::Complete {
+                                    content,
+                                    usage,
+                                    iterations: iterations + 1,
+                                    tool_name,
+                                    traces,
+                                }
+                            }
+                            // Escalate from Reactive shouldn't happen, but handle it.
+                            other => other,
+                        }
+                    }
+                    complete => complete,
+                }
             }
             ExecutionMode::Reactive { max_iterations } => {
                 debug!(
@@ -78,11 +117,21 @@ impl ExecutionRouter {
             iterations,
             tool_name,
             traces,
-        } = result;
+        } = result
+        else {
+            unreachable!("only Direct can produce Escalate and it is handled above");
+        };
+
+        // If escalation happened, the final mode is "reactive" (via escalation).
+        let final_mode = if matches!(mode, ExecutionMode::Direct) && iterations > 1 {
+            "reactive(escalated)"
+        } else {
+            mode.short_name()
+        };
 
         Ok(RouterResult {
             content,
-            final_mode: mode_name.to_string(),
+            final_mode: final_mode.to_string(),
             usage,
             iterations,
             tool_name,

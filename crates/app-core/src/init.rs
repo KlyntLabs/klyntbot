@@ -334,6 +334,31 @@ impl AppCore {
         // Spawn background services (agent loop + channel manager).
         spawn_background(inbound_rx, channel_manager, &agent, &shutdown_token);
 
+        // Spawn daily analytics retention cleanup.
+        {
+            let repos_bg = core.repos.clone();
+            let token = shutdown_token.clone();
+            tokio::spawn(async move {
+                let mut interval =
+                    tokio::time::interval(std::time::Duration::from_secs(24 * 60 * 60));
+                interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+                // Skip first tick (don't run immediately on startup).
+                interval.tick().await;
+                loop {
+                    tokio::select! {
+                        _ = interval.tick() => {
+                            match repos_bg.cleanup_analytics().await {
+                                Ok(0) => {}
+                                Ok(n) => info!(deleted = n, "analytics retention: cleaned up old records"),
+                                Err(e) => warn!(error = %e, "analytics retention cleanup failed"),
+                            }
+                        }
+                        _ = token.cancelled() => break,
+                    }
+                }
+            });
+        }
+
         let channels = EventChannels {
             intervention_rx,
             domain_event_bus,

@@ -130,4 +130,38 @@ impl Repos {
     pub fn pool(&self) -> &sqlx::SqlitePool {
         &self.pool
     }
+
+    /// Run retention cleanup on analytics tables. Returns total rows deleted.
+    ///
+    /// Default retention periods:
+    /// - `strategy_records`: 90 days
+    /// - `learning_outcomes`: 30 days
+    /// - `interaction_log`: 60 days
+    /// - `tool_usage`: 90 days
+    /// - `enrichment_feedback`: 90 days
+    pub async fn cleanup_analytics(&self) -> Result<u64, crate::error::StorageError> {
+        let now = chrono::Utc::now();
+        let mut total = 0u64;
+
+        total += self.strategies.delete_older_than(90, now).await?;
+        total += self.outcomes.delete_older_than(30, now).await?;
+        total += self.interaction_log.delete_older_than(60, now).await?;
+
+        // tool_usage has no dedicated repo — use direct SQL.
+        let cutoff_90 = now - chrono::Duration::days(90);
+        let result = sqlx::query("DELETE FROM tool_usage WHERE created_at < ?1")
+            .bind(cutoff_90)
+            .execute(&self.pool)
+            .await?;
+        total += result.rows_affected();
+
+        // enrichment_feedback
+        let result = sqlx::query("DELETE FROM enrichment_feedback WHERE timestamp < ?1")
+            .bind(cutoff_90)
+            .execute(&self.pool)
+            .await?;
+        total += result.rows_affected();
+
+        Ok(total)
+    }
 }

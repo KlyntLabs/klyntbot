@@ -46,9 +46,11 @@ impl ExecutionEngine for DirectEngine {
                 Ok(EngineResult::complete(content, usage, 1))
             }
             CycleOutcome::ToolsExecuted { .. } => {
-                // LLM wanted tools despite Direct mode classification — misclassified.
-                tracing::warn!("DirectEngine: LLM issued tool calls in Direct mode; returning empty (should have been classified as Reactive)");
-                Ok(EngineResult::empty(usage, 1))
+                // LLM wanted tools despite Direct mode classification — escalate to Reactive.
+                tracing::info!(
+                    "DirectEngine: LLM issued tool calls in Direct mode; escalating to Reactive"
+                );
+                Ok(EngineResult::Escalate { usage })
             }
             CycleOutcome::EmptyResponse => Ok(EngineResult::empty(usage, 1)),
         }
@@ -83,20 +85,20 @@ mod tests {
             .await
             .unwrap();
 
-        match result {
-            EngineResult::Complete {
-                content,
-                iterations,
-                ..
-            } => {
-                assert_eq!(content, "Hello! How can I help?");
-                assert_eq!(iterations, 1);
-            }
-        }
+        let EngineResult::Complete {
+            content,
+            iterations,
+            ..
+        } = result
+        else {
+            panic!("expected Complete");
+        };
+        assert_eq!(content, "Hello! How can I help?");
+        assert_eq!(iterations, 1);
     }
 
     #[tokio::test]
-    async fn returns_empty_when_tool_calls_in_direct_mode() {
+    async fn escalates_when_tool_calls_in_direct_mode() {
         let engine = make_engine(MockSequenceProvider::with_tool_call("web_search"));
 
         let result = engine
@@ -110,11 +112,10 @@ mod tests {
             .await
             .unwrap();
 
-        match result {
-            EngineResult::Complete { content, .. } => {
-                assert!(content.is_empty());
-            }
-        }
+        assert!(
+            matches!(result, EngineResult::Escalate { .. }),
+            "Expected Escalate variant, got {result:?}"
+        );
     }
 
     #[tokio::test]
@@ -132,11 +133,10 @@ mod tests {
             .await
             .unwrap();
 
-        match result {
-            EngineResult::Complete { content, .. } => {
-                assert!(content.is_empty());
-            }
-        }
+        let EngineResult::Complete { content, .. } = result else {
+            panic!("expected Complete");
+        };
+        assert!(content.is_empty());
     }
 
     #[test]

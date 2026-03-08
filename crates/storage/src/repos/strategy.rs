@@ -227,6 +227,20 @@ impl StrategyRepo {
         })
     }
 
+    /// Delete strategy records older than `days` days. Returns count of deleted rows.
+    pub async fn delete_older_than(
+        &self,
+        days: i64,
+        now: chrono::DateTime<Utc>,
+    ) -> Result<u64, StorageError> {
+        let cutoff = now - chrono::Duration::days(days);
+        let result = sqlx::query("DELETE FROM strategy_records WHERE timestamp < ?1")
+            .bind(cutoff)
+            .execute(&self.pool)
+            .await?;
+        Ok(result.rows_affected())
+    }
+
     /// Get per-tool stats (only for records where tool_name is non-null).
     pub async fn get_tool_stats(&self) -> Result<Vec<ToolStatsRow>, StorageError> {
         let rows = sqlx::query_as::<_, ToolStatsRow>(
