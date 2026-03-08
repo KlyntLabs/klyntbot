@@ -536,7 +536,7 @@ Each `feature-*` crate implements `FeaturePackage`:
 
 4. **No external observability.** Zero telemetry, no Prometheus metrics, no distributed tracing. Only local `tracing` crate logs. No dashboards beyond the desktop UI.
 
-5. **Unbounded analytics tables.** `strategy_records`, `learning_outcomes`, `tool_usage`, `interaction_log`, `enrichment_feedback` grow without limits. No retention policy, no cleanup.
+5. ~~**Unbounded analytics tables.**~~ Fixed — `Repos::cleanup_analytics()` runs daily via background task, enforcing retention: `strategy_records` (90d), `learning_outcomes` (30d), `interaction_log` (60d), `tool_usage` (90d), `enrichment_feedback` (90d).
 
 6. **Coaching feedback is in-memory only.** `FeedbackTracker` loses all data on restart. Cannot analyze coaching effectiveness historically.
 
@@ -706,9 +706,8 @@ Security        ███████░░░  7.5
 **Fix:** `FeedbackTracker` now has `with_repo()`, `persist()`, and `load_from_db()` methods backed by the `coaching_strategies` table via `CoachingStrategyRepo`.
 **Impact:** Coaching effectiveness data survives restarts.
 
-#### R6: Add retention policies for analytics tables
-**Fix:** Add daily compaction for `strategy_records` (keep 90 days), `learning_outcomes` (keep 30 days), `interaction_log` (keep 60 days), `tool_usage` (keep 90 days).
-**Impact:** Prevents unbounded database growth.
+#### ~~R6: Add retention policies for analytics tables~~ — SOLVED
+**Fix:** Added `delete_older_than()` to `StrategyRepo` (90d), `OutcomeRepo` (30d), `InteractionLogRepo` (60d). `Repos::cleanup_analytics()` coordinates all tables including `tool_usage` (90d) and `enrichment_feedback` (90d). Runs daily via background task in `AppCore::init()`.
 
 #### ~~R7: Implement conversation memory decay~~ — SOLVED
 **Fix:** `ConversationEmbeddingStore.search_similar()` now applies `score × decay_factor^days_old` using `created_at` from LanceDB. `search_conv_embeddings` updated to return timestamps.
@@ -720,10 +719,8 @@ Security        ███████░░░  7.5
 **Fix:** For complex tasks (complexity score ≥5), inject a planning step before tool execution: "Before executing, write a step-by-step plan." Parse and track plan completion.
 **Impact:** Improves success rate on multi-step tasks.
 
-#### R9: Handle Direct mode tool-call overflow
-**Current:** If LLM issues tool calls during Direct mode, `DirectEngine` logs a warning and returns empty content.
-**Fix:** Escalate to Reactive mode on tool-call detection in Direct mode.
-**Impact:** Eliminates a class of silent failures.
+#### ~~R9: Handle Direct mode tool-call overflow~~ — SOLVED
+**Fix:** `DirectEngine` now returns `EngineResult::Escalate` instead of empty. `ExecutionRouter` catches escalation, clones original messages, and transparently retries with `ReactiveEngine` + actual tools. Usage from the failed Direct attempt is accumulated.
 
 #### ~~R10: Create explicit ANN indexes in LanceDB~~ — SOLVED
 **Fix:** Added `VectorStore::ensure_indexes(min_rows)` — creates IVF-PQ (cosine) indexes on tables with 256+ rows, called in background on boot via `AppCore::init()`.
