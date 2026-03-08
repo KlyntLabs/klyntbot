@@ -50,6 +50,7 @@ function CompletedToolSegment({ segment, nested }: { segment: ToolSegment; neste
     () => (segment.result && !isDelegate ? formatResult(segment.result) : null),
     [segment.result, isDelegate],
   );
+  const durationLabel = segment.durationMs > 0 ? formatDuration(segment.durationMs) : null;
   const canExpand = !isDelegate && (formattedResult || segment.estimatedTokens);
 
   return (
@@ -73,7 +74,7 @@ function CompletedToolSegment({ segment, nested }: { segment: ToolSegment; neste
           <X className="w-3 h-3 text-destructive" strokeWidth={2} />
         )}
         <span>{qualifiedName}</span>
-        <span className="text-dim">{formatDuration(segment.durationMs)}</span>
+        {durationLabel && <span className="text-dim">{durationLabel}</span>}
       </button>
       {expanded && (
         <div className="mt-1 ml-5 space-y-1">
@@ -83,7 +84,7 @@ function CompletedToolSegment({ segment, nested }: { segment: ToolSegment; neste
             </pre>
           )}
           <div className="flex items-center gap-2 text-[10px] font-light text-dim">
-            <span>{formatDuration(segment.durationMs)}</span>
+            {durationLabel && <span>{durationLabel}</span>}
             {segment.estimatedTokens && (
               <span>~{formatTokens(segment.estimatedTokens)} tokens</span>
             )}
@@ -116,7 +117,9 @@ function DelegateGroup({ delegate, subTools }: { delegate: ToolSegment; subTools
           <X className="w-3 h-3 text-destructive" strokeWidth={2} />
         )}
         <span>delegate</span>
-        <span className="text-dim">{formatDuration(delegate.durationMs)}</span>
+        {delegate.durationMs > 0 && (
+          <span className="text-dim">{formatDuration(delegate.durationMs)}</span>
+        )}
         {subTools.length > 0 && (
           <span className="text-dim">
             ({subTools.length} tool{subTools.length !== 1 ? "s" : ""})

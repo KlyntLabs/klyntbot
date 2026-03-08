@@ -1,37 +1,20 @@
-import { Pin } from "lucide-react";
+import { useMemo } from "react";
 import type { ContentBlock, SessionMessage } from "../../lib/session-types";
-import { CollapsibleToolBlock } from "./CollapsibleToolBlock";
+import { MarkdownContent } from "../chat/MarkdownContent";
 
 interface SessionMessageItemProps {
   message: SessionMessage;
   onPin?: (messageUuid: string) => void;
 }
 
-function renderContentBlocks(content: ContentBlock[]) {
-  const elements: React.ReactNode[] = [];
-  for (let i = 0; i < content.length; i++) {
-    const block = content[i];
-    if (block.type === "text" && block.text) {
-      elements.push(
-        <p key={`text-${i}`} className="whitespace-pre-wrap break-words">
-          {block.text}
-        </p>,
-      );
-    } else if (block.type === "tool_use") {
-      const next = content[i + 1];
-      const toolResult =
-        next?.type === "tool_result" && next.toolUseId === block.id ? next : undefined;
-      if (toolResult) i++; // skip the consumed tool_result
-      elements.push(
-        <CollapsibleToolBlock key={block.id ?? `tool-${i}`} tool={block} result={toolResult} />,
-      );
-    }
-    // standalone tool_result blocks without a preceding tool_use are silently skipped
-  }
-  return elements;
-}
-
 export function SessionMessageItem({ message, onPin }: SessionMessageItemProps) {
+  // Hooks must be called unconditionally (before any early returns)
+  const text = useMemo(() => {
+    if (Array.isArray(message.content)) return extractText(message.content);
+    if (typeof message.content === "string") return message.content;
+    return message.text ?? "";
+  }, [message.content, message.text]);
+
   if (message.type === "progress") {
     return (
       <div className="flex justify-center py-0.5">
@@ -51,7 +34,6 @@ export function SessionMessageItem({ message, onPin }: SessionMessageItemProps) 
   }
 
   if (message.type === "queueOperation") {
-    // Enqueue with content = user sent a message while Claude was working
     const queueText = typeof message.content === "string" ? message.content : message.text;
     if (message.operation === "enqueue" && queueText) {
       return (
@@ -62,47 +44,53 @@ export function SessionMessageItem({ message, onPin }: SessionMessageItemProps) 
         </div>
       );
     }
-    // Hide dequeue/remove operations — they're just bookkeeping
     return null;
   }
 
   const isUser = message.type === "user";
 
-  return (
-    <div className={`group flex ${isUser ? "justify-end" : "justify-start"} py-1`}>
-      <div
-        className={`max-w-[85%] px-4 py-2.5 text-[13px] font-light ${
-          isUser ? "glass-bubble-user text-primary" : "glass-bubble text-primary"
-        }`}
-      >
-        {isUser ? (
-          <p className="whitespace-pre-wrap break-words">{message.text}</p>
-        ) : (
-          <AssistantContent message={message} />
-        )}
+  // Skip assistant messages with no text content (pure tool calls)
+  if (!isUser && !text) return null;
+
+  if (isUser) {
+    return (
+      <div className="group flex justify-end py-1">
+        <div className="max-w-[85%] glass-bubble-user px-5 py-3.5">
+          <p className="text-[13px] font-light whitespace-pre-wrap leading-relaxed text-primary">
+            {message.text ?? (typeof message.content === "string" ? message.content : "")}
+          </p>
+        </div>
       </div>
-      {onPin && message.uuid && (
-        <button
-          type="button"
-          onClick={() => onPin(message.uuid as string)}
-          title="Pin message"
-          className="self-start mt-2 ml-1 opacity-0 group-hover:opacity-100 transition-opacity w-6 h-6 rounded-md flex items-center justify-center text-dim hover:text-muted"
-        >
-          <Pin className="w-3 h-3" strokeWidth={1.5} />
-        </button>
-      )}
+    );
+  }
+
+  return (
+    <div className="group flex justify-start items-start gap-2 py-0.5">
+      <PinMarker canPin={!!onPin && !!message.uuid} onPin={() => onPin?.(message.uuid!)} />
+      <div className="max-w-[85%]">{text && <MarkdownContent content={text} />}</div>
     </div>
   );
 }
 
-function AssistantContent({ message }: { message: SessionMessage }) {
-  if (Array.isArray(message.content)) {
-    return <div className="space-y-1">{renderContentBlocks(message.content)}</div>;
+function PinMarker({ canPin, onPin }: { canPin: boolean; onPin: () => void }) {
+  if (!canPin) {
+    return <span className="mt-[5px] w-2 h-2 shrink-0 rounded-full border border-brand/40" />;
   }
-  const display = typeof message.content === "string" ? message.content : message.text;
-  return display ? (
-    <div className="space-y-1">
-      <p className="whitespace-pre-wrap break-words">{display}</p>
-    </div>
-  ) : null;
+
+  return (
+    <button
+      type="button"
+      onClick={onPin}
+      title="Pin message"
+      className="mt-[5px] w-2 h-2 shrink-0 rounded-full border border-brand/40 transition-colors hover:border-brand hover:bg-brand/40"
+    />
+  );
+}
+
+/** Extract only text content from ContentBlock[], skipping tool_use/tool_result. */
+function extractText(blocks: ContentBlock[]): string {
+  return blocks
+    .filter((b) => b.type === "text" && b.text)
+    .map((b) => b.text!)
+    .join("\n\n");
 }

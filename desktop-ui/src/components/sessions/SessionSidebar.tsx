@@ -26,6 +26,10 @@ interface ProjectGroup {
   sessions: TrackedSession[];
 }
 
+function isSessionLive(status: TrackedSession["status"]): boolean {
+  return status === "active" || status === "idle";
+}
+
 function groupByProject(sessions: TrackedSession[]): ProjectGroup[] {
   const map = new Map<string, ProjectGroup>();
   for (const s of sessions) {
@@ -40,7 +44,25 @@ function groupByProject(sessions: TrackedSession[]): ProjectGroup[] {
     }
     group.sessions.push(s);
   }
-  return Array.from(map.values());
+  // Sort: groups with live sessions first, then by session count
+  const groups = Array.from(map.values());
+  const liveGroups = new Set(
+    groups.filter((g) => g.sessions.some((s) => isSessionLive(s.status))).map((g) => g.projectPath),
+  );
+  groups.sort((a, b) => {
+    const aLive = liveGroups.has(a.projectPath);
+    const bLive = liveGroups.has(b.projectPath);
+    if (aLive !== bLive) return aLive ? -1 : 1;
+    return b.sessions.length - a.sessions.length;
+  });
+  return groups;
+}
+
+/** Groups that should auto-expand: has live sessions, or contains the current session */
+function shouldAutoExpand(group: ProjectGroup, activeSessionId: string | undefined): boolean {
+  if (group.sessions.some((s) => isSessionLive(s.status))) return true;
+  if (activeSessionId && group.sessions.some((s) => s.sessionId === activeSessionId)) return true;
+  return false;
 }
 
 export function SessionSidebar({ activeSessionId }: SessionSidebarProps) {
@@ -57,14 +79,16 @@ export function SessionSidebar({ activeSessionId }: SessionSidebarProps) {
   const groups = useMemo(() => groupByProject(sessions), [sessions]);
   const [expandedGroups, toggleGroup] = useSetToggle();
 
-  // Auto-expand all groups when sessions first load
+  // Auto-expand only relevant groups (active sessions or current session's group)
   const hasExpandedRef = useRef(false);
   // biome-ignore lint/correctness/useExhaustiveDependencies: one-time expansion on first data load
   useEffect(() => {
     if (groups.length > 0 && !hasExpandedRef.current) {
       hasExpandedRef.current = true;
       for (const g of groups) {
-        toggleGroup(`proj:${g.projectPath}`);
+        if (shouldAutoExpand(g, activeSessionId)) {
+          toggleGroup(`proj:${g.projectPath}`);
+        }
       }
     }
   }, [groups]);

@@ -43,10 +43,10 @@ export function SessionMirrorView({ sessionId, showPinButtons }: SessionMirrorVi
           <span className="text-muted text-[12px] font-light">No messages yet</span>
         </div>
       ) : (
-        <div className="space-y-0.5">
-          {messages.map((msg) => (
+        <div className="space-y-1.5">
+          {messages.map((msg, i) => (
             <SessionMessageItem
-              key={msg.uuid}
+              key={msg.uuid ?? `${msg.type}-${i}`}
               message={msg}
               onPin={showPinButtons ? handlePin : undefined}
             />
