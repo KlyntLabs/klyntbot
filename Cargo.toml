@@ -27,7 +27,6 @@ members = [
     "crates/feature-productivity",
     "crates/cognitive",
     "crates/feature-coaching",
-    "crates/feature-session-tracker",
     "crates/app-core",
 ]
 
@@ -61,7 +60,6 @@ feature-productivity = { path = "crates/feature-productivity" }
 plugin-runtime = { path = "crates/plugin-runtime" }
 cognitive = { path = "crates/cognitive" }
 feature-coaching = { path = "crates/feature-coaching" }
-feature-session-tracker = { path = "crates/feature-session-tracker" }
 desktop-shared = { path = "crates/desktop-shared" }
 desktop = { path = "crates/desktop" }
 app-core = { path = "crates/app-core" }

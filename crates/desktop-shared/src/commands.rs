@@ -954,41 +954,6 @@ pub struct ColumnValueSetParams {
     pub value: serde_json::Value,
 }
 
-// ── Session Tracker ──────────────────────────────────────────────────
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PinMessageParams {
-    pub session_id: String,
-    pub message_uuid: String,
-    pub message_content: String,
-    pub message_role: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CreateBrainstormParams {
-    pub session_id: String,
-    pub mode: String,
-    pub model_key: Option<String>,
-    pub agent_profile: Option<String>,
-    pub title: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SendBrainstormParams {
-    pub conversation_id: String,
-    pub content: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SendToClaudeCodeParams {
-    pub session_id: String,
-    pub content: String,
-}
-
 // ── App Info ──────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

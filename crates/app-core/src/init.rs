@@ -10,7 +10,6 @@ use feature_productivity::auto_focus::AutoFocusSession;
 use feature_productivity::repos::ProductivityRepos;
 use feature_productivity::tracker::categorizer::Categorizer;
 use feature_productivity::{DailyAggregator, FocusManager, NudgeService, ProductivityEngine};
-use feature_session_tracker::repos::SessionTrackerRepos;
 use scheduling::CronService;
 use storage::{Repos, StoragePool, VectorStore};
 use tokio::sync::{mpsc, Mutex, RwLock};
@@ -29,8 +28,6 @@ pub struct EventChannels {
     pub dashboard_tick_rx:
         Option<tokio::sync::broadcast::Receiver<feature_productivity::ActivityTick>>,
     pub dashboard_poll_interval_secs: u64,
-    pub session_watcher_rx:
-        Option<mpsc::Receiver<crate::services::session_watcher::SessionWatcherEvent>>,
 }
 
 impl AppCore {
@@ -74,16 +71,6 @@ impl AppCore {
         .await
         .map_err(|e| format!("notes migration failed: {e}"))?;
         let note_repo = NoteRepo::new(notes_pool);
-
-        // Run session tracker migrations.
-        let st_pool = storage_pool.inner().clone();
-        StoragePool::run_feature_migrations(
-            &st_pool,
-            &feature_session_tracker::SessionTrackerFeature::migrations_static(),
-        )
-        .await
-        .map_err(|e| format!("session tracker migration failed: {e}"))?;
-        let session_tracker_repos = SessionTrackerRepos::new(st_pool);
 
         // 3. Create LLM provider (graceful — falls back to noop for setup wizard)
         let (provider, resolved_model) = match providers::create_provider(&config) {
@@ -178,15 +165,6 @@ impl AppCore {
         ));
 
         let shutdown_token = CancellationToken::new();
-
-        // Start session watcher service (optional — graceful if ~/.claude missing).
-        let session_watcher_rx = crate::services::session_watcher::start(
-            session_tracker_repos.clone(),
-            shutdown_token.clone(),
-        );
-        if session_watcher_rx.is_some() {
-            info!("session watcher service started");
-        }
 
         // Initialize productivity feature (optional — requires enabled config).
         let dashboard_poll_interval_secs = config.productivity.tracking.poll_interval_secs;
@@ -341,7 +319,6 @@ impl AppCore {
             feedback_tracker: Some(feedback_tracker),
             user_situation: Some(user_situation),
             coaching_service: Some(Arc::new(Mutex::new(coaching_service))),
-            session_tracker_repos,
             has_cognitive_provider: cognitive_provider.is_some(),
         };
 
@@ -356,7 +333,6 @@ impl AppCore {
             nudge_rx,
             dashboard_tick_rx,
             dashboard_poll_interval_secs,
-            session_watcher_rx,
         };
 
         Ok((core, channels))

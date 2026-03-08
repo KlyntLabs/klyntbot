@@ -848,7 +848,6 @@ export type SidebarItem =
   | "Notes"
   | "Finance"
   | "Productivity"
-  | "Sessions"
   | "Debug"
   | "Settings";
 export type ViewMode = "table" | "board" | "tree";

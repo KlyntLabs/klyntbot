@@ -5,7 +5,6 @@ import {
   FileText,
   MessageCircle,
   MessageSquare,
-  Monitor,
   Settings,
   Wallet,
 } from "lucide-react";
@@ -26,7 +25,6 @@ const items: { key: SidebarItem; icon: typeof MessageSquare; path?: string; bott
   { key: "Notes", icon: FileText, path: "/notes" },
   { key: "Finance", icon: Wallet, path: "/finance" },
   { key: "Productivity", icon: Activity, path: "/productivity" },
-  { key: "Sessions", icon: Monitor, path: "/sessions" },
   { key: "Debug", icon: Bug, path: "/debug", bottom: true },
   { key: "Settings", icon: Settings, path: "/settings", bottom: true },
 ];

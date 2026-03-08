@@ -19,7 +19,6 @@ feature-coaching = { workspace = true }
 dashmap = { workspace = true }
 context_engine = { workspace = true }
 feature-notes = { workspace = true }
-feature-session-tracker = { workspace = true }
 feature-productivity = { workspace = true }
 providers = { workspace = true }
 scheduling = { workspace = true }

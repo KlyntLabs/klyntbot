@@ -109,16 +109,6 @@ const DistractionOverlay = lazy(() =>
     default: m.DistractionOverlay,
   })),
 );
-const Sessions = lazy(() =>
-  import("./components/views/Sessions").then((m) => ({ default: m.Sessions })),
-);
-const SessionDetail = lazy(() =>
-  import("./components/views/SessionDetail").then((m) => ({ default: m.SessionDetail })),
-);
-const BrainstormChat = lazy(() =>
-  import("./components/views/BrainstormChat").then((m) => ({ default: m.BrainstormChat })),
-);
-
 // ── Setup Wizard ──────────────────────────────────────────────────────
 const SetupLayout = lazy(() =>
   import("./components/setup/SetupLayout").then((m) => ({ default: m.SetupLayout })),
@@ -188,9 +178,6 @@ const router = createHashRouter([
       { path: "/finance/investments", element: <FinanceInvestments /> },
       { path: "/finance/goals", element: <FinanceGoals /> },
       { path: "/finance/liabilities", element: <FinanceLiabilities /> },
-      { path: "/sessions", element: <Sessions /> },
-      { path: "/sessions/:sessionId", element: <SessionDetail /> },
-      { path: "/sessions/:sessionId/brainstorm/:brainstormId", element: <BrainstormChat /> },
       { path: "/debug", element: <DebugDashboard /> },
       { path: "/settings", element: <Navigate to="/settings/general" replace /> },
       {
