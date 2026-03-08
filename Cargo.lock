@@ -34,6 +34,7 @@ dependencies = [
  "domain",
  "feature-coaching",
  "feature-finance",
+ "feature-notes",
  "feature-productivity",
  "feature-todo",
  "futures-util",

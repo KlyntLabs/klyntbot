@@ -611,6 +611,25 @@ impl AgentLoopBuilder {
             }
         }
 
+        // ── Notes tool (requires real pool) ──────────────────────────────────
+        if let Some(pool) = &self.pool {
+            storage::StoragePool::run_feature_migrations(
+                pool,
+                &feature_notes::NotesFeature::migrations_static(),
+            )
+            .await
+            .map_err(|e| {
+                common::KlyntbotError::Config(common::ConfigError::Invalid(format!(
+                    "Failed to run notes migrations: {}",
+                    e
+                )))
+            })?;
+
+            let note_repo = feature_notes::repo::NoteRepo::new(pool.clone());
+            tool_registry.register(feature_notes::tool::NotesTool::new(note_repo));
+            info!("Notes tool registered");
+        }
+
         // ── Productivity tool (reuses prod_repos from context source block) ──
         if let Some(prod_repos) = prod_repos {
             if let Some(pool) = &self.pool {

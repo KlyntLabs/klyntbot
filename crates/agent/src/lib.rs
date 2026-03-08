@@ -17,6 +17,8 @@ pub mod enrichment;
 pub mod events;
 #[cfg(test)]
 mod events_tests;
+#[cfg(test)]
+mod notes_integration_tests;
 pub mod execution;
 pub mod finance_adapter;
 pub mod intent_pipeline;
