@@ -312,31 +312,16 @@ impl AgentRuntime {
             *max_iterations = (*max_iterations).min(profile.max_iterations);
         }
 
-        // Step 5: Confidence check
+        // Step 5: Confidence check — downgrade to Direct mode for low-confidence
+        // instead of blocking the user with a technical clarification message.
         if let Some(ref evaluator) = self.confidence_evaluator {
             let threshold = evaluator.threshold();
             if analysis.confidence < threshold {
                 debug!(
-                    "AgentRuntime: low confidence ({:.2} < {:.2}), suggesting clarification",
+                    "AgentRuntime: low confidence ({:.2} < {:.2}), downgrading to Direct mode",
                     analysis.confidence, threshold
                 );
-                let content = format!(
-                    "I'm not entirely sure what you'd like me to do. Could you clarify? \
-                     I interpreted this as a {} request (confidence: {:.0}%).",
-                    analysis.mode.short_name(),
-                    analysis.confidence * 100.0
-                );
-                return Ok(RuntimeResult {
-                    content,
-                    mode_used: CLARIFICATION_MODE.to_string(),
-                    classification: analysis,
-                    validation: ValidationResult {
-                        is_valid: true,
-                        warnings: vec![],
-                        filtered_content: String::new(),
-                    },
-                    agent_name,
-                });
+                analysis.mode = crate::intent_pipeline::types::ExecutionMode::Direct;
             }
         }
 

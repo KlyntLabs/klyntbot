@@ -153,30 +153,16 @@ impl IntentPipeline {
                 .await;
         }
 
-        // Step 1.5: Confidence check — ask for clarification if confidence is too low
+        // Step 1.5: Confidence check — downgrade to Direct mode for low-confidence
+        // instead of blocking the user with a technical clarification message.
         if let Some(ref evaluator) = self.confidence_evaluator {
             let threshold = evaluator.threshold();
             if analysis.confidence < threshold {
                 debug!(
-                    "IntentPipeline: low confidence ({:.2} < {:.2}), suggesting clarification",
+                    "IntentPipeline: low confidence ({:.2} < {:.2}), downgrading to Direct mode",
                     analysis.confidence, threshold
                 );
-                let content = format!(
-                    "I'm not entirely sure what you'd like me to do. Could you clarify? \
-                     I interpreted this as a {} request (confidence: {:.0}%).",
-                    analysis.mode.short_name(),
-                    analysis.confidence * 100.0
-                );
-                return Ok(PipelineResult {
-                    content,
-                    mode_used: "clarification".to_string(),
-                    classification: analysis,
-                    validation: ValidationResult {
-                        is_valid: true,
-                        warnings: vec![],
-                        filtered_content: String::new(),
-                    },
-                });
+                analysis.mode = super::types::ExecutionMode::Direct;
             }
         }
 

@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use common::utils::truncate_at_boundary;
-use storage::VectorStore;
+use storage::{sanitize_predicate_value, VectorStore};
 
 use crate::embedder::TextEmbedder;
 
@@ -161,7 +161,7 @@ impl ConversationRecallService {
 
     /// Delete conversation embeddings older than the given cutoff.
     pub async fn delete_older_than(&self, cutoff: DateTime<Utc>) -> common::Result<()> {
-        let cutoff_str = cutoff.to_rfc3339();
+        let cutoff_str = sanitize_predicate_value(&cutoff.to_rfc3339())?;
         self.vector_store
             .delete_where(
                 "conv_embeddings",
@@ -173,7 +173,7 @@ impl ConversationRecallService {
 
     /// Delete all conversation embeddings for a specific session.
     pub async fn delete_by_session_key(&self, session_key: &str) -> common::Result<()> {
-        let escaped = session_key.replace('\'', "''");
+        let escaped = sanitize_predicate_value(session_key)?;
         self.vector_store
             .delete_where(
                 "conv_embeddings",

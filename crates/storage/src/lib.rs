@@ -17,7 +17,7 @@ pub mod vector_store;
 pub use error::{OptionExt, StorageError};
 pub use pool::StoragePool;
 pub use repos::Repos;
-pub use vector_store::VectorStore;
+pub use vector_store::{sanitize_predicate_value, VectorStore};
 
 // Re-export repo types for consumer convenience.
 pub use repos::action_repo::{ActionFilter, ActionPatch, ActionRepo, ActionSummary};

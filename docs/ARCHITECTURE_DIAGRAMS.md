@@ -243,7 +243,7 @@ flowchart TD
     Synthesize --> SynthResult([EngineResult::Complete<br/>{synthesized content}])
 
     subgraph "Tool Execution (ExecutionCore::run_cycle)"
-        TC1["LLM returns tool_calls[]"] --> TC2["Parallel execution via tokio::join!<br/>Per-tool timeout (30s default)"]
+        TC1["LLM returns tool_calls[]"] --> TC2["Bounded parallel execution<br/>Semaphore(10) + join_all<br/>Per-tool timeout (30s default)"]
         TC2 --> TC3["Duplicate detection:<br/>hash(tool_name + args) in seen_tool_calls"]
         TC3 --> TC4["OutcomeRecorder::record()<br/>privacy-safe: no args/content stored"]
         TC4 --> TC5["Append tool results to messages"]
@@ -584,7 +584,7 @@ flowchart TD
     end
 
     subgraph TOOLS_EXEC["Tool Execution"]
-        ParallelExec["Parallel tokio::join!<br/><i>per-tool 30s timeout</i>"]
+        ParallelExec["Bounded parallel join_all<br/><i>Semaphore(10), per-tool 30s timeout</i>"]
         OutcomeRec["OutcomeRecorder<br/><i>privacy-safe recording</i>"]
         Delegate["DelegateTool<br/><i>depth < MAX_DELEGATION_DEPTH (2)</i>"]
         SubRuntime["Sub-AgentRuntime<br/><i>specialized agent profile</i>"]
@@ -712,7 +712,7 @@ flowchart TD
 1. **User messages** arrive via 6 platform channels (Telegram, Discord, Slack, WhatsApp, Email, QQ) through the `MessageBus` (mpsc, buffer=100) into the `AgentLoop`.
 2. **Session management** (`DashMap` + SQLite, LRU@1000) provides conversation context and history.
 3. The **10-step AgentRuntime pipeline** performs: agent matching → profile-based filtering → two-stage intent classification (heuristics→LLM) → confidence gating → 8-priority context assembly → tool filtering + delegation injection → execution routing → validation → cost/strategy recording.
-4. **Direct mode** handles simple queries (single LLM call); **Reactive mode** runs a ReAct loop (1..max_iterations) with fabrication detection, duplicate prevention, failure reflection, and chain-of-thought planning for complexity >= 5.
+4. **Direct mode** handles simple queries (single LLM call); **Reactive mode** runs a ReAct loop (1..max_iterations) with fabrication detection, duplicate prevention, failure reflection, and chain-of-thought planning for complexity >= 5. Tool calls execute in bounded parallel (semaphore capped at 10, per-tool 30s timeout).
 5. **Multi-agent delegation** allows the `general` orchestrator to dispatch to 4 specialized agents (task, finance, automation, communication) with max depth 2.
 6. **Cognitive memory** processes domain events through salience filtering → LLM extraction → Mem0-style consolidation → SemanticFactRepo (SQLite) + vector embedding (LanceDB, 384-dim MiniLM). Retrieval uses a 5-factor FSRS-scored relevance formula. **Passive learning** via `ChatTurnCompleted` events feeds every chat turn into the extraction pipeline (importance 0.8), enabling fact discovery from ordinary conversation.
 7. **Adaptive learning** records tool outcomes (privacy-safe), analyzes hourly, adjusts confidence thresholds (+/-0.05/cycle, lock-free `AtomicU32`), and feeds back into the confidence gate.
@@ -743,6 +743,4 @@ flowchart TD
 | M2 | **`CharTokenCounter` fallback loses accuracy** | SYSTEM_ANALYSIS.md §6.4 | `chars / 4` is a rough approximation. When tiktoken-rs fails to load, context assembly may over- or under-allocate by 20-30%. | Log a warning when falling back. Consider bundling the tiktoken BPE data or using a more accurate character-based heuristic. |
 | M3 | **WhatsApp/QQ require external bridges** | SYSTEM_ANALYSIS.md §4.1 | WhatsApp needs `ws://localhost:3001` (Node.js Baileys bridge), QQ needs a similar bridge. These are external processes not managed by the klyntbot binary. | Document the bridge setup clearly. Consider embedding the bridge or providing a Docker Compose config. |
 | M4 | **No web chat channel** | SYSTEM_ANALYSIS.md §9.4 R14 | Users can only interact via 6 platform integrations or the desktop app. No browser-based fallback. | SSE streaming added to dev server (`291f4dc4`), enabling browser-based chat in dev mode. Full production web channel still needed. |
-| M5 | **Manual SQL predicate escaping in vector store** | SYSTEM_ANALYSIS.md §6.2 #7, §8 | `VectorStore` uses manual `'` escaping instead of parameterized queries for LanceDB filter predicates. Potential for injection if untrusted input reaches filter construction. | LanceDB may not support parameterized predicates natively. Add strict input validation/sanitization at the API boundary before values reach the vector store. |
-| M6 | **No global tool concurrency limit** | SYSTEM_ANALYSIS.md §6.4 | Parallel tool execution via `tokio::join!` has per-tool timeouts (30s) but no cap on how many tools run simultaneously. A malicious or buggy LLM could request 50 concurrent tool calls. | Add a `tokio::sync::Semaphore` in `ExecutionCore` to cap concurrent tool executions (e.g., 10). |
-| M7 | **Session LRU eviction at 1000** | SYSTEM_ANALYSIS.md §6.4 | `DashMap` in-memory cache evicts at 1000 sessions. For personal use this is fine, but multi-tenant would need per-user limits and smarter eviction. | Acceptable for single-user. Document the limit. |
+| M5 | **Session LRU eviction at 1000** | SYSTEM_ANALYSIS.md §6.4 | `DashMap` in-memory cache evicts at 1000 sessions. For personal use this is fine, but multi-tenant would need per-user limits and smarter eviction. | Acceptable for single-user. Document the limit. |

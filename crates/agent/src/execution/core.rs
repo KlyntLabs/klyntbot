@@ -7,7 +7,7 @@ use std::time::Instant;
 
 use futures_util::future::join_all;
 use futures_util::StreamExt;
-use tokio::sync::RwLock;
+use tokio::sync::{RwLock, Semaphore};
 
 use common::{utils::tool_def_name, Result};
 use context_engine::TokenCounter;
@@ -21,6 +21,9 @@ use crate::execution::types::{CycleOutcome, ExecutionParams, ToolExecutionResult
 
 /// Extended timeout for interactive tools that wait on user input.
 const INTERACTIVE_TOOL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(600);
+
+/// Maximum number of tool calls that can execute concurrently within a single cycle.
+const MAX_CONCURRENT_TOOLS: usize = 10;
 
 /// Hash a `serde_json::Value` without serializing to a string.
 ///
@@ -282,6 +285,7 @@ pub struct ExecutionCore {
     pub provider: DynProvider,
     pub tool_registry: Arc<RwLock<ToolRegistry>>,
     pub outcome_recorder: Option<Arc<crate::learning::recorder::OutcomeRecorder>>,
+    tool_semaphore: Arc<Semaphore>,
 }
 
 impl ExecutionCore {
@@ -290,6 +294,7 @@ impl ExecutionCore {
             provider,
             tool_registry,
             outcome_recorder: None,
+            tool_semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_TOOLS)),
         }
     }
 
@@ -446,6 +451,7 @@ impl ExecutionCore {
                 .enumerate()
                 .map(|(i, tc)| {
                     let registry = self.tool_registry.clone();
+                    let semaphore = self.tool_semaphore.clone();
                     let name = tc.name.clone();
                     let args = tc.arguments.clone();
                     let mut ctx = routing_ctx.clone();
@@ -459,6 +465,9 @@ impl ExecutionCore {
                     let tx = event_tx.cloned();
 
                     async move {
+                        // Limit concurrent tool executions to prevent runaway parallelism.
+                        let _permit = semaphore.acquire().await.expect("semaphore closed");
+
                         // Emit ToolStart BEFORE executing
                         if let Some(ref tx) = tx {
                             let _ = tx

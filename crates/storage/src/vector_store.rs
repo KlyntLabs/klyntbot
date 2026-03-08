@@ -15,6 +15,27 @@ use lancedb::Connection;
 
 use crate::error::StorageError;
 
+/// Escape a string value for use in a LanceDB SQL filter predicate.
+///
+/// LanceDB does not support parameterized queries, so string values must be
+/// escaped before interpolation. This function escapes single quotes and
+/// rejects values containing characters that should never appear in
+/// identifiers or filter values (semicolons, line breaks, comment markers).
+pub fn sanitize_predicate_value(value: &str) -> Result<String, StorageError> {
+    if value.contains(';')
+        || value.contains('\n')
+        || value.contains('\r')
+        || value.contains("--")
+        || value.contains("/*")
+    {
+        return Err(StorageError::Vector(format!(
+            "Predicate value contains disallowed characters: {:?}",
+            &value[..value.len().min(40)]
+        )));
+    }
+    Ok(value.replace('\'', "''"))
+}
+
 /// LanceDB-backed vector store for embedding similarity search.
 ///
 /// Manages three tables (all share the convention: `id` first, `vector` second,
@@ -154,8 +175,8 @@ impl VectorStore {
         // Delete old rows SECOND (safe: crash here = temporary duplicate,
         // cleaned up on next upsert). We delete rows with matching ID that
         // have an older timestamp than `now`.
-        let safe_id = id.replace('\'', "''");
-        let safe_now = now.replace('\'', "''");
+        let safe_id = sanitize_predicate_value(id)?;
+        let safe_now = sanitize_predicate_value(&now)?;
         let predicate = format!("id = '{safe_id}' AND {ts_col_name} < '{safe_now}'");
         tbl.delete(&predicate)
             .await
@@ -228,8 +249,7 @@ impl VectorStore {
             Ok(t) => t,
             Err(_) => return Ok(()), // table may not exist yet
         };
-        // Escape single quotes to prevent predicate injection.
-        let safe_id = id.replace('\'', "''");
+        let safe_id = sanitize_predicate_value(id)?;
         tbl.delete(&format!("id = '{safe_id}'"))
             .await
             .map_err(|e| StorageError::Vector(format!("LanceDB delete from {table}: {e}")))?;
@@ -404,10 +424,11 @@ impl VectorStore {
             .limit(top_k);
 
         if !domains.is_empty() {
-            let quoted: Vec<String> = domains
-                .iter()
-                .map(|d| format!("'{}'", d.replace('\'', "''")))
-                .collect();
+            let mut quoted = Vec::with_capacity(domains.len());
+            for d in domains {
+                let safe = sanitize_predicate_value(d)?;
+                quoted.push(format!("'{safe}'"));
+            }
             let domain_filter = format!("domain IN ({})", quoted.join(", "));
             query = query.only_if(domain_filter);
         }
@@ -555,6 +576,36 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let store = VectorStore::connect(dir.path()).await.unwrap();
         (store, dir)
+    }
+
+    #[test]
+    fn test_sanitize_predicate_value_escapes_quotes() {
+        let result = sanitize_predicate_value("it's a test").unwrap();
+        assert_eq!(result, "it''s a test");
+    }
+
+    #[test]
+    fn test_sanitize_predicate_value_rejects_semicolons() {
+        assert!(sanitize_predicate_value("foo; DROP TABLE").is_err());
+    }
+
+    #[test]
+    fn test_sanitize_predicate_value_rejects_comments() {
+        assert!(sanitize_predicate_value("foo -- comment").is_err());
+        assert!(sanitize_predicate_value("foo /* block */").is_err());
+    }
+
+    #[test]
+    fn test_sanitize_predicate_value_rejects_newlines() {
+        assert!(sanitize_predicate_value("foo\nbar").is_err());
+        assert!(sanitize_predicate_value("foo\rbar").is_err());
+    }
+
+    #[test]
+    fn test_sanitize_predicate_value_allows_clean_values() {
+        assert!(sanitize_predicate_value("2024-01-01T00:00:00Z").is_ok());
+        assert!(sanitize_predicate_value("session-key-123").is_ok());
+        assert!(sanitize_predicate_value("identity").is_ok());
     }
 
     #[tokio::test]

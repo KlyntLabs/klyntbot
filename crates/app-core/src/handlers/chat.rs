@@ -555,15 +555,25 @@ impl AppCore {
         session_key: String,
         context: Option<SessionContextInput>,
     ) -> Result<(ChatMessageResponse, ChatStreamInfo), ApiError> {
-        chat_send(
+        let result = chat_send(
             &self.repos,
             &self.agent,
             &self.active_streams,
-            content,
-            session_key,
+            content.clone(),
+            session_key.clone(),
             context,
         )
-        .await
+        .await?;
+
+        // Publish chat turn to cognitive consolidation pipeline
+        if let Some(bus) = &self.domain_event_bus {
+            bus.publish(bus::DomainEvent::ChatTurnCompleted {
+                user_message: content,
+                session_key,
+            });
+        }
+
+        Ok(result)
     }
 
     /// Spawn the streaming relay as a background task with the given emitter.

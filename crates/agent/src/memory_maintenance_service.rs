@@ -5,7 +5,7 @@ use std::time::Duration;
 use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
 
-use storage::VectorStore;
+use storage::{sanitize_predicate_value, VectorStore};
 
 /// Spawns a background task that deletes conversation embeddings older than
 /// `max_age_days` every `interval_hours` hours. Shuts down gracefully when
@@ -47,7 +47,13 @@ impl MemoryMaintenanceService {
                 _ = interval.tick() => {
                     let cutoff = chrono::Utc::now()
                         - chrono::Duration::days(self.max_age_days as i64);
-                    let cutoff_str = cutoff.to_rfc3339();
+                    let cutoff_str = match sanitize_predicate_value(&cutoff.to_rfc3339()) {
+                        Ok(s) => s,
+                        Err(e) => {
+                            warn!(error = %e, "MemoryMaintenanceService: invalid cutoff");
+                            continue;
+                        }
+                    };
                     let predicate = format!("created_at < '{cutoff_str}'");
 
                     let before = match self.store.count("conv_embeddings").await {
