@@ -2,8 +2,9 @@
 
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex as StdMutex};
 use tokio::sync::Mutex as TokioMutex;
 use tracing::{debug, warn};
@@ -146,25 +147,28 @@ const COMPACTION_KEEP: usize = 500;
 ///
 /// Uses a DashMap for concurrent per-session access — each session has its own
 /// `tokio::sync::Mutex`, eliminating the global write lock bottleneck.
-/// LRU eviction order is tracked via a `std::sync::Mutex<VecDeque>` (fast, non-async).
+/// LRU eviction order is tracked via a `std::sync::Mutex<IndexMap>` (O(1) promote/evict).
 ///
 /// `SessionManager` is `Clone`: all clones share the same underlying map and repo,
 /// so it can be stored directly (no `Arc<RwLock<SessionManager>>` needed).
 #[derive(Clone)]
 pub struct SessionManager {
     sessions: Arc<DashMap<String, Arc<TokioMutex<Session>>>>,
-    lru_order: Arc<StdMutex<VecDeque<String>>>,
+    lru_order: Arc<StdMutex<IndexMap<String, ()>>>,
     max_cache_size: usize,
     sql_repo: storage::SessionRepo,
 }
 
 impl SessionManager {
     /// Create a session manager backed by a SQL repository.
-    pub async fn from_repo(repo: storage::SessionRepo) -> Self {
+    ///
+    /// `max_cache_size` controls how many sessions are kept in the in-memory cache.
+    /// When the cache is full, the least-recently-used session is saved to SQL and evicted.
+    pub async fn from_repo(repo: storage::SessionRepo, max_cache_size: usize) -> Self {
         Self {
             sessions: Arc::new(DashMap::new()),
-            lru_order: Arc::new(StdMutex::new(VecDeque::new())),
-            max_cache_size: 1000,
+            lru_order: Arc::new(StdMutex::new(IndexMap::new())),
+            max_cache_size,
             sql_repo: repo,
         }
     }
@@ -205,15 +209,17 @@ impl SessionManager {
     pub async fn get_or_create(&self, key: impl Into<String>) -> Result<Arc<TokioMutex<Session>>> {
         let key = key.into();
 
-        // Update LRU order and collect keys to evict (sync, brief hold)
+        // Update LRU order and collect keys to evict (sync, brief hold).
+        // IndexMap gives O(1) remove-by-key + insert, vs O(n) VecDeque::retain.
         let evict_keys = {
             let mut lru = self.lru_order.lock().unwrap();
-            lru.retain(|k| k != &key);
-            lru.push_back(key.clone());
+            // Promote: remove existing entry (O(1) swap-remove) then re-insert at back
+            lru.shift_remove(&key);
+            lru.insert(key.clone(), ());
 
             let mut to_evict = Vec::new();
             while lru.len() > self.max_cache_size {
-                if let Some(old_key) = lru.pop_front() {
+                if let Some((old_key, _)) = lru.shift_remove_index(0) {
                     to_evict.push(old_key);
                 }
             }
@@ -377,7 +383,7 @@ impl SessionManager {
         self.sessions.remove(key);
         {
             let mut lru = self.lru_order.lock().unwrap();
-            lru.retain(|k| k != key);
+            lru.shift_remove(key);
         }
 
         // Delete from database (cascades to messages)
@@ -560,7 +566,7 @@ mod tests {
     async fn test_reset_session_removes_from_cache() {
         let pool = sqlx::SqlitePool::connect(":memory:").await.unwrap();
         let repo = storage::SessionRepo::new(pool);
-        let manager = SessionManager::from_repo(repo).await;
+        let manager = SessionManager::from_repo(repo, 1000).await;
 
         let key = "test:reset";
 
@@ -569,7 +575,11 @@ mod tests {
             key.to_string(),
             Arc::new(TokioMutex::new(Session::new(key))),
         );
-        manager.lru_order.lock().unwrap().push_back(key.to_string());
+        manager
+            .lru_order
+            .lock()
+            .unwrap()
+            .insert(key.to_string(), ());
 
         assert!(
             manager.has_session(key),
@@ -584,7 +594,11 @@ mod tests {
             "session should no longer be in cache after reset"
         );
         assert!(
-            !manager.lru_order.lock().unwrap().contains(&key.to_string()),
+            !manager
+                .lru_order
+                .lock()
+                .unwrap()
+                .contains_key(&key.to_string()),
             "session key should be removed from LRU order"
         );
     }
@@ -630,7 +644,7 @@ mod tests {
 
         let pool = sqlx::SqlitePool::connect(":memory:").await.unwrap();
         let repo = storage::SessionRepo::new(pool);
-        let manager = SessionManager::from_repo(repo).await;
+        let manager = SessionManager::from_repo(repo, 1000).await;
 
         let key_a = "test:session_a";
         let key_b = "test:session_b";

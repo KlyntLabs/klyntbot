@@ -11,6 +11,9 @@ pub struct SessionConfig {
     /// Maximum number of history messages to load (default: 50)
     #[serde(default = "default_history_limit")]
     pub history_limit: usize,
+    /// Maximum number of sessions to keep in the in-memory cache (default: 1000)
+    #[serde(default = "default_max_cache_size")]
+    pub max_cache_size: usize,
     /// Number of days before an inactive session is considered stale and deleted (default: 30)
     #[serde(default = "default_ttl_days")]
     pub ttl_days: u32,
@@ -23,6 +26,7 @@ impl Default for SessionConfig {
     fn default() -> Self {
         Self {
             history_limit: default_history_limit(),
+            max_cache_size: default_max_cache_size(),
             ttl_days: default_ttl_days(),
             cleanup_interval_hours: default_cleanup_interval_hours(),
         }
@@ -31,6 +35,10 @@ impl Default for SessionConfig {
 
 fn default_history_limit() -> usize {
     50
+}
+
+fn default_max_cache_size() -> usize {
+    1000
 }
 
 fn default_ttl_days() -> u32 {
@@ -172,6 +180,21 @@ mod tests {
         });
         let config: ConversationConfig = serde_json::from_value(json).unwrap();
         assert_eq!(config.session.history_limit, 100);
+    }
+
+    #[test]
+    fn test_session_max_cache_size_default() {
+        let config = SessionConfig::default();
+        assert_eq!(config.max_cache_size, 1000);
+    }
+
+    #[test]
+    fn test_session_max_cache_size_custom() {
+        let json = serde_json::json!({
+            "session": { "maxCacheSize": 500 }
+        });
+        let config: ConversationConfig = serde_json::from_value(json).unwrap();
+        assert_eq!(config.session.max_cache_size, 500);
     }
 
     #[test]

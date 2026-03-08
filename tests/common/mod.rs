@@ -61,7 +61,7 @@ pub async fn test_session_manager() -> (SessionManager, TempDir) {
     let temp_dir = TempDir::new().expect("failed to create temp dir");
     let pool = test_pool().await;
     let repo = klyntbot::storage::SessionRepo::new(pool.inner().clone());
-    let manager = SessionManager::from_repo(repo).await;
+    let manager = SessionManager::from_repo(repo, 1000).await;
     (manager, temp_dir)
 }
 

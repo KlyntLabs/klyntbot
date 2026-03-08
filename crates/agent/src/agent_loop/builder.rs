@@ -312,9 +312,11 @@ impl AgentLoopBuilder {
             .with_summary_provider(summary_provider);
 
         // ── Session manager (SQL-backed) ──────────────────────────────────
-        let session_manager =
-            SessionManager::from_repo(storage::SessionRepo::new(storage_pool.inner().clone()))
-                .await;
+        let session_manager = SessionManager::from_repo(
+            storage::SessionRepo::new(storage_pool.inner().clone()),
+            config.conversation.session.max_cache_size,
+        )
+        .await;
 
         // ── Subagent manager ──────────────────────────────────────────────
         let brave_api_key = (!config.tools.web.brave_api_key.is_empty())

@@ -9,6 +9,7 @@ license.workspace = true
 common.workspace = true
 storage.workspace = true
 dashmap.workspace = true
+indexmap.workspace = true
 serde = { workspace = true }
 serde_json = { workspace = true }
 chrono = { workspace = true }

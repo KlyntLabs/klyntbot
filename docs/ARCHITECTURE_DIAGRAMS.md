@@ -734,7 +734,4 @@ flowchart TD
 
 ### Medium
 
-| # | Title | Location | Why It Matters | Suggested Fix |
-|---|-------|----------|---------------|---------------|
-| M1 | **No web chat channel** | SYSTEM_ANALYSIS.md §9.4 R14 | Users can only interact via 4 platform integrations or the desktop app. No browser-based fallback. | SSE streaming added to dev server (`291f4dc4`), enabling browser-based chat in dev mode. Full production web channel still needed. |
-| M2 | **Session LRU eviction at 1000** | SYSTEM_ANALYSIS.md §6.4 | `DashMap` in-memory cache evicts at 1000 sessions. For personal use this is fine, but multi-tenant would need per-user limits and smarter eviction. | Acceptable for single-user. Document the limit. |
+*No medium items remain* — M1 (session LRU) is SOLVED: cache size is now configurable via `maxCacheSize` in `SessionConfig` (default 1000), and the LRU was upgraded from O(n) `VecDeque::retain` to O(1) `IndexMap` promote/evict.
