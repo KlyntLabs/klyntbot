@@ -1,4 +1,4 @@
-//! AgentRuntime — replaces IntentPipeline with agent-first execution.
+//! AgentRuntime — agent-first execution pipeline.
 //!
 //! Flow: AgentManager.match_agent → set active profile → IntentAnalyzer →
 //! ContextEngine → tool filtering via AgentProfile → ExecutionRouter →
@@ -24,7 +24,7 @@ const PROFILE_MIN_CONFIDENCE: f64 = 0.5;
 const PATTERN_MIN_SAMPLES: i32 = 5;
 use crate::execution::ExecutionParams;
 use crate::intent_pipeline::analysis::IntentAnalyzer;
-use crate::intent_pipeline::pipeline::PipelineConfig;
+use crate::intent_pipeline::types::PipelineConfig;
 use crate::intent_pipeline::router::{ExecutionRouter, RouterResult};
 use crate::intent_pipeline::types::IntentAnalysis;
 use crate::output::cost_tracker::CostTracker;

@@ -6,9 +6,9 @@
 
 pub mod analysis;
 pub mod engines;
-pub mod pipeline;
 pub mod router;
 pub mod types;
 
-pub use pipeline::IntentPipeline;
-pub use types::{AnalysisSource, ComplexitySignals, ExecutionMode, FailureRisk, IntentAnalysis};
+pub use types::{
+    AnalysisSource, ComplexitySignals, ExecutionMode, FailureRisk, IntentAnalysis, PipelineConfig,
+};

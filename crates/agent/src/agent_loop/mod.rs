@@ -56,7 +56,7 @@ pub struct AgentLoop {
     pub(crate) conversation_recall_handler: Option<Arc<dyn tools::ConversationRecallHandler>>,
     /// Background learning service for adaptive threshold updates (None if learning disabled)
     pub(crate) learning_service: Option<Arc<RwLock<crate::learning::LearningService>>>,
-    /// Agent runtime: agent-first pipeline replacing IntentPipeline.
+    /// Agent runtime: agent-first execution pipeline.
     pub(crate) runtime: Arc<crate::agent_runtime::AgentRuntime>,
     /// Strategy repo for updating satisfaction scores from reactions.
     pub(crate) strategy_repo: Option<storage::StrategyRepo>,

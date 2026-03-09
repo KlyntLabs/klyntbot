@@ -792,39 +792,29 @@ flowchart TD
 - **Why it matters**: Every new Tauri command requires manual addition. Missing commands return 404 silently. No compile-time check ensures parity.
 - **Fix**: Generate the dispatch table from a shared registry, or use a macro that both Tauri commands and dev server share.
 
-**3. IntentPipeline is dead code**
-- **Location**: `crates/agent/src/intent_pipeline/pipeline.rs`
-- **Why it matters**: `IntentPipeline` has its own `process_message()` that is tested but never called in production — `AgentRuntime` replaced it. Maintaining dead code increases confusion and maintenance burden.
-- **Fix**: Remove `IntentPipeline` or clearly mark it as deprecated. Remove associated tests.
-
-**4. HistoryCompressor makes N/5 LLM calls for abstractive compression**
+**3. HistoryCompressor makes N/5 LLM calls for abstractive compression**
 - **Location**: `crates/context_engine/src/` — history compression
 - **Why it matters**: 100 messages → 19 LLM calls for compression, each blocking. No batching, no parallelism. Adds latency to every request with long histories.
 - **Fix**: Batch chunks into a single LLM call with structured output, or parallelize chunk compression with `join_all`.
 
 ### Medium
 
-**5. Cognitive provider created twice**
+**4. Cognitive provider created twice**
 - **Location**: `crates/app-core/src/init.rs` (Step 3) and `crates/app-core/src/handlers/cognitive.rs:L537`
 - **Why it matters**: `cognitive_run_reflection()` re-creates the provider from config instead of using the cached one. Minor inefficiency and config divergence risk.
 - **Fix**: Store the cognitive provider in `AppCore` and pass it through to the reflection handler.
 
-**6. Single monolithic cron callback**
+**5. Single monolithic cron callback**
 - **Location**: `crates/app-core/src/init.rs:L434-L618` — `register_cron_callbacks()`
 - **Why it matters**: All cron job types share one `match job_name.as_str()` dispatch. Adding new jobs requires editing this growing match block.
 - **Fix**: Use a trait-based callback registry where each job type registers its own handler.
 
-**7. No test for delegation at max depth**
-- **Location**: `crates/agent/src/agent_runtime/runtime.rs` — `MAX_DELEGATION_DEPTH = 2`
-- **Why it matters**: The depth guard prevents runaway recursion, but there's no integration test verifying that an agent at depth=2 correctly lacks the delegation tool.
-- **Fix**: Add an integration test that delegates twice and verifies the third-level agent has no `delegate_to_agent` tool available.
-
-**8. Context cache invalidated on every tool execution**
+**6. Context cache invalidated on every tool execution**
 - **Location**: `crates/context_engine/src/assembler.rs` — generation counter
 - **Why it matters**: `invalidate_cache()` bumps a generation counter that marks all 8 LRU entries stale. Since tool execution always triggers re-assembly, the cache only benefits the first assembly in a request cycle.
 - **Fix**: Use a more granular invalidation strategy — only invalidate when specific context sources change (e.g., session history appended, new cognitive facts).
 
-**9. `block_on` in Tauri setup blocks UI thread**
+**7. `block_on` in Tauri setup blocks UI thread**
 - **Location**: `crates/desktop/src/main.rs:L53`
 - **Why it matters**: `tauri::async_runtime::block_on(app_core::init(handle))` blocks the Tauri setup thread for the entire boot sequence (potentially several seconds). Users see a blank window during initialization.
 - **Fix**: Show a loading/splash screen, then complete initialization asynchronously. Or move heavy init (LLM provider, MCP connections, embedding engine) to a post-setup task.
@@ -839,3 +829,5 @@ The following gaps have been addressed:
 - ~~USER_MODEL_DOMAINS hardcoded to 6~~ — Fixed: expanded to 10 domains with `other` catch-all field (`types.rs`, `repos/mod.rs`, `context_source.rs`)
 - ~~Notes migrations run twice~~ — Fixed: removed duplicate call in `AgentLoopBuilder::build()` (`builder.rs`)
 - ~~`threshold_confidence` computed but unused~~ — Fixed: scales `MAX_THRESHOLD_STEP` for faster convergence (`adaptive.rs`)
+- ~~IntentPipeline is dead code~~ — Fixed: deleted `pipeline.rs`, moved `PipelineConfig` to `types.rs`, removed e2e tests
+- ~~No test for delegation at max depth~~ — Already resolved: `test_delegation_tool_not_injected_at_max_depth` exists in `runtime.rs`

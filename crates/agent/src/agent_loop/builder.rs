@@ -884,7 +884,7 @@ impl AgentLoopBuilder {
             storage::UsageRepo::new(storage_pool.inner().clone()),
         ));
 
-        let runtime_config = crate::intent_pipeline::pipeline::PipelineConfig {
+        let runtime_config = crate::intent_pipeline::types::PipelineConfig {
             execution_model: config.agents.defaults.model.clone(),
             system_prompt: String::new(),
             context_window: provider.context_window(),

@@ -126,6 +126,35 @@ pub enum AnalysisSource {
     MidExecutionEscalation,
 }
 
+/// Configuration for the execution pipeline (used by `AgentRuntime`).
+pub struct PipelineConfig {
+    /// Model name for execution.
+    pub execution_model: String,
+    /// System prompt to prepend.
+    pub system_prompt: String,
+    /// Context window size in tokens.
+    pub context_window: usize,
+    /// Maximum response tokens for validation.
+    pub max_response_tokens: usize,
+    /// Default channel name (overridden per-request by RoutingContext).
+    pub channel: String,
+    /// Provider name for cost tracking.
+    pub provider_name: String,
+}
+
+impl Default for PipelineConfig {
+    fn default() -> Self {
+        Self {
+            execution_model: "claude-sonnet-4-20250514".to_string(),
+            system_prompt: "You are a helpful assistant.".to_string(),
+            context_window: 128_000,
+            max_response_tokens: 4096,
+            channel: "unknown".to_string(),
+            provider_name: "unknown".to_string(),
+        }
+    }
+}
+
 /// Result of intent analysis — the selected execution mode with supporting data.
 #[derive(Debug, Clone)]
 pub struct IntentAnalysis {
