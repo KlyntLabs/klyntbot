@@ -1,4 +1,4 @@
-import { Calendar, ChevronLeft, ChevronRight } from "lucide-react";
+import { Calendar, ChevronLeft, ChevronRight, Layers } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate, useParams } from "react-router";
@@ -6,6 +6,7 @@ import { useClickOutside } from "../../hooks/useClickOutside";
 import { todayISO, toLocalISO } from "../../lib/dates";
 import { cn } from "../../lib/utils";
 import { MiniCalendar } from "../tasks/editors/MiniCalendar";
+import { LAYERS, LayerContext, useLayerToggle } from "./layers";
 
 type ViewMode = "day" | "week" | "month" | "year";
 
@@ -80,6 +81,28 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
     navigate(`/${mode}/${iso}`);
   };
 
+  // Layer toggle
+  const { enabled, toggle, reset, enabledSources } = useLayerToggle();
+  const [layersOpen, setLayersOpen] = useState(false);
+  const layersTriggerRef = useRef<HTMLButtonElement>(null);
+  const layersDropdownRef = useRef<HTMLDivElement>(null);
+  const [layersPos, setLayersPos] = useState({ top: 0, right: 0 });
+
+  useClickOutside(layersDropdownRef, () => setLayersOpen(false), layersOpen);
+
+  const updateLayersPos = useCallback(() => {
+    if (!layersTriggerRef.current) return;
+    const rect = layersTriggerRef.current.getBoundingClientRect();
+    setLayersPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+  }, []);
+
+  useEffect(() => {
+    if (!layersOpen) return;
+    updateLayersPos();
+    window.addEventListener("resize", updateLayersPos);
+    return () => window.removeEventListener("resize", updateLayersPos);
+  }, [layersOpen, updateLayersPos]);
+
   // Calendar picker popover
   const [calOpen, setCalOpen] = useState(false);
   const calTriggerRef = useRef<HTMLButtonElement>(null);
@@ -144,6 +167,22 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
           ))}
         </div>
 
+        {/* Layers toggle */}
+        <button
+          ref={layersTriggerRef}
+          type="button"
+          onClick={() => setLayersOpen(!layersOpen)}
+          aria-haspopup="dialog"
+          aria-expanded={layersOpen}
+          className={cn(
+            "p-1.5 rounded-full text-muted hover:text-secondary hover:bg-white/[0.08] transition-colors",
+            layersOpen && "bg-white/[0.08] text-secondary",
+          )}
+          title="Toggle layers"
+        >
+          <Layers className="w-4 h-4" />
+        </button>
+
         {/* Nav pill group */}
         <div className="flex items-center rounded-full bg-white/[0.06] p-0.5 ml-auto">
           <button
@@ -177,6 +216,47 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
         </div>
       </div>
 
+      {/* Layers dropdown popover */}
+      {layersOpen &&
+        createPortal(
+          <div
+            ref={layersDropdownRef}
+            className="fixed z-[9999] glass-dropdown py-2 min-w-[180px]"
+            style={{ top: layersPos.top, right: layersPos.right }}
+          >
+            {LAYERS.map((layer) => (
+              <label
+                key={layer.key}
+                className={cn(
+                  "flex items-center gap-2 px-3 py-1.5 text-xs cursor-pointer rounded-lg transition-colors",
+                  layer.comingSoon
+                    ? "text-dim cursor-not-allowed"
+                    : "text-secondary hover:bg-white/[0.06]",
+                )}
+              >
+                <input
+                  type="checkbox"
+                  checked={enabled.has(layer.key)}
+                  disabled={layer.comingSoon}
+                  onChange={() => toggle(layer.key)}
+                  className="accent-brand w-3 h-3"
+                />
+                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: layer.color }} />
+                {layer.label}
+                {layer.comingSoon && <span className="text-[9px] text-dim ml-auto">Soon</span>}
+              </label>
+            ))}
+            <button
+              type="button"
+              onClick={reset}
+              className="w-full text-left mt-1 px-3 py-1.5 text-[11px] text-muted hover:text-secondary rounded-lg hover:bg-white/[0.06] transition-colors"
+            >
+              Reset to defaults
+            </button>
+          </div>,
+          document.body,
+        )}
+
       {/* Calendar picker popover */}
       {calOpen &&
         createPortal(
@@ -195,7 +275,9 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
         )}
 
       {/* Content */}
-      <div className="flex-1 overflow-hidden">{children}</div>
+      <LayerContext.Provider value={{ enabled, enabledSources }}>
+        <div className="flex-1 overflow-hidden">{children}</div>
+      </LayerContext.Provider>
     </div>
   );
 }

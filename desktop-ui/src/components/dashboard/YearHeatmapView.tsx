@@ -49,10 +49,10 @@ function buildMonthGrid(year: number, month: number): (string | null)[][] {
 function intensityClass(secs: number, maxSecs: number): string {
   if (secs === 0 || maxSecs === 0) return "bg-white/[0.03]";
   const ratio = secs / maxSecs;
-  if (ratio > 0.75) return "bg-brand/60";
-  if (ratio > 0.5) return "bg-brand/40";
-  if (ratio > 0.25) return "bg-brand/25";
-  return "bg-brand/10";
+  if (ratio > 0.75) return "bg-timeline-focus/60";
+  if (ratio > 0.5) return "bg-timeline-focus/40";
+  if (ratio > 0.25) return "bg-timeline-focus/25";
+  return "bg-timeline-focus/10";
 }
 
 export function YearHeatmapView() {
@@ -66,10 +66,11 @@ export function YearHeatmapView() {
   );
   const { data, loading } = useQuery("timeline_query", queryArgs, EMPTY_TIMELINE_RESPONSE);
 
-  // Aggregate total seconds per day
+  // Aggregate focus seconds per day
   const { dayMap, maxSecs } = useMemo(() => {
     const map = new Map<string, number>();
     for (const entry of data.entries) {
+      if (entry.source !== "focus") continue;
       const day = toLocalISO(new Date(entry.startedAt));
       map.set(day, (map.get(day) || 0) + (entry.durationSecs ?? 0));
     }
@@ -135,13 +136,13 @@ export function YearHeatmapView() {
 
         {/* Legend */}
         <div className="flex items-center gap-2 mt-4 justify-center">
-          <span className="text-[10px] text-muted">Less</span>
+          <span className="text-[10px] text-muted">Less focus</span>
           <div className="w-3 h-3 rounded-[2px] bg-white/[0.03]" />
-          <div className="w-3 h-3 rounded-[2px] bg-brand/10" />
-          <div className="w-3 h-3 rounded-[2px] bg-brand/25" />
-          <div className="w-3 h-3 rounded-[2px] bg-brand/40" />
-          <div className="w-3 h-3 rounded-[2px] bg-brand/60" />
-          <span className="text-[10px] text-muted">More</span>
+          <div className="w-3 h-3 rounded-[2px] bg-timeline-focus/10" />
+          <div className="w-3 h-3 rounded-[2px] bg-timeline-focus/25" />
+          <div className="w-3 h-3 rounded-[2px] bg-timeline-focus/40" />
+          <div className="w-3 h-3 rounded-[2px] bg-timeline-focus/60" />
+          <span className="text-[10px] text-muted">More focus</span>
         </div>
       </div>
 

@@ -53,6 +53,12 @@
   --timeline-note: oklch(0.75 0.14 80);
   --timeline-finance: oklch(0.72 0.16 160);
   --timeline-system: oklch(0.55 0.02 250);
+  --timeline-focus-high: oklch(0.58 0.22 290);
+  --timeline-focus-low: oklch(0.72 0.12 290);
+  --timeline-unfocused: rgba(255, 255, 255, 0.03);
+  --timeline-dot-note: oklch(0.7 0.14 250);
+  --timeline-dot-task-done: oklch(0.65 0.18 155);
+  --timeline-dot-finance: oklch(0.78 0.16 85);
 
   /* ── Overlay ───────────────────────────────── */
   --overlay: rgba(0, 0, 0, 0.25);
@@ -136,6 +142,12 @@
   --color-timeline-note: var(--timeline-note);
   --color-timeline-finance: var(--timeline-finance);
   --color-timeline-system: var(--timeline-system);
+  --color-timeline-focus-high: var(--timeline-focus-high);
+  --color-timeline-focus-low: var(--timeline-focus-low);
+  --color-timeline-unfocused: var(--timeline-unfocused);
+  --color-timeline-dot-note: var(--timeline-dot-note);
+  --color-timeline-dot-task-done: var(--timeline-dot-task-done);
+  --color-timeline-dot-finance: var(--timeline-dot-finance);
 
   /* Radius — Tahoe uses larger, pill-like radii */
   --radius-sm: calc(var(--radius) - 6px);

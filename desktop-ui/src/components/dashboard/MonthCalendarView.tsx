@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useNavigate, useParams } from "react-router";
 import { useQuery } from "../../hooks/useQuery";
-import { todayISO, toLocalISO } from "../../lib/dates";
+import { formatHumanDuration, todayISO, toLocalISO } from "../../lib/dates";
 import type { TimelineEntry, TimelineSource } from "../../lib/types";
 import { EMPTY_TIMELINE_RESPONSE } from "../../lib/types";
 import { cn } from "../../lib/utils";
@@ -83,6 +83,15 @@ const SOURCE_COLORS: Record<TimelineSource, string> = {
   system: "var(--timeline-system)",
 };
 
+function focusIntensityBg(secs: number, maxSecs: number): string {
+  if (secs === 0 || maxSecs === 0) return "transparent";
+  const ratio = secs / maxSecs;
+  if (ratio > 0.75) return "color-mix(in oklch, var(--timeline-focus) 25%, transparent)";
+  if (ratio > 0.5) return "color-mix(in oklch, var(--timeline-focus) 18%, transparent)";
+  if (ratio > 0.25) return "color-mix(in oklch, var(--timeline-focus) 10%, transparent)";
+  return "color-mix(in oklch, var(--timeline-focus) 5%, transparent)";
+}
+
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 export function MonthCalendarView() {
@@ -100,6 +109,20 @@ export function MonthCalendarView() {
     () => buildCalendarGrid(year, month, data.entries),
     [year, month, data.entries],
   );
+
+  const { focusByDay, maxFocusSecs } = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const entry of data.entries) {
+      if (entry.source !== "focus") continue;
+      const day = toLocalISO(new Date(entry.startedAt));
+      map.set(day, (map.get(day) || 0) + (entry.durationSecs ?? 0));
+    }
+    let max = 0;
+    for (const v of map.values()) {
+      if (v > max) max = v;
+    }
+    return { focusByDay: map, maxFocusSecs: max };
+  }, [data.entries]);
 
   return (
     <div className="flex gap-2 h-full">
@@ -119,51 +142,64 @@ export function MonthCalendarView() {
         <div className="flex-1 grid grid-rows-6 gap-px">
           {weeks.map((week) => (
             <div key={week[0].date} className="grid grid-cols-7 gap-px">
-              {week.map((cell) => (
-                <button
-                  type="button"
-                  key={cell.date}
-                  onClick={() => navigate(`/day/${cell.date}`)}
-                  className={cn(
-                    "rounded-lg p-1 flex flex-col items-start text-left transition-colors min-h-[60px]",
-                    "hover:bg-white/[0.05] cursor-pointer",
-                    cell.isCurrentMonth ? "text-primary" : "text-muted/40",
-                    cell.date === today && "ring-1 ring-brand/50",
-                  )}
-                >
-                  <span
+              {week.map((cell) => {
+                const focusSecs = focusByDay.get(cell.date) || 0;
+                return (
+                  <button
+                    type="button"
+                    key={cell.date}
+                    onClick={() => navigate(`/day/${cell.date}`)}
                     className={cn(
-                      "text-[11px] font-medium mb-0.5",
-                      cell.date === today && "text-brand",
+                      "rounded-lg p-1 flex flex-col items-start text-left transition-colors min-h-[60px]",
+                      "hover:bg-white/[0.05] cursor-pointer",
+                      cell.isCurrentMonth ? "text-primary" : "text-muted/40",
+                      cell.date === today && "ring-1 ring-brand/50",
                     )}
+                    style={{
+                      backgroundColor: focusIntensityBg(focusSecs, maxFocusSecs),
+                    }}
                   >
-                    {cell.day}
-                  </span>
-
-                  {/* Source color bars */}
-                  {cell.entries.length > 0 && (
-                    <div className="flex gap-px flex-wrap w-full">
-                      {getSourceBars(cell.entries).map(({ source, count }) => (
-                        <div
-                          key={source}
-                          className="h-1 rounded-full"
-                          style={{
-                            backgroundColor: SOURCE_COLORS[source],
-                            width: `${Math.min(count * 3, 100)}%`,
-                            minWidth: 4,
-                          }}
-                          title={`${source}: ${count}`}
-                        />
-                      ))}
+                    <div className="flex items-center justify-between w-full">
+                      <span
+                        className={cn(
+                          "text-[11px] font-medium mb-0.5",
+                          cell.date === today && "text-brand",
+                        )}
+                      >
+                        {cell.day}
+                      </span>
+                      {focusSecs > 0 && (
+                        <span className="text-[9px] text-muted/60">
+                          {formatHumanDuration(focusSecs)}
+                        </span>
+                      )}
                     </div>
-                  )}
 
-                  {/* Entry count badge */}
-                  {cell.entries.length > 0 && (
-                    <span className="text-[9px] text-muted mt-auto">{cell.entries.length}</span>
-                  )}
-                </button>
-              ))}
+                    {/* Source color bars */}
+                    {cell.entries.length > 0 && (
+                      <div className="flex gap-px flex-wrap w-full">
+                        {getSourceBars(cell.entries).map(({ source, count }) => (
+                          <div
+                            key={source}
+                            className="h-1 rounded-full"
+                            style={{
+                              backgroundColor: SOURCE_COLORS[source],
+                              width: `${Math.min(count * 3, 100)}%`,
+                              minWidth: 4,
+                            }}
+                            title={`${source}: ${count}`}
+                          />
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Entry count badge */}
+                    {cell.entries.length > 0 && (
+                      <span className="text-[9px] text-muted mt-auto">{cell.entries.length}</span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           ))}
         </div>

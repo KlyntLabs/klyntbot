@@ -1,16 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "react-router";
+import { useNavigate, useParams } from "react-router";
 import { useQuery } from "../../hooks/useQuery";
-import { minutesSinceMidnight, todayISO, toLocalISO } from "../../lib/dates";
+import { formatHumanDuration, todayISO, toLocalISO } from "../../lib/dates";
 import type { TimelineEntry } from "../../lib/types";
 import { EMPTY_TIMELINE_RESPONSE } from "../../lib/types";
 import { cn } from "../../lib/utils";
+import { type ActivityContainer, buildContainers, focusColor } from "./buildContainers";
+import { useEnabledLayers } from "./layers";
 import { SummaryPanel } from "./SummaryPanel";
 
 const HOUR_HEIGHT = 48;
 const TOTAL_HEIGHT = 24 * HOUR_HEIGHT;
 const MIN_BLOCK_HEIGHT = 12;
 const HOUR_GUTTER = 40;
+const PX_PER_MIN = HOUR_HEIGHT / 60;
 
 function getWeekRange(dateStr: string): { start: string; end: string; days: string[] } {
   const d = new Date(`${dateStr}T00:00:00`);
@@ -38,13 +41,41 @@ function formatHour(h: number): string {
   return `${h - 12}p`;
 }
 
+function buildWeekTooltip(container: ActivityContainer): string {
+  const parts: string[] = [];
+  const durationMin = container.endMin - container.startMin;
+  if (container.type === "focused") {
+    parts.push(`${formatHumanDuration(durationMin * 60)} focus`);
+  } else {
+    parts.push(`${formatHumanDuration(durationMin * 60)} unfocused`);
+  }
+  if (container.taskEntries.length > 0) {
+    const taskTime = container.taskEntries.reduce((s, e) => s + (e.durationSecs ?? 0), 0);
+    const taskName = container.taskEntries[0].title;
+    parts.push(`${formatHumanDuration(taskTime)} on '${taskName}'`);
+  }
+  if (container.appActivity.length > 0) {
+    const topApp = container.appActivity.reduce((best, e) =>
+      (e.durationSecs ?? 0) > (best.durationSecs ?? 0) ? e : best,
+    );
+    const pct = Math.round(((topApp.durationSecs ?? 0) / (durationMin * 60)) * 100);
+    parts.push(`${topApp.title} ${pct}%`);
+  }
+  return parts.join(" · ");
+}
+
 export function WeekCalendarView() {
   const { date } = useParams<{ date: string }>();
+  const navigate = useNavigate();
   const dateStr = date || todayISO();
   const { start, end, days } = useMemo(() => getWeekRange(dateStr), [dateStr]);
   const today = todayISO();
 
-  const queryArgs = useMemo(() => ({ startDate: start, endDate: end }), [start, end]);
+  const { enabledSources } = useEnabledLayers();
+  const queryArgs = useMemo(
+    () => ({ startDate: start, endDate: end, sources: enabledSources }),
+    [start, end, enabledSources],
+  );
   const { data, loading } = useQuery("timeline_query", queryArgs, EMPTY_TIMELINE_RESPONSE);
 
   const [selectedEntry, setSelectedEntry] = useState<TimelineEntry | null>(null);
@@ -57,19 +88,22 @@ export function WeekCalendarView() {
     }
   }, [dateStr]);
 
-  // Group entries by day
-  const entriesByDay = useMemo(() => {
-    const map = new Map<string, TimelineEntry[]>();
-    for (const day of days) map.set(day, []);
+  // Build containers per day
+  const containersByDay = useMemo(() => {
+    const entryMap = new Map<string, TimelineEntry[]>();
+    for (const day of days) entryMap.set(day, []);
     for (const entry of data.entries) {
       const day = toLocalISO(new Date(entry.startedAt));
-      map.get(day)?.push(entry);
+      entryMap.get(day)?.push(entry);
     }
-    return map;
+    const result = new Map<string, ActivityContainer[]>();
+    for (const [day, dayEntries] of entryMap) {
+      result.set(day, buildContainers(dayEntries));
+    }
+    return result;
   }, [data.entries, days]);
 
   const hours = Array.from({ length: 24 }, (_, i) => i);
-  const pxPerMin = HOUR_HEIGHT / 60;
 
   return (
     <div className="flex gap-2 h-full">
@@ -114,40 +148,47 @@ export function WeekCalendarView() {
             {/* Day columns */}
             <div className="absolute inset-0 flex" style={{ left: HOUR_GUTTER }}>
               {days.map((day) => {
-                const dayEntries = entriesByDay.get(day) || [];
+                const dayContainers = containersByDay.get(day) || [];
                 return (
                   <div key={day} className="flex-1 relative border-r border-border last:border-r-0">
-                    {dayEntries.map((entry) => {
-                      const startMin = minutesSinceMidnight(entry.startedAt);
-                      const dur = entry.durationSecs ?? 0;
+                    {dayContainers.map((container) => {
+                      const top = container.startMin * PX_PER_MIN;
                       const height = Math.max(
-                        dur > 0 ? (dur / 60) * pxPerMin : MIN_BLOCK_HEIGHT,
+                        (container.endMin - container.startMin) * PX_PER_MIN,
                         MIN_BLOCK_HEIGHT,
                       );
-                      const top = startMin * pxPerMin;
+                      const isFocused = container.type === "focused";
+                      const hasTask = container.taskEntries.length > 0;
 
                       return (
                         <button
                           type="button"
-                          key={entry.id}
-                          onClick={() =>
-                            setSelectedEntry(selectedEntry?.id === entry.id ? null : entry)
-                          }
+                          key={container.id}
+                          onClick={() => navigate(`/day/${day}`)}
                           className={cn(
-                            "absolute left-0.5 right-0.5 rounded text-[9px] leading-tight overflow-hidden cursor-pointer px-0.5",
+                            "absolute left-0.5 right-0.5 rounded text-[9px] leading-tight overflow-hidden cursor-pointer",
                             "hover:opacity-90 border border-white/10",
-                            selectedEntry?.id === entry.id && "ring-1 ring-brand",
                           )}
                           style={{
                             top,
                             height,
-                            backgroundColor: `color-mix(in oklch, ${entry.color} 30%, transparent)`,
-                            borderLeftColor: entry.color,
+                            backgroundColor: isFocused
+                              ? focusColor(container.qualityScore)
+                              : "var(--timeline-unfocused)",
+                            borderLeftColor: hasTask
+                              ? "var(--timeline-task)"
+                              : isFocused
+                                ? "var(--timeline-focus)"
+                                : "transparent",
                             borderLeftWidth: 2,
                           }}
-                          title={entry.title}
+                          title={buildWeekTooltip(container)}
                         >
-                          <span className="text-secondary truncate block">{entry.title}</span>
+                          {height > 20 && isFocused && (
+                            <span className="text-secondary truncate block px-0.5">
+                              {container.focusSession?.title}
+                            </span>
+                          )}
                         </button>
                       );
                     })}
