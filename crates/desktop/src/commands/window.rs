@@ -31,7 +31,7 @@ pub fn open_url(url: String) {
 pub fn show_dashboard(app: tauri::AppHandle) {
     // Restore Dock icon before showing the window
     #[cfg(target_os = "macos")]
-    app.set_activation_policy(tauri::ActivationPolicy::Regular);
+    let _ = app.set_activation_policy(tauri::ActivationPolicy::Regular);
 
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();

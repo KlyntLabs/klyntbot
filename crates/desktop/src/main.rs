@@ -82,7 +82,7 @@ fn main() {
                         let _ = mw.hide();
                         // Remove from Dock — pure tray app when main window is hidden
                         #[cfg(target_os = "macos")]
-                        app_handle.set_activation_policy(tauri::ActivationPolicy::Accessory);
+                        let _ = app_handle.set_activation_policy(tauri::ActivationPolicy::Accessory);
                     }
                 });
             }
