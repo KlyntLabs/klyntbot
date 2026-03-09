@@ -75,6 +75,29 @@ impl NoteRepo {
         Ok(rows)
     }
 
+    /// Fetch notes created or updated within a date range (for timeline display).
+    pub async fn notes_in_date_range(
+        &self,
+        start_date: &str,
+        end_date: &str,
+    ) -> Result<Vec<NoteRow>, StorageError> {
+        let end_bound = format!("{end_date}T23:59:59Z");
+        let rows = sqlx::query_as::<_, NoteRow>(
+            r#"
+            SELECT * FROM notes
+            WHERE archived = 0
+              AND ((created_at >= ?1 AND created_at < ?2)
+                   OR (updated_at >= ?1 AND updated_at < ?2))
+            ORDER BY COALESCE(updated_at, created_at) ASC
+            "#,
+        )
+        .bind(start_date)
+        .bind(&end_bound)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
+    }
+
     pub async fn update_note(
         &self,
         id: &str,

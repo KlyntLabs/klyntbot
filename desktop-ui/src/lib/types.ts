@@ -711,6 +711,7 @@ export interface ActivityTimeline {
   durationSecs: number | null;
   isIdle: boolean;
   projectId: string | null;
+  focusSessionId: string | null;
 }
 
 export interface CategoryRules {
@@ -1083,7 +1084,14 @@ export interface AppInfoResponse {
 
 // ── Timeline / Dashboard ──────────────────────────────────────────
 
-export type TimelineSource = "productivity" | "focus" | "task" | "note" | "finance" | "system";
+export type TimelineSource =
+  | "productivity"
+  | "focus"
+  | "task"
+  | "todo"
+  | "note"
+  | "finance"
+  | "system";
 
 export type TimelineEntryType =
   | "appUsage"
@@ -1092,6 +1100,7 @@ export type TimelineEntryType =
   | "taskCreated"
   | "taskCompleted"
   | "taskUpdated"
+  | "taskDue"
   | "noteCreated"
   | "noteUpdated"
   | "transactionRecorded"

@@ -138,6 +138,7 @@ pub fn event_to_timeline(
         duration_secs: e.duration_secs,
         is_idle: e.is_idle,
         project_id: e.project_id,
+        focus_session_id: e.focus_session_id,
     }
 }
 

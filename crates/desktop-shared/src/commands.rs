@@ -757,6 +757,7 @@ pub struct ActivityTimelineResponse {
     pub duration_secs: Option<i64>,
     pub is_idle: bool,
     pub project_id: Option<String>,
+    pub focus_session_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1060,6 +1061,7 @@ pub enum TimelineSource {
     Productivity,
     Focus,
     Task,
+    Todo,
     Note,
     Finance,
     System,
@@ -1074,6 +1076,7 @@ pub enum TimelineEntryType {
     TaskCreated,
     TaskCompleted,
     TaskUpdated,
+    TaskDue,
     NoteCreated,
     NoteUpdated,
     TransactionRecorded,

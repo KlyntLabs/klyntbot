@@ -477,6 +477,23 @@ export function getCategoryTypeColor(categoryType: string): string {
   return TYPE_BADGE_COLORS[categoryType] ?? TYPE_BADGE_COLORS.neutral;
 }
 
+/** Resolve activity block color from category type. Used by timeline and activity track. */
+export function resolveActivityColor(categoryType: string | undefined, isIdle: boolean): string {
+  if (isIdle) return "var(--surface-highest)";
+  if (categoryType === "productive") return "var(--success)";
+  if (categoryType === "distracting") return "var(--destructive)";
+  if (categoryType === "neutral") return "var(--text-muted)";
+  return "var(--brand)";
+}
+
+/** Resolve category type to a human-readable label. */
+export function resolveCategoryLabel(categoryType: string): string {
+  if (categoryType === "productive") return "Productive";
+  if (categoryType === "distracting") return "Distracting";
+  if (categoryType === "neutral") return "Neutral";
+  return "Uncategorized";
+}
+
 /** Score color thresholds — shared between ScoreRing and stats widgets. */
 export function scoreColor(score: number): string {
   if (score >= 80) return "var(--success)";

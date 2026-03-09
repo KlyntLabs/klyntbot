@@ -31,6 +31,9 @@ impl BatchWriter {
             let mut buffer: Vec<ActivityEvent> = Vec::new();
             let mut current_event: Option<ActivityEvent> = None;
             let mut last_flush = tokio::time::Instant::now();
+            // Cache the active focus session ID to stamp activity events.
+            // Checked on every tick; changes trigger event finalization.
+            let mut cached_focus_id: Option<String> = None;
 
             loop {
                 tokio::select! {
@@ -55,6 +58,23 @@ impl BatchWriter {
                             Err(broadcast::error::RecvError::Closed) => break,
                         };
 
+                        // Refresh focus session state — lightweight indexed query
+                        let live_focus_id = repos
+                            .sessions
+                            .get_active()
+                            .await
+                            .ok()
+                            .flatten()
+                            .map(|s| s.id);
+                        let focus_changed = live_focus_id != cached_focus_id;
+                        if focus_changed {
+                            debug!(
+                                "BatchWriter: focus state changed {:?} -> {:?}",
+                                cached_focus_id, live_focus_id
+                            );
+                            cached_focus_id = live_focus_id.clone();
+                        }
+
                         let (persisted_title, persisted_site, persisted_url) =
                             if privacy.exclude_window_titles {
                                 (None, None, None)
@@ -64,6 +84,7 @@ impl BatchWriter {
 
                         let same_context = !tick.is_idle
                             && !tick.is_context_switch
+                            && !focus_changed
                             && current_event.as_ref().is_some_and(|e| {
                                 e.app_name == tick.app_name && e.site_name == persisted_site
                             });
@@ -94,6 +115,7 @@ impl BatchWriter {
                                 is_idle: tick.is_idle,
                                 metadata: None,
                                 project_id: tick.project_id.clone(),
+                                focus_session_id: cached_focus_id.clone(),
                             });
                         }
 

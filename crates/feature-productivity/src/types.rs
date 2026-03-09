@@ -38,6 +38,7 @@ pub struct ActivityEvent {
     pub is_idle: bool,
     pub metadata: Option<String>,
     pub project_id: Option<String>,
+    pub focus_session_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

@@ -91,6 +91,7 @@ async fn test_full_focus_session_lifecycle() {
             is_idle: false,
             metadata: None,
             project_id: None,
+            focus_session_id: None,
         };
         repos.events.insert(&event).await.unwrap();
     }
@@ -186,6 +187,7 @@ async fn test_daily_aggregation_accuracy() {
             is_idle: false,
             metadata: None,
             project_id: None,
+            focus_session_id: None,
         },
         ActivityEvent {
             id: None,
@@ -201,6 +203,7 @@ async fn test_daily_aggregation_accuracy() {
             is_idle: false,
             metadata: None,
             project_id: None,
+            focus_session_id: None,
         },
         ActivityEvent {
             id: None,
@@ -216,6 +219,7 @@ async fn test_daily_aggregation_accuracy() {
             is_idle: false,
             metadata: None,
             project_id: None,
+            focus_session_id: None,
         },
         ActivityEvent {
             id: None,
@@ -231,6 +235,7 @@ async fn test_daily_aggregation_accuracy() {
             is_idle: true,
             metadata: None,
             project_id: None,
+            focus_session_id: None,
         },
     ];
 
@@ -370,6 +375,7 @@ async fn test_nudge_service_delivers_break_reminder() {
         is_idle: false,
         metadata: None,
         project_id: None,
+        focus_session_id: None,
     };
     repos.events.insert(&event).await.unwrap();
 
@@ -593,6 +599,7 @@ async fn test_goal_tracking() {
             is_idle: false,
             metadata: None,
             project_id: None,
+            focus_session_id: None,
         })
         .await
         .unwrap();
@@ -710,6 +717,7 @@ async fn test_project_tracking_aggregation() {
         is_idle: false,
         metadata: None,
         project_id: Some("klyntbot".into()),
+        focus_session_id: None,
     };
     repos.events.insert(&event_with_project).await.unwrap();
 
@@ -728,6 +736,7 @@ async fn test_project_tracking_aggregation() {
         is_idle: false,
         metadata: None,
         project_id: None,
+        focus_session_id: None,
     };
     repos.events.insert(&event_no_project).await.unwrap();
 
@@ -771,6 +780,7 @@ async fn test_activity_export_csv() {
             is_idle: false,
             metadata: None,
             project_id: None,
+            focus_session_id: None,
         };
         repos.events.insert(&event).await.unwrap();
     }

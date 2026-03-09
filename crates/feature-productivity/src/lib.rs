@@ -67,6 +67,10 @@ impl ProductivityFeature {
         include_str!("../migrations/004_intelligence_layer.sql")
     }
 
+    fn migration_v5_sql() -> &'static str {
+        include_str!("../migrations/005_focus_activity_link.sql")
+    }
+
     pub fn migrations_static() -> Vec<FeatureMigration> {
         vec![
             FeatureMigration {
@@ -93,6 +97,12 @@ impl ProductivityFeature {
                 version: 4,
                 description: "Add intelligence layer tables".to_string(),
                 sql: Self::migration_v4_sql().to_string(),
+            },
+            FeatureMigration {
+                feature_name: "productivity".to_string(),
+                version: 5,
+                description: "Link activity events to focus sessions".to_string(),
+                sql: Self::migration_v5_sql().to_string(),
             },
         ]
     }

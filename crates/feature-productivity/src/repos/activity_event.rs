@@ -8,8 +8,8 @@ pub struct ActivityEventRepo {
     pool: SqlitePool,
 }
 
-const INSERT_SQL: &str = r#"INSERT INTO activity_events (app_name, window_title, site_name, bundle_id, url, category_id, started_at, ended_at, duration_secs, is_idle, metadata, project_id)
-VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)"#;
+const INSERT_SQL: &str = r#"INSERT INTO activity_events (app_name, window_title, site_name, bundle_id, url, category_id, started_at, ended_at, duration_secs, is_idle, metadata, project_id, focus_session_id)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)"#;
 
 fn bind_event<'a>(
     query: sqlx::query::Query<'a, sqlx::Sqlite, sqlx::sqlite::SqliteArguments<'a>>,
@@ -28,6 +28,7 @@ fn bind_event<'a>(
         .bind(event.is_idle)
         .bind(&event.metadata)
         .bind(&event.project_id)
+        .bind(&event.focus_session_id)
 }
 
 impl ActivityEventRepo {
@@ -85,7 +86,7 @@ impl ActivityEventRepo {
         let limit = limit.unwrap_or(10_000);
         let offset = offset.unwrap_or(0).max(0);
         let rows = sqlx::query_as::<_, ActivityEvent>(
-            r#"SELECT id, app_name, window_title, site_name, bundle_id, url, category_id, started_at, ended_at, duration_secs, is_idle, metadata, project_id
+            r#"SELECT id, app_name, window_title, site_name, bundle_id, url, category_id, started_at, ended_at, duration_secs, is_idle, metadata, project_id, focus_session_id
                FROM activity_events
                WHERE started_at >= ?1 AND started_at < ?2
                ORDER BY started_at ASC
@@ -104,7 +105,7 @@ impl ActivityEventRepo {
     /// Returns the most recent events (newest first), limited by `limit`.
     pub async fn list_recent(&self, limit: i64) -> common::Result<Vec<ActivityEvent>> {
         let rows = sqlx::query_as::<_, ActivityEvent>(
-            r#"SELECT id, app_name, window_title, site_name, bundle_id, url, category_id, started_at, ended_at, duration_secs, is_idle, metadata, project_id
+            r#"SELECT id, app_name, window_title, site_name, bundle_id, url, category_id, started_at, ended_at, duration_secs, is_idle, metadata, project_id, focus_session_id
                FROM activity_events
                ORDER BY started_at DESC
                LIMIT ?1"#,

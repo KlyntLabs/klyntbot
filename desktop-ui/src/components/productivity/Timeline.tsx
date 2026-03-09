@@ -1,7 +1,10 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "../../hooks/useQuery";
+import type { MergeableEvent } from "../../lib/activity-sessions";
+import { mergeActivitySessions } from "../../lib/activity-sessions";
 import { formatHumanDuration, todayISO } from "../../lib/dates";
 import type { ActivityCategory, ActivityTimeline } from "../../lib/types";
+import { resolveActivityColor } from "./shared";
 
 interface TimelineBarProps {
   date: string;
@@ -16,29 +19,11 @@ interface Block {
   duration: number;
 }
 
-/** Full 24-hour range: midnight to midnight. */
-const START_HOUR = 0;
-const END_HOUR = 24;
-const SPAN_HOURS = END_HOUR - START_HOUR;
-
-function resolveColor(categoryType: string | undefined, isIdle: boolean): string {
-  if (isIdle) return "var(--surface-highest)";
-  if (categoryType === "productive") return "var(--success)";
-  if (categoryType === "distracting") return "var(--destructive)";
-  if (categoryType === "neutral") return "var(--text-muted)";
-  return "var(--brand)";
-}
-
-const TICK_LABELS: { hour: number; label: string }[] = [];
-for (let h = START_HOUR; h <= END_HOUR; h += 1) {
-  const display = h === 0 || h === 24 ? "12a" : h < 12 ? `${h}a` : h === 12 ? "12p" : `${h - 12}p`;
-  TICK_LABELS.push({ hour: h, label: display });
-}
-
-/** Fraction of the day (0–1) for the current time. */
-function nowFraction(): number {
-  const now = new Date();
-  return (now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds()) / (SPAN_HOURS * 3600);
+function formatHour(h: number): string {
+  if (h === 0 || h === 24) return "12a";
+  if (h < 12) return `${h}a`;
+  if (h === 12) return "12p";
+  return `${h - 12}p`;
 }
 
 export function TimelineBar({ date }: TimelineBarProps) {
@@ -52,84 +37,131 @@ export function TimelineBar({ date }: TimelineBarProps) {
 
   const categoryMap = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
 
+  // Compute the visible time range: auto-zoom to activity with 1h padding,
+  // or fall back to full 24h when there's no data.
+  const { startHour, endHour } = useMemo(() => {
+    if (events.length === 0) return { startHour: 0, endHour: 24 };
+
+    let minSecs = Number.POSITIVE_INFINITY;
+    let maxSecs = 0;
+    for (const e of events) {
+      if (e.isIdle) continue;
+      const s = new Date(e.startedAt);
+      const sec = s.getHours() * 3600 + s.getMinutes() * 60 + s.getSeconds();
+      const dur = e.durationSecs ?? 0;
+      if (sec < minSecs) minSecs = sec;
+      if (sec + dur > maxSecs) maxSecs = sec + dur;
+    }
+
+    if (minSecs > maxSecs) return { startHour: 0, endHour: 24 };
+
+    // For today, extend to current time
+    const isToday = date === todayISO();
+    if (isToday) {
+      const now = new Date();
+      const nowSecs = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+      if (nowSecs > maxSecs) maxSecs = nowSecs;
+    }
+
+    // 1h padding on each side, clamped to 0–24
+    const sh = Math.max(0, Math.floor(minSecs / 3600) - 1);
+    const eh = Math.min(24, Math.ceil(maxSecs / 3600) + 1);
+    // Minimum 3h window for readability
+    if (eh - sh < 3) {
+      const mid = (sh + eh) / 2;
+      return {
+        startHour: Math.max(0, Math.floor(mid - 1.5)),
+        endHour: Math.min(24, Math.ceil(mid + 1.5)),
+      };
+    }
+    return { startHour: sh, endHour: eh };
+  }, [events, date]);
+
+  const spanHours = endHour - startHour;
+
+  // Build tick labels for the visible range
+  const tickLabels = useMemo(() => {
+    const labels: { hour: number; label: string }[] = [];
+    for (let h = startHour; h <= endHour; h += 1) {
+      labels.push({ hour: h, label: formatHour(h) });
+    }
+    return labels;
+  }, [startHour, endHour]);
+
+  // Merge adjacent non-idle events into consolidated session blocks.
   const blocks: Block[] = useMemo(() => {
     if (events.length === 0) return [];
-    const spanSecs = SPAN_HOURS * 3600;
+    const startSecs = startHour * 3600;
+    const spanSecs = spanHours * 3600;
 
-    return events
-      .map((e) => {
-        const start = new Date(e.startedAt);
-        const eSecs = start.getHours() * 3600 + start.getMinutes() * 60 + start.getSeconds();
-        const dur = e.durationSecs ?? 0;
-        if (eSecs + dur < 0 || eSecs > END_HOUR * 3600) return null;
+    // Parse events into the shared MergeableEvent shape (with siteName extra)
+    interface TimelineEvent extends MergeableEvent {
+      siteName: string | null;
+    }
+    const parsed: TimelineEvent[] = events.map((e) => {
+      const start = new Date(e.startedAt);
+      const eSecs = start.getHours() * 3600 + start.getMinutes() * 60 + start.getSeconds();
+      const dur = e.durationSecs ?? 0;
+      const cat = e.categoryId ? categoryMap.get(e.categoryId) : undefined;
+      return {
+        startSecs: eSecs,
+        endSecs: eSecs + dur,
+        catType: cat?.categoryType ?? "uncategorized",
+        color: resolveActivityColor(cat?.categoryType, e.isIdle),
+        label: e.projectId ?? e.siteName ?? e.appName,
+        siteName: e.siteName,
+        isIdle: e.isIdle,
+        dur,
+      };
+    });
 
-        const clampedStart = Math.max(eSecs, 0);
-        const clampedEnd = Math.min(eSecs + dur, spanSecs);
-        const cat = e.categoryId ? categoryMap.get(e.categoryId) : undefined;
+    const sessions = mergeActivitySessions(parsed);
 
+    // Convert to percentage-based Block positions
+    return sessions
+      .map((session) => {
+        const clampedStart = Math.max(session.startSecs - startSecs, 0);
+        const clampedEnd = Math.min(session.endSecs - startSecs, spanSecs);
+        const totalDur = clampedEnd - clampedStart;
+        if (totalDur <= 0) return null;
         return {
           leftPct: (clampedStart / spanSecs) * 100,
-          widthPct: Math.max(((clampedEnd - clampedStart) / spanSecs) * 100, 0.15),
-          color: resolveColor(cat?.categoryType, e.isIdle),
-          label: e.projectId ?? e.siteName ?? e.appName,
-          siteName: e.siteName,
-          duration: dur,
+          widthPct: Math.max(((clampedEnd - clampedStart) / spanSecs) * 100, 0.5),
+          color: session.color,
+          label: session.label,
+          siteName: session.events[0]?.siteName ?? null,
+          duration: totalDur,
         };
       })
       .filter(Boolean) as Block[];
-  }, [events, categoryMap]);
+  }, [events, categoryMap, startHour, spanHours]);
 
   const isToday = date === todayISO();
-  const nowPct = isToday ? nowFraction() * 100 : null;
+  const nowPct = useMemo(() => {
+    if (!isToday) return null;
+    const now = new Date();
+    const nowSecs = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+    const startSecs = startHour * 3600;
+    const spanSecs = spanHours * 3600;
+    const pct = ((nowSecs - startSecs) / spanSecs) * 100;
+    return pct >= 0 && pct <= 100 ? pct : null;
+  }, [isToday, startHour, spanHours]);
+
+  const rangeLabel = `${formatHour(startHour).replace("a", ":00 AM").replace("p", ":00 PM")} – ${formatHour(endHour).replace("a", ":00 AM").replace("p", ":00 PM")}`;
 
   return (
     <div className="glass-card p-4 flex flex-col gap-2 col-span-3">
       <div className="flex items-center justify-between">
         <h2 className="text-[13px] font-medium text-secondary">Timeline</h2>
-        <span className="text-[10px] font-light text-dim tabular-nums">0:00 – 23:59</span>
+        <span className="text-[10px] font-light text-dim tabular-nums">{rangeLabel}</span>
       </div>
 
-      {/* Timeline bar */}
-      <div className="relative h-9 rounded-lg bg-white/[0.08] overflow-hidden">
-        {blocks.map((b, idx) => (
-          <div
-            aria-hidden="true"
-            // biome-ignore lint/suspicious/noArrayIndexKey: index is a tiebreaker for same-app same-position blocks
-            key={`${b.label}-${b.leftPct.toFixed(2)}-${idx}`}
-            className="absolute top-0 h-full transition-opacity duration-150"
-            style={{
-              left: `${b.leftPct}%`,
-              width: `${b.widthPct}%`,
-              backgroundColor: b.color,
-              opacity: hoveredIdx !== null && hoveredIdx !== idx ? 0.3 : 1,
-              borderRadius: b.widthPct > 0.5 ? "2px" : undefined,
-            }}
-            onMouseEnter={() => setHoveredIdx(idx)}
-            onMouseLeave={() => setHoveredIdx(null)}
-          />
-        ))}
-
-        {/* Now marker */}
-        {nowPct !== null && (
-          <div
-            className="absolute top-0 h-full w-px pointer-events-none"
-            style={{
-              left: `${nowPct}%`,
-              background: "var(--brand)",
-              boxShadow: "0 0 4px var(--brand-glow)",
-            }}
-          >
-            <div
-              className="absolute -top-0.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full"
-              style={{ background: "var(--brand)" }}
-            />
-          </div>
-        )}
-
-        {/* Hover tooltip */}
+      {/* Timeline bar — wrapper is relative for tooltip positioning outside overflow */}
+      <div className="relative">
+        {/* Hover tooltip — outside overflow-hidden so it's not clipped */}
         {hoveredIdx !== null && blocks[hoveredIdx] && (
           <div
-            className="absolute -top-8 z-10 px-2 py-1 rounded text-[10px] font-light text-primary whitespace-nowrap pointer-events-none"
+            className="absolute -top-7 z-10 px-2 py-1 rounded text-[10px] font-light text-primary whitespace-nowrap pointer-events-none"
             style={{
               left: `${Math.min(blocks[hoveredIdx].leftPct + blocks[hoveredIdx].widthPct / 2, 95)}%`,
               transform: "translateX(-50%)",
@@ -141,15 +173,52 @@ export function TimelineBar({ date }: TimelineBarProps) {
             {blocks[hoveredIdx].label} · {formatHumanDuration(blocks[hoveredIdx].duration)}
           </div>
         )}
+
+        <div className="relative h-9 rounded-lg bg-white/[0.08] overflow-hidden">
+          {blocks.map((b, idx) => (
+            <div
+              aria-hidden="true"
+              // biome-ignore lint/suspicious/noArrayIndexKey: index is a tiebreaker for same-app same-position blocks
+              key={`${b.label}-${b.leftPct.toFixed(2)}-${idx}`}
+              className="absolute top-0 h-full transition-opacity duration-150"
+              style={{
+                left: `${b.leftPct}%`,
+                width: `${b.widthPct}%`,
+                backgroundColor: b.color,
+                opacity: hoveredIdx !== null && hoveredIdx !== idx ? 0.3 : 1,
+                borderRadius: "3px",
+              }}
+              onMouseEnter={() => setHoveredIdx(idx)}
+              onMouseLeave={() => setHoveredIdx(null)}
+            />
+          ))}
+
+          {/* Now marker */}
+          {nowPct !== null && (
+            <div
+              className="absolute top-0 h-full w-px pointer-events-none"
+              style={{
+                left: `${nowPct}%`,
+                background: "var(--brand)",
+                boxShadow: "0 0 4px var(--brand-glow)",
+              }}
+            >
+              <div
+                className="absolute -top-0.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full"
+                style={{ background: "var(--brand)" }}
+              />
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Time axis — every hour */}
+      {/* Time axis */}
       <div className="relative h-4 mt-1">
-        {TICK_LABELS.map(({ hour, label }) => (
+        {tickLabels.map(({ hour, label }) => (
           <span
             key={hour}
             className="absolute text-[9px] font-light text-dim tabular-nums -translate-x-1/2"
-            style={{ left: `${(hour / SPAN_HOURS) * 100}%` }}
+            style={{ left: `${((hour - startHour) / spanHours) * 100}%` }}
           >
             {label}
           </span>

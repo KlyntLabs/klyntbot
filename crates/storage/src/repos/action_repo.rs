@@ -719,6 +719,32 @@ impl ActionRepo {
         Ok(rows)
     }
 
+    /// Fetch tasks relevant to a date range for the timeline:
+    /// due on the date, created during the range, or completed during the range.
+    pub async fn tasks_for_timeline(
+        &self,
+        start_date: &str,
+        end_date: &str,
+    ) -> Result<Vec<ActionRow>, StorageError> {
+        let end_bound = format!("{end_date}T23:59:59Z");
+        let rows = sqlx::query_as::<_, ActionRow>(
+            r#"
+            SELECT * FROM actions
+            WHERE is_template = 0 AND (
+                (due_date >= ?1 AND due_date < ?2)
+                OR (created_at >= ?1 AND created_at < ?2)
+                OR (completed_at >= ?1 AND completed_at < ?2)
+            )
+            ORDER BY COALESCE(due_date, created_at) ASC
+            "#,
+        )
+        .bind(start_date)
+        .bind(&end_bound)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
+    }
+
     // -----------------------------------------------------------------------
     // Hierarchy
     // -----------------------------------------------------------------------

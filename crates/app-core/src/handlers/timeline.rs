@@ -46,11 +46,50 @@ impl AppCore {
             }
         }
 
-        // 2. Task time entries (duration blocks)
-        if want(sources, TimelineSource::Task) {
-            if let Ok(time_entries) = self.repos.actions.time_entries_in_range(start, end).await {
-                entries.extend(time_entries.into_iter().map(normalize_time_entry));
-            }
+        // 2–6. Independent queries — run concurrently for lower latency
+        let (time_entries_res, tasks_res, txs_res, notes_res) = tokio::join!(
+            async {
+                if !want(sources, TimelineSource::Task) {
+                    return None;
+                }
+                self.repos.actions.time_entries_in_range(start, end).await.ok()
+            },
+            async {
+                if !want(sources, TimelineSource::Todo) {
+                    return None;
+                }
+                self.repos.actions.tasks_for_timeline(start, end).await.ok()
+            },
+            async {
+                if !want(sources, TimelineSource::Finance) {
+                    return None;
+                }
+                let filter = storage::rows::finance::FinanceTransactionFilter {
+                    date_from: chrono::NaiveDate::parse_from_str(start, "%Y-%m-%d").ok(),
+                    date_to: chrono::NaiveDate::parse_from_str(end, "%Y-%m-%d").ok(),
+                    limit: Some(100),
+                    ..Default::default()
+                };
+                self.repos.finance.transactions.list(&filter).await.ok()
+            },
+            async {
+                if !want(sources, TimelineSource::Note) {
+                    return None;
+                }
+                self.note_repo.notes_in_date_range(start, end).await.ok()
+            },
+        );
+        if let Some(time_entries) = time_entries_res {
+            entries.extend(time_entries.into_iter().map(normalize_time_entry));
+        }
+        if let Some(tasks) = tasks_res {
+            entries.extend(tasks.into_iter().flat_map(|t| normalize_task(t, start, end)));
+        }
+        if let Some(txs) = txs_res {
+            entries.extend(txs.into_iter().map(normalize_transaction));
+        }
+        if let Some(notes) = notes_res {
+            entries.extend(notes.into_iter().map(|n| normalize_note_activity(n, start)));
         }
 
         // 3. Domain event log (point-in-time events — may produce Task/Note/Finance/System)
@@ -65,6 +104,17 @@ impl AppCore {
                     if let Some(src_list) = sources {
                         domain_entries.retain(|e| src_list.contains(&e.source));
                     }
+                    // Remove entries now handled by direct pipelines to avoid duplicates
+                    domain_entries.retain(|e| {
+                        !matches!(
+                            e.entry_type,
+                            TimelineEntryType::TaskCreated
+                                | TimelineEntryType::TaskCompleted
+                                | TimelineEntryType::NoteCreated
+                                | TimelineEntryType::NoteUpdated
+                                | TimelineEntryType::TransactionRecorded
+                        )
+                    });
                     entries.extend(domain_entries);
                 }
             }
@@ -96,8 +146,9 @@ fn parse_end_of_day(date_str: &str) -> Option<chrono::DateTime<chrono::Utc>> {
 // ── Normalization functions ─────────────────────────────────────────
 
 fn normalize_app_event(e: feature_productivity::ActivityEvent) -> TimelineEntry {
-    // category_type (productive/distracting) isn't available on ActivityEvent,
-    // so we use neutral for all app events. The UI can refine color via metadata.
+    let metadata = e.focus_session_id.as_ref().map(|fid| {
+        serde_json::json!({ "focusSessionId": fid })
+    });
     TimelineEntry {
         id: e.id.map(|i| i.to_string()).unwrap_or_default(),
         source: TimelineSource::Productivity,
@@ -110,7 +161,7 @@ fn normalize_app_event(e: feature_productivity::ActivityEvent) -> TimelineEntry 
         entity_id: None,
         entity_route: Some("/productivity".into()),
         color: "var(--timeline-app-neutral)".into(),
-        metadata: None,
+        metadata,
     }
 }
 
@@ -245,6 +296,155 @@ fn normalize_domain_event(e: cognitive::DomainEventRow) -> Option<TimelineEntry>
     })
 }
 
+/// Normalize a task row into 1+ timeline entries.
+fn normalize_task(t: storage::ActionRow, start: &str, end: &str) -> Vec<TimelineEntry> {
+    let mut out = Vec::new();
+    let start_bound = format!("{start}T00:00:00Z");
+    let end_bound = format!("{end}T23:59:59Z");
+    let task_route = format!("/task/{}", t.id);
+
+    // Task due on this date
+    if let Some(ref due) = t.due_date {
+        let due_str = due.to_rfc3339();
+        if due_str >= start_bound && due_str <= end_bound {
+            out.push(TimelineEntry {
+                id: format!("{}-due", t.id),
+                source: TimelineSource::Todo,
+                entry_type: TimelineEntryType::TaskDue,
+                title: t.title.clone(),
+                description: t.description.clone(),
+                started_at: due_str,
+                ended_at: None,
+                duration_secs: t.estimated_minutes.map(|m| m as i64 * 60),
+                entity_id: Some(t.id.clone()),
+                entity_route: Some(task_route.clone()),
+                color: "var(--timeline-todo)".into(),
+                metadata: Some(serde_json::json!({
+                    "status": t.status,
+                    "priority": t.priority,
+                })),
+            });
+        }
+    }
+
+    // Task created in range
+    let created_str = t.created_at.to_rfc3339();
+    if created_str >= start_bound && created_str <= end_bound {
+        out.push(TimelineEntry {
+            id: format!("{}-created", t.id),
+            source: TimelineSource::Todo,
+            entry_type: TimelineEntryType::TaskCreated,
+            title: format!("Created: {}", t.title),
+            description: None,
+            started_at: created_str,
+            ended_at: None,
+            duration_secs: None,
+            entity_id: Some(t.id.clone()),
+            entity_route: Some(task_route.clone()),
+            color: "var(--timeline-todo)".into(),
+            metadata: None,
+        });
+    }
+
+    // Task completed in range
+    if let Some(ref completed) = t.completed_at {
+        let comp_str = completed.to_rfc3339();
+        if comp_str >= start_bound && comp_str <= end_bound {
+            out.push(TimelineEntry {
+                id: format!("{}-completed", t.id),
+                source: TimelineSource::Todo,
+                entry_type: TimelineEntryType::TaskCompleted,
+                title: format!("Completed: {}", t.title),
+                description: None,
+                started_at: comp_str,
+                ended_at: None,
+                duration_secs: None,
+                entity_id: Some(t.id.clone()),
+                entity_route: Some(task_route),
+                color: "var(--timeline-todo)".into(),
+                metadata: None,
+            });
+        }
+    }
+
+    out
+}
+
+fn normalize_transaction(tx: storage::rows::finance::FinanceTransactionRow) -> TimelineEntry {
+    let is_expense = tx.tx_type == "expense";
+    let entry_type = if is_expense {
+        TimelineEntryType::ExpenseRecorded
+    } else {
+        TimelineEntryType::IncomeRecorded
+    };
+    let amount_display = format!(
+        "{}{:.2}",
+        if is_expense { "-$" } else { "+$" },
+        tx.amount.unsigned_abs() as f64 / 100.0
+    );
+    let title = match &tx.category {
+        Some(cat) => format!("{} {}", amount_display, cat),
+        None => amount_display,
+    };
+
+    TimelineEntry {
+        id: tx.id.clone(),
+        source: TimelineSource::Finance,
+        entry_type,
+        title,
+        description: tx.notes.clone(),
+        started_at: tx.created_at.to_rfc3339(),
+        ended_at: None,
+        duration_secs: None,
+        entity_id: Some(tx.id),
+        entity_route: Some("/finance/transactions".into()),
+        color: if is_expense {
+            "var(--timeline-finance-expense)".into()
+        } else {
+            "var(--timeline-finance-income)".into()
+        },
+        metadata: Some(serde_json::json!({
+            "amount": tx.amount,
+            "txType": tx.tx_type,
+            "category": tx.category,
+            "counterparty": tx.counterparty,
+        })),
+    }
+}
+
+fn normalize_note_activity(note: feature_notes::models::NoteRow, start: &str) -> TimelineEntry {
+    let start_bound = format!("{start}T00:00:00Z");
+    let is_created = note.created_at >= start_bound && note.created_at == note.updated_at;
+    let (entry_type, prefix) = if is_created {
+        (TimelineEntryType::NoteCreated, "Created")
+    } else {
+        (TimelineEntryType::NoteUpdated, "Edited")
+    };
+
+    TimelineEntry {
+        id: format!(
+            "{}-{}",
+            note.id,
+            if is_created { "created" } else { "updated" }
+        ),
+        source: TimelineSource::Note,
+        entry_type,
+        title: format!("{}: {}", prefix, note.title),
+        description: None,
+        started_at: if is_created {
+            note.created_at.clone()
+        } else {
+            note.updated_at.clone()
+        },
+        ended_at: None,
+        duration_secs: None,
+        entity_id: Some(note.id),
+        entity_route: Some("/notes".into()),
+        color: "var(--timeline-note)".into(),
+        metadata: None,
+    }
+}
+
 /// Convert "CamelCaseString" to "Camel Case String".
 fn camel_to_title(s: &str) -> String {
     let mut out = String::with_capacity(s.len() + 4);
@@ -283,6 +483,7 @@ fn compute_summary(entries: &[TimelineEntry]) -> TimelineSummary {
             TimelineEntryType::FocusSession => focus_secs += dur,
             TimelineEntryType::TaskCompleted => tasks_completed += 1,
             TimelineEntryType::TaskCreated => tasks_created += 1,
+            TimelineEntryType::TaskDue => {}
             TimelineEntryType::NoteCreated | TimelineEntryType::NoteUpdated => notes_touched += 1,
             TimelineEntryType::TransactionRecorded
             | TimelineEntryType::ExpenseRecorded

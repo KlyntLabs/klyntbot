@@ -243,23 +243,16 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
             {LAYERS.map((layer) => (
               <label
                 key={layer.key}
-                className={cn(
-                  "flex items-center gap-2 px-3 py-1.5 text-xs cursor-pointer rounded-lg transition-colors",
-                  layer.comingSoon
-                    ? "text-dim cursor-not-allowed"
-                    : "text-secondary hover:bg-white/[0.06]",
-                )}
+                className="flex items-center gap-2 px-3 py-1.5 text-xs cursor-pointer rounded-lg transition-colors text-secondary hover:bg-white/[0.06]"
               >
                 <input
                   type="checkbox"
                   checked={enabled.has(layer.key)}
-                  disabled={layer.comingSoon}
                   onChange={() => toggle(layer.key)}
                   className="accent-brand w-3 h-3"
                 />
                 <span className="w-2 h-2 rounded-full" style={{ backgroundColor: layer.color }} />
                 {layer.label}
-                {layer.comingSoon && <span className="text-[9px] text-dim ml-auto">Soon</span>}
               </label>
             ))}
             <button

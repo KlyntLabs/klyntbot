@@ -52,6 +52,9 @@
   --timeline-task: oklch(0.68 0.16 240);
   --timeline-note: oklch(0.75 0.14 80);
   --timeline-finance: oklch(0.72 0.16 160);
+  --timeline-todo: oklch(0.7 0.16 200);
+  --timeline-finance-expense: oklch(0.65 0.18 25);
+  --timeline-finance-income: oklch(0.72 0.16 155);
   --timeline-system: oklch(0.55 0.02 250);
   --timeline-focus-high: oklch(0.58 0.22 290);
   --timeline-focus-low: oklch(0.72 0.12 290);
@@ -141,6 +144,9 @@
   --color-timeline-task: var(--timeline-task);
   --color-timeline-note: var(--timeline-note);
   --color-timeline-finance: var(--timeline-finance);
+  --color-timeline-todo: var(--timeline-todo);
+  --color-timeline-finance-expense: var(--timeline-finance-expense);
+  --color-timeline-finance-income: var(--timeline-finance-income);
   --color-timeline-system: var(--timeline-system);
   --color-timeline-focus-high: var(--timeline-focus-high);
   --color-timeline-focus-low: var(--timeline-focus-low);

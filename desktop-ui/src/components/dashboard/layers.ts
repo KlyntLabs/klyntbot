@@ -1,7 +1,7 @@
 import { createContext, useContext, useMemo, useState } from "react";
 import type { TimelineSource } from "../../lib/types";
 
-export type LayerKey = "focus" | "tasks" | "apps" | "events" | "calendar";
+export type LayerKey = "activity" | "timeEntries" | "tasks" | "transactions" | "notes";
 
 export interface LayerConfig {
   key: LayerKey;
@@ -10,46 +10,43 @@ export interface LayerConfig {
   sources: TimelineSource[];
   defaultOn: boolean;
   color: string;
-  /** If true, the layer is not yet implemented */
-  comingSoon?: boolean;
 }
 
 export const LAYERS: LayerConfig[] = [
   {
-    key: "focus",
-    label: "Focus Sessions",
-    sources: ["focus"],
+    key: "activity",
+    label: "Activity",
+    sources: ["productivity", "focus"],
     defaultOn: true,
-    color: "var(--timeline-focus)",
+    color: "var(--timeline-app-productive)",
   },
   {
-    key: "tasks",
-    label: "Task Time Entries",
+    key: "timeEntries",
+    label: "Time Entries",
     sources: ["task"],
-    defaultOn: true,
+    defaultOn: false,
     color: "var(--timeline-task)",
   },
   {
-    key: "apps",
-    label: "App Activity",
-    sources: ["productivity"],
+    key: "tasks",
+    label: "Tasks",
+    sources: ["todo"],
     defaultOn: true,
-    color: "var(--timeline-app-neutral)",
+    color: "var(--timeline-todo)",
   },
   {
-    key: "events",
-    label: "Point Events",
-    sources: ["note", "finance", "system"],
+    key: "transactions",
+    label: "Transactions",
+    sources: ["finance"],
+    defaultOn: true,
+    color: "var(--timeline-finance)",
+  },
+  {
+    key: "notes",
+    label: "Notes",
+    sources: ["note"],
     defaultOn: true,
     color: "var(--timeline-note)",
-  },
-  {
-    key: "calendar",
-    label: "Calendar Events",
-    sources: [],
-    defaultOn: false,
-    color: "var(--timeline-system)",
-    comingSoon: true,
   },
 ];
 
@@ -91,7 +88,7 @@ export function useLayerToggle() {
 
   /** Flat list of TimelineSource values for enabled layers, to pass to timeline_query */
   const enabledSources = useMemo(
-    () => LAYERS.filter((l) => enabled.has(l.key) && !l.comingSoon).flatMap((l) => l.sources),
+    () => LAYERS.filter((l) => enabled.has(l.key)).flatMap((l) => l.sources),
     [enabled],
   );
 
