@@ -15,7 +15,6 @@ import { GoalsProgress } from "./GoalsProgress";
 import { InsightCardList } from "./InsightCardList";
 import { LearnedRulesCard } from "./LearnedRulesCard";
 import { LiveScoreRing } from "./LiveScoreRing";
-import { PomodoroTimer } from "./PomodoroTimer";
 import { ProjectsCard } from "./ProjectsCard";
 import { buildBreakdownSegments } from "./shared";
 import { TimeEntrySection } from "./TimeEntrySection";
@@ -80,7 +79,6 @@ export function DayView({ date }: DayViewProps) {
 
       {/* Row 2-3: Left column */}
       <div className="flex flex-col gap-4">
-        <PomodoroTimer />
         <ActivityFeed />
       </div>
 
