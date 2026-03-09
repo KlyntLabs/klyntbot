@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Navigate, Outlet, useLocation } from "react-router";
+import { Navigate, Outlet, useLocation, useNavigate } from "react-router";
 import { useEvent } from "../../hooks/useEvent";
 import { ipc } from "../../hooks/useIpc";
 import type { AppInfoResponse, SidebarItem } from "../../lib/types";
@@ -8,6 +8,7 @@ import { Sidebar } from "./Sidebar";
 
 export function AppShell() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [openSessionKey, setOpenSessionKey] = useState<string | null>(null);
   const [setupState, setSetupState] = useState<"loading" | "needed" | "ready">("loading");
@@ -68,6 +69,11 @@ export function AppShell() {
   useEvent<{ text?: string; sessionKey?: string }>("open-chat", (payload) => {
     setIsChatOpen(true);
     setOpenSessionKey(payload?.sessionKey ?? null);
+  });
+
+  // Listen for navigate events from tray / launcher
+  useEvent<{ path: string }>("navigate", (payload) => {
+    if (payload?.path) navigate(payload.path);
   });
 
   // Gate: redirect to setup wizard if setup not completed

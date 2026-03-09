@@ -200,6 +200,13 @@ async fn dispatch(
         return dispatch_chat_send(core, &body, &state.sse_channels).await;
     }
 
+    // ── open_url (desktop-like: opens URL in default browser) ───────
+    if cmd == "open_url" {
+        let url: String = dev::get_str(&body, "url").unwrap_or_default();
+        let _ = open::that(&url);
+        return ok(serde_json::json!(true));
+    }
+
     err(ApiError::new(
         "NOT_FOUND",
         format!("command '{cmd}' is not supported in browser dev mode"),
@@ -413,6 +420,7 @@ mod tests {
         "permissions_check_accessibility",
         "permissions_open_accessibility",
         "resize_window",
+        "quit_app",
         "mcp_oauth_start",
         "mcp_oauth_disconnect",
     ];

@@ -316,6 +316,8 @@ fn main() {
             commands::status::agent_status,
             // Window
             commands::window::resize_window,
+            commands::window::open_url,
+            commands::window::quit_app,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Klynt desktop");

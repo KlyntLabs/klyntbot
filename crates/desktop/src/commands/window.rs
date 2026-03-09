@@ -21,3 +21,13 @@ pub fn resize_window(app: tauri::AppHandle, label: String, height: f64) {
         let _ = window.set_size(tauri::LogicalSize::new(width, height));
     }
 }
+
+#[tauri::command]
+pub fn open_url(url: String) {
+    let _ = open::that(&url);
+}
+
+#[tauri::command]
+pub fn quit_app(app: tauri::AppHandle) {
+    app.exit(0);
+}
