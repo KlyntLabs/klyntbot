@@ -15,8 +15,5 @@ pub trait SummaryProvider: Send + Sync {
     /// Returns one `Result` per input segment — individual segments may fail
     /// independently, allowing callers to fall back to extractive summarization
     /// on a per-segment basis.
-    async fn summarize_batch(
-        &self,
-        segments: Vec<Vec<Message>>,
-    ) -> Vec<Result<String, String>>;
+    async fn summarize_batch(&self, segments: Vec<Vec<Message>>) -> Vec<Result<String, String>>;
 }

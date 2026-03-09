@@ -778,22 +778,7 @@ flowchart TD
 
 ## Implementation Gaps & Technical Debt Analysis
 
-### Medium
-
-**4. Single monolithic cron callback**
-- **Location**: `crates/app-core/src/init.rs:L434-L618` — `register_cron_callbacks()`
-- **Why it matters**: All cron job types share one `match job_name.as_str()` dispatch. Adding new jobs requires editing this growing match block.
-- **Fix**: Use a trait-based callback registry where each job type registers its own handler.
-
-**5. Context cache invalidated on every tool execution**
-- **Location**: `crates/context_engine/src/assembler.rs` — generation counter
-- **Why it matters**: `invalidate_cache()` bumps a generation counter that marks all 8 LRU entries stale. Since tool execution always triggers re-assembly, the cache only benefits the first assembly in a request cycle.
-- **Fix**: Use a more granular invalidation strategy — only invalidate when specific context sources change (e.g., session history appended, new cognitive facts).
-
-**6. `block_on` in Tauri setup blocks UI thread**
-- **Location**: `crates/desktop/src/main.rs:L53`
-- **Why it matters**: `tauri::async_runtime::block_on(app_core::init(handle))` blocks the Tauri setup thread for the entire boot sequence (potentially several seconds). Users see a blank window during initialization.
-- **Fix**: Show a loading/splash screen, then complete initialization asynchronously. Or move heavy init (LLM provider, MCP connections, embedding engine) to a post-setup task.
+No active gaps. All identified issues have been resolved.
 
 ### Resolved
 
@@ -811,3 +796,6 @@ The following gaps have been addressed:
 - ~~AccumulatedEntry buffer not persisted across restarts~~ — Fixed: added `accumulated_observations` table, repo, and migration; `BackgroundConsolidationService` loads on startup, persists on add, deletes on promotion (`background.rs`, `repos/accumulated_observation.rs`)
 - ~~Dev server dispatch must be manually updated~~ — Fixed: co-located `dispatch_dev()` functions in each command module with `DEV_COMMANDS` const arrays; chained dispatch in `dev_server.rs`; parity test ensures all Tauri commands have dev server coverage (`commands/*.rs`, `dev_server.rs`)
 - ~~HistoryCompressor makes N/5 LLM calls for abstractive compression~~ — Fixed: `SummaryProvider::summarize_batch` accepts all segments at once; `LlmSummaryProvider` batches into sub-groups of 5, produces JSON array summaries per call, and runs sub-batches in parallel via `join_all`; per-segment extractive fallback on failure (`summary_provider.rs`, `llm_summary_provider.rs`, `history_compressor.rs`)
+- ~~Single monolithic cron callback~~ — Fixed: `CronService::register_handler(name, callback)` allows per-job-name handlers; `set_callback` remains as fallback for unregistered names. Each job type is now a self-contained handler in `init.rs` (`scheduling/service/mod.rs`, `executor.rs`, `store.rs`, `app-core/init.rs`)
+- ~~Context cache invalidated on every tool execution~~ — Fixed: `invalidate_cache()` was dead code (never called). Removed the unused generation-counter mechanism. The SHA-256 cache key already captures all relevant state changes (history, message, strategy, tools), so cache entries expire naturally when inputs differ (`assembler.rs`)
+- ~~`block_on` in Tauri setup blocks UI thread~~ — Fixed: main window starts hidden (`visible: false` in `tauri.conf.json`), shown after init completes via `window.show()`. Users no longer see a blank window during boot (`main.rs`, `tauri.conf.json`)

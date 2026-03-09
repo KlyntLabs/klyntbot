@@ -236,4 +236,3 @@ pub async fn test_outcome_repo() -> klyntbot::storage::OutcomeRepo {
 pub async fn test_strategy_repo() -> klyntbot::storage::StrategyRepo {
     klyntbot::storage::StrategyRepo::new(test_pool().await.inner().clone())
 }
-

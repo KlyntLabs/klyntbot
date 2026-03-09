@@ -201,7 +201,8 @@ impl AppCore {
         };
 
         // Any explicit interaction resets the consecutive ignore counter
-        self.consecutive_coaching_ignores.store(0, Ordering::Relaxed);
+        self.consecutive_coaching_ignores
+            .store(0, Ordering::Relaxed);
         debug!("coaching consecutive ignores reset (explicit feedback)");
 
         // Record in FeedbackTracker (single lock scope — record_explicit removes
@@ -242,17 +243,12 @@ impl AppCore {
     /// Report that a coaching nudge was ignored (auto-collapsed without interaction).
     /// Increments the consecutive ignore counter; after [`MAX_CONSECUTIVE_IGNORES`]
     /// in a row, delivery is skipped.
-    pub async fn coaching_report_ignored(
-        &self,
-        intervention_id: String,
-    ) -> Result<bool, ApiError> {
+    pub async fn coaching_report_ignored(&self, intervention_id: String) -> Result<bool, ApiError> {
         let count = self
             .consecutive_coaching_ignores
             .fetch_add(1, Ordering::Relaxed)
             + 1;
-        debug!(
-            "coaching nudge ignored (id={intervention_id}), consecutive={count}"
-        );
+        debug!("coaching nudge ignored (id={intervention_id}), consecutive={count}");
         Ok(true)
     }
 }

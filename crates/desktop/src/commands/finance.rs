@@ -368,92 +368,105 @@ pub(crate) async fn dispatch_dev(
         "finance_transactions" => {
             dev::val(core.finance_transactions(dev::get(body, "limit")).await)
         }
-        "finance_transactions_filtered" => {
-            dev::val(core.finance_transactions_filtered(try_field!(dev::parse_params(body))).await)
-        }
+        "finance_transactions_filtered" => dev::val(
+            core.finance_transactions_filtered(try_field!(dev::parse_params(body)))
+                .await,
+        ),
         "finance_budget_usage" => dev::val(core.finance_budget_usage().await),
         "finance_portfolios" => dev::val(core.finance_portfolios().await),
         "finance_investments" => dev::val(core.finance_investments().await),
-        "finance_investments_filtered" => {
-            dev::val(core.finance_investments_filtered(dev::get(body, "portfolio_id")).await)
-        }
+        "finance_investments_filtered" => dev::val(
+            core.finance_investments_filtered(dev::get(body, "portfolio_id"))
+                .await,
+        ),
         "finance_goals" => dev::val(core.finance_goals().await),
         "finance_liabilities" => dev::val(core.finance_liabilities().await),
         "finance_net_worth" => dev::val(core.finance_net_worth().await),
         "finance_exchange_rates" => dev::val(core.finance_exchange_rates().await),
         // Mutations
-        "finance_account_create" => {
-            dev::val_rh(core.finance_account_create(try_field!(dev::parse_params(body))).await)
-        }
-        "finance_account_update" => {
-            dev::val_rh(core.finance_account_update(try_field!(dev::parse_params(body))).await)
-        }
+        "finance_account_create" => dev::val_rh(
+            core.finance_account_create(try_field!(dev::parse_params(body)))
+                .await,
+        ),
+        "finance_account_update" => dev::val_rh(
+            core.finance_account_update(try_field!(dev::parse_params(body)))
+                .await,
+        ),
         "finance_account_delete" => {
             let id = try_field!(dev::get_str(body, "id"));
             dev::val_rh(core.finance_account_delete(id).await)
         }
-        "finance_transaction_create" => {
-            dev::val_rh(core.finance_transaction_create(try_field!(dev::parse_params(body))).await)
-        }
+        "finance_transaction_create" => dev::val_rh(
+            core.finance_transaction_create(try_field!(dev::parse_params(body)))
+                .await,
+        ),
         "finance_transaction_delete" => {
             let id = try_field!(dev::get_str(body, "id"));
             dev::val_rh(core.finance_transaction_delete(id).await)
         }
-        "finance_budget_create" => {
-            dev::val_rh(core.finance_budget_create(try_field!(dev::parse_params(body))).await)
-        }
-        "finance_budget_update" => {
-            dev::val_rh(core.finance_budget_update(try_field!(dev::parse_params(body))).await)
-        }
+        "finance_budget_create" => dev::val_rh(
+            core.finance_budget_create(try_field!(dev::parse_params(body)))
+                .await,
+        ),
+        "finance_budget_update" => dev::val_rh(
+            core.finance_budget_update(try_field!(dev::parse_params(body)))
+                .await,
+        ),
         "finance_budget_delete" => {
             let id = try_field!(dev::get_str(body, "id"));
             dev::val_rh(core.finance_budget_delete(id).await)
         }
-        "finance_goal_create" => {
-            dev::val_rh(core.finance_goal_create(try_field!(dev::parse_params(body))).await)
-        }
-        "finance_goal_update" => {
-            dev::val_rh(core.finance_goal_update(try_field!(dev::parse_params(body))).await)
-        }
+        "finance_goal_create" => dev::val_rh(
+            core.finance_goal_create(try_field!(dev::parse_params(body)))
+                .await,
+        ),
+        "finance_goal_update" => dev::val_rh(
+            core.finance_goal_update(try_field!(dev::parse_params(body)))
+                .await,
+        ),
         "finance_goal_delete" => {
             let id = try_field!(dev::get_str(body, "id"));
             dev::val_rh(core.finance_goal_delete(id).await)
         }
-        "finance_liability_create" => {
-            dev::val_rh(core.finance_liability_create(try_field!(dev::parse_params(body))).await)
-        }
-        "finance_liability_update" => {
-            dev::val_rh(core.finance_liability_update(try_field!(dev::parse_params(body))).await)
-        }
+        "finance_liability_create" => dev::val_rh(
+            core.finance_liability_create(try_field!(dev::parse_params(body)))
+                .await,
+        ),
+        "finance_liability_update" => dev::val_rh(
+            core.finance_liability_update(try_field!(dev::parse_params(body)))
+                .await,
+        ),
         "finance_liability_delete" => {
             let id = try_field!(dev::get_str(body, "id"));
             dev::val_rh(core.finance_liability_delete(id).await)
         }
-        "finance_portfolio_create" => {
-            dev::val_rh(core.finance_portfolio_create(try_field!(dev::parse_params(body))).await)
-        }
-        "finance_investment_create" => {
-            dev::val_rh(core.finance_investment_create(try_field!(dev::parse_params(body))).await)
-        }
-        "finance_investment_update" => {
-            dev::val_rh(core.finance_investment_update(try_field!(dev::parse_params(body))).await)
-        }
+        "finance_portfolio_create" => dev::val_rh(
+            core.finance_portfolio_create(try_field!(dev::parse_params(body)))
+                .await,
+        ),
+        "finance_investment_create" => dev::val_rh(
+            core.finance_investment_create(try_field!(dev::parse_params(body)))
+                .await,
+        ),
+        "finance_investment_update" => dev::val_rh(
+            core.finance_investment_update(try_field!(dev::parse_params(body)))
+                .await,
+        ),
         // Reports
-        "finance_report_spending" => {
-            dev::val(
-                core.finance_report_spending(dev::get(body, "date_from"), dev::get(body, "date_to"))
-                    .await,
-            )
-        }
-        "finance_report_income" => {
-            dev::val(
-                core.finance_report_income(dev::get(body, "date_from"), dev::get(body, "date_to"))
-                    .await,
-            )
-        }
+        "finance_report_spending" => dev::val(
+            core.finance_report_spending(dev::get(body, "date_from"), dev::get(body, "date_to"))
+                .await,
+        ),
+        "finance_report_income" => dev::val(
+            core.finance_report_income(dev::get(body, "date_from"), dev::get(body, "date_to"))
+                .await,
+        ),
         "finance_report_trends" => {
             let metric = try_field!(dev::get_str(body, "metric"));
-            dev::val(core.finance_report_trends(metric, dev::get(body, "periods")).await)
+            dev::val(
+                core.finance_report_trends(metric, dev::get(body, "periods"))
+                    .await,
+            )
         }
         _ => return None,
     })

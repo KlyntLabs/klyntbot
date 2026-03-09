@@ -120,8 +120,14 @@ mod tests {
         for _ in 0..1000 {
             s = update_stability(s, true);
         }
-        assert!(s <= 30.0, "Stability should never exceed MAX_STABILITY after many retrievals");
-        assert!((s - 30.0).abs() < f64::EPSILON, "Should reach exactly MAX_STABILITY");
+        assert!(
+            s <= 30.0,
+            "Stability should never exceed MAX_STABILITY after many retrievals"
+        );
+        assert!(
+            (s - 30.0).abs() < f64::EPSILON,
+            "Should reach exactly MAX_STABILITY"
+        );
     }
 
     #[test]

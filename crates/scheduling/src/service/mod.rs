@@ -7,6 +7,7 @@
 mod executor;
 mod store;
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use chrono::Utc;
@@ -88,7 +89,11 @@ pub type JobCallback = Arc<dyn Fn(&CronJob) -> Result<Option<String>> + Send + S
 /// Service for managing and executing scheduled jobs (SQL-only via CronRepo).
 pub struct CronService {
     pub(crate) store: Arc<RwLock<CronStore>>,
+    /// Fallback callback for job names without a registered handler.
     pub(crate) on_job: Option<JobCallback>,
+    /// Named handlers — checked first before falling back to `on_job`.
+    /// Wrapped in `Arc` when the timer loop starts (see `start_timer_loop`).
+    pub(crate) handlers: HashMap<String, JobCallback>,
     pub(crate) running: Arc<RwLock<bool>>,
     pub(crate) timer_task: Arc<RwLock<Option<JoinHandle<()>>>>,
     /// SQL backend for persistence. Always `Some` in production; `None` only in
@@ -104,6 +109,7 @@ impl CronService {
         Self {
             store: Arc::new(RwLock::new(CronStore::default())),
             on_job: None,
+            handlers: HashMap::new(),
             running: Arc::new(RwLock::new(false)),
             timer_task: Arc::new(RwLock::new(None)),
             repo: Some(repo),
@@ -117,6 +123,7 @@ impl CronService {
         Self {
             store: Arc::new(RwLock::new(CronStore::default())),
             on_job: None,
+            handlers: HashMap::new(),
             running: Arc::new(RwLock::new(false)),
             timer_task: Arc::new(RwLock::new(None)),
             repo: None,
@@ -124,9 +131,19 @@ impl CronService {
         }
     }
 
-    /// Set the job execution callback
+    /// Set the fallback callback for job names without a named handler.
     pub fn set_callback(&mut self, callback: JobCallback) {
         self.on_job = Some(callback);
+    }
+
+    /// Register a named handler for a specific job name.
+    ///
+    /// Named handlers are checked first during execution; `set_callback`
+    /// provides the fallback for unregistered names.
+    ///
+    /// Must be called before `start()` (takes `&mut self`).
+    pub fn register_handler(&mut self, name: impl Into<String>, callback: JobCallback) {
+        self.handlers.insert(name.into(), callback);
     }
 
     /// Recompute next run times for all enabled jobs
@@ -165,6 +182,7 @@ impl CronService {
         let store = self.store.clone();
         let repo = self.repo.clone();
         let on_job = self.on_job.clone();
+        let handlers = Arc::new(self.handlers.clone());
         let running = self.running.clone();
         let wake = self.wake.clone();
 
@@ -204,7 +222,7 @@ impl CronService {
                 let next_wake_ms = CronService::next_wake_ms_static(&store).await;
                 if let Some(next_wake) = next_wake_ms {
                     if now_ms() >= next_wake {
-                        CronService::process_due_jobs(&store, &repo, &on_job).await;
+                        CronService::process_due_jobs(&store, &repo, &handlers, &on_job).await;
                     }
                 }
             }

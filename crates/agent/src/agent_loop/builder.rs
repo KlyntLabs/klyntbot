@@ -267,10 +267,8 @@ impl AgentLoopBuilder {
                             Arc::new(crate::cognitive_handlers::HeuristicConsolidationHandler),
                         )
                     };
-                    let episodic_repo =
-                        cognitive::EpisodicMemoryRepo::new(pool.clone());
-                    let accum_repo =
-                        cognitive::AccumulatedObservationRepo::new(pool.clone());
+                    let episodic_repo = cognitive::EpisodicMemoryRepo::new(pool.clone());
+                    let accum_repo = cognitive::AccumulatedObservationRepo::new(pool.clone());
                     let cancel = CancellationToken::new();
                     let bg_service = cognitive::background::BackgroundConsolidationService::start(
                         event_rx,
@@ -442,8 +440,7 @@ impl AgentLoopBuilder {
 
         // ── Wire automatic memory retrieval (CognitiveMemoryRetriever) ───
         let context_engine = if let Some(ref recall) = recall_service {
-            let retriever =
-                Arc::new(cognitive::CognitiveMemoryRetriever::new(Arc::clone(recall)));
+            let retriever = Arc::new(cognitive::CognitiveMemoryRetriever::new(Arc::clone(recall)));
             context_engine.with_memory_retriever(retriever)
         } else {
             context_engine
@@ -572,9 +569,7 @@ impl AgentLoopBuilder {
                     .with_threshold(config.conversation.search.semantic_threshold)
                     .with_rrf_k(config.todo.search.rrf_k);
 
-                if let (Some(ref h), Some(ref vs)) =
-                    (&todo_embedding_handler, &self.vector_store)
-                {
+                if let (Some(ref h), Some(ref vs)) = (&todo_embedding_handler, &self.vector_store) {
                     memory_tool = memory_tool
                         .with_todo_embedding_handler(Arc::clone(h))
                         .with_embedding_store(vs.clone());

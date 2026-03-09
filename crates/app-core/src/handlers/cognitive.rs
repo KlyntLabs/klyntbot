@@ -20,16 +20,16 @@ pub(crate) fn build_reflection_handlers(
     Box<dyn cognitive::ReflectionHandler>,
     Box<dyn cognitive::ConsolidationHandler>,
 ) {
-    let reflection: Box<dyn cognitive::ReflectionHandler> =
-        if let Some(ref cp) = cognitive_provider {
-            let params = providers::cognitive_chat_params(config, 2048);
-            Box::new(agent::cognitive_handlers::LlmReflectionHandler::new(
-                cp.clone(),
-                params,
-            ))
-        } else {
-            Box::new(agent::cognitive_handlers::HeuristicReflectionHandler)
-        };
+    let reflection: Box<dyn cognitive::ReflectionHandler> = if let Some(ref cp) = cognitive_provider
+    {
+        let params = providers::cognitive_chat_params(config, 2048);
+        Box::new(agent::cognitive_handlers::LlmReflectionHandler::new(
+            cp.clone(),
+            params,
+        ))
+    } else {
+        Box::new(agent::cognitive_handlers::HeuristicReflectionHandler)
+    };
 
     let consolidation: Box<dyn cognitive::ConsolidationHandler> =
         if let Some(ref cp) = cognitive_provider {
@@ -137,7 +137,10 @@ impl AppCore {
 
         let all_facts = match domain.as_deref() {
             Some(d) => fact_repo.list_active(d).await.map_err(map_cognitive_err)?,
-            None => fact_repo.list_all_active().await.map_err(map_cognitive_err)?,
+            None => fact_repo
+                .list_all_active()
+                .await
+                .map_err(map_cognitive_err)?,
         };
 
         Ok(all_facts.iter().map(fact_to_response).collect())
@@ -157,10 +160,7 @@ impl AppCore {
                 .list_by_domain(d, limit)
                 .await
                 .map_err(map_cognitive_err)?,
-            None => repo
-                .list_recent(limit)
-                .await
-                .map_err(map_cognitive_err)?,
+            None => repo.list_recent(limit).await.map_err(map_cognitive_err)?,
         };
 
         Ok(memories
@@ -213,15 +213,9 @@ impl AppCore {
         // a destructive mutation and must NOT be used for reads.
         let archived = 0u64;
 
-        let episodic_count = episodic_repo
-            .count_all()
-            .await
-            .unwrap_or(0) as usize;
+        let episodic_count = episodic_repo.count_all().await.unwrap_or(0) as usize;
 
-        let rules_count = rule_repo
-            .count_all_active()
-            .await
-            .unwrap_or(0) as usize;
+        let rules_count = rule_repo.count_all_active().await.unwrap_or(0) as usize;
 
         Ok(MemoryStatsResponse {
             active_facts,
@@ -648,10 +642,7 @@ impl AppCore {
                 score: payload["score"].as_f64().unwrap_or(0.0),
             },
             "ChatTurnCompleted" => bus::DomainEvent::ChatTurnCompleted {
-                user_message: payload["user_message"]
-                    .as_str()
-                    .unwrap_or("")
-                    .to_string(),
+                user_message: payload["user_message"].as_str().unwrap_or("").to_string(),
                 session_key: payload["session_key"]
                     .as_str()
                     .unwrap_or("debug")

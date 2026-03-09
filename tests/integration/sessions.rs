@@ -251,8 +251,7 @@ async fn role_prefix_included_in_embedding() {
 
     // The deterministic embedding should include the role prefix
     let expected_text = "user: Test message";
-    let expected_embedding =
-        MockConversationRecallHandler::deterministic_embedding(expected_text);
+    let expected_embedding = MockConversationRecallHandler::deterministic_embedding(expected_text);
 
     let embeddings = handler.embeddings.lock().unwrap();
     let stored_embedding = embeddings.get("msg1").unwrap();

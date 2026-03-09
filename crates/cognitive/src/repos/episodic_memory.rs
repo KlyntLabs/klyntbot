@@ -82,10 +82,9 @@ impl EpisodicMemoryRepo {
 
     /// Count all episodic memories.
     pub async fn count_all(&self) -> Result<i64, sqlx::Error> {
-        let row: (i64,) =
-            sqlx::query_as("SELECT COUNT(*) FROM episodic_memories")
-                .fetch_one(&self.pool)
-                .await?;
+        let row: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM episodic_memories")
+            .fetch_one(&self.pool)
+            .await?;
         Ok(row.0)
     }
 

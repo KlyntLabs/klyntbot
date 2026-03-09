@@ -65,6 +65,13 @@ fn main() {
 
             app.manage(core);
 
+            // Show the main window now that init is complete (starts hidden
+            // via tauri.conf.json to avoid a blank window during boot).
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+
             // Build system tray icon — click toggles the tray popup window
             let tray_icon = Image::from_bytes(include_bytes!("../icons/tray.png"))
                 .expect("failed to load tray icon");

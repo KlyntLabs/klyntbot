@@ -290,16 +290,14 @@ pub(crate) async fn dispatch_dev(
                     .await,
             )
         }
-        "productivity_focus_start" => {
-            dev::val(
-                core.productivity_focus_start(
-                    dev::get(body, "action_id"),
-                    dev::get(body, "project_id"),
-                    dev::get(body, "target_mins"),
-                )
-                .await,
+        "productivity_focus_start" => dev::val(
+            core.productivity_focus_start(
+                dev::get(body, "action_id"),
+                dev::get(body, "project_id"),
+                dev::get(body, "target_mins"),
             )
-        }
+            .await,
+        ),
         "productivity_focus_end" => {
             dev::val(core.productivity_focus_end(dev::get(body, "notes")).await)
         }
@@ -315,19 +313,18 @@ pub(crate) async fn dispatch_dev(
             let end_date = try_field!(dev::get_str(body, "endDate"));
             dev::val(core.productivity_summary_range(start_date, end_date).await)
         }
-        "productivity_activity_feed" => {
-            dev::val(core.productivity_activity_feed(dev::get(body, "limit")).await)
-        }
-        "productivity_goals" => dev::val(core.productivity_goals().await),
-        "productivity_pomodoro_start" => {
-            dev::val(
-                core.productivity_pomodoro_start(
-                    dev::get(body, "work_mins"),
-                    dev::get(body, "break_mins"),
-                )
+        "productivity_activity_feed" => dev::val(
+            core.productivity_activity_feed(dev::get(body, "limit"))
                 .await,
+        ),
+        "productivity_goals" => dev::val(core.productivity_goals().await),
+        "productivity_pomodoro_start" => dev::val(
+            core.productivity_pomodoro_start(
+                dev::get(body, "work_mins"),
+                dev::get(body, "break_mins"),
             )
-        }
+            .await,
+        ),
         "productivity_time_entries" => {
             let date = try_field!(dev::get_str(body, "date"));
             dev::val(core.productivity_time_entries(date).await)
@@ -336,7 +333,10 @@ pub(crate) async fn dispatch_dev(
             let goal_type = try_field!(dev::get_str(body, "goal_type"));
             let metric = try_field!(dev::get_str(body, "metric"));
             let target_value: f64 = try_field!(dev::require(body, "target_value"));
-            dev::val(core.productivity_goal_create(goal_type, metric, target_value).await)
+            dev::val(
+                core.productivity_goal_create(goal_type, metric, target_value)
+                    .await,
+            )
         }
         "productivity_goal_delete" => {
             let id: i64 = try_field!(dev::require(body, "id"));
@@ -386,9 +386,10 @@ pub(crate) async fn dispatch_dev(
             let id = try_field!(dev::get_str(body, "id"));
             dev::val(core.productivity_insight_dismiss(id).await)
         }
-        "productivity_auto_focus_confirm" => {
-            dev::val(core.productivity_auto_focus_confirm(try_field!(dev::parse_params(body))).await)
-        }
+        "productivity_auto_focus_confirm" => dev::val(
+            core.productivity_auto_focus_confirm(try_field!(dev::parse_params(body)))
+                .await,
+        ),
         "productivity_projects_list" => dev::val(core.productivity_projects_list().await),
         "productivity_project_upsert" => {
             let id = try_field!(dev::get_str(body, "id"));

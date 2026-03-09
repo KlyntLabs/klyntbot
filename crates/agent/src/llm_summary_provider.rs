@@ -110,10 +110,7 @@ impl LlmSummaryProvider {
 
 #[async_trait]
 impl SummaryProvider for LlmSummaryProvider {
-    async fn summarize_batch(
-        &self,
-        segments: Vec<Vec<Message>>,
-    ) -> Vec<Result<String, String>> {
+    async fn summarize_batch(&self, segments: Vec<Vec<Message>>) -> Vec<Result<String, String>> {
         if segments.is_empty() {
             return vec![];
         }

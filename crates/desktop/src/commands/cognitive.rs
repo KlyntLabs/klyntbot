@@ -260,31 +260,34 @@ pub(crate) async fn dispatch_dev(
         "cognitive_facts_list" => {
             dev::val(core.cognitive_facts_list(dev::get(body, "domain")).await)
         }
-        "cognitive_episodic_list" => {
-            dev::val(
-                core.cognitive_episodic_list(dev::get(body, "domain"), dev::get(body, "limit"))
-                    .await,
-            )
-        }
+        "cognitive_episodic_list" => dev::val(
+            core.cognitive_episodic_list(dev::get(body, "domain"), dev::get(body, "limit"))
+                .await,
+        ),
         "cognitive_rules_list" => {
             dev::val(core.cognitive_rules_list(dev::get(body, "domain")).await)
         }
         "cognitive_memory_stats" => dev::val(core.cognitive_memory_stats().await),
         "cognitive_system_status" => dev::val(core.cognitive_system_status().await),
-        "cognitive_fact_create" => {
-            dev::val(core.cognitive_fact_create(try_field!(dev::parse_params(body))).await)
-        }
+        "cognitive_fact_create" => dev::val(
+            core.cognitive_fact_create(try_field!(dev::parse_params(body)))
+                .await,
+        ),
         "cognitive_fact_update" => {
             let id = try_field!(dev::get_str(body, "id"));
-            dev::val(core.cognitive_fact_update(id, try_field!(dev::parse_params(body))).await)
+            dev::val(
+                core.cognitive_fact_update(id, try_field!(dev::parse_params(body)))
+                    .await,
+            )
         }
         "cognitive_fact_delete" => {
             let id = try_field!(dev::get_str(body, "id"));
             dev::val(core.cognitive_fact_delete(id).await)
         }
-        "cognitive_rule_create" => {
-            dev::val(core.cognitive_rule_create(try_field!(dev::parse_params(body))).await)
-        }
+        "cognitive_rule_create" => dev::val(
+            core.cognitive_rule_create(try_field!(dev::parse_params(body)))
+                .await,
+        ),
         "cognitive_rule_deactivate" => {
             let id = try_field!(dev::get_str(body, "id"));
             dev::val(core.cognitive_rule_deactivate(id).await)
@@ -307,27 +310,22 @@ pub(crate) async fn dispatch_dev(
         "coaching_feedback_stats" => dev::val(core.coaching_feedback_stats().await),
         "coaching_router_status" => dev::val(core.coaching_router_status().await),
         "coaching_pending_interventions" => dev::val(core.coaching_pending_interventions().await),
-        "coaching_reset_dismissals" => {
-            dev::val(core.coaching_reset_dismissals(dev::get(body, "trigger_name")).await)
-        }
+        "coaching_reset_dismissals" => dev::val(
+            core.coaching_reset_dismissals(dev::get(body, "trigger_name"))
+                .await,
+        ),
         "coaching_clear_signals" => dev::val(core.coaching_clear_signals().await),
-        "coaching_submit_feedback" => {
-            dev::val(
-                core.coaching_submit_feedback(
-                    dev::get(body, "intervention_id").unwrap_or_default(),
-                    dev::get(body, "response").unwrap_or_default(),
-                )
-                .await,
+        "coaching_submit_feedback" => dev::val(
+            core.coaching_submit_feedback(
+                dev::get(body, "intervention_id").unwrap_or_default(),
+                dev::get(body, "response").unwrap_or_default(),
             )
-        }
-        "coaching_report_ignored" => {
-            dev::val(
-                core.coaching_report_ignored(
-                    dev::get(body, "intervention_id").unwrap_or_default(),
-                )
+            .await,
+        ),
+        "coaching_report_ignored" => dev::val(
+            core.coaching_report_ignored(dev::get(body, "intervention_id").unwrap_or_default())
                 .await,
-            )
-        }
+        ),
         _ => return None,
     })
 }

@@ -23,8 +23,8 @@ use serde_json::Value;
 use tokio::sync::broadcast;
 use tracing::{error, info};
 
-use ::app_core::events::AppEventEmitter;
 use crate::app_core::AppCore;
+use ::app_core::events::AppEventEmitter;
 
 type SseChannels = Arc<DashMap<String, broadcast::Sender<(String, Value)>>>;
 
@@ -49,10 +49,7 @@ impl AppEventEmitter for SseEmitter {
 pub async fn start(core: Arc<AppCore>) {
     let sse_channels: SseChannels = Arc::new(DashMap::new());
 
-    let state = DevState {
-        core,
-        sse_channels,
-    };
+    let state = DevState { core, sse_channels };
 
     let app = Router::new()
         .route("/api/events/{sessionKey}", axum::routing::get(sse_handler))
@@ -215,11 +212,7 @@ async fn dispatch(
 
 /// Handle `chat_send` separately because it needs SSE channel state to relay
 /// streaming agent events back to the browser via Server-Sent Events.
-async fn dispatch_chat_send(
-    core: &AppCore,
-    body: &Value,
-    sse_channels: &SseChannels,
-) -> ApiResult {
+async fn dispatch_chat_send(core: &AppCore, body: &Value, sse_channels: &SseChannels) -> ApiResult {
     let content = match dev::get_str(body, "content") {
         Ok(v) => v,
         Err(e) => return err(e),
@@ -228,13 +221,9 @@ async fn dispatch_chat_send(
         Ok(v) => v,
         Err(e) => return err(e),
     };
-    let context: Option<desktop_shared::commands::SessionContextInput> =
-        dev::get(body, "context");
+    let context: Option<desktop_shared::commands::SessionContextInput> = dev::get(body, "context");
 
-    match core
-        .chat_send(content, session_key.clone(), context)
-        .await
-    {
+    match core.chat_send(content, session_key.clone(), context).await {
         Ok((user_msg, stream_info)) => {
             let tx = sse_channels
                 .entry(session_key)
@@ -396,8 +385,9 @@ fn domain_for_event(event: &bus::DomainEvent) -> &'static str {
         | bus::DomainEvent::FocusSessionEnded { .. }
         | bus::DomainEvent::DistractionDetected { .. }
         | bus::DomainEvent::ProductivityScoreComputed { .. } => "energy",
-        bus::DomainEvent::TransactionRecorded { .. }
-        | bus::DomainEvent::BudgetAlert { .. } => "finance",
+        bus::DomainEvent::TransactionRecorded { .. } | bus::DomainEvent::BudgetAlert { .. } => {
+            "finance"
+        }
         bus::DomainEvent::UserStatedFact { .. } => "general",
         bus::DomainEvent::UserCorrectedAI { .. } => "learning",
         bus::DomainEvent::CoachingFeedback { .. } => "coaching",

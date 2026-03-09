@@ -1,5 +1,6 @@
 //! Job execution logic — runs callbacks and updates job state.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use tokio::sync::RwLock;
@@ -10,8 +11,11 @@ use crate::types::{CronJob, CronSchedule, CronStore};
 use super::{compute_next_run, now_ms, JobCallback};
 
 /// Execute a single job and update its state in the store.
+///
+/// Named handlers are checked first by job name; `on_job` is the fallback.
 pub(crate) async fn execute_job_static(
     store: &Arc<RwLock<CronStore>>,
+    handlers: &HashMap<String, JobCallback>,
     on_job: &Option<JobCallback>,
     job: &CronJob,
 ) {
@@ -21,7 +25,10 @@ pub(crate) async fn execute_job_static(
     let status;
     let error_msg;
 
-    if let Some(callback) = on_job {
+    // Look up named handler first, then fall back to the generic callback.
+    let callback = handlers.get(&job.name).or(on_job.as_ref());
+
+    if let Some(callback) = callback {
         match callback(job) {
             Ok(_response) => {
                 status = "ok".to_string();
@@ -78,6 +85,6 @@ pub(crate) async fn execute_job_static(
 impl super::CronService {
     /// Execute a single job
     pub(crate) async fn execute_job(&self, job: &CronJob) {
-        execute_job_static(&self.store, &self.on_job, job).await;
+        execute_job_static(&self.store, &self.handlers, &self.on_job, job).await;
     }
 }

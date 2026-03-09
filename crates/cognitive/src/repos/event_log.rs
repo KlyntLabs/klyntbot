@@ -132,18 +132,15 @@ impl EventLogRepo {
     /// Delete events older than the given number of days.
     pub async fn prune_old_events(&self, older_than_days: i64) -> Result<u64, sqlx::Error> {
         let cutoff = format!("-{older_than_days} days");
-        let r1 = sqlx::query(
-            "DELETE FROM domain_event_log WHERE timestamp < datetime('now', ?1)",
-        )
-        .bind(&cutoff)
-        .execute(&self.pool)
-        .await?;
-        let r2 = sqlx::query(
-            "DELETE FROM pipeline_event_log WHERE timestamp < datetime('now', ?1)",
-        )
-        .bind(&cutoff)
-        .execute(&self.pool)
-        .await?;
+        let r1 = sqlx::query("DELETE FROM domain_event_log WHERE timestamp < datetime('now', ?1)")
+            .bind(&cutoff)
+            .execute(&self.pool)
+            .await?;
+        let r2 =
+            sqlx::query("DELETE FROM pipeline_event_log WHERE timestamp < datetime('now', ?1)")
+                .bind(&cutoff)
+                .execute(&self.pool)
+                .await?;
         Ok(r1.rows_affected() + r2.rows_affected())
     }
 }

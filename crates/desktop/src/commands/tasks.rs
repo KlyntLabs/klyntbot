@@ -125,16 +125,14 @@ pub(crate) async fn dispatch_dev(
 ) -> Option<Result<serde_json::Value, ApiError>> {
     use super::dev_helpers::{self as dev, try_field};
     Some(match cmd {
-        "task_list" => {
-            dev::val(
-                core.task_list(
-                    dev::get(body, "area_id"),
-                    dev::get(body, "project_id"),
-                    dev::get(body, "status"),
-                )
-                .await,
+        "task_list" => dev::val(
+            core.task_list(
+                dev::get(body, "area_id"),
+                dev::get(body, "project_id"),
+                dev::get(body, "status"),
             )
-        }
+            .await,
+        ),
         "task_get" => {
             let id = try_field!(dev::get_str(body, "id"));
             dev::val(core.task_get(id).await)
@@ -154,12 +152,11 @@ pub(crate) async fn dispatch_dev(
             dev::val(core.task_list_children(parent_id).await)
         }
         "today_tasks" => dev::val(core.today_tasks().await),
-        "project_list" => {
-            dev::val(core.project_list_for_tasks(dev::get(body, "area_id")).await)
-        }
-        "objective_list" => {
-            dev::val(core.objective_list_for_tasks(dev::get(body, "project_id")).await)
-        }
+        "project_list" => dev::val(core.project_list_for_tasks(dev::get(body, "area_id")).await),
+        "objective_list" => dev::val(
+            core.objective_list_for_tasks(dev::get(body, "project_id"))
+                .await,
+        ),
         _ => return None,
     })
 }

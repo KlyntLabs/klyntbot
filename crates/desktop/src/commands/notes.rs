@@ -237,12 +237,14 @@ pub(crate) async fn dispatch_dev(
             dev::val(core.note_save_attachment(data, filename).await)
         }
         "notebook_list" => dev::val(core.notebook_list().await),
-        "notebook_create" => {
-            dev::val_rh(core.notebook_create(try_field!(dev::parse_params(body))).await)
-        }
-        "notebook_update" => {
-            dev::val_rh(core.notebook_update(try_field!(dev::parse_params(body))).await)
-        }
+        "notebook_create" => dev::val_rh(
+            core.notebook_create(try_field!(dev::parse_params(body)))
+                .await,
+        ),
+        "notebook_update" => dev::val_rh(
+            core.notebook_update(try_field!(dev::parse_params(body)))
+                .await,
+        ),
         "notebook_delete" => {
             let id = try_field!(dev::get_str(body, "id"));
             dev::val_rh(core.notebook_delete(id).await)

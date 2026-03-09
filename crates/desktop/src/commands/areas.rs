@@ -58,8 +58,13 @@ pub async fn area_reorder(
 // ── Dev server dispatch ─────────────────────────────────────────────
 
 #[cfg(test)]
-pub(crate) const DEV_COMMANDS: &[&str] =
-    &["area_list", "area_create", "area_update", "area_delete", "area_reorder"];
+pub(crate) const DEV_COMMANDS: &[&str] = &[
+    "area_list",
+    "area_create",
+    "area_update",
+    "area_delete",
+    "area_reorder",
+];
 
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(
@@ -78,7 +83,10 @@ pub(crate) async fn dispatch_dev(
         }
         "area_reorder" => {
             let id = try_field!(dev::get_str(body, "id"));
-            dev::val_rh(core.area_reorder(id, dev::get(body, "position").unwrap_or(0)).await)
+            dev::val_rh(
+                core.area_reorder(id, dev::get(body, "position").unwrap_or(0))
+                    .await,
+            )
         }
         _ => return None,
     })

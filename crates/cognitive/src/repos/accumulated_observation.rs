@@ -58,12 +58,12 @@ impl AccumulatedObservationRepo {
 
         let mut map: HashMap<String, PersistedAccumulatedEntry> = HashMap::new();
         for row in rows {
-            let entry = map
-                .entry(row.event_type_key)
-                .or_insert_with(|| PersistedAccumulatedEntry {
-                    observations: Vec::new(),
-                    days_seen: HashSet::new(),
-                });
+            let entry =
+                map.entry(row.event_type_key)
+                    .or_insert_with(|| PersistedAccumulatedEntry {
+                        observations: Vec::new(),
+                        days_seen: HashSet::new(),
+                    });
             entry.days_seen.insert(row.day_key);
 
             let timestamp = row
@@ -111,10 +111,11 @@ impl AccumulatedObservationRepo {
 
     /// Delete all observations for an event type (after promotion).
     pub async fn delete_by_key(&self, event_type_key: &str) {
-        if let Err(e) = sqlx::query("DELETE FROM accumulated_observations WHERE event_type_key = ?1")
-            .bind(event_type_key)
-            .execute(&self.pool)
-            .await
+        if let Err(e) =
+            sqlx::query("DELETE FROM accumulated_observations WHERE event_type_key = ?1")
+                .bind(event_type_key)
+                .execute(&self.pool)
+                .await
         {
             warn!("Failed to delete accumulated observations for '{event_type_key}': {e}");
         }

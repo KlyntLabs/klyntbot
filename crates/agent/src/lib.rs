@@ -17,8 +17,6 @@ pub mod enrichment;
 pub mod events;
 #[cfg(test)]
 mod events_tests;
-#[cfg(test)]
-mod notes_integration_tests;
 pub mod execution;
 pub mod finance_adapter;
 pub mod intent_pipeline;
@@ -26,6 +24,8 @@ pub mod learning;
 pub mod learning_handler;
 pub mod llm_summary_provider;
 pub mod memory_maintenance_service;
+#[cfg(test)]
+mod notes_integration_tests;
 pub mod notifications;
 pub mod output;
 pub mod persona;
@@ -39,9 +39,9 @@ pub mod todo_embedding_handler;
 
 pub use agent_loop::{AgentLoop, StreamingHandle};
 pub use agent_runtime::{AgentRuntime, RuntimeResult};
+pub use cognitive_embedder::TextEmbedderImpl;
 pub use confidence::{ConfidenceAssessment, ConfidenceEvaluator, DecisionAction, DecisionLogger};
 pub use context_sources::ConfidenceSource;
-pub use cognitive_embedder::TextEmbedderImpl;
 pub use conversation_recall_handler::ConversationRecallHandlerImpl;
 pub use cron_handler_adapter::CronHandlerAdapter;
 pub use enrichment::EnrichmentEngine;

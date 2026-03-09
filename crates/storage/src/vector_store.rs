@@ -899,7 +899,10 @@ mod tests {
 
         assert_eq!(store.count("todo_embeddings").await.unwrap(), 2);
 
-        let deduped = store.dedup_table("todo_embeddings", "updated_at").await.unwrap();
+        let deduped = store
+            .dedup_table("todo_embeddings", "updated_at")
+            .await
+            .unwrap();
         assert_eq!(deduped, 1); // 1 ID had duplicates
 
         assert_eq!(store.count("todo_embeddings").await.unwrap(), 1);
@@ -921,7 +924,10 @@ mod tests {
 
         assert_eq!(store.count("todo_embeddings").await.unwrap(), 2);
 
-        let deduped = store.dedup_table("todo_embeddings", "updated_at").await.unwrap();
+        let deduped = store
+            .dedup_table("todo_embeddings", "updated_at")
+            .await
+            .unwrap();
         assert_eq!(deduped, 0);
         assert_eq!(store.count("todo_embeddings").await.unwrap(), 2);
     }

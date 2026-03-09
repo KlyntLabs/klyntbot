@@ -63,16 +63,17 @@ const DEFAULT_MEMORY_RETRIEVAL_LIMIT: usize = 5;
 /// Maximum number of entries in the context assembly cache.
 const DEFAULT_CACHE_CAPACITY: usize = 8;
 
-/// Bounded cache for assembled contexts, keyed by a hash of the request inputs.
+/// Bounded LRU cache for assembled contexts, keyed by SHA-256 of request inputs.
+///
+/// The cache key captures all relevant state (system prompt, history, message,
+/// strategy, tools, context window), so entries naturally expire when inputs change.
+/// No explicit invalidation is needed — tool execution appends to history,
+/// changing the cache key.
 struct ContextCache {
     entries: HashMap<String, AssembledContext>,
     /// Insertion order for eviction (oldest first). VecDeque for O(1) pop_front.
     order: VecDeque<String>,
     capacity: usize,
-    /// Generation counter — incremented on invalidation.
-    generation: u64,
-    /// Generation at which each entry was inserted.
-    entry_generations: HashMap<String, u64>,
 }
 
 impl ContextCache {
@@ -81,17 +82,10 @@ impl ContextCache {
             entries: HashMap::with_capacity(capacity),
             order: VecDeque::with_capacity(capacity),
             capacity,
-            generation: 0,
-            entry_generations: HashMap::with_capacity(capacity),
         }
     }
 
     fn get(&self, key: &str) -> Option<&AssembledContext> {
-        // Only return if entry is from the current generation
-        let entry_gen = self.entry_generations.get(key)?;
-        if *entry_gen < self.generation {
-            return None;
-        }
         self.entries.get(key)
     }
 
@@ -100,18 +94,12 @@ impl ContextCache {
             // Evict oldest — O(1) with VecDeque
             if let Some(oldest_key) = self.order.pop_front() {
                 self.entries.remove(&oldest_key);
-                self.entry_generations.remove(&oldest_key);
             }
         }
         if !self.order.contains(&key) {
             self.order.push_back(key.clone());
         }
-        self.entries.insert(key.clone(), value);
-        self.entry_generations.insert(key, self.generation);
-    }
-
-    fn invalidate(&mut self) {
-        self.generation += 1;
+        self.entries.insert(key, value);
     }
 }
 
@@ -241,14 +229,6 @@ impl ContextEngine {
             .collect();
 
         sections.join("\n\n---\n\n")
-    }
-
-    /// Invalidate the assembled context cache.
-    ///
-    /// Call this after tool executions or config changes that affect
-    /// the context assembly output.
-    pub async fn invalidate_cache(&self) {
-        self.cache.lock().await.invalidate();
     }
 
     pub async fn assemble(&self, request: ContextRequest) -> AssembledContext {

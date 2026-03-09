@@ -48,10 +48,7 @@ impl ConversationRecallHandler for ConversationRecallHandlerImpl {
         limit: usize,
         threshold: f64,
     ) -> common::Result<Vec<RecallSearchResult>> {
-        let results = self
-            .service
-            .search(query, limit, threshold as f32)
-            .await?;
+        let results = self.service.search(query, limit, threshold as f32).await?;
 
         Ok(results
             .into_iter()
