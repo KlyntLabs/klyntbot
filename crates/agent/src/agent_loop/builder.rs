@@ -59,6 +59,7 @@ pub struct AgentLoopBuilder {
     domain_event_bus: Option<Arc<bus::DomainEventBus>>,
     cognitive_provider: Option<DynProvider>,
     pipeline_tx: Option<tokio::sync::broadcast::Sender<cognitive::PipelineEvent>>,
+    user_situation: Option<Arc<tokio::sync::Mutex<cognitive::situation::UserSituation>>>,
 }
 
 impl AgentLoopBuilder {
@@ -74,6 +75,7 @@ impl AgentLoopBuilder {
             domain_event_bus: None,
             cognitive_provider: None,
             pipeline_tx: None,
+            user_situation: None,
         }
     }
 
@@ -112,6 +114,14 @@ impl AgentLoopBuilder {
         tx: tokio::sync::broadcast::Sender<cognitive::PipelineEvent>,
     ) -> Self {
         self.pipeline_tx = Some(tx);
+        self
+    }
+
+    pub fn with_user_situation(
+        mut self,
+        situation: Arc<tokio::sync::Mutex<cognitive::situation::UserSituation>>,
+    ) -> Self {
+        self.user_situation = Some(situation);
         self
     }
 
@@ -236,12 +246,15 @@ impl AgentLoopBuilder {
                     min_similarity: config.cognitive.min_similarity,
                 };
 
-                sources.push(Box::new(
+                let mut cog_source =
                     cognitive::CognitiveContextSource::new(fact_repo.clone(), rule_repo)
                         .with_embedder_opt(cognitive_embedder.clone())
                         .with_config(retrieval_config)
-                        .with_confidence_threshold(Arc::clone(&confidence_bits)),
-                ));
+                        .with_confidence_threshold(Arc::clone(&confidence_bits));
+                if let Some(ref sit) = self.user_situation {
+                    cog_source = cog_source.with_situation(Arc::clone(sit));
+                }
+                sources.push(Box::new(cog_source));
 
                 // Start background consolidation service if we have a DomainEventBus
                 if let Some(ref domain_bus) = self.domain_event_bus {

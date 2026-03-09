@@ -259,6 +259,8 @@ pub async fn focus_timer_start(
     break_mins: Option<u64>,
     action_id: Option<String>,
     action_title: Option<String>,
+    sound_enabled: Option<bool>,
+    notification_enabled: Option<bool>,
 ) -> Result<FocusSessionResponse, ApiError> {
     let timer_mode = match mode.as_str() {
         "pomodoro" => TimerMode::Pomodoro,
@@ -283,7 +285,15 @@ pub async fn focus_timer_start(
 
     // Then start the desktop timer (tray title + countdown)
     timer
-        .start(app, timer_mode, work_mins, break_mins, action_title)
+        .start(
+            app,
+            timer_mode,
+            work_mins,
+            break_mins,
+            action_title,
+            sound_enabled.unwrap_or(true),
+            notification_enabled.unwrap_or(true),
+        )
         .await
         .map_err(|e| ApiError::new("TIMER_ERROR", e.to_string()))?;
 
@@ -298,8 +308,13 @@ pub async fn focus_timer_stop(
     notes: Option<String>,
 ) -> Result<Option<FocusSessionResponse>, ApiError> {
     timer.stop(&app).await;
-    // During a break there's no active focus session — don't error in that case
-    Ok(state.productivity_focus_end(notes).await.unwrap_or(None))
+    // Try ending a focus/pomodoro session first, then try a break session
+    let focus_result = state.productivity_focus_end(notes).await.unwrap_or(None);
+    if focus_result.is_some() {
+        return Ok(focus_result);
+    }
+    // During a break, end the break session instead
+    Ok(state.productivity_break_end().await.unwrap_or(None))
 }
 
 #[tauri::command]
@@ -321,10 +336,14 @@ pub async fn focus_timer_status(
 
 #[tauri::command(rename_all = "snake_case")]
 pub async fn focus_break_start(
+    state: State<'_, Arc<AppCore>>,
     timer: State<'_, Arc<FocusTimer>>,
     app: tauri::AppHandle,
     break_mins: u64,
 ) -> Result<(), ApiError> {
+    // Persist break session to SQLite so it appears in daily summaries
+    state.productivity_break_start(break_mins as i64).await?;
+
     timer
         .start_break(app, break_mins)
         .await

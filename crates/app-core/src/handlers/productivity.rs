@@ -319,6 +319,27 @@ impl AppCore {
         Ok(session_to_response(session))
     }
 
+    pub async fn productivity_break_start(
+        &self,
+        break_mins: i64,
+    ) -> Result<FocusSessionResponse, ApiError> {
+        let focus_mgr = self.focus_manager()?;
+        let session = focus_mgr
+            .start_break_session(break_mins)
+            .await
+            .map_err(map_prod_err)?;
+        Ok(session_to_response(session))
+    }
+
+    pub async fn productivity_break_end(&self) -> Result<Option<FocusSessionResponse>, ApiError> {
+        let focus_mgr = self.focus_manager()?;
+        let session = focus_mgr
+            .end_break_session()
+            .await
+            .map_err(map_prod_err)?;
+        Ok(session.map(session_to_response))
+    }
+
     pub async fn productivity_time_entries(
         &self,
         date: String,

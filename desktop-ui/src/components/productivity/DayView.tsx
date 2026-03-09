@@ -80,11 +80,11 @@ export function DayView({ date }: DayViewProps) {
       {/* Row 2-3: Left column */}
       <div className="flex flex-col gap-4">
         <ActivityFeed />
+        <FocusSessionsList date={date} />
       </div>
 
       {/* Row 2-3: Center column */}
       <div className="flex flex-col gap-4">
-        <FocusSessionsList date={date} />
         <TopApps apps={summary?.topApps ?? []} />
         <ProjectsCard
           projects={summary?.topProjects ?? []}

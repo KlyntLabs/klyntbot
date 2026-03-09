@@ -144,6 +144,11 @@ impl AppCore {
         // 8. DomainEventBus for cross-feature communication (cognitive + coaching)
         let domain_event_bus = Arc::new(DomainEventBus::new(256));
 
+        // Pre-create user situation (defaults now, recomputed with real data below
+        // and every 2 min afterwards). Shared with CognitiveContextSource for
+        // situational_boost in memory retrieval.
+        let user_situation = Arc::new(Mutex::new(UserSituation::default()));
+
         // 8. Build AgentLoop
         let (pipeline_broadcast_tx, _) =
             tokio::sync::broadcast::channel::<cognitive::PipelineEvent>(256);
@@ -154,7 +159,8 @@ impl AppCore {
             .with_notification_handle(notification_dispatcher.last_active_handle())
             .with_domain_bus(Arc::clone(&domain_event_bus))
             .with_cognitive_provider(cognitive_provider.clone())
-            .with_pipeline_tx(pipeline_tx);
+            .with_pipeline_tx(pipeline_tx)
+            .with_user_situation(user_situation.clone());
 
         if let Some(vs) = vector_store {
             builder = builder.with_vector_store(vs);
@@ -274,14 +280,17 @@ impl AppCore {
         let mut tracker = FeedbackTracker::new().with_repo(coaching_repo);
         tracker.load_from_db().await;
         let feedback_tracker = Arc::new(Mutex::new(tracker));
-        // Compute initial user situation from real productivity data.
-        let initial_situation = build_situation_inputs(
-            productivity_repos.as_ref(),
-            &repos,
-            None, // no router yet
-        )
-        .await;
-        let user_situation = Arc::new(Mutex::new(initial_situation));
+
+        // Compute real user situation now that productivity_repos is available.
+        {
+            let real_situation = build_situation_inputs(
+                productivity_repos.as_ref(),
+                &repos,
+                None, // router just created, no dismissals yet
+            )
+            .await;
+            *user_situation.lock().await = real_situation;
+        }
 
         // Start CoachingService — processes domain events through coaching pipeline.
         let coaching_reasoner: Arc<dyn feature_coaching::CoachingReasonerHandler> =

@@ -157,6 +157,53 @@ impl FocusManager {
         }
     }
 
+    /// Start a break session so it appears in daily summaries.
+    pub async fn start_break_session(
+        &self,
+        break_mins: i64,
+    ) -> common::Result<FocusSession> {
+        // End any lingering active session first (defensive)
+        let _ = self.end_session(None).await;
+
+        let session = FocusSession {
+            id: Uuid::new_v4().to_string(),
+            action_id: None,
+            project_id: None,
+            session_type: SessionType::Break,
+            target_mins: Some(break_mins),
+            started_at: Utc::now(),
+            ended_at: None,
+            actual_mins: None,
+            interruptions: 0,
+            distraction_events: vec![],
+            quality_score: None,
+            completed: false,
+            notes: None,
+            source: SessionSource::Pomodoro,
+        };
+
+        self.repos.sessions.create(&session).await?;
+        Ok(session)
+    }
+
+    /// End the active break session.
+    pub async fn end_break_session(&self) -> common::Result<Option<FocusSession>> {
+        let Some(mut session) = self.repos.sessions.get_active().await? else {
+            return Ok(None);
+        };
+        if session.session_type != SessionType::Break {
+            return Ok(None);
+        }
+
+        let now = Utc::now();
+        session.ended_at = Some(now);
+        session.actual_mins = Some((now - session.started_at).num_minutes());
+        session.completed = true;
+        // No quality score for breaks
+        self.repos.sessions.update(&session).await?;
+        Ok(Some(session))
+    }
+
     /// Get the currently active focus session, if any.
     pub async fn get_active(&self) -> common::Result<Option<FocusSession>> {
         self.repos.sessions.get_active().await

@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { todayISO } from "../lib/dates";
 import type {
   FocusCompletedPayload,
   FocusSession,
@@ -12,7 +13,6 @@ import { useQuery } from "./useQuery";
 // ── Settings persistence ────────────────────────────────────────────
 
 const SETTINGS_KEY = "klynt:focus:settings";
-const SESSIONS_KEY = "klynt:focus:completedSessions";
 
 export interface FocusSettings {
   focusDuration: number; // work session (minutes)
@@ -20,6 +20,8 @@ export interface FocusSettings {
   longBreak: number; // long break (minutes)
   longBreakAfter: number; // sessions before long break
   dndEnabled: boolean; // macOS Do Not Disturb
+  soundEnabled: boolean; // play sound on completion
+  notificationEnabled: boolean; // show OS notification on completion
 }
 
 const DEFAULT_SETTINGS: FocusSettings = {
@@ -28,7 +30,21 @@ const DEFAULT_SETTINGS: FocusSettings = {
   longBreak: 15,
   longBreakAfter: 4,
   dndEnabled: false,
+  soundEnabled: true,
+  notificationEnabled: true,
 };
+
+export interface FocusPreset {
+  label: string;
+  focusDuration: number;
+  shortBreak: number;
+}
+
+export const FOCUS_PRESETS: FocusPreset[] = [
+  { label: "Standard", focusDuration: 25, shortBreak: 5 },
+  { label: "Deep Work", focusDuration: 50, shortBreak: 10 },
+  { label: "Sprint", focusDuration: 15, shortBreak: 3 },
+];
 
 function loadSettings(): FocusSettings {
   try {
@@ -48,25 +64,16 @@ function saveSettings(s: FocusSettings) {
   }
 }
 
-function loadSessions(): number {
-  try {
-    return Number.parseInt(localStorage.getItem(SESSIONS_KEY) || "0", 10);
-  } catch {
-    return 0;
-  }
-}
-
-function saveSessions(n: number) {
-  try {
-    localStorage.setItem(SESSIONS_KEY, String(n));
-  } catch {
-    /* noop */
-  }
-}
-
 // ── Phase state machine ─────────────────────────────────────────────
 
 export type FocusPhase = "idle" | "focus" | "break_pending" | "break";
+
+// ── Coaching intervention ────────────────────────────────────────────
+
+interface CoachingIntervention {
+  message: string;
+  interventionType: string;
+}
 
 // ── Hook ────────────────────────────────────────────────────────────
 
@@ -85,6 +92,8 @@ export function useFocusTimer() {
       break_mins?: number;
       action_id?: string;
       action_title?: string;
+      sound_enabled?: boolean;
+      notification_enabled?: boolean;
     }
   >("focus_timer_start");
   const stopTimer = useMutation<FocusSession | null, { notes?: string }>("focus_timer_stop");
@@ -92,6 +101,14 @@ export function useFocusTimer() {
   const extendMut = useMutation<boolean, { extra_secs: number }>("focus_timer_extend");
   const pauseMut = useMutation<boolean, Record<string, never>>("focus_timer_pause");
   const resumeMut = useMutation<boolean, Record<string, never>>("focus_timer_resume");
+  const logDistractionMut = useMutation<void, { app_name: string }>("distraction_dismiss");
+
+  const [todayDate] = useState(todayISO);
+  const { data: todaySessions, refetch: refetchToday } = useQuery<FocusSession[]>(
+    "productivity_sessions",
+    { date: todayDate },
+    [],
+  );
 
   const [phase, setPhase] = useState<FocusPhase>("idle");
   const [paused, setPaused] = useState(false);
@@ -99,9 +116,9 @@ export function useFocusTimer() {
   const [totalSecs, setTotalSecs] = useState<number | null>(null);
   const [completed, setCompleted] = useState<FocusCompletedPayload | null>(null);
   const [settings, setSettings] = useState(loadSettings);
-  const [completedSessions, setCompletedSessions] = useState(loadSessions);
   const [actionTitle, setActionTitle] = useState<string | null>(null);
   const [selectedTask, setSelectedTask] = useState<{ id: string; title: string } | null>(null);
+  const [coaching, setCoaching] = useState<CoachingIntervention | null>(null);
   const autoBreakTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Stable refs for mutation functions used in effects/timeouts
@@ -109,6 +126,8 @@ export function useFocusTimer() {
   breakStartRef.current = breakStartMut.mutate;
   const refetchRef = useRef(refetch);
   refetchRef.current = refetch;
+  const refetchTodayRef = useRef(refetchToday);
+  refetchTodayRef.current = refetchToday;
 
   // Real-time tick events from Rust timer
   useEvent<FocusTickPayload>("focus:tick", (payload) => {
@@ -117,6 +136,13 @@ export function useFocusTimer() {
       setTotalSecs(payload.totalSecs);
       setPaused(payload.paused);
       setActionTitle(payload.actionTitle ?? null);
+    }
+  });
+
+  // Coaching intervention after focus completion
+  useEvent<CoachingIntervention>("coaching:intervention", (payload) => {
+    if (payload?.message) {
+      setCoaching(payload);
     }
   });
 
@@ -132,13 +158,9 @@ export function useFocusTimer() {
         setPhase("idle");
       } else {
         setPhase("break_pending");
-        setCompletedSessions((prev) => {
-          const next = prev + 1;
-          saveSessions(next);
-          return next;
-        });
       }
       refetch();
+      refetchToday();
     }
   });
 
@@ -178,19 +200,40 @@ export function useFocusTimer() {
     });
   }, []);
 
+  // Derive session count + today stats from SQLite in a single pass
+  const { completedSessions, todayStats } = useMemo(() => {
+    let sessions = 0;
+    let totalMins = 0;
+    let qualitySum = 0;
+    let qualityCount = 0;
+    for (const s of todaySessions) {
+      if (!s.completed) continue;
+      sessions++;
+      totalMins += s.actualMins ?? 0;
+      if (s.qualityScore != null) {
+        qualitySum += s.qualityScore;
+        qualityCount++;
+      }
+    }
+    return {
+      completedSessions: sessions,
+      todayStats: {
+        sessions,
+        totalMins,
+        avgQuality: qualityCount > 0 ? qualitySum / qualityCount : null,
+      },
+    };
+  }, [todaySessions]);
+
   // Shared helper: reset cycle if needed and start a focus timer
   const launchFocus = useCallback(
     async (workMins: number) => {
       setCompleted(null);
+      setCoaching(null);
       setPaused(false);
       setPhase("focus");
-      let sessions = completedSessions;
-      if (sessions >= settings.longBreakAfter) {
-        sessions = 0;
-        setCompletedSessions(0);
-        saveSessions(0);
-      }
-      const nextIsLongBreak = sessions + 1 >= settings.longBreakAfter;
+      const cyclePosition = completedSessions % settings.longBreakAfter;
+      const nextIsLongBreak = cyclePosition + 1 >= settings.longBreakAfter;
       const breakMins = nextIsLongBreak ? settings.longBreak : settings.shortBreak;
       await startTimer.mutate({
         mode: "focus",
@@ -198,6 +241,8 @@ export function useFocusTimer() {
         break_mins: breakMins,
         action_id: selectedTask?.id,
         action_title: selectedTask?.title,
+        sound_enabled: settings.soundEnabled,
+        notification_enabled: settings.notificationEnabled,
       });
       refetch();
     },
@@ -220,8 +265,9 @@ export function useFocusTimer() {
       setActionTitle(null);
       setSelectedTask(null);
       refetch();
+      refetchToday();
     },
-    [stopTimer, refetch],
+    [stopTimer, refetch, refetchToday],
   );
 
   const pause = useCallback(async () => {
@@ -247,12 +293,8 @@ export function useFocusTimer() {
   // Stop focus early and go straight to break
   const takeBreak = useCallback(async () => {
     await stopTimer.mutate({});
-    setCompletedSessions((prev) => {
-      const next = prev + 1;
-      saveSessions(next);
-      return next;
-    });
-    const nextIsLongBreak = completedSessions + 1 >= settings.longBreakAfter;
+    const cyclePosition = completedSessions % settings.longBreakAfter;
+    const nextIsLongBreak = cyclePosition + 1 >= settings.longBreakAfter;
     const breakMins = nextIsLongBreak ? settings.longBreak : settings.shortBreak;
     setPhase("break");
     setCompleted(null);
@@ -268,6 +310,13 @@ export function useFocusTimer() {
     [extendMut],
   );
 
+  const logDistraction = useCallback(
+    async (category: string) => {
+      await logDistractionMut.mutate({ app_name: category });
+    },
+    [logDistractionMut],
+  );
+
   const extendWork = useCallback(
     async (mins: number = 5) => {
       if (autoBreakTimer.current) clearTimeout(autoBreakTimer.current);
@@ -281,10 +330,12 @@ export function useFocusTimer() {
         break_mins: breakMins,
         action_id: selectedTask?.id,
         action_title: selectedTask?.title,
+        sound_enabled: settings.soundEnabled,
+        notification_enabled: settings.notificationEnabled,
       });
       refetch();
     },
-    [startTimer, refetch, completed, settings.shortBreak, selectedTask],
+    [startTimer, refetch, completed, settings, selectedTask],
   );
 
   const skipBreak = useCallback(async () => {
@@ -295,10 +346,20 @@ export function useFocusTimer() {
     await launchFocus(settings.focusDuration);
   }, [stopTimer, phase, launchFocus, settings.focusDuration]);
 
-  const resetSessions = useCallback(() => {
-    setCompletedSessions(0);
-    saveSessions(0);
-  }, []);
+  const activePreset = useMemo(
+    () =>
+      FOCUS_PRESETS.find(
+        (p) => p.focusDuration === settings.focusDuration && p.shortBreak === settings.shortBreak,
+      )?.label ?? "Custom",
+    [settings.focusDuration, settings.shortBreak],
+  );
+
+  const applyPreset = useCallback(
+    (preset: FocusPreset) => {
+      updateSettings({ focusDuration: preset.focusDuration, shortBreak: preset.shortBreak });
+    },
+    [updateSettings],
+  );
 
   const dismissCompleted = useCallback(() => setCompleted(null), []);
 
@@ -318,7 +379,8 @@ export function useFocusTimer() {
       breakStartMut.loading ||
       extendMut.loading ||
       pauseMut.loading ||
-      resumeMut.loading,
+      resumeMut.loading ||
+      logDistractionMut.loading,
     settings,
     updateSettings,
     completedSessions,
@@ -330,8 +392,13 @@ export function useFocusTimer() {
     takeBreak,
     extend,
     extendWork,
+    logDistraction,
+    coaching,
+    dismissCoaching: useCallback(() => setCoaching(null), []),
     skipBreak,
-    resetSessions,
+    todayStats,
+    activePreset,
+    applyPreset,
     dismissCompleted,
     selectedTaskId: selectedTask?.id ?? null,
     selectedTaskTitle: selectedTask?.title ?? null,

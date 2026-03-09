@@ -47,6 +47,8 @@ struct TimerState {
     break_mins: Option<u64>,
     #[allow(dead_code)]
     action_title: Option<String>,
+    sound_enabled: bool,
+    notification_enabled: bool,
     handle: JoinHandle<()>,
     cmd_tx: mpsc::Sender<TimerCommand>,
 }
@@ -65,6 +67,7 @@ impl FocusTimer {
     }
 
     /// Start a focus timer. Caller must start the FocusManager session first.
+    #[allow(clippy::too_many_arguments)]
     pub async fn start(
         &self,
         app: AppHandle,
@@ -72,6 +75,8 @@ impl FocusTimer {
         work_mins: u64,
         break_mins: Option<u64>,
         action_title: Option<String>,
+        sound_enabled: bool,
+        notification_enabled: bool,
     ) -> common::Result<()> {
         let mut guard = self.state.lock().await;
         if guard.is_some() {
@@ -94,6 +99,8 @@ impl FocusTimer {
             total_secs,
             break_mins,
             action_title,
+            sound_enabled,
+            notification_enabled,
             handle,
             cmd_tx,
         });
@@ -124,6 +131,8 @@ impl FocusTimer {
             total_secs,
             break_mins: None,
             action_title: None,
+            sound_enabled: true,
+            notification_enabled: true,
             handle,
             cmd_tx,
         });
@@ -167,6 +176,15 @@ impl FocusTimer {
         } else {
             false
         }
+    }
+
+    /// Get sound/notification preferences for the current session.
+    pub async fn preferences(&self) -> (bool, bool) {
+        let guard = self.state.lock().await;
+        guard
+            .as_ref()
+            .map(|s| (s.sound_enabled, s.notification_enabled))
+            .unwrap_or((true, true))
     }
 
     /// Get current timer status.
@@ -322,6 +340,16 @@ fn clear_tray_title(app: &AppHandle) {
     }
 }
 
+/// Read sound/notification preferences from the timer state, defaulting to
+/// `(true, true)` if no timer is registered.
+async fn read_preferences(app: &AppHandle) -> (bool, bool) {
+    if let Some(timer) = app.try_state::<Arc<FocusTimer>>() {
+        timer.preferences().await
+    } else {
+        (true, true)
+    }
+}
+
 // ── Completion handlers ─────────────────────────────────────────────
 
 pub fn open_tray_window(app: &AppHandle) {
@@ -353,26 +381,31 @@ async fn on_focus_complete(
     let duration_mins = total_secs / 60;
     let quality_score = ended_session.and_then(|s| s.quality_score);
 
+    let (sound_enabled, notification_enabled) = read_preferences(app).await;
+
     // Notification
-    let body = match (break_mins, quality_score) {
-        (Some(brk), Some(q)) => format!(
-            "{duration_mins}m done (quality {}%). Take a {brk}m break!",
-            (q * 100.0).round() as u32
-        ),
-        (Some(brk), None) => {
-            format!("{duration_mins}m session done. Time for a {brk}m break!")
-        }
-        (None, Some(q)) => format!(
-            "{duration_mins}m session finished. Quality: {}%",
-            (q * 100.0).round() as u32
-        ),
-        (None, None) => format!("{duration_mins}m session finished."),
-    };
-    let _ = common::utils::notify::send_os_notification("Focus Session Complete", &body).await;
+    if notification_enabled {
+        let body = match (break_mins, quality_score) {
+            (Some(brk), Some(q)) => format!(
+                "{duration_mins}m done (quality {}%). Take a {brk}m break!",
+                (q * 100.0).round() as u32
+            ),
+            (Some(brk), None) => {
+                format!("{duration_mins}m session done. Time for a {brk}m break!")
+            }
+            (None, Some(q)) => format!(
+                "{duration_mins}m session finished. Quality: {}%",
+                (q * 100.0).round() as u32
+            ),
+            (None, None) => format!("{duration_mins}m session finished."),
+        };
+        let _ =
+            common::utils::notify::send_os_notification("Focus Session Complete", &body).await;
+    }
 
     // Sound
     #[cfg(target_os = "macos")]
-    {
+    if sound_enabled {
         let _ = tokio::process::Command::new("afplay")
             .arg("/System/Library/Sounds/Glass.aiff")
             .spawn();
@@ -393,15 +426,24 @@ async fn on_focus_complete(
 }
 
 async fn on_break_complete(app: &AppHandle) {
-    let _ = common::utils::notify::send_os_notification(
-        "Break Over",
-        "Ready for the next focus session!",
-    )
-    .await;
+    // End the break session in SQLite
+    if let Some(core) = app.try_state::<Arc<AppCore>>() {
+        let _ = core.productivity_break_end().await;
+    }
+
+    let (sound_enabled, notification_enabled) = read_preferences(app).await;
+
+    if notification_enabled {
+        let _ = common::utils::notify::send_os_notification(
+            "Break Over",
+            "Ready for the next focus session!",
+        )
+        .await;
+    }
 
     // Softer sound for break end
     #[cfg(target_os = "macos")]
-    {
+    if sound_enabled {
         let _ = tokio::process::Command::new("afplay")
             .arg("/System/Library/Sounds/Blow.aiff")
             .spawn();

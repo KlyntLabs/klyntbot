@@ -680,8 +680,6 @@ Feature Crate ──emit──▶ DomainEventBus
 - **LLM-dependent consolidation** — every memory write requires an LLM call when similar facts exist, adding latency and cost
 
 **Unwired Features (discovered during deep analysis):**
-- **`situational_boost` is always 0.0** — `CognitiveContextSource` passes `situational_boost: 0.0` to retrieval (line 222). The `UserSituation` computation exists and works, but its output never flows into memory retrieval scoring. This means 25% of the relevance formula is permanently zeroed out.
-- **Weekly reflection has no scheduler wiring** — `run_weekly_reflection()` is defined and tested, but `AgentLoopBuilder` doesn't wire it to any scheduler. It needs an external cron trigger.
 - **`semantic_facts_archive` has no retrieval path** — facts enter the archive table but there is no query mechanism to reinstate or search archived facts. This is permanent cold storage with no way back.
 - **Accumulation thresholds are hardcoded** — `ACCUMULATE_PROMOTE_THRESHOLD=5` and `ACCUMULATE_MIN_DAYS=3` are constants, not configurable via `Config`.
 
@@ -776,21 +774,7 @@ The system excels at memory architecture and personalization (where it arguably 
 
 ## 9. Recommendations for Improvement
 
-### 9.1 Critical — Wire Existing Features
-
-#### 0. Wire `situational_boost` into Memory Retrieval
-
-**Problem:** 25% of the relevance scoring formula is permanently zeroed. `CognitiveContextSource` always passes `situational_boost: 0.0` despite `compute_situation()` being fully implemented and tested.
-
-**Solution:** Compute `UserSituation` in `CognitiveContextSource::provide()` and pass relevant signals as `situational_boost` to `retrieve_relevant_facts()`. This single change would significantly improve memory retrieval quality by making it context-aware.
-
-#### 0b. Wire Weekly Reflection to Scheduler
-
-**Problem:** `run_weekly_reflection()` exists but has no scheduler wiring in `AgentLoopBuilder`. The reflection cycle never runs.
-
-**Solution:** Add a cron trigger in `AgentLoopBuilder` that calls `run_weekly_reflection()` weekly. This would activate the entire procedural rule learning system.
-
-### 9.2 High Priority
+### 9.1 High Priority
 
 #### 1. Add Intelligence & Understanding Metrics
 
@@ -819,7 +803,7 @@ The system excels at memory architecture and personalization (where it arguably 
 - Apply a single composite relevance score across all memory types
 - Deduplicate overlapping information between conversation recall and extracted facts
 
-### 9.3 Medium Priority
+### 9.2 Medium Priority
 
 #### 4. Batch LLM Operations
 
@@ -857,7 +841,7 @@ The system excels at memory architecture and personalization (where it arguably 
 - Adjust stability growth rate and relevance weights per user based on actual recall patterns
 - Implement Bayesian parameter optimization over time
 
-### 9.4 Lower Priority / Future Vision
+### 9.3 Lower Priority / Future Vision
 
 #### 8. Multi-Model Memory Pipeline
 

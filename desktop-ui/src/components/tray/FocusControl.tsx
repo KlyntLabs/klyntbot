@@ -4,16 +4,15 @@ import {
   Eye,
   Pause,
   Play,
-  Plus,
-  RotateCcw,
   Settings,
+  Sparkles,
   Square,
   X,
 } from "lucide-react";
 import { useRef, useState } from "react";
-import type { FocusSettings, useFocusTimer } from "../../hooks/useFocusTimer";
+import { FOCUS_PRESETS, type FocusSettings, type useFocusTimer } from "../../hooks/useFocusTimer";
 import { useQuery } from "../../hooks/useQuery";
-import { formatElapsed } from "../../lib/dates";
+import { formatElapsed, formatHumanDuration } from "../../lib/dates";
 import type { TodayTask } from "../../lib/types";
 import { Checkbox } from "../ui/Checkbox";
 
@@ -123,6 +122,53 @@ function TaskPicker({
   );
 }
 
+// ── Distraction quick-log ────────────────────────────────────────────
+
+const DISTRACTION_CATEGORIES = [
+  { label: "Social", value: "social_media" },
+  { label: "Chat", value: "chat" },
+  { label: "Email", value: "email" },
+  { label: "Tired", value: "fatigue" },
+  { label: "Meeting", value: "meeting" },
+] as const;
+
+function QuickDistractionLog({ onLog }: { onLog: (cat: string) => void }) {
+  return (
+    <div className="flex gap-1 justify-center flex-wrap px-2">
+      {DISTRACTION_CATEGORIES.map((c) => (
+        <button
+          key={c.value}
+          type="button"
+          onClick={() => onLog(c.value)}
+          className="px-2 py-0.5 text-[10px] rounded-md bg-surface-raised/30
+                     text-muted hover:text-foreground transition-colors"
+        >
+          {c.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ── Today stats ─────────────────────────────────────────────────────
+
+function TodayStats({
+  stats,
+}: {
+  stats: { sessions: number; totalMins: number; avgQuality: number | null };
+}) {
+  if (stats.sessions === 0) return null;
+
+  const timeStr = formatHumanDuration(stats.totalMins * 60);
+
+  return (
+    <div className="text-center text-[10px] text-muted">
+      Today: {stats.sessions} session{stats.sessions !== 1 ? "s" : ""} · {timeStr}
+      {stats.avgQuality != null && <span> · {(stats.avgQuality * 100).toFixed(0)}% quality</span>}
+    </div>
+  );
+}
+
 // ── Main export ─────────────────────────────────────────────────────
 
 export function FocusControl({ timer }: { timer: Timer }) {
@@ -224,6 +270,9 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
 
   return (
     <div className="flex flex-col items-center px-4 py-4">
+      {/* ── Today stats (idle only) ──────────────────────────────── */}
+      {phase === "idle" && <TodayStats stats={timer.todayStats} />}
+
       {/* Circular progress ring */}
       <div className="relative" style={{ width: RING_SIZE, height: RING_SIZE }}>
         <svg viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`} className="w-full h-full" aria-hidden="true">
@@ -325,11 +374,40 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
         </div>
       </div>
 
+      {/* ── Presets (idle only) ─────────────────────────────────────── */}
+      {phase === "idle" && (
+        <div className="flex gap-1.5 justify-center mt-1">
+          {FOCUS_PRESETS.map((preset) => (
+            <button
+              key={preset.label}
+              type="button"
+              onClick={() => timer.applyPreset(preset)}
+              className={`px-2.5 py-1 text-[10px] rounded-full transition-colors
+                ${
+                  timer.activePreset === preset.label
+                    ? "bg-brand/20 text-brand border border-brand/30"
+                    : "bg-surface-raised/30 text-muted hover:text-foreground border border-transparent"
+                }`}
+            >
+              {preset.label} {preset.focusDuration}/{preset.shortBreak}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* ── Distraction quick-log (focus only, no warning) ────────── */}
+      {isFocus && !showWarning && <QuickDistractionLog onLog={timer.logDistraction} />}
+
       {/* ── 30s warning banner ────────────────────────────────────── */}
       {showWarning && <WarningBanner timer={timer} isFocus={isFocus} />}
 
       {/* ── Break pending actions ─────────────────────────────────── */}
       {isBreakPending && <BreakPendingActions timer={timer} cycleComplete={cycleComplete} />}
+
+      {/* ── Coaching debrief (break_pending only) ──────────────────── */}
+      {isBreakPending && timer.coaching && (
+        <CoachingDebrief message={timer.coaching.message} onDismiss={timer.dismissCoaching} />
+      )}
 
       {/* ── DND toggle (only in idle/focus without warning) ───────── */}
       {!isBreak && !isBreakPending && !showWarning && (
@@ -391,15 +469,7 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
           ) : (
             <div className="flex flex-col gap-3 w-full">
               <TaskPicker selectedId={timer.selectedTaskId} onSelect={timer.selectTask} />
-              <div className="flex items-center justify-between w-full">
-                <button
-                  type="button"
-                  className={ICON_BTN}
-                  onClick={timer.resetSessions}
-                  title="Reset sessions"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" strokeWidth={1.5} />
-                </button>
+              <div className="flex items-center justify-center gap-3 w-full">
                 <button
                   type="button"
                   onClick={timer.start}
@@ -418,31 +488,64 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
   );
 }
 
+// ── Coaching debrief ────────────────────────────────────────────────
+
+function CoachingDebrief({ message, onDismiss }: { message: string; onDismiss: () => void }) {
+  return (
+    <div className="mx-2 p-2.5 rounded-lg bg-brand/10 border border-brand/20">
+      <div className="flex items-start gap-2">
+        <Sparkles className="w-3.5 h-3.5 text-brand mt-0.5 shrink-0" />
+        <p className="text-xs text-foreground leading-relaxed flex-1">{message}</p>
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="text-muted hover:text-foreground shrink-0"
+        >
+          <X className="w-3 h-3" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── 30-second warning banner ────────────────────────────────────────
 
 function WarningBanner({ timer, isFocus }: { timer: Timer; isFocus: boolean }) {
+  const extendOptions = isFocus
+    ? [
+        { label: "+5m", secs: 300 },
+        { label: "+10m", secs: 600 },
+        { label: "+15m", secs: 900 },
+      ]
+    : [
+        { label: "+30s", secs: 30 },
+        { label: "+1m", secs: 60 },
+        { label: "+2m", secs: 120 },
+      ];
+
   return (
     <div className="flex flex-col items-center gap-2 mt-3 animate-fade-in">
       <p className="text-[11px] text-warning font-light text-center">
         {isFocus ? "Focus ending soon" : "Break ending soon"}
       </p>
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={() => timer.extend(isFocus ? 300 : 30)}
-          disabled={timer.loading}
-          className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-white/[0.06] text-[10px] uppercase tracking-[0.1em] text-secondary font-light hover:bg-white/[0.10] transition-colors disabled:opacity-50"
-        >
-          <Plus className="w-3 h-3" strokeWidth={1.5} />
-          {isFocus ? "5m more" : "30s more"}
-        </button>
+      <div className="flex gap-1.5">
+        {extendOptions.map((opt) => (
+          <button
+            key={opt.secs}
+            type="button"
+            onClick={() => timer.extend(opt.secs)}
+            disabled={timer.loading}
+            className="px-2.5 py-1.5 text-[10px] rounded-full bg-warning/20 text-warning hover:bg-warning/30 transition-colors disabled:opacity-50"
+          >
+            {opt.label}
+          </button>
+        ))}
         <button
           type="button"
           onClick={() => timer.stop()}
           disabled={timer.loading}
-          className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-white/[0.06] text-[10px] uppercase tracking-[0.1em] text-secondary font-light hover:bg-white/[0.10] transition-colors disabled:opacity-50"
+          className="px-2.5 py-1.5 text-[10px] rounded-full bg-white/[0.06] text-secondary font-light hover:bg-white/[0.10] transition-colors disabled:opacity-50"
         >
-          <X className="w-3 h-3" strokeWidth={1.5} />
           End now
         </button>
       </div>
@@ -463,16 +566,20 @@ function BreakPendingActions({ timer, cycleComplete }: { timer: Timer; cycleComp
           : `${breakMins}m break starting soon`}
       </p>
 
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={() => timer.extendWork()}
-          disabled={timer.loading}
-          className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-white/[0.06] text-[10px] uppercase tracking-[0.1em] text-secondary font-light hover:bg-white/[0.10] transition-colors disabled:opacity-50"
-        >
-          <Plus className="w-3 h-3" strokeWidth={1.5} />
-          5m more
-        </button>
+      <div className="flex gap-1.5">
+        {[5, 10, 15].map((mins) => (
+          <button
+            key={mins}
+            type="button"
+            onClick={() => timer.extendWork(mins)}
+            disabled={timer.loading}
+            className="px-2 py-1.5 text-[10px] rounded-full bg-white/[0.06] text-secondary font-light hover:bg-white/[0.10] transition-colors disabled:opacity-50"
+          >
+            +{mins}m work
+          </button>
+        ))}
+      </div>
+      <div className="flex gap-1.5">
         <button
           type="button"
           onClick={timer.startBreak}
@@ -583,11 +690,17 @@ function FocusSettingsPanel({
         <div className="space-y-1">
           <div className="flex items-center justify-between py-2.5">
             <span className="text-[13px] text-secondary font-light">Sound</span>
-            <Checkbox checked onCheckedChange={() => {}} /> {/* TODO: wire to FocusSettings */}
+            <Checkbox
+              checked={settings.soundEnabled}
+              onCheckedChange={(v) => onUpdate({ soundEnabled: !!v })}
+            />
           </div>
           <div className="flex items-center justify-between py-2.5">
             <span className="text-[13px] text-secondary font-light">Notification</span>
-            <Checkbox checked onCheckedChange={() => {}} /> {/* TODO: wire to FocusSettings */}
+            <Checkbox
+              checked={settings.notificationEnabled}
+              onCheckedChange={(v) => onUpdate({ notificationEnabled: !!v })}
+            />
           </div>
           <div className="flex items-center justify-between py-2.5">
             <span className="text-[13px] text-secondary font-light">Do Not Disturb</span>
