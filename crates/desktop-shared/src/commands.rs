@@ -681,7 +681,9 @@ pub struct AppUsageResponse {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CategoryUsageResponse {
+    pub category_id: String,
     pub category: String,
+    pub category_type: String,
     pub duration_secs: i64,
 }
 
@@ -754,6 +756,15 @@ pub struct ActivityCategoryResponse {
     pub color: Option<String>,
     pub icon: Option<String>,
     pub is_system: bool,
+    pub rules: Option<CategoryRulesResponse>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CategoryRulesResponse {
+    pub app_names: Vec<String>,
+    pub bundle_ids: Vec<String>,
+    pub url_patterns: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

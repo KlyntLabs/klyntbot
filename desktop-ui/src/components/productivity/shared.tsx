@@ -421,45 +421,50 @@ export function AppIcon({ appName, color }: { appName: string; color: string }) 
 
 // ── Category colors ───────────────────────────────────────────────────
 
-/** Canonical category-to-color map (lowercase keys). */
+/** Unique color per category — visually distinct on dark backgrounds. */
 const CATEGORY_COLORS: Record<string, string> = {
-  coding: "var(--success)",
-  design: "var(--purple)",
-  communication: "var(--info)",
-  entertainment: "var(--destructive)",
-  project_management: "var(--purple)",
-  documentation: "var(--info)",
-  email: "var(--text-muted)",
-  browsing: "var(--brand)",
-  ai_tools: "var(--success)",
-  social_media: "var(--destructive)",
-  video_streaming: "var(--destructive)",
-  news_forums: "var(--text-muted)",
-  developer_tools: "var(--success)",
-  cloud_devops: "var(--success)",
-  shopping: "var(--destructive)",
-  finance: "var(--text-muted)",
-  learning: "var(--info)",
-  music: "var(--purple)",
-  gaming: "var(--destructive)",
+  coding: "#22C55E",
+  design: "#A78BFA",
+  communication: "#F59E0B",
+  entertainment: "#F87171",
+  project_management: "#8B5CF6",
+  documentation: "#60A5FA",
+  email: "#78716C",
+  browsing: "#94A3B8",
+  ai_tools: "#06B6D4",
+  social_media: "#F43F5E",
+  video_streaming: "#EF4444",
+  news_forums: "#FB923C",
+  developer_tools: "#10B981",
+  cloud_devops: "#34D399",
+  shopping: "#FB7185",
+  finance: "#A1A1AA",
+  learning: "#2DD4BF",
+  music: "#C084FC",
+  gaming: "#E11D48",
 };
 
-const FALLBACK_COLORS = [
-  "var(--brand)",
-  "var(--purple)",
-  "var(--info)",
-  "var(--success)",
-  "var(--text-muted)",
-  "var(--destructive)",
-];
+const FALLBACK_COLORS = ["#60A5FA", "#A78BFA", "#F59E0B", "#22C55E", "#94A3B8", "#F43F5E"];
+
+/** Type badge colors: productive (green), neutral (slate), distracting (rose). */
+export const TYPE_BADGE_COLORS: Record<string, string> = {
+  productive: "#22C55E",
+  neutral: "#94A3B8",
+  distracting: "#F43F5E",
+};
 
 /**
  * Resolve a category color from either an ID ("coding") or display name ("Coding").
- * Falls back to a rotating palette, then to brand.
+ * Falls back to a rotating palette, then to slate.
  */
 export function getCategoryColor(nameOrId: string, index = 0): string {
-  const key = nameOrId.toLowerCase().replace(/ /g, "_");
+  const key = nameOrId.toLowerCase().replace(/[ &]/g, "_");
   return CATEGORY_COLORS[key] ?? FALLBACK_COLORS[index % FALLBACK_COLORS.length];
+}
+
+/** Get the type badge color for a category type. */
+export function getCategoryTypeColor(categoryType: string): string {
+  return TYPE_BADGE_COLORS[categoryType] ?? TYPE_BADGE_COLORS.neutral;
 }
 
 /** Score color thresholds — shared between ScoreRing and stats widgets. */

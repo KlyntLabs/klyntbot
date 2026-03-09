@@ -3,9 +3,9 @@
 use std::sync::Arc;
 
 use desktop_shared::commands::{
-    ActivityCategoryResponse, ActivityTimelineResponse, FocusSessionResponse, GoalProgressResponse,
-    InsightCardResponse, ProductivityProjectResponse, ProductivitySummaryResponse,
-    TimeEntryResponse,
+    ActivityCategoryResponse, ActivityTimelineResponse, CategoryRulesResponse,
+    FocusSessionResponse, GoalProgressResponse, InsightCardResponse,
+    ProductivityProjectResponse, ProductivitySummaryResponse, TimeEntryResponse,
 };
 use desktop_shared::errors::ApiError;
 use feature_productivity::auto_focus::AutoFocusSession;
@@ -180,9 +180,10 @@ pub async fn productivity_category_upsert(
     category_type: String,
     color: Option<String>,
     icon: Option<String>,
+    rules: Option<CategoryRulesResponse>,
 ) -> Result<ActivityCategoryResponse, ApiError> {
     state
-        .productivity_category_upsert(id, name, category_type, color, icon)
+        .productivity_category_upsert(id, name, category_type, color, icon, rules)
         .await
 }
 
@@ -500,6 +501,7 @@ pub(crate) async fn dispatch_dev(
                     category_type,
                     dev::get(body, "color"),
                     dev::get(body, "icon"),
+                    dev::get(body, "rules"),
                 )
                 .await,
             )

@@ -3,9 +3,10 @@
 
 use chrono::Utc;
 use desktop_shared::commands::{
-    ActivityCategoryResponse, ActivityTimelineResponse, AppUsageResponse, CategoryUsageResponse,
-    FocusSessionResponse, GoalProgressResponse, InsightCardResponse, ProductivityProjectResponse,
-    ProductivitySummaryResponse, ProjectUsageResponse, TimeEntryResponse,
+    ActivityCategoryResponse, ActivityTimelineResponse, AppUsageResponse, CategoryRulesResponse,
+    CategoryUsageResponse, FocusSessionResponse, GoalProgressResponse, InsightCardResponse,
+    ProductivityProjectResponse, ProductivitySummaryResponse, ProjectUsageResponse,
+    TimeEntryResponse,
 };
 use desktop_shared::errors::ApiError;
 use feature_productivity::auto_focus::AutoFocusSession;
@@ -15,6 +16,26 @@ use crate::errors::{map_prod_err, parse_date_or_err};
 use crate::state::AppCore;
 
 // ── Converters ────────────────────────────────────────────────────────
+
+fn rules_to_response(
+    r: feature_productivity::types::CategoryRules,
+) -> CategoryRulesResponse {
+    CategoryRulesResponse {
+        app_names: r.app_names,
+        bundle_ids: r.bundle_ids,
+        url_patterns: r.url_patterns,
+    }
+}
+
+fn rules_from_response(
+    r: CategoryRulesResponse,
+) -> feature_productivity::types::CategoryRules {
+    feature_productivity::types::CategoryRules {
+        app_names: r.app_names,
+        bundle_ids: r.bundle_ids,
+        url_patterns: r.url_patterns,
+    }
+}
 
 pub fn summary_to_response(s: DailySummary) -> ProductivitySummaryResponse {
     ProductivitySummaryResponse {
@@ -43,7 +64,9 @@ pub fn summary_to_response(s: DailySummary) -> ProductivitySummaryResponse {
             .top_categories
             .into_iter()
             .map(|c| CategoryUsageResponse {
+                category_id: c.category_id,
                 category: c.category,
+                category_type: c.category_type,
                 duration_secs: c.duration_secs,
             })
             .collect(),
@@ -231,6 +254,7 @@ impl AppCore {
                 color: c.color,
                 icon: c.icon,
                 is_system: c.is_system,
+                rules: c.rules.map(rules_to_response),
             })
             .collect())
     }
@@ -469,6 +493,7 @@ impl AppCore {
         category_type: String,
         color: Option<String>,
         icon: Option<String>,
+        rules: Option<CategoryRulesResponse>,
     ) -> Result<ActivityCategoryResponse, ApiError> {
         let repos = self.productivity_repos()?;
         let ct: feature_productivity::types::CategoryType =
@@ -478,13 +503,14 @@ impl AppCore {
                     "Invalid category_type. Use: productive, neutral, distracting",
                 )
             })?;
+        let cat_rules = rules.map(rules_from_response);
         let cat = feature_productivity::types::ActivityCategory {
             id,
             name,
             category_type: ct,
             color,
             icon,
-            rules: None,
+            rules: cat_rules,
             is_system: false,
         };
         repos.categories.upsert(&cat).await.map_err(map_prod_err)?;
@@ -495,6 +521,7 @@ impl AppCore {
             color: cat.color,
             icon: cat.icon,
             is_system: false,
+            rules: cat.rules.map(rules_to_response),
         })
     }
 

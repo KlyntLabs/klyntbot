@@ -681,7 +681,9 @@ export interface AppUsage {
 }
 
 export interface CategoryUsage {
+  categoryId: string;
   category: string;
+  categoryType: "productive" | "neutral" | "distracting";
   durationSecs: number;
 }
 
@@ -711,6 +713,12 @@ export interface ActivityTimeline {
   projectId: string | null;
 }
 
+export interface CategoryRules {
+  appNames: string[];
+  bundleIds: string[];
+  urlPatterns: string[];
+}
+
 export interface ActivityCategory {
   id: string;
   name: string;
@@ -718,6 +726,7 @@ export interface ActivityCategory {
   color: string | null;
   icon: string | null;
   isSystem: boolean;
+  rules: CategoryRules | null;
 }
 
 export interface GoalProgress {

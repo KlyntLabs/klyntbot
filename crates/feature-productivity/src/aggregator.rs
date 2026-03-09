@@ -107,7 +107,9 @@ impl DailyAggregator {
                         crate::types::CategoryType::Distracting => distracting_secs += secs,
                     }
                     top_categories.push(CategoryUsage {
+                        category_id: cat.id.clone(),
                         category: cat.name.clone(),
+                        category_type: cat.category_type.to_string(),
                         duration_secs: *secs,
                     });
                 } else {

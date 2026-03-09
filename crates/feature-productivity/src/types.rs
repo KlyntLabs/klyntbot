@@ -187,7 +187,9 @@ pub struct AppUsage {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CategoryUsage {
+    pub category_id: String,
     pub category: String,
+    pub category_type: String,
     pub duration_secs: i64,
 }
 
