@@ -26,8 +26,11 @@ pub async fn productivity_timeline(
     date: String,
     limit: Option<i64>,
     offset: Option<i64>,
+    tz_offset_mins: Option<i32>,
 ) -> Result<Vec<ActivityTimelineResponse>, ApiError> {
-    state.productivity_timeline(date, limit, offset).await
+    state
+        .productivity_timeline(date, limit, offset, tz_offset_mins)
+        .await
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -429,8 +432,13 @@ pub(crate) async fn dispatch_dev(
         "productivity_timeline" => {
             let date = try_field!(dev::get_str(body, "date"));
             dev::val(
-                core.productivity_timeline(date, dev::get(body, "limit"), dev::get(body, "offset"))
-                    .await,
+                core.productivity_timeline(
+                    date,
+                    dev::get(body, "limit"),
+                    dev::get(body, "offset"),
+                    dev::get(body, "tzOffsetMins"),
+                )
+                .await,
             )
         }
         "productivity_focus_start" => dev::val(

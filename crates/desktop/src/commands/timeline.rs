@@ -13,6 +13,7 @@ pub async fn timeline_query(
     end_date: String,
     sources: Option<Vec<TimelineSource>>,
     include_point_events: Option<bool>,
+    tz_offset_mins: Option<i32>,
 ) -> Result<TimelineResponse, ApiError> {
     state
         .timeline_query(TimelineQuery {
@@ -20,6 +21,7 @@ pub async fn timeline_query(
             end_date,
             sources,
             include_point_events,
+            tz_offset_mins,
         })
         .await
 }

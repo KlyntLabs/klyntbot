@@ -5,6 +5,7 @@ use desktop_shared::commands::{
 use desktop_shared::errors::ApiError;
 use std::collections::HashMap;
 
+use crate::errors::parse_local_day_range;
 use crate::AppCore;
 
 impl AppCore {
@@ -16,6 +17,7 @@ impl AppCore {
         let end = &params.end_date;
         let include_point = params.include_point_events.unwrap_or(true);
         let sources = params.sources.as_deref();
+        let tz = params.tz_offset_mins;
 
         /// Check if a source should be fetched (no filter = fetch all).
         fn want(sources: Option<&[TimelineSource]>, s: TimelineSource) -> bool {
@@ -27,20 +29,23 @@ impl AppCore {
         // 1. Activity events + Focus sessions (productivity repos)
         if want(sources, TimelineSource::Productivity) || want(sources, TimelineSource::Focus) {
             if let Ok(repos) = self.productivity_repos() {
-                let start_dt = parse_start_of_day(start);
-                let end_dt = parse_end_of_day(end);
+                // Use timezone-aware range: start_date 00:00 local → end_date+1 00:00 local (in UTC)
+                let (start_utc, _) = parse_local_day_range(start, tz)?;
+                let (_, end_utc) = parse_local_day_range(end, tz)?;
 
-                if let (Some(s), Some(e)) = (start_dt, end_dt) {
-                    if want(sources, TimelineSource::Productivity) {
-                        if let Ok(app_events) = repos.events.list_range(&s, &e, None).await {
-                            entries.extend(app_events.into_iter().map(normalize_app_event));
-                        }
+                if want(sources, TimelineSource::Productivity) {
+                    if let Ok(app_events) =
+                        repos.events.list_range(&start_utc, &end_utc, None).await
+                    {
+                        entries.extend(app_events.into_iter().map(normalize_app_event));
                     }
+                }
 
-                    if want(sources, TimelineSource::Focus) {
-                        if let Ok(sessions) = repos.sessions.list_range(&s, &e, None).await {
-                            entries.extend(sessions.into_iter().map(normalize_focus_session));
-                        }
+                if want(sources, TimelineSource::Focus) {
+                    if let Ok(sessions) =
+                        repos.sessions.list_range(&start_utc, &end_utc, None).await
+                    {
+                        entries.extend(sessions.into_iter().map(normalize_focus_session));
                     }
                 }
             }
@@ -129,19 +134,6 @@ impl AppCore {
 
 // ── Date helpers ─────────────────────────────────────────────────────
 
-fn parse_start_of_day(date_str: &str) -> Option<chrono::DateTime<chrono::Utc>> {
-    chrono::NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
-        .ok()
-        .and_then(|d| d.and_hms_opt(0, 0, 0))
-        .map(|dt| dt.and_utc())
-}
-
-fn parse_end_of_day(date_str: &str) -> Option<chrono::DateTime<chrono::Utc>> {
-    chrono::NaiveDate::parse_from_str(date_str, "%Y-%m-%d")
-        .ok()
-        .and_then(|d| d.and_hms_opt(23, 59, 59))
-        .map(|dt| dt.and_utc())
-}
 
 // ── Normalization functions ─────────────────────────────────────────
 

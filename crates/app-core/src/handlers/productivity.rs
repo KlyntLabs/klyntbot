@@ -12,7 +12,7 @@ use desktop_shared::errors::ApiError;
 use feature_productivity::auto_focus::AutoFocusSession;
 use feature_productivity::types::{DailySummary, FocusSession, InsightCard};
 
-use crate::errors::{map_prod_err, parse_date_or_err};
+use crate::errors::{map_prod_err, parse_date_or_err, parse_local_day_range};
 use crate::state::AppCore;
 
 // ── Converters ────────────────────────────────────────────────────────
@@ -158,10 +158,10 @@ impl AppCore {
         date: String,
         limit: Option<i64>,
         offset: Option<i64>,
+        tz_offset_mins: Option<i32>,
     ) -> Result<Vec<ActivityTimelineResponse>, ApiError> {
         let repos = self.productivity_repos()?;
-        let start = parse_date_or_err(&date)?;
-        let end = start + chrono::Duration::days(1);
+        let (start, end) = parse_local_day_range(&date, tz_offset_mins)?;
         let cap = limit.unwrap_or(10_000).min(10_000);
         let events = repos
             .events

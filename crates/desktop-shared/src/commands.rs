@@ -1045,6 +1045,9 @@ pub struct TimelineQuery {
     pub end_date: String,
     pub sources: Option<Vec<TimelineSource>>,
     pub include_point_events: Option<bool>,
+    /// JS-style timezone offset in minutes (e.g. -420 for UTC+7).
+    /// Used to shift day boundaries so local-time events appear on the correct date.
+    pub tz_offset_mins: Option<i32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

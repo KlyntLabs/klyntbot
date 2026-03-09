@@ -9,7 +9,7 @@ import { useEvent } from "../../hooks/useEvent";
 import { useQuery } from "../../hooks/useQuery";
 import type { MergeableEvent } from "../../lib/activity-sessions";
 import { mergeActivitySessions } from "../../lib/activity-sessions";
-import { formatHumanDuration, minutesSinceMidnight } from "../../lib/dates";
+import { TZ_OFFSET_MINS, formatHumanDuration, minutesSinceMidnight } from "../../lib/dates";
 import type {
   ActivityCategory,
   ActivitySwitchPayload,
@@ -66,7 +66,7 @@ export function ActivityTrack({
 
   const { data: events, refetch: refetchEvents } = useQuery<ActivityTimeline[]>(
     "productivity_timeline",
-    { date },
+    { date, tzOffsetMins: TZ_OFFSET_MINS },
     [],
   );
   const { data: categories } = useQuery<ActivityCategory[]>(

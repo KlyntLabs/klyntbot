@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo } from "react";
 import { useParams } from "react-router";
 import { useEvent } from "../../hooks/useEvent";
 import { useQuery } from "../../hooks/useQuery";
-import { todayISO } from "../../lib/dates";
+import { TZ_OFFSET_MINS, todayISO } from "../../lib/dates";
 import type { FocusCompletedPayload, ProductivitySummary } from "../../lib/types";
 import { EMPTY_TIMELINE_RESPONSE } from "../../lib/types";
 import { DayColumnsView } from "./DayColumnsView";
@@ -15,7 +15,7 @@ export function DayCalendarView() {
 
   const { enabledSources } = useEnabledLayers();
   const queryArgs = useMemo(
-    () => ({ startDate: dateStr, endDate: dateStr, sources: enabledSources }),
+    () => ({ startDate: dateStr, endDate: dateStr, sources: enabledSources, tzOffsetMins: TZ_OFFSET_MINS }),
     [dateStr, enabledSources],
   );
 

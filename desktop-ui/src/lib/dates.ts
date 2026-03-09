@@ -110,6 +110,12 @@ export function todayISO(): string {
   return toLocalISO(new Date());
 }
 
+/**
+ * JS-style timezone offset in minutes (e.g. -420 for UTC+7).
+ * Pass to backend APIs so they query the correct UTC range for a local date.
+ */
+export const TZ_OFFSET_MINS = new Date().getTimezoneOffset();
+
 /** Get the Monday of the week containing the given date */
 export function weekStartISO(iso: string): string {
   const d = new Date(`${iso}T00:00:00`);

@@ -33,6 +33,27 @@ pub fn parse_date_or_err(s: &str) -> Result<DateTime<Utc>, ApiError> {
     parse_date(s).ok_or_else(|| ApiError::new("VALIDATION", format!("invalid date: {s}")))
 }
 
+/// Parse a local date into UTC day boundaries, accounting for timezone offset.
+///
+/// `tz_offset_mins` is the JS-style offset (e.g. -420 for UTC+7, meaning local = UTC + 7h).
+/// When `None`, treats the date as UTC (offset = 0).
+///
+/// Returns `(start_utc, end_utc)` representing the 24-hour local day in UTC.
+pub fn parse_local_day_range(
+    s: &str,
+    tz_offset_mins: Option<i32>,
+) -> Result<(DateTime<Utc>, DateTime<Utc>), ApiError> {
+    let naive_date = chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d")
+        .map_err(|_| ApiError::new("VALIDATION", format!("invalid date: {s}")))?;
+    let midnight = naive_date.and_hms_opt(0, 0, 0).unwrap().and_utc();
+    // JS `getTimezoneOffset()` returns minutes *behind* UTC (e.g. UTC+7 → -420).
+    // To get UTC from local midnight: UTC = local - offset_from_utc = local + js_offset.
+    let offset_secs = i64::from(tz_offset_mins.unwrap_or(0)) * 60;
+    let start = midnight + chrono::Duration::seconds(offset_secs);
+    let end = start + chrono::Duration::days(1);
+    Ok((start, end))
+}
+
 /// Parse a "YYYY-MM-DD" string into a `NaiveDate`.
 pub fn parse_naive_date(s: &str) -> Option<NaiveDate> {
     NaiveDate::parse_from_str(s, "%Y-%m-%d").ok()
