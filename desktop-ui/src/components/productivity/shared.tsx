@@ -446,6 +446,16 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 const FALLBACK_COLORS = ["#60A5FA", "#A78BFA", "#F59E0B", "#22C55E", "#94A3B8", "#F43F5E"];
 
+/** Default color for new or uncolored categories. */
+export const DEFAULT_CATEGORY_COLOR = "#94A3B8";
+
+/** Category type groups for grouping by productive/neutral/distracting. */
+export const CATEGORY_TYPE_GROUPS: { type: string; label: string }[] = [
+  { type: "productive", label: "Work" },
+  { type: "neutral", label: "Utilities" },
+  { type: "distracting", label: "Distraction" },
+];
+
 /** Type badge colors: productive (green), neutral (slate), distracting (rose). */
 export const TYPE_BADGE_COLORS: Record<string, string> = {
   productive: "#22C55E",

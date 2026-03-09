@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { Cell, Pie, PieChart } from "recharts";
 import { formatHumanDuration } from "../../lib/dates";
 import type { CategoryUsage } from "../../lib/types";
-import { getCategoryColor, getCategoryTypeColor } from "./shared";
+import { CATEGORY_TYPE_GROUPS, getCategoryColor, getCategoryTypeColor } from "./shared";
 
 interface CategoriesListProps {
   categories: CategoryUsage[];
@@ -17,17 +17,11 @@ interface CategoryGroup {
   totalSecs: number;
 }
 
-const GROUP_CONFIG: { type: string; label: string }[] = [
-  { type: "productive", label: "Work" },
-  { type: "neutral", label: "Utilities" },
-  { type: "distracting", label: "Distraction" },
-];
-
 export function CategoriesList({ categories, totalSecs }: CategoriesListProps) {
   const active = useMemo(() => categories.filter((c) => c.durationSecs > 0), [categories]);
 
   const groups = useMemo<CategoryGroup[]>(() => {
-    return GROUP_CONFIG.map((g) => {
+    return CATEGORY_TYPE_GROUPS.map((g) => {
       const cats = active.filter((c) => c.categoryType === g.type);
       return {
         label: g.label,

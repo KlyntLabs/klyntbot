@@ -255,6 +255,8 @@ fn main() {
             commands::productivity::productivity_time_entry_create,
             commands::productivity::productivity_time_entry_delete,
             commands::productivity::productivity_category_upsert,
+            commands::productivity::productivity_tracked_apps,
+            commands::productivity::productivity_category_delete,
             commands::productivity::productivity_insights,
             commands::productivity::productivity_insight_dismiss,
             commands::productivity::productivity_auto_focus_confirm,

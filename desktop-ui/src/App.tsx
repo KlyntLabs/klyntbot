@@ -35,6 +35,11 @@ const ProductivityMonthPage = lazy(() =>
     default: m.ProductivityMonthPage,
   })),
 );
+const CategoriesPage = lazy(() =>
+  import("./components/productivity/pages/CategoriesPage").then((m) => ({
+    default: m.CategoriesPage,
+  })),
+);
 const NotesView = lazy(() => import("./components/notes/NotesView"));
 const Finance = lazy(() =>
   import("./components/views/Finance").then((m) => ({ default: m.Finance })),
@@ -171,6 +176,7 @@ const router = createHashRouter([
       { path: "/productivity/day/:date", element: <ProductivityDayPage /> },
       { path: "/productivity/week/:weekStart", element: <ProductivityWeekPage /> },
       { path: "/productivity/month/:yearMonth", element: <ProductivityMonthPage /> },
+      { path: "/productivity/categories", element: <CategoriesPage /> },
       { path: "/finance", element: <Finance /> },
       { path: "/finance/accounts", element: <FinanceAccounts /> },
       { path: "/finance/transactions", element: <FinanceTransactions /> },
