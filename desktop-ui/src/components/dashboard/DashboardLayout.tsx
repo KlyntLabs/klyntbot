@@ -1,8 +1,11 @@
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import type { ReactNode } from "react";
+import { Calendar, ChevronLeft, ChevronRight } from "lucide-react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useLocation, useNavigate, useParams } from "react-router";
+import { useClickOutside } from "../../hooks/useClickOutside";
 import { todayISO, toLocalISO } from "../../lib/dates";
 import { cn } from "../../lib/utils";
+import { MiniCalendar } from "../tasks/editors/MiniCalendar";
 
 type ViewMode = "day" | "week" | "month" | "year";
 
@@ -77,9 +80,35 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
     navigate(`/${mode}/${iso}`);
   };
 
-  const navigateToday = () => {
-    const iso = mode === "year" ? String(new Date().getFullYear()) : todayISO();
-    navigate(`/${mode}/${iso}`);
+  // Calendar picker popover
+  const [calOpen, setCalOpen] = useState(false);
+  const calTriggerRef = useRef<HTMLButtonElement>(null);
+  const calDropdownRef = useRef<HTMLDivElement>(null);
+  const [calPos, setCalPos] = useState({ top: 0, right: 0 });
+
+  useClickOutside(calDropdownRef, () => setCalOpen(false), calOpen);
+
+  const updateCalPos = useCallback(() => {
+    if (!calTriggerRef.current) return;
+    const rect = calTriggerRef.current.getBoundingClientRect();
+    setCalPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+  }, []);
+
+  useEffect(() => {
+    if (!calOpen) return;
+    updateCalPos();
+    window.addEventListener("resize", updateCalPos);
+    return () => window.removeEventListener("resize", updateCalPos);
+  }, [calOpen, updateCalPos]);
+
+  const handleDateSelect = (iso: string) => {
+    if (mode === "year") {
+      const year = new Date(`${iso}T00:00:00`).getFullYear();
+      navigate(`/year/${year}`);
+    } else {
+      navigate(`/${mode}/${iso}`);
+    }
+    setCalOpen(false);
   };
 
   const views: { key: ViewMode; label: string }[] = [
@@ -92,18 +121,22 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex-1 flex flex-col gap-2 min-w-0">
       {/* Top bar */}
-      <div className="glass-card px-4 py-2 flex items-center justify-between">
-        <div className="flex items-center gap-2">
+      <div className="glass-card px-4 py-2 flex items-center gap-4">
+        {/* Date label */}
+        <span className="text-sm font-medium text-primary whitespace-nowrap">
+          {formatDateDisplay(mode, dateParam)}
+        </span>
+
+        {/* View switcher pill group */}
+        <div className="flex items-center rounded-full bg-white/[0.06] p-0.5">
           {views.map((v) => (
             <button
               key={v.key}
               type="button"
               onClick={() => navigateToView(v.key)}
               className={cn(
-                "px-3 py-1 rounded-lg text-xs font-medium transition-all",
-                mode === v.key
-                  ? "glass-button-active text-brand"
-                  : "text-muted hover:text-secondary hover:bg-white/[0.05]",
+                "px-3.5 py-1 rounded-full text-xs font-medium transition-all",
+                mode === v.key ? "bg-white/[0.12] text-primary" : "text-muted hover:text-secondary",
               )}
             >
               {v.label}
@@ -111,34 +144,55 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
           ))}
         </div>
 
-        <span className="text-sm font-medium text-primary">
-          {formatDateDisplay(mode, dateParam)}
-        </span>
-
-        <div className="flex items-center gap-1">
+        {/* Nav pill group */}
+        <div className="flex items-center rounded-full bg-white/[0.06] p-0.5 ml-auto">
           <button
             type="button"
             onClick={() => navigateBy(-1)}
-            className="p-1 rounded hover:bg-white/[0.05] text-muted hover:text-secondary"
+            className="p-1.5 rounded-full text-muted hover:text-secondary hover:bg-white/[0.08] transition-colors"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
           <button
+            ref={calTriggerRef}
             type="button"
-            onClick={navigateToday}
-            className="px-2 py-1 rounded text-xs text-muted hover:text-secondary hover:bg-white/[0.05]"
+            onClick={() => setCalOpen(!calOpen)}
+            aria-haspopup="dialog"
+            aria-expanded={calOpen}
+            className={cn(
+              "p-1.5 rounded-full text-muted hover:text-secondary hover:bg-white/[0.08] transition-colors",
+              calOpen && "bg-white/[0.08] text-secondary",
+            )}
+            title="Pick date"
           >
-            Today
+            <Calendar className="w-4 h-4" />
           </button>
           <button
             type="button"
             onClick={() => navigateBy(1)}
-            className="p-1 rounded hover:bg-white/[0.05] text-muted hover:text-secondary"
+            className="p-1.5 rounded-full text-muted hover:text-secondary hover:bg-white/[0.08] transition-colors"
           >
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
       </div>
+
+      {/* Calendar picker popover */}
+      {calOpen &&
+        createPortal(
+          <div
+            ref={calDropdownRef}
+            className="fixed z-[9999] glass-dropdown"
+            style={{ top: calPos.top, right: calPos.right }}
+          >
+            <MiniCalendar
+              value={mode === "year" ? null : dateParam}
+              onSelect={handleDateSelect}
+              showShortcuts={false}
+            />
+          </div>,
+          document.body,
+        )}
 
       {/* Content */}
       <div className="flex-1 overflow-hidden">{children}</div>

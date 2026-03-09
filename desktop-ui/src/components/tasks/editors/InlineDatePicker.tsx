@@ -47,7 +47,7 @@ export function InlineDatePicker({ value, onSave }: InlineDatePickerProps) {
         createPortal(
           <div
             ref={dropdownRef}
-            className="fixed z-[9999] glass-panel"
+            className="fixed z-[9999] glass-dropdown"
             style={{ top: pos.top, right: pos.right }}
           >
             <MiniCalendar

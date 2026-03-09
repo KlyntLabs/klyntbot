@@ -82,8 +82,8 @@ function TaskPicker({
       </button>
       {open && (
         <div
-          className="absolute bottom-full left-0 right-0 mb-1 rounded-lg glass-panel
-                        border border-border p-1 max-h-40 overflow-y-auto z-50"
+          className="absolute bottom-full left-0 right-0 mb-1 rounded-lg glass-dropdown
+                        p-1 max-h-40 overflow-y-auto z-50"
         >
           <button
             type="button"

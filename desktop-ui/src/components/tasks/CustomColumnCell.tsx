@@ -189,7 +189,7 @@ function DropdownCell({
       </button>
       {open && options && (
         <div
-          className="absolute z-50 top-full left-0 mt-1 min-w-[140px] glass-panel"
+          className="absolute z-50 top-full left-0 mt-1 min-w-[140px] glass-dropdown"
           role="listbox"
         >
           <button

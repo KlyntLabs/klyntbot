@@ -56,7 +56,7 @@ export function WorkflowPicker({ currentWorkflowId, onSelect }: WorkflowPickerPr
         createPortal(
           <div
             ref={dropdownRef}
-            className="fixed z-[9999] min-w-[200px] glass-panel py-1"
+            className="fixed z-[9999] min-w-[200px] glass-dropdown py-1"
             style={{ top: pos.top, left: pos.left }}
           >
             {nonTemplates.map((wf) => (

@@ -172,7 +172,7 @@ export function ProjectDetail() {
             style={{ backgroundColor: project.color }}
           />
           {showColorPicker && (
-            <div className="absolute top-6 left-0 z-50 glass-panel flex gap-1.5">
+            <div className="absolute top-6 left-0 z-50 glass-dropdown flex gap-1.5">
               {PROJECT_COLORS.map((c) => (
                 <button
                   type="button"

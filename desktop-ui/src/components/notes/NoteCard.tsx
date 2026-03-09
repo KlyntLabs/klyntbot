@@ -95,7 +95,7 @@ function NoteContextMenu({
   return createPortal(
     <div
       ref={ref}
-      className="fixed z-50 glass-panel rounded-xl py-1 min-w-[140px] shadow-xl border border-border"
+      className="fixed z-50 glass-dropdown rounded-xl py-1 min-w-[140px]"
       style={{ left: x, top: y }}
     >
       <button

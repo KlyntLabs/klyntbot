@@ -1,10 +1,14 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { toLocalISO } from "../../../lib/dates";
+import { cn } from "../../../lib/utils";
 
 interface MiniCalendarProps {
   value: string | null;
   onSelect: (iso: string) => void;
   onClear?: () => void;
+  /** Show Today/Tomorrow/Next Mon shortcuts. Defaults to true. */
+  showShortcuts?: boolean;
 }
 
 const WEEKDAYS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
@@ -23,14 +27,6 @@ const MONTH_NAMES = [
   "December",
 ];
 
-/** Format a Date as YYYY-MM-DD (local). */
-function toISO(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
 /** Add `n` days to a date (local). */
 function addDays(d: Date, n: number): Date {
   const r = new Date(d);
@@ -45,14 +41,32 @@ function nextWeekday(from: Date, weekday: number): Date {
   return addDays(from, diff <= 0 ? diff + 7 : diff);
 }
 
-export function MiniCalendar({ value, onSelect, onClear }: MiniCalendarProps) {
-  const today = useMemo(() => {
+export function MiniCalendar({
+  value,
+  onSelect,
+  onClear,
+  showShortcuts = true,
+}: MiniCalendarProps) {
+  const [todayISO, setTodayISO] = useState(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
-    return d;
-  }, []);
+    return toLocalISO(d);
+  });
 
-  const todayISO = useMemo(() => toISO(today), [today]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-schedule on todayISO change after midnight
+  useEffect(() => {
+    const now = new Date();
+    const msUntilMidnight =
+      new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime() - now.getTime();
+    const id = setTimeout(() => {
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      setTodayISO(toLocalISO(d));
+    }, msUntilMidnight + 100);
+    return () => clearTimeout(id);
+  }, [todayISO]);
+
+  const today = useMemo(() => new Date(`${todayISO}T00:00:00`), [todayISO]);
 
   // The month being viewed (year + month index)
   const [viewYear, setViewYear] = useState(() => {
@@ -81,7 +95,6 @@ export function MiniCalendar({ value, onSelect, onClear }: MiniCalendarProps) {
   // Build the 42-cell grid (6 rows × 7 cols), starting from Monday
   const cells = useMemo(() => {
     const first = new Date(viewYear, viewMonth, 1);
-    // Day of week: 0=Sun → we want Mon=0, so (day+6)%7
     const startOffset = (first.getDay() + 6) % 7;
     const gridStart = new Date(viewYear, viewMonth, 1 - startOffset);
 
@@ -96,35 +109,36 @@ export function MiniCalendar({ value, onSelect, onClear }: MiniCalendarProps) {
   const shortcuts = useMemo(
     () => [
       { label: "Today", iso: todayISO },
-      { label: "Tomorrow", iso: toISO(addDays(today, 1)) },
-      { label: "Next Mon", iso: toISO(nextWeekday(today, 1)) },
+      { label: "Tomorrow", iso: toLocalISO(addDays(today, 1)) },
+      { label: "Next Mon", iso: toLocalISO(nextWeekday(today, 1)) },
     ],
     [today, todayISO],
   );
 
   return (
     <fieldset
-      className="w-[232px] border-none p-0 m-0"
+      className="w-[252px] border-none p-0 m-0"
       onClick={(e) => e.stopPropagation()}
       onKeyDown={(e) => e.stopPropagation()}
     >
       {/* Quick-select shortcuts */}
-      <div className="flex gap-1 mb-1.5 px-0.5">
-        {shortcuts.map((s) => (
-          <button
-            type="button"
-            key={s.label}
-            onClick={() => onSelect(s.iso)}
-            className={`px-2 py-0.5 text-[11px] font-light rounded-md transition-colors ${
-              value === s.iso
-                ? "bg-brand text-white"
-                : "bg-white/[0.06] text-muted hover:bg-white/[0.08] hover:text-secondary"
-            }`}
-          >
-            {s.label}
-          </button>
-        ))}
-      </div>
+      {showShortcuts && (
+        <div className="flex gap-1 mb-1.5 px-0.5">
+          {shortcuts.map((s) => (
+            <button
+              type="button"
+              key={s.label}
+              onClick={() => onSelect(s.iso)}
+              className={cn(
+                "px-2 py-0.5 text-[11px] rounded-lg transition-all",
+                value === s.iso ? "glass-button-active text-brand" : "glass-button text-muted",
+              )}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Month navigation header */}
       <div className="flex items-center justify-between px-0.5 mb-1">
@@ -132,18 +146,18 @@ export function MiniCalendar({ value, onSelect, onClear }: MiniCalendarProps) {
           type="button"
           onClick={prevMonth}
           aria-label="Previous month"
-          className="w-6 h-6 flex items-center justify-center rounded-md text-muted hover:text-secondary hover:bg-white/[0.08] transition-colors"
+          className="w-6 h-6 flex items-center justify-center glass-button rounded-lg text-muted hover:text-secondary transition-colors"
         >
           <ChevronLeft className="w-3.5 h-3.5" strokeWidth={1.5} />
         </button>
-        <span className="text-[12px] font-light text-secondary">
+        <span className="text-[12px] font-medium text-secondary">
           {MONTH_NAMES[viewMonth]} {viewYear}
         </span>
         <button
           type="button"
           onClick={nextMonth}
           aria-label="Next month"
-          className="w-6 h-6 flex items-center justify-center rounded-md text-muted hover:text-secondary hover:bg-white/[0.08] transition-colors"
+          className="w-6 h-6 flex items-center justify-center glass-button rounded-lg text-muted hover:text-secondary transition-colors"
         >
           <ChevronRight className="w-3.5 h-3.5" strokeWidth={1.5} />
         </button>
@@ -154,7 +168,7 @@ export function MiniCalendar({ value, onSelect, onClear }: MiniCalendarProps) {
         {WEEKDAYS.map((d) => (
           <div
             key={d}
-            className="h-6 flex items-center justify-center text-[10px] font-light text-dim"
+            className="h-6 flex items-center justify-center text-[10px] font-medium text-muted"
           >
             {d}
           </div>
@@ -162,9 +176,9 @@ export function MiniCalendar({ value, onSelect, onClear }: MiniCalendarProps) {
       </div>
 
       {/* Day grid */}
-      <div className="grid grid-cols-7">
+      <div className="grid grid-cols-7 gap-0.5">
         {cells.map((d) => {
-          const iso = toISO(d);
+          const iso = toLocalISO(d);
           const isCurrentMonth = d.getMonth() === viewMonth;
           const isToday = iso === todayISO;
           const isSelected = iso === value;
@@ -175,15 +189,16 @@ export function MiniCalendar({ value, onSelect, onClear }: MiniCalendarProps) {
               key={iso}
               onClick={() => onSelect(iso)}
               aria-label={`${d.getDate()} ${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`}
-              className={`h-7 w-full flex items-center justify-center text-[11px] font-light rounded-md transition-colors ${
+              className={cn(
+                "h-8 w-full flex items-center justify-center text-[11px] font-medium rounded-lg border transition-all",
                 isSelected
-                  ? "bg-brand text-white"
+                  ? "bg-brand text-white border-brand/40"
                   : isToday
-                    ? "ring-1 ring-brand text-brand"
+                    ? "bg-white/[0.10] text-brand border-brand/30"
                     : isCurrentMonth
-                      ? "text-secondary hover:bg-white/[0.08]"
-                      : "text-dim hover:bg-white/[0.08]"
-              }`}
+                      ? "bg-white/[0.04] text-secondary border-white/[0.06] hover:bg-white/[0.10] hover:border-white/[0.12]"
+                      : "text-muted/30 border-transparent hover:bg-white/[0.06]",
+              )}
             >
               {d.getDate()}
             </button>
@@ -196,8 +211,7 @@ export function MiniCalendar({ value, onSelect, onClear }: MiniCalendarProps) {
         <button
           type="button"
           onClick={onClear}
-          className="w-full text-left mt-1 px-2 py-1 text-[11px] font-light text-destructive hover:bg-white/[0.08] transition-colors"
-          style={{ borderRadius: "var(--glass-radius-inner)" }}
+          className="w-full text-left mt-1.5 px-2 py-1 text-[11px] text-destructive rounded-lg hover:bg-white/[0.08] transition-colors"
         >
           Clear date
         </button>
