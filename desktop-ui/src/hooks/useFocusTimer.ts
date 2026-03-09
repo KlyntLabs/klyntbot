@@ -1,36 +1,70 @@
 import { useCallback, useEffect, useState } from "react";
-import { useEvent } from "./useEvent";
-import { useMutation } from "./useMutation";
-import { useQuery } from "./useQuery";
 import type {
   FocusCompletedPayload,
   FocusSession,
   FocusTickPayload,
   FocusTimerStatus,
 } from "../lib/types";
+import { useEvent } from "./useEvent";
+import { useMutation } from "./useMutation";
+import { useQuery } from "./useQuery";
 
-const STORAGE_KEYS = {
-  focusDuration: "klynt:focus:lastDuration",
-  pomodoroWork: "klynt:pomodoro:lastWorkDuration",
-  pomodoroBreak: "klynt:pomodoro:lastBreakDuration",
-} as const;
+// ── Settings persistence ────────────────────────────────────────────
 
-function getStoredDuration(key: string, fallback: number): number {
+const SETTINGS_KEY = "klynt:focus:settings";
+const SESSIONS_KEY = "klynt:focus:completedSessions";
+
+export interface FocusSettings {
+  focusDuration: number; // work session (minutes)
+  shortBreak: number; // short break (minutes)
+  longBreak: number; // long break (minutes)
+  longBreakAfter: number; // sessions before long break
+  dndEnabled: boolean; // macOS Do Not Disturb
+}
+
+const DEFAULT_SETTINGS: FocusSettings = {
+  focusDuration: 25,
+  shortBreak: 5,
+  longBreak: 15,
+  longBreakAfter: 4,
+  dndEnabled: false,
+};
+
+function loadSettings(): FocusSettings {
   try {
-    const val = localStorage.getItem(key);
-    return val ? Number.parseInt(val, 10) : fallback;
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (raw) return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
   } catch {
-    return fallback;
+    /* corrupted — fall through */
+  }
+  return { ...DEFAULT_SETTINGS };
+}
+
+function saveSettings(s: FocusSettings) {
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+  } catch {
+    /* localStorage may be unavailable */
   }
 }
 
-function storeDuration(key: string, value: number) {
+function loadSessions(): number {
   try {
-    localStorage.setItem(key, String(value));
+    return Number.parseInt(localStorage.getItem(SESSIONS_KEY) ?? "0", 10);
   } catch {
-    // localStorage may be unavailable
+    return 0;
   }
 }
+
+function saveSessions(n: number) {
+  try {
+    localStorage.setItem(SESSIONS_KEY, String(n));
+  } catch {
+    /* noop */
+  }
+}
+
+// ── Hook ────────────────────────────────────────────────────────────
 
 export function useFocusTimer() {
   const { data: timerStatus, refetch } = useQuery<FocusTimerStatus>(
@@ -48,19 +82,10 @@ export function useFocusTimer() {
   const [remainingSecs, setRemainingSecs] = useState<number | null>(null);
   const [totalSecs, setTotalSecs] = useState<number | null>(null);
   const [completed, setCompleted] = useState<FocusCompletedPayload | null>(null);
+  const [settings, setSettings] = useState(loadSettings);
+  const [completedSessions, setCompletedSessions] = useState(loadSessions);
 
-  // Stored durations
-  const [focusDuration, setFocusDuration] = useState(() =>
-    getStoredDuration(STORAGE_KEYS.focusDuration, 25),
-  );
-  const [pomodoroWork, setPomodoroWork] = useState(() =>
-    getStoredDuration(STORAGE_KEYS.pomodoroWork, 25),
-  );
-  const [pomodoroBreak, setPomodoroBreak] = useState(() =>
-    getStoredDuration(STORAGE_KEYS.pomodoroBreak, 5),
-  );
-
-  // Listen to tick events
+  // Real-time tick events from Rust timer
   useEvent<FocusTickPayload>("focus:tick", (payload) => {
     if (payload) {
       setRemainingSecs(payload.remainingSecs);
@@ -68,46 +93,49 @@ export function useFocusTimer() {
     }
   });
 
-  // Listen to completion events
+  // Session completion event from Rust timer
   useEvent<FocusCompletedPayload>("focus:completed", (payload) => {
     if (payload) {
       setCompleted(payload);
       setRemainingSecs(null);
       setTotalSecs(null);
+      setCompletedSessions((prev) => {
+        const next = prev + 1;
+        saveSessions(next);
+        return next;
+      });
       refetch();
     }
   });
 
-  // Sync with status on mount
+  // Sync totalSecs from status on mount (in case we reconnect mid-session)
   useEffect(() => {
     if (timerStatus.active && timerStatus.totalSecs) {
       setTotalSecs(timerStatus.totalSecs);
     }
   }, [timerStatus.active, timerStatus.totalSecs]);
 
-  const startFocus = useCallback(
-    async (mins: number) => {
-      storeDuration(STORAGE_KEYS.focusDuration, mins);
-      setFocusDuration(mins);
-      setCompleted(null);
-      await startTimer.mutate({ mode: "focus", work_mins: mins });
-      refetch();
-    },
-    [startTimer, refetch],
-  );
+  const updateSettings = useCallback((partial: Partial<FocusSettings>) => {
+    setSettings((prev) => {
+      const next = { ...prev, ...partial };
+      saveSettings(next);
+      return next;
+    });
+  }, []);
 
-  const startPomodoro = useCallback(
-    async (workMins: number, breakMins: number) => {
-      storeDuration(STORAGE_KEYS.pomodoroWork, workMins);
-      storeDuration(STORAGE_KEYS.pomodoroBreak, breakMins);
-      setPomodoroWork(workMins);
-      setPomodoroBreak(breakMins);
-      setCompleted(null);
-      await startTimer.mutate({ mode: "pomodoro", work_mins: workMins, break_mins: breakMins });
-      refetch();
-    },
-    [startTimer, refetch],
-  );
+  const start = useCallback(async () => {
+    setCompleted(null);
+    // Auto-reset cycle if previous cycle was fully completed
+    setCompletedSessions((prev) => {
+      if (prev >= settings.longBreakAfter) {
+        saveSessions(0);
+        return 0;
+      }
+      return prev;
+    });
+    await startTimer.mutate({ mode: "focus", work_mins: settings.focusDuration });
+    refetch();
+  }, [startTimer, refetch, settings.focusDuration, settings.longBreakAfter]);
 
   const stop = useCallback(
     async (notes?: string) => {
@@ -119,6 +147,11 @@ export function useFocusTimer() {
     [stopTimer, refetch],
   );
 
+  const resetSessions = useCallback(() => {
+    setCompletedSessions(0);
+    saveSessions(0);
+  }, []);
+
   const dismissCompleted = useCallback(() => setCompleted(null), []);
 
   return {
@@ -129,14 +162,12 @@ export function useFocusTimer() {
     totalSecs,
     completed,
     loading: startTimer.loading || stopTimer.loading,
-    // Stored defaults
-    focusDuration,
-    pomodoroWork,
-    pomodoroBreak,
-    // Actions
-    startFocus,
-    startPomodoro,
+    settings,
+    updateSettings,
+    completedSessions,
+    start,
     stop,
+    resetSessions,
     dismissCompleted,
   };
 }
