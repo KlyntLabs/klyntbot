@@ -6,7 +6,7 @@ use desktop_shared::commands::{
     ActivityCategoryResponse, ActivityTimelineResponse, AppUsageResponse, CategoryRulesResponse,
     CategoryUsageResponse, FocusSessionResponse, GoalProgressResponse, InsightCardResponse,
     ProductivityProjectResponse, ProductivitySummaryResponse, ProjectUsageResponse,
-    TimeEntryResponse,
+    TimeEntryResponse, TrackedAppResponse,
 };
 use desktop_shared::errors::ApiError;
 use feature_productivity::auto_focus::AutoFocusSession;
@@ -255,6 +255,23 @@ impl AppCore {
                 icon: c.icon,
                 is_system: c.is_system,
                 rules: c.rules.map(rules_to_response),
+            })
+            .collect())
+    }
+
+    pub async fn productivity_tracked_apps(&self) -> Result<Vec<TrackedAppResponse>, ApiError> {
+        let repos = self.productivity_repos()?;
+        let rows = repos.events.tracked_apps().await.map_err(map_prod_err)?;
+        Ok(rows
+            .into_iter()
+            .map(|r| TrackedAppResponse {
+                display_name: r.display_name,
+                app_name: r.app_name,
+                site_name: r.site_name,
+                category_id: r.category_id,
+                category_name: r.category_name,
+                total_secs: r.total_secs,
+                event_count: r.event_count,
             })
             .collect())
     }
@@ -523,6 +540,11 @@ impl AppCore {
             is_system: false,
             rules: cat.rules.map(rules_to_response),
         })
+    }
+
+    pub async fn productivity_category_delete(&self, id: String) -> Result<bool, ApiError> {
+        let repos = self.productivity_repos()?;
+        repos.categories.delete(&id).await.map_err(map_prod_err)
     }
 
     // ── V2: Insights & Auto-Focus ─────────────────────────────────────

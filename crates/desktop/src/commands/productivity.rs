@@ -6,6 +6,7 @@ use desktop_shared::commands::{
     ActivityCategoryResponse, ActivityTimelineResponse, CategoryRulesResponse,
     FocusSessionResponse, GoalProgressResponse, InsightCardResponse,
     ProductivityProjectResponse, ProductivitySummaryResponse, TimeEntryResponse,
+    TrackedAppResponse,
 };
 use desktop_shared::errors::ApiError;
 use feature_productivity::auto_focus::AutoFocusSession;
@@ -77,6 +78,13 @@ pub async fn productivity_categories(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<Vec<ActivityCategoryResponse>, ApiError> {
     state.productivity_categories().await
+}
+
+#[tauri::command]
+pub async fn productivity_tracked_apps(
+    state: State<'_, Arc<AppCore>>,
+) -> Result<Vec<TrackedAppResponse>, ApiError> {
+    state.productivity_tracked_apps().await
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -185,6 +193,14 @@ pub async fn productivity_category_upsert(
     state
         .productivity_category_upsert(id, name, category_type, color, icon, rules)
         .await
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn productivity_category_delete(
+    state: State<'_, Arc<AppCore>>,
+    id: String,
+) -> Result<bool, ApiError> {
+    state.productivity_category_delete(id).await
 }
 
 // ── V2: Insights & Auto-Focus ─────────────────────────────────────────
@@ -392,6 +408,8 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "productivity_time_entry_create",
     "productivity_time_entry_delete",
     "productivity_category_upsert",
+    "productivity_tracked_apps",
+    "productivity_category_delete",
     "productivity_insights",
     "productivity_insight_dismiss",
     "productivity_auto_focus_confirm",
@@ -505,6 +523,11 @@ pub(crate) async fn dispatch_dev(
                 )
                 .await,
             )
+        }
+        "productivity_tracked_apps" => dev::val(core.productivity_tracked_apps().await),
+        "productivity_category_delete" => {
+            let id = try_field!(dev::get_str(body, "id"));
+            dev::val(core.productivity_category_delete(id).await)
         }
         "productivity_insights" => {
             dev::val(core.productivity_insights(dev::get(body, "date")).await)

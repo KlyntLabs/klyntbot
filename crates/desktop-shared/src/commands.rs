@@ -689,6 +689,18 @@ pub struct CategoryUsageResponse {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct TrackedAppResponse {
+    pub display_name: String,
+    pub app_name: String,
+    pub site_name: Option<String>,
+    pub category_id: Option<String>,
+    pub category_name: Option<String>,
+    pub total_secs: i64,
+    pub event_count: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ProjectUsageResponse {
     pub project_id: String,
     pub display_name: String,

@@ -729,6 +729,16 @@ export interface ActivityCategory {
   rules: CategoryRules | null;
 }
 
+export interface TrackedApp {
+  displayName: string;
+  appName: string;
+  siteName: string | null;
+  categoryId: string | null;
+  categoryName: string | null;
+  totalSecs: number;
+  eventCount: number;
+}
+
 export interface GoalProgress {
   id: number;
   goalType: string;
