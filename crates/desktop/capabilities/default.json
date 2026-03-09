@@ -9,6 +9,7 @@
     "core:window:allow-show",
     "core:window:allow-set-focus",
     "core:window:allow-center",
-    "global-shortcut:default"
+    "global-shortcut:default",
+    "notification:default"
   ]
 }

@@ -106,3 +106,29 @@ export const LayerContext = createContext<{
 export function useEnabledLayers() {
   return useContext(LayerContext);
 }
+
+export const SidebarContext = createContext<boolean>(true);
+
+export function useSidebarOpen() {
+  return useContext(SidebarContext);
+}
+
+export function useSidebarToggle() {
+  const [open, setOpen] = useState(() => {
+    try {
+      return localStorage.getItem("dashboard-sidebar") !== "closed";
+    } catch {
+      return true;
+    }
+  });
+
+  const toggle = () => {
+    setOpen((prev) => {
+      const next = !prev;
+      localStorage.setItem("dashboard-sidebar", next ? "open" : "closed");
+      return next;
+    });
+  };
+
+  return { sidebarOpen: open, toggleSidebar: toggle };
+}

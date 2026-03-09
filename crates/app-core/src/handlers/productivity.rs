@@ -17,9 +17,7 @@ use crate::state::AppCore;
 
 // ── Converters ────────────────────────────────────────────────────────
 
-fn rules_to_response(
-    r: feature_productivity::types::CategoryRules,
-) -> CategoryRulesResponse {
+fn rules_to_response(r: feature_productivity::types::CategoryRules) -> CategoryRulesResponse {
     CategoryRulesResponse {
         app_names: r.app_names,
         bundle_ids: r.bundle_ids,
@@ -27,9 +25,7 @@ fn rules_to_response(
     }
 }
 
-fn rules_from_response(
-    r: CategoryRulesResponse,
-) -> feature_productivity::types::CategoryRules {
+fn rules_from_response(r: CategoryRulesResponse) -> feature_productivity::types::CategoryRules {
     feature_productivity::types::CategoryRules {
         app_names: r.app_names,
         bundle_ids: r.bundle_ids,
@@ -374,10 +370,7 @@ impl AppCore {
 
     pub async fn productivity_break_end(&self) -> Result<Option<FocusSessionResponse>, ApiError> {
         let focus_mgr = self.focus_manager()?;
-        let session = focus_mgr
-            .end_break_session()
-            .await
-            .map_err(map_prod_err)?;
+        let session = focus_mgr.end_break_session().await.map_err(map_prod_err)?;
         Ok(session.map(session_to_response))
     }
 

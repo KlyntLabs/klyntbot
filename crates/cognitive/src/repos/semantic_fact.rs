@@ -157,10 +157,9 @@ impl SemanticFactRepo {
 
     /// Count facts in the archive table.
     pub async fn count_archived(&self) -> Result<u64, sqlx::Error> {
-        let row: (i64,) =
-            sqlx::query_as("SELECT COUNT(*) FROM semantic_facts_archive")
-                .fetch_one(&self.pool)
-                .await?;
+        let row: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM semantic_facts_archive")
+            .fetch_one(&self.pool)
+            .await?;
         Ok(row.0 as u64)
     }
 

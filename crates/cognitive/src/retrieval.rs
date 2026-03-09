@@ -167,8 +167,14 @@ async fn vector_path(
         .map(|fact| {
             let similarity = sim_map.get(fact.id.as_str()).copied().unwrap_or(0.5);
             let (r, freq) = compute_decay_and_freq(&fact, &now);
-            let score =
-                relevance_score(similarity, r, fact.confidence, freq, situational_boost, weights);
+            let score = relevance_score(
+                similarity,
+                r,
+                fact.confidence,
+                freq,
+                situational_boost,
+                weights,
+            );
             ScoredFact {
                 fact,
                 score,
@@ -197,8 +203,7 @@ async fn fallback_path(
         .into_iter()
         .map(|fact| {
             let (r, freq) = compute_decay_and_freq(&fact, &now);
-            let score =
-                relevance_score(0.5, r, fact.confidence, freq, situational_boost, weights);
+            let score = relevance_score(0.5, r, fact.confidence, freq, situational_boost, weights);
             ScoredFact {
                 fact,
                 score,

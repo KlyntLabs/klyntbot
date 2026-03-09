@@ -60,8 +60,7 @@ impl AccumulatedEntry {
     }
 
     fn should_promote(&self, promote_threshold: usize, min_days: usize) -> bool {
-        self.observations.len() >= promote_threshold
-            && self.days_seen.len() >= min_days
+        self.observations.len() >= promote_threshold && self.days_seen.len() >= min_days
     }
 }
 
@@ -394,6 +393,90 @@ fn event_to_observation(event: &DomainEvent) -> Option<Observation> {
             source_event: "CoachingFeedback".into(),
             timestamp: now,
         }),
+        DomainEvent::SessionEnded {
+            session_type,
+            duration_secs,
+            quality_score,
+            ..
+        } => {
+            let quality = quality_score.map_or("N/A".to_string(), |q| format!("{q:.0}"));
+            Some(Observation {
+                domain: "productivity".into(),
+                content: format!(
+                    "{session_type} session ended: {}min, quality {quality}",
+                    duration_secs / 60
+                ),
+                importance: if quality_score.is_some_and(|q| q >= 80.0) {
+                    0.7
+                } else {
+                    0.5
+                },
+                source_event: "SessionEnded".into(),
+                timestamp: now,
+            })
+        }
+        DomainEvent::QualityScored {
+            score_date,
+            overall_score,
+            ..
+        } => Some(Observation {
+            domain: "productivity".into(),
+            content: format!("Quality score for {score_date}: {overall_score:.1}"),
+            importance: if *overall_score >= 85.0 || *overall_score <= 30.0 {
+                0.8
+            } else {
+                0.4
+            },
+            source_event: "QualityScored".into(),
+            timestamp: now,
+        }),
+        DomainEvent::NarrativeGenerated {
+            date,
+            sentiment,
+            excerpt,
+        } => Some(Observation {
+            domain: "productivity".into(),
+            content: format!("Daily narrative ({date}, {sentiment}): {excerpt}"),
+            importance: 0.7,
+            source_event: "NarrativeGenerated".into(),
+            timestamp: now,
+        }),
+        DomainEvent::VoiceJournalProcessed {
+            extracted_fact_count,
+            sentiment,
+            ..
+        } => {
+            let sent = sentiment.as_deref().unwrap_or("unknown");
+            Some(Observation {
+                domain: "productivity".into(),
+                content: format!(
+                    "Voice journal processed: {extracted_fact_count} facts extracted, sentiment {sent}"
+                ),
+                importance: 0.6,
+                source_event: "VoiceJournalProcessed".into(),
+                timestamp: now,
+            })
+        }
+        // Intelligence layer events that are discarded by salience — avoid Debug formatting
+        DomainEvent::SessionCreated { .. } | DomainEvent::RuleEvolved { .. } => None,
+        DomainEvent::PredictiveAlert {
+            forecast_type,
+            predicted_value,
+            suggested_action,
+            ..
+        } => Some(Observation {
+            domain: "productivity".into(),
+            content: format!(
+                "Predictive alert ({forecast_type}): value={predicted_value:.2}{}",
+                suggested_action
+                    .as_deref()
+                    .map(|a| format!(", action: {a}"))
+                    .unwrap_or_default()
+            ),
+            importance: 0.5,
+            source_event: "PredictiveAlert".into(),
+            timestamp: now,
+        }),
         _ => {
             // TaskCreated, TaskDeferred, GoalProgress, ActivitySessionCompleted
             // Lower priority — convert generically
@@ -429,6 +512,13 @@ fn event_type_key(event: &DomainEvent) -> String {
         DomainEvent::CoachingFeedback { .. } => "CoachingFeedback".into(),
         DomainEvent::NoteCreated { .. } => "NoteCreated".into(),
         DomainEvent::NoteUpdated { .. } => "NoteUpdated".into(),
+        DomainEvent::SessionCreated { .. } => "SessionCreated".into(),
+        DomainEvent::SessionEnded { .. } => "SessionEnded".into(),
+        DomainEvent::QualityScored { .. } => "QualityScored".into(),
+        DomainEvent::PredictiveAlert { .. } => "PredictiveAlert".into(),
+        DomainEvent::NarrativeGenerated { .. } => "NarrativeGenerated".into(),
+        DomainEvent::RuleEvolved { .. } => "RuleEvolved".into(),
+        DomainEvent::VoiceJournalProcessed { .. } => "VoiceJournalProcessed".into(),
     }
 }
 

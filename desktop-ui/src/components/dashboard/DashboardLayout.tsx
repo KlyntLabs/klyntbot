@@ -1,4 +1,4 @@
-import { Calendar, ChevronLeft, ChevronRight, Layers } from "lucide-react";
+import { Calendar, ChevronLeft, ChevronRight, Layers, PanelRight } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate, useParams } from "react-router";
@@ -6,7 +6,7 @@ import { useClickOutside } from "../../hooks/useClickOutside";
 import { todayISO, toLocalISO } from "../../lib/dates";
 import { cn } from "../../lib/utils";
 import { MiniCalendar } from "../tasks/editors/MiniCalendar";
-import { LAYERS, LayerContext, useLayerToggle } from "./layers";
+import { LAYERS, LayerContext, SidebarContext, useLayerToggle, useSidebarToggle } from "./layers";
 
 type ViewMode = "day" | "week" | "month" | "year";
 
@@ -80,6 +80,9 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
     const iso = mode === "year" ? String(d.getFullYear()) : toLocalISO(d);
     navigate(`/${mode}/${iso}`);
   };
+
+  // Sidebar toggle
+  const { sidebarOpen, toggleSidebar } = useSidebarToggle();
 
   // Layer toggle
   const { enabled, toggle, reset, enabledSources } = useLayerToggle();
@@ -214,6 +217,19 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
+
+        {/* Sidebar toggle */}
+        <button
+          type="button"
+          onClick={toggleSidebar}
+          className={cn(
+            "p-1.5 rounded-full text-muted hover:text-secondary hover:bg-white/[0.08] transition-colors",
+            sidebarOpen && "bg-white/[0.08] text-secondary",
+          )}
+          title={sidebarOpen ? "Hide summary" : "Show summary"}
+        >
+          <PanelRight className="w-4 h-4" />
+        </button>
       </div>
 
       {/* Layers dropdown popover */}
@@ -276,7 +292,9 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
 
       {/* Content */}
       <LayerContext.Provider value={{ enabled, enabledSources }}>
-        <div className="flex-1 overflow-hidden">{children}</div>
+        <SidebarContext.Provider value={sidebarOpen}>
+          <div className="flex-1 overflow-hidden">{children}</div>
+        </SidebarContext.Provider>
       </LayerContext.Provider>
     </div>
   );

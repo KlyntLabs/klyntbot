@@ -158,10 +158,7 @@ impl FocusManager {
     }
 
     /// Start a break session so it appears in daily summaries.
-    pub async fn start_break_session(
-        &self,
-        break_mins: i64,
-    ) -> common::Result<FocusSession> {
+    pub async fn start_break_session(&self, break_mins: i64) -> common::Result<FocusSession> {
         // End any lingering active session first (defensive)
         let _ = self.end_session(None).await;
 

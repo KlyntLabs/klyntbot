@@ -37,4 +37,43 @@ impl ProductivityHandler for ProductivityHandlerImpl {
             ))
         })
     }
+
+    async fn generate_narrative(&self, context: &str) -> common::Result<String> {
+        let prompt = format!(
+            "Write a 3-4 sentence narrative about the user's day, as if telling a story about their productivity. Be encouraging but honest. Use the data below.\n\n{}",
+            context
+        );
+
+        let messages = vec![Message::user(prompt)];
+        let params = ChatParams::new(&self.model).with_max_tokens(512);
+
+        let response = self.provider.chat(&messages, None, &params).await?;
+        response.content.ok_or_else(|| {
+            common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(
+                "Empty LLM response for narrative".to_string(),
+            ))
+        })
+    }
+
+    async fn classify_activity(
+        &self,
+        app: &str,
+        title: &str,
+        url: Option<&str>,
+    ) -> common::Result<String> {
+        let url_str = url.unwrap_or("none");
+        let prompt = format!(
+            "Classify this activity into a category and session type.\nApp: {app}\nTitle: {title}\nURL: {url_str}\n\nRespond with exactly: category:session_type\nWhere session_type is one of: focus, meeting, break\nExample: coding:focus"
+        );
+
+        let messages = vec![Message::user(prompt)];
+        let params = ChatParams::new(&self.model).with_max_tokens(32);
+
+        let response = self.provider.chat(&messages, None, &params).await?;
+        response.content.ok_or_else(|| {
+            common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(
+                "Empty LLM response for activity classification".to_string(),
+            ))
+        })
+    }
 }

@@ -399,8 +399,8 @@ async fn on_focus_complete(
             ),
             (None, None) => format!("{duration_mins}m session finished."),
         };
-        let _ =
-            common::utils::notify::send_os_notification("Focus Session Complete", &body).await;
+        let _ = crate::notify::TauriNotificationSender::new(app.clone())
+            .send_sync("Focus Session Complete", &body);
     }
 
     // Sound
@@ -434,11 +434,8 @@ async fn on_break_complete(app: &AppHandle) {
     let (sound_enabled, notification_enabled) = read_preferences(app).await;
 
     if notification_enabled {
-        let _ = common::utils::notify::send_os_notification(
-            "Break Over",
-            "Ready for the next focus session!",
-        )
-        .await;
+        let _ = crate::notify::TauriNotificationSender::new(app.clone())
+            .send_sync("Break Over", "Ready for the next focus session!");
     }
 
     // Softer sound for break end

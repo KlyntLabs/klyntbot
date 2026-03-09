@@ -2,8 +2,35 @@
 //!
 //! Platform-specific implementations for desktop notifications.
 //! Uses tokio::process::Command for async compatibility.
+//!
+//! Callers can inject a custom [`NotificationSender`] (e.g. Tauri's native
+//! notification API) via dependency inversion, falling back to the
+//! platform-specific `osascript`/`notify-send`/PowerShell default.
 
 use crate::Result;
+
+// ── Trait for dependency inversion ──────────────────────────────────────
+
+/// Abstraction over OS notification delivery.
+///
+/// Implement this in higher layers (e.g. the desktop crate) to route
+/// notifications through a framework-specific API that shows the correct
+/// app icon.
+#[async_trait::async_trait]
+pub trait NotificationSender: Send + Sync {
+    async fn send(&self, title: &str, body: &str) -> Result<()>;
+}
+
+/// Default implementation — delegates to the platform `osascript` /
+/// `notify-send` / PowerShell helpers defined below.
+pub struct OsNotificationSender;
+
+#[async_trait::async_trait]
+impl NotificationSender for OsNotificationSender {
+    async fn send(&self, title: &str, body: &str) -> Result<()> {
+        send_os_notification(title, body).await
+    }
+}
 
 /// Sanitize text for embedding in an AppleScript double-quoted string.
 ///

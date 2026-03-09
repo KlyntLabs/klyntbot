@@ -4,9 +4,8 @@ use std::sync::Arc;
 
 use desktop_shared::commands::{
     ActivityCategoryResponse, ActivityTimelineResponse, CategoryRulesResponse,
-    FocusSessionResponse, GoalProgressResponse, InsightCardResponse,
-    ProductivityProjectResponse, ProductivitySummaryResponse, TimeEntryResponse,
-    TrackedAppResponse,
+    FocusSessionResponse, GoalProgressResponse, InsightCardResponse, ProductivityProjectResponse,
+    ProductivitySummaryResponse, TimeEntryResponse, TrackedAppResponse,
 };
 use desktop_shared::errors::ApiError;
 use feature_productivity::auto_focus::AutoFocusSession;

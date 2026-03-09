@@ -37,7 +37,10 @@ pub(crate) async fn dispatch_dev(
 ) -> Option<Result<serde_json::Value, ApiError>> {
     use super::dev_helpers::{self as dev, try_field};
     Some(match cmd {
-        "timeline_query" => dev::val(core.timeline_query(try_field!(dev::parse_params(body))).await),
+        "timeline_query" => dev::val(
+            core.timeline_query(try_field!(dev::parse_params(body)))
+                .await,
+        ),
         _ => return None,
     })
 }

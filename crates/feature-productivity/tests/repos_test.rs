@@ -212,7 +212,9 @@ async fn test_daily_summary_upsert() {
             category: Some("coding".to_string()),
         }],
         top_categories: vec![CategoryUsage {
-            category: "coding".to_string(),
+            category_id: "coding".to_string(),
+            category: "Coding".to_string(),
+            category_type: "productive".to_string(),
             duration_secs: 2400,
         }],
         top_projects: vec![],

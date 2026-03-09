@@ -387,7 +387,14 @@ fn domain_for_event(event: &bus::DomainEvent) -> &'static str {
         | bus::DomainEvent::FocusSessionStarted { .. }
         | bus::DomainEvent::FocusSessionEnded { .. }
         | bus::DomainEvent::DistractionDetected { .. }
-        | bus::DomainEvent::ProductivityScoreComputed { .. } => "energy",
+        | bus::DomainEvent::ProductivityScoreComputed { .. }
+        | bus::DomainEvent::SessionCreated { .. }
+        | bus::DomainEvent::SessionEnded { .. }
+        | bus::DomainEvent::QualityScored { .. }
+        | bus::DomainEvent::PredictiveAlert { .. }
+        | bus::DomainEvent::NarrativeGenerated { .. }
+        | bus::DomainEvent::RuleEvolved { .. }
+        | bus::DomainEvent::VoiceJournalProcessed { .. } => "energy",
         bus::DomainEvent::TransactionRecorded { .. } | bus::DomainEvent::BudgetAlert { .. } => {
             "finance"
         }

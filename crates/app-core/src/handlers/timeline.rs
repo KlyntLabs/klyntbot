@@ -8,7 +8,10 @@ use std::collections::HashMap;
 use crate::AppCore;
 
 impl AppCore {
-    pub async fn timeline_query(&self, params: TimelineQuery) -> Result<TimelineResponse, ApiError> {
+    pub async fn timeline_query(
+        &self,
+        params: TimelineQuery,
+    ) -> Result<TimelineResponse, ApiError> {
         let start = &params.start_date;
         let end = &params.end_date;
         let include_point = params.include_point_events.unwrap_or(true);
@@ -54,8 +57,10 @@ impl AppCore {
         if include_point {
             if let Some(ref repo) = self.event_log_repo {
                 if let Ok(events) = repo.query_domain_events_range(start, end).await {
-                    let mut domain_entries: Vec<_> =
-                        events.into_iter().filter_map(normalize_domain_event).collect();
+                    let mut domain_entries: Vec<_> = events
+                        .into_iter()
+                        .filter_map(normalize_domain_event)
+                        .collect();
                     // Apply source filter to domain events since they span multiple sources
                     if let Some(src_list) = sources {
                         domain_entries.retain(|e| src_list.contains(&e.source));
@@ -208,7 +213,10 @@ fn normalize_domain_event(e: cognitive::DomainEventRow) -> Option<TimelineEntry>
             "var(--timeline-finance)",
         ),
         // Skip events we don't want on the timeline
-        "ChatTurnCompleted" | "UserStatedFact" | "UserCorrectedAI" | "CoachingFeedback"
+        "ChatTurnCompleted"
+        | "UserStatedFact"
+        | "UserCorrectedAI"
+        | "CoachingFeedback"
         | "ProductivityScoreComputed" => return None,
         // Other events as System
         _ => (

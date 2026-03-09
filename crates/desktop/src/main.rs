@@ -5,6 +5,7 @@ mod commands;
 #[cfg(debug_assertions)]
 mod dev_server;
 mod focus_timer;
+mod notify;
 mod oauth;
 
 use std::sync::Arc;
@@ -62,6 +63,7 @@ fn main() {
                 })
                 .build(),
         )
+        .plugin(tauri_plugin_notification::init())
         .setup(|app| {
             let handle = app.handle().clone();
             let core = Arc::new(

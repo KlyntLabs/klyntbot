@@ -28,6 +28,24 @@ pub fn evaluate_salience(event: &DomainEvent) -> SalienceVerdict {
         // Coaching feedback is always important
         DomainEvent::CoachingFeedback { .. } => SalienceVerdict::Extract,
 
+        // Intelligence layer events
+        DomainEvent::SessionCreated { .. } => SalienceVerdict::Discard,
+        DomainEvent::SessionEnded {
+            quality_score: Some(q),
+            ..
+        } if *q >= 80.0 => SalienceVerdict::Extract,
+        DomainEvent::SessionEnded { .. } => SalienceVerdict::Accumulate,
+        DomainEvent::QualityScored { overall_score, .. }
+            if *overall_score >= 85.0 || *overall_score <= 30.0 =>
+        {
+            SalienceVerdict::Extract
+        }
+        DomainEvent::QualityScored { .. } => SalienceVerdict::Accumulate,
+        DomainEvent::NarrativeGenerated { .. } => SalienceVerdict::Extract,
+        DomainEvent::PredictiveAlert { .. } => SalienceVerdict::Accumulate,
+        DomainEvent::RuleEvolved { .. } => SalienceVerdict::Discard,
+        DomainEvent::VoiceJournalProcessed { .. } => SalienceVerdict::Extract,
+
         // Routine events — accumulated for pattern detection
         DomainEvent::ProductivityScoreComputed { .. } => SalienceVerdict::Accumulate,
         DomainEvent::ActivitySessionCompleted { .. } => SalienceVerdict::Accumulate,

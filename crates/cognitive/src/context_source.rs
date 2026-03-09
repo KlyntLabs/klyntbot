@@ -567,7 +567,10 @@ mod tests {
         let boost = source.current_situational_boost().await;
 
         // 0.8*0.25 + 0.9*0.30 + 0.6*0.25 + 0.9*0.20 = 0.2+0.27+0.15+0.18 = 0.80
-        assert!(boost > 0.7, "active situation should produce high boost: {boost}");
+        assert!(
+            boost > 0.7,
+            "active situation should produce high boost: {boost}"
+        );
     }
 
     #[tokio::test]
@@ -588,6 +591,9 @@ mod tests {
 
         let boost = source.current_situational_boost().await;
         // 0.1*0.25 + 0.1*0.30 + 0.0*0.25 + 0.2*0.20 = 0.025+0.03+0+0.04 = 0.095
-        assert!(boost < 0.15, "depleted situation should produce low boost: {boost}");
+        assert!(
+            boost < 0.15,
+            "depleted situation should produce low boost: {boost}"
+        );
     }
 }

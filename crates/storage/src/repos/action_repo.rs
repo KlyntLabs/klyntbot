@@ -1040,10 +1040,12 @@ mod tests {
         let repo = ActionRepo::new(db.clone());
 
         // Create required area + action
-        sqlx::query("INSERT INTO areas (id, name, color, status) VALUES ('a', 'Test', '#000', 'active')")
-            .execute(&db)
-            .await
-            .unwrap();
+        sqlx::query(
+            "INSERT INTO areas (id, name, color, status) VALUES ('a', 'Test', '#000', 'active')",
+        )
+        .execute(&db)
+        .await
+        .unwrap();
         let now = chrono::Utc::now();
         let row = ActionRow {
             id: "te-range-1".into(),

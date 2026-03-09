@@ -117,6 +117,11 @@ impl ProductivityEngine {
         self.auto_focus_rx.take()
     }
 
+    /// Get a reference to the tick broadcast sender (for IntelligenceLayer subscription).
+    pub fn tick_sender(&self) -> &broadcast::Sender<ActivityTick> {
+        &self.tick_sender
+    }
+
     /// Get a new broadcast subscriber (for DashboardEmitter).
     pub fn subscribe(&self) -> broadcast::Receiver<ActivityTick> {
         self.tick_sender.subscribe()

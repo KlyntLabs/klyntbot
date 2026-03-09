@@ -3,6 +3,8 @@
 
 pub use ::app_core::AppCore;
 
+use std::sync::Arc;
+
 use ::app_core::EventChannels;
 use desktop_shared::events;
 use feature_productivity::dashboard_emitter::{DashboardEmitter, DashboardEvent};
@@ -13,7 +15,10 @@ use tracing::warn;
 
 /// Initialize `AppCore` and wire event channels to Tauri emitters.
 pub async fn init(app_handle: tauri::AppHandle) -> Result<AppCore, String> {
-    let (core, channels) = AppCore::init(None).await?;
+    let sender = Arc::new(crate::notify::TauriNotificationSender::new(
+        app_handle.clone(),
+    ));
+    let (core, channels) = AppCore::init_with_sender(None, Some(sender)).await?;
     wire_event_channels(&core, channels, &app_handle);
     Ok(core)
 }
@@ -144,7 +149,14 @@ fn wire_event_channels(core: &AppCore, channels: EventChannels, app_handle: &tau
                             | bus::DomainEvent::FocusSessionStarted { .. }
                             | bus::DomainEvent::FocusSessionEnded { .. }
                             | bus::DomainEvent::DistractionDetected { .. }
-                            | bus::DomainEvent::ProductivityScoreComputed { .. } => "energy",
+                            | bus::DomainEvent::ProductivityScoreComputed { .. }
+                            | bus::DomainEvent::SessionCreated { .. }
+                            | bus::DomainEvent::SessionEnded { .. }
+                            | bus::DomainEvent::QualityScored { .. }
+                            | bus::DomainEvent::PredictiveAlert { .. }
+                            | bus::DomainEvent::NarrativeGenerated { .. }
+                            | bus::DomainEvent::RuleEvolved { .. }
+                            | bus::DomainEvent::VoiceJournalProcessed { .. } => "energy",
                             bus::DomainEvent::TransactionRecorded { .. }
                             | bus::DomainEvent::BudgetAlert { .. } => "finance",
                             bus::DomainEvent::UserStatedFact { domain, .. } => domain.as_str(),

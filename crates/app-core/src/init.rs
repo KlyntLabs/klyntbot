@@ -42,6 +42,18 @@ impl AppCore {
     pub async fn init(
         config_override: Option<config::Config>,
     ) -> Result<(Self, EventChannels), String> {
+        Self::init_with_sender(config_override, None).await
+    }
+
+    /// Initialize with an optional custom notification sender.
+    ///
+    /// When `sender` is `Some`, OS-native notifications are routed through it
+    /// (e.g. Tauri's notification plugin, which shows the app icon). When
+    /// `None`, the default platform command (`osascript` / `notify-send`) is used.
+    pub async fn init_with_sender(
+        config_override: Option<config::Config>,
+        notification_sender: Option<Arc<dyn common::utils::notify::NotificationSender>>,
+    ) -> Result<(Self, EventChannels), String> {
         // 1. Load config
         let mut config = match config_override {
             Some(c) => c,
@@ -114,10 +126,17 @@ impl AppCore {
             .await
             .map_err(|e| format!("cron start failed: {e}"))?;
 
-        let notification_dispatcher = Arc::new(agent::NotificationDispatcher::new(
-            bus.outbound_sender(),
-            config.todo.notifications.clone(),
-        ));
+        let notification_dispatcher = Arc::new(match &notification_sender {
+            Some(sender) => agent::NotificationDispatcher::with_sender(
+                bus.outbound_sender(),
+                config.todo.notifications.clone(),
+                Arc::clone(sender),
+            ),
+            None => agent::NotificationDispatcher::new(
+                bus.outbound_sender(),
+                config.todo.notifications.clone(),
+            ),
+        });
 
         register_cron_callbacks(
             &mut cron_service,
@@ -156,7 +175,14 @@ impl AppCore {
         let mut builder = AgentLoop::builder(bus.clone(), provider, config.clone())
             .with_pool(storage_pool.inner().clone())
             .with_cron_service(cron_service.clone())
-            .with_notification_handle(notification_dispatcher.last_active_handle())
+            .with_notification_handle(notification_dispatcher.last_active_handle());
+
+        // Thread the custom notification sender (if provided) to the agent's ReminderEngine
+        if let Some(ref sender) = notification_sender {
+            builder = builder.with_notification_sender(Arc::clone(sender));
+        }
+
+        let mut builder = builder
             .with_domain_bus(Arc::clone(&domain_event_bus))
             .with_cognitive_provider(cognitive_provider.clone())
             .with_pipeline_tx(pipeline_tx)
@@ -242,6 +268,36 @@ impl AppCore {
                 let dashboard_tick_rx = Some(engine.subscribe());
 
                 engine.start();
+
+                // Wire ProductivityIntelligenceLayer — subscribes to tick broadcast
+                // for classification, session aggregation, quality scoring, and interventions.
+                {
+                    let prod_handler: Option<Arc<dyn feature_productivity::ProductivityHandler>> =
+                        cognitive_provider.as_ref().map(|cp| {
+                            let model = config.agents.defaults.model.clone();
+                            Arc::new(agent::ProductivityHandlerImpl::new(cp.clone(), model))
+                                as Arc<dyn feature_productivity::ProductivityHandler>
+                        });
+
+                    match feature_productivity::intelligence::ProductivityIntelligenceLayer::new(
+                        engine.tick_sender(),
+                        Arc::clone(&domain_event_bus),
+                        prod_repos.clone(),
+                        prod_handler,
+                        shutdown_token.child_token(),
+                    )
+                    .await
+                    {
+                        Ok(layer) => {
+                            layer.start();
+                            info!("productivity intelligence layer started");
+                        }
+                        Err(e) => {
+                            warn!("Failed to start intelligence layer: {e}");
+                        }
+                    }
+                }
+
                 let engine = Arc::new(Mutex::new(engine));
 
                 // Nudge service — break reminders + burnout alerts.
@@ -1165,5 +1221,12 @@ fn domain_for_event(event: &bus::DomainEvent) -> &'static str {
         bus::DomainEvent::CoachingFeedback { .. } => "coaching",
         bus::DomainEvent::ChatTurnCompleted { .. } => "general",
         bus::DomainEvent::NoteCreated { .. } | bus::DomainEvent::NoteUpdated { .. } => "notes",
+        bus::DomainEvent::SessionCreated { .. }
+        | bus::DomainEvent::SessionEnded { .. }
+        | bus::DomainEvent::QualityScored { .. } => "energy",
+        bus::DomainEvent::PredictiveAlert { .. } | bus::DomainEvent::NarrativeGenerated { .. } => {
+            "general"
+        }
+        _ => "general",
     }
 }

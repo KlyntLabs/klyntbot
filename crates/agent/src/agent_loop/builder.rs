@@ -56,6 +56,7 @@ pub struct AgentLoopBuilder {
     vector_store: Option<storage::VectorStore>,
     cron_service: Option<Arc<scheduling::CronService>>,
     notification_handle: Option<LastActiveChannel>,
+    notification_sender: Option<Arc<dyn common::utils::notify::NotificationSender>>,
     domain_event_bus: Option<Arc<bus::DomainEventBus>>,
     cognitive_provider: Option<DynProvider>,
     pipeline_tx: Option<tokio::sync::broadcast::Sender<cognitive::PipelineEvent>>,
@@ -72,6 +73,7 @@ impl AgentLoopBuilder {
             vector_store: None,
             cron_service: None,
             notification_handle: None,
+            notification_sender: None,
             domain_event_bus: None,
             cognitive_provider: None,
             pipeline_tx: None,
@@ -96,6 +98,14 @@ impl AgentLoopBuilder {
 
     pub fn with_notification_handle(mut self, handle: LastActiveChannel) -> Self {
         self.notification_handle = Some(handle);
+        self
+    }
+
+    pub fn with_notification_sender(
+        mut self,
+        sender: Arc<dyn common::utils::notify::NotificationSender>,
+    ) -> Self {
+        self.notification_sender = Some(sender);
         self
     }
 
@@ -246,7 +256,9 @@ impl AgentLoopBuilder {
                     min_similarity: config.cognitive.min_similarity,
                     max_stability: config.cognitive.max_stability,
                     relevance_weight_semantic: config.cognitive.relevance_weight_semantic,
-                    relevance_weight_retrievability: config.cognitive.relevance_weight_retrievability,
+                    relevance_weight_retrievability: config
+                        .cognitive
+                        .relevance_weight_retrievability,
                     relevance_weight_importance: config.cognitive.relevance_weight_importance,
                     relevance_weight_frequency: config.cognitive.relevance_weight_frequency,
                     relevance_weight_situation: config.cognitive.relevance_weight_situation,
@@ -419,10 +431,17 @@ impl AgentLoopBuilder {
 
         // ── Notification dispatcher ───────────────────────────────────────
         let notification_dispatcher = if !config.todo.notifications.targets.is_empty() {
-            Some(Arc::new(super::super::NotificationDispatcher::new(
-                bus.outbound_sender(),
-                config.todo.notifications.clone(),
-            )))
+            Some(Arc::new(match &self.notification_sender {
+                Some(sender) => super::super::NotificationDispatcher::with_sender(
+                    bus.outbound_sender(),
+                    config.todo.notifications.clone(),
+                    Arc::clone(sender),
+                ),
+                None => super::super::NotificationDispatcher::new(
+                    bus.outbound_sender(),
+                    config.todo.notifications.clone(),
+                ),
+            }))
         } else {
             None
         };
@@ -900,9 +919,9 @@ impl AgentLoopBuilder {
         .with_strategy_repo(repos.strategies.clone());
 
         let cost_tracker = Arc::new(
-            crate::output::CostTracker::from_repo(
-                storage::UsageRepo::new(storage_pool.inner().clone()),
-            )
+            crate::output::CostTracker::from_repo(storage::UsageRepo::new(
+                storage_pool.inner().clone(),
+            ))
             .with_monthly_budget(config.agents.monthly_budget_usd),
         );
 
