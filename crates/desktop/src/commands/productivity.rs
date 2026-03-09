@@ -277,7 +277,7 @@ pub async fn focus_timer_start(
     timer
         .start(app, timer_mode, work_mins, break_mins)
         .await
-        .map_err(|e| ApiError::new("TIMER_ERROR", &e.to_string()))?;
+        .map_err(|e| ApiError::new("TIMER_ERROR", e.to_string()))?;
 
     Ok(session)
 }

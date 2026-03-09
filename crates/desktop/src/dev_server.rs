@@ -410,6 +410,7 @@ mod tests {
         "permissions_check_accessibility",
         "permissions_open_accessibility",
         "resize_window",
+        "open_url",
         "quit_app",
         "show_dashboard",
         "focus_timer_start",
