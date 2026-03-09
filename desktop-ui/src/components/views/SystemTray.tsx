@@ -1,6 +1,6 @@
 import { LogicalSize } from "@tauri-apps/api/dpi";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { Check, Lightbulb, LogOut, Send, Settings, X, XCircle } from "lucide-react";
+import { Check, Lightbulb, LogOut, Monitor, Send, Settings, X, XCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useCoachingNudge } from "../../hooks/useCoachingNudge";
 import { useEvent } from "../../hooks/useEvent";
@@ -88,6 +88,13 @@ export function SystemTray() {
         await mainWindow.show();
         await mainWindow.setFocus();
       }
+      await getCurrentWindow().hide();
+    }
+  };
+
+  const handleOpenDashboard = async () => {
+    await ipc("show_dashboard");
+    if (isTauri) {
       await getCurrentWindow().hide();
     }
   };
@@ -342,6 +349,14 @@ export function SystemTray() {
 
           {/* Footer Menu */}
           <div className="flex items-center justify-end gap-1 px-3 py-2">
+            <button
+              type="button"
+              onClick={handleOpenDashboard}
+              title="Open Dashboard"
+              className="w-7 h-7 flex items-center justify-center rounded-lg text-muted hover:text-secondary hover:bg-white/[0.06] transition-colors"
+            >
+              <Monitor className="w-3.5 h-3.5" strokeWidth={1.5} />
+            </button>
             <button
               type="button"
               onClick={handleOpenSettings}
