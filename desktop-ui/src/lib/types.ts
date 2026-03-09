@@ -800,6 +800,27 @@ export interface InsightCard {
 
 export type InsightPayload = Pick<InsightCard, "id" | "insightType" | "title" | "sentiment">;
 
+export interface FocusTimerStatus {
+  active: boolean;
+  mode: string | null;
+  remainingSecs: number | null;
+  totalSecs: number | null;
+  session: FocusSession | null;
+}
+
+export interface FocusTickPayload {
+  remainingSecs: number;
+  totalSecs: number;
+  mode: string;
+}
+
+export interface FocusCompletedPayload {
+  mode: string;
+  durationMins: number;
+  qualityScore: number | null;
+  breakMins: number | null;
+}
+
 export type ProductivityPeriod = "day" | "week" | "month";
 
 // ── Coaching ─────────────────────────────────────────────────────────
