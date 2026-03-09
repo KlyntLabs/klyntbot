@@ -899,9 +899,12 @@ impl AgentLoopBuilder {
         )
         .with_strategy_repo(repos.strategies.clone());
 
-        let cost_tracker = Arc::new(crate::output::CostTracker::from_repo(
-            storage::UsageRepo::new(storage_pool.inner().clone()),
-        ));
+        let cost_tracker = Arc::new(
+            crate::output::CostTracker::from_repo(
+                storage::UsageRepo::new(storage_pool.inner().clone()),
+            )
+            .with_monthly_budget(config.agents.monthly_budget_usd),
+        );
 
         let runtime_config = crate::intent_pipeline::types::PipelineConfig {
             execution_model: config.agents.defaults.model.clone(),

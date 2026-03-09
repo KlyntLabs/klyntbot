@@ -623,6 +623,16 @@ impl AgentRuntime {
                     response_time_ms: pipeline_elapsed_ms,
                 })
                 .await;
+
+            if let Some(alert) = self.cost_tracker.check_budget().await {
+                let _ = tx
+                    .send(AgentEvent::BudgetWarning {
+                        monthly_spend_usd: alert.monthly_spend_usd,
+                        monthly_budget_usd: alert.monthly_budget_usd,
+                        usage_percent: alert.usage_percent,
+                    })
+                    .await;
+            }
         }
     }
 

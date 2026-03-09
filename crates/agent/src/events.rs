@@ -91,6 +91,16 @@ pub enum AgentEvent {
         response_time_ms: u64,
     },
 
+    /// Monthly LLM cost budget warning (emitted at 80% and 100%).
+    BudgetWarning {
+        #[serde(rename = "monthlySpendUsd")]
+        monthly_spend_usd: f64,
+        #[serde(rename = "monthlyBudgetUsd")]
+        monthly_budget_usd: f64,
+        #[serde(rename = "usagePercent")]
+        usage_percent: f64,
+    },
+
     /// A memory search or operation was performed.
     MemoryAccess {
         action: String,

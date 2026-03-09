@@ -681,9 +681,7 @@ Feature Crate ──emit──▶ DomainEventBus
 
 **Observability:**
 - **No structured metrics export** — no Prometheus/OpenTelemetry integration
-- **Pipeline events are debug-only** — `PipelineEvent` broadcast exists but isn't persisted or dashboarded
 - **No A/B testing framework** for memory retrieval strategies
-- **Cost tracking lacks alerting** — usage is recorded but no automatic warnings or budget enforcement
 
 **Evaluation & Intelligence:**
 - **No explicit intelligence scoring** — there is no mechanism to evaluate the AI's intelligence level
@@ -757,7 +755,7 @@ Feature Crate ──emit──▶ DomainEventBus
 | **Architecture Design** | **8/10** | Strict 9-layer hierarchy with dependency inversion is excellent. Single-binary monolith limits scalability but is appropriate for a personal AI. Feature packages are well-isolated. Loses points for SQLite single-writer limitation and lack of distributed event processing. |
 | **Memory System Quality** | **9/10** | Best-in-class for a personal AI agent. Three-tier cognitive model, FSRS decay, Mem0-style consolidation, bi-temporal facts, salience filtering, weekly reflection — this is more sophisticated than most commercial memory systems. Loses a point for sequential consolidation and separate conversation recall paths. |
 | **Scalability** | **5/10** | Designed for single-user personal AI — SQLite, in-process event bus, single binary. Would need fundamental changes for multi-user. LanceDB vector search is brute-force until enough rows for indexing. Adequate for intended use case, but limited beyond it. |
-| **Observability** | **4/10** | Tracing via `tracing` crate exists but no structured metrics export. Pipeline events are broadcast but not persisted. Cost tracking is passive. No dashboarding, alerting, or A/B testing infrastructure. This is the weakest dimension. |
+| **Observability** | **4/10** | Tracing via `tracing` crate exists but no structured metrics export. No dashboarding or A/B testing infrastructure. This is the weakest dimension. |
 | **Intelligence & Reasoning** | **7/10** | Multi-agent routing, intent analysis, ReAct execution with tool calling, abstractive history compression, and context-window-aware budget allocation. No chain-of-thought or multi-step planning beyond ReAct. No self-reflection on response quality. |
 | **User Understanding & Personalization** | **8/10** | Structured UserModel with 10 domains, dynamic + static context injection, procedural rules from reflection, situation-aware coaching. Confidence calibration exists but isn't dynamically tuned. No explicit measurement of how well the system understands the user. |
 | **Maintainability** | **8/10** | Clean crate boundaries, zero-clippy-warning policy, comprehensive tests, derive macros for tools, conventional commit format. 26 crates is a lot to navigate but well-organized. Legacy L2 learning tables alongside L5 cognitive system adds some confusion. |
@@ -783,11 +781,10 @@ The system excels at memory architecture and personalization (where it arguably 
 
 #### 2. Implement Structured Observability
 
-**Problem:** No metrics export, no dashboard, pipeline events aren't persisted.
+**Problem:** No metrics export, no dashboard.
 
 **Solution:**
 - Add OpenTelemetry integration with spans for: agent routing, context assembly, LLM calls, memory retrieval, consolidation
-- Persist `PipelineEvent` to SQLite (already have `EventLogRepo` partially built)
 - Build a desktop dashboard showing: memory growth, fact domains, retrieval hit rates, cost per interaction
 
 #### 3. Unify Memory Retrieval Paths

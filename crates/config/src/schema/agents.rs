@@ -9,6 +9,11 @@ use serde::{Deserialize, Serialize};
 pub struct AgentsConfig {
     #[serde(default)]
     pub defaults: AgentDefaults,
+
+    /// Optional monthly LLM cost budget in USD.
+    /// When set, the system emits warnings at 80% and 100% of budget.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub monthly_budget_usd: Option<f64>,
 }
 
 /// Default agent configuration

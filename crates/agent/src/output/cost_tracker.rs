@@ -36,9 +36,18 @@ pub struct UsageReport {
     pub by_day: Vec<(String, f64)>,
 }
 
+/// Budget check result when monthly spend exceeds a threshold.
+#[derive(Debug, Clone)]
+pub struct BudgetAlert {
+    pub monthly_spend_usd: f64,
+    pub monthly_budget_usd: f64,
+    pub usage_percent: f64,
+}
+
 /// Tracks LLM usage and costs, persisted to SQL.
 pub struct CostTracker {
     sql_repo: storage::UsageRepo,
+    monthly_budget_usd: Option<f64>,
 }
 
 /// Per-million-token pricing for a model.
@@ -223,7 +232,36 @@ pub fn estimate_cost(usage: &Usage, model: &str) -> f64 {
 impl CostTracker {
     /// Create a CostTracker backed by a SQL repository.
     pub fn from_repo(repo: storage::UsageRepo) -> Self {
-        Self { sql_repo: repo }
+        Self {
+            sql_repo: repo,
+            monthly_budget_usd: None,
+        }
+    }
+
+    /// Set a monthly budget threshold. Warnings emitted at 80% and 100%.
+    pub fn with_monthly_budget(mut self, budget: Option<f64>) -> Self {
+        self.monthly_budget_usd = budget;
+        self
+    }
+
+    /// Check if monthly spend has crossed a budget threshold (80% or 100%).
+    /// Returns a `BudgetAlert` if the current spend exceeds a warning level.
+    pub async fn check_budget(&self) -> Option<BudgetAlert> {
+        let budget = self.monthly_budget_usd?;
+        if budget <= 0.0 {
+            return None;
+        }
+        let spend = self.sql_repo.total_cost_current_month().await.ok()?;
+        let pct = (spend / budget) * 100.0;
+        if pct >= 80.0 {
+            Some(BudgetAlert {
+                monthly_spend_usd: spend,
+                monthly_budget_usd: budget,
+                usage_percent: pct,
+            })
+        } else {
+            None
+        }
     }
 
     /// Record a usage entry to SQL.
