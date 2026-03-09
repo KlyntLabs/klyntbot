@@ -209,9 +209,7 @@ impl AppCore {
         let model = load_user_model(&fact_repo).await;
         let active_facts = model.active_fact_count();
 
-        // TODO: add a `count_archived()` query to SemanticFactRepo — archive_superseded() is
-        // a destructive mutation and must NOT be used for reads.
-        let archived = 0u64;
+        let archived = fact_repo.count_archived().await.unwrap_or(0);
 
         let episodic_count = episodic_repo.count_all().await.unwrap_or(0) as usize;
 

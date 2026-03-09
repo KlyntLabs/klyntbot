@@ -155,6 +155,95 @@ impl SemanticFactRepo {
         .await
     }
 
+    /// Count facts in the archive table.
+    pub async fn count_archived(&self) -> Result<u64, sqlx::Error> {
+        let row: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM semantic_facts_archive")
+                .fetch_one(&self.pool)
+                .await?;
+        Ok(row.0 as u64)
+    }
+
+    /// Search archived facts by domain and/or keyword in subject/predicate/object.
+    pub async fn search_archived(
+        &self,
+        domain: Option<&str>,
+        keyword: Option<&str>,
+        limit: i64,
+    ) -> Result<Vec<SemanticFact>, sqlx::Error> {
+        let mut conditions = Vec::new();
+        if domain.is_some() {
+            conditions.push("domain = ?1".to_string());
+        }
+        if keyword.is_some() {
+            let kw_param = if domain.is_some() { "?2" } else { "?1" };
+            conditions.push(format!(
+                "(subject LIKE '%' || {kw} || '%' OR predicate LIKE '%' || {kw} || '%' OR object LIKE '%' || {kw} || '%')",
+                kw = kw_param
+            ));
+        }
+        let where_clause = if conditions.is_empty() {
+            String::new()
+        } else {
+            format!("WHERE {}", conditions.join(" AND "))
+        };
+        let limit_param = if domain.is_some() && keyword.is_some() {
+            "?3"
+        } else if domain.is_some() || keyword.is_some() {
+            "?2"
+        } else {
+            "?1"
+        };
+        let sql = format!(
+            "SELECT id, domain, subject, predicate, object, confidence, source, \
+             valid_from, valid_until, recorded_at, superseded_at, superseded_by, \
+             stability, last_accessed, access_count \
+             FROM semantic_facts_archive {where_clause} ORDER BY recorded_at DESC LIMIT {limit_param}"
+        );
+        let mut query = sqlx::query_as::<_, SemanticFact>(&sql);
+        if let Some(d) = domain {
+            query = query.bind(d);
+        }
+        if let Some(kw) = keyword {
+            query = query.bind(kw);
+        }
+        query = query.bind(limit);
+        query.fetch_all(&self.pool).await
+    }
+
+    /// Reinstate an archived fact back into the active table.
+    pub async fn reinstate_archived(&self, id: &str) -> Result<bool, sqlx::Error> {
+        let mut tx = self.pool.begin().await?;
+
+        let rows = sqlx::query(
+            r#"
+            INSERT INTO semantic_facts
+                (id, domain, subject, predicate, object, confidence, source,
+                 valid_from, valid_until, recorded_at, superseded_at, superseded_by,
+                 stability, last_accessed, access_count)
+            SELECT id, domain, subject, predicate, object, confidence, source,
+                   valid_from, NULL, recorded_at, NULL, NULL,
+                   stability, last_accessed, access_count
+            FROM semantic_facts_archive
+            WHERE id = ?1
+            "#,
+        )
+        .bind(id)
+        .execute(&mut *tx)
+        .await?
+        .rows_affected();
+
+        if rows > 0 {
+            sqlx::query("DELETE FROM semantic_facts_archive WHERE id = ?1")
+                .bind(id)
+                .execute(&mut *tx)
+                .await?;
+        }
+
+        tx.commit().await?;
+        Ok(rows > 0)
+    }
+
     /// Move superseded facts older than N days to the archive table.
     pub async fn archive_superseded(&self, older_than_days: i64) -> Result<u64, sqlx::Error> {
         let mut tx = self.pool.begin().await?;
@@ -309,5 +398,113 @@ mod tests {
 
         let similar = repo.find_similar("user", "peak_hours").await.unwrap();
         assert_eq!(similar.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_count_archived_empty() {
+        let pool = setup().await;
+        let repo = SemanticFactRepo::new(pool);
+        let count = repo.count_archived().await.unwrap();
+        assert_eq!(count, 0);
+    }
+
+    #[tokio::test]
+    async fn test_archive_and_count() {
+        let pool = setup().await;
+        let repo = SemanticFactRepo::new(pool);
+
+        // Create and supersede a fact, then archive it
+        let old = test_fact("f1", "productivity", "peak_hours", "10am-12pm");
+        repo.upsert(&old).await.unwrap();
+        let new = test_fact("f2", "productivity", "peak_hours", "9am-11am");
+        repo.upsert(&new).await.unwrap();
+        repo.supersede("f1", "f2").await.unwrap();
+
+        // Manually set superseded_at to > 0 days ago so archive_superseded(0) picks it up
+        let archived = repo.archive_superseded(0).await.unwrap();
+        assert_eq!(archived, 1);
+
+        let count = repo.count_archived().await.unwrap();
+        assert_eq!(count, 1);
+    }
+
+    #[tokio::test]
+    async fn test_search_archived_by_domain() {
+        let pool = setup().await;
+        let repo = SemanticFactRepo::new(pool);
+
+        let f1 = test_fact("f1", "productivity", "peak_hours", "10am-12pm");
+        repo.upsert(&f1).await.unwrap();
+        repo.supersede("f1", "f2").await.unwrap();
+        repo.archive_superseded(0).await.unwrap();
+
+        let results = repo
+            .search_archived(Some("productivity"), None, 10)
+            .await
+            .unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, "f1");
+
+        let empty = repo
+            .search_archived(Some("finance"), None, 10)
+            .await
+            .unwrap();
+        assert!(empty.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_search_archived_by_keyword() {
+        let pool = setup().await;
+        let repo = SemanticFactRepo::new(pool);
+
+        let f1 = test_fact("f1", "productivity", "peak_hours", "10am-12pm");
+        repo.upsert(&f1).await.unwrap();
+        repo.supersede("f1", "f2").await.unwrap();
+        repo.archive_superseded(0).await.unwrap();
+
+        let results = repo.search_archived(None, Some("peak"), 10).await.unwrap();
+        assert_eq!(results.len(), 1);
+
+        let empty = repo
+            .search_archived(None, Some("nonexistent"), 10)
+            .await
+            .unwrap();
+        assert!(empty.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_reinstate_archived() {
+        let pool = setup().await;
+        let repo = SemanticFactRepo::new(pool);
+
+        let f1 = test_fact("f1", "productivity", "peak_hours", "10am-12pm");
+        repo.upsert(&f1).await.unwrap();
+        repo.supersede("f1", "f2").await.unwrap();
+        repo.archive_superseded(0).await.unwrap();
+
+        // Fact should be in archive, not active
+        assert!(repo.get("f1").await.unwrap().is_none());
+        assert_eq!(repo.count_archived().await.unwrap(), 1);
+
+        // Reinstate it
+        let reinstated = repo.reinstate_archived("f1").await.unwrap();
+        assert!(reinstated);
+
+        // Now it's active again with cleared supersession
+        let fact = repo.get("f1").await.unwrap().unwrap();
+        assert!(fact.superseded_at.is_none());
+        assert!(fact.superseded_by.is_none());
+        assert!(fact.valid_until.is_none());
+
+        // Archive is empty
+        assert_eq!(repo.count_archived().await.unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_reinstate_nonexistent_returns_false() {
+        let pool = setup().await;
+        let repo = SemanticFactRepo::new(pool);
+        let reinstated = repo.reinstate_archived("nonexistent").await.unwrap();
+        assert!(!reinstated);
     }
 }

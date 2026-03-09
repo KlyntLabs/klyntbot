@@ -38,11 +38,6 @@ pub enum PipelineEvent {
     Consolidation { operation: String, fact: String },
 }
 
-/// Minimum occurrences of an accumulated event type before promoting to extraction.
-const ACCUMULATE_PROMOTE_THRESHOLD: usize = 5;
-/// Minimum distinct days for accumulated events before promoting.
-const ACCUMULATE_MIN_DAYS: usize = 3;
-
 /// Tracks accumulated events for pattern promotion.
 #[derive(Debug, Clone)]
 struct AccumulatedEntry {
@@ -64,9 +59,9 @@ impl AccumulatedEntry {
         self.observations.push(obs);
     }
 
-    fn should_promote(&self) -> bool {
-        self.observations.len() >= ACCUMULATE_PROMOTE_THRESHOLD
-            && self.days_seen.len() >= ACCUMULATE_MIN_DAYS
+    fn should_promote(&self, promote_threshold: usize, min_days: usize) -> bool {
+        self.observations.len() >= promote_threshold
+            && self.days_seen.len() >= min_days
     }
 }
 
@@ -94,6 +89,8 @@ impl BackgroundConsolidationService {
         cancel: CancellationToken,
         pipeline_tx: Option<tokio::sync::broadcast::Sender<PipelineEvent>>,
         accum_repo: Option<AccumulatedObservationRepo>,
+        promote_threshold: usize,
+        min_days: usize,
     ) -> Self {
         let cancel_clone = cancel.clone();
         let handle = tokio::spawn(async move {
@@ -210,7 +207,7 @@ impl BackgroundConsolidationService {
                                     entry.add(obs);
 
                                     // Check for promotion
-                                    if entry.should_promote() {
+                                    if entry.should_promote(promote_threshold, min_days) {
                                         debug!(
                                             "Promoting accumulated events for '{key}' ({} events, {} days)",
                                             entry.observations.len(),
@@ -534,7 +531,7 @@ mod tests {
             });
         }
 
-        assert!(entry.should_promote());
+        assert!(entry.should_promote(5, 3));
         assert_eq!(entry.observations.len(), 5);
         assert_eq!(entry.days_seen.len(), 3);
     }
@@ -554,7 +551,7 @@ mod tests {
             });
         }
 
-        assert!(!entry.should_promote()); // Not enough days
+        assert!(!entry.should_promote(5, 3)); // Not enough days
     }
 
     #[test]

@@ -244,6 +244,12 @@ impl AgentLoopBuilder {
                     dynamic_fact_limit: config.cognitive.dynamic_fact_limit,
                     vector_top_k: config.cognitive.vector_top_k,
                     min_similarity: config.cognitive.min_similarity,
+                    max_stability: config.cognitive.max_stability,
+                    relevance_weight_semantic: config.cognitive.relevance_weight_semantic,
+                    relevance_weight_retrievability: config.cognitive.relevance_weight_retrievability,
+                    relevance_weight_importance: config.cognitive.relevance_weight_importance,
+                    relevance_weight_frequency: config.cognitive.relevance_weight_frequency,
+                    relevance_weight_situation: config.cognitive.relevance_weight_situation,
                 };
 
                 let mut cog_source =
@@ -293,6 +299,8 @@ impl AgentLoopBuilder {
                         cancel.clone(),
                         self.pipeline_tx.take(),
                         Some(accum_repo),
+                        config.cognitive.accumulate_promote_threshold,
+                        config.cognitive.accumulate_min_days,
                     );
                     info!("Cognitive background consolidation service started");
                     Some(bg_service)

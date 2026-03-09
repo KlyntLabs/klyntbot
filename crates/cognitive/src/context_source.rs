@@ -34,6 +34,12 @@ pub struct CognitiveRetrievalConfig {
     pub dynamic_fact_limit: usize,
     pub vector_top_k: usize,
     pub min_similarity: f64,
+    pub max_stability: f64,
+    pub relevance_weight_semantic: f64,
+    pub relevance_weight_retrievability: f64,
+    pub relevance_weight_importance: f64,
+    pub relevance_weight_frequency: f64,
+    pub relevance_weight_situation: f64,
 }
 
 impl Default for CognitiveRetrievalConfig {
@@ -44,6 +50,12 @@ impl Default for CognitiveRetrievalConfig {
             dynamic_fact_limit: 15,
             vector_top_k: 30,
             min_similarity: 0.55,
+            max_stability: 30.0,
+            relevance_weight_semantic: 0.3,
+            relevance_weight_retrievability: 0.2,
+            relevance_weight_importance: 0.15,
+            relevance_weight_frequency: 0.1,
+            relevance_weight_situation: 0.25,
         }
     }
 }
@@ -245,6 +257,12 @@ impl ContextSource for CognitiveContextSource {
                 vector_top_k: self.config.vector_top_k,
                 min_similarity: self.config.min_similarity,
                 situational_boost,
+                max_stability: self.config.max_stability,
+                relevance_weight_semantic: self.config.relevance_weight_semantic,
+                relevance_weight_retrievability: self.config.relevance_weight_retrievability,
+                relevance_weight_importance: self.config.relevance_weight_importance,
+                relevance_weight_frequency: self.config.relevance_weight_frequency,
+                relevance_weight_situation: self.config.relevance_weight_situation,
             };
             let results = retrieve_relevant_facts(
                 &self.fact_repo,

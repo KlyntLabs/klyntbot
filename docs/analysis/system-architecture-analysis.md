@@ -667,7 +667,7 @@ Feature Crate ──emit──▶ DomainEventBus
 **Memory System:**
 - **No vector index until enough rows** — IVF-PQ indexing requires a minimum row count, meaning early queries do brute-force scans (acceptable for personal use, not scalable)
 - **Sequential consolidation** — `consolidate_batch` processes facts one-by-one; could batch LLM calls
-- **No forgetting curve tuning** — FSRS parameters (`MAX_STABILITY = 30.0`, relevance weights) are hardcoded; no per-user calibration
+- **No per-user FSRS calibration** — FSRS parameters are configurable globally but not automatically tuned per-user based on retrieval outcomes
 - **Text-only embeddings** — no support for image/audio memory
 - **Conversation recall is separate from cognitive facts** — two parallel vector search paths that don't share a unified relevance model
 - **Legacy L2 learning tables** (`user_profile`, `behavioral_patterns`, `agent_adaptations`) coexist with the L5 cognitive system — potential confusion about which system is authoritative
@@ -678,10 +678,6 @@ Feature Crate ──emit──▶ DomainEventBus
 - **No distributed event processing** — `tokio::broadcast` is in-process only
 - **No retry/dead-letter for failed extractions** — if the LLM extraction fails, the observation is lost
 - **LLM-dependent consolidation** — every memory write requires an LLM call when similar facts exist, adding latency and cost
-
-**Unwired Features (discovered during deep analysis):**
-- **`semantic_facts_archive` has no retrieval path** — facts enter the archive table but there is no query mechanism to reinstate or search archived facts. This is permanent cold storage with no way back.
-- **Accumulation thresholds are hardcoded** — `ACCUMULATE_PROMOTE_THRESHOLD=5` and `ACCUMULATE_MIN_DAYS=3` are constants, not configurable via `Config`.
 
 **Observability:**
 - **No structured metrics export** — no Prometheus/OpenTelemetry integration
@@ -834,7 +830,7 @@ The system excels at memory architecture and personalization (where it arguably 
 
 #### 7. Add Per-User FSRS Calibration
 
-**Problem:** FSRS parameters are hardcoded globally.
+**Problem:** FSRS parameters (`maxStability`, relevance weights) are configurable via `CognitiveConfig` but not automatically tuned per-user.
 
 **Solution:**
 - Track retrieval success/failure outcomes

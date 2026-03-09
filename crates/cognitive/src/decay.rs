@@ -12,34 +12,54 @@ pub fn retrievability(elapsed_days: f64, stability: f64) -> f64 {
     (0.9_f64.ln() * elapsed_days / stability).exp()
 }
 
+/// Configurable relevance weights for the 5-factor scoring formula.
+#[derive(Debug, Clone, Copy)]
+pub struct RelevanceWeights {
+    pub semantic: f64,
+    pub retrievability: f64,
+    pub importance: f64,
+    pub frequency: f64,
+    pub situation: f64,
+}
+
+impl Default for RelevanceWeights {
+    fn default() -> Self {
+        Self {
+            semantic: 0.3,
+            retrievability: 0.2,
+            importance: 0.15,
+            frequency: 0.1,
+            situation: 0.25,
+        }
+    }
+}
+
 /// Combined relevance score for memory retrieval ranking.
 ///
-/// Weights: semantic 0.3, retrievability 0.2, importance 0.15, frequency 0.1, situation 0.25
+/// Default weights: semantic 0.3, retrievability 0.2, importance 0.15, frequency 0.1, situation 0.25
 pub fn relevance_score(
     semantic_similarity: f64,
     retrievability: f64,
     importance: f64,
     access_frequency: f64,
     situational_boost: f64,
+    weights: &RelevanceWeights,
 ) -> f64 {
-    (semantic_similarity * 0.3
-        + retrievability * 0.2
-        + importance * 0.15
-        + access_frequency * 0.1
-        + situational_boost * 0.25)
+    (semantic_similarity * weights.semantic
+        + retrievability * weights.retrievability
+        + importance * weights.importance
+        + access_frequency * weights.frequency
+        + situational_boost * weights.situation)
         .clamp(0.0, 1.0)
 }
 
-/// Maximum stability value to prevent runaway inflation from frequent retrievals.
-const MAX_STABILITY: f64 = 30.0;
-
 /// Update stability after a retrieval event.
 /// Successful retrieval increases stability (diminishing returns via ln curve),
-/// capped at `MAX_STABILITY` to prevent ranking domination by frequently accessed facts.
+/// capped at `max_stability` to prevent ranking domination by frequently accessed facts.
 /// Failed retrieval leaves stability unchanged.
-pub fn update_stability(current: f64, success: bool) -> f64 {
+pub fn update_stability(current: f64, success: bool, max_stability: f64) -> f64 {
     if success {
-        (current + (1.0 + current).ln().max(0.1)).min(MAX_STABILITY)
+        (current + (1.0 + current).ln().max(0.1)).min(max_stability)
     } else {
         current
     }
@@ -48,6 +68,15 @@ pub fn update_stability(current: f64, success: bool) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const W: RelevanceWeights = RelevanceWeights {
+        semantic: 0.3,
+        retrievability: 0.2,
+        importance: 0.15,
+        frequency: 0.1,
+        situation: 0.25,
+    };
+    const MAX_S: f64 = 30.0;
 
     #[test]
     fn test_retrievability_fresh_memory() {
@@ -84,56 +113,82 @@ mod tests {
 
     #[test]
     fn test_relevance_score_combines_factors() {
-        let score = relevance_score(0.8, 0.9, 0.7, 0.5, 0.6);
+        let score = relevance_score(0.8, 0.9, 0.7, 0.5, 0.6, &W);
         assert!(score > 0.0 && score <= 1.0);
     }
 
     #[test]
     fn test_relevance_score_clamps() {
-        let score = relevance_score(1.0, 1.0, 1.0, 1.0, 1.0);
+        let score = relevance_score(1.0, 1.0, 1.0, 1.0, 1.0, &W);
         assert!((score - 1.0).abs() < f64::EPSILON);
 
-        let score = relevance_score(0.0, 0.0, 0.0, 0.0, 0.0);
+        let score = relevance_score(0.0, 0.0, 0.0, 0.0, 0.0, &W);
         assert!((score - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_relevance_score_custom_weights() {
+        // All weight on semantic similarity
+        let custom = RelevanceWeights {
+            semantic: 1.0,
+            retrievability: 0.0,
+            importance: 0.0,
+            frequency: 0.0,
+            situation: 0.0,
+        };
+        let score = relevance_score(0.8, 0.1, 0.1, 0.1, 0.1, &custom);
+        assert!((score - 0.8).abs() < f64::EPSILON);
     }
 
     #[test]
     fn test_new_stability_after_successful_retrieval() {
         let old = 1.0;
-        let new = update_stability(old, true);
+        let new = update_stability(old, true, MAX_S);
         assert!(new > old);
     }
 
     #[test]
     fn test_stability_unchanged_on_failed_retrieval() {
         let old = 5.0;
-        let new = update_stability(old, false);
+        let new = update_stability(old, false, MAX_S);
         assert!((new - old).abs() < f64::EPSILON);
     }
 
     #[test]
     fn test_stability_capped_at_max() {
-        let high = update_stability(29.0, true);
-        assert!(high <= 30.0, "Stability should be capped at MAX_STABILITY");
+        let high = update_stability(29.0, true, MAX_S);
+        assert!(high <= 30.0, "Stability should be capped at max_stability");
         // Repeated retrievals should not exceed the cap
         let mut s = 1.0;
         for _ in 0..1000 {
-            s = update_stability(s, true);
+            s = update_stability(s, true, MAX_S);
         }
         assert!(
             s <= 30.0,
-            "Stability should never exceed MAX_STABILITY after many retrievals"
+            "Stability should never exceed max_stability after many retrievals"
         );
         assert!(
             (s - 30.0).abs() < f64::EPSILON,
-            "Should reach exactly MAX_STABILITY"
+            "Should reach exactly max_stability"
+        );
+    }
+
+    #[test]
+    fn test_stability_custom_max() {
+        let mut s = 1.0;
+        for _ in 0..100 {
+            s = update_stability(s, true, 10.0);
+        }
+        assert!(
+            (s - 10.0).abs() < f64::EPSILON,
+            "Should cap at custom max_stability of 10.0"
         );
     }
 
     #[test]
     fn test_stability_growth_diminishes() {
-        let s1 = update_stability(1.0, true) - 1.0;
-        let s10 = update_stability(10.0, true) - 10.0;
+        let s1 = update_stability(1.0, true, MAX_S) - 1.0;
+        let s10 = update_stability(10.0, true, MAX_S) - 10.0;
         // Growth from stability=1 should be less than growth from stability=10
         // but the *relative* growth rate decreases
         assert!(s1 > 0.0);

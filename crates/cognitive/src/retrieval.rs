@@ -8,7 +8,7 @@
 use chrono::Utc;
 use tracing::{debug, warn};
 
-use crate::decay::{relevance_score, retrievability, update_stability};
+use crate::decay::{relevance_score, retrievability, update_stability, RelevanceWeights};
 use crate::embedder::SemanticFactEmbedder;
 use crate::repos::SemanticFactRepo;
 use crate::types::SemanticFact;
@@ -32,6 +32,12 @@ pub struct RetrievalParams {
     pub vector_top_k: usize,
     pub min_similarity: f64,
     pub situational_boost: f64,
+    pub max_stability: f64,
+    pub relevance_weight_semantic: f64,
+    pub relevance_weight_retrievability: f64,
+    pub relevance_weight_importance: f64,
+    pub relevance_weight_frequency: f64,
+    pub relevance_weight_situation: f64,
 }
 
 impl RetrievalParams {
@@ -41,6 +47,12 @@ impl RetrievalParams {
             vector_top_k: 30,
             min_similarity: 0.55,
             situational_boost: 0.0,
+            max_stability: 30.0,
+            relevance_weight_semantic: 0.3,
+            relevance_weight_retrievability: 0.2,
+            relevance_weight_importance: 0.15,
+            relevance_weight_frequency: 0.1,
+            relevance_weight_situation: 0.25,
         }
     }
 }
@@ -67,6 +79,14 @@ pub async fn retrieve_relevant_facts(
 ) -> Result<Vec<ScoredFact>, sqlx::Error> {
     let use_vector = !query.is_empty() && embedder.map(|e| e.is_available()).unwrap_or(false);
 
+    let weights = RelevanceWeights {
+        semantic: params.relevance_weight_semantic,
+        retrievability: params.relevance_weight_retrievability,
+        importance: params.relevance_weight_importance,
+        frequency: params.relevance_weight_frequency,
+        situation: params.relevance_weight_situation,
+    };
+
     let mut scored = if use_vector {
         let embedder = embedder.unwrap(); // safe: checked above
         match embedder
@@ -74,25 +94,27 @@ pub async fn retrieve_relevant_facts(
             .await
         {
             Ok(hits) if hits.len() >= MIN_VECTOR_RESULTS => {
-                vector_path(repo, &hits, params.situational_boost).await?
+                vector_path(repo, &hits, params.situational_boost, &weights).await?
             }
             Ok(hits) => {
                 // Too few vector results — merge with fallback
-                let mut vector_scored = vector_path(repo, &hits, params.situational_boost).await?;
+                let mut vector_scored =
+                    vector_path(repo, &hits, params.situational_boost, &weights).await?;
                 let vector_ids: std::collections::HashSet<String> =
                     vector_scored.iter().map(|s| s.fact.id.clone()).collect();
-                let mut fallback = fallback_path(repo, domains, params.situational_boost).await?;
+                let mut fallback =
+                    fallback_path(repo, domains, params.situational_boost, &weights).await?;
                 fallback.retain(|s| !vector_ids.contains(&s.fact.id));
                 vector_scored.append(&mut fallback);
                 vector_scored
             }
             Err(e) => {
                 warn!("Vector search failed, using fallback: {e}");
-                fallback_path(repo, domains, params.situational_boost).await?
+                fallback_path(repo, domains, params.situational_boost, &weights).await?
             }
         }
     } else {
-        fallback_path(repo, domains, params.situational_boost).await?
+        fallback_path(repo, domains, params.situational_boost, &weights).await?
     };
 
     // Sort by FSRS score regardless of path (vector re-ranking can change order)
@@ -105,7 +127,7 @@ pub async fn retrieve_relevant_facts(
 
     // Record access on retrieved facts (increases FSRS stability)
     for result in &scored {
-        let new_stability = update_stability(result.fact.stability, true);
+        let new_stability = update_stability(result.fact.stability, true, params.max_stability);
         if let Err(e) = repo.record_access(&result.fact.id, new_stability).await {
             warn!("Failed to record access for fact '{}': {e}", result.fact.id);
         }
@@ -127,6 +149,7 @@ async fn vector_path(
     repo: &SemanticFactRepo,
     hits: &[(String, f64)],
     situational_boost: f64,
+    weights: &RelevanceWeights,
 ) -> Result<Vec<ScoredFact>, sqlx::Error> {
     if hits.is_empty() {
         return Ok(Vec::new());
@@ -144,7 +167,8 @@ async fn vector_path(
         .map(|fact| {
             let similarity = sim_map.get(fact.id.as_str()).copied().unwrap_or(0.5);
             let (r, freq) = compute_decay_and_freq(&fact, &now);
-            let score = relevance_score(similarity, r, fact.confidence, freq, situational_boost);
+            let score =
+                relevance_score(similarity, r, fact.confidence, freq, situational_boost, weights);
             ScoredFact {
                 fact,
                 score,
@@ -154,11 +178,12 @@ async fn vector_path(
         .collect())
 }
 
-/// Score facts with hardcoded similarity (fallback when vector search unavailable).
+/// Score facts with neutral similarity (fallback when vector search unavailable).
 async fn fallback_path(
     repo: &SemanticFactRepo,
     domains: &[&str],
     situational_boost: f64,
+    weights: &RelevanceWeights,
 ) -> Result<Vec<ScoredFact>, sqlx::Error> {
     let mut all_facts = Vec::new();
     for domain in domains {
@@ -172,7 +197,8 @@ async fn fallback_path(
         .into_iter()
         .map(|fact| {
             let (r, freq) = compute_decay_and_freq(&fact, &now);
-            let score = relevance_score(0.5, r, fact.confidence, freq, situational_boost);
+            let score =
+                relevance_score(0.5, r, fact.confidence, freq, situational_boost, weights);
             ScoredFact {
                 fact,
                 score,
