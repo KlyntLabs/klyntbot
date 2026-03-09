@@ -242,19 +242,33 @@ impl HistoryCompressor {
         let provider = self.summary_provider.as_ref().unwrap();
         let chunk_size = self.config.chunk_size;
         let snippet_len = self.config.snippet_length;
-        let mut summaries = Vec::new();
 
-        for (chunk_idx, chunk) in to_summarize.chunks(chunk_size).enumerate() {
-            let content = match provider.summarize(chunk).await {
-                Ok(text) => text,
-                Err(_) => Self::extractive_summary_with_length(chunk, snippet_len),
+        // Collect chunks with their original ranges, then batch-summarize
+        let (segments, ranges): (Vec<Vec<Message>>, Vec<(usize, usize)>) = to_summarize
+            .chunks(chunk_size)
+            .enumerate()
+            .map(|(i, chunk)| {
+                let start = i * chunk_size;
+                let end = (start + chunk.len()).min(split_point);
+                (chunk.to_vec(), (start, end))
+            })
+            .unzip();
+
+        let results = provider.summarize_batch(segments).await;
+
+        let mut summaries = Vec::with_capacity(results.len());
+        for (chunk_idx, result) in results.into_iter().enumerate() {
+            let content = match result {
+                Ok(text) if !text.is_empty() => text,
+                _ => {
+                    let (start, end) = ranges[chunk_idx];
+                    Self::extractive_summary_with_length(&history[start..end], snippet_len)
+                }
             };
             let token_count = self.token_counter.estimate_text(&content);
-            let start = chunk_idx * chunk_size;
-            let end = (start + chunk.len()).min(split_point);
             summaries.push(HistorySummary {
                 content,
-                message_range: (start, end),
+                message_range: ranges[chunk_idx],
                 token_count,
             });
         }
@@ -630,8 +644,14 @@ mod tests {
 
     #[async_trait]
     impl SummaryProvider for MockSummaryProvider {
-        async fn summarize(&self, _messages: &[Message]) -> Result<String, String> {
-            Ok(self.fixed_response.clone())
+        async fn summarize_batch(
+            &self,
+            segments: Vec<Vec<Message>>,
+        ) -> Vec<Result<String, String>> {
+            segments
+                .iter()
+                .map(|_| Ok(self.fixed_response.clone()))
+                .collect()
         }
     }
 
@@ -686,8 +706,14 @@ mod tests {
 
     #[async_trait]
     impl SummaryProvider for FailingSummaryProvider {
-        async fn summarize(&self, _messages: &[Message]) -> Result<String, String> {
-            Err("Provider unavailable".to_string())
+        async fn summarize_batch(
+            &self,
+            segments: Vec<Vec<Message>>,
+        ) -> Vec<Result<String, String>> {
+            segments
+                .iter()
+                .map(|_| Err("Provider unavailable".into()))
+                .collect()
         }
     }
 

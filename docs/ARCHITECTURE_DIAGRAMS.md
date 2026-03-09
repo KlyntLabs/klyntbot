@@ -778,13 +778,6 @@ flowchart TD
 
 ## Implementation Gaps & Technical Debt Analysis
 
-### High
-
-**3. HistoryCompressor makes N/5 LLM calls for abstractive compression**
-- **Location**: `crates/context_engine/src/` — history compression
-- **Why it matters**: 100 messages → 19 LLM calls for compression, each blocking. No batching, no parallelism. Adds latency to every request with long histories.
-- **Fix**: Batch chunks into a single LLM call with structured output, or parallelize chunk compression with `join_all`.
-
 ### Medium
 
 **4. Single monolithic cron callback**
@@ -817,3 +810,4 @@ The following gaps have been addressed:
 - ~~Cognitive provider created twice~~ — Fixed: stored `Option<DynProvider>` in `AppCore`, reflection handler uses it directly (`state.rs`, `cognitive.rs`)
 - ~~AccumulatedEntry buffer not persisted across restarts~~ — Fixed: added `accumulated_observations` table, repo, and migration; `BackgroundConsolidationService` loads on startup, persists on add, deletes on promotion (`background.rs`, `repos/accumulated_observation.rs`)
 - ~~Dev server dispatch must be manually updated~~ — Fixed: co-located `dispatch_dev()` functions in each command module with `DEV_COMMANDS` const arrays; chained dispatch in `dev_server.rs`; parity test ensures all Tauri commands have dev server coverage (`commands/*.rs`, `dev_server.rs`)
+- ~~HistoryCompressor makes N/5 LLM calls for abstractive compression~~ — Fixed: `SummaryProvider::summarize_batch` accepts all segments at once; `LlmSummaryProvider` batches into sub-groups of 5, produces JSON array summaries per call, and runs sub-batches in parallel via `join_all`; per-segment extractive fallback on failure (`summary_provider.rs`, `llm_summary_provider.rs`, `history_compressor.rs`)

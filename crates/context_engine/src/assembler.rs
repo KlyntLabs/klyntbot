@@ -885,12 +885,15 @@ mod tests {
 
         #[async_trait]
         impl SummaryProvider for TrackingProvider {
-            async fn summarize(
+            async fn summarize_batch(
                 &self,
-                _messages: &[Message],
-            ) -> std::result::Result<String, String> {
+                segments: Vec<Vec<Message>>,
+            ) -> Vec<std::result::Result<String, String>> {
                 self.called.store(true, std::sync::atomic::Ordering::SeqCst);
-                Ok("LLM summary".to_string())
+                segments
+                    .iter()
+                    .map(|_| Ok("LLM summary".to_string()))
+                    .collect()
             }
         }
 
