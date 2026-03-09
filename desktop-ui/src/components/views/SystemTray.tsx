@@ -1,14 +1,16 @@
 import { LogicalSize } from "@tauri-apps/api/dpi";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { Check, Lightbulb, LogOut, Monitor, Send, Settings, X, XCircle } from "lucide-react";
+import { Check, Lightbulb, LogOut, Monitor, Play, Send, Settings, Square, Timer, X, XCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useCoachingNudge } from "../../hooks/useCoachingNudge";
 import { useEvent } from "../../hooks/useEvent";
+import { useFocusTimer } from "../../hooks/useFocusTimer";
 import { ipc } from "../../hooks/useIpc";
 import { useMutation } from "../../hooks/useMutation";
 import { useQuery } from "../../hooks/useQuery";
 import { useSetToggle } from "../../hooks/useSetToggle";
 import { useTransparentBackground } from "../../hooks/useTransparentBackground";
+import { formatElapsed } from "../../lib/dates";
 import type { AgentStatus as AgentStatusType, CalendarEvent, TodayTask } from "../../lib/types";
 import { isTauri } from "../../lib/utils";
 import { Badge } from "../ui/Badge";
@@ -24,6 +26,225 @@ function taskIndicatorClass(task: TodayTask, isCompleted: boolean): string {
   if (task.isDueToday) return "border-l-brand";
   if (task.status === "doing") return "border-l-info";
   return "border-l-transparent";
+}
+
+function FocusControl() {
+  const timer = useFocusTimer();
+  const [tab, setTab] = useState<"focus" | "pomodoro">("focus");
+  const [customMins, setCustomMins] = useState("");
+  const [customWork, setCustomWork] = useState("");
+  const [customBreak, setCustomBreak] = useState("");
+
+  const focusPresets = [15, 25, 45];
+  const pomodoroWorkPresets = [15, 25, 45];
+  const pomodoroBreakPresets = [3, 5, 10];
+
+  if (timer.completed) {
+    return (
+      <div className="px-4 py-3">
+        <div className="flex items-center justify-between">
+          <span className="text-[12px] text-success font-light">
+            {timer.completed.mode === "pomodoro" ? "Pomodoro" : "Focus"} complete!
+          </span>
+          {timer.completed.qualityScore != null && (
+            <span className="text-[11px] text-muted font-light">
+              Quality: {Math.round(timer.completed.qualityScore * 100)}%
+            </span>
+          )}
+        </div>
+        {timer.completed.mode === "pomodoro" && timer.completed.breakMins && (
+          <p className="text-[11px] text-muted font-light mt-1">
+            Time for a {timer.completed.breakMins}m break!
+          </p>
+        )}
+        <button
+          type="button"
+          onClick={timer.dismissCompleted}
+          className="mt-2 w-full py-1.5 rounded-lg bg-white/[0.06] text-[11px] text-muted font-light hover:bg-white/[0.1] transition-colors"
+        >
+          Dismiss
+        </button>
+      </div>
+    );
+  }
+
+  if (timer.active && timer.remainingSecs != null && timer.totalSecs) {
+    const progress = ((timer.totalSecs - timer.remainingSecs) / timer.totalSecs) * 100;
+    return (
+      <div className="px-4 py-3">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-destructive animate-pulse" />
+            <span className="text-[12px] text-secondary font-light capitalize">
+              {timer.mode} Session
+            </span>
+          </div>
+          <span className="text-[16px] font-light text-brand tabular-nums">
+            {formatElapsed(timer.remainingSecs)}
+          </span>
+        </div>
+        <div className="h-1 rounded-full bg-white/[0.08] overflow-hidden mb-2">
+          <div
+            className="h-full rounded-full bg-brand transition-[width] duration-1000"
+            style={{ width: `${Math.min(progress, 100)}%` }}
+          />
+        </div>
+        <button
+          type="button"
+          onClick={() => timer.stop()}
+          disabled={timer.loading}
+          className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-white/[0.06] text-destructive text-[11px] font-light hover:bg-white/[0.1] transition-colors"
+        >
+          <Square className="w-3 h-3" strokeWidth={1.5} />
+          End Session
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="px-4 py-3">
+      <div className="flex gap-1 mb-2.5">
+        <button
+          type="button"
+          onClick={() => setTab("focus")}
+          className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[11px] font-light transition-colors ${
+            tab === "focus"
+              ? "bg-brand text-white"
+              : "bg-white/[0.06] text-muted hover:bg-white/[0.1]"
+          }`}
+        >
+          <Play className="w-3 h-3" strokeWidth={1.5} />
+          Focus
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("pomodoro")}
+          className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-[11px] font-light transition-colors ${
+            tab === "pomodoro"
+              ? "bg-brand text-white"
+              : "bg-white/[0.06] text-muted hover:bg-white/[0.1]"
+          }`}
+        >
+          <Timer className="w-3 h-3" strokeWidth={1.5} />
+          Pomodoro
+        </button>
+      </div>
+
+      {tab === "focus" ? (
+        <div className="flex items-center gap-1.5">
+          {focusPresets.map((mins) => (
+            <button
+              key={mins}
+              type="button"
+              onClick={() => timer.startFocus(mins)}
+              disabled={timer.loading}
+              className={`flex-1 py-1.5 rounded-md text-[11px] font-light transition-colors ${
+                timer.focusDuration === mins
+                  ? "bg-white/[0.12] text-primary ring-1 ring-white/[0.15]"
+                  : "bg-white/[0.06] text-muted hover:bg-white/[0.1]"
+              }`}
+            >
+              {mins}m
+            </button>
+          ))}
+          <form
+            className="flex-1"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const mins = Number.parseInt(customMins, 10);
+              if (mins > 0 && mins <= 480) timer.startFocus(mins);
+            }}
+          >
+            <input
+              type="number"
+              value={customMins}
+              onChange={(e) => setCustomMins(e.target.value)}
+              placeholder="min"
+              min={1}
+              max={480}
+              className="w-full py-1.5 px-2 rounded-md bg-white/[0.06] text-[11px] font-light text-primary placeholder:text-dim text-center outline-none focus:ring-1 focus:ring-white/[0.15] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            />
+          </form>
+        </div>
+      ) : (
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] text-dim font-light w-8">Work</span>
+            {pomodoroWorkPresets.map((mins) => (
+              <button
+                key={mins}
+                type="button"
+                onClick={() => timer.startPomodoro(mins, timer.pomodoroBreak)}
+                disabled={timer.loading}
+                className={`flex-1 py-1 rounded-md text-[10px] font-light transition-colors ${
+                  timer.pomodoroWork === mins
+                    ? "bg-white/[0.12] text-primary ring-1 ring-white/[0.15]"
+                    : "bg-white/[0.06] text-muted hover:bg-white/[0.1]"
+                }`}
+              >
+                {mins}m
+              </button>
+            ))}
+            <form
+              className="flex-1"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const w = Number.parseInt(customWork, 10);
+                if (w > 0 && w <= 480) timer.startPomodoro(w, timer.pomodoroBreak);
+              }}
+            >
+              <input
+                type="number"
+                value={customWork}
+                onChange={(e) => setCustomWork(e.target.value)}
+                placeholder="min"
+                min={1}
+                max={480}
+                className="w-full py-1 px-2 rounded-md bg-white/[0.06] text-[10px] font-light text-primary placeholder:text-dim text-center outline-none focus:ring-1 focus:ring-white/[0.15] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              />
+            </form>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] text-dim font-light w-8">Break</span>
+            {pomodoroBreakPresets.map((mins) => (
+              <button
+                key={mins}
+                type="button"
+                onClick={() => timer.startPomodoro(timer.pomodoroWork, mins)}
+                disabled={timer.loading}
+                className={`flex-1 py-1 rounded-md text-[10px] font-light transition-colors ${
+                  timer.pomodoroBreak === mins
+                    ? "bg-white/[0.12] text-primary ring-1 ring-white/[0.15]"
+                    : "bg-white/[0.06] text-muted hover:bg-white/[0.1]"
+                }`}
+              >
+                {mins}m
+              </button>
+            ))}
+            <form
+              className="flex-1"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const b = Number.parseInt(customBreak, 10);
+                if (b > 0 && b <= 60) timer.startPomodoro(timer.pomodoroWork, b);
+              }}
+            >
+              <input
+                type="number"
+                value={customBreak}
+                onChange={(e) => setCustomBreak(e.target.value)}
+                placeholder="min"
+                min={1}
+                max={60}
+                className="w-full py-1 px-2 rounded-md bg-white/[0.06] text-[10px] font-light text-primary placeholder:text-dim text-center outline-none focus:ring-1 focus:ring-white/[0.15] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              />
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function SystemTray() {
@@ -53,7 +274,12 @@ export function SystemTray() {
     refetchTasks();
   });
 
-  const displayStatus: DisplayStatus = agentStatusData.status === "active" ? "active" : "idle";
+  const focusTimer = useFocusTimer();
+  const displayStatus: DisplayStatus = focusTimer.active
+    ? "active"
+    : agentStatusData.status === "active"
+      ? "active"
+      : "idle";
 
   const handleToggleTask = async (taskId: string) => {
     toggleCompletedId(taskId);
@@ -177,7 +403,7 @@ export function SystemTray() {
                   }}
                 />
                 <span className="text-[11px] text-muted font-light capitalize">
-                  {displayStatus}
+                  {focusTimer.active ? "Focusing" : displayStatus}
                 </span>
               </div>
             </div>
@@ -226,6 +452,11 @@ export function SystemTray() {
               </div>
             </>
           )}
+
+          <div className="mx-4 glass-divider" />
+
+          {/* Focus / Pomodoro Timer */}
+          <FocusControl />
 
           <div className="mx-4 glass-divider" />
 
