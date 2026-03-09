@@ -336,7 +336,7 @@ impl AppCore {
             feedback_tracker: Some(feedback_tracker),
             user_situation: Some(user_situation),
             coaching_service: Some(Arc::new(Mutex::new(coaching_service))),
-            has_cognitive_provider: cognitive_provider.is_some(),
+            cognitive_provider,
             pipeline_broadcast: Some(pipeline_broadcast_tx),
             event_log_repo: Some(cognitive::EventLogRepo::new(
                 storage_pool.inner().clone(),
@@ -1068,6 +1068,7 @@ fn domain_for_event(event: &bus::DomainEvent) -> &'static str {
         | bus::DomainEvent::TaskDeferred { .. }
         | bus::DomainEvent::GoalProgress { .. } => "work",
         bus::DomainEvent::ActivitySessionCompleted { .. }
+        | bus::DomainEvent::FocusSessionStarted { .. }
         | bus::DomainEvent::FocusSessionEnded { .. }
         | bus::DomainEvent::DistractionDetected { .. }
         | bus::DomainEvent::ProductivityScoreComputed { .. } => "energy",

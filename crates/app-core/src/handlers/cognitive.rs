@@ -239,7 +239,7 @@ impl AppCore {
         let fact_repo = SemanticFactRepo::new(pool.clone());
         let model = load_user_model(&fact_repo).await;
         let active_facts = model.active_fact_count();
-        let has_llm = self.has_cognitive_provider;
+        let has_llm = self.cognitive_provider.is_some();
 
         let components = vec![
             ComponentStatusResponse {
@@ -534,9 +534,8 @@ impl AppCore {
         let rule_repo = cognitive::repos::ProceduralRuleRepo::new(pool.clone());
 
         let config = self.config.read().await;
-        let cognitive_provider = providers::create_cognitive_provider(&config).ok().flatten();
         let (reflection_handler, consolidation_handler) =
-            build_reflection_handlers(&cognitive_provider, &config);
+            build_reflection_handlers(&self.cognitive_provider, &config);
         drop(config);
 
         let output = cognitive::reflection::run_weekly_reflection(
@@ -612,6 +611,13 @@ impl AppCore {
                 app: payload["app"].as_str().unwrap_or("unknown").to_string(),
                 duration_secs: payload["duration_secs"].as_i64(),
                 context: payload["context"].as_str().unwrap_or("").to_string(),
+            },
+            "FocusSessionStarted" => bus::DomainEvent::FocusSessionStarted {
+                session_type: payload["session_type"]
+                    .as_str()
+                    .unwrap_or("Focus")
+                    .to_string(),
+                target_mins: payload["target_mins"].as_i64().unwrap_or(25),
             },
             "FocusSessionEnded" => bus::DomainEvent::FocusSessionEnded {
                 quality: payload["quality"].as_f64().unwrap_or(0.5),

@@ -799,22 +799,17 @@ flowchart TD
 
 ### Medium
 
-**4. Cognitive provider created twice**
-- **Location**: `crates/app-core/src/init.rs` (Step 3) and `crates/app-core/src/handlers/cognitive.rs:L537`
-- **Why it matters**: `cognitive_run_reflection()` re-creates the provider from config instead of using the cached one. Minor inefficiency and config divergence risk.
-- **Fix**: Store the cognitive provider in `AppCore` and pass it through to the reflection handler.
-
-**5. Single monolithic cron callback**
+**4. Single monolithic cron callback**
 - **Location**: `crates/app-core/src/init.rs:L434-L618` — `register_cron_callbacks()`
 - **Why it matters**: All cron job types share one `match job_name.as_str()` dispatch. Adding new jobs requires editing this growing match block.
 - **Fix**: Use a trait-based callback registry where each job type registers its own handler.
 
-**6. Context cache invalidated on every tool execution**
+**5. Context cache invalidated on every tool execution**
 - **Location**: `crates/context_engine/src/assembler.rs` — generation counter
 - **Why it matters**: `invalidate_cache()` bumps a generation counter that marks all 8 LRU entries stale. Since tool execution always triggers re-assembly, the cache only benefits the first assembly in a request cycle.
 - **Fix**: Use a more granular invalidation strategy — only invalidate when specific context sources change (e.g., session history appended, new cognitive facts).
 
-**7. `block_on` in Tauri setup blocks UI thread**
+**6. `block_on` in Tauri setup blocks UI thread**
 - **Location**: `crates/desktop/src/main.rs:L53`
 - **Why it matters**: `tauri::async_runtime::block_on(app_core::init(handle))` blocks the Tauri setup thread for the entire boot sequence (potentially several seconds). Users see a blank window during initialization.
 - **Fix**: Show a loading/splash screen, then complete initialization asynchronously. Or move heavy init (LLM provider, MCP connections, embedding engine) to a post-setup task.
@@ -831,3 +826,4 @@ The following gaps have been addressed:
 - ~~`threshold_confidence` computed but unused~~ — Fixed: scales `MAX_THRESHOLD_STEP` for faster convergence (`adaptive.rs`)
 - ~~IntentPipeline is dead code~~ — Fixed: deleted `pipeline.rs`, moved `PipelineConfig` to `types.rs`, removed e2e tests
 - ~~No test for delegation at max depth~~ — Already resolved: `test_delegation_tool_not_injected_at_max_depth` exists in `runtime.rs`
+- ~~Cognitive provider created twice~~ — Fixed: stored `Option<DynProvider>` in `AppCore`, reflection handler uses it directly (`state.rs`, `cognitive.rs`)

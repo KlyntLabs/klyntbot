@@ -64,8 +64,8 @@ pub struct AppCore {
     pub feedback_tracker: Option<Arc<Mutex<FeedbackTracker>>>,
     pub user_situation: Option<Arc<Mutex<UserSituation>>>,
     pub coaching_service: Option<Arc<Mutex<feature_coaching::CoachingService>>>,
-    /// Whether a cognitive LLM provider is active (affects component status reporting).
-    pub has_cognitive_provider: bool,
+    /// Cognitive LLM provider — shared across reflection, cron, and status reporting.
+    pub cognitive_provider: Option<providers::DynProvider>,
     /// Broadcast sender for pipeline events — allows multiple subscribers (Tauri + dev server).
     pub pipeline_broadcast: Option<broadcast::Sender<cognitive::PipelineEvent>>,
     /// Event log repo for persisting domain and pipeline events.
