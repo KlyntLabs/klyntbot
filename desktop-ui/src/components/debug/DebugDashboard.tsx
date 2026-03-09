@@ -1,11 +1,10 @@
-import { Activity, Brain, Cpu, GitBranch, Radio } from "lucide-react";
+import { Activity, Brain, GitBranch, Radio } from "lucide-react";
 import { useEffect, useState } from "react";
 import { DEV_SSE_BASE, isTauri } from "../../lib/utils";
 import { CoachingTab } from "./tabs/CoachingTab";
 import { EventsTab } from "./tabs/EventsTab";
 import { MemoryTab } from "./tabs/MemoryTab";
 import { PipelineTab } from "./tabs/PipelineTab";
-import { SystemTab } from "./tabs/SystemTab";
 
 const COGNITIVE_SSE_EVENTS = [
   "cognitive:domain_event",
@@ -13,14 +12,13 @@ const COGNITIVE_SSE_EVENTS = [
   "cognitive:consolidation",
 ];
 
-type DebugTab = "memory" | "coaching" | "events" | "pipeline" | "system";
+type DebugTab = "memory" | "coaching" | "events" | "pipeline";
 
 const tabs: { id: DebugTab; label: string; icon: typeof Brain }[] = [
   { id: "memory", label: "Memory", icon: Brain },
   { id: "coaching", label: "Coaching", icon: Activity },
   { id: "events", label: "Events", icon: Radio },
   { id: "pipeline", label: "Pipeline", icon: GitBranch },
-  { id: "system", label: "System", icon: Cpu },
 ];
 
 export function DebugDashboard() {
@@ -80,7 +78,6 @@ export function DebugDashboard() {
         {activeTab === "coaching" && <CoachingTab />}
         {activeTab === "events" && <EventsTab />}
         {activeTab === "pipeline" && <PipelineTab />}
-        {activeTab === "system" && <SystemTab />}
       </div>
     </div>
   );

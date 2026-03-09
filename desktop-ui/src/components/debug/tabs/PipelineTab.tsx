@@ -117,7 +117,14 @@ export function PipelineTab() {
                 className="p-3 bg-white/[0.04] rounded-lg border border-white/[0.08]"
               >
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-[10px] text-muted font-mono">{e.ts.slice(11, 19)}</span>
+                  <span className="text-[10px] text-muted font-mono">
+                    {new Date(e.ts).toLocaleTimeString(undefined, {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      second: "2-digit",
+                      hour12: false,
+                    })}
+                  </span>
                   <span className="text-[10px] bg-brand/20 text-brand px-1 py-0.5 rounded">
                     {e.factsExtracted} facts
                   </span>
@@ -141,7 +148,14 @@ export function PipelineTab() {
                 className="p-3 bg-white/[0.04] rounded-lg border border-white/[0.08]"
               >
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-[10px] text-muted font-mono">{c.ts.slice(11, 19)}</span>
+                  <span className="text-[10px] text-muted font-mono">
+                    {new Date(c.ts).toLocaleTimeString(undefined, {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      second: "2-digit",
+                      hour12: false,
+                    })}
+                  </span>
                   <span
                     className={`text-[10px] px-1 py-0.5 rounded ${opColors[c.operation] ?? opColors.NOOP}`}
                   >

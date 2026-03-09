@@ -131,7 +131,12 @@ export function EventsTab() {
             >
               <div className="flex items-center gap-2">
                 <span className="text-[10px] text-muted font-mono w-20 shrink-0">
-                  {e.timestamp.slice(11, 19)}
+                  {new Date(e.timestamp).toLocaleTimeString(undefined, {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit",
+                    hour12: false,
+                  })}
                 </span>
                 <span className="text-[11px] text-secondary">{e.eventType}</span>
                 <span className={`text-[9px] px-1 py-0.5 rounded ${color}`}>{e.salience}</span>

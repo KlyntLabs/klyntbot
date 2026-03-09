@@ -94,3 +94,4 @@ Five built-in agents in `agents/`: general, task, finance, automation, communica
 - **Dependency inversion** — new tools needing agent context must inject via `Arc<dyn Trait>` to avoid circular deps.
 - **`email` feature** (on by default) gates IMAP/SMTP deps in `channels` crate.
 - **`tauri.conf.json` uses `npm` in `beforeDevCommand`** but project requires `bun`. `cargo tauri dev` may fail with ENOENT. Workaround: start Vite manually (`cd desktop-ui && bun run dev`) then run `cargo tauri dev`, or use browser-only dev mode.
+- **Timestamps are UTC** — Rust emits `chrono::Utc::now().to_rfc3339()`. Never `.slice()` ISO strings for display — always parse via `new Date(iso)` and use `toLocaleTimeString()`. Shared helper: `formatTime()` in `desktop-ui/src/lib/dates.ts`.
