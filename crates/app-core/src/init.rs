@@ -1164,5 +1164,6 @@ fn domain_for_event(event: &bus::DomainEvent) -> &'static str {
         bus::DomainEvent::UserCorrectedAI { .. } => "learning",
         bus::DomainEvent::CoachingFeedback { .. } => "coaching",
         bus::DomainEvent::ChatTurnCompleted { .. } => "general",
+        bus::DomainEvent::NoteCreated { .. } | bus::DomainEvent::NoteUpdated { .. } => "notes",
     }
 }

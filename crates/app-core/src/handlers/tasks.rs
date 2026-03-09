@@ -323,6 +323,15 @@ impl AppCore {
             id: id.clone(),
         }];
 
+        // Emit domain event for timeline tracking
+        if let Ok(bus) = self.domain_event_bus() {
+            bus.publish(bus::DomainEvent::TaskCreated {
+                task_id: id.clone(),
+                project: created.project_id.clone(),
+                estimate_mins: None,
+            });
+        }
+
         // Newly created task has no subtasks yet; resolve status label for the response
         let mut task = action_to_task(&created, 0, 0);
         task.status_label = resolve_status_label(&self.repos, &created).await?;
@@ -408,6 +417,17 @@ impl AppCore {
             .update(&patch)
             .await
             .map_err(map_storage_err)?;
+
+        // Emit domain event when completing
+        if updated.status == "done" {
+            if let Ok(bus) = self.domain_event_bus() {
+                bus.publish(bus::DomainEvent::TaskCompleted {
+                    task_id: id.clone(),
+                    actual_duration_mins: None,
+                    estimated_duration_mins: row.estimated_minutes.map(|m| m as i64),
+                });
+            }
+        }
 
         let updates = vec![EntityUpdate {
             kind: EntityKind::Task,

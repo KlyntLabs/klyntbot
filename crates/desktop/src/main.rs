@@ -142,6 +142,8 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            // Timeline / Dashboard
+            commands::timeline::timeline_query,
             // Tasks
             commands::tasks::today_tasks,
             commands::tasks::task_get,

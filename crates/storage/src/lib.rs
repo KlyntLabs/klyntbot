@@ -20,7 +20,9 @@ pub use repos::Repos;
 pub use vector_store::{sanitize_predicate_value, VectorStore};
 
 // Re-export repo types for consumer convenience.
-pub use repos::action_repo::{ActionFilter, ActionPatch, ActionRepo, ActionSummary};
+pub use repos::action_repo::{
+    ActionFilter, ActionPatch, ActionRepo, ActionSummary, TimeEntryWithTask,
+};
 pub use repos::area::AreaRepo;
 pub use repos::key_result::KeyResultRepo;
 pub use repos::objective::ObjectiveRepo;

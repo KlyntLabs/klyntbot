@@ -42,6 +42,8 @@ pub fn evaluate_salience(event: &DomainEvent) -> SalienceVerdict {
             is_over_budget: false,
             ..
         } => SalienceVerdict::Accumulate,
+        DomainEvent::NoteCreated { .. } => SalienceVerdict::Accumulate,
+        DomainEvent::NoteUpdated { .. } => SalienceVerdict::Accumulate,
     }
 }
 

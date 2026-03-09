@@ -308,6 +308,15 @@ impl AppCore {
                 .map_err(map_storage_err)?;
         }
 
+        // Emit domain event for timeline tracking
+        if let Ok(bus) = self.domain_event_bus() {
+            bus.publish(bus::DomainEvent::TransactionRecorded {
+                category: row.category.clone().unwrap_or_default(),
+                amount: row.amount as f64 / 100.0,
+                is_over_budget: false,
+            });
+        }
+
         Ok((row, Self::finance_updates(id)))
     }
 

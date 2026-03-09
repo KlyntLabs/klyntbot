@@ -71,6 +71,16 @@ pub enum DomainEvent {
         limit: f64,
     },
 
+    // -- Notes --
+    NoteCreated {
+        note_id: String,
+        title: String,
+    },
+    NoteUpdated {
+        note_id: String,
+        title: String,
+    },
+
     // -- Chat --
     ChatTurnCompleted {
         user_message: String,

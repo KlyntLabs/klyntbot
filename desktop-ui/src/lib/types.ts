@@ -914,6 +914,7 @@ export interface ColumnValueSetParams {
 
 export type Tab = "All" | string;
 export type SidebarItem =
+  | "Dashboard"
   | "Chat"
   | "Tasks"
   | "OKR"
@@ -1079,3 +1080,85 @@ export interface AppInfoResponse {
   dataDir: string;
   setupCompleted: boolean;
 }
+
+// ── Timeline / Dashboard ──────────────────────────────────────────
+
+export type TimelineSource = "productivity" | "focus" | "task" | "note" | "finance" | "system";
+
+export type TimelineEntryType =
+  | "appUsage"
+  | "focusSession"
+  | "taskTimeEntry"
+  | "taskCreated"
+  | "taskCompleted"
+  | "taskUpdated"
+  | "noteCreated"
+  | "noteUpdated"
+  | "transactionRecorded"
+  | "expenseRecorded"
+  | "incomeRecorded"
+  | "systemEvent";
+
+export interface TimelineEntry {
+  id: string;
+  source: TimelineSource;
+  entryType: TimelineEntryType;
+  title: string;
+  description?: string;
+  startedAt: string;
+  endedAt?: string;
+  durationSecs?: number;
+  entityId?: string;
+  entityRoute?: string;
+  color: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface TopAppSummary {
+  appName: string;
+  durationSecs: number;
+  percentage: number;
+}
+
+export interface SourceBreakdown {
+  source: TimelineSource;
+  durationSecs: number;
+  count: number;
+}
+
+export interface TimelineSummary {
+  totalTrackedSecs: number;
+  focusSecs: number;
+  tasksCompleted: number;
+  tasksCreated: number;
+  notesTouched: number;
+  transactionsCount: number;
+  topApps: TopAppSummary[];
+  sourceBreakdown: SourceBreakdown[];
+}
+
+export interface TimelineResponse {
+  entries: TimelineEntry[];
+  summary: TimelineSummary;
+}
+
+export interface TimelineQuery {
+  startDate: string;
+  endDate: string;
+  sources?: TimelineSource[];
+  includePointEvents?: boolean;
+}
+
+export const EMPTY_TIMELINE_RESPONSE: TimelineResponse = {
+  entries: [],
+  summary: {
+    totalTrackedSecs: 0,
+    focusSecs: 0,
+    tasksCompleted: 0,
+    tasksCreated: 0,
+    notesTouched: 0,
+    transactionsCount: 0,
+    topApps: [],
+    sourceBreakdown: [],
+  },
+};

@@ -191,6 +191,9 @@ async fn dispatch(
     if let Some(r) = commands::cognitive::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }
+    if let Some(r) = commands::timeline::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
 
     // ── chat_send (needs SSE channels, handled inline) ──────────────
     if cmd == "chat_send" {
@@ -392,6 +395,7 @@ fn domain_for_event(event: &bus::DomainEvent) -> &'static str {
         bus::DomainEvent::UserCorrectedAI { .. } => "learning",
         bus::DomainEvent::CoachingFeedback { .. } => "coaching",
         bus::DomainEvent::ChatTurnCompleted { .. } => "general",
+        bus::DomainEvent::NoteCreated { .. } | bus::DomainEvent::NoteUpdated { .. } => "notes",
     }
 }
 
@@ -458,6 +462,7 @@ mod tests {
             commands::workflows::DEV_COMMANDS,
             commands::columns::DEV_COMMANDS,
             commands::cognitive::DEV_COMMANDS,
+            commands::timeline::DEV_COMMANDS,
         ];
         // chat_send is handled inline in dev_server.rs
         let mut set: BTreeSet<String> = modules

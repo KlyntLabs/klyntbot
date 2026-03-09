@@ -154,6 +154,12 @@ export function formatLongDuration(secs: number): string {
   return `${m} min`;
 }
 
+/** Minutes elapsed since midnight for an ISO timestamp (local timezone). */
+export function minutesSinceMidnight(isoStr: string): number {
+  const d = new Date(isoStr);
+  return d.getHours() * 60 + d.getMinutes();
+}
+
 /** Format an ISO timestamp as a compact relative time (e.g. "now", "5m", "3h", "2d", "1w", "3mo"). */
 export function formatRelativeTime(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();

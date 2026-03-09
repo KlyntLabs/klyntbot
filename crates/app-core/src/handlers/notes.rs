@@ -266,6 +266,14 @@ impl AppCore {
                 .map_err(map_storage_err)?;
         }
 
+        // Emit domain event for timeline tracking
+        if let Ok(bus) = self.domain_event_bus() {
+            bus.publish(bus::DomainEvent::NoteCreated {
+                note_id: id.clone(),
+                title: created.title.clone(),
+            });
+        }
+
         let response = note_with_tags(self, &created).await?;
         let updates = vec![EntityUpdate {
             kind: EntityKind::Note,
@@ -298,6 +306,14 @@ impl AppCore {
         // Extract wiki-links and entity mentions only when body content changed
         if params.body.is_some() || params.body_html.is_some() {
             extract_links_and_mentions(self, &params.id, &updated).await?;
+        }
+
+        // Emit domain event for timeline tracking
+        if let Ok(bus) = self.domain_event_bus() {
+            bus.publish(bus::DomainEvent::NoteUpdated {
+                note_id: params.id.clone(),
+                title: updated.title.clone(),
+            });
         }
 
         let response = note_with_tags(self, &updated).await?;

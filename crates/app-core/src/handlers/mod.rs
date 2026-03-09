@@ -14,4 +14,5 @@ pub mod projects;
 pub mod settings;
 pub mod status;
 pub mod tasks;
+pub mod timeline;
 pub mod workflows;

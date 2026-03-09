@@ -103,6 +103,31 @@ const ArchivedSettings = lazy(() =>
     default: m.ArchivedSettings,
   })),
 );
+const DashboardLayout = lazy(() =>
+  import("./components/dashboard/DashboardLayout").then((m) => ({
+    default: m.DashboardLayout,
+  })),
+);
+const DashboardDayPage = lazy(() =>
+  import("./components/dashboard/DayCalendarView").then((m) => ({
+    default: m.DayCalendarView,
+  })),
+);
+const DashboardWeekPage = lazy(() =>
+  import("./components/dashboard/WeekCalendarView").then((m) => ({
+    default: m.WeekCalendarView,
+  })),
+);
+const DashboardMonthPage = lazy(() =>
+  import("./components/dashboard/MonthCalendarView").then((m) => ({
+    default: m.MonthCalendarView,
+  })),
+);
+const DashboardYearPage = lazy(() =>
+  import("./components/dashboard/YearHeatmapView").then((m) => ({
+    default: m.YearHeatmapView,
+  })),
+);
 const Launcher = lazy(() =>
   import("./components/views/Launcher").then((m) => ({ default: m.Launcher })),
 );
@@ -145,6 +170,10 @@ const CompleteStep = lazy(() =>
   import("./components/setup/pages/CompleteStep").then((m) => ({ default: m.CompleteStep })),
 );
 
+function DashboardRedirect() {
+  return <Navigate to={`/day/${todayISO()}`} replace />;
+}
+
 function ProductivityRedirect() {
   return <Navigate to={`/productivity/day/${todayISO()}`} replace />;
 }
@@ -166,7 +195,40 @@ const router = createHashRouter([
   {
     element: <AppShell />,
     children: [
-      { path: "/", element: <MainApp /> },
+      { path: "/", element: <DashboardRedirect /> },
+      {
+        path: "/day/:date",
+        element: (
+          <DashboardLayout>
+            <DashboardDayPage />
+          </DashboardLayout>
+        ),
+      },
+      {
+        path: "/week/:date",
+        element: (
+          <DashboardLayout>
+            <DashboardWeekPage />
+          </DashboardLayout>
+        ),
+      },
+      {
+        path: "/month/:date",
+        element: (
+          <DashboardLayout>
+            <DashboardMonthPage />
+          </DashboardLayout>
+        ),
+      },
+      {
+        path: "/year/:year",
+        element: (
+          <DashboardLayout>
+            <DashboardYearPage />
+          </DashboardLayout>
+        ),
+      },
+      { path: "/tasks", element: <MainApp /> },
       { path: "/chat", element: <Chat /> },
       { path: "/notes", element: <NotesView /> },
       { path: "/project/:id", element: <ProjectDetail /> },

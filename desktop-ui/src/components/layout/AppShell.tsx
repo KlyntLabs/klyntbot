@@ -38,11 +38,13 @@ export function AppShell() {
   const activeSidebarItem = useMemo((): SidebarItem => {
     const path = location.pathname;
     if (path.startsWith("/chat")) return "Chat";
+    if (path.startsWith("/tasks") || path.startsWith("/task/")) return "Tasks";
     if (path.startsWith("/notes")) return "Notes";
     if (path.startsWith("/finance")) return "Finance";
     if (path.startsWith("/productivity")) return "Productivity";
     if (path.startsWith("/settings")) return "Settings";
-    return "Tasks";
+    if (path.startsWith("/debug")) return "Debug";
+    return "Dashboard";
   }, [location.pathname]);
 
   // Derive chat context from current route (detail pages handled by usePageContext inside SidebarChat)
@@ -50,10 +52,18 @@ export function AppShell() {
     const path = location.pathname;
     const search = new URLSearchParams(location.search);
 
-    if (path === "/") {
+    if (path.startsWith("/tasks")) {
       const tab = search.get("tab");
       if (tab) return { entityKind: `tasks.${tab.toLowerCase()}` };
       return { entityKind: "tasks" };
+    }
+    if (
+      path.startsWith("/day/") ||
+      path.startsWith("/week/") ||
+      path.startsWith("/month/") ||
+      path.startsWith("/year/")
+    ) {
+      return { entityKind: "dashboard" };
     }
     if (path.startsWith("/chat")) return { entityKind: "chat" };
     if (path.startsWith("/notes")) return { entityKind: "notes" };

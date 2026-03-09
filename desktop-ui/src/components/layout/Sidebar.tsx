@@ -3,6 +3,7 @@ import {
   Bug,
   CheckSquare,
   FileText,
+  LayoutDashboard,
   MessageCircle,
   MessageSquare,
   Settings,
@@ -21,7 +22,8 @@ interface SidebarProps {
 
 const items: { key: SidebarItem; icon: typeof MessageSquare; path?: string; bottom?: boolean }[] = [
   { key: "Chat", icon: MessageSquare, path: "/chat" },
-  { key: "Tasks", icon: CheckSquare, path: "/" },
+  { key: "Dashboard", icon: LayoutDashboard, path: "/" },
+  { key: "Tasks", icon: CheckSquare, path: "/tasks" },
   { key: "Notes", icon: FileText, path: "/notes" },
   { key: "Finance", icon: Wallet, path: "/finance" },
   { key: "Productivity", icon: Activity, path: "/productivity" },

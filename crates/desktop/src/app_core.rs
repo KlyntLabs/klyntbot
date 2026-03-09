@@ -151,6 +151,8 @@ fn wire_event_channels(core: &AppCore, channels: EventChannels, app_handle: &tau
                             bus::DomainEvent::UserCorrectedAI { .. } => "learning",
                             bus::DomainEvent::CoachingFeedback { .. } => "coaching",
                             bus::DomainEvent::ChatTurnCompleted { .. } => "general",
+                            bus::DomainEvent::NoteCreated { .. }
+                            | bus::DomainEvent::NoteUpdated { .. } => "notes",
                         };
                         let salience_str = match salience {
                             cognitive::types::SalienceVerdict::Extract => "extract",

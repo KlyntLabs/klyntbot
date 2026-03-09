@@ -427,6 +427,8 @@ fn event_type_key(event: &DomainEvent) -> String {
         DomainEvent::UserStatedFact { .. } => "UserStatedFact".into(),
         DomainEvent::UserCorrectedAI { .. } => "UserCorrectedAI".into(),
         DomainEvent::CoachingFeedback { .. } => "CoachingFeedback".into(),
+        DomainEvent::NoteCreated { .. } => "NoteCreated".into(),
+        DomainEvent::NoteUpdated { .. } => "NoteUpdated".into(),
     }
 }
 

@@ -44,6 +44,16 @@
   --border: rgba(255, 255, 255, 0.08);
   --border-subtle: rgba(255, 255, 255, 0.04);
 
+  /* ── Timeline / Dashboard ──────────────────── */
+  --timeline-app-productive: oklch(0.72 0.15 145);
+  --timeline-app-distracting: oklch(0.65 0.18 25);
+  --timeline-app-neutral: oklch(0.55 0.02 250);
+  --timeline-focus: oklch(0.65 0.18 290);
+  --timeline-task: oklch(0.68 0.16 240);
+  --timeline-note: oklch(0.75 0.14 80);
+  --timeline-finance: oklch(0.72 0.16 160);
+  --timeline-system: oklch(0.55 0.02 250);
+
   /* ── Overlay ───────────────────────────────── */
   --overlay: rgba(0, 0, 0, 0.25);
   --overlay-heavy: rgba(0, 0, 0, 0.45);
@@ -116,6 +126,16 @@
   /* Overlay */
   --color-overlay: var(--overlay);
   --color-overlay-heavy: var(--overlay-heavy);
+
+  /* Timeline */
+  --color-timeline-app-productive: var(--timeline-app-productive);
+  --color-timeline-app-distracting: var(--timeline-app-distracting);
+  --color-timeline-app-neutral: var(--timeline-app-neutral);
+  --color-timeline-focus: var(--timeline-focus);
+  --color-timeline-task: var(--timeline-task);
+  --color-timeline-note: var(--timeline-note);
+  --color-timeline-finance: var(--timeline-finance);
+  --color-timeline-system: var(--timeline-system);
 
   /* Radius — Tahoe uses larger, pill-like radii */
   --radius-sm: calc(var(--radius) - 6px);
