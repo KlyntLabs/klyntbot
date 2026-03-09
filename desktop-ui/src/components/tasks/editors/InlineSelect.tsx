@@ -52,7 +52,7 @@ export function InlineSelect({
         }}
         aria-haspopup="listbox"
         aria-expanded={open}
-        className="w-full text-left rounded px-1 -mx-1 cursor-pointer transition-colors"
+        className="inline-flex text-left rounded px-1 -mx-1 cursor-pointer transition-colors"
       >
         {renderDisplay(value)}
       </button>

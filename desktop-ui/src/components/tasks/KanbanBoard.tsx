@@ -18,7 +18,6 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router";
 import { formatDate } from "../../lib/dates";
 import type { Area, Project, StatusLabel, Task, TaskUpdateParams } from "../../lib/types";
 import { Badge } from "../ui/Badge";
@@ -31,6 +30,7 @@ interface KanbanBoardProps {
   statusLabels: StatusLabel[];
   onUpdateTask: (params: TaskUpdateParams) => Promise<void>;
   onRefetch: () => void;
+  onSelectTask: (id: string) => void;
 }
 
 interface ColumnData {
@@ -204,8 +204,8 @@ export function KanbanBoard({
   statusLabels,
   onUpdateTask,
   onRefetch,
+  onSelectTask,
 }: KanbanBoardProps) {
-  const navigate = useNavigate();
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [overColumnId, setOverColumnId] = useState<string | null>(null);
   const dragJustEnded = useRef(false);
@@ -366,9 +366,9 @@ export function KanbanBoard({
 
   const handleNavigate = useCallback(
     (id: string) => {
-      navigate(`/task/${id}`);
+      onSelectTask(id);
     },
-    [navigate],
+    [onSelectTask],
   );
 
   return (
