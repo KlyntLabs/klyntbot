@@ -1,8 +1,10 @@
+pub mod accumulated_observation;
 pub mod episodic_memory;
 pub mod event_log;
 pub mod procedural_rule;
 pub mod semantic_fact;
 
+pub use accumulated_observation::AccumulatedObservationRepo;
 pub use episodic_memory::EpisodicMemoryRepo;
 pub use event_log::EventLogRepo;
 pub use procedural_rule::ProceduralRuleRepo;
@@ -51,6 +53,12 @@ pub fn cognitive_migrations() -> Vec<FeatureMigration> {
             version: 3,
             description: "Create domain_event_log and pipeline_event_log tables".to_string(),
             sql: include_str!("../../migrations/003_event_log_tables.sql").to_string(),
+        },
+        FeatureMigration {
+            feature_name: "cognitive".to_string(),
+            version: 4,
+            description: "Persist accumulated observations across restarts".to_string(),
+            sql: include_str!("../../migrations/004_accumulated_observations.sql").to_string(),
         },
     ]
 }

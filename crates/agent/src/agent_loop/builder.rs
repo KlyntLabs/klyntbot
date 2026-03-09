@@ -269,6 +269,8 @@ impl AgentLoopBuilder {
                     };
                     let episodic_repo =
                         cognitive::EpisodicMemoryRepo::new(pool.clone());
+                    let accum_repo =
+                        cognitive::AccumulatedObservationRepo::new(pool.clone());
                     let cancel = CancellationToken::new();
                     let bg_service = cognitive::background::BackgroundConsolidationService::start(
                         event_rx,
@@ -279,6 +281,7 @@ impl AgentLoopBuilder {
                         cognitive_embedder,
                         cancel.clone(),
                         self.pipeline_tx.take(),
+                        Some(accum_repo),
                     );
                     info!("Cognitive background consolidation service started");
                     Some(bg_service)

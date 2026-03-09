@@ -778,13 +778,6 @@ flowchart TD
 
 ## Implementation Gaps & Technical Debt Analysis
 
-### Critical
-
-**1. AccumulatedEntry buffer not persisted across restarts**
-- **Location**: `crates/cognitive/src/background.rs` — `HashMap<String, AccumulatedEntry>` in-memory
-- **Why it matters**: App restart clears all accumulated event counts, resetting promotion thresholds. Events that were 4/5 toward promotion are silently lost.
-- **Fix**: Persist `AccumulatedEntry` to a SQLite table. Load on startup, save on each accumulation.
-
 ### High
 
 **2. Dev server dispatch must be manually updated**
@@ -827,3 +820,4 @@ The following gaps have been addressed:
 - ~~IntentPipeline is dead code~~ — Fixed: deleted `pipeline.rs`, moved `PipelineConfig` to `types.rs`, removed e2e tests
 - ~~No test for delegation at max depth~~ — Already resolved: `test_delegation_tool_not_injected_at_max_depth` exists in `runtime.rs`
 - ~~Cognitive provider created twice~~ — Fixed: stored `Option<DynProvider>` in `AppCore`, reflection handler uses it directly (`state.rs`, `cognitive.rs`)
+- ~~AccumulatedEntry buffer not persisted across restarts~~ — Fixed: added `accumulated_observations` table, repo, and migration; `BackgroundConsolidationService` loads on startup, persists on add, deletes on promotion (`background.rs`, `repos/accumulated_observation.rs`)

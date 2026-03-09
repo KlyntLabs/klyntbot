@@ -12,13 +12,14 @@ use serde::Serialize;
 use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, warn};
+use tracing::{debug, info, warn};
 
 use bus::DomainEvent;
 
 use crate::consolidation::{consolidate_batch, ConsolidationHandler};
 use crate::embedder::SemanticFactEmbedder;
 use crate::extraction::{extract_from_observation, ExtractionHandler};
+use crate::repos::accumulated_observation::AccumulatedObservationRepo;
 use crate::repos::{EpisodicMemoryRepo, SemanticFactRepo};
 use crate::salience::evaluate_salience;
 use crate::types::{EpisodicMemory, Observation, SalienceVerdict};
@@ -92,10 +93,34 @@ impl BackgroundConsolidationService {
         embedder: Option<Arc<dyn SemanticFactEmbedder>>,
         cancel: CancellationToken,
         pipeline_tx: Option<tokio::sync::broadcast::Sender<PipelineEvent>>,
+        accum_repo: Option<AccumulatedObservationRepo>,
     ) -> Self {
         let cancel_clone = cancel.clone();
         let handle = tokio::spawn(async move {
-            let mut accumulator: HashMap<String, AccumulatedEntry> = HashMap::new();
+            // Restore accumulated entries from previous session
+            let mut accumulator: HashMap<String, AccumulatedEntry> =
+                if let Some(ref ar) = accum_repo {
+                    let persisted = ar.load_all().await;
+                    let mut map = HashMap::new();
+                    for (key, entry) in persisted {
+                        map.insert(
+                            key,
+                            AccumulatedEntry {
+                                observations: entry.observations,
+                                days_seen: entry.days_seen,
+                            },
+                        );
+                    }
+                    if !map.is_empty() {
+                        info!(
+                            "Restored {} accumulated event type(s) from previous session",
+                            map.len()
+                        );
+                    }
+                    map
+                } else {
+                    HashMap::new()
+                };
 
             loop {
                 tokio::select! {
@@ -173,6 +198,12 @@ impl BackgroundConsolidationService {
                             SalienceVerdict::Accumulate => {
                                 if let Some(obs) = obs {
                                     let key = event_type_key(&event);
+
+                                    // Persist observation before adding to in-memory buffer
+                                    if let Some(ref ar) = accum_repo {
+                                        ar.insert(&key, &obs).await;
+                                    }
+
                                     let entry = accumulator
                                         .entry(key.clone())
                                         .or_insert_with(AccumulatedEntry::new);
@@ -220,6 +251,10 @@ impl BackgroundConsolidationService {
                                             }
                                         }
                                         accumulator.remove(&key);
+                                        // Clear persisted rows after promotion
+                                        if let Some(ref ar) = accum_repo {
+                                            ar.delete_by_key(&key).await;
+                                        }
                                     }
                                 }
                             }
@@ -381,6 +416,7 @@ fn event_to_observation(event: &DomainEvent) -> Option<Observation> {
 fn event_type_key(event: &DomainEvent) -> String {
     match event {
         DomainEvent::ActivitySessionCompleted { .. } => "ActivitySessionCompleted".into(),
+        DomainEvent::FocusSessionStarted { .. } => "FocusSessionStarted".into(),
         DomainEvent::FocusSessionEnded { .. } => "FocusSessionEnded".into(),
         DomainEvent::DistractionDetected { .. } => "DistractionDetected".into(),
         DomainEvent::ProductivityScoreComputed { .. } => "ProductivityScoreComputed".into(),
