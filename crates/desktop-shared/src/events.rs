@@ -59,6 +59,8 @@ pub const ACTIVITY_TICK: &str = "activity:tick";
 pub const ACTIVITY_SWITCH: &str = "activity:switch";
 pub const FOCUS_STATE_CHANGED: &str = "focus:state_changed";
 pub const FOCUS_AUTO_DETECTED: &str = "focus:auto_detected";
+pub const FOCUS_TICK: &str = "focus:tick";
+pub const FOCUS_COMPLETED: &str = "focus:completed";
 pub const SCORE_UPDATED: &str = "score:updated";
 pub const BUCKET_COMPLETED: &str = "bucket:completed";
 pub const INSIGHT_GENERATED: &str = "insight:generated";
@@ -530,4 +532,21 @@ pub struct InsightPayload {
     pub insight_type: String,
     pub title: String,
     pub sentiment: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FocusTickPayload {
+    pub remaining_secs: u64,
+    pub total_secs: u64,
+    pub mode: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FocusCompletedPayload {
+    pub mode: String,
+    pub duration_mins: u64,
+    pub quality_score: Option<f64>,
+    pub break_mins: Option<u64>,
 }

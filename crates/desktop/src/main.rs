@@ -4,6 +4,7 @@ mod app_core;
 mod commands;
 #[cfg(debug_assertions)]
 mod dev_server;
+mod focus_timer;
 mod oauth;
 
 use std::sync::Arc;
