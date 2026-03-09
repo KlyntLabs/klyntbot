@@ -308,6 +308,7 @@ fn main() {
             commands::cognitive::coaching_reset_dismissals,
             commands::cognitive::coaching_clear_signals,
             commands::cognitive::coaching_submit_feedback,
+            commands::cognitive::coaching_report_ignored,
             commands::cognitive::cognitive_inject_event,
             commands::cognitive::cognitive_event_log,
             commands::cognitive::cognitive_pipeline_log,

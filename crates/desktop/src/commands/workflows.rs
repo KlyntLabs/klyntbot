@@ -72,3 +72,52 @@ pub async fn label_reorder(
 ) -> Result<(), ApiError> {
     state.label_reorder(params).await
 }
+
+// ── Dev server dispatch ─────────────────────────────────────────────
+
+#[cfg(test)]
+pub(crate) const DEV_COMMANDS: &[&str] = &[
+    "workflow_list",
+    "workflow_get",
+    "workflow_get_effective",
+    "workflow_create",
+    "workflow_delete",
+    "label_create",
+    "label_update",
+    "label_delete",
+    "label_reorder",
+];
+
+#[cfg(debug_assertions)]
+pub(crate) async fn dispatch_dev(
+    cmd: &str,
+    core: &AppCore,
+    body: &serde_json::Value,
+) -> Option<Result<serde_json::Value, ApiError>> {
+    use super::dev_helpers::{self as dev, try_field};
+    Some(match cmd {
+        "workflow_list" => dev::val(core.workflow_list().await),
+        "workflow_get" => {
+            let id = try_field!(dev::get_str(body, "id"));
+            dev::val(core.workflow_get(id).await)
+        }
+        "workflow_get_effective" => {
+            dev::val(core.workflow_get_effective(dev::get(body, "projectId")).await)
+        }
+        "workflow_create" => {
+            dev::val(core.workflow_create(try_field!(dev::parse_params(body))).await)
+        }
+        "workflow_delete" => {
+            let id = try_field!(dev::get_str(body, "id"));
+            dev::val(core.workflow_delete(id).await)
+        }
+        "label_create" => dev::val(core.label_create(try_field!(dev::parse_params(body))).await),
+        "label_update" => dev::val(core.label_update(try_field!(dev::parse_params(body))).await),
+        "label_delete" => {
+            let id = try_field!(dev::get_str(body, "id"));
+            dev::val(core.label_delete(id).await)
+        }
+        "label_reorder" => dev::val(core.label_reorder(try_field!(dev::parse_params(body))).await),
+        _ => return None,
+    })
+}

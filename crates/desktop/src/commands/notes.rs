@@ -166,3 +166,87 @@ pub async fn notebook_delete(
     super::emit_updates(&app, &updates);
     Ok(result)
 }
+
+// ── Dev server dispatch ─────────────────────────────────────────────
+
+#[cfg(test)]
+pub(crate) const DEV_COMMANDS: &[&str] = &[
+    "note_list",
+    "note_get",
+    "note_create",
+    "note_update",
+    "note_delete",
+    "note_search",
+    "note_links_all",
+    "note_list_by_entity",
+    "note_version_list",
+    "note_version_create",
+    "note_version_restore",
+    "note_save_attachment",
+    "notebook_list",
+    "notebook_create",
+    "notebook_update",
+    "notebook_delete",
+];
+
+#[cfg(debug_assertions)]
+pub(crate) async fn dispatch_dev(
+    cmd: &str,
+    core: &AppCore,
+    body: &serde_json::Value,
+) -> Option<Result<serde_json::Value, ApiError>> {
+    use super::dev_helpers::{self as dev, try_field};
+    Some(match cmd {
+        "note_list" => dev::val(core.note_list(dev::get(body, "notebook_id")).await),
+        "note_get" => {
+            let id = try_field!(dev::get_str(body, "id"));
+            dev::val(core.note_get(id).await)
+        }
+        "note_create" => dev::val_rh(core.note_create(try_field!(dev::parse_params(body))).await),
+        "note_update" => dev::val_rh(core.note_update(try_field!(dev::parse_params(body))).await),
+        "note_delete" => {
+            let id = try_field!(dev::get_str(body, "id"));
+            dev::val_rh(core.note_delete(id).await)
+        }
+        "note_search" => {
+            let query = try_field!(dev::get_str(body, "query"));
+            dev::val(core.note_search(query).await)
+        }
+        "note_links_all" => dev::val(core.note_links_all().await),
+        "note_list_by_entity" => {
+            let entity_type = try_field!(dev::get_str(body, "entity_type"));
+            let entity_id = try_field!(dev::get_str(body, "entity_id"));
+            dev::val(core.note_list_by_entity(entity_type, entity_id).await)
+        }
+        "note_version_list" => {
+            let note_id = try_field!(dev::get_str(body, "note_id"));
+            dev::val(core.note_version_list(note_id).await)
+        }
+        "note_version_create" => {
+            let note_id = try_field!(dev::get_str(body, "note_id"));
+            dev::val(core.note_version_create(note_id).await)
+        }
+        "note_version_restore" => {
+            let version_id = try_field!(dev::get_str(body, "version_id"));
+            let note_id = try_field!(dev::get_str(body, "note_id"));
+            dev::val_rh(core.note_version_restore(version_id, note_id).await)
+        }
+        "note_save_attachment" => {
+            let data = try_field!(dev::get_str(body, "data"));
+            let filename = try_field!(dev::get_str(body, "filename"));
+            dev::val(core.note_save_attachment(data, filename).await)
+        }
+        "notebook_list" => dev::val(core.notebook_list().await),
+        "notebook_create" => {
+            dev::val_rh(core.notebook_create(try_field!(dev::parse_params(body))).await)
+        }
+        "notebook_update" => {
+            dev::val_rh(core.notebook_update(try_field!(dev::parse_params(body))).await)
+        }
+        "notebook_delete" => {
+            let id = try_field!(dev::get_str(body, "id"));
+            dev::val_rh(core.notebook_delete(id).await)
+        }
+        _ => return None,
+    })
+}

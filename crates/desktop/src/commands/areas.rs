@@ -54,3 +54,32 @@ pub async fn area_reorder(
     super::emit_updates(&app, &updates);
     Ok(result)
 }
+
+// ── Dev server dispatch ─────────────────────────────────────────────
+
+#[cfg(test)]
+pub(crate) const DEV_COMMANDS: &[&str] =
+    &["area_list", "area_create", "area_update", "area_delete", "area_reorder"];
+
+#[cfg(debug_assertions)]
+pub(crate) async fn dispatch_dev(
+    cmd: &str,
+    core: &AppCore,
+    body: &serde_json::Value,
+) -> Option<Result<serde_json::Value, ApiError>> {
+    use super::dev_helpers::{self as dev, try_field};
+    Some(match cmd {
+        "area_list" => dev::val(core.area_list().await),
+        "area_create" => dev::val_rh(core.area_create(try_field!(dev::parse_params(body))).await),
+        "area_update" => dev::val_rh(core.area_update(try_field!(dev::parse_params(body))).await),
+        "area_delete" => {
+            let id = try_field!(dev::get_str(body, "id"));
+            dev::val_rh(core.area_delete(id).await)
+        }
+        "area_reorder" => {
+            let id = try_field!(dev::get_str(body, "id"));
+            dev::val_rh(core.area_reorder(id, dev::get(body, "position").unwrap_or(0)).await)
+        }
+        _ => return None,
+    })
+}

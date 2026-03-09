@@ -95,3 +95,62 @@ pub async fn chat_cancel(
 ) -> Result<(), ApiError> {
     state.chat_cancel(session_key).await
 }
+
+// ── Dev server dispatch ─────────────────────────────────────────────
+// Note: `chat_send` is dispatched directly in `dev_server.rs` because it needs
+// SSE channel state. All other chat commands are handled here.
+
+#[cfg(test)]
+pub(crate) const DEV_COMMANDS: &[&str] = &[
+    "chat_threads",
+    "chat_messages",
+    "chat_pin_thread",
+    "chat_rename_thread",
+    "chat_delete_thread",
+    "chat_cancel",
+    "chat_respond_interaction",
+    // chat_send handled in dev_server.rs (needs SSE channels)
+];
+
+#[cfg(debug_assertions)]
+pub(crate) async fn dispatch_dev(
+    cmd: &str,
+    core: &AppCore,
+    body: &serde_json::Value,
+) -> Option<Result<serde_json::Value, ApiError>> {
+    use super::dev_helpers::{self as dev, try_field};
+    Some(match cmd {
+        "chat_threads" => dev::val(core.chat_threads().await),
+        "chat_messages" => {
+            let session_key = try_field!(dev::get_str(body, "sessionKey"));
+            dev::val(core.chat_messages(session_key, dev::get(body, "limit")).await)
+        }
+        "chat_pin_thread" => {
+            let session_key = try_field!(dev::get_str(body, "sessionKey"));
+            dev::val(core.chat_pin_thread(session_key).await)
+        }
+        "chat_rename_thread" => {
+            let session_key = try_field!(dev::get_str(body, "sessionKey"));
+            let title = try_field!(dev::get_str(body, "title"));
+            dev::val(core.chat_rename_thread(session_key, title).await)
+        }
+        "chat_delete_thread" => {
+            let session_key = try_field!(dev::get_str(body, "sessionKey"));
+            dev::val(core.chat_delete_thread(session_key).await)
+        }
+        "chat_cancel" => {
+            let session_key = try_field!(dev::get_str(body, "sessionKey"));
+            dev::val(core.chat_cancel(session_key).await)
+        }
+        "chat_respond_interaction" => {
+            let session_key = try_field!(dev::get_str(body, "sessionKey"));
+            let request_id = try_field!(dev::get_str(body, "requestId"));
+            let response: common::FormResponse = try_field!(dev::require(body, "response"));
+            dev::val(
+                core.chat_respond_interaction(session_key, request_id, response)
+                    .await,
+            )
+        }
+        _ => return None,
+    })
+}

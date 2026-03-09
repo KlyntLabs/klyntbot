@@ -45,3 +45,39 @@ pub async fn objective_delete(
     super::emit_updates(&app, &updates);
     Ok(result)
 }
+
+// ── Dev server dispatch ─────────────────────────────────────────────
+
+#[cfg(test)]
+pub(crate) const DEV_COMMANDS: &[&str] = &[
+    "objective_create",
+    "objective_get",
+    "objective_update",
+    "objective_delete",
+];
+
+#[cfg(debug_assertions)]
+pub(crate) async fn dispatch_dev(
+    cmd: &str,
+    core: &AppCore,
+    body: &serde_json::Value,
+) -> Option<Result<serde_json::Value, ApiError>> {
+    use super::dev_helpers::{self as dev, try_field};
+    Some(match cmd {
+        "objective_create" => {
+            dev::val_rh(core.objective_create(try_field!(dev::parse_params(body))).await)
+        }
+        "objective_get" => {
+            let id = try_field!(dev::get_str(body, "id"));
+            dev::val(core.objective_get(id).await)
+        }
+        "objective_update" => {
+            dev::val_rh(core.objective_update(try_field!(dev::parse_params(body))).await)
+        }
+        "objective_delete" => {
+            let id = try_field!(dev::get_str(body, "id"));
+            dev::val_rh(core.objective_delete(id).await)
+        }
+        _ => return None,
+    })
+}

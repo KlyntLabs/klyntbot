@@ -1,7 +1,8 @@
 import { LogicalSize } from "@tauri-apps/api/dpi";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { Send } from "lucide-react";
+import { Check, Lightbulb, Send, X, XCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCoachingNudge } from "../../hooks/useCoachingNudge";
 import { useEvent } from "../../hooks/useEvent";
 import { useMutation } from "../../hooks/useMutation";
 import { useQuery } from "../../hooks/useQuery";
@@ -36,6 +37,11 @@ export function SystemTray() {
     [],
   );
   const { data: calendarEvents } = useQuery<CalendarEvent[]>("calendar_events", { limit: 5 }, []);
+
+  // Coaching nudge (Channel 2: tray nudge) — 30s auto-collapse for compact tray
+  const { nudge: coachingNudge, handleFeedback: handleCoachingFeedback } = useCoachingNudge({
+    autoCollapseMs: 30_000,
+  });
 
   const toggleComplete = useMutation<TodayTask, { id: string }>("task_toggle_complete");
   const [chatInput, setChatInput] = useState("");
@@ -146,6 +152,50 @@ export function SystemTray() {
               </div>
             </div>
           </div>
+
+          {/* Coaching Nudge (Channel 2: tray) */}
+          {coachingNudge && (
+            <>
+              <div className="mx-4 glass-divider" />
+              <div className="px-4 py-3" style={{ animation: "nudge-slide-in 0.25s ease-out" }}>
+                <div className="flex items-start gap-2.5">
+                  <Lightbulb className="w-3.5 h-3.5 text-info shrink-0 mt-0.5" strokeWidth={1.5} />
+                  <p className="flex-1 text-[12px] text-secondary font-light leading-relaxed">
+                    {coachingNudge.message}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1 mt-2 ml-6">
+                  <button
+                    type="button"
+                    onClick={() => handleCoachingFeedback(coachingNudge.id, "helpful")}
+                    title="Helpful"
+                    className="h-6 px-2 flex items-center gap-1 rounded-md text-[10px] text-muted hover:text-success hover:bg-white/[0.06] transition-colors"
+                  >
+                    <Check className="w-3 h-3" strokeWidth={2} />
+                    Helpful
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleCoachingFeedback(coachingNudge.id, "dismissed")}
+                    title="Dismiss"
+                    className="h-6 px-2 flex items-center gap-1 rounded-md text-[10px] text-muted hover:text-secondary hover:bg-white/[0.06] transition-colors"
+                  >
+                    <X className="w-3 h-3" strokeWidth={2} />
+                    Dismiss
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleCoachingFeedback(coachingNudge.id, "stop")}
+                    title="Stop suggesting this"
+                    className="h-6 px-2 flex items-center gap-1 rounded-md text-[10px] text-muted hover:text-destructive hover:bg-white/[0.06] transition-colors"
+                  >
+                    <XCircle className="w-3 h-3" strokeWidth={2} />
+                    Stop
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
 
           <div className="mx-4 glass-divider" />
 

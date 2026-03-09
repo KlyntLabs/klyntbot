@@ -49,3 +49,42 @@ pub async fn key_result_delete(
     super::emit_updates(&app, &updates);
     Ok(result)
 }
+
+// ── Dev server dispatch ─────────────────────────────────────────────
+
+#[cfg(test)]
+pub(crate) const DEV_COMMANDS: &[&str] = &[
+    "key_result_create",
+    "key_result_update",
+    "key_result_update_metric",
+    "key_result_delete",
+];
+
+#[cfg(debug_assertions)]
+pub(crate) async fn dispatch_dev(
+    cmd: &str,
+    core: &AppCore,
+    body: &serde_json::Value,
+) -> Option<Result<serde_json::Value, ApiError>> {
+    use super::dev_helpers::{self as dev, try_field};
+    Some(match cmd {
+        "key_result_create" => {
+            dev::val_rh(core.key_result_create(try_field!(dev::parse_params(body))).await)
+        }
+        "key_result_update" => {
+            dev::val_rh(core.key_result_update(try_field!(dev::parse_params(body))).await)
+        }
+        "key_result_update_metric" => {
+            let id = try_field!(dev::get_str(body, "id"));
+            dev::val_rh(
+                core.key_result_update_metric(id, dev::get(body, "currentValue").unwrap_or(0.0))
+                    .await,
+            )
+        }
+        "key_result_delete" => {
+            let id = try_field!(dev::get_str(body, "id"));
+            dev::val_rh(core.key_result_delete(id).await)
+        }
+        _ => return None,
+    })
+}

@@ -17,6 +17,9 @@ pub mod tasks;
 pub mod window;
 pub mod workflows;
 
+#[cfg(debug_assertions)]
+pub(crate) mod dev_helpers;
+
 use desktop_shared::events::{EntityUpdatedPayload, ENTITY_UPDATED};
 use desktop_shared::types::EntityKind;
 use tauri::Emitter;

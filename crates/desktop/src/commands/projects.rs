@@ -56,3 +56,44 @@ pub async fn project_archive(
     super::emit_updates(&app, &updates);
     Ok(result)
 }
+
+// ── Dev server dispatch ─────────────────────────────────────────────
+
+#[cfg(test)]
+pub(crate) const DEV_COMMANDS: &[&str] = &[
+    "project_create",
+    "project_get",
+    "project_update",
+    "project_delete",
+    "project_archive",
+];
+
+#[cfg(debug_assertions)]
+pub(crate) async fn dispatch_dev(
+    cmd: &str,
+    core: &AppCore,
+    body: &serde_json::Value,
+) -> Option<Result<serde_json::Value, ApiError>> {
+    use super::dev_helpers::{self as dev, try_field};
+    Some(match cmd {
+        "project_create" => {
+            dev::val_rh(core.project_create(try_field!(dev::parse_params(body))).await)
+        }
+        "project_get" => {
+            let id = try_field!(dev::get_str(body, "id"));
+            dev::val(core.project_get(id).await)
+        }
+        "project_update" => {
+            dev::val_rh(core.project_update(try_field!(dev::parse_params(body))).await)
+        }
+        "project_delete" => {
+            let id = try_field!(dev::get_str(body, "id"));
+            dev::val_rh(core.project_delete(id).await)
+        }
+        "project_archive" => {
+            let id = try_field!(dev::get_str(body, "id"));
+            dev::val_rh(core.project_archive(id).await)
+        }
+        _ => return None,
+    })
+}

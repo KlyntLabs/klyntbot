@@ -100,3 +100,66 @@ pub async fn objective_list(
 ) -> Result<Vec<ObjectiveResponse>, ApiError> {
     state.objective_list_for_tasks(project_id).await
 }
+
+// ── Dev server dispatch ─────────────────────────────────────────────
+
+#[cfg(test)]
+pub(crate) const DEV_COMMANDS: &[&str] = &[
+    "task_list",
+    "task_get",
+    "task_create",
+    "task_update",
+    "task_delete",
+    "task_toggle_complete",
+    "task_list_children",
+    "today_tasks",
+    "project_list",
+    "objective_list",
+];
+
+#[cfg(debug_assertions)]
+pub(crate) async fn dispatch_dev(
+    cmd: &str,
+    core: &AppCore,
+    body: &serde_json::Value,
+) -> Option<Result<serde_json::Value, ApiError>> {
+    use super::dev_helpers::{self as dev, try_field};
+    Some(match cmd {
+        "task_list" => {
+            dev::val(
+                core.task_list(
+                    dev::get(body, "area_id"),
+                    dev::get(body, "project_id"),
+                    dev::get(body, "status"),
+                )
+                .await,
+            )
+        }
+        "task_get" => {
+            let id = try_field!(dev::get_str(body, "id"));
+            dev::val(core.task_get(id).await)
+        }
+        "task_create" => dev::val_rh(core.task_create(try_field!(dev::parse_params(body))).await),
+        "task_update" => dev::val_rh(core.task_update(try_field!(dev::parse_params(body))).await),
+        "task_delete" => {
+            let id = try_field!(dev::get_str(body, "id"));
+            dev::val_rh(core.task_delete(id).await)
+        }
+        "task_toggle_complete" => {
+            let id = try_field!(dev::get_str(body, "id"));
+            dev::val_rh(core.task_toggle_complete(id).await)
+        }
+        "task_list_children" => {
+            let parent_id = try_field!(dev::get_str(body, "parentId"));
+            dev::val(core.task_list_children(parent_id).await)
+        }
+        "today_tasks" => dev::val(core.today_tasks().await),
+        "project_list" => {
+            dev::val(core.project_list_for_tasks(dev::get(body, "area_id")).await)
+        }
+        "objective_list" => {
+            dev::val(core.objective_list_for_tasks(dev::get(body, "project_id")).await)
+        }
+        _ => return None,
+    })
+}

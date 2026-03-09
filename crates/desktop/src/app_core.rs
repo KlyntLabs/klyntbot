@@ -6,7 +6,7 @@ pub use ::app_core::AppCore;
 use ::app_core::EventChannels;
 use desktop_shared::events;
 use feature_productivity::dashboard_emitter::{DashboardEmitter, DashboardEvent};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 use tracing::warn;
@@ -100,7 +100,7 @@ fn wire_event_channels(core: &AppCore, channels: EventChannels, app_handle: &tau
         });
     }
 
-    // Coaching interventions → Tauri event
+    // Coaching interventions → Tauri event + tray popup when main window is unfocused
     spawn_channel_forwarder(
         channels.intervention_rx,
         app_handle,
@@ -110,6 +110,18 @@ fn wire_event_channels(core: &AppCore, channels: EventChannels, app_handle: &tau
                 handle.emit(desktop_shared::events::COACHING_INTERVENTION, &intervention)
             {
                 warn!("failed to emit coaching intervention: {e}");
+            }
+
+            // Show tray popup when main window is not focused (Channel 2: tray nudge)
+            let main_focused = handle
+                .get_webview_window("main")
+                .and_then(|w| w.is_focused().ok())
+                .unwrap_or(false);
+            if !main_focused {
+                if let Some(tray_window) = handle.get_webview_window("tray") {
+                    let _ = tray_window.show();
+                    let _ = tray_window.set_focus();
+                }
             }
         },
     );

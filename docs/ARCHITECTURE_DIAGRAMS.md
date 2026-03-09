@@ -780,11 +780,6 @@ flowchart TD
 
 ### High
 
-**2. Dev server dispatch must be manually updated**
-- **Location**: `crates/desktop/src/dev_server.rs` — 700+ line `match cmd {}` block
-- **Why it matters**: Every new Tauri command requires manual addition. Missing commands return 404 silently. No compile-time check ensures parity.
-- **Fix**: Generate the dispatch table from a shared registry, or use a macro that both Tauri commands and dev server share.
-
 **3. HistoryCompressor makes N/5 LLM calls for abstractive compression**
 - **Location**: `crates/context_engine/src/` — history compression
 - **Why it matters**: 100 messages → 19 LLM calls for compression, each blocking. No batching, no parallelism. Adds latency to every request with long histories.
@@ -821,3 +816,4 @@ The following gaps have been addressed:
 - ~~No test for delegation at max depth~~ — Already resolved: `test_delegation_tool_not_injected_at_max_depth` exists in `runtime.rs`
 - ~~Cognitive provider created twice~~ — Fixed: stored `Option<DynProvider>` in `AppCore`, reflection handler uses it directly (`state.rs`, `cognitive.rs`)
 - ~~AccumulatedEntry buffer not persisted across restarts~~ — Fixed: added `accumulated_observations` table, repo, and migration; `BackgroundConsolidationService` loads on startup, persists on add, deletes on promotion (`background.rs`, `repos/accumulated_observation.rs`)
+- ~~Dev server dispatch must be manually updated~~ — Fixed: co-located `dispatch_dev()` functions in each command module with `DEV_COMMANDS` const arrays; chained dispatch in `dev_server.rs`; parity test ensures all Tauri commands have dev server coverage (`commands/*.rs`, `dev_server.rs`)

@@ -9,3 +9,21 @@ use crate::app_core::AppCore;
 pub async fn agent_status(state: State<'_, Arc<AppCore>>) -> Result<AgentStatusResponse, ApiError> {
     state.agent_status().await
 }
+
+// ── Dev server dispatch ─────────────────────────────────────────────
+
+#[cfg(test)]
+pub(crate) const DEV_COMMANDS: &[&str] = &["agent_status"];
+
+#[cfg(debug_assertions)]
+pub(crate) async fn dispatch_dev(
+    cmd: &str,
+    core: &AppCore,
+    _body: &serde_json::Value,
+) -> Option<Result<serde_json::Value, ApiError>> {
+    use super::dev_helpers as dev;
+    Some(match cmd {
+        "agent_status" => dev::val(core.agent_status().await),
+        _ => return None,
+    })
+}

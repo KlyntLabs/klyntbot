@@ -1,3 +1,4 @@
+use std::sync::atomic::AtomicI32;
 use std::sync::Arc;
 
 use agent::{AgentLoop, PersonaManager};
@@ -70,6 +71,9 @@ pub struct AppCore {
     pub pipeline_broadcast: Option<broadcast::Sender<cognitive::PipelineEvent>>,
     /// Event log repo for persisting domain and pipeline events.
     pub event_log_repo: Option<cognitive::EventLogRepo>,
+    /// Consecutive coaching nudges that were auto-collapsed (ignored).
+    /// Resets on explicit user feedback. Delivery skipped when >= 2.
+    pub consecutive_coaching_ignores: Arc<AtomicI32>,
 }
 
 impl AppCore {

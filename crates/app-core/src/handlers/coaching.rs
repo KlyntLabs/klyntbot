@@ -1,10 +1,21 @@
 //! Coaching engine handlers — situation, signals, patterns, feedback, and router status.
+//!
+//! The `coaching_pending_interventions` handler acts as the delivery manager:
+//! it gates intervention visibility based on streaming state and consecutive
+//! ignore count, so both chat nudge and tray nudge components poll the same
+//! endpoint and get consistent delivery decisions.
+
+use std::sync::atomic::Ordering;
 
 use chrono::Timelike;
 use desktop_shared::cognitive_commands::*;
 use desktop_shared::errors::ApiError;
+use tracing::debug;
 
 use crate::state::AppCore;
+
+/// Maximum consecutive ignored nudges before delivery is skipped.
+const MAX_CONSECUTIVE_IGNORES: i32 = 2;
 
 impl AppCore {
     pub async fn coaching_situation(&self) -> Result<UserSituationResponse, ApiError> {
@@ -111,9 +122,22 @@ impl AppCore {
         })
     }
 
+    /// Returns pending coaching interventions, gated by delivery rules:
+    /// - Returns empty while AI is actively streaming (streaming block)
+    /// - Returns empty after [`MAX_CONSECUTIVE_IGNORES`] consecutive ignored nudges
     pub async fn coaching_pending_interventions(
         &self,
     ) -> Result<Vec<DeliveredInterventionResponse>, ApiError> {
+        // Delivery gate: block while AI is streaming
+        if !self.active_streams.is_empty() {
+            return Ok(vec![]);
+        }
+
+        // Delivery gate: skip after N consecutive ignores
+        if self.consecutive_coaching_ignores.load(Ordering::Relaxed) >= MAX_CONSECUTIVE_IGNORES {
+            return Ok(vec![]);
+        }
+
         let tracker = self.feedback_tracker()?.lock().await;
         let now = chrono::Utc::now();
         Ok(tracker
@@ -157,7 +181,8 @@ impl AppCore {
     /// Submit user feedback for a coaching intervention.
     ///
     /// Records explicit feedback in the FeedbackTracker and, if dismissed,
-    /// increases the backoff in InterventionRouter.
+    /// increases the backoff in InterventionRouter. Any explicit feedback
+    /// resets the consecutive ignore counter.
     pub async fn coaching_submit_feedback(
         &self,
         intervention_id: String,
@@ -174,6 +199,10 @@ impl AppCore {
                 ));
             }
         };
+
+        // Any explicit interaction resets the consecutive ignore counter
+        self.consecutive_coaching_ignores.store(0, Ordering::Relaxed);
+        debug!("coaching consecutive ignores reset (explicit feedback)");
 
         // Record in FeedbackTracker (single lock scope — record_explicit removes
         // the pending entry, so we must extract trigger_name first)
@@ -207,6 +236,23 @@ impl AppCore {
             });
         }
 
+        Ok(true)
+    }
+
+    /// Report that a coaching nudge was ignored (auto-collapsed without interaction).
+    /// Increments the consecutive ignore counter; after [`MAX_CONSECUTIVE_IGNORES`]
+    /// in a row, delivery is skipped.
+    pub async fn coaching_report_ignored(
+        &self,
+        intervention_id: String,
+    ) -> Result<bool, ApiError> {
+        let count = self
+            .consecutive_coaching_ignores
+            .fetch_add(1, Ordering::Relaxed)
+            + 1;
+        debug!(
+            "coaching nudge ignored (id={intervention_id}), consecutive={count}"
+        );
         Ok(true)
     }
 }

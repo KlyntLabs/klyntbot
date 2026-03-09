@@ -242,3 +242,173 @@ pub async fn productivity_project_delete(
 ) -> Result<(), ApiError> {
     state.productivity_project_delete(id).await
 }
+
+// ── Dev server dispatch ─────────────────────────────────────────────
+
+#[cfg(test)]
+pub(crate) const DEV_COMMANDS: &[&str] = &[
+    "productivity_today",
+    "productivity_timeline",
+    "productivity_focus_start",
+    "productivity_focus_end",
+    "productivity_focus_status",
+    "productivity_sessions",
+    "productivity_weekly",
+    "productivity_categories",
+    "productivity_summary_range",
+    "productivity_activity_feed",
+    "productivity_goals",
+    "productivity_pomodoro_start",
+    "productivity_time_entries",
+    "productivity_goal_create",
+    "productivity_goal_delete",
+    "productivity_goal_toggle",
+    "productivity_time_entry_create",
+    "productivity_time_entry_delete",
+    "productivity_category_upsert",
+    "productivity_insights",
+    "productivity_insight_dismiss",
+    "productivity_auto_focus_confirm",
+    "productivity_projects_list",
+    "productivity_project_upsert",
+    "productivity_project_delete",
+];
+
+#[cfg(debug_assertions)]
+pub(crate) async fn dispatch_dev(
+    cmd: &str,
+    core: &AppCore,
+    body: &serde_json::Value,
+) -> Option<Result<serde_json::Value, ApiError>> {
+    use super::dev_helpers::{self as dev, try_field};
+    Some(match cmd {
+        "productivity_today" => dev::val(core.productivity_today().await),
+        "productivity_timeline" => {
+            let date = try_field!(dev::get_str(body, "date"));
+            dev::val(
+                core.productivity_timeline(date, dev::get(body, "limit"), dev::get(body, "offset"))
+                    .await,
+            )
+        }
+        "productivity_focus_start" => {
+            dev::val(
+                core.productivity_focus_start(
+                    dev::get(body, "action_id"),
+                    dev::get(body, "project_id"),
+                    dev::get(body, "target_mins"),
+                )
+                .await,
+            )
+        }
+        "productivity_focus_end" => {
+            dev::val(core.productivity_focus_end(dev::get(body, "notes")).await)
+        }
+        "productivity_focus_status" => dev::val(core.productivity_focus_status().await),
+        "productivity_sessions" => {
+            let date = try_field!(dev::get_str(body, "date"));
+            dev::val(core.productivity_sessions(date).await)
+        }
+        "productivity_weekly" => dev::val(core.productivity_weekly().await),
+        "productivity_categories" => dev::val(core.productivity_categories().await),
+        "productivity_summary_range" => {
+            let start_date = try_field!(dev::get_str(body, "startDate"));
+            let end_date = try_field!(dev::get_str(body, "endDate"));
+            dev::val(core.productivity_summary_range(start_date, end_date).await)
+        }
+        "productivity_activity_feed" => {
+            dev::val(core.productivity_activity_feed(dev::get(body, "limit")).await)
+        }
+        "productivity_goals" => dev::val(core.productivity_goals().await),
+        "productivity_pomodoro_start" => {
+            dev::val(
+                core.productivity_pomodoro_start(
+                    dev::get(body, "work_mins"),
+                    dev::get(body, "break_mins"),
+                )
+                .await,
+            )
+        }
+        "productivity_time_entries" => {
+            let date = try_field!(dev::get_str(body, "date"));
+            dev::val(core.productivity_time_entries(date).await)
+        }
+        "productivity_goal_create" => {
+            let goal_type = try_field!(dev::get_str(body, "goal_type"));
+            let metric = try_field!(dev::get_str(body, "metric"));
+            let target_value: f64 = try_field!(dev::require(body, "target_value"));
+            dev::val(core.productivity_goal_create(goal_type, metric, target_value).await)
+        }
+        "productivity_goal_delete" => {
+            let id: i64 = try_field!(dev::require(body, "id"));
+            dev::val(core.productivity_goal_delete(id).await)
+        }
+        "productivity_goal_toggle" => {
+            let id: i64 = try_field!(dev::require(body, "id"));
+            let enabled: bool = try_field!(dev::require(body, "enabled"));
+            dev::val(core.productivity_goal_toggle(id, enabled).await)
+        }
+        "productivity_time_entry_create" => {
+            let description = try_field!(dev::get_str(body, "description"));
+            let duration_mins: i64 = try_field!(dev::require(body, "duration_mins"));
+            dev::val(
+                core.productivity_time_entry_create(
+                    description,
+                    duration_mins,
+                    dev::get(body, "category_id"),
+                    dev::get(body, "project_id"),
+                )
+                .await,
+            )
+        }
+        "productivity_time_entry_delete" => {
+            let id: i64 = try_field!(dev::require(body, "id"));
+            dev::val(core.productivity_time_entry_delete(id).await)
+        }
+        "productivity_category_upsert" => {
+            let id = try_field!(dev::get_str(body, "id"));
+            let name = try_field!(dev::get_str(body, "name"));
+            let category_type = try_field!(dev::get_str(body, "category_type"));
+            dev::val(
+                core.productivity_category_upsert(
+                    id,
+                    name,
+                    category_type,
+                    dev::get(body, "color"),
+                    dev::get(body, "icon"),
+                )
+                .await,
+            )
+        }
+        "productivity_insights" => {
+            dev::val(core.productivity_insights(dev::get(body, "date")).await)
+        }
+        "productivity_insight_dismiss" => {
+            let id = try_field!(dev::get_str(body, "id"));
+            dev::val(core.productivity_insight_dismiss(id).await)
+        }
+        "productivity_auto_focus_confirm" => {
+            dev::val(core.productivity_auto_focus_confirm(try_field!(dev::parse_params(body))).await)
+        }
+        "productivity_projects_list" => dev::val(core.productivity_projects_list().await),
+        "productivity_project_upsert" => {
+            let id = try_field!(dev::get_str(body, "id"));
+            let display_name = try_field!(dev::get_str(body, "display_name"));
+            let path = try_field!(dev::get_str(body, "path"));
+            dev::val(
+                core.productivity_project_upsert(
+                    id,
+                    display_name,
+                    path,
+                    dev::get(body, "url_patterns"),
+                    dev::get(body, "color"),
+                )
+                .await,
+            )
+        }
+        "productivity_project_delete" => {
+            let id = try_field!(dev::get_str(body, "id"));
+            dev::val(core.productivity_project_delete(id).await)
+        }
+        _ => return None,
+    })
+}

@@ -43,3 +43,34 @@ pub async fn group_reorder(
 ) -> Result<(), ApiError> {
     state.group_reorder(params).await
 }
+
+// ── Dev server dispatch ─────────────────────────────────────────────
+
+#[cfg(test)]
+pub(crate) const DEV_COMMANDS: &[&str] = &[
+    "group_list",
+    "group_create",
+    "group_update",
+    "group_delete",
+    "group_reorder",
+];
+
+#[cfg(debug_assertions)]
+pub(crate) async fn dispatch_dev(
+    cmd: &str,
+    core: &AppCore,
+    body: &serde_json::Value,
+) -> Option<Result<serde_json::Value, ApiError>> {
+    use super::dev_helpers::{self as dev, try_field};
+    Some(match cmd {
+        "group_list" => dev::val(core.group_list(dev::get(body, "projectId")).await),
+        "group_create" => dev::val(core.group_create(try_field!(dev::parse_params(body))).await),
+        "group_update" => dev::val(core.group_update(try_field!(dev::parse_params(body))).await),
+        "group_delete" => {
+            let id = try_field!(dev::get_str(body, "id"));
+            dev::val(core.group_delete(id).await)
+        }
+        "group_reorder" => dev::val(core.group_reorder(try_field!(dev::parse_params(body))).await),
+        _ => return None,
+    })
+}

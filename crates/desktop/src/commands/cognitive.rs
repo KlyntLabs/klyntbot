@@ -184,6 +184,14 @@ pub async fn coaching_submit_feedback(
 }
 
 #[tauri::command]
+pub async fn coaching_report_ignored(
+    state: State<'_, Arc<AppCore>>,
+    intervention_id: String,
+) -> Result<bool, ApiError> {
+    state.coaching_report_ignored(intervention_id).await
+}
+
+#[tauri::command]
 pub async fn cognitive_inject_event(
     state: State<'_, Arc<AppCore>>,
     event_type: String,
@@ -206,4 +214,120 @@ pub async fn cognitive_pipeline_log(
     limit: Option<i64>,
 ) -> Result<Vec<cognitive::PipelineEventRow>, ApiError> {
     state.cognitive_pipeline_log(limit).await
+}
+
+// ── Dev server dispatch ─────────────────────────────────────────────
+
+#[cfg(test)]
+pub(crate) const DEV_COMMANDS: &[&str] = &[
+    "cognitive_user_model",
+    "cognitive_facts_list",
+    "cognitive_episodic_list",
+    "cognitive_rules_list",
+    "cognitive_memory_stats",
+    "cognitive_system_status",
+    "cognitive_fact_create",
+    "cognitive_fact_update",
+    "cognitive_fact_delete",
+    "cognitive_rule_create",
+    "cognitive_rule_deactivate",
+    "cognitive_run_compaction",
+    "cognitive_run_reflection",
+    "cognitive_inject_event",
+    "cognitive_event_log",
+    "cognitive_pipeline_log",
+    "coaching_situation",
+    "coaching_signals",
+    "coaching_patterns",
+    "coaching_feedback_stats",
+    "coaching_router_status",
+    "coaching_pending_interventions",
+    "coaching_reset_dismissals",
+    "coaching_clear_signals",
+    "coaching_submit_feedback",
+    "coaching_report_ignored",
+];
+
+#[cfg(debug_assertions)]
+pub(crate) async fn dispatch_dev(
+    cmd: &str,
+    core: &AppCore,
+    body: &serde_json::Value,
+) -> Option<Result<serde_json::Value, ApiError>> {
+    use super::dev_helpers::{self as dev, try_field};
+    Some(match cmd {
+        "cognitive_user_model" => dev::val(core.cognitive_user_model().await),
+        "cognitive_facts_list" => {
+            dev::val(core.cognitive_facts_list(dev::get(body, "domain")).await)
+        }
+        "cognitive_episodic_list" => {
+            dev::val(
+                core.cognitive_episodic_list(dev::get(body, "domain"), dev::get(body, "limit"))
+                    .await,
+            )
+        }
+        "cognitive_rules_list" => {
+            dev::val(core.cognitive_rules_list(dev::get(body, "domain")).await)
+        }
+        "cognitive_memory_stats" => dev::val(core.cognitive_memory_stats().await),
+        "cognitive_system_status" => dev::val(core.cognitive_system_status().await),
+        "cognitive_fact_create" => {
+            dev::val(core.cognitive_fact_create(try_field!(dev::parse_params(body))).await)
+        }
+        "cognitive_fact_update" => {
+            let id = try_field!(dev::get_str(body, "id"));
+            dev::val(core.cognitive_fact_update(id, try_field!(dev::parse_params(body))).await)
+        }
+        "cognitive_fact_delete" => {
+            let id = try_field!(dev::get_str(body, "id"));
+            dev::val(core.cognitive_fact_delete(id).await)
+        }
+        "cognitive_rule_create" => {
+            dev::val(core.cognitive_rule_create(try_field!(dev::parse_params(body))).await)
+        }
+        "cognitive_rule_deactivate" => {
+            let id = try_field!(dev::get_str(body, "id"));
+            dev::val(core.cognitive_rule_deactivate(id).await)
+        }
+        "cognitive_run_compaction" => dev::val(core.cognitive_run_compaction().await),
+        "cognitive_run_reflection" => dev::val(core.cognitive_run_reflection().await),
+        "cognitive_inject_event" => {
+            let event_type = try_field!(dev::get_str(body, "event_type"));
+            let payload = body.get("payload").cloned().unwrap_or_default();
+            dev::val(core.cognitive_inject_event(event_type, payload).await)
+        }
+        "cognitive_event_log" => dev::val(core.cognitive_event_log(dev::get(body, "limit")).await),
+        "cognitive_pipeline_log" => {
+            dev::val(core.cognitive_pipeline_log(dev::get(body, "limit")).await)
+        }
+        // Coaching
+        "coaching_situation" => dev::val(core.coaching_situation().await),
+        "coaching_signals" => dev::val(core.coaching_signals().await),
+        "coaching_patterns" => dev::val(core.coaching_patterns().await),
+        "coaching_feedback_stats" => dev::val(core.coaching_feedback_stats().await),
+        "coaching_router_status" => dev::val(core.coaching_router_status().await),
+        "coaching_pending_interventions" => dev::val(core.coaching_pending_interventions().await),
+        "coaching_reset_dismissals" => {
+            dev::val(core.coaching_reset_dismissals(dev::get(body, "trigger_name")).await)
+        }
+        "coaching_clear_signals" => dev::val(core.coaching_clear_signals().await),
+        "coaching_submit_feedback" => {
+            dev::val(
+                core.coaching_submit_feedback(
+                    dev::get(body, "intervention_id").unwrap_or_default(),
+                    dev::get(body, "response").unwrap_or_default(),
+                )
+                .await,
+            )
+        }
+        "coaching_report_ignored" => {
+            dev::val(
+                core.coaching_report_ignored(
+                    dev::get(body, "intervention_id").unwrap_or_default(),
+                )
+                .await,
+            )
+        }
+        _ => return None,
+    })
 }

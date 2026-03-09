@@ -117,52 +117,23 @@ fn err(e: ApiError) -> ApiResult {
     ApiResult::Err(e)
 }
 
-/// Convert a plain `Result<T, ApiError>` into `ApiResult`.
-fn r<T: serde::Serialize>(result: Result<T, ApiError>) -> ApiResult {
-    match result {
-        Ok(v) => ok(v),
-        Err(e) => err(e),
-    }
-}
-
-/// Convert a `HandlerResult<T>` (value + entity updates) into `ApiResult`,
-/// discarding the entity updates (no Tauri event bus in dev mode).
-fn rh<T: serde::Serialize, U>(result: Result<(T, U), ApiError>) -> ApiResult {
-    match result {
-        Ok((v, _)) => ok(v),
-        Err(e) => err(e),
-    }
-}
-
-// ── JSON extraction helpers ─────────────────────────────────────────────
-
-/// Extract a typed field from the JSON body (returns `None` if missing or wrong type).
-fn get<T: serde::de::DeserializeOwned>(body: &Value, key: &str) -> Option<T> {
-    body.get(key)
-        .and_then(|v| serde_json::from_value(v.clone()).ok())
-}
-
-/// Extract a required string field.
-fn get_str(body: &Value, key: &str) -> Result<String, ApiError> {
-    body.get(key)
-        .and_then(|v| v.as_str())
-        .map(String::from)
-        .ok_or_else(|| ApiError::new("VALIDATION", format!("missing required field: {key}")))
-}
-
-/// Deserialize structured params from the body (tries `body.params` first, then `body` itself).
-fn parse_params<T: serde::de::DeserializeOwned>(body: &Value) -> Result<T, ApiError> {
-    serde_json::from_value(body.get("params").cloned().unwrap_or(body.clone()))
-        .map_err(|e| ApiError::new("VALIDATION", e.to_string()))
-}
-
-/// Require a typed field (returns validation error if missing).
-fn require<T: serde::de::DeserializeOwned>(body: &Value, key: &str) -> Result<T, ApiError> {
-    get(body, key)
-        .ok_or_else(|| ApiError::new("VALIDATION", format!("missing required field: {key}")))
-}
-
 // ── Dispatch ────────────────────────────────────────────────────────────
+//
+// Each command module defines a `dispatch_dev()` function co-located with its
+// Tauri commands. The dev server chains them here. This ensures parity: when
+// you add a new Tauri command, the dev dispatch is right next to it.
+//
+// `chat_send` is handled inline because it needs SSE channel state.
+
+use crate::commands::dev_helpers as dev;
+
+/// Convert a module dispatch result into an `ApiResult`.
+fn into_api_result(r: Result<Value, ApiError>) -> ApiResult {
+    match r {
+        Ok(v) => ApiResult::Ok(v),
+        Err(e) => ApiResult::Err(e),
+    }
+}
 
 async fn dispatch(
     State(state): State<DevState>,
@@ -170,1015 +141,103 @@ async fn dispatch(
     Json(body): Json<Value>,
 ) -> ApiResult {
     let core = &state.core;
-    match cmd.as_str() {
-        // ── Tasks ──────────────────────────────────────────────
-        "task_list" => r(core
-            .task_list(
-                get(&body, "area_id"),
-                get(&body, "project_id"),
-                get(&body, "status"),
-            )
-            .await),
-        "task_get" => {
-            let id = match get_str(&body, "id") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            r(core.task_get(id).await)
-        }
-        "task_create" => rh(core
-            .task_create(match parse_params(&body) {
-                Ok(p) => p,
-                Err(e) => return err(e),
-            })
-            .await),
-        "task_update" => rh(core
-            .task_update(match parse_params(&body) {
-                Ok(p) => p,
-                Err(e) => return err(e),
-            })
-            .await),
-        "task_delete" => {
-            let id = match get_str(&body, "id") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            rh(core.task_delete(id).await)
-        }
-        "task_toggle_complete" => {
-            let id = match get_str(&body, "id") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            rh(core.task_toggle_complete(id).await)
-        }
-        "task_list_children" => {
-            let parent_id = match get_str(&body, "parentId") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            r(core.task_list_children(parent_id).await)
-        }
-        "today_tasks" => r(core.today_tasks().await),
+    let cmd = cmd.as_str();
 
-        // ── Projects ──────────────────────────────────────────
-        "project_list" => r(core.project_list_for_tasks(get(&body, "area_id")).await),
-        "project_create" => rh(core
-            .project_create(match parse_params(&body) {
-                Ok(p) => p,
-                Err(e) => return err(e),
-            })
-            .await),
-        "project_get" => {
-            let id = match get_str(&body, "id") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            r(core.project_get(id).await)
-        }
-        "project_update" => rh(core
-            .project_update(match parse_params(&body) {
-                Ok(p) => p,
-                Err(e) => return err(e),
-            })
-            .await),
-        "project_delete" => {
-            let id = match get_str(&body, "id") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            rh(core.project_delete(id).await)
-        }
-        "project_archive" => {
-            let id = match get_str(&body, "id") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            rh(core.project_archive(id).await)
-        }
+    use crate::commands;
 
-        // ── Areas ─────────────────────────────────────────────
-        "area_list" => r(core.area_list().await),
-        "area_create" => rh(core
-            .area_create(match parse_params(&body) {
-                Ok(p) => p,
-                Err(e) => return err(e),
-            })
-            .await),
-        "area_update" => rh(core
-            .area_update(match parse_params(&body) {
-                Ok(p) => p,
-                Err(e) => return err(e),
-            })
-            .await),
-        "area_delete" => {
-            let id = match get_str(&body, "id") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            rh(core.area_delete(id).await)
-        }
-        "area_reorder" => {
-            let id = match get_str(&body, "id") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            rh(core
-                .area_reorder(id, get(&body, "position").unwrap_or(0))
-                .await)
-        }
+    // ── Per-module dispatch (co-located with Tauri commands) ─────────
+    if let Some(r) = commands::tasks::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
+    if let Some(r) = commands::projects::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
+    if let Some(r) = commands::areas::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
+    if let Some(r) = commands::objectives::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
+    if let Some(r) = commands::key_results::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
+    if let Some(r) = commands::status::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
+    if let Some(r) = commands::finance::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
+    if let Some(r) = commands::notes::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
+    if let Some(r) = commands::productivity::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
+    if let Some(r) = commands::distraction::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
+    if let Some(r) = commands::settings::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
+    if let Some(r) = commands::chat::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
+    if let Some(r) = commands::groups::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
+    if let Some(r) = commands::workflows::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
+    if let Some(r) = commands::columns::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
+    if let Some(r) = commands::cognitive::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
 
-        // ── Objectives ────────────────────────────────────────
-        "objective_list" => r(core
-            .objective_list_for_tasks(get(&body, "project_id"))
-            .await),
-        "objective_create" => rh(core
-            .objective_create(match parse_params(&body) {
-                Ok(p) => p,
-                Err(e) => return err(e),
-            })
-            .await),
-        "objective_get" => {
-            let id = match get_str(&body, "id") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            r(core.objective_get(id).await)
-        }
-        "objective_update" => rh(core
-            .objective_update(match parse_params(&body) {
-                Ok(p) => p,
-                Err(e) => return err(e),
-            })
-            .await),
-        "objective_delete" => {
-            let id = match get_str(&body, "id") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            rh(core.objective_delete(id).await)
-        }
+    // ── chat_send (needs SSE channels, handled inline) ──────────────
+    if cmd == "chat_send" {
+        return dispatch_chat_send(core, &body, &state.sse_channels).await;
+    }
 
-        // ── Key Results ───────────────────────────────────────
-        "key_result_create" => rh(core
-            .key_result_create(match parse_params(&body) {
-                Ok(p) => p,
-                Err(e) => return err(e),
-            })
-            .await),
-        "key_result_update" => rh(core
-            .key_result_update(match parse_params(&body) {
-                Ok(p) => p,
-                Err(e) => return err(e),
-            })
-            .await),
-        "key_result_update_metric" => {
-            let id = match get_str(&body, "id") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            rh(core
-                .key_result_update_metric(id, get(&body, "currentValue").unwrap_or(0.0))
-                .await)
-        }
-        "key_result_delete" => {
-            let id = match get_str(&body, "id") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            rh(core.key_result_delete(id).await)
-        }
+    err(ApiError::new(
+        "NOT_FOUND",
+        format!("command '{cmd}' is not supported in browser dev mode"),
+    ))
+}
 
-        // ── Status ────────────────────────────────────────────
-        "agent_status" => r(core.agent_status().await),
+/// Handle `chat_send` separately because it needs SSE channel state to relay
+/// streaming agent events back to the browser via Server-Sent Events.
+async fn dispatch_chat_send(
+    core: &AppCore,
+    body: &Value,
+    sse_channels: &SseChannels,
+) -> ApiResult {
+    let content = match dev::get_str(body, "content") {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    let session_key = match dev::get_str(body, "sessionKey") {
+        Ok(v) => v,
+        Err(e) => return err(e),
+    };
+    let context: Option<desktop_shared::commands::SessionContextInput> =
+        dev::get(body, "context");
 
-        // ── Finance — queries ─────────────────────────────────
-        "finance_accounts" => r(core.finance_accounts().await),
-        "finance_transactions" => r(core.finance_transactions(get(&body, "limit")).await),
-        "finance_transactions_filtered" => r(core
-            .finance_transactions_filtered(match parse_params(&body) {
-                Ok(p) => p,
-                Err(e) => return err(e),
-            })
-            .await),
-        "finance_budget_usage" => r(core.finance_budget_usage().await),
-        "finance_portfolios" => r(core.finance_portfolios().await),
-        "finance_investments" => r(core.finance_investments().await),
-        "finance_investments_filtered" => r(core
-            .finance_investments_filtered(get(&body, "portfolio_id"))
-            .await),
-        "finance_goals" => r(core.finance_goals().await),
-        "finance_liabilities" => r(core.finance_liabilities().await),
-        "finance_net_worth" => r(core.finance_net_worth().await),
-        "finance_exchange_rates" => r(core.finance_exchange_rates().await),
-        // ── Finance — mutations ──────────────────────────────
-        "finance_account_create" => rh(core
-            .finance_account_create(match parse_params(&body) {
-                Ok(p) => p,
-                Err(e) => return err(e),
-            })
-            .await),
-        "finance_account_update" => rh(core
-            .finance_account_update(match parse_params(&body) {
-                Ok(p) => p,
-                Err(e) => return err(e),
-            })
-            .await),
-        "finance_account_delete" => {
-            let id = match get_str(&body, "id") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            rh(core.finance_account_delete(id).await)
+    match core
+        .chat_send(content, session_key.clone(), context)
+        .await
+    {
+        Ok((user_msg, stream_info)) => {
+            let tx = sse_channels
+                .entry(session_key)
+                .or_insert_with(|| broadcast::channel(256).0)
+                .clone();
+            let emitter: Arc<dyn AppEventEmitter> = Arc::new(SseEmitter { tx });
+            core.spawn_chat_relay(stream_info, emitter);
+            ok(user_msg)
         }
-        "finance_transaction_create" => rh(core
-            .finance_transaction_create(match parse_params(&body) {
-                Ok(p) => p,
-                Err(e) => return err(e),
-            })
-            .await),
-        "finance_transaction_delete" => {
-            let id = match get_str(&body, "id") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            rh(core.finance_transaction_delete(id).await)
-        }
-        "finance_budget_create" => rh(core
-            .finance_budget_create(match parse_params(&body) {
-                Ok(p) => p,
-                Err(e) => return err(e),
-            })
-            .await),
-        "finance_budget_update" => rh(core
-            .finance_budget_update(match parse_params(&body) {
-                Ok(p) => p,
-                Err(e) => return err(e),
-            })
-            .await),
-        "finance_budget_delete" => {
-            let id = match get_str(&body, "id") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            rh(core.finance_budget_delete(id).await)
-        }
-        "finance_goal_create" => rh(core
-            .finance_goal_create(match parse_params(&body) {
-                Ok(p) => p,
-                Err(e) => return err(e),
-            })
-            .await),
-        "finance_goal_update" => rh(core
-            .finance_goal_update(match parse_params(&body) {
-                Ok(p) => p,
-                Err(e) => return err(e),
-            })
-            .await),
-        "finance_goal_delete" => {
-            let id = match get_str(&body, "id") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            rh(core.finance_goal_delete(id).await)
-        }
-        "finance_liability_create" => rh(core
-            .finance_liability_create(match parse_params(&body) {
-                Ok(p) => p,
-                Err(e) => return err(e),
-            })
-            .await),
-        "finance_liability_update" => rh(core
-            .finance_liability_update(match parse_params(&body) {
-                Ok(p) => p,
-                Err(e) => return err(e),
-            })
-            .await),
-        "finance_liability_delete" => {
-            let id = match get_str(&body, "id") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            rh(core.finance_liability_delete(id).await)
-        }
-        "finance_portfolio_create" => rh(core
-            .finance_portfolio_create(match parse_params(&body) {
-                Ok(p) => p,
-                Err(e) => return err(e),
-            })
-            .await),
-        "finance_investment_create" => rh(core
-            .finance_investment_create(match parse_params(&body) {
-                Ok(p) => p,
-                Err(e) => return err(e),
-            })
-            .await),
-        "finance_investment_update" => rh(core
-            .finance_investment_update(match parse_params(&body) {
-                Ok(p) => p,
-                Err(e) => return err(e),
-            })
-            .await),
-        // ── Finance — reports ────────────────────────────────
-        "finance_report_spending" => r(core
-            .finance_report_spending(get(&body, "date_from"), get(&body, "date_to"))
-            .await),
-        "finance_report_income" => r(core
-            .finance_report_income(get(&body, "date_from"), get(&body, "date_to"))
-            .await),
-        "finance_report_trends" => {
-            let metric = match get_str(&body, "metric") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            r(core
-                .finance_report_trends(metric, get(&body, "periods"))
-                .await)
-        }
-
-        // ── Notes ─────────────────────────────────────────────
-        "note_list" => r(core.note_list(get(&body, "notebook_id")).await),
-        "note_get" => {
-            let id = match get_str(&body, "id") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            r(core.note_get(id).await)
-        }
-        "note_create" => rh(core
-            .note_create(match parse_params(&body) {
-                Ok(p) => p,
-                Err(e) => return err(e),
-            })
-            .await),
-        "note_update" => rh(core
-            .note_update(match parse_params(&body) {
-                Ok(p) => p,
-                Err(e) => return err(e),
-            })
-            .await),
-        "note_delete" => {
-            let id = match get_str(&body, "id") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            rh(core.note_delete(id).await)
-        }
-        "note_search" => {
-            let query = match get_str(&body, "query") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            r(core.note_search(query).await)
-        }
-        "note_links_all" => r(core.note_links_all().await),
-        "note_list_by_entity" => {
-            let entity_type = match get_str(&body, "entity_type") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            let entity_id = match get_str(&body, "entity_id") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            r(core.note_list_by_entity(entity_type, entity_id).await)
-        }
-        "note_version_list" => {
-            let note_id = match get_str(&body, "note_id") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            r(core.note_version_list(note_id).await)
-        }
-        "note_version_create" => {
-            let note_id = match get_str(&body, "note_id") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            r(core.note_version_create(note_id).await)
-        }
-        "note_version_restore" => {
-            let version_id = match get_str(&body, "version_id") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            let note_id = match get_str(&body, "note_id") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            rh(core.note_version_restore(version_id, note_id).await)
-        }
-        "note_save_attachment" => {
-            let data = match get_str(&body, "data") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            let filename = match get_str(&body, "filename") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            r(core.note_save_attachment(data, filename).await)
-        }
-        "notebook_list" => r(core.notebook_list().await),
-        "notebook_create" => rh(core
-            .notebook_create(match parse_params(&body) {
-                Ok(p) => p,
-                Err(e) => return err(e),
-            })
-            .await),
-        "notebook_update" => rh(core
-            .notebook_update(match parse_params(&body) {
-                Ok(p) => p,
-                Err(e) => return err(e),
-            })
-            .await),
-        "notebook_delete" => {
-            let id = match get_str(&body, "id") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            rh(core.notebook_delete(id).await)
-        }
-
-        // ── Productivity ──────────────────────────────────────
-        "productivity_today" => r(core.productivity_today().await),
-        "productivity_timeline" => {
-            let date = match get_str(&body, "date") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            r(core
-                .productivity_timeline(date, get(&body, "limit"), get(&body, "offset"))
-                .await)
-        }
-        "productivity_focus_start" => r(core
-            .productivity_focus_start(
-                get(&body, "action_id"),
-                get(&body, "project_id"),
-                get(&body, "target_mins"),
-            )
-            .await),
-        "productivity_focus_end" => r(core.productivity_focus_end(get(&body, "notes")).await),
-        "productivity_focus_status" => r(core.productivity_focus_status().await),
-        "productivity_sessions" => {
-            let date = match get_str(&body, "date") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            r(core.productivity_sessions(date).await)
-        }
-        "productivity_weekly" => r(core.productivity_weekly().await),
-        "productivity_categories" => r(core.productivity_categories().await),
-        "productivity_summary_range" => {
-            let start_date = match get_str(&body, "startDate") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            let end_date = match get_str(&body, "endDate") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            r(core.productivity_summary_range(start_date, end_date).await)
-        }
-        "productivity_activity_feed" => {
-            r(core.productivity_activity_feed(get(&body, "limit")).await)
-        }
-        "productivity_goals" => r(core.productivity_goals().await),
-        "productivity_pomodoro_start" => r(core
-            .productivity_pomodoro_start(get(&body, "work_mins"), get(&body, "break_mins"))
-            .await),
-        "productivity_time_entries" => {
-            let date = match get_str(&body, "date") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            r(core.productivity_time_entries(date).await)
-        }
-        "productivity_goal_create" => {
-            let goal_type = match get_str(&body, "goal_type") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            let metric = match get_str(&body, "metric") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            let target_value: f64 = match require(&body, "target_value") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            r(core
-                .productivity_goal_create(goal_type, metric, target_value)
-                .await)
-        }
-        "productivity_goal_delete" => {
-            let id: i64 = match require(&body, "id") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            r(core.productivity_goal_delete(id).await)
-        }
-        "productivity_goal_toggle" => {
-            let id: i64 = match require(&body, "id") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            let enabled: bool = match require(&body, "enabled") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            r(core.productivity_goal_toggle(id, enabled).await)
-        }
-        "productivity_time_entry_create" => {
-            let description = match get_str(&body, "description") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            let duration_mins: i64 = match require(&body, "duration_mins") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            r(core
-                .productivity_time_entry_create(
-                    description,
-                    duration_mins,
-                    get(&body, "category_id"),
-                    get(&body, "project_id"),
-                )
-                .await)
-        }
-        "productivity_time_entry_delete" => {
-            let id: i64 = match require(&body, "id") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            r(core.productivity_time_entry_delete(id).await)
-        }
-        "productivity_category_upsert" => {
-            let id = match get_str(&body, "id") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            let name = match get_str(&body, "name") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            let category_type = match get_str(&body, "category_type") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            r(core
-                .productivity_category_upsert(
-                    id,
-                    name,
-                    category_type,
-                    get(&body, "color"),
-                    get(&body, "icon"),
-                )
-                .await)
-        }
-        "productivity_insights" => r(core.productivity_insights(get(&body, "date")).await),
-        "productivity_insight_dismiss" => {
-            let id = match get_str(&body, "id") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            r(core.productivity_insight_dismiss(id).await)
-        }
-        "productivity_auto_focus_confirm" => r(core
-            .productivity_auto_focus_confirm(match parse_params(&body) {
-                Ok(p) => p,
-                Err(e) => return err(e),
-            })
-            .await),
-        "productivity_projects_list" => r(core.productivity_projects_list().await),
-        "productivity_project_upsert" => {
-            let id = match get_str(&body, "id") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            let display_name = match get_str(&body, "display_name") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            let path = match get_str(&body, "path") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            r(core
-                .productivity_project_upsert(
-                    id,
-                    display_name,
-                    path,
-                    get(&body, "url_patterns"),
-                    get(&body, "color"),
-                )
-                .await)
-        }
-        "productivity_project_delete" => {
-            let id = match get_str(&body, "id") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            r(core.productivity_project_delete(id).await)
-        }
-
-        // ── Distraction ───────────────────────────────────────
-        "distraction_dismiss" => {
-            let app_name = match get_str(&body, "app_name") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            r(core.distraction_dismiss(app_name).await)
-        }
-        "distraction_allow_temp" => {
-            let pattern = match get_str(&body, "pattern") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            r(core.distraction_allow_temp(pattern).await)
-        }
-        "distraction_allow_session" => {
-            let app_name = match get_str(&body, "app_name") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            let classification = match get_str(&body, "classification") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            r(core
-                .distraction_allow_session(app_name, get(&body, "window_title"), classification)
-                .await)
-        }
-        "distraction_learned_rules" => r(core.distraction_learned_rules().await),
-        "distraction_delete_rule" => {
-            let id: i64 = match require(&body, "id") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            r(core.distraction_delete_rule(id).await)
-        }
-
-        // ── Settings (MCP) ────────────────────────────────────
-        "mcp_get_config" => r(core.mcp_get_config().await),
-        "mcp_add_server" => r(core
-            .mcp_add_server(match parse_params(&body) {
-                Ok(p) => p,
-                Err(e) => return err(e),
-            })
-            .await),
-        "mcp_remove_server" => r(core
-            .mcp_remove_server(match parse_params(&body) {
-                Ok(p) => p,
-                Err(e) => return err(e),
-            })
-            .await),
-        "mcp_toggle_server" => r(core
-            .mcp_toggle_server(match parse_params(&body) {
-                Ok(p) => p,
-                Err(e) => return err(e),
-            })
-            .await),
-        "mcp_update_server" => r(core
-            .mcp_update_server(match parse_params(&body) {
-                Ok(p) => p,
-                Err(e) => return err(e),
-            })
-            .await),
-
-        // ── Settings (generic config) ────────────────────────
-        "app_info" => r(core.app_info().await),
-        "config_get_section" => {
-            let section = match get_str(&body, "section") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            r(core.config_get_section(section).await)
-        }
-        "config_update_section" => {
-            let section = match get_str(&body, "section") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            let patch = body
-                .get("patch")
-                .cloned()
-                .unwrap_or(serde_json::Value::Object(Default::default()));
-            r(core.config_update_section(section, patch).await)
-        }
-        "config_mark_setup_completed" => r(core.config_mark_setup_completed().await),
-
-        // ── Chat ──────────────────────────────────────────────
-        "chat_threads" => r(core.chat_threads().await),
-        "chat_messages" => {
-            let session_key = match get_str(&body, "sessionKey") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            r(core.chat_messages(session_key, get(&body, "limit")).await)
-        }
-        "chat_pin_thread" => {
-            let session_key = match get_str(&body, "sessionKey") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            r(core.chat_pin_thread(session_key).await)
-        }
-        "chat_rename_thread" => {
-            let session_key = match get_str(&body, "sessionKey") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            let title = match get_str(&body, "title") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            r(core.chat_rename_thread(session_key, title).await)
-        }
-        "chat_delete_thread" => {
-            let session_key = match get_str(&body, "sessionKey") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            r(core.chat_delete_thread(session_key).await)
-        }
-        "chat_cancel" => {
-            let session_key = match get_str(&body, "sessionKey") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            r(core.chat_cancel(session_key).await)
-        }
-        "chat_send" => {
-            let content = match get_str(&body, "content") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            let session_key = match get_str(&body, "sessionKey") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            let context: Option<desktop_shared::commands::SessionContextInput> =
-                get(&body, "context");
-
-            match core.chat_send(content, session_key.clone(), context).await {
-                Ok((user_msg, stream_info)) => {
-                    // Reuse existing channel if SSE handler already created one,
-                    // otherwise create a new one. This avoids a race where SSE
-                    // connects before chat_send and gets a different channel.
-                    let tx = state
-                        .sse_channels
-                        .entry(session_key)
-                        .or_insert_with(|| broadcast::channel(256).0)
-                        .clone();
-                    let emitter: Arc<dyn ::app_core::events::AppEventEmitter> =
-                        Arc::new(SseEmitter { tx });
-                    core.spawn_chat_relay(stream_info, emitter);
-                    ok(user_msg)
-                }
-                Err(e) => err(e),
-            }
-        }
-        "chat_respond_interaction" => {
-            let session_key = match get_str(&body, "sessionKey") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            let request_id = match get_str(&body, "requestId") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            let response: common::FormResponse = match require(&body, "response") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            r(core
-                .chat_respond_interaction(session_key, request_id, response)
-                .await)
-        }
-
-        // ── Task Groups ──────────────────────────────────────
-        "group_list" => r(core.group_list(get(&body, "projectId")).await),
-        "group_create" => r(core
-            .group_create(match parse_params(&body) {
-                Ok(p) => p,
-                Err(e) => return err(e),
-            })
-            .await),
-        "group_update" => r(core
-            .group_update(match parse_params(&body) {
-                Ok(p) => p,
-                Err(e) => return err(e),
-            })
-            .await),
-        "group_delete" => {
-            let id = match get_str(&body, "id") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            r(core.group_delete(id).await)
-        }
-        "group_reorder" => r(core
-            .group_reorder(match parse_params(&body) {
-                Ok(p) => p,
-                Err(e) => return err(e),
-            })
-            .await),
-
-        // ── Workflows ────────────────────────────────────────
-        "workflow_list" => r(core.workflow_list().await),
-        "workflow_get" => {
-            let id = match get_str(&body, "id") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            r(core.workflow_get(id).await)
-        }
-        "workflow_get_effective" => r(core.workflow_get_effective(get(&body, "projectId")).await),
-        "workflow_create" => r(core
-            .workflow_create(match parse_params(&body) {
-                Ok(p) => p,
-                Err(e) => return err(e),
-            })
-            .await),
-        "workflow_delete" => {
-            let id = match get_str(&body, "id") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            r(core.workflow_delete(id).await)
-        }
-        "label_create" => r(core
-            .label_create(match parse_params(&body) {
-                Ok(p) => p,
-                Err(e) => return err(e),
-            })
-            .await),
-        "label_update" => r(core
-            .label_update(match parse_params(&body) {
-                Ok(p) => p,
-                Err(e) => return err(e),
-            })
-            .await),
-        "label_delete" => {
-            let id = match get_str(&body, "id") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            r(core.label_delete(id).await)
-        }
-        "label_reorder" => r(core
-            .label_reorder(match parse_params(&body) {
-                Ok(p) => p,
-                Err(e) => return err(e),
-            })
-            .await),
-
-        // ── Custom Columns ───────────────────────────────────
-        "custom_column_list" => {
-            let project_id = match get_str(&body, "projectId") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            r(core.custom_column_list(project_id).await)
-        }
-        "custom_column_create" => r(core
-            .custom_column_create(match parse_params(&body) {
-                Ok(p) => p,
-                Err(e) => return err(e),
-            })
-            .await),
-        "custom_column_update" => r(core
-            .custom_column_update(match parse_params(&body) {
-                Ok(p) => p,
-                Err(e) => return err(e),
-            })
-            .await),
-        "custom_column_delete" => {
-            let id = match get_str(&body, "id") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            r(core.custom_column_delete(id).await)
-        }
-        "custom_column_reorder" => r(core
-            .custom_column_reorder(match parse_params(&body) {
-                Ok(p) => p,
-                Err(e) => return err(e),
-            })
-            .await),
-        "custom_column_values" => {
-            let task_id = match get_str(&body, "taskId") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            r(core.custom_column_values(task_id).await)
-        }
-        "custom_column_value_set" => r(core
-            .custom_column_value_set(match parse_params(&body) {
-                Ok(p) => p,
-                Err(e) => return err(e),
-            })
-            .await),
-        "custom_column_value_delete" => {
-            let task_id = match get_str(&body, "taskId") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            let column_id = match get_str(&body, "columnId") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            r(core.custom_column_value_delete(task_id, column_id).await)
-        }
-
-        // ── Cognitive ─────────────────────────────────────────
-        "cognitive_user_model" => r(core.cognitive_user_model().await),
-        "cognitive_facts_list" => r(core.cognitive_facts_list(get(&body, "domain")).await),
-        "cognitive_episodic_list" => r(core
-            .cognitive_episodic_list(get(&body, "domain"), get(&body, "limit"))
-            .await),
-        "cognitive_rules_list" => r(core.cognitive_rules_list(get(&body, "domain")).await),
-        "cognitive_memory_stats" => r(core.cognitive_memory_stats().await),
-        "cognitive_system_status" => r(core.cognitive_system_status().await),
-        "cognitive_fact_create" => r(core
-            .cognitive_fact_create(match parse_params(&body) {
-                Ok(p) => p,
-                Err(e) => return err(e),
-            })
-            .await),
-        "cognitive_fact_update" => {
-            let id = match get_str(&body, "id") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            r(core
-                .cognitive_fact_update(
-                    id,
-                    match parse_params(&body) {
-                        Ok(p) => p,
-                        Err(e) => return err(e),
-                    },
-                )
-                .await)
-        }
-        "cognitive_fact_delete" => {
-            let id = match get_str(&body, "id") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            r(core.cognitive_fact_delete(id).await)
-        }
-        "cognitive_rule_create" => r(core
-            .cognitive_rule_create(match parse_params(&body) {
-                Ok(p) => p,
-                Err(e) => return err(e),
-            })
-            .await),
-        "cognitive_rule_deactivate" => {
-            let id = match get_str(&body, "id") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            r(core.cognitive_rule_deactivate(id).await)
-        }
-        "cognitive_run_compaction" => r(core.cognitive_run_compaction().await),
-        "cognitive_run_reflection" => r(core.cognitive_run_reflection().await),
-        "cognitive_inject_event" => {
-            let event_type = match get_str(&body, "event_type") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            let payload = body.get("payload").cloned().unwrap_or_default();
-            r(core.cognitive_inject_event(event_type, payload).await)
-        }
-        "cognitive_event_log" => r(core.cognitive_event_log(get(&body, "limit")).await),
-        "cognitive_pipeline_log" => r(core.cognitive_pipeline_log(get(&body, "limit")).await),
-
-        // ── Coaching ──────────────────────────────────────────
-        "coaching_situation" => r(core.coaching_situation().await),
-        "coaching_signals" => r(core.coaching_signals().await),
-        "coaching_patterns" => r(core.coaching_patterns().await),
-        "coaching_feedback_stats" => r(core.coaching_feedback_stats().await),
-        "coaching_router_status" => r(core.coaching_router_status().await),
-        "coaching_pending_interventions" => r(core.coaching_pending_interventions().await),
-        "coaching_reset_dismissals" => r(core
-            .coaching_reset_dismissals(get(&body, "trigger_name"))
-            .await),
-        "coaching_clear_signals" => r(core.coaching_clear_signals().await),
-        "coaching_submit_feedback" => r(core
-            .coaching_submit_feedback(
-                get(&body, "intervention_id").unwrap_or_default(),
-                get(&body, "response").unwrap_or_default(),
-            )
-            .await),
-
-        // ── Unsupported ───────────────────────────────────────
-        _ => err(ApiError::new(
-            "NOT_FOUND",
-            format!("command '{cmd}' is not supported in browser dev mode"),
-        )),
+        Err(e) => err(e),
     }
 }
 
@@ -1336,5 +395,99 @@ fn domain_for_event(event: &bus::DomainEvent) -> &'static str {
         bus::DomainEvent::UserCorrectedAI { .. } => "learning",
         bus::DomainEvent::CoachingFeedback { .. } => "coaching",
         bus::DomainEvent::ChatTurnCompleted { .. } => "general",
+    }
+}
+
+// ── Parity test ─────────────────────────────────────────────────────────
+//
+// Verifies that every Tauri command registered in `main.rs` has a matching
+// entry in some module's `dispatch_dev` (via `DEV_COMMANDS`). If someone adds
+// a new Tauri command but forgets the dev dispatch, this test fails.
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeSet;
+
+    /// Commands that only exist in Tauri IPC (desktop-only, no HTTP equivalent).
+    const TAURI_ONLY: &[&str] = &[
+        "permissions_check_accessibility",
+        "permissions_open_accessibility",
+        "resize_window",
+        "mcp_oauth_start",
+        "mcp_oauth_disconnect",
+    ];
+
+    /// Parse Tauri command function names from `main.rs` source text.
+    fn tauri_command_names() -> BTreeSet<String> {
+        let src = include_str!("main.rs");
+        src.lines()
+            .map(str::trim)
+            .filter(|l| l.starts_with("commands::") || l.starts_with("oauth::commands::"))
+            .filter_map(|l| {
+                l.rsplit("::")
+                    .next()
+                    .map(|s| s.trim_end_matches(',').to_string())
+            })
+            .collect()
+    }
+
+    /// Collect all dev command names from module `DEV_COMMANDS` arrays.
+    fn dev_command_names() -> BTreeSet<String> {
+        use crate::commands;
+        let modules: &[&[&str]] = &[
+            commands::tasks::DEV_COMMANDS,
+            commands::projects::DEV_COMMANDS,
+            commands::areas::DEV_COMMANDS,
+            commands::objectives::DEV_COMMANDS,
+            commands::key_results::DEV_COMMANDS,
+            commands::status::DEV_COMMANDS,
+            commands::finance::DEV_COMMANDS,
+            commands::notes::DEV_COMMANDS,
+            commands::productivity::DEV_COMMANDS,
+            commands::distraction::DEV_COMMANDS,
+            commands::settings::DEV_COMMANDS,
+            commands::chat::DEV_COMMANDS,
+            commands::groups::DEV_COMMANDS,
+            commands::workflows::DEV_COMMANDS,
+            commands::columns::DEV_COMMANDS,
+            commands::cognitive::DEV_COMMANDS,
+        ];
+        // chat_send is handled inline in dev_server.rs
+        let mut set: BTreeSet<String> = modules
+            .iter()
+            .flat_map(|m| m.iter().map(|s| s.to_string()))
+            .collect();
+        set.insert("chat_send".to_string());
+        set
+    }
+
+    #[test]
+    fn dev_server_covers_all_tauri_commands() {
+        let tauri = tauri_command_names();
+        let dev = dev_command_names();
+        let tauri_only: BTreeSet<String> = TAURI_ONLY.iter().map(|s| s.to_string()).collect();
+
+        let expected: BTreeSet<String> = tauri.difference(&tauri_only).cloned().collect();
+        let missing: Vec<&String> = expected.difference(&dev).collect();
+
+        assert!(
+            missing.is_empty(),
+            "Tauri commands missing from dev server dispatch: {missing:?}\n\
+             Add dispatch_dev entries in the corresponding commands/*.rs module."
+        );
+    }
+
+    #[test]
+    fn dev_server_has_no_orphan_commands() {
+        let tauri = tauri_command_names();
+        let dev = dev_command_names();
+
+        let orphans: Vec<&String> = dev.difference(&tauri).collect();
+
+        assert!(
+            orphans.is_empty(),
+            "Dev server dispatches commands not registered in Tauri: {orphans:?}\n\
+             Remove orphan entries from the corresponding DEV_COMMANDS array."
+        );
     }
 }

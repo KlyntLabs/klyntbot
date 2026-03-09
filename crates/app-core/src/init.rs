@@ -341,6 +341,7 @@ impl AppCore {
             event_log_repo: Some(cognitive::EventLogRepo::new(
                 storage_pool.inner().clone(),
             )),
+            consecutive_coaching_ignores: Arc::new(std::sync::atomic::AtomicI32::new(0)),
         };
 
         // Spawn background services (agent loop + channel manager).
