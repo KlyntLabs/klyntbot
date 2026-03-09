@@ -389,7 +389,7 @@ export function DayColumnsView({
 
         {/* Collapsible activity feed — only for today */}
         {isToday && (
-          <div className="border-t border-border" style={{ maxHeight: feedExpanded ? 260 : 36, overflow: "hidden" }}>
+          <div className="border-t border-border transition-[max-height] duration-300 ease-in-out" style={{ maxHeight: feedExpanded ? 260 : 36, overflow: "hidden" }}>
             <button
               type="button"
               onClick={() => setFeedExpanded(!feedExpanded)}

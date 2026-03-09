@@ -70,7 +70,7 @@ function DefaultSummary({
     : 0;
 
   return (
-    <div className="w-72 glass-card p-4 flex flex-col gap-4 overflow-y-auto">
+    <div className="w-72 glass-card p-4 flex flex-col gap-4 overflow-y-auto [&>*]:animate-[fade-in-up_0.3s_ease-out_both]">
       <h3 className="text-xs font-semibold text-muted uppercase tracking-wider">Summary</h3>
 
       {/* Productivity score ring */}
