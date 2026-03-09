@@ -716,10 +716,7 @@ impl AppCore {
         week_start: String,
     ) -> Result<WeeklyAssessmentResponse, ApiError> {
         let repos = self.productivity_repos()?;
-        let start_date =
-            chrono::NaiveDate::parse_from_str(&week_start, "%Y-%m-%d").map_err(|_| {
-                ApiError::new("VALIDATION", "Invalid week_start date. Use YYYY-MM-DD format")
-            })?;
+        let start_date = parse_date_or_err(&week_start)?;
         let end_date = start_date + chrono::Duration::days(6);
         let end_str = end_date.format("%Y-%m-%d").to_string();
 

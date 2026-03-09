@@ -2,10 +2,6 @@ use sqlx::SqlitePool;
 
 use crate::types::CalendarEvent;
 
-fn map_err(e: sqlx::Error) -> common::KlyntbotError {
-    common::KlyntbotError::Storage(e.to_string())
-}
-
 #[derive(Debug, Clone)]
 pub struct CalendarEventRepo {
     pool: SqlitePool,
@@ -57,7 +53,7 @@ impl CalendarEventRepo {
         .bind(&event.updated_at)
         .execute(&self.pool)
         .await
-        .map_err(map_err)?;
+        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         Ok(())
     }
 
@@ -74,7 +70,7 @@ impl CalendarEventRepo {
         .bind(to)
         .fetch_all(&self.pool)
         .await
-        .map_err(map_err)
+        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))
     }
 
     /// List calendar events for a specific date (YYYY-MM-DD prefix match).
@@ -90,7 +86,7 @@ impl CalendarEventRepo {
             .bind(external_uid)
             .execute(&self.pool)
             .await
-            .map_err(map_err)?;
+            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         Ok(())
     }
 
@@ -105,6 +101,6 @@ impl CalendarEventRepo {
         .bind(session_id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(map_err)
+        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))
     }
 }

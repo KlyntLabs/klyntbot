@@ -5,6 +5,7 @@
 
 import { Calendar, Loader2, RefreshCw } from "lucide-react";
 import { useState } from "react";
+import { formatTime } from "../../lib/dates";
 import { useMutation } from "../../hooks/useMutation";
 import { cn } from "../../lib/utils";
 
@@ -19,7 +20,7 @@ export function CalendarSync() {
       // The frontend sends an empty array to trigger a "pull" sync
       // In production, this would be populated by MCP Google Calendar data
       await mutate({ events: [] });
-      setLastSynced(new Date().toLocaleTimeString());
+      setLastSynced(formatTime(new Date().toISOString()));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Sync failed");
     }
