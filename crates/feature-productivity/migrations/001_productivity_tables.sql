@@ -93,6 +93,7 @@ CREATE INDEX IF NOT EXISTS idx_activity_events_started ON activity_events(starte
 CREATE INDEX IF NOT EXISTS idx_activity_events_category ON activity_events(category_id);
 CREATE INDEX IF NOT EXISTS idx_activity_events_app ON activity_events(app_name, started_at DESC);
 CREATE INDEX IF NOT EXISTS idx_activity_events_site ON activity_events(site_name, started_at DESC);
+CREATE INDEX IF NOT EXISTS idx_activity_events_started_idle ON activity_events(started_at, is_idle);
 
 -- Focus sessions: explicit deep work periods
 CREATE TABLE IF NOT EXISTS focus_sessions (

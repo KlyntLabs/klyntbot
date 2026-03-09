@@ -61,12 +61,10 @@ async fn test_full_focus_session_lifecycle() {
     // completed = actual_mins >= target. Since start/end are near-instant, actual_mins=0,
     // so completed=false. This is correct behavior — session didn't reach target duration.
     assert!(ended.ended_at.is_some());
-    assert!(ended.quality_score.is_some());
+    // quality_score is now computed by the intelligence layer's QualityScorer
+    assert!(ended.quality_score.is_none());
     assert!(ended.actual_mins.is_some());
     assert_eq!(ended.notes, Some("Good session".into()));
-
-    // Quality should be < 1.0 due to interruption and not reaching target
-    assert!(ended.quality_score.unwrap() < 1.0);
 
     // 5. No active session anymore
     assert!(repos.sessions.get_active().await.unwrap().is_none());
@@ -102,7 +100,9 @@ async fn test_full_focus_session_lifecycle() {
 
     assert!(summary.total_active_secs > 0);
     assert_eq!(summary.focus_sessions_count, 1);
-    assert!(summary.avg_session_quality.is_some());
+    // quality_score is now computed by the intelligence layer's QualityScorer,
+    // so avg_session_quality may be None when no intelligence scoring has run.
+    // assert!(summary.avg_session_quality.is_some());
 }
 
 /// Categorizer loads categories from DB and matches apps correctly.
@@ -554,7 +554,8 @@ async fn test_pomodoro_lifecycle() {
     // End it
     let ended = mgr.end_session(None).await.unwrap().unwrap();
     assert_eq!(ended.session_type, SessionType::Pomodoro);
-    assert!(ended.quality_score.is_some());
+    // quality_score is now computed by the intelligence layer's QualityScorer
+    assert!(ended.quality_score.is_none());
     assert!(ended.ended_at.is_some());
 }
 

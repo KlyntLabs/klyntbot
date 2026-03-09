@@ -1,6 +1,7 @@
 pub mod activity_category;
 pub mod activity_event;
 pub mod bucket;
+pub mod calendar_event;
 pub mod categorization_cache;
 pub mod daily_summary;
 pub mod distraction_pattern;
@@ -19,10 +20,12 @@ pub mod rule_evolution_log;
 pub mod time_entry;
 pub mod tracking_rule;
 pub mod voice_journal;
+pub mod weekly_assessment;
 
 pub use activity_category::ActivityCategoryRepo;
 pub use activity_event::ActivityEventRepo;
 pub use bucket::BucketRepo;
+pub use calendar_event::CalendarEventRepo;
 pub use categorization_cache::CategorizationCacheRepo;
 pub use daily_summary::DailySummaryRepo;
 pub use distraction_pattern::DistractionPatternRepo;
@@ -41,6 +44,7 @@ pub use rule_evolution_log::RuleEvolutionLogRepo;
 pub use time_entry::TimeEntryRepo;
 pub use tracking_rule::TrackingRuleRepo;
 pub use voice_journal::VoiceJournalRepo;
+pub use weekly_assessment::WeeklyAssessmentRepo;
 
 /// Aggregate access to all productivity repos.
 #[derive(Debug, Clone)]
@@ -66,6 +70,8 @@ pub struct ProductivityRepos {
     pub categorization_cache: CategorizationCacheRepo,
     pub privacy_rules: PrivacyRuleRepo,
     pub rule_evolution_log: RuleEvolutionLogRepo,
+    pub calendar_events: CalendarEventRepo,
+    pub weekly_assessments: WeeklyAssessmentRepo,
 }
 
 impl ProductivityRepos {
@@ -91,7 +97,9 @@ impl ProductivityRepos {
             voice_journals: VoiceJournalRepo::new(pool.clone()),
             categorization_cache: CategorizationCacheRepo::new(pool.clone()),
             privacy_rules: PrivacyRuleRepo::new(pool.clone()),
-            rule_evolution_log: RuleEvolutionLogRepo::new(pool),
+            rule_evolution_log: RuleEvolutionLogRepo::new(pool.clone()),
+            calendar_events: CalendarEventRepo::new(pool.clone()),
+            weekly_assessments: WeeklyAssessmentRepo::new(pool),
         }
     }
 }

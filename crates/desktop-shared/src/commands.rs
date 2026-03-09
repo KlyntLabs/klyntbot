@@ -821,6 +821,22 @@ pub struct InsightCardResponse {
     pub generated_at: DateTime<Utc>,
 }
 
+// ── Weekly Assessment ──────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WeeklyAssessmentResponse {
+    pub id: String,
+    pub week_start: String,
+    pub week_end: String,
+    pub avg_score: Option<f64>,
+    pub total_focus_mins: Option<i64>,
+    pub total_productive_secs: Option<i64>,
+    pub total_distracting_secs: Option<i64>,
+    pub top_apps: Option<String>,
+    pub summary: Option<String>,
+}
+
 // ── Distraction ────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1112,4 +1128,23 @@ pub struct SourceBreakdown {
     pub source: TimelineSource,
     pub duration_secs: i64,
     pub count: i64,
+}
+
+// ── Calendar ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CalendarEventInput {
+    pub title: String,
+    pub started_at: String,
+    pub ended_at: String,
+    pub external_uid: String,
+    pub calendar_id: Option<String>,
+    pub description: Option<String>,
+    pub location: Option<String>,
+    pub attendees_count: Option<i64>,
+    pub is_recurring: Option<bool>,
+    pub recurrence_id: Option<String>,
+    pub source: Option<String>,
+    pub color: Option<String>,
 }

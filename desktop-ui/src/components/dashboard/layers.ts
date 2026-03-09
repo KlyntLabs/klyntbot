@@ -1,7 +1,7 @@
 import { createContext, useContext, useMemo, useState } from "react";
 import type { TimelineSource } from "../../lib/types";
 
-export type LayerKey = "activity" | "timeEntries" | "tasks" | "transactions" | "notes";
+export type LayerKey = "activity" | "calendar" | "timeEntries" | "tasks" | "transactions" | "notes";
 
 export interface LayerConfig {
   key: LayerKey;
@@ -19,6 +19,13 @@ export const LAYERS: LayerConfig[] = [
     sources: ["productivity", "focus"],
     defaultOn: true,
     color: "var(--timeline-app-productive)",
+  },
+  {
+    key: "calendar",
+    label: "Calendar",
+    sources: [],
+    defaultOn: true,
+    color: "var(--timeline-focus)",
   },
   {
     key: "timeEntries",

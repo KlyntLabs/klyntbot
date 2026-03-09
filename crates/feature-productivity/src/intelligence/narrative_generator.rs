@@ -254,6 +254,13 @@ mod tests {
             okr_alignment: Some(0.8),
             notes: None,
             tags: None,
+            action_id: None,
+            project_id: None,
+            target_mins: None,
+            actual_mins: None,
+            interruptions: None,
+            distraction_events: None,
+            completed: None,
             created_at: "2026-03-09T10:00:00Z".to_string(),
             updated_at: "2026-03-09T11:00:00Z".to_string(),
         }

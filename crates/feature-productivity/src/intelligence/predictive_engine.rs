@@ -324,6 +324,13 @@ mod tests {
             okr_alignment: None,
             notes: None,
             tags: None,
+            action_id: None,
+            project_id: None,
+            target_mins: None,
+            actual_mins: None,
+            interruptions: None,
+            distraction_events: None,
+            completed: None,
             created_at: format!("{date}T{:02}:00:00Z", hour),
             updated_at: format!("{date}T{:02}:00:00Z", hour),
         }

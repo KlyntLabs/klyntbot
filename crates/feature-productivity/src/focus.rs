@@ -88,13 +88,8 @@ impl FocusManager {
         session.completed = actual_mins >= target;
         session.notes = notes;
 
-        // Compute quality score
-        let on_task_ratio = compute_on_task_ratio(&session);
-        session.quality_score = Some(compute_quality(
-            &session,
-            on_task_ratio,
-            self.config.default_duration_mins,
-        ));
+        // Quality score is computed by the intelligence layer's QualityScorer
+        // after the session is persisted — leave it as None here.
 
         self.repos.sessions.update(&session).await?;
 
@@ -234,6 +229,9 @@ impl FocusManager {
 
 /// Estimate on-task ratio from distraction events.
 /// Simple heuristic: each distraction costs ~2 minutes of focus time.
+///
+/// Legacy helper — retained for potential future use.
+#[allow(dead_code)]
 fn compute_on_task_ratio(session: &FocusSession) -> f64 {
     let elapsed_mins = session
         .actual_mins
@@ -331,7 +329,8 @@ mod tests {
         let session = ended.unwrap();
 
         assert!(session.ended_at.is_some());
-        assert!(session.quality_score.is_some());
+        // quality_score is now computed by the intelligence layer's QualityScorer
+        assert!(session.quality_score.is_none());
         assert!(session.notes.as_deref() == Some("good session"));
     }
 

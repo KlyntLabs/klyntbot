@@ -4,7 +4,7 @@
 -- client-side time-overlap heuristics and enables accurate focus-aware
 -- productivity analysis.
 
-ALTER TABLE activity_events ADD COLUMN focus_session_id TEXT REFERENCES focus_sessions(id);
+ALTER TABLE activity_events ADD COLUMN focus_session_id TEXT REFERENCES productivity_sessions(id);
 
 CREATE INDEX IF NOT EXISTS idx_activity_events_focus_session
     ON activity_events(focus_session_id)

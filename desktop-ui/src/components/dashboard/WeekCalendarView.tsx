@@ -6,7 +6,7 @@ import type { TimelineEntry } from "../../lib/types";
 import { EMPTY_TIMELINE_RESPONSE } from "../../lib/types";
 import { cn } from "../../lib/utils";
 import { type ActivityContainer, buildContainers, focusColor } from "./buildContainers";
-import { useEnabledLayers } from "./layers";
+import { useEnabledLayers, useSidebarOpen } from "./layers";
 import { SummaryPanel } from "./SummaryPanel";
 
 const HOUR_HEIGHT = 48;
@@ -72,6 +72,7 @@ export function WeekCalendarView() {
   const today = todayISO();
 
   const { enabledSources } = useEnabledLayers();
+  const sidebarOpen = useSidebarOpen();
   const queryArgs = useMemo(
     () => ({ startDate: start, endDate: end, sources: enabledSources }),
     [start, end, enabledSources],
@@ -203,11 +204,13 @@ export function WeekCalendarView() {
         </div>
       </div>
 
-      <SummaryPanel
-        summary={data.summary}
-        selectedEntry={selectedEntry}
-        onClose={() => setSelectedEntry(null)}
-      />
+      {sidebarOpen && (
+        <SummaryPanel
+          summary={data.summary}
+          selectedEntry={selectedEntry}
+          onClose={() => setSelectedEntry(null)}
+        />
+      )}
     </div>
   );
 }

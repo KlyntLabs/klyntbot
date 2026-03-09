@@ -6,6 +6,9 @@ import { useClickOutside } from "../../hooks/useClickOutside";
 import { todayISO, toLocalISO } from "../../lib/dates";
 import { cn } from "../../lib/utils";
 import { MiniCalendar } from "../tasks/editors/MiniCalendar";
+import { AutoFocusToast } from "../productivity/AutoFocusToast";
+import { FocusStateIndicator } from "../productivity/FocusStateIndicator";
+import { CalendarSync } from "./CalendarSync";
 import { LAYERS, LayerContext, SidebarContext, useLayerToggle, useSidebarToggle } from "./layers";
 
 type ViewMode = "day" | "week" | "month" | "year";
@@ -186,6 +189,8 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
           <Layers className="w-4 h-4" />
         </button>
 
+        <CalendarSync />
+
         {/* Nav pill group */}
         <div className="flex items-center rounded-full bg-white/[0.06] p-0.5 ml-auto">
           <button
@@ -282,6 +287,10 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
           </div>,
           document.body,
         )}
+
+      {/* Real-time overlays */}
+      <FocusStateIndicator />
+      <AutoFocusToast />
 
       {/* Content */}
       <LayerContext.Provider value={{ enabled, enabledSources }}>

@@ -45,6 +45,7 @@ struct ScoreWindow {
     productive_secs: i64,
     neutral_secs: i64,
     distracting_secs: i64,
+    context_switches: i64,
     last_emit: DateTime<Utc>,
 }
 
@@ -54,8 +55,13 @@ impl ScoreWindow {
             productive_secs: 0,
             neutral_secs: 0,
             distracting_secs: 0,
+            context_switches: 0,
             last_emit: Utc::now(),
         }
+    }
+
+    fn record_switch(&mut self) {
+        self.context_switches += 1;
     }
 
     fn record(&mut self, tick: &ActivityTick, interval_secs: i64) {
@@ -82,9 +88,12 @@ impl ScoreWindow {
             neutral_secs: self.neutral_secs,
             distracting_secs: self.distracting_secs,
             focus_sessions_count: 0,
+            // avg_session_quality is left as None — the authoritative value
+            // comes from the intelligence layer's QualityScorer, which is not
+            // available in this lightweight in-memory window.
             avg_session_quality: None,
             interruptions_count: 0,
-            context_switches: 0,
+            context_switches: self.context_switches,
             top_apps: vec![],
             top_categories: vec![],
             top_projects: vec![],
@@ -141,6 +150,7 @@ impl DashboardEmitter {
                         };
 
                         if last_app.as_deref() != Some(&current_app) {
+                            score_window.record_switch();
                             emit(DashboardEvent::ActivitySwitch {
                                 from_app: last_app.take(),
                                 to_app: current_app.clone(),

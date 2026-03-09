@@ -26,14 +26,14 @@ CREATE INDEX IF NOT EXISTS idx_tracking_rules_category ON productivity_tracking_
 -- Unified sessions: focus, meeting, break
 CREATE TABLE IF NOT EXISTS productivity_sessions (
     id                TEXT PRIMARY KEY,
-    session_type      TEXT NOT NULL CHECK (session_type IN ('focus', 'meeting', 'break')),
+    session_type      TEXT NOT NULL CHECK (session_type IN ('focus', 'meeting', 'break', 'pomodoro')),
     started_at        TEXT NOT NULL,
     ended_at          TEXT,
     duration_secs     INTEGER,
     dominant_category TEXT,
     category_purity   REAL,
     quality_score     REAL,
-    source            TEXT NOT NULL DEFAULT 'auto' CHECK (source IN ('auto', 'manual', 'predicted')),
+    source            TEXT NOT NULL DEFAULT 'auto' CHECK (source IN ('auto', 'manual', 'predicted', 'auto_detected', 'pomodoro')),
     app_breakdown     TEXT,
     context_switches  INTEGER NOT NULL DEFAULT 0,
     distraction_count INTEGER NOT NULL DEFAULT 0,
@@ -41,6 +41,13 @@ CREATE TABLE IF NOT EXISTS productivity_sessions (
     okr_alignment     REAL,
     notes             TEXT,
     tags              TEXT,
+    action_id         TEXT,
+    project_id        TEXT,
+    target_mins       INTEGER,
+    actual_mins       INTEGER,
+    interruptions     INTEGER DEFAULT 0,
+    distraction_events TEXT,
+    completed         INTEGER DEFAULT 0,
     created_at        TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at        TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -48,6 +55,7 @@ CREATE TABLE IF NOT EXISTS productivity_sessions (
 CREATE INDEX IF NOT EXISTS idx_prod_sessions_started ON productivity_sessions(started_at DESC);
 CREATE INDEX IF NOT EXISTS idx_prod_sessions_type ON productivity_sessions(session_type, started_at DESC);
 CREATE INDEX IF NOT EXISTS idx_prod_sessions_active ON productivity_sessions(ended_at) WHERE ended_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_productivity_sessions_action ON productivity_sessions(action_id) WHERE action_id IS NOT NULL;
 
 -- Quality scores: daily + per-session
 CREATE TABLE IF NOT EXISTS productivity_quality_scores (
@@ -156,16 +164,23 @@ CREATE TABLE IF NOT EXISTS productivity_rule_evolution_log (
 CREATE INDEX IF NOT EXISTS idx_rule_evolution_rule ON productivity_rule_evolution_log(rule_id, created_at DESC);
 
 -- Data migration: copy existing focus_sessions → productivity_sessions
-INSERT OR IGNORE INTO productivity_sessions (id, session_type, started_at, ended_at, duration_secs, quality_score, source, notes, created_at)
+INSERT OR IGNORE INTO productivity_sessions (id, session_type, started_at, ended_at, duration_secs, quality_score, source, notes, action_id, project_id, target_mins, actual_mins, interruptions, distraction_events, completed, created_at)
 SELECT
     id,
-    CASE session_type WHEN 'pomodoro' THEN 'focus' ELSE session_type END,
+    session_type,
     started_at,
     ended_at,
     CASE WHEN actual_mins IS NOT NULL THEN actual_mins * 60 ELSE NULL END,
     quality_score,
-    CASE source WHEN 'auto_detected' THEN 'auto' WHEN 'pomodoro' THEN 'auto' ELSE 'manual' END,
+    source,
     notes,
+    action_id,
+    project_id,
+    target_mins,
+    actual_mins,
+    interruptions,
+    distraction_events,
+    completed,
     started_at
 FROM focus_sessions;
 
@@ -266,3 +281,45 @@ INSERT OR IGNORE INTO productivity_tracking_rules (id, rule_type, match_field, m
     ('sys-url-tradingview',   'url', 'url', 'tradingview.com',        'contains', 'finance', 'focus', 20, 'system'),
     -- Entertainment (distracting → break)
     ('sys-url-9gag',          'url', 'url', '9gag.com',               'contains', 'entertainment', 'break', 5, 'system');
+
+-- Calendar events table
+CREATE TABLE IF NOT EXISTS calendar_events (
+    id TEXT PRIMARY KEY,
+    calendar_id TEXT NOT NULL DEFAULT 'primary',
+    title TEXT NOT NULL,
+    description TEXT,
+    started_at TEXT NOT NULL,
+    ended_at TEXT NOT NULL,
+    location TEXT,
+    attendees_count INTEGER DEFAULT 0,
+    is_recurring INTEGER DEFAULT 0,
+    recurrence_id TEXT,
+    source TEXT NOT NULL DEFAULT 'google',
+    external_uid TEXT,
+    session_id TEXT REFERENCES productivity_sessions(id),
+    color TEXT,
+    synced_at TEXT NOT NULL DEFAULT (datetime('now')),
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(external_uid, calendar_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_calendar_events_time ON calendar_events(started_at, ended_at);
+CREATE INDEX IF NOT EXISTS idx_calendar_events_date ON calendar_events(date(started_at));
+CREATE INDEX IF NOT EXISTS idx_calendar_events_session ON calendar_events(session_id) WHERE session_id IS NOT NULL;
+
+-- Weekly assessments: aggregated weekly productivity data
+CREATE TABLE IF NOT EXISTS weekly_assessments (
+    id                    TEXT PRIMARY KEY,
+    week_start            TEXT NOT NULL,
+    week_end              TEXT NOT NULL,
+    avg_score             REAL,
+    total_focus_mins      INTEGER,
+    total_productive_secs INTEGER,
+    total_distracting_secs INTEGER,
+    top_apps              TEXT,
+    summary               TEXT,
+    created_at            TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_weekly_assessments_week ON weekly_assessments(week_start);

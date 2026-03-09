@@ -34,14 +34,14 @@ impl From<SessionRow> for FocusSession {
             .and_then(|s| match serde_json::from_str(s) {
                 Ok(v) => Some(v),
                 Err(e) => {
-                    warn!(field = "distraction_events", %e, "failed to deserialize JSON from focus_sessions");
+                    warn!(field = "distraction_events", %e, "failed to deserialize JSON from productivity_sessions");
                     None
                 }
             })
             .unwrap_or_default();
         let started_at = common::utils::date::parse_datetime(&row.started_at, "UTC")
             .unwrap_or_else(|| {
-                warn!(raw = %row.started_at, "unparseable started_at in focus_sessions, using now()");
+                warn!(raw = %row.started_at, "unparseable started_at in productivity_sessions, using now()");
                 Utc::now()
             });
         let ended_at = row
@@ -92,7 +92,7 @@ impl FocusSessionRepo {
                 "[]".to_string()
             });
         sqlx::query(
-            r#"INSERT INTO focus_sessions (id, action_id, project_id, session_type, target_mins, started_at, ended_at, actual_mins, interruptions, distraction_events, quality_score, completed, notes, source)
+            r#"INSERT INTO productivity_sessions (id, action_id, project_id, session_type, target_mins, started_at, ended_at, actual_mins, interruptions, distraction_events, quality_score, completed, notes, source)
                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)"#,
         )
         .bind(&session.id)
@@ -117,7 +117,7 @@ impl FocusSessionRepo {
 
     pub async fn get(&self, id: &str) -> common::Result<Option<FocusSession>> {
         let row = sqlx::query_as::<_, SessionRow>(&format!(
-            "SELECT {SESSION_COLUMNS} FROM focus_sessions WHERE id = ?1"
+            "SELECT {SESSION_COLUMNS} FROM productivity_sessions WHERE id = ?1"
         ))
         .bind(id)
         .fetch_optional(&self.pool)
@@ -128,7 +128,7 @@ impl FocusSessionRepo {
 
     pub async fn get_active(&self) -> common::Result<Option<FocusSession>> {
         let row = sqlx::query_as::<_, SessionRow>(
-            &format!("SELECT {SESSION_COLUMNS} FROM focus_sessions WHERE ended_at IS NULL ORDER BY started_at DESC LIMIT 1"),
+            &format!("SELECT {SESSION_COLUMNS} FROM productivity_sessions WHERE ended_at IS NULL ORDER BY started_at DESC LIMIT 1"),
         )
         .fetch_optional(&self.pool)
         .await
@@ -145,11 +145,11 @@ impl FocusSessionRepo {
                 "[]".to_string()
             });
         sqlx::query(
-            r#"UPDATE focus_sessions SET
+            r#"UPDATE productivity_sessions SET
                    action_id = ?2, project_id = ?3, session_type = ?4, target_mins = ?5,
                    ended_at = ?6, actual_mins = ?7, interruptions = ?8,
                    distraction_events = ?9, quality_score = ?10, completed = ?11, notes = ?12,
-                   source = ?13
+                   source = ?13, updated_at = datetime('now')
                WHERE id = ?1"#,
         )
         .bind(&session.id)
@@ -179,7 +179,7 @@ impl FocusSessionRepo {
     ) -> common::Result<Vec<FocusSession>> {
         let limit = limit.unwrap_or(1000);
         let rows = sqlx::query_as::<_, SessionRow>(
-            &format!("SELECT {SESSION_COLUMNS} FROM focus_sessions WHERE started_at >= ?1 AND started_at < ?2 ORDER BY started_at DESC LIMIT ?3"),
+            &format!("SELECT {SESSION_COLUMNS} FROM productivity_sessions WHERE started_at >= ?1 AND started_at < ?2 ORDER BY started_at DESC LIMIT ?3"),
         )
         .bind(start)
         .bind(end)
@@ -192,7 +192,7 @@ impl FocusSessionRepo {
 
     pub async fn list_by_action(&self, action_id: &str) -> common::Result<Vec<FocusSession>> {
         let rows = sqlx::query_as::<_, SessionRow>(
-            &format!("SELECT {SESSION_COLUMNS} FROM focus_sessions WHERE action_id = ?1 ORDER BY started_at DESC"),
+            &format!("SELECT {SESSION_COLUMNS} FROM productivity_sessions WHERE action_id = ?1 ORDER BY started_at DESC"),
         )
         .bind(action_id)
         .fetch_all(&self.pool)

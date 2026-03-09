@@ -343,6 +343,13 @@ impl SessionAggregator {
                 okr_alignment: None,
                 notes: None,
                 tags: None,
+                action_id: None,
+                project_id: None,
+                target_mins: None,
+                actual_mins: None,
+                interruptions: None,
+                distraction_events: None,
+                completed: None,
                 created_at: now_str.clone(),
                 updated_at: now_str,
             };

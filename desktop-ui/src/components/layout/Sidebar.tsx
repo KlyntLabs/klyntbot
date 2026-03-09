@@ -26,7 +26,7 @@ const items: { key: SidebarItem; icon: typeof MessageSquare; path?: string; bott
   { key: "Tasks", icon: CheckSquare, path: "/tasks" },
   { key: "Notes", icon: FileText, path: "/notes" },
   { key: "Finance", icon: Wallet, path: "/finance" },
-  { key: "Productivity", icon: Activity, path: "/productivity" },
+  { key: "Productivity", icon: Activity, path: "/categories" },
   { key: "Debug", icon: Bug, path: "/debug", bottom: true },
   { key: "Settings", icon: Settings, path: "/settings", bottom: true },
 ];

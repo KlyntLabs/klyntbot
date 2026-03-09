@@ -288,13 +288,13 @@ export function SystemTray() {
                 <div key={event.id} className="flex items-center gap-2.5">
                   <div
                     className="w-1 h-6 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: event.color }}
+                    style={{ backgroundColor: event.color ?? "var(--brand)" }}
                   />
                   <div className="flex-1 min-w-0">
                     <p className="text-[12px] font-light text-secondary truncate">{event.title}</p>
                   </div>
                   <span className="text-[11px] text-dim font-light flex-shrink-0">
-                    {new Date(event.startAt).toLocaleTimeString([], {
+                    {new Date(event.startedAt).toLocaleTimeString([], {
                       hour: "numeric",
                       minute: "2-digit",
                     })}

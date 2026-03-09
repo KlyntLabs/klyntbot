@@ -95,10 +95,22 @@ export interface KeyResult {
 
 export interface CalendarEvent {
   id: string;
+  calendarId: string;
   title: string;
-  startAt: string;
-  endAt: string;
-  color: string;
+  description: string | null;
+  startedAt: string;
+  endedAt: string;
+  location: string | null;
+  attendeesCount: number;
+  isRecurring: boolean;
+  recurrenceId: string | null;
+  source: string;
+  externalUid: string;
+  sessionId: string | null;
+  color: string | null;
+  syncedAt: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export type MessageSegment =
@@ -841,6 +853,18 @@ export interface FocusCompletedPayload {
   durationMins: number;
   qualityScore: number | null;
   breakMins: number | null;
+}
+
+export interface WeeklyAssessment {
+  id: string;
+  weekStart: string;
+  weekEnd: string;
+  avgScore: number | null;
+  totalFocusMins: number | null;
+  totalProductiveSecs: number | null;
+  totalDistractingSecs: number | null;
+  topApps: string | null;
+  summary: string | null;
 }
 
 export type ProductivityPeriod = "day" | "week" | "month";

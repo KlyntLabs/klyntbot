@@ -81,12 +81,8 @@ export function ActivityTrack({
     if (payload?.entityKind === "productivity") refetchEvents();
   });
 
-  // Periodic polling for today — activity accumulates continuously
-  useEffect(() => {
-    if (!isToday) return;
-    const id = setInterval(() => refetchEvents(), 30_000);
-    return () => clearInterval(id);
-  }, [isToday, refetchEvents]);
+  // No periodic polling here — DayCalendarView already polls every 30s
+  // and event listeners above handle real-time updates
 
   const categoryMap = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
 
@@ -190,6 +186,7 @@ export function ActivityTrack({
                 : undefined,
             }}
             onClick={() => focusEntry && onSelectEntry(focusEntry)}
+            aria-label={`Focus session: ${f.title || "Untitled"}${f.isLive ? " (in progress)" : ""}, ${formatHumanDuration(Math.round((f.endMin - f.startMin) * 60))}`}
             title={`${f.title}${f.isLive ? " (in progress)" : ""}`}
           >
             {f.isLive && (

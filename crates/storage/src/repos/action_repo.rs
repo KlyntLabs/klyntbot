@@ -613,6 +613,8 @@ impl ActionRepo {
     ) -> Result<ActionTimeEntryRow, StorageError> {
         let ended_at = duration_secs.map(|d| started_at + chrono::Duration::seconds(d));
         let id = uuid::Uuid::new_v4();
+        let mut tx = self.pool.begin().await?;
+
         let row = sqlx::query_as::<_, ActionTimeEntryRow>(
             r#"
             INSERT INTO action_time_entries (id, action_id, source, started_at, ended_at, duration_secs, note)
@@ -627,7 +629,7 @@ impl ActionRepo {
         .bind(ended_at)
         .bind(duration_secs)
         .bind(note)
-        .fetch_one(&self.pool)
+        .fetch_one(&mut *tx)
         .await?;
 
         if let Some(secs) = duration_secs {
@@ -636,10 +638,11 @@ impl ActionRepo {
             )
             .bind(action_id)
             .bind(secs)
-            .execute(&self.pool)
+            .execute(&mut *tx)
             .await?;
         }
 
+        tx.commit().await?;
         Ok(row)
     }
 
@@ -649,6 +652,8 @@ impl ActionRepo {
         action_id: &str,
         entry_id: uuid::Uuid,
     ) -> Result<ActionTimeEntryRow, StorageError> {
+        let mut tx = self.pool.begin().await?;
+
         let row = sqlx::query_as::<_, ActionTimeEntryRow>(
             r#"
             UPDATE action_time_entries
@@ -660,7 +665,7 @@ impl ActionRepo {
         )
         .bind(entry_id)
         .bind(action_id)
-        .fetch_optional(&self.pool)
+        .fetch_optional(&mut *tx)
         .await?
         .ok_or_else(|| {
             StorageError::NotFound(format!("open time entry {entry_id} for action {action_id}"))
@@ -672,10 +677,11 @@ impl ActionRepo {
             )
             .bind(action_id)
             .bind(secs)
-            .execute(&self.pool)
+            .execute(&mut *tx)
             .await?;
         }
 
+        tx.commit().await?;
         Ok(row)
     }
 

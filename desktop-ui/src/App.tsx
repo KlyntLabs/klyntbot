@@ -228,17 +228,26 @@ const router = createHashRouter([
           </DashboardLayout>
         ),
       },
+      {
+        path: "/categories",
+        element: (
+          <DashboardLayout>
+            <CategoriesPage />
+          </DashboardLayout>
+        ),
+      },
       { path: "/tasks", element: <MainApp /> },
       { path: "/chat", element: <Chat /> },
       { path: "/notes", element: <NotesView /> },
       { path: "/project/:id", element: <ProjectDetail /> },
       { path: "/task/:id", element: <TaskDetail /> },
       { path: "/objective/:id", element: <ObjectiveDetail /> },
-      { path: "/productivity", element: <ProductivityRedirect /> },
-      { path: "/productivity/day/:date", element: <ProductivityDayPage /> },
-      { path: "/productivity/week/:weekStart", element: <ProductivityWeekPage /> },
-      { path: "/productivity/month/:yearMonth", element: <ProductivityMonthPage /> },
-      { path: "/productivity/categories", element: <CategoriesPage /> },
+      // Redirect old productivity routes to dashboard
+      { path: "/productivity", element: <Navigate to="/" replace /> },
+      { path: "/productivity/day/:date", element: <Navigate to="/" replace /> },
+      { path: "/productivity/week/:weekStart", element: <Navigate to="/" replace /> },
+      { path: "/productivity/month/:yearMonth", element: <Navigate to="/" replace /> },
+      { path: "/productivity/categories", element: <Navigate to="/categories" replace /> },
       { path: "/finance", element: <Finance /> },
       { path: "/finance/accounts", element: <FinanceAccounts /> },
       { path: "/finance/transactions", element: <FinanceTransactions /> },

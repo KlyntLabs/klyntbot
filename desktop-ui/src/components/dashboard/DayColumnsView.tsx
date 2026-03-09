@@ -1,8 +1,11 @@
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatHumanDuration, minutesSinceMidnight } from "../../lib/dates";
 import type { ProductivitySummary, TimelineEntry, TimelineSummary } from "../../lib/types";
 import { cn } from "../../lib/utils";
+import { ActivityFeed } from "../productivity/ActivityFeed";
 import { ActivityTrack, type SessionBlock } from "./ActivityTrack";
+import { CalendarTrack } from "./CalendarTrack";
 import { type LayerKey, useEnabledLayers, useSidebarOpen } from "./layers";
 import { SummaryPanel } from "./SummaryPanel";
 
@@ -32,6 +35,14 @@ const COLUMNS: ColumnDef[] = [
     color: "var(--timeline-app-productive)",
     flex: 1.2,
     filter: (e) => e.entryType === "appUsage" || e.entryType === "focusSession",
+  },
+  {
+    key: "calendar",
+    label: "Calendar",
+    icon: "📅",
+    color: "var(--timeline-focus)",
+    flex: 1.4,
+    filter: () => false, // Calendar uses its own data source
   },
   {
     key: "timeEntries",
@@ -92,6 +103,7 @@ export function DayColumnsView({
   const sidebarOpen = useSidebarOpen();
   const [selectedEntry, setSelectedEntry] = useState<TimelineEntry | null>(null);
   const [selectedSession, setSelectedSession] = useState<SessionBlock | null>(null);
+  const [feedExpanded, setFeedExpanded] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Dynamic zoom state
@@ -222,7 +234,7 @@ export function DayColumnsView({
             <span className="tabular-nums">
               Zoom: {Math.round((hourHeight / DEFAULT_HOUR_HEIGHT) * 100)}%
             </span>
-            <button type="button" onClick={resetZoom} className="text-brand hover:underline">
+            <button type="button" onClick={resetZoom} className="text-brand hover:underline" aria-label="Reset zoom to default level">
               Reset
             </button>
           </div>
@@ -258,11 +270,29 @@ export function DayColumnsView({
                 className="absolute w-full flex items-start"
                 style={{ top: h * hourHeight }}
               >
-                {/* biome-ignore lint/a11y/noStaticElementInteractions: drag handle for timeline zoom */}
                 <div
+                  role={h === 0 ? "slider" : undefined}
+                  aria-label={h === 0 ? "Timeline zoom level" : undefined}
+                  aria-valuemin={h === 0 ? MIN_HOUR_HEIGHT : undefined}
+                  aria-valuemax={h === 0 ? MAX_HOUR_HEIGHT : undefined}
+                  aria-valuenow={h === 0 ? hourHeight : undefined}
+                  tabIndex={h === 0 ? 0 : undefined}
                   className="text-[10px] text-muted text-right pr-2 select-none cursor-ns-resize"
                   style={{ width: HOUR_GUTTER }}
                   onMouseDown={handleGutterMouseDown}
+                  onKeyDown={h === 0 ? (e) => {
+                    if (e.key === "ArrowUp") {
+                      e.preventDefault();
+                      const next = Math.min(MAX_HOUR_HEIGHT, hourHeightRef.current + 10);
+                      hourHeightRef.current = next;
+                      setHourHeight(next);
+                    } else if (e.key === "ArrowDown") {
+                      e.preventDefault();
+                      const next = Math.max(MIN_HOUR_HEIGHT, hourHeightRef.current - 10);
+                      hourHeightRef.current = next;
+                      setHourHeight(next);
+                    }
+                  } : undefined}
                 >
                   {h === 0 ? "" : formatHour(h)}
                 </div>
@@ -301,6 +331,39 @@ export function DayColumnsView({
                   );
                 }
 
+                // Calendar column: fetches its own data
+                if (col.key === "calendar") {
+                  return (
+                    <div
+                      key={col.key}
+                      className="relative border-r border-border last:border-r-0 min-w-0"
+                    >
+                      <CalendarTrack
+                        date={date}
+                        hourHeight={hourHeight}
+                        selectedEventId={selectedEntry?.id ?? null}
+                        onSelectEvent={(event) =>
+                          handleSelectEntry({
+                            id: event.id,
+                            title: event.title,
+                            description: event.description ?? undefined,
+                            startedAt: event.startedAt,
+                            endedAt: event.endedAt,
+                            durationSecs: Math.round(
+                              (new Date(event.endedAt).getTime() -
+                                new Date(event.startedAt).getTime()) /
+                                1000,
+                            ),
+                            source: "calendar",
+                            entryType: "calendarEvent",
+                            color: event.color ?? "var(--timeline-focus)",
+                          } as TimelineEntry)
+                        }
+                      />
+                    </div>
+                  );
+                }
+
                 const colEntries = columnEntries.get(col.key) ?? [];
                 return (
                   <div
@@ -323,6 +386,25 @@ export function DayColumnsView({
             </div>
           </div>
         </div>
+
+        {/* Collapsible activity feed — only for today */}
+        {isToday && (
+          <div className="border-t border-border" style={{ maxHeight: feedExpanded ? 260 : 36, overflow: "hidden" }}>
+            <button
+              type="button"
+              onClick={() => setFeedExpanded(!feedExpanded)}
+              className="flex items-center gap-2 px-3 py-2 text-xs text-muted hover:text-secondary transition-colors w-full"
+            >
+              {feedExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
+              Live Activity Feed
+            </button>
+            {feedExpanded && (
+              <div className="overflow-y-auto" style={{ maxHeight: 224 }}>
+                <ActivityFeed />
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {sidebarOpen && (

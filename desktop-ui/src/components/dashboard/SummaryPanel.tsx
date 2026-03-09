@@ -1,8 +1,20 @@
 import { CheckCircle, DollarSign, ExternalLink, FileText, ListTodo, X } from "lucide-react";
 import { useNavigate } from "react-router";
-import { formatHumanDuration } from "../../lib/dates";
-import type { ProductivitySummary, TimelineEntry, TimelineSummary } from "../../lib/types";
+import { formatHumanDuration, todayISO } from "../../lib/dates";
+import { useQuery } from "../../hooks/useQuery";
+import type {
+  ProductivitySummary,
+  TimelineEntry,
+  TimelineSummary,
+} from "../../lib/types";
+import { AiSummaryCard } from "../productivity/AiSummaryCard";
+import { DistractionBanner } from "../productivity/DistractionBanner";
+import { FocusSessionsList } from "../productivity/FocusSessionsList";
+import { GoalsProgress } from "../productivity/GoalsProgress";
+import { InsightCardList } from "../productivity/InsightCardList";
+import { ProductivityScoreRing } from "../productivity/ProductivityScoreRing";
 import { resolveActivityColor, resolveCategoryLabel } from "../productivity/shared";
+import { WorkHoursCard } from "../productivity/WorkHoursCard";
 import type { SessionBlock } from "./ActivityTrack";
 
 interface SummaryPanelProps {
@@ -61,28 +73,34 @@ function DefaultSummary({
     <div className="w-72 glass-card p-4 flex flex-col gap-4 overflow-y-auto">
       <h3 className="text-xs font-semibold text-muted uppercase tracking-wider">Summary</h3>
 
-      {/* Productivity score + activity ratio */}
+      {/* Productivity score ring */}
+      {hasProductivity && ps.productivityScore != null && (
+        <div className="flex justify-center py-1">
+          <ProductivityScoreRing
+            score={ps.productivityScore}
+            size={100}
+            summary={{
+              productiveSecs: ps.productiveSecs,
+              neutralSecs: ps.neutralSecs,
+              distractingSecs: ps.distractingSecs,
+              totalActiveSecs: ps.totalActiveSecs,
+              avgSessionQuality: ps.avgSessionQuality,
+              focusSessionsCount: ps.focusSessionsCount,
+              contextSwitches: ps.contextSwitches,
+            }}
+          />
+        </div>
+      )}
+
+      {/* Activity ratio bar */}
       {hasProductivity && (
         <div className="p-2.5 rounded-lg border border-success/20 bg-success/[0.06]">
           <div className="flex items-center justify-between mb-2">
-            <div>
-              {ps.productivityScore != null && (
-                <div className="text-lg font-semibold text-primary tabular-nums">
-                  {Math.round(ps.productivityScore)}
-                  <span className="text-xs font-normal text-dim">/100</span>
-                </div>
-              )}
-              <div className="text-[10px] text-muted">Productivity score</div>
+            <div className="text-sm font-semibold text-primary tabular-nums">
+              {formatHumanDuration(ps.totalActiveSecs)}
             </div>
-            <div className="text-right">
-              <div className="text-sm font-semibold text-primary tabular-nums">
-                {formatHumanDuration(ps.totalActiveSecs)}
-              </div>
-              <div className="text-[10px] text-muted">active time</div>
-            </div>
+            <div className="text-[10px] text-muted">active time</div>
           </div>
-
-          {/* Productive / Neutral / Distracting ratio bar */}
           <div className="flex h-1.5 rounded-full overflow-hidden bg-white/[0.06]">
             {ps.productiveSecs > 0 && (
               <div
@@ -122,6 +140,9 @@ function DefaultSummary({
           </div>
         </div>
       )}
+
+      {/* 7-day trend */}
+      {hasProductivity && <WeeklyTrend />}
 
       {/* Focus — primary stat */}
       <div className="p-2 rounded-lg bg-timeline-focus/10 border border-timeline-focus/20">
@@ -199,6 +220,24 @@ function DefaultSummary({
           </div>
         </div>
       )}
+
+      {/* Distraction banner */}
+      {hasProductivity && <DistractionBanner summary={ps} />}
+
+      {/* Work hours progress */}
+      {hasProductivity && <WorkHoursCard totalActiveSecs={ps.totalActiveSecs} />}
+
+      {/* Focus sessions */}
+      <FocusSessionsList date={todayISO()} />
+
+      {/* Goals */}
+      <GoalsProgress />
+
+      {/* Insights */}
+      <InsightCardList date={todayISO()} />
+
+      {/* AI Summary */}
+      {ps?.aiSummary && <AiSummaryCard summary={ps.aiSummary} />}
     </div>
   );
 }
@@ -336,6 +375,77 @@ function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; va
         <span className="text-[10px]">{label}</span>
       </div>
       <div className="text-sm font-semibold text-primary">{value}</div>
+    </div>
+  );
+}
+
+function Sparkline({ values }: { values: number[] }) {
+  if (values.length < 2) return null;
+  const w = 120;
+  const h = 28;
+  const pad = 2;
+  const max = Math.max(...values, 1);
+  const min = Math.min(...values, 0);
+  const range = max - min || 1;
+  const points = values
+    .map((v, i) => {
+      const x = pad + (i / (values.length - 1)) * (w - pad * 2);
+      const y = h - pad - ((v - min) / range) * (h - pad * 2);
+      return `${x},${y}`;
+    })
+    .join(" ");
+
+  return (
+    <svg width={w} height={h} className="block">
+      <polyline
+        points={points}
+        fill="none"
+        stroke="var(--brand)"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      {/* Dot on last point */}
+      {values.length > 0 && (() => {
+        const lastX = pad + ((values.length - 1) / (values.length - 1)) * (w - pad * 2);
+        const lastY = h - pad - ((values[values.length - 1] - min) / range) * (h - pad * 2);
+        return <circle cx={lastX} cy={lastY} r="2.5" fill="var(--brand)" />;
+      })()}
+    </svg>
+  );
+}
+
+function WeeklyTrend() {
+  const { data: weeklyData } = useQuery<ProductivitySummary[]>("productivity_weekly", undefined);
+
+  if (!weeklyData || weeklyData.length < 2) return null;
+
+  const scores = weeklyData.map((d) => d.productivityScore ?? 0);
+
+  // Compare this week's avg vs prior week's avg
+  const halfLen = Math.floor(scores.length / 2);
+  const recentScores = scores.slice(halfLen);
+  const olderScores = scores.slice(0, halfLen);
+  const recentAvg =
+    recentScores.length > 0 ? recentScores.reduce((a, b) => a + b, 0) / recentScores.length : 0;
+  const olderAvg =
+    olderScores.length > 0 ? olderScores.reduce((a, b) => a + b, 0) / olderScores.length : 0;
+
+  const changePct = olderAvg > 0 ? Math.round(((recentAvg - olderAvg) / olderAvg) * 100) : 0;
+  const isUp = changePct >= 0;
+
+  return (
+    <div className="p-2.5 rounded-lg border border-brand/15 bg-brand/[0.04]">
+      <h4 className="text-[10px] font-medium text-muted mb-1.5">7-day trend</h4>
+      <Sparkline values={scores} />
+      {changePct !== 0 && (
+        <div className="flex items-center gap-1 mt-1.5">
+          <span className={`text-[10px] font-medium ${isUp ? "text-success" : "text-destructive"}`}>
+            {isUp ? "\u2191" : "\u2193"} {Math.abs(changePct)}%
+          </span>
+          <span className="text-[9px] text-dim">vs last week</span>
+        </div>
+      )}
     </div>
   );
 }

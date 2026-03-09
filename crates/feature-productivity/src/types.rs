@@ -541,6 +541,23 @@ pub struct DistractionPattern {
     pub created_at: DateTime<Utc>,
 }
 
+// ── Weekly Assessment ────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct WeeklyAssessment {
+    pub id: String,
+    pub week_start: String,
+    pub week_end: String,
+    pub avg_score: Option<f64>,
+    pub total_focus_mins: Option<i64>,
+    pub total_productive_secs: Option<i64>,
+    pub total_distracting_secs: Option<i64>,
+    pub top_apps: Option<String>,
+    pub summary: Option<String>,
+    pub created_at: String,
+}
+
 // ── Intelligence Layer Types ──────────────────────────────────────────
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -733,6 +750,13 @@ pub struct ProductivitySession {
     pub okr_alignment: Option<f64>,
     pub notes: Option<String>,
     pub tags: Option<String>,
+    pub action_id: Option<String>,
+    pub project_id: Option<String>,
+    pub target_mins: Option<i64>,
+    pub actual_mins: Option<i64>,
+    pub interruptions: Option<i64>,
+    pub distraction_events: Option<String>,
+    pub completed: Option<bool>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -866,6 +890,28 @@ pub struct CategorizationCacheEntry {
     pub source: String,
     pub created_at: String,
     pub expires_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct CalendarEvent {
+    pub id: String,
+    pub calendar_id: String,
+    pub title: String,
+    pub description: Option<String>,
+    pub started_at: String,
+    pub ended_at: String,
+    pub location: Option<String>,
+    pub attendees_count: i64,
+    pub is_recurring: bool,
+    pub recurrence_id: Option<String>,
+    pub source: String,
+    pub external_uid: String,
+    pub session_id: Option<String>,
+    pub color: Option<String>,
+    pub synced_at: String,
+    pub created_at: String,
+    pub updated_at: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

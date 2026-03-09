@@ -31,6 +31,7 @@ pub struct ProductivityEngine {
     auto_focus_rx: Option<mpsc::Receiver<AutoFocusSession>>,
     tick_sender: broadcast::Sender<ActivityTick>,
     domain_bus: Option<Arc<DomainEventBus>>,
+    repos: ProductivityRepos,
 }
 
 impl ProductivityEngine {
@@ -109,6 +110,7 @@ impl ProductivityEngine {
             auto_focus_rx: Some(auto_focus_rx),
             tick_sender: tick_tx,
             domain_bus,
+            repos: repos.clone(),
         }
     }
 
@@ -129,6 +131,21 @@ impl ProductivityEngine {
 
     pub fn start(&mut self) {
         self.tracker.start();
+
+        // Periodic cache cleanup — purge expired categorization cache entries every hour
+        let repos = self.repos.clone();
+        let cancel = self.cancel_token.child_token();
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(3600));
+            loop {
+                tokio::select! {
+                    _ = cancel.cancelled() => break,
+                    _ = interval.tick() => {
+                        let _ = repos.categorization_cache.purge_expired().await;
+                    }
+                }
+            }
+        });
     }
 
     pub async fn stop(&mut self) {

@@ -29,8 +29,8 @@ impl IntelligenceSessionRepo {
 
     pub async fn create(&self, session: &ProductivitySession) -> common::Result<()> {
         sqlx::query(
-            r#"INSERT INTO productivity_sessions (id, session_type, started_at, ended_at, duration_secs, dominant_category, category_purity, quality_score, source, app_breakdown, context_switches, distraction_count, predicted_energy, okr_alignment, notes, tags, created_at, updated_at)
-               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)"#,
+            r#"INSERT INTO productivity_sessions (id, session_type, started_at, ended_at, duration_secs, dominant_category, category_purity, quality_score, source, app_breakdown, context_switches, distraction_count, predicted_energy, okr_alignment, notes, tags, action_id, project_id, target_mins, actual_mins, interruptions, distraction_events, completed, created_at, updated_at)
+               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25)"#,
         )
         .bind(&session.id)
         .bind(&session.session_type)
@@ -48,6 +48,13 @@ impl IntelligenceSessionRepo {
         .bind(session.okr_alignment)
         .bind(&session.notes)
         .bind(&session.tags)
+        .bind(&session.action_id)
+        .bind(&session.project_id)
+        .bind(session.target_mins)
+        .bind(session.actual_mins)
+        .bind(session.interruptions)
+        .bind(&session.distraction_events)
+        .bind(session.completed)
         .bind(&session.created_at)
         .bind(&session.updated_at)
         .execute(&self.pool)
@@ -215,6 +222,13 @@ mod tests {
             okr_alignment: None,
             notes: None,
             tags: None,
+            action_id: None,
+            project_id: None,
+            target_mins: None,
+            actual_mins: None,
+            interruptions: None,
+            distraction_events: None,
+            completed: None,
             created_at: "2026-03-09T10:00:00Z".to_string(),
             updated_at: "2026-03-09T10:00:00Z".to_string(),
         }
