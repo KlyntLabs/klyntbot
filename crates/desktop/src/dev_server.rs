@@ -411,6 +411,7 @@ mod tests {
         "permissions_open_accessibility",
         "resize_window",
         "quit_app",
+        "show_dashboard",
         "mcp_oauth_start",
         "mcp_oauth_disconnect",
     ];

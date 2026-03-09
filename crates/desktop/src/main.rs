@@ -67,9 +67,22 @@ fn main() {
 
             // Show the main window now that init is complete (starts hidden
             // via tauri.conf.json to avoid a blank window during boot).
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.show();
-                let _ = window.set_focus();
+            if let Some(main_window) = app.get_webview_window("main") {
+                let _ = main_window.show();
+                let _ = main_window.set_focus();
+
+                // Hide on close instead of quitting — keeps the tray alive
+                let mw = main_window.clone();
+                let app_handle = app.handle().clone();
+                main_window.on_window_event(move |event| {
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                        api.prevent_close();
+                        let _ = mw.hide();
+                        // Remove from Dock — pure tray app when main window is hidden
+                        #[cfg(target_os = "macos")]
+                        app_handle.set_activation_policy(tauri::ActivationPolicy::Accessory);
+                    }
+                });
             }
 
             // Build system tray icon — click toggles the tray popup window
@@ -324,8 +337,14 @@ fn main() {
             // Window
             commands::window::resize_window,
             commands::window::open_url,
+            commands::window::show_dashboard,
             commands::window::quit_app,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running Klynt desktop");
+        .build(tauri::generate_context!())
+        .expect("error while building Klynt desktop")
+        .run(|_app, event| {
+            if let tauri::RunEvent::ExitRequested { api, .. } = event {
+                api.prevent_exit();
+            }
+        });
 }
