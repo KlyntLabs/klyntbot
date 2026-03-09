@@ -23,7 +23,7 @@ import type {
   TransparencyData,
   UsageReportPayload,
 } from "../lib/types";
-import { isTauri, qualifiedToolName } from "../lib/utils";
+import { DEV_SSE_BASE, isTauri, qualifiedToolName } from "../lib/utils";
 import { useEvent } from "./useEvent";
 
 /** All SSE event names the dev-api server emits — used to bridge SSE → CustomEvent in browser mode. */
@@ -152,7 +152,9 @@ export function useAgentStream(sessionKey: string, onDone?: () => void): AgentSt
       // Close any previous connection
       eventSourceRef.current?.close();
 
-      const es = new EventSource(`/api/events/${encodeURIComponent(sessionKeyRef.current)}`);
+      const es = new EventSource(
+        `${DEV_SSE_BASE}/api/events/${encodeURIComponent(sessionKeyRef.current)}`,
+      );
       eventSourceRef.current = es;
 
       for (const eventName of SSE_AGENT_EVENTS) {

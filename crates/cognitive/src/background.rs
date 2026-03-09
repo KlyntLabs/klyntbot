@@ -91,7 +91,7 @@ impl BackgroundConsolidationService {
         episodic_repo: Option<EpisodicMemoryRepo>,
         embedder: Option<Arc<dyn SemanticFactEmbedder>>,
         cancel: CancellationToken,
-        pipeline_tx: Option<tokio::sync::mpsc::UnboundedSender<PipelineEvent>>,
+        pipeline_tx: Option<tokio::sync::broadcast::Sender<PipelineEvent>>,
     ) -> Self {
         let cancel_clone = cancel.clone();
         let handle = tokio::spawn(async move {

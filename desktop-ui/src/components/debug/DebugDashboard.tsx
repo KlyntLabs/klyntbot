@@ -1,6 +1,6 @@
 import { Activity, Brain, Cpu, GitBranch, Radio } from "lucide-react";
 import { useEffect, useState } from "react";
-import { isTauri } from "../../lib/utils";
+import { DEV_SSE_BASE, isTauri } from "../../lib/utils";
 import { CoachingTab } from "./tabs/CoachingTab";
 import { EventsTab } from "./tabs/EventsTab";
 import { MemoryTab } from "./tabs/MemoryTab";
@@ -31,7 +31,7 @@ export function DebugDashboard() {
   useEffect(() => {
     if (isTauri) return;
 
-    const es = new EventSource("/api/cognitive/stream");
+    const es = new EventSource(`${DEV_SSE_BASE}/api/cognitive/stream`);
     for (const eventName of COGNITIVE_SSE_EVENTS) {
       es.addEventListener(eventName, (e: MessageEvent) => {
         try {

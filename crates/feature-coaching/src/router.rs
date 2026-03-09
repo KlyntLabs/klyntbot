@@ -211,6 +211,11 @@ impl InterventionRouter {
     pub fn limits(&self) -> (usize, usize) {
         (self.config.max_per_hour, self.config.max_per_day)
     }
+
+    /// Total number of dismissals across all trigger types.
+    pub fn total_dismissals(&self) -> i32 {
+        self.dismissal_counts.values().sum()
+    }
 }
 
 impl Default for InterventionRouter {

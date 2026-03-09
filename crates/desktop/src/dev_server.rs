@@ -56,6 +56,10 @@ pub async fn start(core: Arc<AppCore>) {
 
     let app = Router::new()
         .route("/api/events/{sessionKey}", axum::routing::get(sse_handler))
+        .route(
+            "/api/cognitive/stream",
+            axum::routing::get(cognitive_sse_handler),
+        )
         .route("/api/{cmd}", post(dispatch))
         .with_state(state);
 
@@ -1149,6 +1153,8 @@ async fn dispatch(
             let payload = body.get("payload").cloned().unwrap_or_default();
             r(core.cognitive_inject_event(event_type, payload).await)
         }
+        "cognitive_event_log" => r(core.cognitive_event_log(get(&body, "limit")).await),
+        "cognitive_pipeline_log" => r(core.cognitive_pipeline_log(get(&body, "limit")).await),
 
         // ── Coaching ──────────────────────────────────────────
         "coaching_situation" => r(core.coaching_situation().await),
@@ -1216,4 +1222,111 @@ async fn sse_handler(
     );
 
     Sse::new(stream).keep_alive(KeepAlive::default())
+}
+
+/// SSE endpoint — streams cognitive debug events (domain events + pipeline).
+///
+/// The frontend (`DebugDashboard.tsx`) connects here in browser dev mode
+/// via `new EventSource("/api/cognitive/stream")`.
+async fn cognitive_sse_handler(
+    State(state): State<DevState>,
+) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
+    // Subscribe to domain events
+    let domain_rx = state
+        .core
+        .domain_event_bus
+        .as_ref()
+        .map(|bus| bus.subscribe());
+
+    // Subscribe to pipeline events
+    let pipeline_rx = state
+        .core
+        .pipeline_broadcast
+        .as_ref()
+        .map(|tx| tx.subscribe());
+
+    let stream = futures_util::stream::unfold(
+        (domain_rx, pipeline_rx),
+        |(mut domain_rx, mut pipeline_rx)| async move {
+            loop {
+                tokio::select! {
+                    // Domain events
+                    result = async {
+                        match domain_rx.as_mut() {
+                            Some(rx) => rx.recv().await.map_err(|e| matches!(e, broadcast::error::RecvError::Closed)),
+                            None => std::future::pending::<Result<bus::DomainEvent, bool>>().await,
+                        }
+                    } => {
+                        match result {
+                            Ok(event) => {
+                                let salience = cognitive::salience::evaluate_salience(&event);
+                                let domain = domain_for_event(&event);
+                                let salience_str = match salience {
+                                    cognitive::types::SalienceVerdict::Extract => "extract",
+                                    cognitive::types::SalienceVerdict::Accumulate => "accumulate",
+                                    cognitive::types::SalienceVerdict::Discard => "discard",
+                                };
+                                let payload = serde_json::json!({
+                                    "eventType": format!("{:?}", event).split('{').next().unwrap_or("Unknown").trim(),
+                                    "salience": salience_str,
+                                    "domain": domain,
+                                    "timestamp": chrono::Utc::now().to_rfc3339(),
+                                    "payload": serde_json::to_value(&event).unwrap_or_default(),
+                                });
+                                let data = serde_json::to_string(&payload).unwrap_or_default();
+                                let event = Event::default().event("cognitive:domain_event").data(data);
+                                return Some((Ok(event), (domain_rx, pipeline_rx)));
+                            }
+                            Err(true) => return None, // closed
+                            Err(false) => continue, // lagged
+                        }
+                    }
+
+                    // Pipeline events
+                    result = async {
+                        match pipeline_rx.as_mut() {
+                            Some(rx) => rx.recv().await.map_err(|e| matches!(e, broadcast::error::RecvError::Closed)),
+                            None => std::future::pending::<Result<cognitive::PipelineEvent, bool>>().await,
+                        }
+                    } => {
+                        match result {
+                            Ok(pe) => {
+                                let event_name = match &pe {
+                                    cognitive::PipelineEvent::Extraction { .. } => "cognitive:extraction",
+                                    cognitive::PipelineEvent::Consolidation { .. } => "cognitive:consolidation",
+                                };
+                                let data = serde_json::to_string(&pe).unwrap_or_default();
+                                let event = Event::default().event(event_name).data(data);
+                                return Some((Ok(event), (domain_rx, pipeline_rx)));
+                            }
+                            Err(true) => return None,
+                            Err(false) => continue,
+                        }
+                    }
+                }
+            }
+        },
+    );
+
+    Sse::new(stream).keep_alive(KeepAlive::default())
+}
+
+/// Map a DomainEvent to its domain string.
+fn domain_for_event(event: &bus::DomainEvent) -> &'static str {
+    match event {
+        bus::DomainEvent::TaskCreated { .. }
+        | bus::DomainEvent::TaskCompleted { .. }
+        | bus::DomainEvent::TaskDeferred { .. }
+        | bus::DomainEvent::GoalProgress { .. } => "work",
+        bus::DomainEvent::ActivitySessionCompleted { .. }
+        | bus::DomainEvent::FocusSessionEnded { .. }
+        | bus::DomainEvent::DistractionDetected { .. }
+        | bus::DomainEvent::ProductivityScoreComputed { .. } => "energy",
+        bus::DomainEvent::TransactionRecorded { .. }
+        | bus::DomainEvent::BudgetAlert { .. } => "finance",
+        bus::DomainEvent::UserStatedFact { .. } => "general",
+        bus::DomainEvent::UserCorrectedAI { .. } => "learning",
+        bus::DomainEvent::CoachingFeedback { .. } => "coaching",
+        bus::DomainEvent::ChatTurnCompleted { .. } => "general",
+    }
 }

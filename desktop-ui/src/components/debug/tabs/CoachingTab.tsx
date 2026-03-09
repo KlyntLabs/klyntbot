@@ -1,4 +1,5 @@
 import { RefreshCw, Trash2 } from "lucide-react";
+import { useEffect } from "react";
 import { useMutation } from "../../../hooks/useMutation";
 import { invalidateQueries, useQuery } from "../../../hooks/useQuery";
 
@@ -30,9 +31,9 @@ interface DetectedPattern {
 }
 
 interface StrategyFeedback {
-  triggerName: string;
-  interventionType: string;
-  timesDelivered: number;
+  strategyType: string;
+  domain: string;
+  timesUsed: number;
   acceptanceRate: number;
   effectiveness: number;
   behavioralPositive: number;
@@ -91,7 +92,9 @@ function Gauge({
 }
 
 export function CoachingTab() {
-  const { data: situation } = useQuery<UserSituation>("coaching_situation", undefined, {
+  const POLL_INTERVAL = 5_000;
+
+  const { data: situation, refetch: rSit } = useQuery<UserSituation>("coaching_situation", undefined, {
     energyLevel: 0,
     focusState: 0,
     deadlinePressure: 0,
@@ -104,22 +107,30 @@ export function CoachingTab() {
     recentContextSwitches: 0,
   });
 
-  const { data: signals } = useQuery<SignalWindow>("coaching_signals", undefined, {
+  const { data: signals, refetch: rSig } = useQuery<SignalWindow>("coaching_signals", undefined, {
     windowSize: 0,
     signals: [],
     triggers: [],
   });
 
-  const { data: patterns } = useQuery<DetectedPattern[]>("coaching_patterns", undefined, []);
+  const { data: patterns, refetch: rPat } = useQuery<DetectedPattern[]>("coaching_patterns", undefined, []);
 
-  const { data: feedback } = useQuery<StrategyFeedback[]>("coaching_feedback_stats", undefined, []);
+  const { data: feedback, refetch: rFb } = useQuery<StrategyFeedback[]>("coaching_feedback_stats", undefined, []);
 
-  const { data: router } = useQuery<RouterStatus>("coaching_router_status", undefined, {
+  const { data: router, refetch: rRtr } = useQuery<RouterStatus>("coaching_router_status", undefined, {
     hourlyCount: 0,
     hourlyLimit: 3,
     dailyCount: 0,
     dailyLimit: 10,
   });
+
+  // Poll all coaching data every 5s so the debug view stays fresh.
+  useEffect(() => {
+    const id = setInterval(() => {
+      rSit(); rSig(); rPat(); rFb(); rRtr();
+    }, POLL_INTERVAL);
+    return () => clearInterval(id);
+  }, [rSit, rSig, rPat, rFb, rRtr]);
 
   const { mutate: clearSignals } = useMutation("coaching_clear_signals");
   const { mutate: resetDismissals } = useMutation("coaching_reset_dismissals");
@@ -272,10 +283,10 @@ export function CoachingTab() {
                 </thead>
                 <tbody>
                   {feedback.map((s) => (
-                    <tr key={s.triggerName} className="border-b border-white/[0.04]">
-                      <td className="p-2 text-secondary">{s.triggerName}</td>
-                      <td className="p-2 text-muted">{s.interventionType}</td>
-                      <td className="p-2 text-muted">{s.timesDelivered}</td>
+                    <tr key={s.strategyType} className="border-b border-white/[0.04]">
+                      <td className="p-2 text-secondary">{s.strategyType}</td>
+                      <td className="p-2 text-muted">{s.domain}</td>
+                      <td className="p-2 text-muted">{s.timesUsed}</td>
                       <td className="p-2 text-muted">{(s.acceptanceRate * 100).toFixed(0)}%</td>
                       <td className="p-2 text-muted">{(s.effectiveness * 100).toFixed(0)}%</td>
                     </tr>

@@ -3,7 +3,8 @@ use std::sync::Arc;
 use agent::{AgentLoop, PersonaManager};
 use bus::{DomainEventBus, MessageBus};
 use channels::ChannelManager;
-use cognitive::situation::UserSituation;
+use chrono::{Duration, Timelike, Utc};
+use cognitive::situation::{SituationInputs, UserSituation, compute_situation};
 use feature_coaching::{FeedbackTracker, InterventionRouter, PatternDetector, SignalAccumulator};
 use feature_notes::repo::NoteRepo;
 use feature_productivity::auto_focus::AutoFocusSession;
@@ -14,7 +15,7 @@ use scheduling::CronService;
 use storage::{Repos, StoragePool, VectorStore};
 use tokio::sync::{mpsc, Mutex, RwLock};
 use tokio_util::sync::CancellationToken;
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 use crate::state::AppCore;
 
@@ -22,7 +23,7 @@ use crate::state::AppCore;
 pub struct EventChannels {
     pub intervention_rx: mpsc::Receiver<feature_coaching::router::DeliveredIntervention>,
     pub domain_event_bus: Arc<DomainEventBus>,
-    pub pipeline_rx: mpsc::UnboundedReceiver<cognitive::PipelineEvent>,
+    pub pipeline_rx: tokio::sync::broadcast::Receiver<cognitive::PipelineEvent>,
     pub auto_focus_rx: Option<mpsc::Receiver<AutoFocusSession>>,
     pub nudge_rx: Option<mpsc::Receiver<feature_productivity::types::NudgeRecord>>,
     pub dashboard_tick_rx:
@@ -144,8 +145,9 @@ impl AppCore {
         let domain_event_bus = Arc::new(DomainEventBus::new(256));
 
         // 8. Build AgentLoop
-        let (pipeline_tx, pipeline_rx) =
-            tokio::sync::mpsc::unbounded_channel::<cognitive::PipelineEvent>();
+        let (pipeline_broadcast_tx, _) =
+            tokio::sync::broadcast::channel::<cognitive::PipelineEvent>(256);
+        let pipeline_tx = pipeline_broadcast_tx.clone();
         let mut builder = AgentLoop::builder(bus.clone(), provider, config.clone())
             .with_pool(storage_pool.inner().clone())
             .with_cron_service(cron_service.clone())
@@ -272,12 +274,14 @@ impl AppCore {
         let mut tracker = FeedbackTracker::new().with_repo(coaching_repo);
         tracker.load_from_db().await;
         let feedback_tracker = Arc::new(Mutex::new(tracker));
-        let user_situation = Arc::new(Mutex::new(UserSituation {
-            energy_level: 0.7,
-            focus_state: 0.5,
-            coaching_receptivity: 0.7,
-            ..Default::default()
-        }));
+        // Compute initial user situation from real productivity data.
+        let initial_situation = build_situation_inputs(
+            productivity_repos.as_ref(),
+            &repos,
+            None, // no router yet
+        )
+        .await;
+        let user_situation = Arc::new(Mutex::new(initial_situation));
 
         // Start CoachingService — processes domain events through coaching pipeline.
         let coaching_reasoner: Arc<dyn feature_coaching::CoachingReasonerHandler> =
@@ -333,6 +337,10 @@ impl AppCore {
             user_situation: Some(user_situation),
             coaching_service: Some(Arc::new(Mutex::new(coaching_service))),
             has_cognitive_provider: cognitive_provider.is_some(),
+            pipeline_broadcast: Some(pipeline_broadcast_tx),
+            event_log_repo: Some(cognitive::EventLogRepo::new(
+                storage_pool.inner().clone(),
+            )),
         };
 
         // Spawn background services (agent loop + channel manager).
@@ -362,6 +370,31 @@ impl AppCore {
                 }
             });
         }
+
+        // Spawn event log persistence — writes domain & pipeline events to DB.
+        if let Some(ref event_log_repo) = core.event_log_repo {
+            spawn_event_log_persistence(
+                event_log_repo.clone(),
+                core.domain_event_bus.as_ref().expect("initialized above"),
+                core.pipeline_broadcast.as_ref().expect("initialized above"),
+                &shutdown_token,
+            );
+        }
+
+        // Spawn periodic situation recomputation (every 2 min).
+        spawn_situation_recompute(
+            core.productivity_repos.clone(),
+            core.repos.clone(),
+            core.intervention_router.clone(),
+            core.user_situation.clone(),
+            &shutdown_token,
+        );
+
+        let pipeline_rx = core
+            .pipeline_broadcast
+            .as_ref()
+            .expect("pipeline broadcast initialized above")
+            .subscribe();
 
         let channels = EventChannels {
             intervention_rx,
@@ -735,4 +768,314 @@ fn parse_time_to_cron(time_str: &str) -> Option<String> {
         return None;
     }
     Some(format!("{} {} * * *", minute, hour))
+}
+
+/// Spawn background tasks that persist domain events and pipeline events to the DB.
+fn spawn_event_log_persistence(
+    repo: cognitive::EventLogRepo,
+    domain_bus: &Arc<DomainEventBus>,
+    pipeline_tx: &tokio::sync::broadcast::Sender<cognitive::PipelineEvent>,
+    shutdown: &CancellationToken,
+) {
+    // Domain events → domain_event_log
+    {
+        let repo = repo.clone();
+        let mut rx = domain_bus.subscribe();
+        let token = shutdown.clone();
+        tokio::spawn(async move {
+            loop {
+                tokio::select! {
+                    _ = token.cancelled() => break,
+                    result = rx.recv() => {
+                        match result {
+                            Ok(event) => {
+                                let salience = cognitive::salience::evaluate_salience(&event);
+                                let domain = domain_for_event(&event);
+                                let salience_str = match salience {
+                                    cognitive::types::SalienceVerdict::Extract => "extract",
+                                    cognitive::types::SalienceVerdict::Accumulate => "accumulate",
+                                    cognitive::types::SalienceVerdict::Discard => "discard",
+                                };
+                                let event_type = format!("{:?}", event)
+                                    .split('{')
+                                    .next()
+                                    .unwrap_or("Unknown")
+                                    .trim()
+                                    .to_string();
+                                let payload = serde_json::to_string(&event).unwrap_or_default();
+                                let ts = chrono::Utc::now().to_rfc3339();
+                                let id = uuid::Uuid::new_v4().to_string();
+
+                                if let Err(e) = repo
+                                    .insert_domain_event(&id, &event_type, domain, salience_str, &payload, &ts)
+                                    .await
+                                {
+                                    warn!("failed to persist domain event: {e}");
+                                }
+                            }
+                            Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                                warn!("event log persistence lagged by {n} domain events");
+                            }
+                            Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Pipeline events → pipeline_event_log
+    {
+        let repo = repo.clone();
+        let mut rx = pipeline_tx.subscribe();
+        let token = shutdown.clone();
+        tokio::spawn(async move {
+            loop {
+                tokio::select! {
+                    _ = token.cancelled() => break,
+                    result = rx.recv() => {
+                        match result {
+                            Ok(pe) => {
+                                let ts = chrono::Utc::now().to_rfc3339();
+                                let id = uuid::Uuid::new_v4().to_string();
+
+                                let result = match &pe {
+                                    cognitive::PipelineEvent::Extraction {
+                                        observation,
+                                        facts_extracted,
+                                        ..
+                                    } => {
+                                        repo.insert_pipeline_event(
+                                            &id,
+                                            "extraction",
+                                            Some(observation.as_str()),
+                                            Some(*facts_extracted as i64),
+                                            None,
+                                            None,
+                                            &ts,
+                                        )
+                                        .await
+                                    }
+                                    cognitive::PipelineEvent::Consolidation {
+                                        operation,
+                                        fact,
+                                        ..
+                                    } => {
+                                        repo.insert_pipeline_event(
+                                            &id,
+                                            "consolidation",
+                                            None,
+                                            None,
+                                            Some(operation.as_str()),
+                                            Some(fact.as_str()),
+                                            &ts,
+                                        )
+                                        .await
+                                    }
+                                };
+
+                                if let Err(e) = result {
+                                    warn!("failed to persist pipeline event: {e}");
+                                }
+                            }
+                            Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                                warn!("event log persistence lagged by {n} pipeline events");
+                            }
+                            Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                        }
+                    }
+                }
+            }
+        });
+    }
+}
+
+/// Build a `UserSituation` from real productivity + task data.
+///
+/// Called at startup and periodically to keep the situation accurate.
+async fn build_situation_inputs(
+    prod_repos: Option<&ProductivityRepos>,
+    repos: &Repos,
+    router: Option<&Arc<Mutex<InterventionRouter>>>,
+) -> UserSituation {
+    let now = Utc::now();
+    let hour_of_day = now.hour();
+    let today_start = now.date_naive().and_hms_opt(0, 0, 0)
+        .map(|dt| dt.and_utc())
+        .unwrap_or(now);
+    let thirty_min_ago = now - Duration::minutes(30);
+
+    let mut inputs = SituationInputs {
+        hour_of_day,
+        coaching_intensity: 0.7,
+        ..Default::default()
+    };
+
+    // Query productivity data if available.
+    if let Some(pr) = prod_repos {
+        // Hours active today
+        if let Ok(active_secs) = pr.events.total_active_secs(&today_start, &now).await {
+            inputs.hours_active_today = active_secs as f64 / 3600.0;
+        }
+
+        // Context switches in last 30 min
+        if let Ok(switches) = pr.events.count_context_switches(&thirty_min_ago, &now).await {
+            inputs.context_switches_last_30min = switches as i32;
+        }
+
+        // Historical average context switches (from last 7 days of daily summaries)
+        let week_ago_date = (now - Duration::days(7)).format("%Y-%m-%d").to_string();
+        let today_date = now.format("%Y-%m-%d").to_string();
+        if let Ok(summaries) = pr.summaries.list_range(&week_ago_date, &today_date).await {
+            if !summaries.is_empty() {
+                let total_switches: i64 = summaries.iter().map(|s| s.context_switches).sum();
+                inputs.historical_avg_context_switches =
+                    total_switches as f64 / summaries.len() as f64;
+            }
+        }
+
+        // Productive ratio today (productive_secs / total_active_secs)
+        if let Ok(by_cat) = pr.events.aggregate_by_category(&today_start, &now).await {
+            let total: i64 = by_cat.iter().map(|(_, secs)| *secs).sum();
+            if total > 0 {
+                // Categories named "productive" or starting with "coding"/"development" are productive.
+                // For now, just use the ratio of non-idle time vs total, or check daily summary.
+                if let Ok(Some(summary)) = pr.summaries.get(&today_date).await {
+                    let total_work = summary.productive_secs + summary.distracting_secs + summary.neutral_secs;
+                    if total_work > 0 {
+                        inputs.productive_ratio_today = summary.productive_secs as f64 / total_work as f64;
+                    }
+                }
+            }
+        }
+
+        // Distraction count in last 30 min
+        if let Ok(patterns) = pr.distraction_patterns.list_range(&today_date, &today_date).await {
+            let recent_count = patterns
+                .iter()
+                .filter(|p| p.created_at >= thirty_min_ago)
+                .count();
+            inputs.distraction_count_last_30min = recent_count as i32;
+        }
+
+        // Focus session status
+        if let Ok(Some(session)) = pr.sessions.get_active().await {
+            inputs.is_in_focus_session = true;
+            inputs.focus_quality = session.quality_score;
+
+            // mins_since_break = time since focus session started (no break during focus)
+            let focus_mins = (now - session.started_at).num_minutes() as f64;
+            inputs.mins_since_break = focus_mins;
+        } else {
+            // mins_since_break: time since last idle event
+            if let Ok(idle_secs) = pr.events.total_idle_secs(&today_start, &now).await {
+                if idle_secs > 0 {
+                    // Check most recent events to find last idle gap
+                    if let Ok(recent) = pr.events.list_recent(50).await {
+                        let last_idle = recent.iter().find(|e| e.is_idle);
+                        if let Some(idle_event) = last_idle {
+                            let idle_end = idle_event.ended_at.unwrap_or(now);
+                            inputs.mins_since_break = (now - idle_end).num_minutes() as f64;
+                        } else {
+                            // No idle events found, use hours active as proxy
+                            inputs.mins_since_break = inputs.hours_active_today * 60.0;
+                        }
+                    }
+                } else {
+                    // No idle time at all today
+                    inputs.mins_since_break = inputs.hours_active_today * 60.0;
+                }
+            }
+        }
+    }
+
+    // Task pressure: overdue tasks
+    if let Ok(overdue) = repos.actions.overdue().await {
+        inputs.overdue_task_count = overdue.len() as i32;
+    }
+
+    // Tasks due within 24h
+    let tomorrow = now + Duration::hours(24);
+    let filter = storage::ActionFilter {
+        due_after: Some(now),
+        due_before: Some(tomorrow),
+        ..Default::default()
+    };
+    if let Ok(upcoming) = repos.actions.list(&filter).await {
+        inputs.tasks_due_within_24h = upcoming.len() as i32;
+    }
+
+    // Dismissals from intervention router
+    if let Some(router) = router {
+        let r = router.lock().await;
+        inputs.recent_dismissals = r.total_dismissals();
+    }
+
+    // Peak hour match — default to common productive hours (9-12, 14-17)
+    // A future enhancement could read this from semantic facts.
+    let is_peak = matches!(hour_of_day, 9..=12 | 14..=17);
+    inputs.peak_hour_match = is_peak;
+
+    compute_situation(&inputs)
+}
+
+/// Spawn a periodic task that recomputes UserSituation from real data every 2 minutes.
+fn spawn_situation_recompute(
+    prod_repos: Option<ProductivityRepos>,
+    repos: Repos,
+    router: Option<Arc<Mutex<InterventionRouter>>>,
+    situation: Option<Arc<Mutex<UserSituation>>>,
+    shutdown: &CancellationToken,
+) {
+    let situation = match situation {
+        Some(s) => s,
+        None => return,
+    };
+    let token = shutdown.clone();
+
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(120));
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        // Skip the immediate first tick (initial situation already computed).
+        interval.tick().await;
+        loop {
+            tokio::select! {
+                _ = interval.tick() => {
+                    let new_sit = build_situation_inputs(
+                        prod_repos.as_ref(),
+                        &repos,
+                        router.as_ref(),
+                    ).await;
+                    debug!(
+                        energy = format!("{:.2}", new_sit.energy_level),
+                        focus = format!("{:.2}", new_sit.focus_state),
+                        hours_active = format!("{:.1}", new_sit.hours_active_today),
+                        "situation recomputed"
+                    );
+                    *situation.lock().await = new_sit;
+                }
+                _ = token.cancelled() => break,
+            }
+        }
+    });
+}
+
+/// Map a DomainEvent to its domain string (shared with dev_server).
+fn domain_for_event(event: &bus::DomainEvent) -> &'static str {
+    match event {
+        bus::DomainEvent::TaskCreated { .. }
+        | bus::DomainEvent::TaskCompleted { .. }
+        | bus::DomainEvent::TaskDeferred { .. }
+        | bus::DomainEvent::GoalProgress { .. } => "work",
+        bus::DomainEvent::ActivitySessionCompleted { .. }
+        | bus::DomainEvent::FocusSessionEnded { .. }
+        | bus::DomainEvent::DistractionDetected { .. }
+        | bus::DomainEvent::ProductivityScoreComputed { .. } => "energy",
+        bus::DomainEvent::TransactionRecorded { .. }
+        | bus::DomainEvent::BudgetAlert { .. } => "finance",
+        bus::DomainEvent::UserStatedFact { .. } => "general",
+        bus::DomainEvent::UserCorrectedAI { .. } => "learning",
+        bus::DomainEvent::CoachingFeedback { .. } => "coaching",
+        bus::DomainEvent::ChatTurnCompleted { .. } => "general",
+    }
 }

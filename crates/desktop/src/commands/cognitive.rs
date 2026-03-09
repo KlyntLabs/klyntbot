@@ -173,3 +173,19 @@ pub async fn cognitive_inject_event(
 ) -> Result<bool, ApiError> {
     state.cognitive_inject_event(event_type, payload).await
 }
+
+#[tauri::command]
+pub async fn cognitive_event_log(
+    state: State<'_, Arc<AppCore>>,
+    limit: Option<i64>,
+) -> Result<Vec<cognitive::DomainEventRow>, ApiError> {
+    state.cognitive_event_log(limit).await
+}
+
+#[tauri::command]
+pub async fn cognitive_pipeline_log(
+    state: State<'_, Arc<AppCore>>,
+    limit: Option<i64>,
+) -> Result<Vec<cognitive::PipelineEventRow>, ApiError> {
+    state.cognitive_pipeline_log(limit).await
+}

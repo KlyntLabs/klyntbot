@@ -172,12 +172,22 @@ fn wire_event_channels(core: &AppCore, channels: EventChannels, app_handle: &tau
         let app_handle_clone = app_handle.clone();
         let mut pipeline_rx = channels.pipeline_rx;
         tokio::spawn(async move {
-            while let Some(pe) = pipeline_rx.recv().await {
-                let event_name = match &pe {
-                    cognitive::PipelineEvent::Extraction { .. } => "cognitive:extraction",
-                    cognitive::PipelineEvent::Consolidation { .. } => "cognitive:consolidation",
-                };
-                let _ = app_handle_clone.emit(event_name, &pe);
+            loop {
+                match pipeline_rx.recv().await {
+                    Ok(pe) => {
+                        let event_name = match &pe {
+                            cognitive::PipelineEvent::Extraction { .. } => "cognitive:extraction",
+                            cognitive::PipelineEvent::Consolidation { .. } => {
+                                "cognitive:consolidation"
+                            }
+                        };
+                        let _ = app_handle_clone.emit(event_name, &pe);
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                        warn!("pipeline event forwarder lagged by {n} events");
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                }
             }
         });
     }

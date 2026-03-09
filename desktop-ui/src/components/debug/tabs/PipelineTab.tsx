@@ -1,6 +1,7 @@
 import { GitBranch } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useEvent } from "../../../hooks/useEvent";
+import { ipc } from "../../../hooks/useIpc";
 
 interface ExtractionEvent {
   observation: string;
@@ -20,16 +21,59 @@ interface TimestampedConsolidation extends ConsolidationEvent {
   ts: string;
 }
 
+/** Shape returned by the `cognitive_pipeline_log` backend command. */
+interface PipelineEventRow {
+  id: string;
+  event_kind: string;
+  observation: string | null;
+  facts_extracted: number | null;
+  operation: string | null;
+  fact_triple: string | null;
+  timestamp: string;
+}
+
 const opColors: Record<string, string> = {
   ADD: "bg-green-500/20 text-green-300",
+  add: "bg-green-500/20 text-green-300",
   UPDATE: "bg-blue-500/20 text-blue-300",
+  update: "bg-blue-500/20 text-blue-300",
   DELETE: "bg-red-500/20 text-red-300",
+  delete: "bg-red-500/20 text-red-300",
   NOOP: "bg-white/[0.06] text-muted",
 };
 
 export function PipelineTab() {
   const [extractions, setExtractions] = useState<TimestampedExtraction[]>([]);
   const [consolidations, setConsolidations] = useState<TimestampedConsolidation[]>([]);
+
+  // Load historical pipeline events on mount
+  useEffect(() => {
+    ipc<PipelineEventRow[]>("cognitive_pipeline_log", { limit: 100 })
+      .then((rows) => {
+        const ext: TimestampedExtraction[] = [];
+        const con: TimestampedConsolidation[] = [];
+        for (const r of rows) {
+          if (r.event_kind === "extraction") {
+            ext.push({
+              observation: r.observation ?? "",
+              factsExtracted: r.facts_extracted ?? 0,
+              ts: r.timestamp,
+            });
+          } else if (r.event_kind === "consolidation") {
+            con.push({
+              operation: (r.operation ?? "NOOP").toUpperCase(),
+              fact: r.fact_triple ?? "",
+              ts: r.timestamp,
+            });
+          }
+        }
+        setExtractions(ext);
+        setConsolidations(con);
+      })
+      .catch(() => {
+        // Endpoint may not exist on older backends — silently ignore.
+      });
+  }, []);
 
   useEvent<ExtractionEvent>(
     "cognitive:extraction",
@@ -49,7 +93,8 @@ export function PipelineTab() {
     () =>
       consolidations.reduce(
         (acc, c) => {
-          if (c.operation in acc) acc[c.operation as keyof typeof acc]++;
+          const key = c.operation.toUpperCase();
+          if (key in acc) acc[key as keyof typeof acc]++;
           return acc;
         },
         { ADD: 0, UPDATE: 0, DELETE: 0 },
@@ -66,9 +111,9 @@ export function PipelineTab() {
             <GitBranch className="w-3.5 h-3.5" /> Extraction Log
           </h2>
           <div className="space-y-2">
-            {extractions.map((e, i) => (
+            {extractions.map((e) => (
               <div
-                key={`ext-${e.ts}-${i}`}
+                key={`ext-${e.ts}-${e.observation.slice(0, 20)}`}
                 className="p-3 bg-white/[0.04] rounded-lg border border-white/[0.08]"
               >
                 <div className="flex items-center gap-2 mb-1">
@@ -82,7 +127,7 @@ export function PipelineTab() {
             ))}
             {extractions.length === 0 && (
               <p className="text-[12px] text-muted text-center py-4">
-                Waiting for extraction events...
+                No extraction events yet
               </p>
             )}
           </div>
@@ -92,9 +137,9 @@ export function PipelineTab() {
         <div>
           <h2 className="text-[13px] font-medium text-secondary mb-3">Consolidation Log</h2>
           <div className="space-y-2">
-            {consolidations.map((c, i) => (
+            {consolidations.map((c) => (
               <div
-                key={`con-${c.ts}-${i}`}
+                key={`con-${c.ts}-${c.fact.slice(0, 20)}`}
                 className="p-3 bg-white/[0.04] rounded-lg border border-white/[0.08]"
               >
                 <div className="flex items-center gap-2 mb-1">
@@ -110,7 +155,7 @@ export function PipelineTab() {
             ))}
             {consolidations.length === 0 && (
               <p className="text-[12px] text-muted text-center py-4">
-                Waiting for consolidation events...
+                No consolidation events yet
               </p>
             )}
           </div>

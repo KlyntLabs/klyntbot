@@ -1,736 +1,860 @@
 # Klyntbot Architecture Diagrams
 
-> Updated: 2026-03-08 | Scope: Full end-to-end workflow across 26 crates
-
----
-
-## Table of Contents
-
-1. [High-Level Architecture](#1-high-level-architecture)
-2. [End-to-End Message Processing Flow](#2-end-to-end-message-processing-flow)
-3. [ReAct Loop + Tool Execution + Multi-Agent Delegation](#3-react-loop--tool-execution--multi-agent-delegation)
-4. [Cognitive Memory & Data Pipeline](#4-cognitive-memory--data-pipeline)
-5. [Adaptive Learning & Training Loop](#5-adaptive-learning--training-loop)
-6. [Context Assembly Waterfall](#6-context-assembly-waterfall)
-7. [Boot Sequence](#7-boot-sequence)
-8. [Master Comprehensive Workflow Diagram](#8-master-comprehensive-workflow-diagram)
-9. [Summary of the Complete Workflow](#9-summary-of-the-complete-workflow)
-10. [Implementation Gaps & Technical Debt Analysis](#10-implementation-gaps--technical-debt-analysis)
-
----
-
 ## 1. High-Level Architecture
 
 ```mermaid
 graph TD
-    subgraph "L8 — Entry Point"
-        klyntbot["klyntbot<br/><i>Re-export facade + main()</i>"]
+    subgraph "L0: Foundation"
+        COMMON["common<br/>KlyntbotError, MessageRole,<br/>ChannelName, ChatId, SessionKey"]
     end
 
-    subgraph "L7 — Application Layer"
-        appcore["app-core<br/><i>AppCore, init(), handlers</i>"]
-        deskshared["desktop-shared<br/><i>30+ IPC event types</i>"]
-        desktop["desktop<br/><i>Tauri 2, 100+ commands</i>"]
+    subgraph "L1: Infrastructure"
+        CONFIG["config<br/>camelCase JSON, Secret&lt;String&gt;,<br/>env overrides"]
+        BUS["bus<br/>MessageBus (mpsc 100),<br/>DomainEventBus (broadcast 256),<br/>LearningEventBus"]
+        TOOLS_CORE["tools-core<br/>Tool trait, FeaturePackage,<br/>ToolRegistry, RoutingContext"]
+        TOOLS_MACROS["tools-core-macros<br/>#[derive(Tool)],<br/>#[derive(ToolParams)],<br/>#[tool_actions]"]
     end
 
-    subgraph "L6 — Interface Layer"
-        cli["cli<br/><i>Clap: serve/init/status/plugin</i>"]
-        mcp_crate["mcp<br/><i>MCP client + server</i>"]
+    subgraph "L2: Data"
+        STORAGE["storage<br/>StoragePool (SqlitePool),<br/>22 Repos, WAL mode,<br/>_feature_migrations"]
+        DOMAIN["domain<br/>OKR, PARA types"]
+        SQLITE[(SQLite<br/>data.db)]
+        LANCE[(LanceDB<br/>cognitive_fact_embeddings<br/>conv_embeddings)]
     end
 
-    subgraph "L5 — Intelligence Layer"
-        channels["channels<br/><i>Telegram, Discord, Slack, Email</i>"]
-        agent["agent<br/><i>AgentRuntime, AgentLoop,<br/>ReAct, Learning, Confidence</i>"]
-        cognitive["cognitive<br/><i>3-tier memory, FSRS,<br/>consolidation, embedding</i>"]
+    subgraph "L3: Services"
+        PROVIDERS["providers<br/>DynProvider, LlmProvider,<br/>chat_stream(), NoopProvider"]
+        SESSION["session<br/>SessionManager,<br/>SessionMessage"]
+        SCHEDULING["scheduling<br/>CronService, CronJob"]
+        CTX_ENGINE["context_engine<br/>ContextEngine, BudgetAllocator,<br/>8-Priority waterfall,<br/>HistoryCompressor, SHA-256 cache"]
     end
 
-    subgraph "L4 — Feature Layer"
-        tools["tools<br/><i>20+ native tools</i>"]
-        ftodo["feature-todo<br/><i>26 actions, subtasks</i>"]
-        ffin["feature-finance<br/><i>40+ actions, 8 modules</i>"]
-        fnotes["feature-notes<br/><i>10 actions</i>"]
-        fprod["feature-productivity<br/><i>Activity, focus, scoring</i>"]
-        fcoach["feature-coaching<br/><i>Signals→Patterns→Interventions</i>"]
-        plugrt["plugin-runtime<br/><i>Extism WASM host</i>"]
+    subgraph "L4: Features"
+        TOOLS["tools<br/>20+ built-in tools,<br/>EmbeddingEngine (384-dim)"]
+        FEAT_TODO["feature-todo"]
+        FEAT_FIN["feature-finance"]
+        FEAT_NOTES["feature-notes"]
+        FEAT_PROD["feature-productivity"]
+        FEAT_COACH["feature-coaching"]
+        PLUGIN_RT["plugin-runtime<br/>WASM plugins"]
     end
 
-    subgraph "L3 — Service Layer"
-        providers["providers<br/><i>14 LLMs, circuit breaker</i>"]
-        session["session<br/><i>DashMap + SQL, LRU@1000</i>"]
-        scheduling["scheduling<br/><i>CronService: At/Every/Cron</i>"]
-        ctxengine["context_engine<br/><i>8-priority token budget</i>"]
+    subgraph "L5: Intelligence"
+        CHANNELS["channels<br/>Telegram, Discord,<br/>Slack, Email"]
+        AGENT["agent<br/>AgentLoop, AgentRuntime,<br/>IntentAnalyzer, ReactiveEngine,<br/>LearningService, OutcomeRecorder"]
+        COGNITIVE["cognitive<br/>BackgroundConsolidation,<br/>SemanticFact, FSRS decay,<br/>Retrieval, Reflection"]
     end
 
-    subgraph "L2 — Data Layer"
-        storage["storage<br/><i>StoragePool, 24 repos,<br/>VectorStore (LanceDB)</i>"]
-        domain["domain<br/><i>OKR + PARA types</i>"]
+    subgraph "L6: Protocol"
+        MCP["mcp<br/>MCP server/client,<br/>sanitize: mcp_{server}_{tool}"]
     end
 
-    subgraph "L1 — Foundation"
-        config["config<br/><i>camelCase JSON, Secret&lt;String&gt;</i>"]
-        bus["bus<br/><i>MessageBus (mpsc×2, buf=100),<br/>DomainEventBus</i>"]
-        toolscore["tools-core<br/><i>Tool/FeaturePackage traits</i>"]
-        macros["tools-core-macros<br/><i>#[derive(Tool/ToolParams)]</i>"]
+    subgraph "L7: Application"
+        APP_CORE["app-core<br/>AppCore, handlers/*,<br/>init(), EventChannels"]
+        DESKTOP_SHARED["desktop-shared<br/>IPC types"]
+        DESKTOP["desktop<br/>Tauri 2 adapter,<br/>commands/*, dev_server.rs"]
     end
 
-    subgraph "L0 — Common"
-        common["common<br/><i>KlyntbotError, MessageRole,<br/>ChannelName, ChatId, SessionKey</i>"]
+    subgraph "L8: Facade"
+        KLYNTBOT["klyntbot<br/>re-export facade"]
     end
 
-    subgraph "External Storage"
-        sqlite[("SQLite<br/>WAL mode<br/>data.db")]
-        lancedb[("LanceDB<br/>384-dim vectors<br/>conv_embeddings<br/>todo_embeddings")]
+    subgraph "Frontend"
+        UI["desktop-ui<br/>React + Tailwind v4 + Vite<br/>Biome 2.0, bun"]
     end
 
-    klyntbot --> appcore & cli
-    desktop --> appcore & deskshared
-    appcore --> agent & channels & cognitive & scheduling & mcp_crate
-    cli --> agent & channels & mcp_crate
-    agent --> ctxengine & providers & session & tools & cognitive
-    cognitive --> storage & providers
-    channels --> bus
-    tools --> toolscore & storage
-    ftodo --> toolscore & storage & domain
-    ffin --> toolscore & storage
-    fnotes --> toolscore & storage
-    fprod --> storage & bus
-    fcoach --> bus & providers
-    ctxengine --> cognitive
-    providers --> config
-    session --> storage
-    storage --> sqlite & lancedb
-    bus --> common
-    toolscore --> common
-    config --> common
-
-    style klyntbot fill:#2d3748,stroke:#4fd1c5,color:#fff
-    style agent fill:#553c9a,stroke:#b794f4,color:#fff
-    style cognitive fill:#2c5282,stroke:#63b3ed,color:#fff
-    style sqlite fill:#c05621,stroke:#fbd38d,color:#fff
-    style lancedb fill:#c05621,stroke:#fbd38d,color:#fff
+    %% Layer dependencies (upward flow)
+    CONFIG --> COMMON
+    BUS --> COMMON
+    TOOLS_CORE --> COMMON
+    STORAGE --> COMMON
+    DOMAIN --> COMMON
+    STORAGE --> SQLITE
+    STORAGE --> LANCE
+    PROVIDERS --> CONFIG
+    SESSION --> STORAGE
+    SCHEDULING --> STORAGE
+    CTX_ENGINE --> PROVIDERS
+    TOOLS --> TOOLS_CORE
+    TOOLS --> TOOLS_MACROS
+    FEAT_TODO --> STORAGE
+    FEAT_TODO --> TOOLS_CORE
+    FEAT_NOTES --> STORAGE
+    CHANNELS --> BUS
+    AGENT --> CTX_ENGINE
+    AGENT --> PROVIDERS
+    AGENT --> SESSION
+    AGENT --> TOOLS
+    AGENT --> COGNITIVE
+    COGNITIVE --> STORAGE
+    COGNITIVE --> LANCE
+    MCP --> TOOLS_CORE
+    APP_CORE --> AGENT
+    APP_CORE --> BUS
+    APP_CORE --> CHANNELS
+    APP_CORE --> COGNITIVE
+    APP_CORE --> SCHEDULING
+    DESKTOP --> APP_CORE
+    DESKTOP --> DESKTOP_SHARED
+    KLYNTBOT --> APP_CORE
+    UI --> DESKTOP
 ```
-
----
 
 ## 2. End-to-End Message Processing Flow
 
 ```mermaid
 sequenceDiagram
-    autonumber
     participant User
-    participant Channel as Channel<br/>(Telegram/Discord/Slack...)
-    participant Bus as MessageBus<br/>(mpsc, buf=100)
-    participant Loop as AgentLoop<br/>::process_message
-    participant Session as SessionManager<br/>(DashMap + SQL)
-    participant Runtime as AgentRuntime<br/>::process_message
-    participant AgentMgr as AgentManager<br/>::match_agent
-    participant Analyzer as IntentAnalyzer<br/>::analyze
-    participant ConfEval as ConfidenceEvaluator<br/>(AtomicU32)
-    participant CtxEngine as ContextEngine<br/>::assemble
-    participant CogCtx as CognitiveContextSource<br/>(UserModel + facts)
-    participant Router as ExecutionRouter<br/>::execute
-    participant LLM as LLM Provider<br/>(14 providers)
-    participant Validator as ResponseValidator<br/>::validate
-    participant CostTrack as CostTracker<br/>+ StrategyRepo
-    participant DEB as DomainEventBus<br/>(cognitive pipeline)
-    participant BusOut as MessageBus<br/>(outbound)
+    participant Channel as Channel<br/>(Telegram/Discord/Slack)
+    participant Bus as MessageBus<br/>(mpsc cap=100)
+    participant AL as AgentLoop<br/>(mod.rs)
+    participant SM as SessionManager
+    participant AR as AgentRuntime<br/>(runtime.rs)
+    participant AM as AgentManager<br/>(manager.rs)
+    participant IA as IntentAnalyzer<br/>(analysis.rs)
+    participant CE as ContextEngine<br/>(assembler.rs)
+    participant ER as ExecutionRouter<br/>(router.rs)
+    participant LLM as LLM Provider<br/>(DynProvider)
+    participant RV as ResponseValidator
+    participant CT as CostTracker
+    participant DEB as DomainEventBus<br/>(broadcast 256)
 
-    User->>Channel: Send message
-    Channel->>Bus: InboundMessage{channel, chat_id, content}
-    Bus->>Loop: rx.recv()
+    User->>Channel: sends message
+    Channel->>Bus: bus.publish(InboundMessage)
+    Bus->>AL: run_with_rx() receives msg
 
-    Loop->>Session: get_or_create(session_key)
-    Session-->>Loop: Session{history, context}
+    Note over AL: Step 1: Validate message size
+    Note over AL: Step 2: Handle Reactions → satisfaction score
+    Note over AL: Step 3: SYSTEM_CHANNEL → process_system_message()
 
-    Loop->>Runtime: process_message(text, history, tools, ctx)
+    AL->>SM: get_or_create(session_key)
+    SM-->>AL: Session + history
+    AL->>AL: spawn_embed_message() [background]
 
-    Note over Runtime: Step 1 — Agent Matching
-    Runtime->>AgentMgr: match_agent(message)
-    AgentMgr-->>Runtime: AgentProfile{name, tools, mcp_tools, skills}
+    AL->>AR: process_message(message, history, tools, event_tx)
 
-    Note over Runtime: Step 2 — Set active_profile (RwLock)
-    Note over Runtime: Step 3 — Filter MCP tools by profile.mcp_tools
+    Note over AR: ── Step 1: Agent Selection ──
+    AR->>AM: match_agent(message)
+    AM-->>AR: AgentProfile (trigger-weighted scoring, fallback="general")
+    Note over AR: emit AgentSelected + SkillLoaded events
 
-    Note over Runtime: Step 4 — Intent Classification
-    Runtime->>Analyzer: analyze(message, tool_names)
-    Note over Analyzer: Stage 1: Heuristics (zero-cost)<br/>Stage 2: LLM classifier (fallback)
-    Analyzer-->>Runtime: IntentAnalysis{mode, confidence, signals}
+    Note over AR: ── Step 2: Set active_profile ──
+    AR->>AR: active_profile.write() = matched profile
 
-    Note over Runtime: Step 5 — Confidence Check
-    Runtime->>ConfEval: threshold()
-    ConfEval-->>Runtime: f32 threshold
-    alt confidence < threshold
-        Runtime-->>Loop: "Could you clarify?"
+    Note over AR: ── Step 3: Filter MCP tools ──
+    AR->>AR: filter by profile.allows_mcp_server()
+    Note over AR: Step 3b: if needs_orchestration → switch to "general",<br/>boost max_iterations ≥ 15
+
+    Note over AR: ── Step 4: Intent Analysis ──
+    AR->>IA: analyze(message, filtered_tool_names)
+    Note over IA: Stage 1: analyze_heuristic()<br/>greeting→Direct(0.95), task→Reactive<br/>ambiguous→None
+    opt confidence < heuristic_threshold
+        IA->>LLM: IntentClassifier::classify() [JSON schema]
+        LLM-->>IA: ExecutionMode + ComplexitySignals
     end
+    IA-->>AR: IntentAnalysis { mode, confidence, needs_orchestration }
 
-    Note over Runtime: Step 6 — Context Assembly
-    Runtime->>CtxEngine: assemble(ContextRequest)
-    CtxEngine->>CogCtx: build UserModel (6 domains)
-    CogCtx-->>CtxEngine: Markdown persona + facts
-    Note over CtxEngine: 8-priority waterfall allocation<br/>SHA-256 cached (60s TTL)
-    CtxEngine-->>Runtime: AssembledContext{messages, token_count}
+    Note over AR: ── Step 5: Confidence Check ──
+    AR->>AR: if confidence < evaluator.threshold() → downgrade to Direct
 
-    Note over Runtime: Step 7 — Tool Filtering + Delegation injection
-    Note over Runtime: Step 7c — Planning prompt if complexity >= 5
+    Note over AR: ── Step 6: Context Assembly ──
+    AR->>CE: assemble(ContextRequest)
+    Note over CE: 8-priority waterfall:<br/>Identity→Bootstrap→Area→Todo→<br/>Agent→Persona→Page→Cognitive
+    CE-->>AR: AssembledContext { messages, token_usage }
 
-    Note over Runtime: Step 8 — Execute
-    Runtime->>Router: execute(mode, messages, tools, params)
-    Router->>LLM: chat()/chat_stream()
-    LLM-->>Router: Response / ToolCalls
-    Note over Router: Direct → single call<br/>Reactive → ReAct loop (1..max_iter)
-    Router-->>Runtime: RouterResult{content, usage, iterations}
+    Note over AR: ── Step 7: Tool Filtering ──
+    AR->>AR: filter_tools_for_profile()
+    Note over AR: Step 7b: inject_delegation_tool() if depth < 2<br/>Step 7c: inject planning prompt if complexity ≥ 4
 
-    Note over Runtime: Step 9 — Validate
-    Runtime->>Validator: validate(content)
-    Validator-->>Runtime: ValidationResult{is_valid, warnings}
+    Note over AR: ── Step 8: Execute ──
+    AR->>ER: execute(mode, messages, tools, params)
+    ER->>LLM: chat() or chat_stream()
+    LLM-->>ER: LlmResponse (text or tool_calls)
+    ER-->>AR: EngineResult::Complete { content, usage }
 
-    Note over Runtime: Step 10 — Record
-    Runtime->>CostTrack: record_usage() + record_strategy()
-    Runtime-->>Loop: RuntimeResult{content, mode_used, agent_name}
+    Note over AR: ── Step 9: Validate ──
+    AR->>RV: validate(content)
+    Note over RV: strip &lt;confidence&gt; blocks<br/>truncate at max_response_chars<br/>system leak detection
 
-    Loop->>Session: save(session + new messages)
-    Loop->>DEB: ChatTurnCompleted{user_message, session_key}
-    Note over DEB: Passive learning — every chat turn<br/>feeds cognitive extraction pipeline
-    Loop->>BusOut: OutboundMessage{channel, chat_id, content}
-    BusOut->>Channel: send(formatted_content)
-    Channel->>User: Formatted response
+    Note over AR: ── Step 10: Record ──
+    AR->>CT: record_usage()
+    AR->>AR: StrategyRepo::create(StrategyRecordRow)
+    AR->>AR: InteractionRecorder::record()
+    AR-->>AL: RuntimeResult { content, mode_used, agent_name }
+
+    AL->>SM: save_to_session(assistant message)
+    AL->>AL: spawn_embed_message() [background]
+    AL->>DEB: publish(ChatTurnCompleted)
+    AL->>Bus: publish_outbound(OutboundMessage)
+    Bus->>Channel: send response
+    Channel->>User: delivers reply
 ```
-
----
 
 ## 3. ReAct Loop + Tool Execution + Multi-Agent Delegation
 
 ```mermaid
 flowchart TD
-    Start([ReactiveEngine::execute]) --> Init["Initialize:<br/>messages, scratchpad = Scratchpad::new()<br/>max_iter = params.max_iterations or engine.max_iterations<br/>fabrication_retries = 0<br/>seen_tool_calls: HashSet"]
+    START([ReactiveEngine::execute<br/>reactive.rs:L62]) --> INIT["iteration = 1<br/>max = analysis.iteration_budget()<br/>traces: Vec&lt;ToolTrace&gt;"]
+    INIT --> CANCEL{CancellationToken<br/>cancelled?}
+    CANCEL -->|yes| ABORT([Return empty EngineResult])
+    CANCEL -->|no| ITER_EVENT["emit IterationStart {iteration, max}"]
+    ITER_EVENT --> RUN_CYCLE
 
-    Init --> PlanCheck{planning_prompt<br/>is Some?}
-    PlanCheck -->|Yes| InjectPlan["messages.push(planning_prompt)<br/>— complexity >= 5 triggers this"]
-    PlanCheck -->|No| LoopStart
-    InjectPlan --> LoopStart
+    subgraph CYCLE ["ExecutionCore::run_cycle() — core.rs:L315"]
+        RUN_CYCLE["call_provider_streaming()<br/>or provider.chat()"] --> PARSE_RESP{LlmResponse<br/>has tool_calls?}
+        PARSE_RESP -->|"no text"| EMPTY_OUT([CycleOutcome::EmptyResponse])
+        PARSE_RESP -->|"text only"| CHECK_FAB{"is_fabricated_tool_response()?<br/>(context-aware heuristics)"}
+        CHECK_FAB -->|yes| FAB_OUT([CycleOutcome::FabricatedResponse])
+        CHECK_FAB -->|no| FINAL_OUT([CycleOutcome::FinalResponse])
 
-    LoopStart["for iteration in 1..=max_iterations"] --> CancelCheck{cancel_token<br/>is_cancelled?}
-    CancelCheck -->|Yes| ReturnEmpty([EngineResult::Complete<br/>empty content])
-    CancelCheck -->|No| EmitIter["emit AgentEvent::IterationStart<br/>{iteration, max}"]
+        PARSE_RESP -->|"tool_calls present"| DEDUP{"Dedup check:<br/>hash(tool_name|args)<br/>vs seen_keys"}
+        DEDUP -->|"all duplicates"| INJECT_FORCE["Inject force-different-action prompt"]
+        INJECT_FORCE --> TOOLS_OUT
+        DEDUP -->|"has new calls"| PAR_EXEC
 
-    EmitIter --> RunCycle["ExecutionCore::run_cycle()<br/>→ LLM call with tools<br/>→ parallel tool execution<br/>→ duplicate detection via seen_tool_calls"]
+        subgraph PAR_EXEC ["Parallel Tool Execution"]
+            direction TB
+            SEM["Semaphore(10) — max concurrency"]
+            SEM --> TOOL1["Tool 1: acquire permit<br/>→ emit ToolStart<br/>→ registry.prepare() + tool.execute()<br/>→ timeout (30s default, 600s ask_user)<br/>→ emit ToolEnd<br/>→ record outcome"]
+            SEM --> TOOL2["Tool 2: same flow"]
+            SEM --> TOOLN["Tool N: same flow"]
+        end
 
-    RunCycle --> Outcome{CycleOutcome?}
-
-    Outcome -->|FinalResponse| PlanIter1{Is planning<br/>iteration 1?}
-    PlanIter1 -->|Yes| ParsePlan["try_store_plan(content)<br/>→ ExecutionPlan::parse()<br/>emit PlanGenerated<br/>continue loop"]
-    ParsePlan --> LoopStart
-    PlanIter1 -->|No| Complete([EngineResult::Complete<br/>{content, usage, iterations, traces}])
-
-    Outcome -->|FabricatedResponse| FabRetry{fabrication_retries<br/>> max_fabrication_retries?<br/><i>default: 2</i>}
-    FabRetry -->|Yes| CompleteFab([EngineResult::Complete<br/>return fabricated content as-is])
-    FabRetry -->|No| InjectForce["Inject force-tool prompt:<br/>'You MUST call the appropriate tool...'<br/>fabrication_retries += 1"]
-    InjectForce --> LoopStart
-
-    Outcome -->|ToolsExecuted| TrackTools["Track last_tool_name<br/>Parse plan from iter 1 if planning<br/>Mark plan steps completed<br/>emit PlanStepCompleted"]
-    TrackTools --> DupCheck{All results are<br/>'Skipped: duplicate'?}
-    DupCheck -->|Yes| InjectDup["Inject anti-dup prompt:<br/>'Do NOT repeat these calls'"]
-    DupCheck -->|No| FailCheck{Any tool<br/>failures?}
-    FailCheck -->|Yes| InjectReflect["Inject reflection prompt:<br/>'What went wrong?'"]
-    FailCheck -->|No| ContinueLoop
-    InjectDup --> ContinueLoop
-    InjectReflect --> ContinueLoop
-    ContinueLoop --> LoopStart
-
-    Outcome -->|EmptyResponse| AddTrace["Add empty_response trace"] --> ContinueLoop
-
-    LoopStart -->|max_iterations<br/>exhausted| Synthesize["Synthesize final response:<br/>LLM call with NO tools<br/>Include plan progress if available<br/>'Based on work so far...'"]
-    Synthesize --> SynthResult([EngineResult::Complete<br/>{synthesized content}])
-
-    subgraph "Tool Execution (ExecutionCore::run_cycle)"
-        TC1["LLM returns tool_calls[]"] --> TC2["Bounded parallel execution<br/>Semaphore(10) + join_all<br/>Per-tool timeout (30s default)"]
-        TC2 --> TC3["Duplicate detection:<br/>hash(tool_name + args) in seen_tool_calls"]
-        TC3 --> TC4["OutcomeRecorder::record()<br/>privacy-safe: no args/content stored"]
-        TC4 --> TC5["Append tool results to messages"]
+        PAR_EXEC --> TOOLS_OUT([CycleOutcome::ToolsExecuted])
     end
 
-    subgraph "Multi-Agent Delegation"
-        D1["IntentAnalyzer sets needs_orchestration=true"] --> D2["Runtime routes to 'general' agent<br/>(ORCHESTRATOR_AGENT)"]
-        D2 --> D3["inject_delegation_tool()<br/>adds DelegateTool to filtered_tools"]
-        D3 --> D4["DelegateTool::execute()<br/>ctx.delegation_depth check"]
-        D4 --> D5{depth <<br/>MAX_DELEGATION_DEPTH?<br/><i>const: 2</i>}
-        D5 -->|Yes| D6["Spawn sub-AgentRuntime::process_message<br/>delegation_depth += 1<br/>Match specialized agent profile"]
-        D5 -->|No| D7["Return error:<br/>'Max delegation depth reached'"]
-        D6 --> D8["5 built-in agents:<br/>general, task, finance,<br/>automation, communication"]
+    %% Match on CycleOutcome
+    FINAL_OUT --> RETURN([EngineResult::Complete<br/>{content, usage, iterations, traces}])
+    EMPTY_OUT --> CONT_LOOP{iteration < max?}
+    TOOLS_OUT --> ADD_REFLECT["Add reflection prompt<br/>if failures or duplicates"] --> CONT_LOOP
+    FAB_OUT --> FAB_RETRY{fabrication_retries < 2?}
+    FAB_RETRY -->|yes| FORCE_TOOL["Inject force-tool prompt<br/>fabrication_retries += 1"] --> RUN_CYCLE
+    FAB_RETRY -->|no| RETURN
+
+    CONT_LOOP -->|yes| INC["iteration += 1"] --> CANCEL
+    CONT_LOOP -->|"no (at max)"| SYNTH["Push synthesis_prompt<br/>→ run_cycle(tools=[])<br/>→ force text output"] --> RETURN
+
+    %% Direct Engine + Escalation
+    DIRECT_START([DirectEngine::execute]) --> SINGLE_CYCLE["ExecutionCore::run_cycle()<br/>with empty tools slice"]
+    SINGLE_CYCLE --> DIRECT_MATCH{CycleOutcome?}
+    DIRECT_MATCH -->|FinalResponse| RETURN
+    DIRECT_MATCH -->|FabricatedResponse| RETURN
+    DIRECT_MATCH -->|ToolsExecuted| ESCALATE([EngineResult::Escalate<br/>→ Router re-runs as Reactive])
+    DIRECT_MATCH -->|EmptyResponse| RETURN
+
+    ESCALATE -.->|"auto-escalation"| START
+
+    %% Delegation
+    subgraph DELEGATION ["Multi-Agent Delegation — runtime.rs:L784"]
+        direction TB
+        DEL_TOOL["DelegationTool.execute()<br/>(injected if depth < MAX=2)"]
+        DEL_TOOL --> DEL_HANDLER["DelegationHandler::delegate(<br/>agent_name, query, ctx, depth)"]
+        DEL_HANDLER --> DEL_MATCH["AgentManager::get(agent_name)<br/>→ delegated AgentProfile"]
+        DEL_MATCH --> DEL_CTX["ContextEngine::assemble()<br/>with delegated agent instructions"]
+        DEL_CTX --> DEL_FILTER["filter_tools_for_profile()"]
+        DEL_FILTER --> DEL_INJECT{"depth+1 < MAX_DEPTH(2)?"}
+        DEL_INJECT -->|yes| DEL_ADD_TOOL["inject_delegation_tool(depth+1)"]
+        DEL_INJECT -->|no| DEL_NO_TOOL["no delegation tool available"]
+        DEL_ADD_TOOL --> DEL_EXEC["ExecutionRouter::execute(Reactive)<br/>max_iters=min(profile.max_iters, 8)"]
+        DEL_NO_TOOL --> DEL_EXEC
+        DEL_EXEC --> DEL_EVENT_FILTER["delegation_event_filter():<br/>suppress ContentChunk, IterationStart<br/>annotate ToolStart/ToolEnd with agent name"]
+        DEL_EVENT_FILTER --> DEL_RETURN["Return content as String<br/>→ parent tool result"]
     end
 
-    style Complete fill:#38a169,stroke:#fff,color:#fff
-    style CompleteFab fill:#d69e2e,stroke:#fff,color:#fff
-    style SynthResult fill:#3182ce,stroke:#fff,color:#fff
-    style ReturnEmpty fill:#718096,stroke:#fff,color:#fff
+    TOOL1 -.->|"if tool is delegate_to_agent"| DEL_TOOL
 ```
-
----
 
 ## 4. Cognitive Memory & Data Pipeline
 
 ```mermaid
 flowchart TD
-    subgraph "Event Sources"
-        US["UserStatedFact<br/><i>'I prefer dark mode'</i>"]
-        UC["UserCorrectedAI<br/><i>'No, I prefer mornings'</i>"]
-        CT["ChatTurnCompleted<br/><i>Every chat turn (passive learning)</i>"]
-        BA["BudgetAlert<br/><i>threshold-crossing</i>"]
-        CF["CoachingFeedback"]
-        PS["ProductivityScoreComputed"]
-        TC["TaskCreated / TaskCompleted"]
-        TR["TransactionRecorded"]
+    subgraph EVENTS ["Domain Events — bus crate"]
+        DE["DomainEventBus::publish()<br/>(broadcast, cap=256)"]
+        DE --> E1["ChatTurnCompleted"]
+        DE --> E2["TaskCreated/Updated"]
+        DE --> E3["AreaCreated"]
+        DE --> E4["FinanceRecorded"]
+        DE --> E5["NoteCreated/Updated"]
     end
 
-    US & UC & CT & BA & CF & PS & TC & TR --> DEB["DomainEventBus<br/>(mpsc, buf=256)"]
-
-    DEB --> Salience["evaluate_salience()<br/><i>cognitive/salience.rs</i>"]
-
-    Salience -->|Extract| Immediate["Immediate Processing<br/><i>UserStatedFact, UserCorrectedAI,<br/>ChatTurnCompleted, BudgetAlert,<br/>CoachingFeedback, over-budget transactions</i>"]
-    Salience -->|Accumulate| Buffer["Accumulator Buffer<br/><i>TaskCreated, ProductivityScore,<br/>FocusSessionEnded, etc.</i>"]
-    Salience -->|Discard| Drop["(no Discard events currently)"]
-
-    Buffer --> PromotionCheck{">=5 occurrences<br/>across >=3 distinct days?"}
-    PromotionCheck -->|Yes| Immediate
-    PromotionCheck -->|No| StayBuffered["Remain buffered"]
-
-    Immediate --> ExtractionHandler["ExtractionHandler<br/><i>LLM-backed: extract SPO triples<br/>from event text</i>"]
-
-    ExtractionHandler --> ExtractedFacts["ExtractedFact[]<br/>{subject, predicate, object,<br/>source, confidence, domain}"]
-
-    ExtractedFacts --> Consolidation["ConsolidationHandler<br/><i>Mem0-style merge logic</i>"]
-
-    Consolidation --> FindExisting["Find existing facts<br/>matching (subject, predicate)"]
-
-    FindExisting --> Decision{Consolidation<br/>Decision?}
-    Decision -->|ADD| Insert["SemanticFactRepo::insert()<br/>New fact with FSRS stability=1.0"]
-    Decision -->|UPDATE| Update["SemanticFactRepo::update()<br/>Supersede old fact<br/>(superseded_at, superseded_by)"]
-    Decision -->|DELETE| Archive["Mark fact superseded<br/>Will be compacted after 90d"]
-    Decision -->|NOOP| Skip["No change needed"]
-
-    Insert & Update --> Embed["SemanticFactEmbedder<br/>::embed_fact(fact_id)"]
-    Embed --> LanceDB[("LanceDB<br/>conv_embeddings table<br/>384-dim MiniLM vectors")]
-
-    Insert & Update --> FSRS["FSRS Scoring<br/>stability = 1.0 (initial)<br/>S_new = S + ln(1 + S) on access"]
-
-    subgraph "Retrieval Path"
-        Query["retrieve_relevant_facts()"] --> VecSearch["Vector search:<br/>embed(query) → ANN search<br/>cosine similarity"]
-        VecSearch --> MinCheck{">=3 results?"}
-        MinCheck -->|Yes| VectorPath["Vector Path:<br/>real semantic_similarity"]
-        MinCheck -->|No| FallbackPath["Fallback Path:<br/>semantic_similarity = 0.5"]
-        VectorPath & FallbackPath --> Score["5-Factor Relevance:<br/>0.30 x semantic_similarity<br/>0.20 x retrievability (FSRS)<br/>0.15 x importance<br/>0.10 x access_frequency<br/>0.25 x situational_boost"]
-        Score --> TopK["Return top-K scored facts"]
+    subgraph SALIENCE ["Salience Filter — salience.rs"]
+        E1 & E2 & E3 & E4 & E5 --> SAL["evaluate_salience(&event)"]
+        SAL --> EXTRACT([SalienceVerdict::Extract])
+        SAL --> ACCUMULATE([SalienceVerdict::Accumulate])
+        SAL --> DISCARD([SalienceVerdict::Discard])
     end
 
-    subgraph "User Model Assembly"
-        TopK --> UserModel["CognitiveContextSource<br/>6 domains:<br/>preferences, background, goals,<br/>relationships, routines, personality"]
-        UserModel --> Markdown["Format as Markdown<br/>→ System Prompt Priority 60<br/>60s cache TTL"]
+    subgraph ACCUM ["Accumulation Buffer — background.rs"]
+        ACCUMULATE --> BUF["HashMap&lt;event_type, AccumulatedEntry&gt;<br/>in-memory buffer"]
+        BUF --> GATE{observations ≥ 5<br/>AND days_seen ≥ 3?}
+        GATE -->|no| WAIT["Keep accumulating"]
+        GATE -->|yes| PROMOTE["summarize_accumulated()<br/>→ synthetic Observation"]
     end
 
-    subgraph "Maintenance (Background)"
-        Compact["Daily Compaction:<br/>Archive superseded >90d<br/>Delete episodic <2 accesses >90d<br/>Cap: 10,000 active facts"]
-        WeeklyRef["Weekly Reflection:<br/>LLM summarizes 7d episodic<br/>→ new facts + procedural rules"]
+    subgraph OBS ["Observation — background.rs:L252"]
+        EXTRACT --> OBS_CREATE["event_to_observation(&event)<br/>→ Observation {domain, content,<br/>importance, source_event}"]
+        PROMOTE --> OBS_CREATE
     end
 
-    style Salience fill:#805ad5,stroke:#fff,color:#fff
-    style ExtractionHandler fill:#2b6cb0,stroke:#fff,color:#fff
-    style Consolidation fill:#2b6cb0,stroke:#fff,color:#fff
-    style LanceDB fill:#c05621,stroke:#fbd38d,color:#fff
-    style Score fill:#38a169,stroke:#fff,color:#fff
+    subgraph EXTRACTION ["Extraction — extraction.rs"]
+        OBS_CREATE --> EXT["ExtractionHandler::extract_facts(&obs)"]
+        EXT --> EXT_LLM["LlmExtractionHandler<br/>POST with EXTRACTION_SYSTEM_PROMPT<br/>→ JSON {facts: [{domain, subject,<br/>predicate, object, confidence}]}"]
+        EXT --> EXT_HEUR["HeuristicExtractionHandler<br/>(fallback on LLM error)"]
+        EXT_LLM --> TO_FACT["to_semantic_fact(candidate, &obs)<br/>→ SemanticFact {id: uuid,<br/>stability: 1.0, ...}"]
+        EXT_HEUR --> TO_FACT
+    end
+
+    subgraph CONSOLIDATION ["Consolidation — consolidation.rs"]
+        TO_FACT --> BATCH["consolidate_batch(&facts, repo, handler, embedder)"]
+        BATCH --> PER_FACT["consolidate_fact(candidate, repo, handler)"]
+        PER_FACT --> FIND_SIM["repo.find_similar(subject, predicate)"]
+        FIND_SIM --> NO_EXISTING{existing<br/>facts found?}
+        NO_EXISTING -->|no| ADD["MemoryOp::Add<br/>repo.upsert(candidate)<br/>embedder.embed_and_store_fact()"]
+        NO_EXISTING -->|yes| DECIDE["ConsolidationHandler::decide<br/>(candidate, existing)"]
+        DECIDE --> UPDATE["MemoryOp::Update<br/>repo.supersede(old, new)<br/>re-embed"]
+        DECIDE --> DELETE["MemoryOp::Delete<br/>repo.supersede(id, by)"]
+        DECIDE --> NOOP["MemoryOp::Noop"]
+    end
+
+    subgraph STORAGE ["Storage Layer"]
+        ADD & UPDATE --> SQLITE_FACT[("SQLite<br/>semantic_facts table<br/>bi-temporal: valid_from,<br/>valid_until, superseded_at")]
+        ADD & UPDATE --> LANCE_VEC[("LanceDB<br/>cognitive_fact_embeddings<br/>384-dim fastembed<br/>text: '{subject} {predicate} {object}'")]
+        DELETE --> SQLITE_FACT
+    end
+
+    subgraph EPISODIC ["Episodic Memory"]
+        OBS_CREATE --> IMP_CHECK{importance ≥ 0.7?}
+        IMP_CHECK -->|yes| EP_STORE["EpisodicMemoryRepo::insert()<br/>EpisodicMemory {domain,<br/>content, importance}"]
+        IMP_CHECK -->|no| SKIP_EP["Skip episodic storage"]
+    end
+
+    subgraph RETRIEVAL ["Retrieval — retrieval.rs"]
+        QUERY["ContextEngine request<br/>(message or intent_summary)"] --> VEC_SEARCH["SemanticFactEmbedder::search_similar<br/>(query, domains, top_k=30,<br/>min_similarity=0.55)"]
+        VEC_SEARCH --> GET_FACTS["repo.get_batch(ids)"]
+        GET_FACTS --> SCORE["relevance_score():<br/>semantic: 0.3 × cosine_sim<br/>retrievability: 0.2 × FSRS<br/>importance: 0.15 × confidence<br/>frequency: 0.1 × access_count<br/>situational: 0.25 × boost"]
+        SCORE --> FSRS_UPDATE["record_access(id)<br/>update_stability(current, true)<br/>new = current + ln(1+current).max(0.1)"]
+        VEC_SEARCH --> FALLBACK{results < 3?}
+        FALLBACK -->|yes| SQL_FALLBACK["SQL: list_active per domain<br/>score with semantic_sim=0.5"]
+        FALLBACK -->|no| FILTER["filter score > 0.3"]
+        SQL_FALLBACK --> MERGE["Merge + deduplicate by ID"]
+        MERGE --> FILTER
+    end
+
+    subgraph USER_MODEL ["User Model — context_source.rs"]
+        FILTER --> STATIC["Static tier: top 10 facts<br/>sorted by confidence × stability<br/>across 6 USER_MODEL_DOMAINS"]
+        FILTER --> DYNAMIC["Dynamic tier: vector-searched<br/>facts specific to current query"]
+        STATIC & DYNAMIC --> INJECT["Inject as '# User Understanding'<br/>block in LLM system prompt"]
+    end
+
+    subgraph REFLECTION ["Weekly Reflection — reflection.rs"]
+        CRON["CronService: Monday 9am<br/>'__klyntbot_cognitive_weekly_reflection'"]
+        CRON --> LOAD["Load 7-day episodic memories<br/>+ UserModel + ProceduralRules"]
+        LOAD --> REFLECT_LLM["ReflectionHandler::reflect(&input)<br/>→ JSON {fact_updates, rule_updates, summary}"]
+        REFLECT_LLM --> VALIDATE["Filter: source=='user_stated'<br/>OR confidence ≥ 0.7"]
+        VALIDATE --> BATCH
+        REFLECT_LLM --> RULES["ProceduralRuleRepo::upsert(rule)"]
+        REFLECT_LLM --> EP_REFLECT["Store reflection as EpisodicMemory<br/>stability=5.0, importance=0.9"]
+    end
+
+    subgraph DECAY ["FSRS Decay — decay.rs"]
+        FSRS_FORMULA["retrievability(elapsed, stability)<br/>= exp(ln(0.9) × elapsed / stability)"]
+        COMPACT["compaction.rs: archive_superseded()<br/>after 90 days"]
+    end
 ```
-
----
 
 ## 5. Adaptive Learning & Training Loop
 
 ```mermaid
 flowchart LR
-    subgraph "Per-Request (Hot Path)"
-        ToolExec["Tool Execution<br/><i>ExecutionCore::run_cycle()</i>"] --> Outcome["ToolExecutionResult<br/>{tool_name, success,<br/>duration_ms, confidence}"]
-        Outcome --> Recorder["OutcomeRecorder::record()<br/><i>Privacy-safe: no args/content</i><br/>→ learning_outcomes table"]
+    subgraph RECORDING ["Outcome Recording — recorder.rs"]
+        TOOL_EXEC["Tool execution<br/>in ReactiveEngine"] --> RECORD["OutcomeRecorder::record()<br/>(privacy-by-omission:<br/>no tool_args, no user_message)"]
+        RECORD --> HASH["FNV-1a hash session_key<br/>'telegram:abc123' →<br/>'telegram:a1b2c3d4'"]
+        HASH --> STORE[("OutcomeStore<br/>(SQLite via OutcomeRepo)<br/>OutcomeRow {id, tool_name,<br/>success, duration_ms,<br/>channel_prefix}")]
     end
 
-    subgraph "Hourly Analysis (Background)"
-        Timer["LearningService<br/><i>hourly tick</i>"] --> Load["OutcomeStore::list_since()<br/><i>load recent outcomes</i>"]
-        Load --> Analyzer["LearningAnalyzer<br/>::analyze()"]
-        Analyzer --> Bucket["Bucket by confidence range<br/>Compute success rates per band<br/>Calculate threshold_confidence"]
-        Bucket --> AnalysisResult["AnalysisResult<br/>{total_outcomes,<br/>suggested_threshold,<br/>threshold_confidence,<br/>per-band stats}"]
+    subgraph SERVICE ["LearningService — service.rs:L1-L208"]
+        LOOP["Background tokio::select! loop<br/>interval from config"] --> LOAD_OUTCOMES["Load recent outcomes<br/>from OutcomeStore"]
+        LOAD_OUTCOMES --> ANALYZER
     end
 
-    subgraph "Threshold Adaptation"
-        AnalysisResult --> ColdStart{"total_outcomes<br/>>= min_outcomes?<br/><i>default: 50</i>"}
-        ColdStart -->|No| Skip["Skip adaptation<br/><i>insufficient data</i>"]
-        ColdStart -->|Yes| Clamp["Clamp suggested to<br/>[min_threshold, max_threshold]"]
-        Clamp --> Delta["delta = suggested - current<br/>clamped to +/-0.05<br/><i>MAX_THRESHOLD_STEP</i>"]
-        Delta --> Significant{"|delta| >= 0.001?"}
-        Significant -->|No| NoChange["No change"]
-        Significant -->|Yes| Update["AdaptiveThresholds<br/>state.current_threshold += delta<br/>Push ThresholdChange to history<br/>Persist to learning_state table"]
+    subgraph ANALYZER ["LearningAnalyzer"]
+        direction TB
+        ANALYZE["analyze(outcomes, feedback)"] --> BANDS["Compute per-tool ConfidenceBands:<br/>[0.0,0.3) [0.3,0.5) [0.5,0.7)<br/>[0.7,0.85) [0.85,1.0]"]
+        BANDS --> SUGGEST["suggest_threshold:<br/>lowest band with ≥5 samples<br/>AND ≥80% success rate<br/>(default: 0.7)"]
+        SUGGEST --> CONF["threshold_confidence:<br/>0.2 (≤10 pts) → 0.5 (≤50)<br/>→ 0.7 (≤200) → 0.9 (>200)"]
+        CONF --> PATTERN["PatternAnalyzer::analyze()<br/>behavioral pattern extraction"]
     end
 
-    subgraph "Confidence Evaluation (Per-Request)"
-        Update --> Evaluator["ConfidenceEvaluator<br/><i>AtomicU32 <- f32 bits</i><br/>Lock-free hot path"]
-        Evaluator --> Decision{"confidence <<br/>threshold?"}
-        Decision -->|Yes| Clarify["Return clarification<br/><i>'Could you clarify?'</i>"]
-        Decision -->|No| Proceed["Proceed with execution"]
+    subgraph ADAPTIVE ["AdaptiveThresholds — adaptive.rs"]
+        SUGGEST --> APPLY["apply_analysis(analysis)"]
+        APPLY --> COLD_CHECK{total_outcomes ≥<br/>min_outcomes (50)?}
+        COLD_CHECK -->|no| SKIP["Cold-start protection:<br/>keep default threshold"]
+        COLD_CHECK -->|yes| DELTA["Compute delta =<br/>suggested - current"]
+        DELTA --> CLAMP["Clamp to ±MAX_THRESHOLD_STEP<br/>(0.05 per cycle)"]
+        CLAMP --> BOUNDS["Clamp to [min_threshold,<br/>max_threshold]"]
+        BOUNDS --> PERSIST["Persist to LearningStateRepo<br/>(key: 'adaptive_thresholds',<br/>JSON blob)"]
     end
 
-    Recorder -.->|"learning_outcomes<br/>(SQL, 30d retention)"| Load
+    subgraph BROADCAST ["Event Propagation"]
+        PERSIST --> PUB["LearningEventBus::publish()"]
+        PUB --> THR_CHANGED["LearningEvent::ThresholdChanged"]
+        PUB --> ANALYSIS_DONE["LearningEvent::AnalysisCompleted"]
+        THR_CHANGED --> ATOMIC["ConfidenceEvaluator<br/>Arc&lt;AtomicU32&gt;::store(<br/>new_threshold.to_bits())"]
+    end
 
-    style Recorder fill:#2b6cb0,stroke:#fff,color:#fff
-    style Analyzer fill:#805ad5,stroke:#fff,color:#fff
-    style Evaluator fill:#38a169,stroke:#fff,color:#fff
-    style Update fill:#d69e2e,stroke:#fff,color:#fff
+    subgraph EVALUATOR ["ConfidenceEvaluator — evaluator.rs"]
+        ATOMIC --> EVAL["evaluate(llm_output)"]
+        EVAL --> PARSE["Parse &lt;confidence&gt; JSON:<br/>{intent_clarity, tool_fit,<br/>info_sufficiency}"]
+        PARSE --> AVG["weighted_avg ≥ threshold()?"]
+        AVG -->|yes| PROCEED["Allow current ExecutionMode"]
+        AVG -->|no| DOWNGRADE["Downgrade to<br/>ExecutionMode::Direct"]
+    end
+
+    subgraph STRATEGY ["Strategy Feedback — StrategyRepo"]
+        STRAT_RECORD["Every pipeline execution →<br/>StrategyRecordRow {<br/>predicted_strategy,<br/>actual_strategy,<br/>escalation_count,<br/>complexity_signals}"]
+        STRAT_RECORD --> STRAT_CACHE["IntentAnalyzer caches<br/>StrategySummaryRow (60s TTL)<br/>→ injected into LLM<br/>classifier prompt"]
+    end
 ```
-
----
 
 ## 6. Context Assembly Waterfall
 
 ```mermaid
 flowchart TD
-    Start["ContextEngine::assemble(ContextRequest)"] --> Budget["BudgetAllocator::new()<br/>total = context_window<br/>reserve = 15% for response"]
+    START([ContextEngine::assemble<br/>assembler.rs:L120]) --> BUDGET["BudgetAllocator::new()<br/>total = model_context_window<br/>response_reserve = 15%<br/>available = 85% of total"]
 
-    Budget --> P0["Priority 0: SystemIdentity<br/><i>Agent name, core personality</i><br/>System prompt injected first"]
-    P0 --> P0Alloc["allocate(SystemIdentity, tokens)"]
+    BUDGET --> P0["Priority 0: SystemIdentity<br/>───────────────────────<br/>IdentitySource: app name + version<br/>BootstrapSource: base instructions<br/>→ allocate(tokens used)"]
 
-    P0Alloc --> P1["Priority 1: ActiveTask<br/><i>Current task context from session</i>"]
-    P1 --> P1Alloc["allocate(ActiveTask, tokens)"]
+    P0 --> P1["Priority 1: ToolDefinitions<br/>───────────────────────<br/>Tool schemas (OpenAI function format)<br/>Only if mode ≠ Direct<br/>→ allocate(schema_tokens)"]
 
-    P1Alloc --> P2["Priority 2: ToolDefinitions<br/><i>JSON tool schemas for LLM</i><br/>Filtered by agent profile"]
-    P2 --> P2Alloc["allocate(ToolDefinitions, tokens)"]
+    P1 --> P2["Priority 2: AgentInstructions<br/>───────────────────────<br/>AgentContextSource reads active_profile<br/>→ AGENT.md content + skills/<br/>→ allocate(agent_tokens)"]
 
-    P2Alloc --> P3["Priority 3: RecentHistory<br/><i>Latest conversation messages</i><br/>Most recent first, truncated to budget"]
-    P3 --> P3Alloc["allocate(RecentHistory, tokens)"]
+    P2 --> P3["Priority 3: PersonaContext<br/>───────────────────────<br/>PersonaContextSource<br/>→ active persona rules + style<br/>→ allocate(persona_tokens)"]
 
-    P3Alloc --> P4["Priority 4: RetrievedMemory<br/><i>CognitiveContextSource</i>"]
-    P4 --> UserModel["Build UserModel from 6 domains:<br/>preferences, background, goals,<br/>relationships, routines, personality"]
-    UserModel --> VecRetrieve["retrieve_relevant_facts()<br/>Vector path (if embedder available)<br/>OR fallback (importance x stability)"]
-    VecRetrieve --> StaticFacts["Static facts: high-confidence<br/>user-stated preferences"]
-    VecRetrieve --> DynFacts["Dynamic facts: query-relevant<br/>scored by 5-factor formula"]
-    StaticFacts & DynFacts --> FormatMD["Format as Markdown section"]
-    FormatMD --> P4Alloc["allocate(RetrievedMemory, tokens)<br/><i>60s cache (SHA-256 key)</i>"]
+    P3 --> P4["Priority 4: CognitiveMemory<br/>───────────────────────<br/>CognitiveContextSource (60s TTL cache):<br/> Static: top 10 facts by confidence×stability<br/>   across 6 domains: identity, energy, work,<br/>   finance, learning, preferences<br/> Dynamic: vector search (384-dim fastembed)<br/>   top_k=30, min_sim=0.55, score>0.3<br/>   FSRS retrievability weighting<br/>→ '# User Understanding' block<br/>→ allocate(cognitive_tokens)"]
 
-    P4Alloc --> P5["Priority 5: CompressedHistory<br/><i>HistoryCompressor</i><br/>Summarize older messages if budget allows"]
-    P5 --> P5Alloc["allocate(CompressedHistory, tokens)"]
+    P4 --> P5["Priority 5: RetrievedMemory<br/>───────────────────────<br/>CognitiveMemoryRetriever<br/>→ ConversationRecallService::search()<br/>   embed query → cosine search<br/>   time-decay: score × decay^days<br/>   (half_life=138 days)<br/>   threshold=0.4, limit=5<br/>→ allocate(memory_tokens)<br/>(skipped for Clarification mode)"]
 
-    P5Alloc --> P6["Priority 6: BootstrapPersona<br/><i>Base instructions, behavioral rules</i><br/>Procedural rules from cognitive memory"]
-    P6 --> P6Alloc["allocate(BootstrapPersona, tokens)"]
+    P5 --> P6["Priority 6: PageContext<br/>───────────────────────<br/>PageContextSource<br/>→ TODO items, area context<br/>→ allocate(page_tokens)"]
 
-    P6Alloc --> P7["Priority 7: Skills<br/><i>Agent skills content</i><br/>Always-loaded + message-activated skills"]
-    P7 --> P7Alloc["allocate(Skills, tokens)"]
+    P6 --> P7["Priority 7: Skills<br/>───────────────────────<br/>ProductivityContextSource<br/>→ focus state, nudges, scores<br/>→ allocate(skill_tokens)"]
 
-    P7Alloc --> Assemble["Build final message array:<br/>System prompt (all sources merged)<br/>+ history messages<br/>+ current user message"]
+    P7 --> REMAINING["remaining_budget =<br/>available - Σ(allocated)"]
 
-    Assemble --> Result["AssembledContext<br/>{messages: Vec&lt;Message&gt;,<br/>token_count: usize}"]
+    REMAINING --> COMPRESS["HistoryCompressor::compress_async()<br/>───────────────────────<br/>min_recent = 4 messages verbatim<br/>expand recent if budget allows<br/>older → chunks of 5 →<br/>  Abstractive: LLM per chunk<br/>  (fallback: Extractive)<br/>→ allocate(RecentHistory)<br/>→ allocate(CompressedHistory)"]
 
-    subgraph "Token Counting"
-        TC["TiktokenCounter<br/><i>accurate, tiktoken-rs</i>"]
-        TCF["CharTokenCounter<br/><i>fallback: chars / 4</i>"]
-        TC -.->|"fallback"| TCF
-    end
+    COMPRESS --> ASSEMBLE["Build final message list:<br/>┌─ System prompt (all sources merged) ─┐<br/>│ MemorySystem (retrieved memories)    │<br/>│ SummarySystem(s) (compressed chunks)  │<br/>└─ Recent messages (min 4, verbatim)  ─┘"]
 
-    style Start fill:#2b6cb0,stroke:#fff,color:#fff
-    style P4 fill:#805ad5,stroke:#fff,color:#fff
-    style Result fill:#38a169,stroke:#fff,color:#fff
+    ASSEMBLE --> CACHE["SHA-256 cache key:<br/>system_prompt + history_len +<br/>last_message + strategy +<br/>tool_count + window<br/>LRU capacity=8, generation-invalidated"]
+
+    CACHE --> RESULT([AssembledContext<br/>{messages, token_usage,<br/>sources_used}])
 ```
-
----
 
 ## 7. Boot Sequence
 
 ```mermaid
 sequenceDiagram
-    autonumber
-    participant Main as main() / Tauri
-    participant AppCore as AppCore::init()
-    participant Config as config::load_with_env_overrides()
-    participant Storage as StoragePool::connect()
-    participant VS as VectorStore::connect()
-    participant Provider as providers::create_provider()
-    participant Bus as MessageBus::new(100)
-    participant Cron as CronService::new + start()
-    participant Persona as PersonaManager::load()
-    participant DEB as DomainEventBus::new(256)
-    participant Builder as AgentLoop::builder().build()
-    participant ChanMgr as ChannelManager::new()
-    participant Coaching as CoachingService::start()
-    participant BG as Background Tasks
+    participant Main as main.rs<br/>(desktop)
+    participant Tauri as Tauri::Builder
+    participant DA as desktop/app_core.rs
+    participant AC as AppCore::init()<br/>(app-core/init.rs)
+    participant SP as StoragePool
+    participant VS as VectorStore
+    participant PM as ProviderManager
+    participant MB as MessageBus
+    participant CS as CronService
+    participant PrM as PersonaManager
+    participant DEB as DomainEventBus
+    participant ALB as AgentLoopBuilder
+    participant AL as AgentLoop
+    participant CM as ChannelManager
+    participant PE as ProductivityEngine
+    participant COS as CoachingService
 
-    Main->>AppCore: init(config_override)
+    Main->>Tauri: Builder::default()<br/>.plugin(global_shortcut Alt+Space)
+    Tauri->>DA: setup(|app| block_on(init(handle)))
+    DA->>AC: AppCore::init(None)
 
-    AppCore->>Config: load_with_env_overrides()
-    Config-->>AppCore: Config (camelCase JSON + env KLYNTBOT_*)
+    Note over AC: Step 1: Config
+    AC->>AC: config::load_with_env_overrides()
 
-    AppCore->>Storage: connect(&data_dir)
-    Note over Storage: WAL mode + FK pragma<br/>Run core migrations (35 tables)<br/>Run cognitive migrations (5 tables)<br/>Run feature migrations (notes, productivity)
-    Storage-->>AppCore: StoragePool + Repos
+    Note over AC: Step 2: Storage
+    AC->>SP: StoragePool::connect(&data_dir)<br/>SQLite WAL + foreign keys + sqlx migrations
+    SP-->>AC: storage_pool
+    AC->>AC: Repos::from_pool() → 22 repo handles
+    AC->>VS: VectorStore::connect(&data_dir)<br/>LanceDB + ANN index [background]
+    AC->>SP: run_feature_migrations(notes)
+    AC->>AC: NoteRepo::new(notes_pool)
 
-    AppCore->>VS: connect(&data_dir)
-    Note over VS: LanceDB at {data_dir}/lancedb/
-    VS-->>AppCore: VectorStore (optional)
+    Note over AC: Step 3: Providers
+    AC->>PM: create_provider(&config)<br/>(graceful NoopProvider fallback)
+    AC->>PM: create_cognitive_provider(&config)<br/>(optional, separate LLM)
 
-    AppCore->>BG: tokio::spawn ensure_indexes(256)
-    Note over BG: IVF-PQ indexes on tables >= 256 rows
+    Note over AC: Step 4: MessageBus
+    AC->>MB: MessageBus::new(100)<br/>mpsc inbound + outbound
 
-    AppCore->>Provider: create_provider(&config)
-    Note over Provider: Primary + fallback<br/>Circuit breaker (5 failures / 60s)<br/>Falls back to NoopProvider
-    Provider-->>AppCore: DynProvider + resolved_model
+    Note over AC: Step 5: Scheduling
+    AC->>CS: CronService::new(repos.cron)
+    CS->>CS: start() tick loop
+    AC->>AC: register_cron_callbacks()<br/>single Arc<Fn> match dispatch
+    AC->>AC: ensure_cron_jobs()<br/>idempotent job registration
 
-    AppCore->>Bus: new(100)
-    Note over Bus: Inbound + Outbound channels<br/>Buffer size = 100
-    Bus-->>AppCore: Arc<MessageBus>
+    Note over AC: Step 6: Personas
+    AC->>PrM: PersonaManager::load(&personas_dir)
+    PrM->>PrM: resolve_scopes(&repos)
 
-    AppCore->>Cron: new(repos.cron) + start()
-    Note over Cron: Load persisted jobs<br/>Register callbacks<br/>Ensure recurring jobs
-    Cron-->>AppCore: Arc<CronService>
+    Note over AC: Step 7: Event Buses
+    AC->>DEB: DomainEventBus::new(256)
+    AC->>AC: broadcast::channel::<PipelineEvent>(256)
 
-    AppCore->>Persona: load(&personas_dir)
-    Note over Persona: Load persona YAML from data_dir/personas/
-    Persona-->>AppCore: Arc<RwLock<PersonaManager>>
+    Note over AC: Step 8: AgentLoop Build
+    AC->>ALB: AgentLoop::builder(bus, provider, config)
+    ALB->>ALB: .with_pool().with_cron_service()<br/>.with_domain_bus().with_cognitive_provider()<br/>.with_pipeline_tx()
+    ALB->>ALB: build().await
+    Note over ALB: ├─ StoragePool::from_existing()<br/>├─ AgentManager::load_builtin_agents() [5]<br/>├─ EmbeddingEngine::new() [fastembed 384-dim]<br/>├─ Assemble 8+ ContextSources by priority<br/>├─ Run cognitive migrations<br/>├─ BackgroundConsolidationService::start()<br/>├─ ToolRegistry: register 20+ tools<br/>├─ Load WASM plugins<br/>├─ Connect MCP servers<br/>├─ ConfidenceEvaluator + LearningService.start()<br/>├─ IntentAnalyzer + ExecutionRouter<br/>├─ AgentRuntime (2-phase Arc init)<br/>└─ SessionCleanupService + MemoryMaintenance
+    ALB-->>AC: AgentLoop
 
-    AppCore->>DEB: new(256)
-    Note over DEB: Cross-feature communication<br/>Cognitive + Coaching subscribers
-    DEB-->>AppCore: Arc<DomainEventBus>
+    Note over AC: Step 9: Channels
+    AC->>CM: ChannelManager::new(config, bus)
 
-    AppCore->>Builder: builder(bus, provider, config)
-    Note over Builder: Wire: pool, cron, vector_store,<br/>domain_bus, cognitive_provider,<br/>pipeline_tx, notification_handle
-    Builder-->>AppCore: AgentLoop (with AgentRuntime inside)
+    Note over AC: Step 10: Productivity
+    AC->>PE: ProductivityEngine::start()<br/>FocusManager, DailyAggregator,<br/>NudgeService, DistractionInterceptor
 
-    AppCore->>ChanMgr: new(config, bus)
-    Note over ChanMgr: Initialize enabled channels:<br/>Telegram, Discord, Slack, Email
-    ChanMgr-->>AppCore: Arc<Mutex<ChannelManager>>
+    Note over AC: Step 11: Coaching
+    AC->>COS: CoachingService::start()<br/>SignalAccumulator, PatternDetector,<br/>InterventionRouter, FeedbackTracker
 
-    AppCore->>Coaching: start(domain_bus.subscribe(), ...)
-    Note over Coaching: SignalAccumulator → PatternDetector<br/>→ CoachingReasoner → InterventionRouter<br/>→ FeedbackTracker
-    Coaching-->>AppCore: CoachingService
+    Note over AC: Step 12: Assemble AppCore struct
 
-    AppCore->>BG: spawn agent_loop.run_with_rx(inbound_rx)
-    AppCore->>BG: spawn channel_manager.start_all()
-    AppCore->>BG: spawn daily analytics cleanup
-    Note over BG: All guarded by CancellationToken
+    Note over AC: Step 13: Spawn background tasks
+    AC->>AL: tokio::spawn(agent_loop.run_with_rx(inbound_rx))
+    AC->>CM: tokio::spawn(channel_manager.start_all())
 
-    AppCore-->>Main: (AppCore, EventChannels)
-    Note over Main: Caller wires EventChannels<br/>to transport (Tauri events / SSE)
+    Note over AC: Steps 14-16
+    AC->>AC: spawn daily analytics cleanup (24h)
+    AC->>AC: spawn_event_log_persistence<br/>(domain + pipeline → SQLite)
+    AC-->>DA: (AppCore, EventChannels)
+
+    DA->>DA: wire_event_channels()
+    Note over DA: ├─ auto_focus_rx → emit "productivity:auto_focus"<br/>├─ dashboard_tick_rx → DashboardEmitter<br/>├─ nudge_rx → emit "productivity:nudge"<br/>├─ intervention_rx → emit "coaching:intervention"<br/>├─ domain_event_bus → emit "cognitive:domain_event"<br/>└─ pipeline_rx → emit "cognitive:extraction/consolidation"
+
+    DA-->>Tauri: app.manage(core)
+    Tauri->>Main: Register 100+ Tauri commands
+    Main->>Main: app.run() — event loop started
 ```
-
----
 
 ## 8. Master Comprehensive Workflow Diagram
 
 ```mermaid
 flowchart TD
-    subgraph USER["User"]
-        UserMsg["Send Message"]
+    USER(["👤 User Message"]) --> CHANNEL
+
+    subgraph CHANNELS ["L5: Platform Channels"]
+        CHANNEL["Telegram / Discord /<br/>Slack / Email"]
     end
 
-    subgraph CHANNELS["L5: Channel Layer"]
-        Telegram["Telegram<br/><i>HTTP long-poll</i>"]
-        Discord["Discord<br/><i>Raw WebSocket</i>"]
-        Slack["Slack<br/><i>Socket Mode WS</i>"]
-        Email["Email<br/><i>IMAP + SMTP</i>"]
-        Formatter["ChannelFormatter<br/><i>Markdown → platform format</i>"]
+    CHANNEL --> BUS_IN
+
+    subgraph BUS ["L1: MessageBus (mpsc cap=100)"]
+        BUS_IN["InboundMessage<br/>{channel, chat_id, content, role}"]
+        BUS_OUT["OutboundMessage<br/>{channel, chat_id, content}"]
     end
 
-    subgraph BUS_IN["L1: MessageBus (Inbound)"]
-        InboundQ["InboundMessage<br/>{channel, chat_id, content, kind}"]
+    BUS_IN --> AGENT_LOOP
+
+    subgraph AGENT_CRATE ["L5: Agent Crate"]
+        subgraph AGENT_LOOP_SG ["AgentLoop — mod.rs"]
+            AGENT_LOOP["run_with_rx() receives msg"]
+            VALIDATE["Validate size + handle reactions"]
+            SESSION_LOAD["SessionManager::get_or_create()<br/>→ load history"]
+            EMBED_BG["spawn_embed_message()<br/>(background)"]
+            AGENT_LOOP --> VALIDATE --> SESSION_LOAD --> EMBED_BG
+        end
+
+        EMBED_BG --> RUNTIME
+
+        subgraph RUNTIME_SG ["AgentRuntime — runtime.rs (10 steps)"]
+            RUNTIME["process_message()"]
+
+            subgraph STEP1 ["Step 1: Agent Selection"]
+                AGENT_MATCH["AgentManager::match_agent()<br/>trigger-weighted scoring<br/>5 built-in: general, task,<br/>finance, automation, communication"]
+            end
+
+            subgraph STEP4 ["Step 4: Intent Analysis"]
+                HEURISTIC["analyze_heuristic()<br/>greeting→Direct(0.95)<br/>task CRUD→Reactive<br/>question→Direct"]
+                LLM_CLASSIFY["IntentClassifier::classify()<br/>(LLM fallback if ambiguous)"]
+                HEURISTIC -->|"confidence < threshold"| LLM_CLASSIFY
+            end
+
+            subgraph STEP5 ["Step 5: Confidence Gate"]
+                CONF_EVAL["ConfidenceEvaluator<br/>Arc&lt;AtomicU32&gt; threshold<br/>→ downgrade if below"]
+            end
+
+            RUNTIME --> STEP1 --> STEP4 --> STEP5
+        end
+
+        STEP5 --> CTX_ASM
+
+        subgraph CTX_ENGINE_SG ["L3: ContextEngine"]
+            CTX_ASM["assemble(ContextRequest)"]
+
+            subgraph WATERFALL ["8-Priority Token Waterfall"]
+                WF0["P0: SystemIdentity"]
+                WF1["P1: ToolDefinitions"]
+                WF2["P2: AgentInstructions"]
+                WF3["P3: PersonaContext"]
+                WF4["P4: CognitiveMemory<br/>(static + dynamic)"]
+                WF5["P5: RetrievedMemory<br/>(conversation recall)"]
+                WF6["P6: PageContext"]
+                WF7["P7: Skills"]
+                WF_HIST["History: compress_async()<br/>min 4 verbatim + summaries"]
+                WF0 --> WF1 --> WF2 --> WF3 --> WF4 --> WF5 --> WF6 --> WF7 --> WF_HIST
+            end
+            CTX_ASM --> WATERFALL
+        end
+
+        WF4 -.->|"vector search"| COGNITIVE_RETRIEVE
+        WF5 -.->|"embed + cosine"| CONV_RECALL
+
+        WF_HIST --> TOOL_FILTER
+
+        subgraph STEP7 ["Step 7: Tool Filtering"]
+            TOOL_FILTER["filter_tools_for_profile()<br/>+ inject_delegation_tool(depth<2)<br/>+ planning prompt (complexity≥4)"]
+        end
+
+        TOOL_FILTER --> EXEC_ROUTER
+
+        subgraph EXECUTION ["Step 8: Execution"]
+            EXEC_ROUTER["ExecutionRouter::execute()"]
+            EXEC_ROUTER --> DIRECT_PATH
+            EXEC_ROUTER --> REACTIVE_PATH
+
+            subgraph DIRECT_PATH ["DirectEngine"]
+                DIRECT["Single LLM call<br/>no tools"]
+                DIRECT --> DIRECT_OUT{outcome?}
+                DIRECT_OUT -->|"ToolsExecuted"| ESCALATE["Auto-escalate<br/>to Reactive"]
+                DIRECT_OUT -->|"FinalResponse"| DONE_D["Complete"]
+            end
+
+            subgraph REACTIVE_PATH ["ReactiveEngine — ReAct Loop"]
+                REACT_START["iteration 1..max_iterations"]
+                REACT_LLM["ExecutionCore::run_cycle()<br/>→ provider.chat_stream()"]
+                REACT_START --> REACT_LLM
+
+                REACT_LLM --> REACT_MATCH{CycleOutcome}
+                REACT_MATCH -->|FinalResponse| DONE_R["Complete"]
+                REACT_MATCH -->|EmptyResponse| REACT_CONT["continue loop"]
+                REACT_MATCH -->|FabricatedResponse| FAB_RETRY["retry ≤ 2"]
+                REACT_MATCH -->|ToolsExecuted| TOOLS_SG
+
+                subgraph TOOLS_SG ["Parallel Tool Execution"]
+                    TOOL_SEM["Semaphore(10)"]
+                    TOOL_EXEC["join_all(tool futures)<br/>timeout: 30s default<br/>600s for ask_user"]
+                    TOOL_DEDUP["Hash dedup:<br/>tool_name|args_hash"]
+                    TOOL_SEM --> TOOL_EXEC
+                    TOOL_DEDUP --> TOOL_EXEC
+                end
+
+                TOOLS_SG --> OUTCOME_REC["OutcomeRecorder::record()"]
+                OUTCOME_REC --> REACT_CONT
+                REACT_CONT --> REACT_START
+                FAB_RETRY --> REACT_LLM
+
+                REACT_MATCH -->|"at max_iterations"| SYNTH["Synthesis prompt<br/>→ run_cycle(tools=[])"]
+                SYNTH --> DONE_R
+            end
+
+            ESCALATE -.-> REACT_START
+
+            %% Delegation
+            TOOL_EXEC -->|"delegate_to_agent tool"| DELEGATION
+
+            subgraph DELEGATION ["Multi-Agent Delegation (depth≤2)"]
+                DEL["DelegationHandler::delegate()"]
+                DEL --> DEL_PROFILE["Load delegated AgentProfile"]
+                DEL_PROFILE --> DEL_CTX["ContextEngine::assemble()<br/>with delegated instructions"]
+                DEL_CTX --> DEL_EXEC["ReactiveEngine<br/>max_iters=min(profile, 8)"]
+                DEL_EXEC --> DEL_RETURN["Return content to parent"]
+            end
+        end
+
+        DONE_D --> VALIDATE_RESP
+        DONE_R --> VALIDATE_RESP
+
+        subgraph STEP9_10 ["Steps 9-10: Validate & Record"]
+            VALIDATE_RESP["ResponseValidator::validate()<br/>strip confidence, truncate,<br/>system leak detection"]
+            COST["CostTracker::record()"]
+            STRAT["StrategyRepo::create()<br/>(StrategyRecordRow)"]
+            INTERACT["InteractionRecorder::record()"]
+            VALIDATE_RESP --> COST --> STRAT --> INTERACT
+        end
     end
 
-    subgraph AGENT_LOOP["L5: AgentLoop"]
-        Receive["rx.recv()"]
-        ReactionCheck{MessageKind?}
-        HandleReaction["handle_reaction()<br/>→ update satisfaction score"]
-        SessionGet["SessionManager::get_or_create<br/><i>DashMap + SQL, LRU@1000</i>"]
-        LoadHistory["Load session history<br/><i>history_limit messages</i>"]
-        ToolDefs["Build tool definitions<br/><i>from ToolRegistry</i>"]
+    INTERACT --> SAVE_SESSION["SessionManager::save()"]
+    SAVE_SESSION --> DOMAIN_PUB["DomainEventBus::publish()<br/>(ChatTurnCompleted)"]
+    DOMAIN_PUB --> BUS_OUT
+
+    BUS_OUT --> CHANNEL
+    CHANNEL --> USER
+
+    %% Cognitive Pipeline (background)
+    DOMAIN_PUB --> COG_BG
+
+    subgraph COGNITIVE_SG ["L5: Cognitive Pipeline (background)"]
+        COG_BG["BackgroundConsolidationService"]
+        COG_SAL["Salience Filter<br/>Extract / Accumulate / Discard"]
+        COG_EXT["ExtractionHandler<br/>(LLM + heuristic fallback)"]
+        COG_CON["ConsolidationHandler<br/>Add / Update / Delete / Noop"]
+        COG_BG --> COG_SAL --> COG_EXT --> COG_CON
     end
 
-    subgraph RUNTIME["L5: AgentRuntime (10-Step Pipeline)"]
-        Step1["1. AgentManager::match_agent<br/><i>keyword trigger scoring</i>"]
-        Step2["2. Set active_profile<br/><i>RwLock&lt;Option&lt;Arc&lt;AgentProfile&gt;&gt;&gt;</i>"]
-        Step3["3. Filter MCP tools<br/><i>profile.mcp_tools allowlist</i>"]
-        Step4["4. IntentAnalyzer::analyze<br/><i>Heuristics → LLM classifier</i>"]
-        OrchOverride{needs_orchestration?}
-        SwitchOrch["Route to 'general' orchestrator<br/>Set min iterations"]
-        Step4b["Override max_iterations<br/><i>from agent profile</i>"]
-        Step5["5. ConfidenceEvaluator<br/><i>AtomicU32, lock-free read</i>"]
-        LowConf{confidence < threshold?}
-        Clarify["Return clarification request"]
-        Step6["6. ContextEngine::assemble<br/><i>8-priority waterfall</i>"]
-        Step7["7. Filter tools by profile<br/>7b. Inject DelegateTool if allowed<br/>7c. Planning prompt if complexity >= 5"]
-        Step8["8. ExecutionRouter::execute"]
-        Step9["9. ResponseValidator::validate<br/><i>empty/overlong detection</i>"]
-        Step10["10. CostTracker + StrategyRepo<br/>+ InteractionRecorder"]
+    subgraph COGNITIVE_STORAGE ["Cognitive Storage"]
+        SEMANTIC_FACTS[("SQLite: semantic_facts<br/>bi-temporal, supersedable")]
+        VEC_EMB[("LanceDB: 384-dim<br/>cognitive_fact_embeddings")]
+        EPISODIC[("SQLite: episodic_memories")]
+        RULES[("SQLite: procedural_rules")]
     end
 
-    subgraph ROUTER["Execution Router"]
-        ModeCheck{ExecutionMode?}
-        DirectEng["DirectEngine<br/><i>Single LLM call, no tools</i>"]
-        ReactEng["ReactiveEngine<br/><i>ReAct loop 1..max_iter</i>"]
-        Escalate{EngineResult::Escalate?}
-        RetryReactive["Retry with ReactiveEngine<br/><i>combine usage from both</i>"]
+    COG_CON --> SEMANTIC_FACTS
+    COG_CON --> VEC_EMB
+    COG_BG -->|"importance ≥ 0.7"| EPISODIC
+
+    subgraph COGNITIVE_RETRIEVE ["Cognitive Retrieval"]
+        RETRIEVE["retrieve_relevant_facts()<br/>vector search + FSRS scoring"]
+        RETRIEVE --> VEC_EMB
+        RETRIEVE --> SEMANTIC_FACTS
     end
 
-    subgraph REACT_LOOP["ReAct Loop (ReactiveEngine)"]
-        Iter["Iteration i"]
-        LLMCall["ExecutionCore::run_cycle<br/>→ LLM Provider chat()"]
-        CycleOut{CycleOutcome?}
-        Final["FinalResponse → return"]
-        Fabricated["FabricatedResponse<br/>→ inject force-tool prompt<br/><i>max 2 retries</i>"]
-        ToolsExec["ToolsExecuted<br/>→ parallel execution<br/>→ duplicate detection<br/>→ failure reflection"]
-        EmptyResp["EmptyResponse → continue"]
-        Synth["Synthesize at max_iter<br/><i>LLM call, no tools</i>"]
+    subgraph CONV_RECALL ["Conversation Recall"]
+        CONV_STORE["ConversationRecallService::store()"]
+        CONV_SEARCH["search(query, limit, threshold=0.4)<br/>time-decay half_life=138 days"]
+        EMBED_BG -.-> CONV_STORE
     end
 
-    subgraph TOOLS_EXEC["Tool Execution"]
-        ParallelExec["Bounded parallel join_all<br/><i>Semaphore(10), per-tool 30s timeout</i>"]
-        OutcomeRec["OutcomeRecorder<br/><i>privacy-safe recording</i>"]
-        Delegate["DelegateTool<br/><i>depth < MAX_DELEGATION_DEPTH (2)</i>"]
-        SubRuntime["Sub-AgentRuntime<br/><i>specialized agent profile</i>"]
+    subgraph REFLECTION_SG ["Weekly Reflection (Cron Monday 9am)"]
+        REFLECT["run_weekly_reflection()"]
+        REFLECT -->|"load 7-day episodic"| EPISODIC
+        REFLECT -->|"consolidate facts"| COG_CON
+        REFLECT -->|"upsert rules"| RULES
     end
 
-    subgraph CONTEXT["Context Assembly"]
-        CTX_P0["P0: SystemIdentity"]
-        CTX_P1["P1: ActiveTask"]
-        CTX_P2["P2: ToolDefinitions"]
-        CTX_P3["P3: RecentHistory"]
-        CTX_P4["P4: RetrievedMemory<br/><i>CognitiveContextSource</i>"]
-        CTX_P5["P5: CompressedHistory"]
-        CTX_P6["P6: BootstrapPersona"]
-        CTX_P7["P7: Skills"]
+    subgraph LEARNING_SG ["Adaptive Learning (background)"]
+        LEARN_SVC["LearningService<br/>(periodic loop)"]
+        LEARN_ANALYZE["LearningAnalyzer<br/>per-tool ConfidenceBands"]
+        LEARN_ADAPT["AdaptiveThresholds<br/>±0.05 max step, min 50 outcomes"]
+        LEARN_ATOMIC["AtomicU32::store()<br/>→ ConfidenceEvaluator"]
+        OUTCOME_REC -.-> LEARN_SVC --> LEARN_ANALYZE --> LEARN_ADAPT --> LEARN_ATOMIC
+        LEARN_ATOMIC -.->|"updates threshold"| CONF_EVAL
     end
-
-    subgraph COGNITIVE["L5: Cognitive Memory Pipeline"]
-        DomainEvt["DomainEvent via DomainEventBus"]
-        SalienceFilter["evaluate_salience()<br/><i>Extract / Accumulate / Discard</i>"]
-        Extraction["ExtractionHandler<br/><i>LLM-backed SPO extraction</i>"]
-        Consolidation["ConsolidationHandler<br/><i>Mem0-style ADD/UPDATE/DELETE/NOOP</i>"]
-        FactRepo[("SemanticFactRepo<br/><i>SQLite, bi-temporal</i>")]
-        Embedder["SemanticFactEmbedder<br/><i>384-dim MiniLM</i>"]
-        VecStore[("LanceDB<br/><i>ANN vector search</i>")]
-        FSRSCalc["FSRS Decay<br/><i>R = exp(ln(0.9) x days/S)</i><br/><i>S_new = S + ln(1+S)</i>"]
-        Retrieval["retrieve_relevant_facts()<br/><i>5-factor scoring</i>"]
-        UserModel["UserModel<br/><i>6 domains → Markdown</i>"]
-    end
-
-    subgraph LEARNING["Adaptive Learning"]
-        OutcomeDB[("learning_outcomes<br/><i>30d retention</i>")]
-        LrnAnalyzer["LearningAnalyzer<br/><i>hourly: bucket by confidence</i>"]
-        AdaptThresh["AdaptiveThresholds<br/><i>+/-0.05 max step/cycle</i>"]
-        ConfEval["ConfidenceEvaluator<br/><i>AtomicU32 hot path</i>"]
-    end
-
-    subgraph LLM_LAYER["L3: LLM Providers"]
-        ProviderMgr["ProviderManager<br/><i>14 providers</i>"]
-        CircuitBreaker["Circuit Breaker<br/><i>5 failures / 60s reset</i>"]
-        Retry["Retry<br/><i>3x exponential backoff</i>"]
-        Failover["Primary → Fallback"]
-    end
-
-    subgraph BUS_OUT["L1: MessageBus (Outbound)"]
-        OutboundQ["OutboundMessage<br/>{channel, chat_id, content}"]
-    end
-
-    %% Main Flow
-    UserMsg --> Telegram & Discord & Slack & Email
-    Telegram & Discord & Slack & Email --> InboundQ
-    InboundQ --> Receive
-
-    Receive --> ReactionCheck
-    ReactionCheck -->|Reaction| HandleReaction
-    ReactionCheck -->|Text| SessionGet
-    SessionGet --> LoadHistory --> ToolDefs
-
-    ToolDefs --> Step1 --> Step2 --> Step3 --> Step4
-    Step4 --> OrchOverride
-    OrchOverride -->|Yes| SwitchOrch --> Step4b
-    OrchOverride -->|No| Step4b
-    Step4b --> Step5
-    Step5 --> LowConf
-    LowConf -->|Yes| Clarify
-    LowConf -->|No| Step6
-
-    Step6 -.-> CTX_P0 & CTX_P1 & CTX_P2 & CTX_P3 & CTX_P4 & CTX_P5 & CTX_P6 & CTX_P7
-    CTX_P4 -.-> Retrieval
-    Retrieval -.-> FSRSCalc & VecStore
-    Retrieval --> UserModel
-
-    Step6 --> Step7 --> Step8
-
-    Step8 --> ModeCheck
-    ModeCheck -->|Direct| DirectEng
-    ModeCheck -->|Reactive| ReactEng
-    DirectEng --> Escalate
-    Escalate -->|Yes| RetryReactive --> ReactEng
-    Escalate -->|No| Step9
-    ReactEng --> Iter
-
-    Iter --> LLMCall
-    LLMCall --> ProviderMgr --> CircuitBreaker --> Retry --> Failover
-    LLMCall --> CycleOut
-    CycleOut -->|FinalResponse| Final
-    CycleOut -->|FabricatedResponse| Fabricated --> Iter
-    CycleOut -->|ToolsExecuted| ToolsExec
-    CycleOut -->|EmptyResponse| EmptyResp --> Iter
-    ToolsExec --> ParallelExec --> OutcomeRec
-    ParallelExec -.-> Delegate --> SubRuntime
-    ToolsExec --> Iter
-    Iter -->|max_iter reached| Synth
-    Final & Synth --> Step9
-
-    Step9 --> Step10
-
-    %% Learning feedback
-    OutcomeRec --> OutcomeDB
-    OutcomeDB --> LrnAnalyzer --> AdaptThresh --> ConfEval
-    ConfEval -.-> Step5
-
-    %% Cognitive pipeline
-    ToolsExec -.-> DomainEvt
-    Step10 -.->|"ChatTurnCompleted<br/>(passive learning)"| DomainEvt
-    DomainEvt --> SalienceFilter --> Extraction --> Consolidation
-    Consolidation --> FactRepo --> Embedder --> VecStore
-
-    %% Output
-    Step10 --> OutboundQ
-    Clarify --> OutboundQ
-    OutboundQ --> Formatter --> Telegram & Discord & Slack & Email
-    Telegram & Discord & Slack & Email --> UserMsg
-
-    style RUNTIME fill:#1a1a2e,stroke:#4fd1c5,color:#fff
-    style REACT_LOOP fill:#16213e,stroke:#e94560,color:#fff
-    style COGNITIVE fill:#1a1a2e,stroke:#63b3ed,color:#fff
-    style LEARNING fill:#1a1a2e,stroke:#fbd38d,color:#fff
-    style LLM_LAYER fill:#2d3748,stroke:#b794f4,color:#fff
 ```
 
 ---
 
-## 9. Summary of the Complete Workflow
+## Summary of the Complete Workflow
 
-1. **User messages** arrive via 4 platform channels (Telegram, Discord, Slack, Email) through the `MessageBus` (mpsc, buffer=100) into the `AgentLoop`.
-2. **Session management** (`DashMap` + SQLite, LRU@1000) provides conversation context and history.
-3. The **10-step AgentRuntime pipeline** performs: agent matching → profile-based filtering → two-stage intent classification (heuristics→LLM) → confidence gating → 8-priority context assembly → tool filtering + delegation injection → execution routing → validation → cost/strategy recording.
-4. **Direct mode** handles simple queries (single LLM call); **Reactive mode** runs a ReAct loop (1..max_iterations) with fabrication detection, duplicate prevention, failure reflection, and chain-of-thought planning for complexity >= 5. Tool calls execute in bounded parallel (semaphore capped at 10, per-tool 30s timeout).
-5. **Multi-agent delegation** allows the `general` orchestrator to dispatch to 4 specialized agents (task, finance, automation, communication) with max depth 2.
-6. **Cognitive memory** processes domain events through salience filtering → LLM extraction → Mem0-style consolidation → SemanticFactRepo (SQLite) + vector embedding (LanceDB, 384-dim MiniLM). Retrieval uses a 5-factor FSRS-scored relevance formula. **Passive learning** via `ChatTurnCompleted` events feeds every chat turn into the extraction pipeline (importance 0.8), enabling fact discovery from ordinary conversation.
-7. **Adaptive learning** records tool outcomes (privacy-safe), analyzes hourly, adjusts confidence thresholds (+/-0.05/cycle, lock-free `AtomicU32`), and feeds back into the confidence gate.
-8. Responses flow back through the `MessageBus` (outbound) → `ChannelFormatter` → platform-specific format → user.
+1. **Message ingestion**: User messages arrive via platform channels (Telegram/Discord/Slack/Email), are published to the `MessageBus` (mpsc, cap 100), and received by `AgentLoop::run_with_rx()`.
+
+2. **Session + embedding**: `SessionManager` loads/creates session history. Messages are embedded in background via `ConversationRecallService` (384-dim fastembed → LanceDB).
+
+3. **Agent matching**: `AgentManager` scores the message against 5 built-in agent profiles using trigger-weighted matching. Orchestration detection can override to the "general" agent with boosted iterations (≥15).
+
+4. **Two-stage intent analysis**: Heuristic patterns (0ms) classify greetings/tasks/questions. Ambiguous messages fall through to an LLM classifier. `ConfidenceEvaluator` (lock-free `AtomicU32` threshold, continuously tuned by `LearningService`) can downgrade Reactive→Direct.
+
+5. **Context assembly**: An 8-priority token waterfall fills the context window — system identity, tools, agent instructions, persona, cognitive memory (static user model + dynamic vector search with FSRS scoring), conversation recall, page context, and skills — then compresses history (min 4 verbatim + abstractive summaries).
+
+6. **Execution**: `ExecutionRouter` dispatches to `DirectEngine` (single call) or `ReactiveEngine` (ReAct loop, 1..max_iterations). Tools execute in parallel (Semaphore(10), `join_all`). Hash-based dedup, fabrication detection with retry, and auto-escalation Direct→Reactive on unexpected tool calls.
+
+7. **Delegation**: The orchestrator can delegate to specialized agents via `DelegationTool` (max depth=2). Sub-agents get their own context assembly, tool filtering, and Reactive execution with event filtering.
+
+8. **Validation + recording**: `ResponseValidator` strips confidence blocks, truncates, and detects system leaks. `CostTracker`, `StrategyRepo`, and `InteractionRecorder` log everything.
+
+9. **Cognitive pipeline**: `DomainEventBus` broadcasts `ChatTurnCompleted` → `BackgroundConsolidationService` applies salience filtering → LLM extraction → consolidation (Add/Update/Delete/Noop) → SQLite semantic facts + LanceDB embeddings. Episodic memories stored for importance ≥ 0.7.
+
+10. **Learning loop**: `OutcomeRecorder` feeds tool results to `LearningService` → `LearningAnalyzer` computes per-tool confidence bands → `AdaptiveThresholds` adjusts the evaluator threshold (±0.05/cycle, min 50 outcomes) → lock-free propagation to `ConfidenceEvaluator`.
+
+11. **Weekly reflection**: Monday 9am cron loads 7-day episodic memories + user model + procedural rules → LLM synthesis → consolidates new facts and upserts rules. The reflection itself is stored as an episodic memory (stability=5.0).
+
+12. **Response delivery**: The validated response is published as `OutboundMessage` via `MessageBus`, routed through the originating channel back to the user.
 
 ---
 
-## 10. Implementation Gaps & Technical Debt Analysis
+## Implementation Gaps & Technical Debt Analysis
 
 ### Critical
 
-*No critical items remain* — R1 (vector search), R2 (unified memory), and R3 (CLI serve parity) are all marked SOLVED in SYSTEM_ANALYSIS.md.
+**1. AccumulatedEntry buffer not persisted across restarts**
+- **Location**: `crates/cognitive/src/background.rs` — `HashMap<String, AccumulatedEntry>` in-memory
+- **Why it matters**: App restart clears all accumulated event counts, resetting promotion thresholds. Events that were 4/5 toward promotion are silently lost.
+- **Fix**: Persist `AccumulatedEntry` to a SQLite table. Load on startup, save on each accumulation.
+
+**2. Synthesis at max_iterations can return empty string**
+- **Location**: `crates/agent/src/intent_pipeline/engines/reactive.rs` — synthesis fallback
+- **Why it matters**: If the synthesis LLM call returns `ToolsExecuted` or `EmptyResponse`, the engine logs a warning and returns `""`. The user gets no response after potentially expensive multi-iteration execution.
+- **Fix**: Implement a secondary fallback: concatenate the last tool results into a summary, or return the best partial response from earlier iterations.
+
+**3. BudgetAllocator silent failure on small context windows**
+- **Location**: `crates/context_engine/src/budget.rs` — `remaining()` can hit 0 after SystemIdentity
+- **Why it matters**: If the system prompt alone exceeds the model's context window (e.g., large AGENT.md + many tools), all subsequent priorities get 0 tokens. No warning is emitted. History and cognitive context silently vanish.
+- **Fix**: Add a warning log when `remaining()` < some threshold after P0. Consider truncating lower-priority system sections to guarantee minimum history/cognitive allocation.
 
 ### High
 
-*No high items remain* — H1 (vector store dedup) and H2 (MessageBus backpressure) are both SOLVED:
+**4. Reflexive stability inflation in FSRS**
+- **Location**: `crates/cognitive/src/retrieval.rs` — `record_access()` called on every retrieval
+- **Why it matters**: Frequently retrieved facts get stability inflated without bound, permanently dominating rankings and crowding out newer, potentially more relevant facts.
+- **Fix**: Cap stability at a maximum value (e.g., 30.0), or apply diminishing returns to `update_stability()`.
 
-- **H1 SOLVED:** `VectorStore::dedup_table()` scans for duplicate IDs and removes older rows, called from `MemoryMaintenanceService` every maintenance cycle for all three tables (`conv_embeddings`, `todo_embeddings`, `cognitive_fact_embeddings`). The insert-first-then-delete upsert pattern is crash-safe: duplicates from a crash are cleaned up on the next maintenance pass.
-- **H2 SOLVED:** The original description was inaccurate — `MessageBus` already uses bounded `tokio::sync::mpsc::channel(100)` with `.send().await`, which provides back-pressure (senders await when full, messages are NOT dropped). The only issue was `NotificationDispatcher::notify` using `let _` to silently discard send errors; this now logs a `warn!` instead.
+**5. Dev server dispatch must be manually updated**
+- **Location**: `crates/desktop/src/dev_server.rs` — 700+ line `match cmd {}` block
+- **Why it matters**: Every new Tauri command requires manual addition. Missing commands return 404 silently. No compile-time check ensures parity.
+- **Fix**: Generate the dispatch table from a shared registry, or use a macro that both Tauri commands and dev server share.
+
+**6. USER_MODEL_DOMAINS hardcoded to 6**
+- **Location**: `crates/cognitive/src/context_source.rs` — `USER_MODEL_DOMAINS = ["identity", "energy", "work", "finance", "learning", "preferences"]`
+- **Why it matters**: Facts in domains like `"general"`, `"tasks"`, `"coaching"`, `"meta"` are stored but never appear in the static user model tier. They're only reachable via dynamic vector search, reducing their visibility.
+- **Fix**: Make domains configurable or derive from the distinct domains present in `semantic_facts` table.
+
+**7. IntentPipeline is dead code**
+- **Location**: `crates/agent/src/intent_pipeline/pipeline.rs`
+- **Why it matters**: `IntentPipeline` has its own `process_message()` that is tested but never called in production — `AgentRuntime` replaced it. Maintaining dead code increases confusion and maintenance burden.
+- **Fix**: Remove `IntentPipeline` or clearly mark it as deprecated. Remove associated tests.
+
+**8. HistoryCompressor makes N/5 LLM calls for abstractive compression**
+- **Location**: `crates/context_engine/src/` — history compression
+- **Why it matters**: 100 messages → 19 LLM calls for compression, each blocking. No batching, no parallelism. Adds latency to every request with long histories.
+- **Fix**: Batch chunks into a single LLM call with structured output, or parallelize chunk compression with `join_all`.
 
 ### Medium
 
-*No medium items remain* — M1 (session LRU) is SOLVED: cache size is now configurable via `maxCacheSize` in `SessionConfig` (default 1000), and the LRU was upgraded from O(n) `VecDeque::retain` to O(1) `IndexMap` promote/evict.
+**9. Cognitive provider created twice**
+- **Location**: `crates/app-core/src/init.rs` (Step 3) and `crates/app-core/src/handlers/cognitive.rs:L537`
+- **Why it matters**: `cognitive_run_reflection()` re-creates the provider from config instead of using the cached one. Minor inefficiency and config divergence risk.
+- **Fix**: Pass the existing `cognitive_provider` through to the reflection handler.
+
+**10. Notes migrations run twice**
+- **Location**: `crates/app-core/src/init.rs:L76-81` and `crates/agent/src/agent_loop/builder.rs:L619-634`
+- **Why it matters**: Feature migrations are idempotent (via `_feature_migrations` table), but running them twice adds ~50ms to boot and creates redundant SQL queries.
+- **Fix**: Remove the duplicate call in `AgentLoopBuilder::build()`, or pass a flag indicating migrations already ran.
+
+**11. Single monolithic cron callback**
+- **Location**: `crates/app-core/src/init.rs:L434-L618` — `register_cron_callbacks()`
+- **Why it matters**: All cron job types share one `match job_name.as_str()` dispatch. Adding new jobs requires editing this growing match block.
+- **Fix**: Use a trait-based callback registry where each job type registers its own handler.
+
+**12. No test for delegation at max depth**
+- **Location**: `crates/agent/src/agent_runtime/runtime.rs` — `MAX_DELEGATION_DEPTH = 2`
+- **Why it matters**: The depth guard prevents runaway recursion, but there's no integration test verifying that an agent at depth=2 correctly lacks the delegation tool.
+- **Fix**: Add an integration test that delegates twice and verifies the third-level agent has no `delegate_to_agent` tool available.
+
+**13. `threshold_confidence` computed but unused**
+- **Location**: `crates/agent/src/learning/adaptive.rs`
+- **Why it matters**: `LearningAnalyzer` computes a `threshold_confidence` (0.2–0.9) based on data volume, but `AdaptiveThresholds::apply_analysis()` never uses it to scale the step size. This is a missed opportunity for faster convergence with high-confidence data.
+- **Fix**: Scale `MAX_THRESHOLD_STEP` by `threshold_confidence` (e.g., 0.05 × confidence).
+
+**14. Context cache invalidated on every tool execution**
+- **Location**: `crates/context_engine/src/assembler.rs` — generation counter
+- **Why it matters**: `invalidate_cache()` bumps a generation counter that marks all 8 LRU entries stale. Since tool execution always triggers re-assembly, the cache only benefits the first assembly in a request cycle.
+- **Fix**: Use a more granular invalidation strategy — only invalidate when specific context sources change (e.g., session history appended, new cognitive facts).
+
+**15. `block_on` in Tauri setup blocks UI thread**
+- **Location**: `crates/desktop/src/main.rs:L53`
+- **Why it matters**: `tauri::async_runtime::block_on(app_core::init(handle))` blocks the Tauri setup thread for the entire boot sequence (potentially several seconds). Users see a blank window during initialization.
+- **Fix**: Show a loading/splash screen, then complete initialization asynchronously. Or move heavy init (LLM provider, MCP connections, embedding engine) to a post-setup task.

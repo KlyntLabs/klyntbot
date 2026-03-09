@@ -1,6 +1,7 @@
 import { Pause, Play, Trash2 } from "lucide-react";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useEvent } from "../../../hooks/useEvent";
+import { ipc } from "../../../hooks/useIpc";
 
 interface DomainEventPayload {
   eventType: string;
@@ -8,6 +9,16 @@ interface DomainEventPayload {
   domain: string;
   timestamp: string;
   payload: unknown;
+}
+
+/** Shape returned by the `cognitive_event_log` backend command. */
+interface DomainEventRow {
+  id: string;
+  event_type: string;
+  domain: string;
+  salience: string;
+  payload: string;
+  timestamp: string;
 }
 
 const salienceColors: Record<string, string> = {
@@ -31,6 +42,30 @@ export function EventsTab() {
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const pausedRef = useRef(paused);
   pausedRef.current = paused;
+
+  // Load historical events on mount
+  useEffect(() => {
+    ipc<DomainEventRow[]>("cognitive_event_log", { limit: 100 })
+      .then((rows) => {
+        const historical: DomainEventPayload[] = rows.map((r) => ({
+          eventType: r.event_type,
+          salience: r.salience,
+          domain: r.domain,
+          timestamp: r.timestamp,
+          payload: (() => {
+            try {
+              return JSON.parse(r.payload);
+            } catch {
+              return {};
+            }
+          })(),
+        }));
+        setEvents(historical);
+      })
+      .catch(() => {
+        // Endpoint may not exist on older backends — silently ignore.
+      });
+  }, []);
 
   useEvent<DomainEventPayload>(
     "cognitive:domain_event",

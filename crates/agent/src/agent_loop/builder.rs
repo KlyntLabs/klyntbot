@@ -58,7 +58,7 @@ pub struct AgentLoopBuilder {
     notification_handle: Option<LastActiveChannel>,
     domain_event_bus: Option<Arc<bus::DomainEventBus>>,
     cognitive_provider: Option<DynProvider>,
-    pipeline_tx: Option<tokio::sync::mpsc::UnboundedSender<cognitive::PipelineEvent>>,
+    pipeline_tx: Option<tokio::sync::broadcast::Sender<cognitive::PipelineEvent>>,
 }
 
 impl AgentLoopBuilder {
@@ -109,7 +109,7 @@ impl AgentLoopBuilder {
 
     pub fn with_pipeline_tx(
         mut self,
-        tx: tokio::sync::mpsc::UnboundedSender<cognitive::PipelineEvent>,
+        tx: tokio::sync::broadcast::Sender<cognitive::PipelineEvent>,
     ) -> Self {
         self.pipeline_tx = Some(tx);
         self

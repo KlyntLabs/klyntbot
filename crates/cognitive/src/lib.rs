@@ -26,6 +26,9 @@ pub use memory_retriever::CognitiveMemoryRetriever;
 pub use embedder::{SemanticFactEmbedder, TextEmbedder};
 pub use extraction::{ExtractedFact, ExtractionHandler};
 pub use reflection::ReflectionHandler;
-pub use repos::{cognitive_migrations, EpisodicMemoryRepo, ProceduralRuleRepo, SemanticFactRepo};
+pub use repos::{
+    cognitive_migrations, EpisodicMemoryRepo, EventLogRepo, ProceduralRuleRepo, SemanticFactRepo,
+};
+pub use repos::event_log::{DomainEventRow, PipelineEventRow};
 pub use situation::{compute_situation, SituationInputs, UserSituation};
 pub use types::*;

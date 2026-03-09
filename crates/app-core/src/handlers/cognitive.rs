@@ -557,6 +557,34 @@ impl AppCore {
         })
     }
 
+    /// Fetch recent domain events from the persistent log.
+    pub async fn cognitive_event_log(
+        &self,
+        limit: Option<i64>,
+    ) -> Result<Vec<cognitive::DomainEventRow>, ApiError> {
+        let repo = self
+            .event_log_repo
+            .as_ref()
+            .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "event log not available"))?;
+        repo.list_recent_domain_events(limit.unwrap_or(100))
+            .await
+            .map_err(map_cognitive_err)
+    }
+
+    /// Fetch recent pipeline events from the persistent log.
+    pub async fn cognitive_pipeline_log(
+        &self,
+        limit: Option<i64>,
+    ) -> Result<Vec<cognitive::PipelineEventRow>, ApiError> {
+        let repo = self
+            .event_log_repo
+            .as_ref()
+            .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "event log not available"))?;
+        repo.list_recent_pipeline_events(limit.unwrap_or(100))
+            .await
+            .map_err(map_cognitive_err)
+    }
+
     pub async fn cognitive_inject_event(
         &self,
         event_type: String,

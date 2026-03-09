@@ -13,7 +13,7 @@ use feature_productivity::repos::ProductivityRepos;
 use feature_productivity::{DailyAggregator, FocusManager, NudgeService, ProductivityEngine};
 use scheduling::CronService;
 use storage::Repos;
-use tokio::sync::{oneshot, Mutex, RwLock};
+use tokio::sync::{broadcast, oneshot, Mutex, RwLock};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info};
 
@@ -66,6 +66,10 @@ pub struct AppCore {
     pub coaching_service: Option<Arc<Mutex<feature_coaching::CoachingService>>>,
     /// Whether a cognitive LLM provider is active (affects component status reporting).
     pub has_cognitive_provider: bool,
+    /// Broadcast sender for pipeline events — allows multiple subscribers (Tauri + dev server).
+    pub pipeline_broadcast: Option<broadcast::Sender<cognitive::PipelineEvent>>,
+    /// Event log repo for persisting domain and pipeline events.
+    pub event_log_repo: Option<cognitive::EventLogRepo>,
 }
 
 impl AppCore {
