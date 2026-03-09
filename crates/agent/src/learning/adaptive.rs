@@ -43,8 +43,9 @@ fn apply_analysis_impl(
     let suggested = analysis
         .suggested_threshold
         .clamp(min_threshold, max_threshold);
-    let delta =
-        (suggested - state.current_threshold).clamp(-MAX_THRESHOLD_STEP, MAX_THRESHOLD_STEP);
+    // Scale step size by data confidence: more data → larger allowed steps → faster convergence.
+    let effective_step = MAX_THRESHOLD_STEP * analysis.threshold_confidence.clamp(0.2, 1.0);
+    let delta = (suggested - state.current_threshold).clamp(-effective_step, effective_step);
     let new_threshold = (state.current_threshold + delta).clamp(min_threshold, max_threshold);
 
     if (new_threshold - state.current_threshold).abs() < 0.001 {

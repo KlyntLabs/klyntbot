@@ -90,6 +90,10 @@ pub struct UserModel {
     pub finance: Vec<SemanticFact>,
     pub learning: Vec<SemanticFact>,
     pub preferences: Vec<SemanticFact>,
+    /// Facts from domains not covered by the named fields above
+    /// (e.g. "general", "tasks", "coaching", "meta").
+    #[serde(default)]
+    pub other: Vec<SemanticFact>,
 }
 
 impl UserModel {
@@ -101,6 +105,7 @@ impl UserModel {
             + self.finance.len()
             + self.learning.len()
             + self.preferences.len()
+            + self.other.len()
     }
 
     /// Number of domains that have at least one fact.
@@ -112,6 +117,7 @@ impl UserModel {
             !self.finance.is_empty(),
             !self.learning.is_empty(),
             !self.preferences.is_empty(),
+            !self.other.is_empty(),
         ]
         .iter()
         .filter(|&&has| has)

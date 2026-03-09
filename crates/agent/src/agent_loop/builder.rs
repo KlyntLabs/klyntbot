@@ -615,19 +615,9 @@ impl AgentLoopBuilder {
         }
 
         // ── Notes tool (requires real pool) ──────────────────────────────────
+        // Notes migrations are already run by AppCore::init() — skip here to avoid
+        // redundant SQL queries on boot (~50ms savings).
         if let Some(pool) = &self.pool {
-            storage::StoragePool::run_feature_migrations(
-                pool,
-                &feature_notes::NotesFeature::migrations_static(),
-            )
-            .await
-            .map_err(|e| {
-                common::KlyntbotError::Config(common::ConfigError::Invalid(format!(
-                    "Failed to run notes migrations: {}",
-                    e
-                )))
-            })?;
-
             let note_repo = feature_notes::repo::NoteRepo::new(pool.clone());
             tool_registry.register(feature_notes::tool::NotesTool::new(note_repo));
             info!("Notes tool registered");

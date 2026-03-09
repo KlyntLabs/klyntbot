@@ -365,10 +365,26 @@ impl ExecutionEngine for ReactiveEngine {
             CycleOutcome::FabricatedResponse { content } => content,
             other => {
                 tracing::warn!(
-                    "ReactiveEngine: synthesis call produced {:?} instead of text",
+                    "ReactiveEngine: synthesis call produced {:?} instead of text, using trace summary",
                     other
                 );
-                String::new()
+                // Fallback: summarize completed work from traces so the user gets *something*
+                let trace_summary: Vec<String> = scratchpad
+                    .traces()
+                    .iter()
+                    .filter(|t| t.actual_action == "tools_executed")
+                    .map(|t| format!("- {}: {}", t.planned_actions.join(", "), t.thought))
+                    .collect();
+                if trace_summary.is_empty() {
+                    "I was unable to complete the request within the iteration limit. \
+                     Please try rephrasing or breaking the task into smaller steps."
+                        .to_string()
+                } else {
+                    format!(
+                        "I reached the iteration limit. Here's what I completed:\n{}",
+                        trace_summary.join("\n")
+                    )
+                }
             }
         };
 

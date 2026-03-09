@@ -21,6 +21,10 @@ pub const USER_MODEL_DOMAINS: &[&str] = &[
     "finance",
     "learning",
     "preferences",
+    "general",
+    "tasks",
+    "coaching",
+    "meta",
 ];
 
 /// Shared domain list for procedural rules.
@@ -63,7 +67,7 @@ pub async fn load_user_model(fact_repo: &SemanticFactRepo) -> UserModel {
                 "finance" => model.finance = facts,
                 "learning" => model.learning = facts,
                 "preferences" => model.preferences = facts,
-                _ => {}
+                _ => model.other.extend(facts),
             },
             Err(e) => {
                 warn!("Failed to load {domain} facts: {e}");

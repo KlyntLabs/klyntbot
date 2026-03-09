@@ -785,76 +785,57 @@ flowchart TD
 - **Why it matters**: App restart clears all accumulated event counts, resetting promotion thresholds. Events that were 4/5 toward promotion are silently lost.
 - **Fix**: Persist `AccumulatedEntry` to a SQLite table. Load on startup, save on each accumulation.
 
-**2. Synthesis at max_iterations can return empty string**
-- **Location**: `crates/agent/src/intent_pipeline/engines/reactive.rs` — synthesis fallback
-- **Why it matters**: If the synthesis LLM call returns `ToolsExecuted` or `EmptyResponse`, the engine logs a warning and returns `""`. The user gets no response after potentially expensive multi-iteration execution.
-- **Fix**: Implement a secondary fallback: concatenate the last tool results into a summary, or return the best partial response from earlier iterations.
-
-**3. BudgetAllocator silent failure on small context windows**
-- **Location**: `crates/context_engine/src/budget.rs` — `remaining()` can hit 0 after SystemIdentity
-- **Why it matters**: If the system prompt alone exceeds the model's context window (e.g., large AGENT.md + many tools), all subsequent priorities get 0 tokens. No warning is emitted. History and cognitive context silently vanish.
-- **Fix**: Add a warning log when `remaining()` < some threshold after P0. Consider truncating lower-priority system sections to guarantee minimum history/cognitive allocation.
-
 ### High
 
-**4. Reflexive stability inflation in FSRS**
-- **Location**: `crates/cognitive/src/retrieval.rs` — `record_access()` called on every retrieval
-- **Why it matters**: Frequently retrieved facts get stability inflated without bound, permanently dominating rankings and crowding out newer, potentially more relevant facts.
-- **Fix**: Cap stability at a maximum value (e.g., 30.0), or apply diminishing returns to `update_stability()`.
-
-**5. Dev server dispatch must be manually updated**
+**2. Dev server dispatch must be manually updated**
 - **Location**: `crates/desktop/src/dev_server.rs` — 700+ line `match cmd {}` block
 - **Why it matters**: Every new Tauri command requires manual addition. Missing commands return 404 silently. No compile-time check ensures parity.
 - **Fix**: Generate the dispatch table from a shared registry, or use a macro that both Tauri commands and dev server share.
 
-**6. USER_MODEL_DOMAINS hardcoded to 6**
-- **Location**: `crates/cognitive/src/context_source.rs` — `USER_MODEL_DOMAINS = ["identity", "energy", "work", "finance", "learning", "preferences"]`
-- **Why it matters**: Facts in domains like `"general"`, `"tasks"`, `"coaching"`, `"meta"` are stored but never appear in the static user model tier. They're only reachable via dynamic vector search, reducing their visibility.
-- **Fix**: Make domains configurable or derive from the distinct domains present in `semantic_facts` table.
-
-**7. IntentPipeline is dead code**
+**3. IntentPipeline is dead code**
 - **Location**: `crates/agent/src/intent_pipeline/pipeline.rs`
 - **Why it matters**: `IntentPipeline` has its own `process_message()` that is tested but never called in production — `AgentRuntime` replaced it. Maintaining dead code increases confusion and maintenance burden.
 - **Fix**: Remove `IntentPipeline` or clearly mark it as deprecated. Remove associated tests.
 
-**8. HistoryCompressor makes N/5 LLM calls for abstractive compression**
+**4. HistoryCompressor makes N/5 LLM calls for abstractive compression**
 - **Location**: `crates/context_engine/src/` — history compression
 - **Why it matters**: 100 messages → 19 LLM calls for compression, each blocking. No batching, no parallelism. Adds latency to every request with long histories.
 - **Fix**: Batch chunks into a single LLM call with structured output, or parallelize chunk compression with `join_all`.
 
 ### Medium
 
-**9. Cognitive provider created twice**
+**5. Cognitive provider created twice**
 - **Location**: `crates/app-core/src/init.rs` (Step 3) and `crates/app-core/src/handlers/cognitive.rs:L537`
 - **Why it matters**: `cognitive_run_reflection()` re-creates the provider from config instead of using the cached one. Minor inefficiency and config divergence risk.
-- **Fix**: Pass the existing `cognitive_provider` through to the reflection handler.
+- **Fix**: Store the cognitive provider in `AppCore` and pass it through to the reflection handler.
 
-**10. Notes migrations run twice**
-- **Location**: `crates/app-core/src/init.rs:L76-81` and `crates/agent/src/agent_loop/builder.rs:L619-634`
-- **Why it matters**: Feature migrations are idempotent (via `_feature_migrations` table), but running them twice adds ~50ms to boot and creates redundant SQL queries.
-- **Fix**: Remove the duplicate call in `AgentLoopBuilder::build()`, or pass a flag indicating migrations already ran.
-
-**11. Single monolithic cron callback**
+**6. Single monolithic cron callback**
 - **Location**: `crates/app-core/src/init.rs:L434-L618` — `register_cron_callbacks()`
 - **Why it matters**: All cron job types share one `match job_name.as_str()` dispatch. Adding new jobs requires editing this growing match block.
 - **Fix**: Use a trait-based callback registry where each job type registers its own handler.
 
-**12. No test for delegation at max depth**
+**7. No test for delegation at max depth**
 - **Location**: `crates/agent/src/agent_runtime/runtime.rs` — `MAX_DELEGATION_DEPTH = 2`
 - **Why it matters**: The depth guard prevents runaway recursion, but there's no integration test verifying that an agent at depth=2 correctly lacks the delegation tool.
 - **Fix**: Add an integration test that delegates twice and verifies the third-level agent has no `delegate_to_agent` tool available.
 
-**13. `threshold_confidence` computed but unused**
-- **Location**: `crates/agent/src/learning/adaptive.rs`
-- **Why it matters**: `LearningAnalyzer` computes a `threshold_confidence` (0.2–0.9) based on data volume, but `AdaptiveThresholds::apply_analysis()` never uses it to scale the step size. This is a missed opportunity for faster convergence with high-confidence data.
-- **Fix**: Scale `MAX_THRESHOLD_STEP` by `threshold_confidence` (e.g., 0.05 × confidence).
-
-**14. Context cache invalidated on every tool execution**
+**8. Context cache invalidated on every tool execution**
 - **Location**: `crates/context_engine/src/assembler.rs` — generation counter
 - **Why it matters**: `invalidate_cache()` bumps a generation counter that marks all 8 LRU entries stale. Since tool execution always triggers re-assembly, the cache only benefits the first assembly in a request cycle.
 - **Fix**: Use a more granular invalidation strategy — only invalidate when specific context sources change (e.g., session history appended, new cognitive facts).
 
-**15. `block_on` in Tauri setup blocks UI thread**
+**9. `block_on` in Tauri setup blocks UI thread**
 - **Location**: `crates/desktop/src/main.rs:L53`
 - **Why it matters**: `tauri::async_runtime::block_on(app_core::init(handle))` blocks the Tauri setup thread for the entire boot sequence (potentially several seconds). Users see a blank window during initialization.
 - **Fix**: Show a loading/splash screen, then complete initialization asynchronously. Or move heavy init (LLM provider, MCP connections, embedding engine) to a post-setup task.
+
+### Resolved
+
+The following gaps have been addressed:
+
+- ~~Synthesis at max_iterations can return empty string~~ — Fixed: fallback to trace summary instead of empty string (`reactive.rs`)
+- ~~BudgetAllocator silent failure on small context windows~~ — Fixed: warning emitted when remaining budget < 15% (`budget.rs`)
+- ~~Reflexive stability inflation in FSRS~~ — Fixed: capped at `MAX_STABILITY = 30.0` (`decay.rs`)
+- ~~USER_MODEL_DOMAINS hardcoded to 6~~ — Fixed: expanded to 10 domains with `other` catch-all field (`types.rs`, `repos/mod.rs`, `context_source.rs`)
+- ~~Notes migrations run twice~~ — Fixed: removed duplicate call in `AgentLoopBuilder::build()` (`builder.rs`)
+- ~~`threshold_confidence` computed but unused~~ — Fixed: scales `MAX_THRESHOLD_STEP` for faster convergence (`adaptive.rs`)

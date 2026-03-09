@@ -167,13 +167,14 @@ impl ContextSource for CognitiveContextSource {
         sections.push("# User Understanding".to_string());
 
         // ── Static tier: top facts by importance across all domains ──
-        let domain_sections = [
+        let domain_sections: Vec<(&str, &Vec<crate::types::SemanticFact>)> = vec![
             ("Identity", &model.identity),
             ("Energy & Rhythms", &model.energy),
             ("Work Patterns", &model.work),
             ("Finance", &model.finance),
             ("Learning", &model.learning),
             ("Preferences", &model.preferences),
+            ("Other Context", &model.other),
         ];
 
         for (label, facts) in &domain_sections {
@@ -209,16 +210,8 @@ impl ContextSource for CognitiveContextSource {
         if self.config.dynamic_facts_enabled && !query.is_empty() {
             use crate::retrieval::retrieve_relevant_facts;
 
-            // Include "general" domain for chat-extracted facts alongside USER_MODEL_DOMAINS
-            const RETRIEVAL_DOMAINS: &[&str] = &[
-                "identity",
-                "energy",
-                "work",
-                "finance",
-                "learning",
-                "preferences",
-                "general",
-            ];
+            use crate::repos::USER_MODEL_DOMAINS;
+            let retrieval_domains = USER_MODEL_DOMAINS;
 
             let retrieval_params = crate::retrieval::RetrievalParams {
                 limit: self.config.dynamic_fact_limit,
@@ -230,7 +223,7 @@ impl ContextSource for CognitiveContextSource {
                 &self.fact_repo,
                 self.embedder.as_deref(),
                 query,
-                RETRIEVAL_DOMAINS,
+                retrieval_domains,
                 &retrieval_params,
             )
             .await;

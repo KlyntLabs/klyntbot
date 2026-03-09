@@ -30,12 +30,16 @@ pub fn relevance_score(
         .clamp(0.0, 1.0)
 }
 
+/// Maximum stability value to prevent runaway inflation from frequent retrievals.
+const MAX_STABILITY: f64 = 30.0;
+
 /// Update stability after a retrieval event.
-/// Successful retrieval increases stability (diminishing returns via ln curve).
+/// Successful retrieval increases stability (diminishing returns via ln curve),
+/// capped at `MAX_STABILITY` to prevent ranking domination by frequently accessed facts.
 /// Failed retrieval leaves stability unchanged.
 pub fn update_stability(current: f64, success: bool) -> f64 {
     if success {
-        current + (1.0 + current).ln().max(0.1)
+        (current + (1.0 + current).ln().max(0.1)).min(MAX_STABILITY)
     } else {
         current
     }
@@ -105,6 +109,19 @@ mod tests {
         let old = 5.0;
         let new = update_stability(old, false);
         assert!((new - old).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_stability_capped_at_max() {
+        let high = update_stability(29.0, true);
+        assert!(high <= 30.0, "Stability should be capped at MAX_STABILITY");
+        // Repeated retrievals should not exceed the cap
+        let mut s = 1.0;
+        for _ in 0..1000 {
+            s = update_stability(s, true);
+        }
+        assert!(s <= 30.0, "Stability should never exceed MAX_STABILITY after many retrievals");
+        assert!((s - 30.0).abs() < f64::EPSILON, "Should reach exactly MAX_STABILITY");
     }
 
     #[test]

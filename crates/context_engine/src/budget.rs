@@ -1,5 +1,10 @@
 use std::collections::HashMap;
 
+use tracing::warn;
+
+/// Warn when remaining budget falls below this fraction of available input.
+const LOW_BUDGET_THRESHOLD: f32 = 0.15;
+
 /// Priority levels for context window content, ordered from highest to lowest.
 /// Higher priority content is allocated space first in the waterfall.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -76,10 +81,22 @@ impl BudgetAllocator {
     }
 
     /// Allocate up to `tokens` for the given priority, capped at remaining budget.
+    /// Emits a warning when the budget drops below 15% of available input after allocation,
+    /// which means history and lower-priority context may be silently truncated.
     pub fn allocate(&mut self, priority: Priority, tokens: usize) {
         let can_add = self.remaining().min(tokens);
         if can_add > 0 {
             *self.allocations.entry(priority).or_insert(0) += can_add;
+        }
+        let available = self.config.available_input();
+        let remaining = self.remaining();
+        if available > 0 && (remaining as f32 / available as f32) < LOW_BUDGET_THRESHOLD {
+            warn!(
+                "Context budget low after {:?}: {remaining}/{available} tokens remaining ({:.0}%). \
+                 History and cognitive context may be truncated.",
+                priority,
+                remaining as f32 / available as f32 * 100.0,
+            );
         }
     }
 
