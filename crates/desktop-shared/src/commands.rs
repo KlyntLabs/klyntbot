@@ -724,6 +724,16 @@ pub struct FocusSessionResponse {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct FocusTimerStatusResponse {
+    pub active: bool,
+    pub mode: Option<String>,
+    pub remaining_secs: Option<u64>,
+    pub total_secs: Option<u64>,
+    pub session: Option<FocusSessionResponse>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ActivityTimelineResponse {
     pub app_name: String,
     pub window_title: Option<String>,

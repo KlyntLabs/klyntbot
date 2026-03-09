@@ -243,6 +243,73 @@ pub async fn productivity_project_delete(
     state.productivity_project_delete(id).await
 }
 
+// ── Focus Timer (tray-driven) ──────────────────────────────────────────
+
+use crate::focus_timer::{FocusTimer, TimerMode};
+use desktop_shared::commands::FocusTimerStatusResponse;
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn focus_timer_start(
+    state: State<'_, Arc<AppCore>>,
+    timer: State<'_, Arc<FocusTimer>>,
+    app: tauri::AppHandle,
+    mode: String,
+    work_mins: u64,
+    break_mins: Option<u64>,
+) -> Result<FocusSessionResponse, ApiError> {
+    let timer_mode = match mode.as_str() {
+        "pomodoro" => TimerMode::Pomodoro,
+        _ => TimerMode::Focus,
+    };
+
+    // Start the persistent session first
+    let session = if timer_mode == TimerMode::Pomodoro {
+        state
+            .productivity_pomodoro_start(Some(work_mins as i64), break_mins.map(|b| b as i64))
+            .await?
+    } else {
+        state
+            .productivity_focus_start(None, None, Some(work_mins as i64))
+            .await?
+    };
+
+    // Then start the desktop timer (tray title + countdown)
+    timer
+        .start(app, timer_mode, work_mins, break_mins)
+        .await
+        .map_err(|e| ApiError::new("TIMER_ERROR", &e.to_string()))?;
+
+    Ok(session)
+}
+
+#[tauri::command]
+pub async fn focus_timer_stop(
+    state: State<'_, Arc<AppCore>>,
+    timer: State<'_, Arc<FocusTimer>>,
+    app: tauri::AppHandle,
+    notes: Option<String>,
+) -> Result<Option<FocusSessionResponse>, ApiError> {
+    timer.stop(&app).await;
+    state.productivity_focus_end(notes).await
+}
+
+#[tauri::command]
+pub async fn focus_timer_status(
+    state: State<'_, Arc<AppCore>>,
+    timer: State<'_, Arc<FocusTimer>>,
+) -> Result<FocusTimerStatusResponse, ApiError> {
+    let session = state.productivity_focus_status().await?;
+    let timer_info = timer.status().await;
+
+    Ok(FocusTimerStatusResponse {
+        active: session.is_some(),
+        mode: timer_info.map(|(m, _)| m.as_str().to_string()),
+        remaining_secs: None, // Remaining is pushed via events, not polled
+        total_secs: timer_info.map(|(_, t)| t),
+        session,
+    })
+}
+
 // ── Dev server dispatch ─────────────────────────────────────────────
 
 #[cfg(test)]

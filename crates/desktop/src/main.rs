@@ -65,6 +65,7 @@ fn main() {
             }
 
             app.manage(core);
+            app.manage(Arc::new(focus_timer::FocusTimer::new()));
 
             // Show the main window now that init is complete (starts hidden
             // via tauri.conf.json to avoid a blank window during boot).
@@ -258,6 +259,10 @@ fn main() {
             commands::productivity::productivity_projects_list,
             commands::productivity::productivity_project_upsert,
             commands::productivity::productivity_project_delete,
+            // Focus Timer
+            commands::productivity::focus_timer_start,
+            commands::productivity::focus_timer_stop,
+            commands::productivity::focus_timer_status,
             // Distraction
             commands::distraction::distraction_dismiss,
             commands::distraction::distraction_allow_temp,

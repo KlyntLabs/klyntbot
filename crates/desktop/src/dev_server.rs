@@ -412,6 +412,9 @@ mod tests {
         "resize_window",
         "quit_app",
         "show_dashboard",
+        "focus_timer_start",
+        "focus_timer_stop",
+        "focus_timer_status",
         "mcp_oauth_start",
         "mcp_oauth_disconnect",
     ];
