@@ -31,6 +31,7 @@ pub fn evaluate_salience(event: &DomainEvent) -> SalienceVerdict {
         // Routine events — accumulated for pattern detection
         DomainEvent::ProductivityScoreComputed { .. } => SalienceVerdict::Accumulate,
         DomainEvent::ActivitySessionCompleted { .. } => SalienceVerdict::Accumulate,
+        DomainEvent::FocusSessionStarted { .. } => SalienceVerdict::Accumulate,
         DomainEvent::FocusSessionEnded { .. } => SalienceVerdict::Accumulate,
         DomainEvent::DistractionDetected { .. } => SalienceVerdict::Accumulate,
         DomainEvent::TaskCreated { .. } => SalienceVerdict::Accumulate,

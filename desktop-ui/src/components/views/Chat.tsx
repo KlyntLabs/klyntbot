@@ -6,6 +6,7 @@ import { useQuery } from "../../hooks/useQuery";
 import { useSetToggle } from "../../hooks/useSetToggle";
 import type { ChatThread } from "../../lib/types";
 import { ChatInput } from "../chat/ChatInput";
+import { CoachingNudge } from "../chat/CoachingNudge";
 import { MessageList } from "../chat/MessageList";
 import { ThreadContextMenu } from "../chat/ThreadContextMenu";
 import { type AreaGroup, featurePrefix, ThreadList } from "../chat/ThreadList";
@@ -278,6 +279,8 @@ export function Chat() {
             )}
           </div>
         </div>
+
+        <CoachingNudge isStreaming={chat.isStreaming} />
 
         <ChatInput
           input={chat.input}

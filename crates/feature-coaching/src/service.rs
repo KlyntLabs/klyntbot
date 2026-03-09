@@ -14,9 +14,9 @@ use cognitive::situation::UserSituation;
 
 use crate::feedback::FeedbackTracker;
 use crate::pattern_detector::PatternDetector;
-use crate::reasoner::{CoachingReasonerHandler, ReasonerInput};
+use crate::reasoner::{CoachingReasonerHandler, InterventionType, ReasonerInput};
 use crate::router::{DeliveredIntervention, InterventionRouter, RoutingResult};
-use crate::signal_accumulator::SignalAccumulator;
+use crate::signal_accumulator::{SignalAccumulator, TriggerFired};
 
 /// Background service that processes domain events through the coaching pipeline.
 pub struct CoachingService {
@@ -39,6 +39,10 @@ impl CoachingService {
     ) -> Self {
         let cancel_clone = cancel.clone();
         let handle = tokio::spawn(async move {
+            // Focus mode state: when active, queue triggers instead of delivering
+            let mut focus_active = false;
+            let mut queued_triggers: Vec<TriggerFired> = Vec::new();
+
             loop {
                 tokio::select! {
                     _ = cancel_clone.cancelled() => break,
@@ -52,7 +56,41 @@ impl CoachingService {
                             Err(broadcast::error::RecvError::Closed) => break,
                         };
 
-                        // 1. Push signal into accumulator
+                        // Track focus mode state from events
+                        match &event {
+                            DomainEvent::FocusSessionStarted { .. } => {
+                                debug!("Focus session started — coaching delivery paused");
+                                focus_active = true;
+                            }
+                            DomainEvent::FocusSessionEnded { quality, interruptions, duration_secs } => {
+                                debug!("Focus session ended — draining queued triggers");
+                                let q = *quality;
+                                let i = *interruptions;
+                                let d = *duration_secs;
+                                focus_active = false;
+
+                                // Deliver post-session debrief if there were queued triggers
+                                if !queued_triggers.is_empty() {
+                                    let debrief = build_focus_debrief(
+                                        &queued_triggers, q, i, d,
+                                        &reasoner, &situation,
+                                    ).await;
+
+                                    if let Some(intervention) = debrief {
+                                        {
+                                            let mut fb = feedback.lock().await;
+                                            fb.record_delivery(&intervention);
+                                        }
+                                        let _ = intervention_tx.send(intervention).await;
+                                    }
+
+                                    queued_triggers.clear();
+                                }
+                            }
+                            _ => {}
+                        }
+
+                        // 1. Push signal into accumulator (always, even during focus)
                         {
                             let mut acc = accumulator.lock().await;
                             acc.push_event(&event);
@@ -74,10 +112,17 @@ impl CoachingService {
 
                         // 4. Process each fired trigger
                         for trigger in fired {
-                            // Record in pattern detector
+                            // Record in pattern detector (always)
                             {
                                 let mut det = detector.lock().await;
                                 det.record_trigger(&trigger);
+                            }
+
+                            // If focus is active, queue the trigger for post-session debrief
+                            if focus_active {
+                                debug!("Focus active — queuing trigger: {}", trigger.condition_name);
+                                queued_triggers.push(trigger);
+                                continue;
                             }
 
                             // Detect patterns
@@ -151,12 +196,92 @@ impl CoachingService {
     }
 }
 
+/// Build a consolidated post-session debrief from queued triggers.
+async fn build_focus_debrief(
+    queued: &[TriggerFired],
+    quality: f64,
+    interruptions: i32,
+    duration_secs: i64,
+    reasoner: &Arc<dyn CoachingReasonerHandler>,
+    situation: &Arc<Mutex<UserSituation>>,
+) -> Option<DeliveredIntervention> {
+    let trigger_names: Vec<&str> = queued.iter().map(|t| t.condition_name.as_str()).collect();
+    let duration_mins = duration_secs / 60;
+    let quality_pct = (quality * 100.0).round() as i32;
+
+    // Build a synthetic trigger for the debrief
+    let debrief_trigger = TriggerFired {
+        condition_name: "focus_session_debrief".into(),
+        confidence: 0.9,
+        context: format!(
+            "Focus session ended: {}min, quality {}%, {} interruptions, queued triggers: {}",
+            duration_mins,
+            quality_pct,
+            interruptions,
+            trigger_names.join(", ")
+        ),
+    };
+
+    let sit = situation.lock().await.clone();
+    let input = ReasonerInput {
+        situation: sit,
+        trigger: debrief_trigger,
+        patterns: vec![],
+        relevant_memories: vec![],
+        recent_interventions: vec![],
+    };
+
+    match reasoner.reason(&input).await {
+        Ok(decision) if decision.should_intervene => {
+            let message = decision.message.unwrap_or_else(|| {
+                format!(
+                    "Focus session complete: {}min, quality {}%. {} interruption(s) detected.",
+                    duration_mins, quality_pct, interruptions
+                )
+            });
+            Some(DeliveredIntervention {
+                id: uuid::Uuid::new_v4().to_string(),
+                intervention_type: InterventionType::ChatMessage,
+                message,
+                delivered_at: chrono::Utc::now(),
+                trigger_name: "focus_session_debrief".into(),
+            })
+        }
+        Ok(_) => {
+            debug!("Reasoner decided no debrief needed for this focus session");
+            None
+        }
+        Err(e) => {
+            warn!("Debrief reasoner failed: {e}");
+            // Fallback: deliver a heuristic debrief if there were significant issues
+            if interruptions >= 2 || quality < 0.5 {
+                Some(DeliveredIntervention {
+                    id: uuid::Uuid::new_v4().to_string(),
+                    intervention_type: InterventionType::ChatMessage,
+                    message: format!(
+                        "Focus session complete: {}min, quality {}%. {} interruption(s) — consider blocking distracting apps during your next session.",
+                        duration_mins, quality_pct, interruptions
+                    ),
+                    delivered_at: chrono::Utc::now(),
+                    trigger_name: "focus_session_debrief".into(),
+                })
+            } else {
+                None
+            }
+        }
+    }
+}
+
 /// Incrementally update UserSituation from a domain event.
 async fn update_situation_from_event(situation: &Arc<Mutex<UserSituation>>, event: &DomainEvent) {
     let mut sit = situation.lock().await;
     match event {
         DomainEvent::DistractionDetected { .. } => {
             sit.distraction_risk = (sit.distraction_risk + 0.15).min(1.0);
+        }
+        DomainEvent::FocusSessionStarted { .. } => {
+            sit.focus_state = 0.9;
+            sit.distraction_risk = (sit.distraction_risk - 0.2).max(0.0);
         }
         DomainEvent::FocusSessionEnded { quality, .. } => {
             sit.focus_state = *quality;

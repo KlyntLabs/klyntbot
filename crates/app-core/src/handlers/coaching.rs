@@ -111,6 +111,28 @@ impl AppCore {
         })
     }
 
+    pub async fn coaching_pending_interventions(
+        &self,
+    ) -> Result<Vec<DeliveredInterventionResponse>, ApiError> {
+        let tracker = self.feedback_tracker()?.lock().await;
+        let now = chrono::Utc::now();
+        Ok(tracker
+            .pending_interventions()
+            .iter()
+            .filter(|p| p.expires_at > now)
+            .map(|p| DeliveredInterventionResponse {
+                id: p.intervention.id.clone(),
+                intervention_type: serde_json::to_value(&p.intervention.intervention_type)
+                    .ok()
+                    .and_then(|v| v.as_str().map(String::from))
+                    .unwrap_or_else(|| format!("{:?}", p.intervention.intervention_type)),
+                message: p.intervention.message.clone(),
+                trigger_name: p.intervention.trigger_name.clone(),
+                timestamp: p.intervention.delivered_at.to_rfc3339(),
+            })
+            .collect())
+    }
+
     // ── Coaching Mutations ──────────────────────────────────────────────
 
     pub async fn coaching_reset_dismissals(
@@ -129,6 +151,62 @@ impl AppCore {
     pub async fn coaching_clear_signals(&self) -> Result<bool, ApiError> {
         let mut acc = self.signal_accumulator()?.lock().await;
         *acc = feature_coaching::SignalAccumulator::new();
+        Ok(true)
+    }
+
+    /// Submit user feedback for a coaching intervention.
+    ///
+    /// Records explicit feedback in the FeedbackTracker and, if dismissed,
+    /// increases the backoff in InterventionRouter.
+    pub async fn coaching_submit_feedback(
+        &self,
+        intervention_id: String,
+        response: String,
+    ) -> Result<bool, ApiError> {
+        let feedback_response = match response.as_str() {
+            "helpful" => bus::FeedbackResponse::Helpful,
+            "dismissed" => bus::FeedbackResponse::Dismissed,
+            "stop" => bus::FeedbackResponse::StopSuggesting,
+            _ => {
+                return Err(ApiError::new(
+                    "INVALID_RESPONSE",
+                    "response must be 'helpful', 'dismissed', or 'stop'",
+                ));
+            }
+        };
+
+        // Record in FeedbackTracker (single lock scope — record_explicit removes
+        // the pending entry, so we must extract trigger_name first)
+        let trigger_name = {
+            let mut tracker = self.feedback_tracker()?.lock().await;
+            let trigger_name = tracker
+                .pending_interventions()
+                .iter()
+                .find(|p| p.intervention.id == intervention_id)
+                .map(|p| p.intervention.trigger_name.clone());
+            tracker.record_explicit(&intervention_id, &feedback_response);
+            trigger_name
+        };
+
+        // If dismissed/stop, record dismissal in router for backoff
+        if matches!(
+            feedback_response,
+            bus::FeedbackResponse::Dismissed | bus::FeedbackResponse::StopSuggesting
+        ) {
+            if let Some(name) = &trigger_name {
+                let mut router = self.intervention_router()?.lock().await;
+                router.record_dismissal(name);
+            }
+        }
+
+        // Publish domain event so coaching service can react
+        if let Ok(bus) = self.domain_event_bus() {
+            bus.publish(bus::DomainEvent::CoachingFeedback {
+                intervention_id,
+                response: feedback_response,
+            });
+        }
+
         Ok(true)
     }
 }

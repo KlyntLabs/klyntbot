@@ -47,7 +47,7 @@ impl Default for RouterConfig {
     fn default() -> Self {
         Self {
             max_per_hour: 3,
-            max_per_day: 10,
+            max_per_day: 5,
             dismiss_cooldown_secs: 1800, // 30min
             backoff_multiplier: 2.0,
         }

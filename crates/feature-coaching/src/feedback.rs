@@ -62,9 +62,9 @@ pub struct FeedbackTracker {
 }
 
 #[derive(Debug, Clone)]
-struct PendingBehavioral {
-    intervention: DeliveredIntervention,
-    expires_at: DateTime<Utc>,
+pub struct PendingBehavioral {
+    pub intervention: DeliveredIntervention,
+    pub expires_at: DateTime<Utc>,
 }
 
 impl FeedbackTracker {
@@ -72,7 +72,7 @@ impl FeedbackTracker {
         Self {
             strategies: HashMap::new(),
             pending_behavioral: Vec::new(),
-            behavioral_window_secs: 120, // 2 minutes
+            behavioral_window_secs: 600, // 10 minutes
             repo: None,
         }
     }
@@ -244,6 +244,11 @@ impl FeedbackTracker {
     /// Get all strategy feedback (for weekly reflection).
     pub fn all_strategies(&self) -> Vec<&StrategyFeedback> {
         self.strategies.values().collect()
+    }
+
+    /// Access pending behavioral interventions (for trigger name lookup).
+    pub fn pending_interventions(&self) -> &[PendingBehavioral] {
+        &self.pending_behavioral
     }
 
     /// Compute coaching receptivity adjustment based on recent feedback.

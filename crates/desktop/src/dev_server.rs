@@ -1162,10 +1162,17 @@ async fn dispatch(
         "coaching_patterns" => r(core.coaching_patterns().await),
         "coaching_feedback_stats" => r(core.coaching_feedback_stats().await),
         "coaching_router_status" => r(core.coaching_router_status().await),
+        "coaching_pending_interventions" => r(core.coaching_pending_interventions().await),
         "coaching_reset_dismissals" => r(core
             .coaching_reset_dismissals(get(&body, "trigger_name"))
             .await),
         "coaching_clear_signals" => r(core.coaching_clear_signals().await),
+        "coaching_submit_feedback" => r(core
+            .coaching_submit_feedback(
+                get(&body, "intervention_id").unwrap_or_default(),
+                get(&body, "response").unwrap_or_default(),
+            )
+            .await),
 
         // ── Unsupported ───────────────────────────────────────
         _ => err(ApiError::new(
@@ -1319,6 +1326,7 @@ fn domain_for_event(event: &bus::DomainEvent) -> &'static str {
         | bus::DomainEvent::TaskDeferred { .. }
         | bus::DomainEvent::GoalProgress { .. } => "work",
         bus::DomainEvent::ActivitySessionCompleted { .. }
+        | bus::DomainEvent::FocusSessionStarted { .. }
         | bus::DomainEvent::FocusSessionEnded { .. }
         | bus::DomainEvent::DistractionDetected { .. }
         | bus::DomainEvent::ProductivityScoreComputed { .. } => "energy",

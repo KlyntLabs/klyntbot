@@ -84,6 +84,13 @@ pub async fn coaching_router_status(
     state.coaching_router_status().await
 }
 
+#[tauri::command]
+pub async fn coaching_pending_interventions(
+    state: State<'_, Arc<AppCore>>,
+) -> Result<Vec<desktop_shared::cognitive_commands::DeliveredInterventionResponse>, ApiError> {
+    state.coaching_pending_interventions().await
+}
+
 // ── System Status ───────────────────────────────────────────────────────
 
 #[tauri::command]
@@ -163,6 +170,17 @@ pub async fn coaching_reset_dismissals(
 #[tauri::command]
 pub async fn coaching_clear_signals(state: State<'_, Arc<AppCore>>) -> Result<bool, ApiError> {
     state.coaching_clear_signals().await
+}
+
+#[tauri::command]
+pub async fn coaching_submit_feedback(
+    state: State<'_, Arc<AppCore>>,
+    intervention_id: String,
+    response: String,
+) -> Result<bool, ApiError> {
+    state
+        .coaching_submit_feedback(intervention_id, response)
+        .await
 }
 
 #[tauri::command]

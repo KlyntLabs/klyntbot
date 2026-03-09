@@ -129,6 +129,7 @@ fn wire_event_channels(core: &AppCore, channels: EventChannels, app_handle: &tau
                             | bus::DomainEvent::TaskDeferred { .. }
                             | bus::DomainEvent::GoalProgress { .. } => "work",
                             bus::DomainEvent::ActivitySessionCompleted { .. }
+                            | bus::DomainEvent::FocusSessionStarted { .. }
                             | bus::DomainEvent::FocusSessionEnded { .. }
                             | bus::DomainEvent::DistractionDetected { .. }
                             | bus::DomainEvent::ProductivityScoreComputed { .. } => "energy",

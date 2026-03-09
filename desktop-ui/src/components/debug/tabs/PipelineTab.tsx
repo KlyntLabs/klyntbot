@@ -126,9 +126,7 @@ export function PipelineTab() {
               </div>
             ))}
             {extractions.length === 0 && (
-              <p className="text-[12px] text-muted text-center py-4">
-                No extraction events yet
-              </p>
+              <p className="text-[12px] text-muted text-center py-4">No extraction events yet</p>
             )}
           </div>
         </div>
@@ -154,9 +152,7 @@ export function PipelineTab() {
               </div>
             ))}
             {consolidations.length === 0 && (
-              <p className="text-[12px] text-muted text-center py-4">
-                No consolidation events yet
-              </p>
+              <p className="text-[12px] text-muted text-center py-4">No consolidation events yet</p>
             )}
           </div>
         </div>

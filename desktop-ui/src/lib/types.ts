@@ -802,6 +802,16 @@ export type InsightPayload = Pick<InsightCard, "id" | "insightType" | "title" | 
 
 export type ProductivityPeriod = "day" | "week" | "month";
 
+// ── Coaching ─────────────────────────────────────────────────────────
+
+export interface CoachingIntervention {
+  id: string;
+  interventionType: string;
+  message: string;
+  triggerName: string;
+  timestamp: string;
+}
+
 // ── Custom Columns ──────────────────────────────────────────────────────
 
 export type ColumnType =

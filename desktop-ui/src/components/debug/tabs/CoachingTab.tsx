@@ -1,7 +1,9 @@
-import { RefreshCw, Trash2 } from "lucide-react";
-import { useEffect } from "react";
+import { Check, RefreshCw, Trash2, X, XCircle } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { useEvent } from "../../../hooks/useEvent";
 import { useMutation } from "../../../hooks/useMutation";
 import { invalidateQueries, useQuery } from "../../../hooks/useQuery";
+import type { CoachingIntervention } from "../../../lib/types";
 
 interface UserSituation {
   energyLevel: number;
@@ -91,21 +93,25 @@ function Gauge({
   );
 }
 
-export function CoachingTab() {
-  const POLL_INTERVAL = 5_000;
+const POLL_INTERVAL = 5_000;
 
-  const { data: situation, refetch: rSit } = useQuery<UserSituation>("coaching_situation", undefined, {
-    energyLevel: 0,
-    focusState: 0,
-    deadlinePressure: 0,
-    distractionRisk: 0,
-    coachingReceptivity: 0,
-    taskAvoidanceDetected: false,
-    hoursActiveToday: 0,
-    minsSinceBreak: 0,
-    hourOfDay: 0,
-    recentContextSwitches: 0,
-  });
+export function CoachingTab() {
+  const { data: situation, refetch: rSit } = useQuery<UserSituation>(
+    "coaching_situation",
+    undefined,
+    {
+      energyLevel: 0,
+      focusState: 0,
+      deadlinePressure: 0,
+      distractionRisk: 0,
+      coachingReceptivity: 0,
+      taskAvoidanceDetected: false,
+      hoursActiveToday: 0,
+      minsSinceBreak: 0,
+      hourOfDay: 0,
+      recentContextSwitches: 0,
+    },
+  );
 
   const { data: signals, refetch: rSig } = useQuery<SignalWindow>("coaching_signals", undefined, {
     windowSize: 0,
@@ -113,27 +119,51 @@ export function CoachingTab() {
     triggers: [],
   });
 
-  const { data: patterns, refetch: rPat } = useQuery<DetectedPattern[]>("coaching_patterns", undefined, []);
+  const { data: patterns, refetch: rPat } = useQuery<DetectedPattern[]>(
+    "coaching_patterns",
+    undefined,
+    [],
+  );
 
-  const { data: feedback, refetch: rFb } = useQuery<StrategyFeedback[]>("coaching_feedback_stats", undefined, []);
+  const { data: feedback, refetch: rFb } = useQuery<StrategyFeedback[]>(
+    "coaching_feedback_stats",
+    undefined,
+    [],
+  );
 
-  const { data: router, refetch: rRtr } = useQuery<RouterStatus>("coaching_router_status", undefined, {
-    hourlyCount: 0,
-    hourlyLimit: 3,
-    dailyCount: 0,
-    dailyLimit: 10,
-  });
+  const { data: router, refetch: rRtr } = useQuery<RouterStatus>(
+    "coaching_router_status",
+    undefined,
+    {
+      hourlyCount: 0,
+      hourlyLimit: 3,
+      dailyCount: 0,
+      dailyLimit: 10,
+    },
+  );
+
+  const { data: interventions, refetch: rInt } = useQuery<CoachingIntervention[]>(
+    "coaching_pending_interventions",
+    undefined,
+    [],
+  );
 
   // Poll all coaching data every 5s so the debug view stays fresh.
   useEffect(() => {
     const id = setInterval(() => {
-      rSit(); rSig(); rPat(); rFb(); rRtr();
+      rSit();
+      rSig();
+      rPat();
+      rFb();
+      rRtr();
+      rInt();
     }, POLL_INTERVAL);
     return () => clearInterval(id);
-  }, [rSit, rSig, rPat, rFb, rRtr]);
+  }, [rSit, rSig, rPat, rFb, rRtr, rInt]);
 
   const { mutate: clearSignals } = useMutation("coaching_clear_signals");
   const { mutate: resetDismissals } = useMutation("coaching_reset_dismissals");
+  const { mutate: submitFeedback } = useMutation("coaching_submit_feedback");
 
   const handleClearSignals = async () => {
     await clearSignals({} as never);
@@ -142,6 +172,14 @@ export function CoachingTab() {
 
   const handleResetDismissals = async () => {
     await resetDismissals({} as never);
+    invalidateQueries("coaching_");
+  };
+
+  const handleFeedback = async (
+    interventionId: string,
+    response: "helpful" | "dismissed" | "stop",
+  ) => {
+    await submitFeedback({ intervention_id: interventionId, response } as never);
     invalidateQueries("coaching_");
   };
 
@@ -175,6 +213,58 @@ export function CoachingTab() {
           </div>
         </div>
       </div>
+
+      {/* Active Interventions */}
+      {interventions.length > 0 && (
+        <div>
+          <h2 className="text-[13px] font-medium text-secondary mb-3">
+            Active Interventions ({interventions.length})
+          </h2>
+          <div className="space-y-2">
+            {interventions.map((iv) => (
+              <div key={iv.id} className="p-3 bg-white/[0.04] rounded-lg border border-brand/30">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[10px] px-1.5 py-0.5 bg-brand/20 text-brand rounded font-medium">
+                        {iv.interventionType}
+                      </span>
+                      <span className="text-[10px] text-muted">{iv.triggerName}</span>
+                    </div>
+                    <p className="text-[12px] text-secondary leading-relaxed">{iv.message}</p>
+                  </div>
+                  <div className="flex gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleFeedback(iv.id, "helpful")}
+                      className="p-1.5 rounded hover:bg-green-500/20 text-muted hover:text-green-400 transition-colors"
+                      title="Helpful"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleFeedback(iv.id, "dismissed")}
+                      className="p-1.5 rounded hover:bg-white/10 text-muted hover:text-secondary transition-colors"
+                      title="Dismiss"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleFeedback(iv.id, "stop")}
+                      className="p-1.5 rounded hover:bg-red-500/20 text-muted hover:text-red-400 transition-colors"
+                      title="Stop suggesting"
+                    >
+                      <XCircle className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-6">
         {/* Left: Signals & Patterns */}

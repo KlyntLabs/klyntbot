@@ -67,6 +67,7 @@ impl FocusManager {
         };
 
         self.repos.sessions.create(&session).await?;
+        self.publish_focus_started(&session.session_type, target);
         Ok(session)
     }
 
@@ -143,7 +144,17 @@ impl FocusManager {
         };
 
         self.repos.sessions.create(&session).await?;
+        self.publish_focus_started(&session.session_type, work);
         Ok(session)
+    }
+
+    fn publish_focus_started(&self, session_type: &SessionType, target_mins: i64) {
+        if let Some(ref bus) = self.domain_bus {
+            bus.publish(DomainEvent::FocusSessionStarted {
+                session_type: session_type.to_string(),
+                target_mins,
+            });
+        }
     }
 
     /// Get the currently active focus session, if any.

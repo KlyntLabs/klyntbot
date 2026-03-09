@@ -26,8 +26,11 @@
 | T16: Desktop UI Transparency | ✅ PASS | Tool calls visible with timing in execution panel |
 | T17: Concurrent Stress | ✅ PASS | Session A: blue→blue, Session B: red→red. No cross-contamination. |
 | T18: Notes Management | ✅ PASS | Create, search, tag, link notes — all via notes tool |
+| T19: Coaching Pipeline E2E | ✅ PASS | Signal injection → trigger fire → LLM reasoning → intervention delivery → user feedback → strategy stats updated |
+| T20: Coaching Feedback Loop | ✅ PASS | "Helpful" → Accept 100%/Effect 100%; "Dismiss" → Accept 0%/Effect -50%; intervention cards appear/disappear correctly |
+| T21: Coaching Delivery + Focus Gate | ✅ PASS | FocusSessionStarted gates delivery, distractions queued silently, FocusSessionEnded drains queue; chat nudge UI renders above input with feedback buttons; daily limit lowered 10→5 |
 
-**Pass: 16 | Partial: 0 | Skip: 2 | Fail: 0**
+**Pass: 19 | Partial: 0 | Skip: 2 | Fail: 0**
 
 ### Bugs Found & Fixed
 - **Notes tool not accessible to agents** — Added `notes` to task agent's tools list + triggers
@@ -570,6 +573,111 @@ L3: providers, session, context_engine
 - NotesTool not registered in tool registry
 - Notes migrations not applied
 - Agent not routing to Reactive mode for tool calls
+
+---
+
+## T19: Coaching Pipeline End-to-End
+
+**Layers:** L1 (bus) → L4 (feature-coaching) → L3 (providers) → L5 (cognitive) → L7 (desktop)
+
+**Tests:** Signal accumulation, trigger evaluation, LLM/heuristic reasoning, intervention routing, rate limiting
+
+### Steps
+
+1. Open Debug > Coaching tab
+2. Verify User Situation gauges show real data (Energy, Focus, etc.)
+3. Inject distraction events via API:
+   ```bash
+   for i in 1 2 3 4 5; do
+     curl -s -X POST http://localhost:3456/api/cognitive_inject_event \
+       -H "Content-Type: application/json" \
+       -d '{"event_type": "DistractionDetected", "payload": {"app": "youtube.com", "duration_secs": 120, "context": "watching videos"}}'
+     sleep 0.5
+   done
+   ```
+4. Wait 5-10 seconds for pipeline processing
+5. Check Signal Accumulator (5+ signals), triggers (distraction_streak fired with cooldown)
+6. Check Active Interventions section for delivered intervention cards
+
+### Expected
+
+- Signal accumulator shows 5+ DistractionDetected signals
+- `distraction_streak` trigger fires (≥3 signals threshold)
+- `context_switch_overload` may also fire if context switches > 10
+- Intervention Router increments hourly/daily counts
+- Active Interventions cards show with LLM-generated coaching messages
+- Strategy Feedback table populates with trigger names
+
+### Failure Indicates
+
+- DomainEventBus not delivering events to CoachingService
+- Signal accumulator deduplication issue
+- LLM reasoner timeout or failure (check for heuristic fallback)
+- InterventionRouter rate-limiting all interventions
+
+---
+
+## T20: Coaching Feedback Loop
+
+**Layers:** L4 (feature-coaching — feedback tracker) → L7 (desktop — commands, UI)
+
+**Tests:** User feedback submission, acceptance rate tracking, dismissal backoff
+
+### Steps (after T19)
+
+1. With active interventions visible, click "Helpful" (checkmark) on one
+2. Verify: intervention card removed, Strategy Feedback table shows Accept: 100%, Effect: 100%
+3. Click "Dismiss" (X) on another intervention
+4. Verify: intervention removed, Accept: 0%, Effect: -50%
+5. Check Intervention Router — dismissal should increase backoff
+
+### Expected
+
+- "Helpful" → acceptance_rate increases, effectiveness positive
+- "Dismissed" → acceptance_rate stays 0, effectiveness negative (-50%)
+- "Stop Suggesting" → same as dismiss + permanent backoff for that trigger
+- Pending interventions expire after 2 minutes if no response
+
+### Failure Indicates
+
+- `coaching_submit_feedback` handler not matching intervention IDs
+- FeedbackTracker not finding pending interventions (expired?)
+- InterventionRouter not recording dismissals
+
+---
+
+## T21: Coaching Delivery + Focus Gate
+
+**Layers:** L1 (bus — FocusSessionStarted event) → L4 (feature-coaching — service focus gate, router daily limit) → L5 (cognitive — salience) → L7 (desktop — inject_event, chat nudge UI)
+
+**Tests:** Focus mode gate queues triggers, debrief consolidation, chat nudge rendering, rate limit enforcement
+
+### Steps
+
+1. Inject 3 `DistractionDetected` events → verify interventions appear in `coaching_pending_interventions`
+2. Inject `FocusSessionStarted` event
+3. Inject 3 more `DistractionDetected` events during focus
+4. Check `coaching_pending_interventions` — no new interventions should appear
+5. Inject `FocusSessionEnded` with quality/interruption data
+6. Check for consolidated debrief (may not appear if trigger cooldowns prevent re-firing)
+7. Verify daily limit is 5 (lowered from 10) via `coaching_router_status`
+8. Open chat view in browser — coaching nudge appears above chat input
+9. Click feedback button — nudge dismisses and feedback recorded
+
+### Expected
+
+- Focus gate silences delivery during active focus session
+- `FocusSessionStarted` updates situation: focus_state → 0.9, distraction_risk decreases
+- Daily limit enforced at 5/day, hourly at 3/hr
+- Chat nudge auto-collapses after 60s if ignored
+- Nudge hidden while AI is streaming
+
+### Failure Indicates
+
+- `FocusSessionStarted` not handled in salience/background/domain_for_event matches
+- CoachingService not tracking `focus_active` state from events
+- Chat nudge component not polling `coaching_pending_interventions`
+- Feedback values not matching backend expectations (`helpful`/`dismissed`/`stop`)
 
 ---
 

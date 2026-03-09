@@ -19,6 +19,10 @@ pub enum DomainEvent {
         productive_secs: i64,
         distracting_secs: i64,
     },
+    FocusSessionStarted {
+        session_type: String,
+        target_mins: i64,
+    },
     FocusSessionEnded {
         duration_secs: i64,
         quality: f64,
