@@ -416,6 +416,10 @@ mod tests {
         "focus_timer_start",
         "focus_timer_stop",
         "focus_timer_status",
+        "focus_break_start",
+        "focus_timer_extend",
+        "focus_timer_pause",
+        "focus_timer_resume",
         "mcp_oauth_start",
         "mcp_oauth_disconnect",
     ];

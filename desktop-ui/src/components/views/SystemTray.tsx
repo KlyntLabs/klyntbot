@@ -1,7 +1,6 @@
-import { LogicalSize } from "@tauri-apps/api/dpi";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Check, Lightbulb, LogOut, Monitor, Send, Settings, X, XCircle } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useCoachingNudge } from "../../hooks/useCoachingNudge";
 import { useEvent } from "../../hooks/useEvent";
 import { useFocusTimer } from "../../hooks/useFocusTimer";
@@ -10,6 +9,7 @@ import { useMutation } from "../../hooks/useMutation";
 import { useQuery } from "../../hooks/useQuery";
 import { useSetToggle } from "../../hooks/useSetToggle";
 import { useTransparentBackground } from "../../hooks/useTransparentBackground";
+import { useWindowAutoResize } from "../../hooks/useWindowAutoResize";
 import type { AgentStatus as AgentStatusType, CalendarEvent, TodayTask } from "../../lib/types";
 import { isTauri } from "../../lib/utils";
 import { FocusControl } from "../tray/FocusControl";
@@ -129,37 +129,11 @@ export function SystemTray() {
     [sortedTasks, isTaskCompleted],
   );
 
-  useTransparentBackground();
+  useTransparentBackground({ nativeVibrancy: true });
 
-  // Auto-resize window to match content height
   const contentRef = useRef<HTMLDivElement>(null);
-  const lastHeight = useRef(0);
-
-  const TRAY_WIDTH = 320;
-
-  const syncSize = useCallback((entries?: ResizeObserverEntry[]) => {
-    if (!isTauri) return;
-
-    const h = Math.ceil(
-      entries?.[0]?.contentRect.height ?? contentRef.current?.getBoundingClientRect().height ?? 0,
-    );
-    if (h === lastHeight.current || h <= 0) return;
-    lastHeight.current = h;
-
-    getCurrentWindow()
-      .setSize(new LogicalSize(TRAY_WIDTH, h))
-      .catch((e: unknown) => console.error("tray resize failed", e));
-  }, []);
-
-  useEffect(() => {
-    const el = contentRef.current;
-    if (!el) return;
-
-    const observer = new ResizeObserver(syncSize);
-    observer.observe(el);
-    syncSize();
-    return () => observer.disconnect();
-  }, [syncSize]);
+  const MAX_TRAY_HEIGHT = 800;
+  useWindowAutoResize(contentRef, { width: 320, maxHeight: MAX_TRAY_HEIGHT });
 
   return (
     <div className="w-screen text-primary">
@@ -168,7 +142,10 @@ export function SystemTray() {
         className="w-full glass-floating overflow-hidden"
         style={{ animation: "glass-appear 0.2s ease-out" }}
       >
-        <div className="rounded-[var(--glass-radius-inner)] overflow-hidden">
+        <div
+          className="rounded-[var(--glass-radius-inner)] overflow-y-auto"
+          style={{ maxHeight: MAX_TRAY_HEIGHT }}
+        >
           {/* Header */}
           <div className="flex items-center gap-3 px-4 py-3">
             <div className="w-7 h-7 rounded-lg bg-white/90 flex items-center justify-center p-0.5 ">

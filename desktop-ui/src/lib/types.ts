@@ -812,6 +812,8 @@ export interface FocusTickPayload {
   remainingSecs: number;
   totalSecs: number;
   mode: string;
+  paused: boolean;
+  actionTitle: string | null;
 }
 
 export interface FocusCompletedPayload {

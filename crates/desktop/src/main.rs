@@ -12,7 +12,7 @@ use std::sync::Arc;
 use commands::window::{WINDOW_LAUNCHER, WINDOW_TRAY};
 use tauri::image::Image;
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{Manager, PhysicalPosition};
+use tauri::Manager;
 use tauri_plugin_global_shortcut::{Code, Modifiers, ShortcutState};
 
 /// Register a dismiss-on-blur handler that hides the window when it loses focus.
@@ -29,12 +29,15 @@ fn main() {
     tauri::Builder::default()
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
-                .with_shortcuts(["alt+space"])
+                .with_shortcuts(["alt+space", "alt+shift+space"])
                 .expect("failed to parse shortcut")
                 .with_handler(|app, shortcut, event| {
-                    if event.state == ShortcutState::Pressed
-                        && shortcut.matches(Modifiers::ALT, Code::Space)
-                    {
+                    if event.state != ShortcutState::Pressed {
+                        return;
+                    }
+
+                    // Option+Space → toggle launcher
+                    if shortcut.matches(Modifiers::ALT, Code::Space) {
                         if let Some(window) = app.get_webview_window(WINDOW_LAUNCHER) {
                             if window.is_visible().unwrap_or(false) {
                                 let _ = window.hide();
@@ -42,6 +45,17 @@ fn main() {
                                 let _ = window.center();
                                 let _ = window.show();
                                 let _ = window.set_focus();
+                            }
+                        }
+                    }
+
+                    // Option+Shift+Space → toggle tray
+                    if shortcut.matches(Modifiers::ALT | Modifiers::SHIFT, Code::Space) {
+                        if let Some(window) = app.get_webview_window(WINDOW_TRAY) {
+                            if window.is_visible().unwrap_or(false) {
+                                let _ = window.hide();
+                            } else {
+                                focus_timer::open_tray_window(app);
                             }
                         }
                     }
@@ -82,7 +96,8 @@ fn main() {
                         let _ = mw.hide();
                         // Remove from Dock — pure tray app when main window is hidden
                         #[cfg(target_os = "macos")]
-                        let _ = app_handle.set_activation_policy(tauri::ActivationPolicy::Accessory);
+                        let _ =
+                            app_handle.set_activation_policy(tauri::ActivationPolicy::Accessory);
                     }
                 });
             }
@@ -99,7 +114,6 @@ fn main() {
                     if let TrayIconEvent::Click {
                         button: MouseButton::Left,
                         button_state: MouseButtonState::Up,
-                        rect,
                         ..
                     } = event
                     {
@@ -108,19 +122,7 @@ fn main() {
                             if window.is_visible().unwrap_or(false) {
                                 let _ = window.hide();
                             } else {
-                                // Position window directly below the tray icon
-                                if let Ok(win_size) = window.outer_size() {
-                                    let scale = window.scale_factor().unwrap_or(1.0);
-                                    let tray_pos = rect.position.to_physical::<f64>(scale);
-                                    let tray_size = rect.size.to_physical::<f64>(scale);
-                                    let x = tray_pos.x + (tray_size.width / 2.0)
-                                        - (win_size.width as f64 / 2.0);
-                                    let y = tray_pos.y + tray_size.height;
-                                    let _ = window
-                                        .set_position(PhysicalPosition::new(x as i32, y as i32));
-                                }
-                                let _ = window.show();
-                                let _ = window.set_focus();
+                                focus_timer::open_tray_window(app);
                             }
                         }
                     }
@@ -263,6 +265,10 @@ fn main() {
             commands::productivity::focus_timer_start,
             commands::productivity::focus_timer_stop,
             commands::productivity::focus_timer_status,
+            commands::productivity::focus_break_start,
+            commands::productivity::focus_timer_extend,
+            commands::productivity::focus_timer_pause,
+            commands::productivity::focus_timer_resume,
             // Distraction
             commands::distraction::distraction_dismiss,
             commands::distraction::distraction_allow_temp,

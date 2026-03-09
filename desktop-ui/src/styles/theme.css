@@ -37,6 +37,7 @@
   --success: #34d399;
   --destructive: #f43f5e;
   --info: #60a5fa;
+  --warning: #fbbf24;
   --purple: #a78bfa;
 
   /* ── Border ────────────────────────────────── */
@@ -105,6 +106,7 @@
   --color-success: var(--success);
   --color-destructive: var(--destructive);
   --color-info: var(--info);
+  --color-warning: var(--warning);
   --color-purple: var(--purple);
 
   /* Border */
@@ -284,6 +286,15 @@
     border-radius: var(--radius-xl);
     box-shadow: none;
     padding: var(--glass-padding);
+  }
+
+  /* When native vibrancy handles the blur (Tauri + macOS), disable the
+     CSS backdrop-filter (it flickers on transparent webview windows) and
+     lighten the overlay so the native material shows through. */
+  :root[data-vibrancy] .glass-floating {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: rgba(10, 10, 14, 0.45);
   }
 
   /* Card glass — content cards with subtle depth */
@@ -497,12 +508,10 @@
   from {
     opacity: 0;
     transform: scale(0.97) translateY(6px);
-    backdrop-filter: blur(0px);
   }
   to {
     opacity: 1;
     transform: scale(1) translateY(0);
-    backdrop-filter: blur(80px);
   }
 }
 

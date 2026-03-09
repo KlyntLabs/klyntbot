@@ -300,9 +300,20 @@ impl AppCore {
         work_mins: Option<i64>,
         break_mins: Option<i64>,
     ) -> Result<FocusSessionResponse, ApiError> {
+        self.productivity_pomodoro_start_with_action(None, None, work_mins, break_mins)
+            .await
+    }
+
+    pub async fn productivity_pomodoro_start_with_action(
+        &self,
+        action_id: Option<String>,
+        project_id: Option<String>,
+        work_mins: Option<i64>,
+        break_mins: Option<i64>,
+    ) -> Result<FocusSessionResponse, ApiError> {
         let focus_mgr = self.focus_manager()?;
         let session = focus_mgr
-            .start_pomodoro(None, None, work_mins, break_mins)
+            .start_pomodoro(action_id, project_id, work_mins, break_mins)
             .await
             .map_err(map_prod_err)?;
         Ok(session_to_response(session))

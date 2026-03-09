@@ -1,7 +1,20 @@
-import { ChevronRight, Eye, RotateCcw, Settings, X } from "lucide-react";
+import {
+  ChevronRight,
+  Coffee,
+  Eye,
+  Pause,
+  Play,
+  Plus,
+  RotateCcw,
+  Settings,
+  Square,
+  X,
+} from "lucide-react";
 import { useRef, useState } from "react";
 import type { FocusSettings, useFocusTimer } from "../../hooks/useFocusTimer";
+import { useQuery } from "../../hooks/useQuery";
 import { formatElapsed } from "../../lib/dates";
+import type { TodayTask } from "../../lib/types";
 import { Checkbox } from "../ui/Checkbox";
 
 // ── SVG ring geometry ───────────────────────────────────────────────
@@ -11,8 +24,104 @@ const STROKE = 5;
 const CENTER = RING_SIZE / 2;
 const RADIUS = CENTER - STROKE / 2 - 4;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+const WARNING_SECS = 30;
 
 type Timer = ReturnType<typeof useFocusTimer>;
+
+const ICON_BTN =
+  "w-8 h-8 rounded-full border border-white/[0.1] flex items-center justify-center text-muted hover:text-secondary hover:border-white/[0.2] transition-colors";
+
+function PauseResumeButton({ timer }: { timer: Timer }) {
+  return (
+    <button
+      type="button"
+      className={ICON_BTN}
+      onClick={timer.paused ? timer.resume : timer.pause}
+      disabled={timer.loading}
+      title={timer.paused ? "Resume" : "Pause"}
+    >
+      {timer.paused ? (
+        <Play className="w-3.5 h-3.5" strokeWidth={1.5} />
+      ) : (
+        <Pause className="w-3.5 h-3.5" strokeWidth={1.5} />
+      )}
+    </button>
+  );
+}
+
+function SettingsButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button type="button" className={ICON_BTN} onClick={onClick} title="Settings">
+      <Settings className="w-3.5 h-3.5" strokeWidth={1.5} />
+    </button>
+  );
+}
+
+// ── Task picker ──────────────────────────────────────────────────────
+
+function TaskPicker({
+  selectedId,
+  onSelect,
+}: {
+  selectedId: string | null;
+  onSelect: (id: string | null, title: string | null) => void;
+}) {
+  const { data: tasks } = useQuery<TodayTask[]>("today_tasks", undefined, []);
+  const [open, setOpen] = useState(false);
+
+  const selected = tasks.find((t) => t.id === selectedId);
+
+  return (
+    <div className="relative w-full">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="w-full px-3 py-1.5 text-xs text-left rounded-lg bg-surface-raised/50
+                   text-muted hover:text-foreground transition-colors truncate"
+      >
+        {selected ? selected.title : "No task linked"}
+      </button>
+      {open && (
+        <div
+          className="absolute bottom-full left-0 right-0 mb-1 rounded-lg glass-panel
+                        border border-border p-1 max-h-40 overflow-y-auto z-50"
+        >
+          <button
+            type="button"
+            onClick={() => {
+              onSelect(null, null);
+              setOpen(false);
+            }}
+            className="w-full px-2 py-1 text-xs text-left text-muted hover:text-foreground
+                       hover:bg-surface-raised/50 rounded"
+          >
+            No task
+          </button>
+          {tasks
+            .filter((t) => !t.completed)
+            .map((task) => (
+              <button
+                key={task.id}
+                type="button"
+                onClick={() => {
+                  onSelect(task.id, task.title);
+                  setOpen(false);
+                }}
+                className={`w-full px-2 py-1 text-xs text-left rounded truncate
+                ${
+                  task.id === selectedId
+                    ? "text-brand bg-brand/10"
+                    : "text-muted hover:text-foreground hover:bg-surface-raised/50"
+                }`}
+              >
+                {task.title}
+              </button>
+            ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ── Main export ─────────────────────────────────────────────────────
 
@@ -35,32 +144,71 @@ export function FocusControl({ timer }: { timer: Timer }) {
 // ── Timer view ──────────────────────────────────────────────────────
 
 function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: () => void }) {
-  const { active, remainingSecs, totalSecs, settings, completedSessions, completed, loading } =
-    timer;
+  const {
+    phase,
+    paused,
+    remainingSecs,
+    totalSecs,
+    settings,
+    completedSessions,
+    completed,
+    loading,
+  } = timer;
 
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const isActive = phase === "focus" || phase === "break";
+  const isBreak = phase === "break";
+  const isBreakPending = phase === "break_pending";
+  const isFocus = phase === "focus";
+  const showWarning =
+    isActive &&
+    !paused &&
+    remainingSecs != null &&
+    remainingSecs <= WARNING_SECS &&
+    remainingSecs > 0;
+
   // Progress: 0 → 1 as time elapses
   const progress =
-    active && remainingSecs != null && totalSecs ? (totalSecs - remainingSecs) / totalSecs : 0;
+    isActive && remainingSecs != null && totalSecs ? (totalSecs - remainingSecs) / totalSecs : 0;
   const dashOffset = CIRCUMFERENCE * (1 - progress);
 
   // Display time
   const timeDisplay =
-    active && remainingSecs != null
+    isActive && remainingSecs != null
       ? formatElapsed(remainingSecs)
-      : `${String(settings.focusDuration).padStart(2, "0")}:00`;
+      : isBreakPending
+        ? formatElapsed((completed?.breakMins ?? settings.shortBreak) * 60)
+        : formatElapsed(settings.focusDuration * 60);
+
+  // Ring color: brand for focus, info-blue for break, warning pulse at 30s
+  const ringColor = showWarning ? "var(--warning)" : isBreak ? "var(--info)" : "var(--brand)";
 
   // Cycle state
   const cycleComplete = completedSessions > 0 && completedSessions >= settings.longBreakAfter;
   const dotsCount = settings.longBreakAfter;
   const filledDots = cycleComplete ? dotsCount : completedSessions;
 
+  // Phase label
+  const phaseLabel = (() => {
+    if (paused) return "Paused";
+    switch (phase) {
+      case "focus":
+        return "Focus";
+      case "break":
+        return "Break";
+      case "break_pending":
+        return cycleComplete ? "Long Break" : "Break";
+      default:
+        return "Focus";
+    }
+  })();
+
   // Edit duration inline
   const handleEditStart = () => {
-    if (active) return;
+    if (isActive || isBreakPending) return;
     setEditValue(String(settings.focusDuration));
     setEditing(true);
     requestAnimationFrame(() => inputRef.current?.select());
@@ -95,23 +243,29 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
               cy={CENTER}
               r={RADIUS}
               fill="none"
-              stroke="var(--brand)"
+              stroke={ringColor}
               strokeWidth={STROKE}
               strokeLinecap="round"
               strokeDasharray={CIRCUMFERENCE}
               strokeDashoffset={dashOffset}
               transform={`rotate(-90 ${CENTER} ${CENTER})`}
-              className="transition-[stroke-dashoffset] duration-1000 ease-linear"
+              className={`transition-[stroke-dashoffset] duration-1000 ease-linear ${
+                paused ? "opacity-50" : showWarning ? "animate-pulse" : ""
+              }`}
             />
           )}
         </svg>
 
         {/* Content inside ring */}
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <Eye
-            className={`w-4 h-4 mb-2 transition-colors ${settings.dndEnabled ? "text-brand" : "text-dim"}`}
-            strokeWidth={1.5}
-          />
+          {isBreak || isBreakPending ? (
+            <Coffee className="w-4 h-4 mb-2 text-info" strokeWidth={1.5} />
+          ) : (
+            <Eye
+              className={`w-4 h-4 mb-2 transition-colors ${settings.dndEnabled ? "text-brand" : "text-dim"}`}
+              strokeWidth={1.5}
+            />
+          )}
 
           {editing ? (
             <form
@@ -138,8 +292,8 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
             <button
               type="button"
               onClick={handleEditStart}
-              disabled={active}
-              className="cursor-pointer disabled:cursor-default"
+              disabled={isActive || isBreakPending}
+              className={`cursor-pointer disabled:cursor-default ${paused ? "animate-pulse" : ""}`}
             >
               <span className="text-[36px] font-extralight tabular-nums text-primary leading-none">
                 {timeDisplay}
@@ -160,60 +314,182 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
           </div>
 
           <span className="text-[10px] text-muted uppercase tracking-[0.2em] mt-1.5 font-light">
-            {active ? "Focus" : completed ? (cycleComplete ? "Long Break" : "Break") : "Focus"}
+            {phaseLabel}
           </span>
+
+          {timer.actionTitle && phase === "focus" && (
+            <p className="text-[10px] text-muted truncate max-w-[120px] mt-0.5">
+              {timer.actionTitle}
+            </p>
+          )}
         </div>
       </div>
 
-      {/* Completion message */}
-      {completed && !active && (
-        <p className="text-[11px] text-muted font-light mt-2 text-center animate-fade-in">
-          {cycleComplete
-            ? `Great cycle! Take a ${settings.longBreak}m break`
-            : `Take a ${settings.shortBreak}m break`}
-        </p>
+      {/* ── 30s warning banner ────────────────────────────────────── */}
+      {showWarning && <WarningBanner timer={timer} isFocus={isFocus} />}
+
+      {/* ── Break pending actions ─────────────────────────────────── */}
+      {isBreakPending && <BreakPendingActions timer={timer} cycleComplete={cycleComplete} />}
+
+      {/* ── DND toggle (only in idle/focus without warning) ───────── */}
+      {!isBreak && !isBreakPending && !showWarning && (
+        /* biome-ignore lint/a11y/noLabelWithoutControl: Radix Checkbox renders its own input */
+        <label className="flex items-center gap-2 mt-3 cursor-pointer select-none">
+          <Checkbox
+            checked={settings.dndEnabled}
+            onCheckedChange={(v) => timer.updateSettings({ dndEnabled: v })}
+          />
+          <span className="text-[11px] text-muted font-light">Do Not Disturb</span>
+        </label>
       )}
 
-      {/* DND toggle */}
-      <button
-        type="button"
-        className="flex items-center gap-2 mt-3 cursor-pointer select-none"
-        onClick={() => timer.updateSettings({ dndEnabled: !settings.dndEnabled })}
-      >
-        <Checkbox
-          checked={settings.dndEnabled}
-          onCheckedChange={(v) => timer.updateSettings({ dndEnabled: v })}
-        />
-        <span className="text-[11px] text-muted font-light">Do Not Disturb</span>
-      </button>
+      {/* ── Bottom controls ───────────────────────────────────────── */}
+      {!isBreakPending && !showWarning && (
+        <div className="flex items-center justify-between w-full mt-4">
+          {isBreak ? (
+            <>
+              <PauseResumeButton timer={timer} />
+              <button
+                type="button"
+                onClick={timer.skipBreak}
+                disabled={loading}
+                className="px-4 py-2 rounded-full bg-white/[0.08] text-[11px] uppercase tracking-[0.15em] text-primary font-light hover:bg-white/[0.12] transition-colors disabled:opacity-50"
+              >
+                Skip
+              </button>
+              <button
+                type="button"
+                onClick={() => timer.stop()}
+                disabled={loading}
+                className="px-4 py-2 rounded-full bg-white/[0.08] text-[11px] uppercase tracking-[0.15em] text-red-400 font-light hover:bg-red-500/[0.10] transition-colors disabled:opacity-50"
+              >
+                Stop
+              </button>
+              <SettingsButton onClick={onOpenSettings} />
+            </>
+          ) : isFocus ? (
+            <>
+              <PauseResumeButton timer={timer} />
+              <button
+                type="button"
+                onClick={timer.takeBreak}
+                disabled={loading}
+                className="px-4 py-2 rounded-full bg-white/[0.08] text-[11px] uppercase tracking-[0.15em] text-primary font-light hover:bg-white/[0.12] transition-colors disabled:opacity-50"
+              >
+                Break
+              </button>
+              <button
+                type="button"
+                onClick={() => timer.stop()}
+                disabled={loading}
+                className="px-4 py-2 rounded-full bg-white/[0.08] text-[11px] uppercase tracking-[0.15em] text-red-400 font-light hover:bg-red-500/[0.10] transition-colors disabled:opacity-50"
+              >
+                Stop
+              </button>
+              <SettingsButton onClick={onOpenSettings} />
+            </>
+          ) : (
+            <div className="flex flex-col gap-3 w-full">
+              <TaskPicker selectedId={timer.selectedTaskId} onSelect={timer.selectTask} />
+              <div className="flex items-center justify-between w-full">
+                <button
+                  type="button"
+                  className={ICON_BTN}
+                  onClick={timer.resetSessions}
+                  title="Reset sessions"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" strokeWidth={1.5} />
+                </button>
+                <button
+                  type="button"
+                  onClick={timer.start}
+                  disabled={loading}
+                  className="px-8 py-2 rounded-full bg-white/[0.08] text-[11px] uppercase tracking-[0.15em] text-primary font-light hover:bg-white/[0.12] transition-colors disabled:opacity-50"
+                >
+                  Start
+                </button>
+                <SettingsButton onClick={onOpenSettings} />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
-      {/* Bottom controls */}
-      <div className="flex items-center justify-between w-full mt-4">
+// ── 30-second warning banner ────────────────────────────────────────
+
+function WarningBanner({ timer, isFocus }: { timer: Timer; isFocus: boolean }) {
+  return (
+    <div className="flex flex-col items-center gap-2 mt-3 animate-fade-in">
+      <p className="text-[11px] text-warning font-light text-center">
+        {isFocus ? "Focus ending soon" : "Break ending soon"}
+      </p>
+      <div className="flex gap-2">
         <button
           type="button"
-          className="w-8 h-8 rounded-full border border-white/[0.1] flex items-center justify-center text-muted hover:text-secondary hover:border-white/[0.2] transition-colors"
-          onClick={timer.resetSessions}
-          title="Reset sessions"
+          onClick={() => timer.extend(isFocus ? 300 : 30)}
+          disabled={timer.loading}
+          className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-white/[0.06] text-[10px] uppercase tracking-[0.1em] text-secondary font-light hover:bg-white/[0.10] transition-colors disabled:opacity-50"
         >
-          <RotateCcw className="w-3.5 h-3.5" strokeWidth={1.5} />
+          <Plus className="w-3 h-3" strokeWidth={1.5} />
+          {isFocus ? "5m more" : "30s more"}
         </button>
-
         <button
           type="button"
-          onClick={active ? () => timer.stop() : () => timer.start()}
-          disabled={loading}
-          className="px-8 py-2 rounded-full bg-white/[0.08] text-[11px] uppercase tracking-[0.15em] text-primary font-light hover:bg-white/[0.12] transition-colors disabled:opacity-50"
+          onClick={() => timer.stop()}
+          disabled={timer.loading}
+          className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-white/[0.06] text-[10px] uppercase tracking-[0.1em] text-secondary font-light hover:bg-white/[0.10] transition-colors disabled:opacity-50"
         >
-          {active ? "Stop" : "Start"}
+          <X className="w-3 h-3" strokeWidth={1.5} />
+          End now
         </button>
+      </div>
+    </div>
+  );
+}
 
+// ── Break pending (between focus end and break start) ────────────────
+
+function BreakPendingActions({ timer, cycleComplete }: { timer: Timer; cycleComplete: boolean }) {
+  const breakMins = timer.completed?.breakMins ?? timer.settings.shortBreak;
+
+  return (
+    <div className="flex flex-col items-center gap-2 mt-3 animate-fade-in">
+      <p className="text-[11px] text-muted font-light text-center">
+        {cycleComplete
+          ? `Great cycle! ${breakMins}m break starting soon`
+          : `${breakMins}m break starting soon`}
+      </p>
+
+      <div className="flex gap-2">
         <button
           type="button"
-          className="w-8 h-8 rounded-full border border-white/[0.1] flex items-center justify-center text-muted hover:text-secondary hover:border-white/[0.2] transition-colors"
-          onClick={onOpenSettings}
-          title="Settings"
+          onClick={() => timer.extendWork()}
+          disabled={timer.loading}
+          className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-white/[0.06] text-[10px] uppercase tracking-[0.1em] text-secondary font-light hover:bg-white/[0.10] transition-colors disabled:opacity-50"
         >
-          <Settings className="w-3.5 h-3.5" strokeWidth={1.5} />
+          <Plus className="w-3 h-3" strokeWidth={1.5} />
+          5m more
+        </button>
+        <button
+          type="button"
+          onClick={timer.startBreak}
+          disabled={timer.loading}
+          className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-white/[0.08] text-[10px] uppercase tracking-[0.1em] text-primary font-light hover:bg-white/[0.12] transition-colors disabled:opacity-50"
+        >
+          <Coffee className="w-3 h-3" strokeWidth={1.5} />
+          Start Break
+        </button>
+        <button
+          type="button"
+          onClick={() => timer.stop()}
+          disabled={timer.loading}
+          className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-white/[0.06] text-[10px] uppercase tracking-[0.1em] text-secondary font-light hover:bg-white/[0.10] transition-colors disabled:opacity-50"
+        >
+          <Square className="w-3 h-3" strokeWidth={1.5} />
+          Stop
         </button>
       </div>
     </div>
@@ -307,11 +583,11 @@ function FocusSettingsPanel({
         <div className="space-y-1">
           <div className="flex items-center justify-between py-2.5">
             <span className="text-[13px] text-secondary font-light">Sound</span>
-            <Checkbox checked onCheckedChange={() => {}} />
+            <Checkbox checked onCheckedChange={() => {}} /> {/* TODO: wire to FocusSettings */}
           </div>
           <div className="flex items-center justify-between py-2.5">
             <span className="text-[13px] text-secondary font-light">Notification</span>
-            <Checkbox checked onCheckedChange={() => {}} />
+            <Checkbox checked onCheckedChange={() => {}} /> {/* TODO: wire to FocusSettings */}
           </div>
           <div className="flex items-center justify-between py-2.5">
             <span className="text-[13px] text-secondary font-light">Do Not Disturb</span>

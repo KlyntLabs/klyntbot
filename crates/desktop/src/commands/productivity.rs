@@ -248,6 +248,7 @@ pub async fn productivity_project_delete(
 use crate::focus_timer::{FocusTimer, TimerMode};
 use desktop_shared::commands::FocusTimerStatusResponse;
 
+#[allow(clippy::too_many_arguments)]
 #[tauri::command(rename_all = "snake_case")]
 pub async fn focus_timer_start(
     state: State<'_, Arc<AppCore>>,
@@ -256,6 +257,8 @@ pub async fn focus_timer_start(
     mode: String,
     work_mins: u64,
     break_mins: Option<u64>,
+    action_id: Option<String>,
+    action_title: Option<String>,
 ) -> Result<FocusSessionResponse, ApiError> {
     let timer_mode = match mode.as_str() {
         "pomodoro" => TimerMode::Pomodoro,
@@ -265,17 +268,22 @@ pub async fn focus_timer_start(
     // Start the persistent session first
     let session = if timer_mode == TimerMode::Pomodoro {
         state
-            .productivity_pomodoro_start(Some(work_mins as i64), break_mins.map(|b| b as i64))
+            .productivity_pomodoro_start_with_action(
+                action_id,
+                None,
+                Some(work_mins as i64),
+                break_mins.map(|b| b as i64),
+            )
             .await?
     } else {
         state
-            .productivity_focus_start(None, None, Some(work_mins as i64))
+            .productivity_focus_start(action_id, None, Some(work_mins as i64))
             .await?
     };
 
     // Then start the desktop timer (tray title + countdown)
     timer
-        .start(app, timer_mode, work_mins, break_mins)
+        .start(app, timer_mode, work_mins, break_mins, action_title)
         .await
         .map_err(|e| ApiError::new("TIMER_ERROR", e.to_string()))?;
 
@@ -290,7 +298,8 @@ pub async fn focus_timer_stop(
     notes: Option<String>,
 ) -> Result<Option<FocusSessionResponse>, ApiError> {
     timer.stop(&app).await;
-    state.productivity_focus_end(notes).await
+    // During a break there's no active focus session — don't error in that case
+    Ok(state.productivity_focus_end(notes).await.unwrap_or(None))
 }
 
 #[tauri::command]
@@ -302,12 +311,42 @@ pub async fn focus_timer_status(
     let timer_info = timer.status().await;
 
     Ok(FocusTimerStatusResponse {
-        active: session.is_some(),
+        active: timer_info.is_some(),
         mode: timer_info.map(|(m, _)| m.as_str().to_string()),
         remaining_secs: None, // Remaining is pushed via events, not polled
         total_secs: timer_info.map(|(_, t)| t),
         session,
     })
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn focus_break_start(
+    timer: State<'_, Arc<FocusTimer>>,
+    app: tauri::AppHandle,
+    break_mins: u64,
+) -> Result<(), ApiError> {
+    timer
+        .start_break(app, break_mins)
+        .await
+        .map_err(|e| ApiError::new("TIMER_ERROR", e.to_string()))
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn focus_timer_extend(
+    timer: State<'_, Arc<FocusTimer>>,
+    extra_secs: u64,
+) -> Result<bool, ApiError> {
+    Ok(timer.extend(extra_secs).await)
+}
+
+#[tauri::command]
+pub async fn focus_timer_pause(timer: State<'_, Arc<FocusTimer>>) -> Result<bool, ApiError> {
+    Ok(timer.pause().await)
+}
+
+#[tauri::command]
+pub async fn focus_timer_resume(timer: State<'_, Arc<FocusTimer>>) -> Result<bool, ApiError> {
+    Ok(timer.resume().await)
 }
 
 // ── Dev server dispatch ─────────────────────────────────────────────

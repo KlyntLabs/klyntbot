@@ -774,28 +774,3 @@ flowchart TD
 
 12. **Response delivery**: The validated response is published as `OutboundMessage` via `MessageBus`, routed through the originating channel back to the user.
 
----
-
-## Implementation Gaps & Technical Debt Analysis
-
-No active gaps. All identified issues have been resolved.
-
-### Resolved
-
-The following gaps have been addressed:
-
-- ~~Synthesis at max_iterations can return empty string~~ — Fixed: fallback to trace summary instead of empty string (`reactive.rs`)
-- ~~BudgetAllocator silent failure on small context windows~~ — Fixed: warning emitted when remaining budget < 15% (`budget.rs`)
-- ~~Reflexive stability inflation in FSRS~~ — Fixed: capped at `MAX_STABILITY = 30.0` (`decay.rs`)
-- ~~USER_MODEL_DOMAINS hardcoded to 6~~ — Fixed: expanded to 10 domains with `other` catch-all field (`types.rs`, `repos/mod.rs`, `context_source.rs`)
-- ~~Notes migrations run twice~~ — Fixed: removed duplicate call in `AgentLoopBuilder::build()` (`builder.rs`)
-- ~~`threshold_confidence` computed but unused~~ — Fixed: scales `MAX_THRESHOLD_STEP` for faster convergence (`adaptive.rs`)
-- ~~IntentPipeline is dead code~~ — Fixed: deleted `pipeline.rs`, moved `PipelineConfig` to `types.rs`, removed e2e tests
-- ~~No test for delegation at max depth~~ — Already resolved: `test_delegation_tool_not_injected_at_max_depth` exists in `runtime.rs`
-- ~~Cognitive provider created twice~~ — Fixed: stored `Option<DynProvider>` in `AppCore`, reflection handler uses it directly (`state.rs`, `cognitive.rs`)
-- ~~AccumulatedEntry buffer not persisted across restarts~~ — Fixed: added `accumulated_observations` table, repo, and migration; `BackgroundConsolidationService` loads on startup, persists on add, deletes on promotion (`background.rs`, `repos/accumulated_observation.rs`)
-- ~~Dev server dispatch must be manually updated~~ — Fixed: co-located `dispatch_dev()` functions in each command module with `DEV_COMMANDS` const arrays; chained dispatch in `dev_server.rs`; parity test ensures all Tauri commands have dev server coverage (`commands/*.rs`, `dev_server.rs`)
-- ~~HistoryCompressor makes N/5 LLM calls for abstractive compression~~ — Fixed: `SummaryProvider::summarize_batch` accepts all segments at once; `LlmSummaryProvider` batches into sub-groups of 5, produces JSON array summaries per call, and runs sub-batches in parallel via `join_all`; per-segment extractive fallback on failure (`summary_provider.rs`, `llm_summary_provider.rs`, `history_compressor.rs`)
-- ~~Single monolithic cron callback~~ — Fixed: `CronService::register_handler(name, callback)` allows per-job-name handlers; `set_callback` remains as fallback for unregistered names. Each job type is now a self-contained handler in `init.rs` (`scheduling/service/mod.rs`, `executor.rs`, `store.rs`, `app-core/init.rs`)
-- ~~Context cache invalidated on every tool execution~~ — Fixed: `invalidate_cache()` was dead code (never called). Removed the unused generation-counter mechanism. The SHA-256 cache key already captures all relevant state changes (history, message, strategy, tools), so cache entries expire naturally when inputs differ (`assembler.rs`)
-- ~~`block_on` in Tauri setup blocks UI thread~~ — Fixed: main window starts hidden (`visible: false` in `tauri.conf.json`), shown after init completes via `window.show()`. Users no longer see a blank window during boot (`main.rs`, `tauri.conf.json`)

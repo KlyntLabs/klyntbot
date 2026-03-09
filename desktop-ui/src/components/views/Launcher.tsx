@@ -11,8 +11,9 @@ import {
   Target,
   TrendingUp,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTransparentBackground } from "../../hooks/useTransparentBackground";
+import { useWindowAutoResize } from "../../hooks/useWindowAutoResize";
 import type { LauncherItem } from "../../lib/types";
 import { isTauri } from "../../lib/utils";
 import { KlyntLogo } from "../ui/KlyntLogo";
@@ -88,7 +89,7 @@ export function Launcher() {
   const [sessionKey, setSessionKey] = useState<string | null>(null);
   const [initialQuery, setInitialQuery] = useState<string | null>(null);
 
-  useTransparentBackground();
+  useTransparentBackground({ nativeVibrancy: true });
 
   const enterChat = useCallback((text: string) => {
     const key = `launcher-${Date.now()}`;
@@ -141,6 +142,9 @@ export function Launcher() {
     return () => window.removeEventListener("keydown", handleGlobalKeyDown);
   }, [mode, exitChat]);
 
+  const contentRef = useRef<HTMLDivElement>(null);
+  useWindowAutoResize(contentRef, { width: 660, maxHeight: 580 });
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "ArrowDown") {
       e.preventDefault();
@@ -160,9 +164,10 @@ export function Launcher() {
   };
 
   return (
-    <div className="w-screen text-primary flex justify-center pt-3 px-4">
+    <div className="w-screen text-primary">
       <div
-        className="w-full max-w-[660px] glass-floating overflow-hidden"
+        ref={contentRef}
+        className="w-full glass-floating overflow-hidden"
         style={{ animation: "glass-appear 0.25s ease-out" }}
       >
         {mode === "command" ? (

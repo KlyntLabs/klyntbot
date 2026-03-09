@@ -25,8 +25,8 @@
         "label": "launcher",
         "url": "/#/launcher",
         "title": "",
-        "width": 700,
-        "height": 600,
+        "width": 660,
+        "height": 580,
         "resizable": false,
         "decorations": false,
         "visible": false,
@@ -34,7 +34,12 @@
         "shadow": false,
         "alwaysOnTop": true,
         "skipTaskbar": true,
-        "center": true
+        "center": true,
+        "windowEffects": {
+          "effects": ["hudWindow"],
+          "state": "active",
+          "radius": 16.0
+        }
       },
       {
         "label": "tray",
@@ -49,7 +54,12 @@
         "shadow": false,
         "alwaysOnTop": true,
         "skipTaskbar": true,
-        "focus": false
+        "focus": false,
+        "windowEffects": {
+          "effects": ["hudWindow"],
+          "state": "active",
+          "radius": 16.0
+        }
       },
       {
         "label": "distraction-overlay",

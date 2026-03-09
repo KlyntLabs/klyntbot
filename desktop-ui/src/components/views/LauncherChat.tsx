@@ -92,7 +92,7 @@ export function LauncherChat({ sessionKey, initialQuery, onBack, onExpand }: Lau
   }, [onExpand]);
 
   return (
-    <div className="flex flex-col h-full max-h-[568px]">
+    <div className="flex flex-col" style={{ height: 568 }}>
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
         <button

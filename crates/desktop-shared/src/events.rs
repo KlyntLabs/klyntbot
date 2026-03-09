@@ -540,6 +540,8 @@ pub struct FocusTickPayload {
     pub remaining_secs: u64,
     pub total_secs: u64,
     pub mode: String,
+    pub paused: bool,
+    pub action_title: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
