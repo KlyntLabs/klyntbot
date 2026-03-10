@@ -390,8 +390,65 @@ impl AppCore {
         );
         info!("coaching service started");
 
+        // Phase 3: Auto-generate ingestion token on first startup if missing.
+        if config.capture.ingestion_api.enabled && config.capture.ingestion_api.token.is_none() {
+            config.capture.ingestion_api.token = Some(uuid::Uuid::new_v4().to_string());
+            if let Err(e) = config::save(&config).await {
+                warn!("Failed to save auto-generated ingestion token: {e}");
+            } else {
+                info!("auto-generated ingestion API token");
+            }
+        }
+
+        // Phase 3: Start file watcher if enabled.
+        if config.capture.file_watcher.enabled {
+            let dirs: Vec<std::path::PathBuf> = config
+                .capture
+                .file_watcher
+                .directories
+                .iter()
+                .map(std::path::PathBuf::from)
+                .collect();
+            if !dirs.is_empty() {
+                let fw = crate::file_watcher::FileWatcherService::new(
+                    dirs,
+                    Arc::clone(&activity_svc),
+                    config.capture.file_watcher.ignore_patterns.clone(),
+                    config.capture.file_watcher.debounce_ms,
+                );
+                let _fw_handle = fw.start(shutdown_token.child_token());
+                info!("file watcher started");
+            }
+        }
+
+        // Phase 2: Start Work Context inference engine + loop.
+        if config.work_context.enabled {
+            let inference_cfg =
+                activity_log::inference::ContextInferenceConfig::from_work_context_config(
+                    &config.work_context,
+                );
+            let embedding_engine = Arc::new(tools::EmbeddingEngine::new());
+            let text_embedder = Arc::new(agent::TextEmbedderImpl::new(embedding_engine));
+            let inference_engine = Arc::new(activity_log::inference::ContextInferenceEngine::new(
+                storage_pool.clone(),
+                text_embedder,
+                None, // VectorStore already consumed by agent builder; centroids cached in-memory
+                inference_cfg,
+            ));
+            let dormancy_days = config.work_context.max_dormancy_days as i64;
+            let _inference_loop = activity_log::inference_loop::ContextInferenceLoop::start(
+                inference_engine,
+                storage_pool.clone(),
+                config.work_context.inference_interval_mins,
+                dormancy_days,
+                shutdown_token.child_token(),
+            );
+            info!("work context inference loop started");
+        }
+
         let core = AppCore {
             repos,
+            storage_pool: storage_pool.clone(),
             agent: Arc::clone(&agent),
             bus: bus.clone(),
             persona_manager,

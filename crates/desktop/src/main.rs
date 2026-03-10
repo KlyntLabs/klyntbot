@@ -364,6 +364,13 @@ fn main() {
             // Status
             commands::status::agent_status,
             // Window
+            // Capture
+            commands::capture::capture_status,
+            commands::capture::capture_shell_hook_status,
+            commands::capture::capture_install_shell_hook,
+            commands::capture::capture_uninstall_shell_hook,
+            commands::capture::capture_get_ingestion_token,
+            commands::capture::capture_regenerate_ingestion_token,
             commands::window::resize_window,
             commands::window::open_url,
             commands::window::show_dashboard,

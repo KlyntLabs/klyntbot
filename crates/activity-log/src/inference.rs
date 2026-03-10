@@ -8,12 +8,15 @@ use tracing::warn;
 use crate::context_resource_repo::ContextResourceRepo;
 use crate::normalizers::new_ulid;
 use crate::repo::ActivityLogRepo;
+use crate::resource_edge_repo::ResourceEdgeRepo;
 use crate::types::*;
 use crate::work_context_repo::WorkContextRepo;
 use crate::work_resource_repo::WorkResourceRepo;
 
 pub struct ContextInferenceConfig {
     pub assignment_threshold: f64,
+    pub merge_threshold: f64,
+    pub merge_resource_overlap_min: f64,
     pub temporal_decay_lambda: f64,
     pub centroid_learning_rate: f64,
     pub semantic_weight: f64,
@@ -26,6 +29,8 @@ impl Default for ContextInferenceConfig {
     fn default() -> Self {
         Self {
             assignment_threshold: 0.55,
+            merge_threshold: 0.85,
+            merge_resource_overlap_min: 0.50,
             temporal_decay_lambda: 0.1,
             centroid_learning_rate: 0.3,
             semantic_weight: 0.50,
@@ -40,6 +45,7 @@ impl ContextInferenceConfig {
     pub fn from_work_context_config(cfg: &config::schema::WorkContextConfig) -> Self {
         Self {
             assignment_threshold: cfg.assignment_threshold,
+            merge_threshold: cfg.merge_threshold,
             semantic_weight: cfg.semantic_weight,
             temporal_weight: cfg.temporal_weight,
             resource_weight: cfg.resource_weight,
@@ -265,13 +271,7 @@ impl ContextInferenceEngine {
             }
         };
 
-        if ctx_resource_ids.is_empty() {
-            return 0.0;
-        }
-
-        let intersection = event_resources.intersection(&ctx_resource_ids).count();
-        let union = event_resources.union(&ctx_resource_ids).count();
-        intersection as f64 / union as f64
+        jaccard_similarity(&event_resources, &ctx_resource_ids)
     }
 
     /// Set a centroid directly (for new contexts).
@@ -340,9 +340,94 @@ impl ContextInferenceEngine {
                 embedding_id: None,
             };
             WorkResourceRepo::upsert(&self.pool, &resource).await?;
+
+            // Create co-occurrence edges between this resource and existing context resources
+            let existing_ids =
+                ContextResourceRepo::list_resource_ids_for_context(&self.pool, context_id).await?;
+            for existing_id in &existing_ids {
+                if *existing_id != res_id {
+                    let edge = ResourceEdge {
+                        source_id: res_id.clone(),
+                        target_id: existing_id.clone(),
+                        edge_type: "co_access".to_string(),
+                        weight: 1.0,
+                        first_seen_at: now,
+                        last_seen_at: now,
+                    };
+                    if let Err(e) = ResourceEdgeRepo::upsert(&self.pool, &edge).await {
+                        warn!("Failed to upsert resource edge: {e}");
+                    }
+                }
+            }
+
             ContextResourceRepo::link(&self.pool, context_id, &res_id, 0.5).await?;
         }
         Ok(())
+    }
+
+    /// Check pairs of active contexts for merge candidates.
+    /// Merges when centroid similarity > merge_threshold AND resource overlap > 50%.
+    pub async fn check_merge_candidates(&self) -> common::Result<Vec<(String, String)>> {
+        let active = WorkContextRepo::list_active(&self.pool).await?;
+        self.ensure_centroids(&active).await;
+
+        // Bulk-fetch resource IDs for all active contexts (avoids N² queries in the pair loop)
+        let mut resource_map: HashMap<String, HashSet<String>> = HashMap::new();
+        for ctx in &active {
+            let ids = ContextResourceRepo::list_resource_ids_for_context(&self.pool, &ctx.id)
+                .await
+                .unwrap_or_default();
+            resource_map.insert(ctx.id.clone(), ids.into_iter().collect());
+        }
+
+        let centroids = self.centroids.read().await;
+        let mut merged = Vec::new();
+
+        for i in 0..active.len() {
+            for j in (i + 1)..active.len() {
+                let ctx_a = &active[i];
+                let ctx_b = &active[j];
+
+                // Check centroid similarity
+                let sim = match (centroids.get(&ctx_a.id), centroids.get(&ctx_b.id)) {
+                    (Some(a), Some(b)) => cosine_similarity(a, b),
+                    _ => continue,
+                };
+
+                if sim < self.config.merge_threshold {
+                    continue;
+                }
+
+                // Check resource overlap (Jaccard)
+                let empty = HashSet::new();
+                let res_a = resource_map.get(&ctx_a.id).unwrap_or(&empty);
+                let res_b = resource_map.get(&ctx_b.id).unwrap_or(&empty);
+                let overlap = jaccard_similarity(res_a, res_b);
+
+                if overlap < self.config.merge_resource_overlap_min {
+                    continue;
+                }
+
+                // Merge: keep the one with more events
+                let (keep, remove) = if ctx_a.event_count >= ctx_b.event_count {
+                    (&ctx_a.id, &ctx_b.id)
+                } else {
+                    (&ctx_b.id, &ctx_a.id)
+                };
+
+                drop(centroids);
+                WorkContextRepo::merge(&self.pool, keep, remove).await?;
+
+                // Remove merged centroid from cache
+                self.centroids.write().await.remove(remove);
+
+                merged.push((keep.clone(), remove.clone()));
+                // After mutation, return early to avoid stale iteration
+                return Ok(merged);
+            }
+        }
+
+        Ok(merged)
     }
 }
 
@@ -391,6 +476,15 @@ fn infer_context_type(event: &ActivityLogEntry) -> WorkContextType {
     } else {
         WorkContextType::General
     }
+}
+
+fn jaccard_similarity(a: &HashSet<String>, b: &HashSet<String>) -> f64 {
+    if a.is_empty() && b.is_empty() {
+        return 0.0;
+    }
+    let intersection = a.intersection(b).count();
+    let union = a.union(b).count();
+    if union == 0 { 0.0 } else { intersection as f64 / union as f64 }
 }
 
 fn cosine_similarity(a: &[f32], b: &[f32]) -> f64 {

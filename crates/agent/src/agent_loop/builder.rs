@@ -369,9 +369,12 @@ impl AgentLoopBuilder {
                 ));
 
                 let token = CancellationToken::new();
+                let dormancy_days = config.work_context.max_dormancy_days as i64;
                 let _handle = activity_log::inference_loop::ContextInferenceLoop::start(
                     Arc::clone(&engine),
+                    storage_pool.clone(),
                     config.work_context.inference_interval_mins,
+                    dormancy_days,
                     token.clone(),
                 );
                 info!("Work context inference loop started");

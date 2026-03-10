@@ -22,6 +22,7 @@ use super::project::ProjectConfig;
 use super::providers::{ProviderManagerConfig, ProvidersConfig};
 use super::todo::TodoConfig;
 use super::tools::ToolsConfig;
+use super::capture::CaptureConfig;
 use super::work_context::WorkContextConfig;
 
 /// Expand a leading `~` in a path to the user's home directory.
@@ -148,6 +149,10 @@ pub struct Config {
     /// Work context inference engine configuration.
     #[serde(default)]
     pub work_context: WorkContextConfig,
+
+    /// External capture sources configuration (shell hook, file watcher, ingestion API).
+    #[serde(default)]
+    pub capture: CaptureConfig,
 
     /// MCP (Model Context Protocol) server connections and server settings.
     #[serde(default)]

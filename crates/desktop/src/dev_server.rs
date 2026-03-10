@@ -57,6 +57,8 @@ pub async fn start(core: Arc<AppCore>) {
             "/api/cognitive/stream",
             axum::routing::get(cognitive_sse_handler),
         )
+        .route("/api/v1/ingest", post(ingest_handler))
+        .route("/api/v1/ingest/batch", post(ingest_batch_handler))
         .route("/api/{cmd}", post(dispatch))
         .with_state(state);
 
@@ -197,6 +199,9 @@ async fn dispatch(
     if let Some(r) = commands::cron::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }
+    if let Some(r) = commands::capture::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
 
     // ── chat_send (needs SSE channels, handled inline) ──────────────
     if cmd == "chat_send" {
@@ -214,6 +219,41 @@ async fn dispatch(
         "NOT_FOUND",
         format!("command '{cmd}' is not supported in browser dev mode"),
     ))
+}
+
+// ── Ingestion API handlers ────────────────────────────────────────────
+
+async fn ingest_handler(
+    State(state): State<DevState>,
+    headers: axum::http::HeaderMap,
+    Json(req): Json<desktop_shared::commands::IngestRequest>,
+) -> ApiResult {
+    let token = extract_bearer_token(&headers);
+    match state.core.ingest_event(&token, req).await {
+        Ok(resp) => ok(resp),
+        Err(e) => err(e),
+    }
+}
+
+async fn ingest_batch_handler(
+    State(state): State<DevState>,
+    headers: axum::http::HeaderMap,
+    Json(reqs): Json<Vec<desktop_shared::commands::IngestRequest>>,
+) -> ApiResult {
+    let token = extract_bearer_token(&headers);
+    match state.core.ingest_batch(&token, reqs).await {
+        Ok(resp) => ok(resp),
+        Err(e) => err(e),
+    }
+}
+
+fn extract_bearer_token(headers: &axum::http::HeaderMap) -> String {
+    headers
+        .get("authorization")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "))
+        .unwrap_or("")
+        .to_string()
 }
 
 /// Handle `chat_send` separately because it needs SSE channel state to relay
@@ -475,6 +515,7 @@ mod tests {
             commands::cognitive::DEV_COMMANDS,
             commands::timeline::DEV_COMMANDS,
             commands::cron::DEV_COMMANDS,
+            commands::capture::DEV_COMMANDS,
         ];
         // chat_send is handled inline in dev_server.rs
         let mut set: BTreeSet<String> = modules

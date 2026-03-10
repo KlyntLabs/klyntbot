@@ -32,9 +32,11 @@ mod project;
 mod providers;
 mod todo;
 mod tools;
+mod capture;
 mod work_context;
 
 pub use self::agents::*;
+pub use self::capture::*;
 pub use self::channels::*;
 pub use self::cognitive::*;
 pub use self::confidence::*;

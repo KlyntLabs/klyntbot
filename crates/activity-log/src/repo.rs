@@ -226,6 +226,13 @@ impl ActivityLogRepo {
         Ok(rows.into_iter().collect())
     }
 
+    pub async fn count_by_source_since(
+        pool: &StoragePool,
+        since: DateTime<Utc>,
+    ) -> common::Result<HashMap<String, i64>> {
+        Self::count_by_source(pool, since, Utc::now()).await
+    }
+
     pub async fn query_unassigned(
         pool: &StoragePool,
         since: DateTime<Utc>,

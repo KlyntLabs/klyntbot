@@ -26,7 +26,13 @@ chrono = { workspace = true }
 uuid = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+tools = { workspace = true }
 tools-core = { workspace = true }
 tracing = { workspace = true }
 base64 = { workspace = true }
 activity-log = { workspace = true }
+notify = { workspace = true }
+notify-debouncer-mini = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

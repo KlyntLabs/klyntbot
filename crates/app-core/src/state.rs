@@ -13,7 +13,7 @@ use feature_notes::repo::NoteRepo;
 use feature_productivity::repos::ProductivityRepos;
 use feature_productivity::{DailyAggregator, FocusManager, NudgeService, ProductivityEngine};
 use scheduling::CronService;
-use storage::Repos;
+use storage::{Repos, StoragePool};
 use tokio::sync::{broadcast, oneshot, Mutex, RwLock};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info};
@@ -33,6 +33,7 @@ pub type HandlerResult<T> = Result<(T, Vec<EntityUpdate>), ApiError>;
 /// Desktop and dev-server each wrap it with their own event wiring.
 pub struct AppCore {
     pub repos: Repos,
+    pub storage_pool: StoragePool,
     pub agent: Arc<AgentLoop>,
     pub bus: Arc<MessageBus>,
     pub persona_manager: Arc<RwLock<PersonaManager>>,

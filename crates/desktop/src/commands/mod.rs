@@ -1,4 +1,5 @@
 pub mod areas;
+pub mod capture;
 pub mod chat;
 pub mod cognitive;
 pub mod columns;
