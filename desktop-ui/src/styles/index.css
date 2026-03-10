@@ -3,6 +3,10 @@
 @import "./theme.css";
 @import "./prose.css";
 @import "./editor.css";
+@import "../shared/styles/themes/_base.css";
+@import "../shared/styles/themes/dark.css";
+@import "../shared/styles/themes/retro.css";
+@import "../shared/styles/glass.css";
 
 body {
   margin: 0;

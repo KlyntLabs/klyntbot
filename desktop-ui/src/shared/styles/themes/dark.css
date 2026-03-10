@@ -1,0 +1,162 @@
+/* ── DARK THEME (default, existing visual appearance) ──────────────────
+   All color and visual variables that define the dark glassmorphism aesthetic.
+   Wraps in [data-theme="dark"] and :root for universal application. */
+
+[data-theme="dark"],
+:root {
+  /* ── Background ──────────────────────────────────────────────────────── */
+  --background: #000000;
+
+  /* ── Surface staircase (Tahoe glass tiers) ────────────────────────────── */
+  --surface-lowest: rgba(255, 255, 255, 0.025);
+  --surface-low: rgba(255, 255, 255, 0.04);
+  --surface-base: rgba(255, 255, 255, 0.06);
+  --surface-raised: rgba(255, 255, 255, 0.09);
+  --surface-highest: rgba(255, 255, 255, 0.13);
+
+  /* ── Text hierarchy ──────────────────────────────────────────────────── */
+  --text-primary: #f0f2f5;
+  --text-secondary: #c8cdd4;
+  --text-muted: #7d8590;
+  --text-dim: #5a616b;
+
+  /* ── Brand ────────────────────────────────────────────────────────────── */
+  --brand: #f97316;
+  --brand-hover: #fb923c;
+  --brand-glow: rgba(249, 115, 22, 0.25);
+
+  /* ── Semantic colors ──────────────────────────────────────────────────── */
+  --success: #34d399;
+  --destructive: #f43f5e;
+  --info: #60a5fa;
+  --warning: #fbbf24;
+  --purple: #a78bfa;
+
+  /* ── Origin badges ────────────────────────────────────────────────────── */
+  --origin-system: #60a5fa;
+  --origin-ai: #a78bfa;
+  --origin-user: #34d399;
+  --origin-plugin: #fbbf24;
+
+  /* ── Border ───────────────────────────────────────────────────────────── */
+  --border: rgba(255, 255, 255, 0.08);
+  --border-subtle: rgba(255, 255, 255, 0.04);
+
+  /* ── Timeline / Dashboard ──────────────────────────────────────────────── */
+  --timeline-app-productive: oklch(0.72 0.15 145);
+  --timeline-app-distracting: oklch(0.65 0.18 25);
+  --timeline-app-neutral: oklch(0.55 0.02 250);
+  --timeline-focus: oklch(0.65 0.18 290);
+  --timeline-task: oklch(0.68 0.16 240);
+  --timeline-note: oklch(0.75 0.14 80);
+  --timeline-finance: oklch(0.72 0.16 160);
+  --timeline-todo: oklch(0.7 0.16 200);
+  --timeline-finance-expense: oklch(0.65 0.18 25);
+  --timeline-finance-income: oklch(0.72 0.16 155);
+  --timeline-system: oklch(0.55 0.02 250);
+  --timeline-calendar: oklch(0.65 0.15 280);
+  --timeline-focus-high: oklch(0.58 0.22 290);
+  --timeline-focus-low: oklch(0.72 0.12 290);
+  --timeline-unfocused: rgba(255, 255, 255, 0.03);
+  --timeline-dot-note: oklch(0.7 0.14 250);
+  --timeline-dot-task-done: oklch(0.65 0.18 155);
+  --timeline-dot-finance: oklch(0.78 0.16 85);
+
+  /* ── Overlay ───────────────────────────────────────────────────────── */
+  --overlay: rgba(0, 0, 0, 0.25);
+  --overlay-heavy: rgba(0, 0, 0, 0.45);
+
+  /* ── Shadows ───────────────────────────────────────────────────────── */
+  --shadow-tooltip: 0 4px 20px rgba(0, 0, 0, 0.35);
+
+  /* ── Floating / glass (Tahoe Liquid Glass) ─────────────────────────── */
+  --surface-floating: rgba(10, 10, 10, 0.92);
+
+  /* Glass material — primary tier */
+  --surface-glass: rgba(255, 255, 255, 0.08);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-border-strong: rgba(255, 255, 255, 0.2);
+  --glass-shadow: none;
+
+  /* Glass material — sidebar tier (more translucent) */
+  --surface-glass-sidebar: rgba(255, 255, 255, 0.06);
+
+  /* Glass material — subtle tier (for buttons, inputs) */
+  --surface-glass-subtle: rgba(255, 255, 255, 0.06);
+  --surface-glass-subtle-hover: rgba(255, 255, 255, 0.1);
+
+  /* Glass material — elevated tier (for active states) */
+  --surface-glass-elevated: rgba(255, 255, 255, 0.14);
+
+  /* Glass material — tint tier (for colored glass) */
+  --glass-tint-brand: rgba(249, 115, 22, 0.08);
+  --glass-tint-info: rgba(96, 165, 250, 0.06);
+  --glass-tint-success: rgba(52, 211, 153, 0.06);
+  --glass-tint-destructive: rgba(244, 63, 94, 0.06);
+}
+
+/* Tailwind @theme inline registration for dark theme colors */
+@theme inline {
+  /* Background */
+  --color-background: var(--background);
+
+  /* Surface staircase */
+  --color-surface-lowest: var(--surface-lowest);
+  --color-surface-low: var(--surface-low);
+  --color-surface-base: var(--surface-base);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-highest: var(--surface-highest);
+  --color-surface-floating: var(--surface-floating);
+  --color-surface-glass: var(--surface-glass);
+
+  /* Text hierarchy */
+  --color-primary: var(--text-primary);
+  --color-secondary: var(--text-secondary);
+  --color-muted: var(--text-muted);
+  --color-dim: var(--text-dim);
+
+  /* Brand */
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+
+  /* Semantic */
+  --color-success: var(--success);
+  --color-destructive: var(--destructive);
+  --color-info: var(--info);
+  --color-warning: var(--warning);
+  --color-purple: var(--purple);
+
+  /* Origin badges */
+  --color-origin-system: var(--origin-system);
+  --color-origin-ai: var(--origin-ai);
+  --color-origin-user: var(--origin-user);
+  --color-origin-plugin: var(--origin-plugin);
+
+  /* Border */
+  --color-border: var(--border);
+  --color-border-subtle: var(--border-subtle);
+
+  /* Overlay */
+  --color-overlay: var(--overlay);
+  --color-overlay-heavy: var(--overlay-heavy);
+
+  /* Timeline */
+  --color-timeline-app-productive: var(--timeline-app-productive);
+  --color-timeline-app-distracting: var(--timeline-app-distracting);
+  --color-timeline-app-neutral: var(--timeline-app-neutral);
+  --color-timeline-focus: var(--timeline-focus);
+  --color-timeline-task: var(--timeline-task);
+  --color-timeline-note: var(--timeline-note);
+  --color-timeline-finance: var(--timeline-finance);
+  --color-timeline-todo: var(--timeline-todo);
+  --color-timeline-finance-expense: var(--timeline-finance-expense);
+  --color-timeline-finance-income: var(--timeline-finance-income);
+  --color-timeline-system: var(--timeline-system);
+  --color-timeline-calendar: var(--timeline-calendar);
+  --color-timeline-focus-high: var(--timeline-focus-high);
+  --color-timeline-focus-low: var(--timeline-focus-low);
+  --color-timeline-unfocused: var(--timeline-unfocused);
+  --color-timeline-dot-note: var(--timeline-dot-note);
+  --color-timeline-dot-task-done: var(--timeline-dot-task-done);
+  --color-timeline-dot-finance: var(--timeline-dot-finance);
+}

@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import path from "path";
 
 export default defineConfig({
   plugins: [
@@ -12,6 +13,14 @@ export default defineConfig({
     tailwindcss(),
   ],
   clearScreen: false,
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
+      "@shared": path.resolve(__dirname, "./src/shared"),
+      "@features": path.resolve(__dirname, "./src/features"),
+      "@app": path.resolve(__dirname, "./src/app"),
+    },
+  },
   server: {
     port: 1420,
     strictPort: true,

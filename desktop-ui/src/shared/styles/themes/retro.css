@@ -1,0 +1,374 @@
+/* ── RETRO CRT TERMINAL THEME ──────────────────────────────────────────
+   A nostalgic green phosphor CRT display aesthetic with scanlines,
+   vignette, and amber accent colors. All variables are overridden to
+   match the retro feel while maintaining component structure. */
+
+[data-theme="retro"] {
+  /* ── Background — Deep dark green CRT ─────────────────────────────── */
+  --background: #0a0f0a;
+
+  /* ── Surface staircase — Green phosphor tinted ────────────────────── */
+  --surface-lowest: rgba(0, 255, 65, 0.02);
+  --surface-low: rgba(0, 255, 65, 0.04);
+  --surface-base: rgba(0, 255, 65, 0.06);
+  --surface-raised: rgba(0, 255, 65, 0.09);
+  --surface-highest: rgba(0, 255, 65, 0.14);
+
+  /* ── Text — Green phosphor glow ──────────────────────────────────── */
+  --text-primary: #33ff66;
+  --text-secondary: #29cc52;
+  --text-muted: #1a8035;
+  --text-dim: #0f4d20;
+
+  /* ── Brand — Amber CRT accent ────────────────────────────────────── */
+  --brand: #ffb000;
+  --brand-hover: #ffc940;
+  --brand-glow: rgba(255, 176, 0, 0.25);
+
+  /* ── Semantic colors — Retro compatible ──────────────────────────── */
+  --success: #00ff41;
+  --destructive: #ff4444;
+  --info: #ffb000;
+  --warning: #ffaa00;
+  --purple: #ff00ff;
+
+  /* ── Origin badges — Retro style ─────────────────────────────────── */
+  --origin-system: #ffb000;
+  --origin-ai: #ff00ff;
+  --origin-user: #00ff41;
+  --origin-plugin: #ffaa00;
+
+  /* ── Border — Green tinted ───────────────────────────────────────── */
+  --border: rgba(0, 255, 65, 0.15);
+  --border-subtle: rgba(0, 255, 65, 0.08);
+
+  /* ── Timeline / Dashboard — Retro colors ─────────────────────────── */
+  --timeline-app-productive: #00ff41;
+  --timeline-app-distracting: #ff4444;
+  --timeline-app-neutral: #888888;
+  --timeline-focus: #ffb000;
+  --timeline-task: #00ccff;
+  --timeline-note: #ffff00;
+  --timeline-finance: #ffaa00;
+  --timeline-todo: #00ffff;
+  --timeline-finance-expense: #ff4444;
+  --timeline-finance-income: #00ff41;
+  --timeline-system: #888888;
+  --timeline-calendar: #ff00ff;
+  --timeline-focus-high: #ffb000;
+  --timeline-focus-low: #ffaa00;
+  --timeline-unfocused: rgba(0, 255, 65, 0.03);
+  --timeline-dot-note: #ffff00;
+  --timeline-dot-task-done: #00ff41;
+  --timeline-dot-finance: #ffaa00;
+
+  /* ── Overlay — Dark and contrasty ────────────────────────────────── */
+  --overlay: rgba(0, 0, 0, 0.4);
+  --overlay-heavy: rgba(0, 0, 0, 0.6);
+
+  /* ── Shadows ────────────────────────────────────────────────────── */
+  --shadow-tooltip: 0 0 20px rgba(0, 255, 65, 0.2);
+
+  /* ── Floating / glass ────────────────────────────────────────────– */
+  --surface-floating: rgba(10, 15, 10, 0.95);
+
+  /* Glass material — primary tier — green tinted */
+  --surface-glass: rgba(0, 255, 65, 0.08);
+  --glass-border: rgba(0, 255, 65, 0.15);
+  --glass-border-strong: rgba(0, 255, 65, 0.25);
+  --glass-shadow: 0 0 15px rgba(0, 255, 65, 0.1);
+
+  /* Glass material — sidebar tier */
+  --surface-glass-sidebar: rgba(0, 255, 65, 0.06);
+
+  /* Glass material — subtle tier */
+  --surface-glass-subtle: rgba(0, 255, 65, 0.06);
+  --surface-glass-subtle-hover: rgba(0, 255, 65, 0.1);
+
+  /* Glass material — elevated tier */
+  --surface-glass-elevated: rgba(0, 255, 65, 0.14);
+
+  /* Glass material — tint tier */
+  --glass-tint-brand: rgba(255, 176, 0, 0.08);
+  --glass-tint-info: rgba(255, 176, 0, 0.06);
+  --glass-tint-success: rgba(0, 255, 65, 0.06);
+  --glass-tint-destructive: rgba(255, 68, 68, 0.06);
+
+  /* ── Retro-specific tokens ───────────────────────────────────────– */
+  --retro-scanline: rgba(0, 0, 0, 0.08);
+  --retro-glow: 0 0 10px rgba(0, 255, 65, 0.3);
+  --retro-text-shadow: 0 0 8px rgba(51, 255, 102, 0.5);
+
+  /* ── Override font to monospace ──────────────────────────────────– */
+  --font-sans: "IBM Plex Mono", "SF Mono", "Fira Code", monospace;
+}
+
+/* Tailwind @theme inline registration for retro theme colors */
+@theme inline {
+  /* Background */
+  --color-background: var(--background);
+
+  /* Surface staircase */
+  --color-surface-lowest: var(--surface-lowest);
+  --color-surface-low: var(--surface-low);
+  --color-surface-base: var(--surface-base);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-highest: var(--surface-highest);
+  --color-surface-floating: var(--surface-floating);
+  --color-surface-glass: var(--surface-glass);
+
+  /* Text hierarchy */
+  --color-primary: var(--text-primary);
+  --color-secondary: var(--text-secondary);
+  --color-muted: var(--text-muted);
+  --color-dim: var(--text-dim);
+
+  /* Brand */
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+
+  /* Semantic */
+  --color-success: var(--success);
+  --color-destructive: var(--destructive);
+  --color-info: var(--info);
+  --color-warning: var(--warning);
+  --color-purple: var(--purple);
+
+  /* Origin badges */
+  --color-origin-system: var(--origin-system);
+  --color-origin-ai: var(--origin-ai);
+  --color-origin-user: var(--origin-user);
+  --color-origin-plugin: var(--origin-plugin);
+
+  /* Border */
+  --color-border: var(--border);
+  --color-border-subtle: var(--border-subtle);
+
+  /* Overlay */
+  --color-overlay: var(--overlay);
+  --color-overlay-heavy: var(--overlay-heavy);
+
+  /* Timeline */
+  --color-timeline-app-productive: var(--timeline-app-productive);
+  --color-timeline-app-distracting: var(--timeline-app-distracting);
+  --color-timeline-app-neutral: var(--timeline-app-neutral);
+  --color-timeline-focus: var(--timeline-focus);
+  --color-timeline-task: var(--timeline-task);
+  --color-timeline-note: var(--timeline-note);
+  --color-timeline-finance: var(--timeline-finance);
+  --color-timeline-todo: var(--timeline-todo);
+  --color-timeline-finance-expense: var(--timeline-finance-expense);
+  --color-timeline-finance-income: var(--timeline-finance-income);
+  --color-timeline-system: var(--timeline-system);
+  --color-timeline-calendar: var(--timeline-calendar);
+  --color-timeline-focus-high: var(--timeline-focus-high);
+  --color-timeline-focus-low: var(--timeline-focus-low);
+  --color-timeline-unfocused: var(--timeline-unfocused);
+  --color-timeline-dot-note: var(--timeline-dot-note);
+  --color-timeline-dot-task-done: var(--timeline-dot-task-done);
+  --color-timeline-dot-finance: var(--timeline-dot-finance);
+}
+
+/* CRT Scanline overlay — horizontal lines for authentic CRT look */
+[data-theme="retro"] body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  background: repeating-linear-gradient(
+    0deg,
+    var(--retro-scanline) 0px,
+    var(--retro-scanline) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+}
+
+/* CRT Vignette — darkened edges for tube monitor effect */
+[data-theme="retro"] body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9998;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 60%,
+    rgba(0, 0, 0, 0.4) 100%
+  );
+}
+
+/* Text glow on interactive elements — green phosphor glow */
+[data-theme="retro"] button,
+[data-theme="retro"] a,
+[data-theme="retro"] input {
+  text-shadow: var(--retro-text-shadow);
+}
+
+/* Retro-specific glass card styling */
+[data-theme="retro"] .glass-card {
+  border-color: rgba(0, 255, 65, 0.15);
+  box-shadow:
+    inset 0 0 20px rgba(0, 255, 65, 0.03),
+    0 0 15px rgba(0, 255, 65, 0.05);
+}
+
+/* Retro-specific glass panel styling */
+[data-theme="retro"] .glass-panel {
+  border-color: rgba(0, 255, 65, 0.15);
+  box-shadow:
+    inset 0 0 20px rgba(0, 255, 65, 0.03),
+    0 0 15px rgba(0, 255, 65, 0.05);
+}
+
+/* Retro-specific glass button styling */
+[data-theme="retro"] .glass-button {
+  border-color: rgba(0, 255, 65, 0.12);
+  box-shadow: 0 0 10px rgba(0, 255, 65, 0.08);
+}
+
+[data-theme="retro"] .glass-button:hover {
+  border-color: rgba(0, 255, 65, 0.18);
+  box-shadow: 0 0 12px rgba(0, 255, 65, 0.12);
+}
+
+/* Retro-specific glass input styling */
+[data-theme="retro"] .glass-input {
+  border-color: rgba(0, 255, 65, 0.12);
+  box-shadow: 0 0 10px rgba(0, 255, 65, 0.05);
+}
+
+[data-theme="retro"] .glass-input:focus-within {
+  border-color: rgba(0, 255, 65, 0.2);
+  box-shadow: 0 0 15px rgba(0, 255, 65, 0.1);
+}
+
+/* Retro-specific glass dropdown styling */
+[data-theme="retro"] .glass-dropdown {
+  border-color: rgba(0, 255, 65, 0.15);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(0, 255, 65, 0.1),
+    0 0 20px rgba(0, 255, 65, 0.1);
+}
+
+/* Retro-specific glass bubble styling */
+[data-theme="retro"] .glass-bubble {
+  border-color: rgba(0, 255, 65, 0.12);
+  box-shadow: 0 0 15px rgba(0, 255, 65, 0.08);
+}
+
+[data-theme="retro"] .glass-bubble-user {
+  border-color: rgba(255, 176, 0, 0.12);
+  box-shadow: 0 0 15px rgba(255, 176, 0, 0.05);
+}
+
+/* Retro-specific badge styling */
+[data-theme="retro"] .glass-badge {
+  border-color: rgba(0, 255, 65, 0.12);
+  box-shadow: 0 0 8px rgba(0, 255, 65, 0.05);
+}
+
+/* Retro-specific divider styling */
+[data-theme="retro"] .glass-divider {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(0, 255, 65, 0.15) 20%,
+    rgba(0, 255, 65, 0.15) 80%,
+    transparent 100%
+  );
+}
+
+/* Retro-specific version dot styling */
+[data-theme="retro"] .version-dot {
+  background: rgba(0, 255, 65, 0.2);
+  border-color: rgba(0, 255, 65, 0.3);
+  box-shadow: 0 0 8px rgba(0, 255, 65, 0.15);
+}
+
+[data-theme="retro"] .version-dot-active {
+  background: #ffb000;
+  border-color: #ffb000;
+  box-shadow: 0 0 12px rgba(255, 176, 0, 0.4);
+}
+
+/* Retro-specific version line styling */
+[data-theme="retro"] .version-line {
+  background: linear-gradient(
+    180deg,
+    rgba(0, 255, 65, 0.15) 0%,
+    rgba(0, 255, 65, 0.08) 100%
+  );
+}
+
+/* Retro-specific tag pill styling */
+[data-theme="retro"] .tag-pill {
+  background: rgba(0, 255, 65, 0.08);
+  border-color: rgba(0, 255, 65, 0.12);
+  color: #33ff66;
+}
+
+[data-theme="retro"] .tag-pill:hover {
+  background: rgba(0, 255, 65, 0.12);
+  color: #33ff66;
+  box-shadow: 0 0 8px rgba(0, 255, 65, 0.1);
+}
+
+[data-theme="retro"] .tag-pill-active {
+  background: rgba(255, 176, 0, 0.15);
+  border-color: rgba(255, 176, 0, 0.25);
+  color: #ffb000;
+  box-shadow: 0 0 8px rgba(255, 176, 0, 0.1);
+}
+
+/* Retro-specific note card styling */
+[data-theme="retro"] .note-card {
+  transition:
+    background 0.18s ease,
+    transform 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+[data-theme="retro"] .note-card:hover {
+  background: rgba(0, 255, 65, 0.08);
+  box-shadow:
+    0 2px 12px rgba(0, 255, 65, 0.1),
+    inset 0 0 15px rgba(0, 255, 65, 0.02);
+}
+
+[data-theme="retro"] .note-card-active {
+  background: rgba(0, 255, 65, 0.1);
+  box-shadow:
+    inset 3px 0 0 0 #ffb000,
+    0 2px 12px rgba(0, 255, 65, 0.1);
+}
+
+/* Retro-specific context menu styling */
+[data-theme="retro"] .context-menu {
+  background: rgba(10, 15, 10, 0.95);
+  border-color: rgba(0, 255, 65, 0.15);
+  box-shadow:
+    0 8px 40px rgba(0, 0, 0, 0.7),
+    0 0 20px rgba(0, 255, 65, 0.1),
+    inset 0 0.5px 0 rgba(0, 255, 65, 0.1);
+}
+
+/* Retro-specific focus ring */
+[data-theme="retro"] button:focus-visible,
+[data-theme="retro"] input:focus-visible,
+[data-theme="retro"] textarea:focus-visible,
+[data-theme="retro"] select:focus-visible,
+[data-theme="retro"] [role="button"]:focus-visible,
+[data-theme="retro"] [tabindex="0"]:focus-visible {
+  outline: 2px solid #ffb000;
+  outline-offset: 2px;
+  box-shadow: 0 0 12px rgba(255, 176, 0, 0.3);
+}
+
+/* Retro-specific streaming cursor */
+[data-theme="retro"] .streaming-cursor > div > *:last-child::after {
+  background: #ffb000;
+  box-shadow: 0 0 8px rgba(255, 176, 0, 0.5);
+}
