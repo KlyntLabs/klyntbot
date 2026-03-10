@@ -158,7 +158,9 @@ function DaySummary({
                   />
                 )}
               </div>
-              <span className="text-[9px] text-success mt-0.5 block">{productivePct}% productive</span>
+              <span className="text-[9px] text-success mt-0.5 block">
+                {productivePct}% productive
+              </span>
             </div>
             {/* 4 metric bars — compact */}
             {ps.totalActiveSecs > 0 && (
@@ -188,9 +190,7 @@ function DaySummary({
 
       {/* ── 3. LLM suggestion ── */}
       {intel?.focusRecommendation && (
-        <p className="text-[10px] text-muted italic leading-relaxed">
-          {intel.focusRecommendation}
-        </p>
+        <p className="text-[10px] text-muted italic leading-relaxed">{intel.focusRecommendation}</p>
       )}
 
       {/* ── 4. Weekly sparkline ── */}

@@ -1,7 +1,10 @@
 use desktop_shared::entity_link_types::*;
 use desktop_shared::errors::ApiError;
+use desktop_shared::types::EntityKind;
 use storage::EntityLinkRow;
+use tracing::warn;
 
+use super::project_sources::source_row_to_response;
 use super::tasks::priority_label;
 
 use crate::errors::map_storage_err;
@@ -20,25 +23,6 @@ fn row_to_response(row: &EntityLinkRow) -> EntityLinkResponse {
             .as_deref()
             .and_then(|m| serde_json::from_str(m).ok()),
         created_at: row.created_at.to_rfc3339(),
-    }
-}
-
-fn source_row_to_response(row: &storage::ProjectSourceRow) -> ProjectSourceResponse {
-    ProjectSourceResponse {
-        id: row.id.clone(),
-        project_id: row.project_id.clone(),
-        source_type: row.source_type.clone(),
-        title: row.title.clone(),
-        content: row.content.clone(),
-        url: row.url.clone(),
-        file_path: row.file_path.clone(),
-        metadata: row
-            .metadata
-            .as_deref()
-            .and_then(|m| serde_json::from_str(m).ok()),
-        tags: serde_json::from_str(&row.tags).unwrap_or_default(),
-        created_at: row.created_at.to_rfc3339(),
-        updated_at: row.updated_at.to_rfc3339(),
     }
 }
 
@@ -103,9 +87,9 @@ impl AppCore {
                 (&link.source_kind, &link.source_id)
             };
 
-            match other_kind.as_str() {
-                "task" => {
-                    if let Ok(Some(action)) = self.repos.actions.get(other_id).await {
+            match EntityKind::parse(other_kind) {
+                Some(EntityKind::Task) => match self.repos.actions.get(other_id).await {
+                    Ok(Some(action)) => {
                         tasks.push(ActionSummaryResponse {
                             id: action.id,
                             title: action.title,
@@ -113,18 +97,22 @@ impl AppCore {
                             priority: priority_label(action.priority),
                         });
                     }
-                }
-                "note" => {
-                    if let Ok(Some(note)) = self.note_repo.get_note(other_id).await {
+                    Err(e) => warn!(kind = other_kind, id = other_id, error = %e, "Failed to fetch linked task"),
+                    _ => {}
+                },
+                Some(EntityKind::Note) => match self.note_repo.get_note(other_id).await {
+                    Ok(Some(note)) => {
                         notes.push(NoteSummaryResponse {
                             id: note.id,
                             title: note.title,
                             updated_at: note.updated_at,
                         });
                     }
-                }
-                "conversation" => {
-                    if let Ok(session) = self.repos.sessions.get_session(other_id).await {
+                    Err(e) => warn!(kind = other_kind, id = other_id, error = %e, "Failed to fetch linked note"),
+                    _ => {}
+                },
+                Some(EntityKind::Conversation) => match self.repos.sessions.get_session(other_id).await {
+                    Ok(session) => {
                         conversations.push(SessionSummaryResponse {
                             key: session.key,
                             title: session
@@ -137,9 +125,10 @@ impl AppCore {
                             updated_at: session.updated_at.to_rfc3339(),
                         });
                     }
-                }
-                "objective" => {
-                    if let Ok(Some(obj)) = self.repos.objectives.get(other_id).await {
+                    Err(e) => warn!(kind = other_kind, id = other_id, error = %e, "Failed to fetch linked conversation"),
+                },
+                Some(EntityKind::Objective) => match self.repos.objectives.get(other_id).await {
+                    Ok(Some(obj)) => {
                         objectives.push(ObjectiveSummaryResponse {
                             id: obj.id,
                             title: obj.title,
@@ -147,21 +136,27 @@ impl AppCore {
                             status: obj.status,
                         });
                     }
-                }
-                "key_result" => {
-                    if let Ok(Some(kr)) = self.repos.key_results.get(other_id).await {
+                    Err(e) => warn!(kind = other_kind, id = other_id, error = %e, "Failed to fetch linked objective"),
+                    _ => {}
+                },
+                Some(EntityKind::KeyResult) => match self.repos.key_results.get(other_id).await {
+                    Ok(Some(kr)) => {
                         key_results.push(KeyResultSummaryResponse {
                             id: kr.id,
                             title: kr.title,
                             progress: kr.progress,
                         });
                     }
-                }
-                "source" => {
-                    if let Ok(Some(src)) = self.repos.project_sources.get(other_id).await {
+                    Err(e) => warn!(kind = other_kind, id = other_id, error = %e, "Failed to fetch linked key result"),
+                    _ => {}
+                },
+                Some(EntityKind::Source) => match self.repos.project_sources.get(other_id).await {
+                    Ok(Some(src)) => {
                         sources.push(source_row_to_response(&src));
                     }
-                }
+                    Err(e) => warn!(kind = other_kind, id = other_id, error = %e, "Failed to fetch linked source"),
+                    _ => {}
+                },
                 _ => {}
             }
         }

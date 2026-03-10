@@ -5,7 +5,7 @@ use desktop_shared::types::EntityKind;
 use crate::errors::map_storage_err;
 use crate::state::{AppCore, EntityUpdate, HandlerResult};
 
-fn row_to_response(row: &storage::ProjectSourceRow) -> ProjectSourceResponse {
+pub(crate) fn source_row_to_response(row: &storage::ProjectSourceRow) -> ProjectSourceResponse {
     ProjectSourceResponse {
         id: row.id.clone(),
         project_id: row.project_id.clone(),
@@ -43,7 +43,7 @@ impl AppCore {
             .await
             .map_err(map_storage_err)?;
 
-        let response = row_to_response(&row);
+        let response = source_row_to_response(&row);
         let updates = vec![EntityUpdate {
             kind: EntityKind::Source,
             id: response.id.clone(),
@@ -81,6 +81,6 @@ impl AppCore {
             .await
             .map_err(map_storage_err)?;
 
-        Ok(rows.iter().map(row_to_response).collect())
+        Ok(rows.iter().map(source_row_to_response).collect())
     }
 }

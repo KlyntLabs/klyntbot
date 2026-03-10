@@ -208,19 +208,19 @@ impl AppCore {
     ) -> HandlerResult<ProjectResponse> {
         let json_str = serde_json::to_string(&instructions)
             .map_err(|e| ApiError::new("SERIALIZATION", e.to_string()))?;
-        self.repos
+        let patch = ProjectPatch {
+            id: id.clone(),
+            instructions: Some(Some(json_str)),
+            ..Default::default()
+        };
+        let updated = self
+            .repos
             .projects
-            .update_instructions(&id, &json_str)
+            .update(&patch)
             .await
             .map_err(map_storage_err)?;
 
-        let row = self
-            .repos
-            .projects
-            .get_or_err(&id)
-            .await
-            .map_err(map_storage_err)?;
-        let response = build_project_response(self, &row).await?;
+        let response = build_project_response(self, &updated).await?;
         let updates = vec![EntityUpdate {
             kind: EntityKind::Project,
             id,
@@ -233,19 +233,19 @@ impl AppCore {
         id: String,
         role: String,
     ) -> HandlerResult<ProjectResponse> {
-        self.repos
+        let patch = ProjectPatch {
+            id: id.clone(),
+            user_role: Some(Some(role)),
+            ..Default::default()
+        };
+        let updated = self
+            .repos
             .projects
-            .update_user_role(&id, &role)
+            .update(&patch)
             .await
             .map_err(map_storage_err)?;
 
-        let row = self
-            .repos
-            .projects
-            .get_or_err(&id)
-            .await
-            .map_err(map_storage_err)?;
-        let response = build_project_response(self, &row).await?;
+        let response = build_project_response(self, &updated).await?;
         let updates = vec![EntityUpdate {
             kind: EntityKind::Project,
             id,
