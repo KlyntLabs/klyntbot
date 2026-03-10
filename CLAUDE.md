@@ -1,5 +1,9 @@
 # CLAUDE.md
 
+## Prerequisites
+
+`rustup`, `cargo-nextest`, `bun`, `cargo-tauri` (Tauri CLI v2). Rust stable toolchain.
+
 ## Build & Test
 
 ```bash

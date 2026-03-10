@@ -121,7 +121,9 @@ impl ProductivityFeature {
             FeatureMigration {
                 feature_name: "productivity".to_string(),
                 version: 7,
-                description: "Add deep_work_ratio, avg_session_length, meeting_focus_ratio to quality scores".to_string(),
+                description:
+                    "Add deep_work_ratio, avg_session_length, meeting_focus_ratio to quality scores"
+                        .to_string(),
                 sql: Self::migration_v7_sql().to_string(),
             },
         ]

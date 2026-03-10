@@ -268,10 +268,7 @@ impl AppCore {
         let week_start = today - chrono::Duration::days(6);
         let mut summaries = repos
             .summaries
-            .list_range(
-                &week_start.format("%Y-%m-%d").to_string(),
-                &today_str,
-            )
+            .list_range(&week_start.format("%Y-%m-%d").to_string(), &today_str)
             .await
             .map_err(map_prod_err)?;
 
@@ -785,7 +782,10 @@ impl AppCore {
 
         // Aggregate
         let days = summaries.len() as f64;
-        let total_focus_mins = summaries.iter().map(|s| s.total_focus_secs / 60).sum::<i64>();
+        let total_focus_mins = summaries
+            .iter()
+            .map(|s| s.total_focus_secs / 60)
+            .sum::<i64>();
         let total_productive_secs = summaries.iter().map(|s| s.productive_secs).sum::<i64>();
         let total_distracting_secs = summaries.iter().map(|s| s.distracting_secs).sum::<i64>();
 
