@@ -668,6 +668,9 @@ export interface ProductivitySummary {
   topProjects: ProjectUsage[];
   aiSummary: string | null;
   productivityScore: number | null;
+  scoreTrend?: number | null;
+  focusTimeTrend?: number | null;
+  activeTimeTrend?: number | null;
 }
 
 export interface ProjectUsage {

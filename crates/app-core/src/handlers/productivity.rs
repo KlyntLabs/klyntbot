@@ -78,6 +78,9 @@ pub fn summary_to_response(s: DailySummary) -> ProductivitySummaryResponse {
             .collect(),
         ai_summary: s.ai_summary,
         productivity_score: s.productivity_score,
+        score_trend: None,
+        focus_time_trend: None,
+        active_time_trend: None,
     }
 }
 
@@ -108,6 +111,22 @@ pub fn project_to_response(
         url_patterns: p.url_patterns,
         color: p.color,
         is_auto_detected: p.is_auto_detected,
+    }
+}
+
+fn assessment_to_response(
+    a: feature_productivity::types::WeeklyAssessment,
+) -> WeeklyAssessmentResponse {
+    WeeklyAssessmentResponse {
+        id: a.id,
+        week_start: a.week_start,
+        week_end: a.week_end,
+        avg_score: a.avg_score,
+        total_focus_mins: a.total_focus_mins,
+        total_productive_secs: a.total_productive_secs,
+        total_distracting_secs: a.total_distracting_secs,
+        top_apps: a.top_apps,
+        summary: a.summary,
     }
 }
 
@@ -150,7 +169,25 @@ impl AppCore {
     ) -> Result<Option<ProductivitySummaryResponse>, ApiError> {
         let aggregator = self.aggregator()?;
         let summary = aggregator.compute_today().await.map_err(map_prod_err)?;
-        Ok(Some(summary_to_response(summary)))
+        let mut resp = summary_to_response(summary);
+
+        // Compute trend deltas vs 4-week rolling average
+        let repos = self.productivity_repos()?;
+        let today_str = Utc::now().format("%Y-%m-%d").to_string();
+        if let Ok(baseline) = repos.summaries.rolling_averages(&today_str, 28).await {
+            resp.score_trend = match (resp.productivity_score, baseline.avg_score) {
+                (Some(current), Some(avg)) => Some(current - avg),
+                _ => None,
+            };
+            resp.focus_time_trend = baseline
+                .avg_focus_secs
+                .map(|avg| resp.total_focus_secs as f64 - avg);
+            resp.active_time_trend = baseline
+                .avg_active_secs
+                .map(|avg| resp.total_active_secs as f64 - avg);
+        }
+
+        Ok(Some(resp))
     }
 
     pub async fn productivity_timeline(
@@ -314,7 +351,26 @@ impl AppCore {
             }
         }
 
-        Ok(summaries.into_iter().map(summary_to_response).collect())
+        let mut responses: Vec<ProductivitySummaryResponse> =
+            summaries.into_iter().map(summary_to_response).collect();
+
+        // Compute trend deltas for each day vs its own 28-day baseline
+        for resp in &mut responses {
+            if let Ok(baseline) = repos.summaries.rolling_averages(&resp.date, 28).await {
+                resp.score_trend = match (resp.productivity_score, baseline.avg_score) {
+                    (Some(current), Some(avg)) => Some(current - avg),
+                    _ => None,
+                };
+                resp.focus_time_trend = baseline
+                    .avg_focus_secs
+                    .map(|avg| resp.total_focus_secs as f64 - avg);
+                resp.active_time_trend = baseline
+                    .avg_active_secs
+                    .map(|avg| resp.total_active_secs as f64 - avg);
+            }
+        }
+
+        Ok(responses)
     }
 
     pub async fn productivity_activity_feed(
@@ -733,18 +789,14 @@ impl AppCore {
         let total_productive_secs = summaries.iter().map(|s| s.productive_secs).sum::<i64>();
         let total_distracting_secs = summaries.iter().map(|s| s.distracting_secs).sum::<i64>();
 
-        let avg_score = if days > 0.0 {
-            let scores: Vec<f64> = summaries
-                .iter()
-                .filter_map(|s| s.productivity_score)
-                .collect();
-            if scores.is_empty() {
-                None
-            } else {
-                Some(scores.iter().sum::<f64>() / scores.len() as f64)
-            }
-        } else {
+        let scores: Vec<f64> = summaries
+            .iter()
+            .filter_map(|s| s.productivity_score)
+            .collect();
+        let avg_score = if scores.is_empty() {
             None
+        } else {
+            Some(scores.iter().sum::<f64>() / scores.len() as f64)
         };
 
         // Aggregate top apps across the week
@@ -795,16 +847,6 @@ impl AppCore {
             .await
             .map_err(map_prod_err)?;
 
-        Ok(WeeklyAssessmentResponse {
-            id: assessment.id,
-            week_start: assessment.week_start,
-            week_end: assessment.week_end,
-            avg_score: assessment.avg_score,
-            total_focus_mins: assessment.total_focus_mins,
-            total_productive_secs: assessment.total_productive_secs,
-            total_distracting_secs: assessment.total_distracting_secs,
-            top_apps: assessment.top_apps,
-            summary: assessment.summary,
-        })
+        Ok(assessment_to_response(assessment))
     }
 }

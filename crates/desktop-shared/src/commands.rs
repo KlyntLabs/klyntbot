@@ -668,6 +668,9 @@ pub struct ProductivitySummaryResponse {
     pub top_projects: Vec<ProjectUsageResponse>,
     pub ai_summary: Option<String>,
     pub productivity_score: Option<f64>,
+    pub score_trend: Option<f64>,
+    pub focus_time_trend: Option<f64>,
+    pub active_time_trend: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

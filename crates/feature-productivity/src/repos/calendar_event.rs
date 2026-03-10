@@ -75,8 +75,8 @@ impl CalendarEventRepo {
 
     /// List calendar events for a specific date (YYYY-MM-DD prefix match).
     pub async fn list_for_date(&self, date: &str) -> common::Result<Vec<CalendarEvent>> {
-        let from = format!("{date}T00:00:00");
-        let to = format!("{date}T23:59:59.999");
+        let from = format!("{date}T00:00:00Z");
+        let to = format!("{date}T23:59:59Z");
         self.list_range(&from, &to).await
     }
 

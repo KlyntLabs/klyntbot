@@ -47,7 +47,6 @@ function formatHour(h: number): string {
 }
 
 /** Assign a hue-based color per app name for visual differentiation */
-const APP_COLORS = new Map<string, string>();
 const PALETTE = [
   "oklch(0.65 0.15 250)", // blue
   "oklch(0.65 0.15 160)", // teal
@@ -60,17 +59,16 @@ const PALETTE = [
 ];
 
 function appColor(appName: string): string {
-  // Skip idle/system entries — render them dimmer
   const lower = appName.toLowerCase();
   if (lower === "loginwindow" || lower === "idle" || lower === "screensaver") {
     return "var(--surface-highest)";
   }
-  let color = APP_COLORS.get(appName);
-  if (!color) {
-    color = PALETTE[APP_COLORS.size % PALETTE.length];
-    APP_COLORS.set(appName, color);
+  // Stable hash so the same app always gets the same color
+  let hash = 0;
+  for (let i = 0; i < appName.length; i++) {
+    hash = (hash * 31 + appName.charCodeAt(i)) | 0;
   }
-  return color;
+  return PALETTE[((hash % PALETTE.length) + PALETTE.length) % PALETTE.length];
 }
 
 interface WeekBlock {

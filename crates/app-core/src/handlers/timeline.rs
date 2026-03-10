@@ -31,7 +31,7 @@ impl AppCore {
             if let Ok(repos) = self.productivity_repos() {
                 // Use timezone-aware range: start_date 00:00 local → end_date+1 00:00 local (in UTC)
                 let (start_utc, _) = parse_local_day_range(start, tz)?;
-                let (_, end_utc) = parse_local_day_range(end, tz)?;
+                let end_utc = parse_local_day_range(end, tz)?.1;
 
                 if want(sources, TimelineSource::Productivity) {
                     if let Ok(app_events) =
