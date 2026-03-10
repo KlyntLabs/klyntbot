@@ -32,6 +32,7 @@ mod project;
 mod providers;
 mod todo;
 mod tools;
+mod work_context;
 
 pub use self::agents::*;
 pub use self::channels::*;
@@ -51,6 +52,7 @@ pub use self::project::*;
 pub use self::providers::*;
 pub use self::todo::*;
 pub use self::tools::*;
+pub use self::work_context::*;
 
 #[cfg(test)]
 mod tests {

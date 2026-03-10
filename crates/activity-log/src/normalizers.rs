@@ -14,6 +14,13 @@ pub fn new_ulid() -> String {
     Ulid::new().to_string()
 }
 
+/// Parse an RFC3339 timestamp string, falling back to `Utc::now()` on failure.
+pub fn parse_rfc3339(s: &str) -> chrono::DateTime<Utc> {
+    chrono::DateTime::parse_from_rfc3339(s)
+        .map(|dt| dt.with_timezone(&Utc))
+        .unwrap_or_else(|_| Utc::now())
+}
+
 /// Compute SHA-256 hex digest for content dedup.
 pub fn content_hash(content: &str) -> String {
     let mut hasher = Sha256::new();

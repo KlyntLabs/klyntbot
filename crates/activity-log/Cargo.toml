@@ -7,6 +7,8 @@ license.workspace = true
 
 [dependencies]
 common.workspace = true
+cognitive.workspace = true
+config.workspace = true
 storage.workspace = true
 bus.workspace = true
 tools-core.workspace = true

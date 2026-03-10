@@ -22,6 +22,7 @@ use super::project::ProjectConfig;
 use super::providers::{ProviderManagerConfig, ProvidersConfig};
 use super::todo::TodoConfig;
 use super::tools::ToolsConfig;
+use super::work_context::WorkContextConfig;
 
 /// Expand a leading `~` in a path to the user's home directory.
 fn expand_tilde(path: &str) -> PathBuf {
@@ -143,6 +144,10 @@ pub struct Config {
     /// Cognitive memory & coaching configuration.
     #[serde(default)]
     pub cognitive: CognitiveConfig,
+
+    /// Work context inference engine configuration.
+    #[serde(default)]
+    pub work_context: WorkContextConfig,
 
     /// MCP (Model Context Protocol) server connections and server settings.
     #[serde(default)]

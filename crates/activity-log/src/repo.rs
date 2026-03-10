@@ -226,6 +226,39 @@ impl ActivityLogRepo {
         Ok(rows.into_iter().collect())
     }
 
+    pub async fn query_unassigned(
+        pool: &StoragePool,
+        since: DateTime<Utc>,
+    ) -> common::Result<Vec<ActivityLogEntry>> {
+        let sql = format!(
+            "SELECT {SELECT_COLS} FROM unified_activity_log \
+             WHERE work_context_id IS NULL AND timestamp >= ?1 \
+             ORDER BY timestamp ASC LIMIT 500"
+        );
+        let rows = sqlx::query_as::<_, RawRow>(&sql)
+            .bind(since.to_rfc3339())
+            .fetch_all(pool.inner())
+            .await
+            .map_err(StorageError::from)?;
+        Ok(rows.into_iter().map(Into::into).collect())
+    }
+
+    pub async fn set_work_context_id(
+        pool: &StoragePool,
+        event_id: &str,
+        context_id: &str,
+    ) -> common::Result<()> {
+        sqlx::query(
+            "UPDATE unified_activity_log SET work_context_id = ?2 WHERE id = ?1",
+        )
+        .bind(event_id)
+        .bind(context_id)
+        .execute(pool.inner())
+        .await
+        .map_err(StorageError::from)?;
+        Ok(())
+    }
+
     pub async fn delete_older_than(pool: &StoragePool, days: i64) -> common::Result<u64> {
         let cutoff = Utc::now() - chrono::Duration::days(days);
         let result = sqlx::query("DELETE FROM unified_activity_log WHERE timestamp < ?1")

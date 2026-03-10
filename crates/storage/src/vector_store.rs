@@ -44,6 +44,8 @@ pub fn sanitize_predicate_value(value: &str) -> Result<String, StorageError> {
 /// - `todo_embeddings`              — id, vector(384), model, updated_at
 /// - `conv_embeddings`              — id, vector(384), session_key, role, content_preview, full_content, created_at
 /// - `cognitive_fact_embeddings`    — id, vector(384), domain, text, importance, stability, confidence, updated_at
+/// - `activity_embeddings`          — id, vector(384), source, work_context_id, timestamp, updated_at
+/// - `work_context_embeddings`      — id, vector(384), updated_at
 #[derive(Clone)]
 pub struct VectorStore {
     db: Arc<Connection>,
@@ -73,6 +75,12 @@ impl VectorStore {
         store.ensure_table("conv_embeddings", conv_schema()).await?;
         store
             .ensure_table("cognitive_fact_embeddings", cognitive_fact_schema())
+            .await?;
+        store
+            .ensure_table("activity_embeddings", activity_embedding_schema())
+            .await?;
+        store
+            .ensure_table("work_context_embeddings", work_context_embedding_schema())
             .await?;
         Ok(store)
     }
@@ -475,6 +483,8 @@ impl VectorStore {
             "todo_embeddings",
             "conv_embeddings",
             "cognitive_fact_embeddings",
+            "activity_embeddings",
+            "work_context_embeddings",
         ];
         for table_name in tables {
             let tbl = match self.db.open_table(table_name).execute().await {
@@ -625,6 +635,25 @@ fn conv_schema() -> Schema {
         Field::new("content_preview", DataType::Utf8, false),
         Field::new("full_content", DataType::Utf8, false),
         Field::new("created_at", DataType::Utf8, false),
+    ])
+}
+
+fn activity_embedding_schema() -> Schema {
+    Schema::new(vec![
+        Field::new("id", DataType::Utf8, false),
+        vector_field(),
+        Field::new("source", DataType::Utf8, false),
+        Field::new("work_context_id", DataType::Utf8, false),
+        Field::new("timestamp", DataType::Utf8, false),
+        Field::new("updated_at", DataType::Utf8, false),
+    ])
+}
+
+fn work_context_embedding_schema() -> Schema {
+    Schema::new(vec![
+        Field::new("id", DataType::Utf8, false),
+        vector_field(),
+        Field::new("updated_at", DataType::Utf8, false),
     ])
 }
 
