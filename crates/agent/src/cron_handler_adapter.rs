@@ -32,6 +32,12 @@ fn convert_schedule(schedule: tools::cron_tool::CronSchedule) -> CronSchedule {
 impl CronHandler for CronHandlerAdapter {
     async fn add_job(&self, params: AddCronJobParams) -> Result<CronJobInfo> {
         let schedule = convert_schedule(params.schedule);
+        let origin = match params.origin.as_str() {
+            "user" => scheduling::CronOrigin::User,
+            "ai" => scheduling::CronOrigin::Ai,
+            "plugin" => scheduling::CronOrigin::Plugin,
+            _ => scheduling::CronOrigin::System,
+        };
 
         let job = self
             .service
@@ -43,6 +49,7 @@ impl CronHandler for CronHandlerAdapter {
                 params.channel,
                 params.to,
                 false, // delete_after_run
+                origin,
             )
             .await?;
 

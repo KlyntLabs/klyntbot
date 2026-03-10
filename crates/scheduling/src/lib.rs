@@ -8,4 +8,4 @@ pub mod types;
 
 pub use error::CronError;
 pub use service::{CronService, JobCallback};
-pub use types::{CronJob, CronJobState, CronPayload, CronSchedule, CronStore};
+pub use types::{CronJob, CronJobState, CronOrigin, CronPayload, CronSchedule, CronStore};

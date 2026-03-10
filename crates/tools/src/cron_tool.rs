@@ -47,6 +47,7 @@ pub struct AddCronJobParams {
     pub channel: Option<String>,
     pub to: Option<String>,
     pub internal: bool,
+    pub origin: String,
 }
 
 /// Trait for cron job management (dependency inversion to avoid circular dependencies).
@@ -174,6 +175,7 @@ impl Tool for CronTool {
                     channel: Some(ctx.channel.as_str().to_string()),
                     to: Some(ctx.chat_id.as_str().to_string()),
                     internal: false,
+                    origin: "ai".to_string(),
                 };
 
                 let job = handler.add_job(params).await?;

@@ -3,6 +3,7 @@ pub mod chat;
 pub mod coaching;
 pub mod cognitive;
 pub mod columns;
+pub mod cron;
 pub mod distraction;
 pub mod finance;
 pub mod groups;

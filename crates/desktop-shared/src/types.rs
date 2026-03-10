@@ -83,3 +83,79 @@ impl EntityKind {
         }
     }
 }
+
+// ── Cron / Automations ──────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CronJobResponse {
+    pub id: String,
+    pub name: String,
+    pub enabled: bool,
+    pub origin: String,
+    pub schedule: serde_json::Value,
+    pub payload: CronPayloadResponse,
+    pub state: CronJobStateResponse,
+    pub created_at_ms: i64,
+    pub updated_at_ms: i64,
+    pub delete_after_run: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CronPayloadResponse {
+    pub kind: String,
+    pub message: String,
+    pub deliver: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub channel: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub to: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CronJobStateResponse {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub next_run_at_ms: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_run_at_ms: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_status: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CronJobCreateParams {
+    pub name: String,
+    pub schedule: serde_json::Value,
+    pub message: String,
+    #[serde(default)]
+    pub deliver: bool,
+    pub channel: Option<String>,
+    pub to: Option<String>,
+    #[serde(default)]
+    pub delete_after_run: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CronJobUpdateParams {
+    pub id: String,
+    pub name: Option<String>,
+    pub schedule: Option<serde_json::Value>,
+    pub message: Option<String>,
+    pub deliver: Option<bool>,
+    pub channel: Option<Option<String>>,
+    pub to: Option<Option<String>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CronStatusResponse {
+    pub enabled: bool,
+    pub jobs: usize,
+    pub next_wake_at_ms: Option<i64>,
+}

@@ -18,7 +18,7 @@ use tokio::time::{Duration, Instant};
 use tracing::info;
 use uuid::Uuid;
 
-use crate::types::{CronJob, CronJobState, CronSchedule, CronStore};
+use crate::types::{CronJob, CronJobState, CronOrigin, CronSchedule, CronStore};
 use common::Result;
 use storage::CronJobRow;
 
@@ -285,6 +285,7 @@ impl CronService {
         channel: Option<String>,
         to: Option<String>,
         delete_after_run: bool,
+        origin: CronOrigin,
     ) -> Result<CronJob> {
         let name = name.into();
         let message = message.into();
@@ -292,7 +293,13 @@ impl CronService {
 
         let job_id = Uuid::new_v4().to_string()[..8].to_string();
 
-        let mut job = CronJob::new(job_id.clone(), name.clone(), schedule.clone(), message);
+        let mut job = CronJob::new(
+            job_id.clone(),
+            name.clone(),
+            schedule.clone(),
+            message,
+            origin,
+        );
         job.payload.deliver = deliver;
         job.payload.channel = channel;
         job.payload.to = to;
@@ -393,6 +400,9 @@ impl CronService {
             id: job.id.clone(),
             name: job.name.clone(),
             enabled: job.enabled,
+            origin: serde_json::to_value(&job.origin)
+                .and_then(|v| serde_json::from_value(v))
+                .unwrap_or_else(|_| "system".to_string()),
             schedule: serde_json::to_value(&job.schedule).unwrap_or_default(),
             payload: serde_json::to_value(&job.payload).unwrap_or_default(),
             next_run_at_ms: job.state.next_run_at_ms,
@@ -414,6 +424,12 @@ impl CronService {
             id: row.id,
             name: row.name,
             enabled: row.enabled,
+            origin: match row.origin.as_str() {
+                "user" => CronOrigin::User,
+                "ai" => CronOrigin::Ai,
+                "plugin" => CronOrigin::Plugin,
+                _ => CronOrigin::System,
+            },
             schedule,
             payload,
             state: CronJobState {
@@ -460,7 +476,16 @@ mod tests {
 
         let schedule = CronSchedule::Every { every_ms: 60000 };
         let job = service
-            .add_job("test", schedule, "Test message", false, None, None, false)
+            .add_job(
+                "test",
+                schedule,
+                "Test message",
+                false,
+                None,
+                None,
+                false,
+                CronOrigin::System,
+            )
             .await
             .unwrap();
 
@@ -482,7 +507,16 @@ mod tests {
         let future_time = now_ms() + 3600000; // 1 hour from now
         let schedule = CronSchedule::At { at_ms: future_time };
         let job = service
-            .add_job("once", schedule, "One-time task", false, None, None, false)
+            .add_job(
+                "once",
+                schedule,
+                "One-time task",
+                false,
+                None,
+                None,
+                false,
+                CronOrigin::System,
+            )
             .await
             .unwrap();
 
@@ -499,7 +533,16 @@ mod tests {
             tz: None,
         };
         let job = service
-            .add_job("daily", schedule, "Daily task", false, None, None, false)
+            .add_job(
+                "daily",
+                schedule,
+                "Daily task",
+                false,
+                None,
+                None,
+                false,
+                CronOrigin::System,
+            )
             .await
             .unwrap();
 
@@ -521,6 +564,7 @@ mod tests {
                 Some("telegram".to_string()),
                 Some("chat123".to_string()),
                 false,
+                CronOrigin::User,
             )
             .await
             .unwrap();
@@ -536,7 +580,16 @@ mod tests {
 
         let schedule = CronSchedule::Every { every_ms: 60000 };
         let job = service
-            .add_job("test", schedule, "Test", false, None, None, false)
+            .add_job(
+                "test",
+                schedule,
+                "Test",
+                false,
+                None,
+                None,
+                false,
+                CronOrigin::System,
+            )
             .await
             .unwrap();
 
@@ -565,7 +618,16 @@ mod tests {
 
         let schedule = CronSchedule::Every { every_ms: 60000 };
         let job = service
-            .add_job("test", schedule, "Test", false, None, None, false)
+            .add_job(
+                "test",
+                schedule,
+                "Test",
+                false,
+                None,
+                None,
+                false,
+                CronOrigin::System,
+            )
             .await
             .unwrap();
 
@@ -611,13 +673,23 @@ mod tests {
                 None,
                 None,
                 false,
+                CronOrigin::System,
             )
             .await
             .unwrap();
 
         // Add disabled job
         let job2 = service
-            .add_job("disabled", schedule, "Test", false, None, None, false)
+            .add_job(
+                "disabled",
+                schedule,
+                "Test",
+                false,
+                None,
+                None,
+                false,
+                CronOrigin::System,
+            )
             .await
             .unwrap();
         service.enable_job(&job2.id, false).await.unwrap();
@@ -648,7 +720,16 @@ mod tests {
 
         let schedule = CronSchedule::Every { every_ms: 60000 };
         let job = service
-            .add_job("test", schedule, "Test", false, None, None, false)
+            .add_job(
+                "test",
+                schedule,
+                "Test",
+                false,
+                None,
+                None,
+                false,
+                CronOrigin::System,
+            )
             .await
             .unwrap();
 
@@ -676,7 +757,16 @@ mod tests {
 
         let schedule = CronSchedule::Every { every_ms: 60000 };
         let job = service
-            .add_job("test", schedule, "Test", false, None, None, false)
+            .add_job(
+                "test",
+                schedule,
+                "Test",
+                false,
+                None,
+                None,
+                false,
+                CronOrigin::System,
+            )
             .await
             .unwrap();
 
@@ -698,7 +788,16 @@ mod tests {
         let future_time = now_ms() + 100;
         let schedule = CronSchedule::At { at_ms: future_time };
         let job = service
-            .add_job("once", schedule, "One-time", false, None, None, true)
+            .add_job(
+                "once",
+                schedule,
+                "One-time",
+                false,
+                None,
+                None,
+                true,
+                CronOrigin::System,
+            )
             .await
             .unwrap();
 
@@ -721,7 +820,16 @@ mod tests {
         let future_time = now_ms() + 100;
         let schedule = CronSchedule::At { at_ms: future_time };
         let job = service
-            .add_job("once", schedule, "One-time", false, None, None, false)
+            .add_job(
+                "once",
+                schedule,
+                "One-time",
+                false,
+                None,
+                None,
+                false,
+                CronOrigin::System,
+            )
             .await
             .unwrap();
 
@@ -743,7 +851,16 @@ mod tests {
 
         let schedule = CronSchedule::Every { every_ms: 60000 };
         let job = service
-            .add_job("recurring", schedule, "Repeat", false, None, None, false)
+            .add_job(
+                "recurring",
+                schedule,
+                "Repeat",
+                false,
+                None,
+                None,
+                false,
+                CronOrigin::System,
+            )
             .await
             .unwrap();
 
@@ -774,7 +891,16 @@ mod tests {
 
         let schedule = CronSchedule::Every { every_ms: 60000 };
         let job = service
-            .add_job("test", schedule, "Test", false, None, None, false)
+            .add_job(
+                "test",
+                schedule,
+                "Test",
+                false,
+                None,
+                None,
+                false,
+                CronOrigin::System,
+            )
             .await
             .unwrap();
 
@@ -798,7 +924,16 @@ mod tests {
 
         let schedule = CronSchedule::Every { every_ms: 60000 };
         service
-            .add_job("test", schedule, "Test", false, None, None, false)
+            .add_job(
+                "test",
+                schedule,
+                "Test",
+                false,
+                None,
+                None,
+                false,
+                CronOrigin::System,
+            )
             .await
             .unwrap();
 

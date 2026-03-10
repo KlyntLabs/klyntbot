@@ -5,8 +5,7 @@ use std::sync::Arc;
 use desktop_shared::commands::{
     ActivityCategoryResponse, ActivityTimelineResponse, CategoryRulesResponse,
     FocusSessionResponse, GoalProgressResponse, InsightCardResponse, ProductivityProjectResponse,
-    ProductivitySummaryResponse, TimeEntryResponse, TrackedAppResponse,
-    WeeklyAssessmentResponse,
+    ProductivitySummaryResponse, TimeEntryResponse, TrackedAppResponse, WeeklyAssessmentResponse,
 };
 use desktop_shared::errors::ApiError;
 use feature_productivity::auto_focus::AutoFocusSession;
@@ -603,9 +602,10 @@ pub(crate) async fn dispatch_dev(
             let date = try_field!(dev::get_str(body, "date"));
             dev::val(core.productivity_calendar_events(date).await)
         }
-        "calendar_sync_events" => {
-            dev::val(core.calendar_sync_events(try_field!(dev::parse_params(body))).await)
-        }
+        "calendar_sync_events" => dev::val(
+            core.calendar_sync_events(try_field!(dev::parse_params(body)))
+                .await,
+        ),
         _ => return None,
     })
 }

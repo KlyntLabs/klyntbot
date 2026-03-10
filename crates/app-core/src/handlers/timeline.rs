@@ -57,7 +57,11 @@ impl AppCore {
                 if !want(sources, TimelineSource::Task) {
                     return None;
                 }
-                self.repos.actions.time_entries_in_range(start, end).await.ok()
+                self.repos
+                    .actions
+                    .time_entries_in_range(start, end)
+                    .await
+                    .ok()
             },
             async {
                 if !want(sources, TimelineSource::Todo) {
@@ -88,7 +92,11 @@ impl AppCore {
             entries.extend(time_entries.into_iter().map(normalize_time_entry));
         }
         if let Some(tasks) = tasks_res {
-            entries.extend(tasks.into_iter().flat_map(|t| normalize_task(t, start, end)));
+            entries.extend(
+                tasks
+                    .into_iter()
+                    .flat_map(|t| normalize_task(t, start, end)),
+            );
         }
         if let Some(txs) = txs_res {
             entries.extend(txs.into_iter().map(normalize_transaction));
@@ -134,13 +142,13 @@ impl AppCore {
 
 // ── Date helpers ─────────────────────────────────────────────────────
 
-
 // ── Normalization functions ─────────────────────────────────────────
 
 fn normalize_app_event(e: feature_productivity::ActivityEvent) -> TimelineEntry {
-    let metadata = e.focus_session_id.as_ref().map(|fid| {
-        serde_json::json!({ "focusSessionId": fid })
-    });
+    let metadata = e
+        .focus_session_id
+        .as_ref()
+        .map(|fid| serde_json::json!({ "focusSessionId": fid }));
     TimelineEntry {
         id: e.id.map(|i| i.to_string()).unwrap_or_default(),
         source: TimelineSource::Productivity,

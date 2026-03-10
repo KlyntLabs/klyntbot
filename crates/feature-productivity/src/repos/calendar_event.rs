@@ -58,11 +58,7 @@ impl CalendarEventRepo {
     }
 
     /// List calendar events within a time range.
-    pub async fn list_range(
-        &self,
-        from: &str,
-        to: &str,
-    ) -> common::Result<Vec<CalendarEvent>> {
+    pub async fn list_range(&self, from: &str, to: &str) -> common::Result<Vec<CalendarEvent>> {
         sqlx::query_as::<_, CalendarEvent>(
             "SELECT * FROM calendar_events WHERE started_at >= ?1 AND started_at < ?2 ORDER BY started_at",
         )
@@ -95,12 +91,10 @@ impl CalendarEventRepo {
         &self,
         session_id: &str,
     ) -> common::Result<Option<CalendarEvent>> {
-        sqlx::query_as::<_, CalendarEvent>(
-            "SELECT * FROM calendar_events WHERE session_id = ?1",
-        )
-        .bind(session_id)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))
+        sqlx::query_as::<_, CalendarEvent>("SELECT * FROM calendar_events WHERE session_id = ?1")
+            .bind(session_id)
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))
     }
 }

@@ -10,6 +10,7 @@ pub struct CronJobRow {
     pub id: String,
     pub name: String,
     pub enabled: bool,
+    pub origin: String,
     pub schedule: serde_json::Value,
     pub payload: serde_json::Value,
     pub next_run_at_ms: Option<i64>,

@@ -353,6 +353,14 @@ fn main() {
             commands::cognitive::cognitive_inject_event,
             commands::cognitive::cognitive_event_log,
             commands::cognitive::cognitive_pipeline_log,
+            // Cron / Automations
+            commands::cron::cron_list,
+            commands::cron::cron_status,
+            commands::cron::cron_enable,
+            commands::cron::cron_run,
+            commands::cron::cron_delete,
+            commands::cron::cron_create,
+            commands::cron::cron_update,
             // Status
             commands::status::agent_status,
             // Window
