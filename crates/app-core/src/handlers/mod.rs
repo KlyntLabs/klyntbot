@@ -17,4 +17,5 @@ pub mod settings;
 pub mod status;
 pub mod tasks;
 pub mod timeline;
+pub mod work_context;
 pub mod workflows;

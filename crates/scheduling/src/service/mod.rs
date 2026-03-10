@@ -431,7 +431,12 @@ impl CronService {
                     row.id,
                     e
                 );
-                (CronSchedule::Every { every_ms: 86_400_000 }, true)
+                (
+                    CronSchedule::Every {
+                        every_ms: 86_400_000,
+                    },
+                    true,
+                )
             }
         };
         let payload = serde_json::from_value(row.payload).unwrap_or_default();

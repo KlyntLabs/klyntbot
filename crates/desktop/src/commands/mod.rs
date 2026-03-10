@@ -18,6 +18,7 @@ pub mod status;
 pub mod tasks;
 pub mod timeline;
 pub mod window;
+pub mod work_context;
 pub mod workflows;
 
 #[cfg(debug_assertions)]

@@ -87,14 +87,15 @@ const MARKER_END: &str = "# end klyntbot shell integration";
 
 /// Return the rc file path for the given shell, or an error for unsupported shells.
 pub fn rc_file_for_shell(shell: &str) -> common::Result<String> {
-    let home = std::env::var("HOME")
-        .map_err(|_| common::KlyntbotError::Config(common::ConfigError::Invalid("HOME not set".into())))?;
+    let home = std::env::var("HOME").map_err(|_| {
+        common::KlyntbotError::Config(common::ConfigError::Invalid("HOME not set".into()))
+    })?;
     match shell {
         "zsh" => Ok(format!("{home}/.zshrc")),
         "bash" => Ok(format!("{home}/.bashrc")),
-        _ => Err(common::KlyntbotError::Config(common::ConfigError::Invalid(format!(
-            "Unsupported shell: {shell}"
-        )))),
+        _ => Err(common::KlyntbotError::Config(common::ConfigError::Invalid(
+            format!("Unsupported shell: {shell}"),
+        ))),
     }
 }
 
@@ -116,10 +117,15 @@ pub fn install(shell: &str, api_url: &str, token: &str) -> common::Result<String
         .append(true)
         .create(true)
         .open(&rc_file)
-        .map_err(|e| common::KlyntbotError::Config(common::ConfigError::Invalid(format!("Cannot write {rc_file}: {e}"))))?;
+        .map_err(|e| {
+            common::KlyntbotError::Config(common::ConfigError::Invalid(format!(
+                "Cannot write {rc_file}: {e}"
+            )))
+        })?;
 
-    writeln!(file, "{hook_script}")
-        .map_err(|e| common::KlyntbotError::Config(common::ConfigError::Invalid(format!("Write failed: {e}"))))?;
+    writeln!(file, "{hook_script}").map_err(|e| {
+        common::KlyntbotError::Config(common::ConfigError::Invalid(format!("Write failed: {e}")))
+    })?;
 
     Ok(format!(
         "Installed to {rc_file}. Restart your terminal or run: source {rc_file}"
@@ -130,12 +136,18 @@ pub fn install(shell: &str, api_url: &str, token: &str) -> common::Result<String
 pub fn uninstall(shell: &str) -> common::Result<String> {
     let rc_file = rc_file_for_shell(shell)?;
 
-    let contents = std::fs::read_to_string(&rc_file)
-        .map_err(|e| common::KlyntbotError::Config(common::ConfigError::Invalid(format!("Cannot read {rc_file}: {e}"))))?;
+    let contents = std::fs::read_to_string(&rc_file).map_err(|e| {
+        common::KlyntbotError::Config(common::ConfigError::Invalid(format!(
+            "Cannot read {rc_file}: {e}"
+        )))
+    })?;
 
     let cleaned = remove_block(&contents);
-    std::fs::write(&rc_file, cleaned)
-        .map_err(|e| common::KlyntbotError::Config(common::ConfigError::Invalid(format!("Cannot write {rc_file}: {e}"))))?;
+    std::fs::write(&rc_file, cleaned).map_err(|e| {
+        common::KlyntbotError::Config(common::ConfigError::Invalid(format!(
+            "Cannot write {rc_file}: {e}"
+        )))
+    })?;
 
     Ok(format!("Removed from {rc_file}"))
 }

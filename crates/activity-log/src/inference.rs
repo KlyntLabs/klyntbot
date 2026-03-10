@@ -484,7 +484,11 @@ fn jaccard_similarity(a: &HashSet<String>, b: &HashSet<String>) -> f64 {
     }
     let intersection = a.intersection(b).count();
     let union = a.union(b).count();
-    if union == 0 { 0.0 } else { intersection as f64 / union as f64 }
+    if union == 0 {
+        0.0
+    } else {
+        intersection as f64 / union as f64
+    }
 }
 
 fn cosine_similarity(a: &[f32], b: &[f32]) -> f64 {

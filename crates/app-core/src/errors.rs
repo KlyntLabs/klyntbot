@@ -68,3 +68,8 @@ pub fn map_config_save_err(e: impl std::fmt::Display) -> ApiError {
 pub fn map_serialization_err(e: impl std::fmt::Display) -> ApiError {
     ApiError::new("SERIALIZATION", e.to_string())
 }
+
+/// Convert a `KlyntbotError` into a work-context–flavored `ApiError`.
+pub fn map_activity_log_err(e: common::KlyntbotError) -> ApiError {
+    ApiError::new("WORK_CONTEXT_ERROR", e.to_string())
+}

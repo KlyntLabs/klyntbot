@@ -70,9 +70,7 @@ impl CronHandler for CronHandlerAdapter {
         let jobs = self.service.list_jobs(true).await;
 
         jobs.into_iter()
-            .filter(|job| {
-                include_internal || job.origin != scheduling::CronOrigin::System
-            })
+            .filter(|job| include_internal || job.origin != scheduling::CronOrigin::System)
             .map(|job| CronJobInfo {
                 id: job.id,
                 name: job.name,

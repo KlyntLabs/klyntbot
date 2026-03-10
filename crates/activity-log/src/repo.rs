@@ -264,6 +264,25 @@ impl ActivityLogRepo {
         Ok(())
     }
 
+    pub async fn query_by_context(
+        pool: &StoragePool,
+        context_id: &str,
+        limit: i64,
+    ) -> common::Result<Vec<ActivityLogEntry>> {
+        let sql = format!(
+            "SELECT {SELECT_COLS} FROM unified_activity_log \
+             WHERE work_context_id = ?1 \
+             ORDER BY timestamp DESC LIMIT ?2"
+        );
+        let rows = sqlx::query_as::<_, RawRow>(&sql)
+            .bind(context_id)
+            .bind(limit)
+            .fetch_all(pool.inner())
+            .await
+            .map_err(StorageError::from)?;
+        Ok(rows.into_iter().map(Into::into).collect())
+    }
+
     pub async fn delete_older_than(pool: &StoragePool, days: i64) -> common::Result<u64> {
         let cutoff = Utc::now() - chrono::Duration::days(days);
         let result = sqlx::query("DELETE FROM unified_activity_log WHERE timestamp < ?1")

@@ -7,11 +7,11 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use activity_log::{
-    ActivityActor, ActivityIngestionService, ActivityLogEntry, ActivitySource,
     normalizers::{content_hash, new_ulid},
+    ActivityActor, ActivityIngestionService, ActivityLogEntry, ActivitySource,
 };
 use chrono::Utc;
-use notify_debouncer_mini::{DebouncedEventKind, new_debouncer};
+use notify_debouncer_mini::{new_debouncer, DebouncedEventKind};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, info, warn};
@@ -52,16 +52,16 @@ impl FileWatcherService {
         let (sync_tx, sync_rx) = std::sync::mpsc::channel();
         let (async_tx, mut async_rx) = tokio::sync::mpsc::channel(256);
 
-        let mut debouncer = new_debouncer(
-            Duration::from_millis(self.debounce_ms),
-            sync_tx,
-        )
-        .map_err(|e| common::KlyntbotError::Storage(format!("File watcher init failed: {e}")))?;
+        let mut debouncer = new_debouncer(Duration::from_millis(self.debounce_ms), sync_tx)
+            .map_err(|e| {
+                common::KlyntbotError::Storage(format!("File watcher init failed: {e}"))
+            })?;
 
         for dir in &self.directories {
             if dir.exists() {
-                if let Err(e) =
-                    debouncer.watcher().watch(dir, notify::RecursiveMode::Recursive)
+                if let Err(e) = debouncer
+                    .watcher()
+                    .watch(dir, notify::RecursiveMode::Recursive)
                 {
                     warn!("Cannot watch {}: {e}", dir.display());
                 }
@@ -220,7 +220,10 @@ impl FileWatcherService {
                 &repo_name,
                 "commit",
                 preview,
-                content_hash(&format!("commit:{repo_name}:{branch}:{}", commit_msg.as_deref().unwrap_or(""))),
+                content_hash(&format!(
+                    "commit:{repo_name}:{branch}:{}",
+                    commit_msg.as_deref().unwrap_or("")
+                )),
                 serde_json::json!({
                     "branch": branch,
                     "commit_message": commit_msg,
@@ -340,11 +343,7 @@ pub fn detect_language(path: &Path) -> Option<String> {
 
 /// Walk up directory tree to detect project from markers.
 pub fn detect_project(path: &Path) -> Option<String> {
-    let mut dir = if path.is_file() {
-        path.parent()?
-    } else {
-        path
-    };
+    let mut dir = if path.is_file() { path.parent()? } else { path };
 
     for _ in 0..10 {
         // Cargo.toml → rust project
@@ -375,7 +374,10 @@ mod tests {
             detect_language(Path::new("app.tsx")),
             Some("typescript".into())
         );
-        assert_eq!(detect_language(Path::new("script.py")), Some("python".into()));
+        assert_eq!(
+            detect_language(Path::new("script.py")),
+            Some("python".into())
+        );
         assert_eq!(detect_language(Path::new("Makefile")), None);
     }
 
@@ -405,7 +407,9 @@ mod tests {
 
     #[test]
     fn test_ignore_binary_extensions() {
-        let binary_exts = ["exe", "o", "dylib", "so", "dll", "a", "class", "pyc", "wasm"];
+        let binary_exts = [
+            "exe", "o", "dylib", "so", "dll", "a", "class", "pyc", "wasm",
+        ];
         for ext in &binary_exts {
             let path = PathBuf::from(format!("file.{ext}"));
             let is_binary = path

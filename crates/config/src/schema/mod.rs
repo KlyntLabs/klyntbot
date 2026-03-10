@@ -15,6 +15,7 @@
 //! - `tools`: ToolsConfig, permissions, exec, web
 
 mod agents;
+mod capture;
 mod channels;
 mod cognitive;
 mod confidence;
@@ -32,7 +33,6 @@ mod project;
 mod providers;
 mod todo;
 mod tools;
-mod capture;
 mod work_context;
 
 pub use self::agents::*;

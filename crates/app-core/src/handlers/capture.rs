@@ -106,8 +106,7 @@ impl AppCore {
 
     pub async fn uninstall_shell_hook(&self) -> Result<String, ApiError> {
         let shell = crate::shell_hook::detect_shell();
-        crate::shell_hook::uninstall(&shell)
-            .map_err(|e| ApiError::new("INTERNAL", format!("{e}")))
+        crate::shell_hook::uninstall(&shell).map_err(|e| ApiError::new("INTERNAL", format!("{e}")))
     }
 
     pub async fn get_shell_hook_status(&self) -> Result<ShellHookStatusResponse, ApiError> {
@@ -129,7 +128,12 @@ impl AppCore {
 
     pub async fn get_capture_status(&self) -> Result<CaptureStatusResponse, ApiError> {
         // Read config and release lock before async I/O
-        let (file_watcher_active, file_watcher_directories, ingestion_api_enabled, ingestion_api_port) = {
+        let (
+            file_watcher_active,
+            file_watcher_directories,
+            ingestion_api_enabled,
+            ingestion_api_port,
+        ) = {
             let cfg = self.config.read().await;
             (
                 cfg.capture.file_watcher.enabled,
@@ -163,12 +167,7 @@ impl AppCore {
 
     pub async fn get_ingestion_token(&self) -> Result<String, ApiError> {
         let cfg = self.config.read().await;
-        Ok(cfg
-            .capture
-            .ingestion_api
-            .token
-            .clone()
-            .unwrap_or_default())
+        Ok(cfg.capture.ingestion_api.token.clone().unwrap_or_default())
     }
 
     pub async fn regenerate_ingestion_token(&self) -> Result<String, ApiError> {

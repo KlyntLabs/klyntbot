@@ -6,6 +6,7 @@ use std::path::PathBuf;
 
 use super::agents::AgentsConfig;
 
+use super::capture::CaptureConfig;
 use super::channels::ChannelsConfig;
 use super::cognitive::CognitiveConfig;
 use super::confidence::ConfidenceConfig;
@@ -22,7 +23,6 @@ use super::project::ProjectConfig;
 use super::providers::{ProviderManagerConfig, ProvidersConfig};
 use super::todo::TodoConfig;
 use super::tools::ToolsConfig;
-use super::capture::CaptureConfig;
 use super::work_context::WorkContextConfig;
 
 /// Expand a leading `~` in a path to the user's home directory.

@@ -364,6 +364,16 @@ fn main() {
             // Status
             commands::status::agent_status,
             // Window
+            // Work Contexts
+            commands::work_context::list_work_contexts,
+            commands::work_context::get_work_context,
+            commands::work_context::get_work_context_detail,
+            commands::work_context::update_work_context,
+            commands::work_context::archive_work_context,
+            commands::work_context::merge_work_contexts,
+            commands::work_context::search_work_contexts,
+            commands::work_context::get_context_timeline,
+            commands::work_context::get_context_resume_data,
             // Capture
             commands::capture::capture_status,
             commands::capture::capture_shell_hook_status,
