@@ -244,7 +244,7 @@ export function DayColumnsView({
   };
 
   return (
-    <div className="flex gap-2 h-full">
+    <div className="flex gap-2 h-full w-full">
       <div className="flex-1 glass-card overflow-hidden flex flex-col">
         {/* Context color ribbon — subtle work context indicator per hour */}
         <ContextRibbon date={date} />

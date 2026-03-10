@@ -22,7 +22,7 @@ export function ProjectLeftPanel({
   const hasInstructions = project.instructions && Object.values(project.instructions).some(Boolean);
 
   return (
-    <div className="w-56 border-r border-white/[0.06] flex flex-col overflow-y-auto shrink-0">
+    <div className="w-[250px] glass-sidebar flex flex-col overflow-y-auto shrink-0">
       {/* AI Context cards */}
       <div className="p-3 space-y-1.5">
         <button
