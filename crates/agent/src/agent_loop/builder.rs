@@ -899,6 +899,9 @@ impl AgentLoopBuilder {
         if let Some(ref recorder) = outcome_recorder {
             execution_core = execution_core.with_outcome_recorder(Arc::clone(recorder));
         }
+        if let Some(ref domain_bus) = self.domain_event_bus {
+            execution_core = execution_core.with_domain_bus(Arc::clone(domain_bus));
+        }
         let execution_core = Arc::new(execution_core);
 
         let direct_engine =

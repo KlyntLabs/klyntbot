@@ -160,6 +160,18 @@ impl AppCore {
         let persona_manager = Arc::new(RwLock::new(persona_manager));
         info!("persona manager loaded");
 
+        // Run activity-log migrations (unified activity log).
+        StoragePool::run_feature_migrations(
+            storage_pool.inner(),
+            &activity_log::ActivityLog::migrations_static(),
+        )
+        .await
+        .map_err(|e| format!("activity-log migration failed: {e}"))?;
+        let activity_svc = Arc::new(activity_log::ActivityIngestionService::new(
+            storage_pool.clone(),
+            activity_log::PrivacyFilter::default(),
+        ));
+
         // 8. DomainEventBus for cross-feature communication (cognitive + coaching)
         let domain_event_bus = Arc::new(DomainEventBus::new(256));
 
@@ -254,11 +266,12 @@ impl AppCore {
                 // Build and start the productivity engine (tracker + all subscribers).
                 let categories = prod_repos.categories.list_all().await.unwrap_or_default();
                 let categorizer = Categorizer::new(categories);
-                let mut engine = ProductivityEngine::new_with_bus(
+                let mut engine = ProductivityEngine::new_full(
                     prod_config.clone(),
                     prod_repos.clone(),
                     categorizer,
                     Some(Arc::clone(&domain_event_bus)),
+                    Some(Arc::clone(&activity_svc)),
                 );
 
                 // Take auto-focus receiver — caller wires to transport.
@@ -405,7 +418,15 @@ impl AppCore {
             pipeline_broadcast: Some(pipeline_broadcast_tx),
             event_log_repo: Some(cognitive::EventLogRepo::new(storage_pool.inner().clone())),
             consecutive_coaching_ignores: Arc::new(std::sync::atomic::AtomicI32::new(0)),
+            activity_ingestion_service: Some(Arc::clone(&activity_svc)),
         };
+
+        // Start ActivityLogSubscriber for domain event normalization.
+        let _activity_subscriber = activity_log::ActivityLogSubscriber::start(
+            &domain_event_bus,
+            activity_svc,
+            shutdown_token.clone(),
+        );
 
         // Spawn background services (agent loop + channel manager).
         spawn_background(inbound_rx, channel_manager, &agent, &shutdown_token);

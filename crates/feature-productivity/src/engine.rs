@@ -49,6 +49,16 @@ impl ProductivityEngine {
         categorizer: Categorizer,
         domain_bus: Option<Arc<DomainEventBus>>,
     ) -> Self {
+        Self::new_full(config, repos, categorizer, domain_bus, None)
+    }
+
+    pub fn new_full(
+        config: ProductivityConfig,
+        repos: ProductivityRepos,
+        categorizer: Categorizer,
+        domain_bus: Option<Arc<DomainEventBus>>,
+        unified_svc: Option<Arc<activity_log::ActivityIngestionService>>,
+    ) -> Self {
         let (tick_tx, _) = broadcast::channel(BROADCAST_CAPACITY);
         let cancel = CancellationToken::new();
 
@@ -61,13 +71,14 @@ impl ProductivityEngine {
             tick_tx.clone(),
         );
 
-        // BatchWriter
-        let batch_writer = BatchWriter::start(
+        // BatchWriter (with optional dual-write to unified activity log)
+        let batch_writer = BatchWriter::start_with_unified(
             tick_tx.subscribe(),
             repos.clone(),
             config.privacy.clone(),
             config.tracking.batch_write_interval_secs,
             cancel.child_token(),
+            unified_svc,
         );
 
         // BucketAggregator

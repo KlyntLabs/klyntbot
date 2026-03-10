@@ -74,6 +74,8 @@ pub struct AppCore {
     /// Consecutive coaching nudges that were auto-collapsed (ignored).
     /// Resets on explicit user feedback. Delivery skipped when >= 2.
     pub consecutive_coaching_ignores: Arc<AtomicI32>,
+    /// Unified activity log ingestion service.
+    pub activity_ingestion_service: Option<Arc<activity_log::ActivityIngestionService>>,
 }
 
 impl AppCore {

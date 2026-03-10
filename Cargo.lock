@@ -3,6 +3,26 @@
 version = 3
 
 [[package]]
+name = "activity-log"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "bus",
+ "chrono",
+ "common",
+ "serde",
+ "serde_json",
+ "sha2",
+ "sqlx",
+ "storage",
+ "tokio",
+ "tokio-util",
+ "tools-core",
+ "tracing",
+ "ulid",
+]
+
+[[package]]
 name = "addr2line"
 version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -148,6 +168,7 @@ checksum = "5f0e0fee31ef5ed1ba1316088939cea399010ed7731dba877ed44aeb407a75ea"
 name = "app-core"
 version = "0.1.0"
 dependencies = [
+ "activity-log",
  "agent",
  "base64 0.22.1",
  "bus",
@@ -3517,6 +3538,7 @@ dependencies = [
 name = "feature-productivity"
 version = "0.1.0"
 dependencies = [
+ "activity-log",
  "async-trait",
  "bus",
  "chrono",
@@ -11319,6 +11341,17 @@ dependencies = [
  "memoffset",
  "tempfile",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "ulid"
+version = "1.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "470dbf6591da1b39d43c14523b2b469c86879a53e8b758c8e090a470fe7b1fbe"
+dependencies = [
+ "rand 0.9.2",
+ "serde",
+ "web-time",
 ]
 
 [[package]]

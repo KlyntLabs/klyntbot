@@ -132,6 +132,14 @@ pub enum DomainEvent {
         session_key: String,
     },
 
+    // -- Tool execution --
+    ToolCallExecuted {
+        tool_name: String,
+        args_preview: Option<String>,
+        session_key: Option<String>,
+        duration_ms: Option<i64>,
+    },
+
     // -- Cross-domain --
     UserStatedFact {
         fact: String,

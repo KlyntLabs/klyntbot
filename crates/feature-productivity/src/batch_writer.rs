@@ -1,6 +1,8 @@
 //! BatchWriter — subscribes to ActivityTick broadcast, buffers events,
 //! and batch-writes to the activity_events table.
 
+use std::sync::Arc;
+
 use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
@@ -17,13 +19,57 @@ pub struct BatchWriter {
     task_handle: Option<JoinHandle<()>>,
 }
 
+/// Convert an ActivityEvent to a WindowEventInput for unified log normalization.
+fn to_window_input(evt: &ActivityEvent) -> activity_log::WindowEventInput {
+    activity_log::WindowEventInput {
+        app_name: evt.app_name.clone(),
+        window_title: evt.window_title.clone(),
+        url: evt.url.clone(),
+        started_at: evt.started_at,
+        duration_secs: evt.duration_secs,
+        project_id: evt.project_id.clone(),
+        is_idle: evt.is_idle,
+    }
+}
+
+/// Dual-write a batch of events to the unified activity log.
+async fn dual_write_to_unified(
+    events: &[ActivityEvent],
+    svc: &Arc<activity_log::ActivityIngestionService>,
+) {
+    let normalizer = activity_log::WindowEventNormalizer;
+    let entries: Vec<_> = events
+        .iter()
+        .filter_map(|evt| {
+            let input = to_window_input(evt);
+            activity_log::ActivityNormalizer::normalize(&normalizer, &input)
+        })
+        .collect();
+    if !entries.is_empty() {
+        if let Err(e) = svc.ingest_batch(entries).await {
+            warn!("Unified log dual-write failed: {e}");
+        }
+    }
+}
+
 impl BatchWriter {
     pub fn start(
+        tick_rx: broadcast::Receiver<ActivityTick>,
+        repos: ProductivityRepos,
+        privacy: PrivacyConfig,
+        batch_interval_secs: u64,
+        cancel: CancellationToken,
+    ) -> Self {
+        Self::start_with_unified(tick_rx, repos, privacy, batch_interval_secs, cancel, None)
+    }
+
+    pub fn start_with_unified(
         mut tick_rx: broadcast::Receiver<ActivityTick>,
         repos: ProductivityRepos,
         privacy: PrivacyConfig,
         batch_interval_secs: u64,
         cancel: CancellationToken,
+        unified_svc: Option<Arc<activity_log::ActivityIngestionService>>,
     ) -> Self {
         let cancel_clone = cancel.clone();
         let handle = tokio::spawn(async move {
@@ -42,6 +88,9 @@ impl BatchWriter {
                             buffer.push(evt);
                         }
                         if !buffer.is_empty() {
+                            if let Some(ref svc) = unified_svc {
+                                dual_write_to_unified(&buffer, svc).await;
+                            }
                             if let Err(e) = repos.events.insert_batch(&buffer).await {
                                 warn!("BatchWriter: failed to flush on shutdown: {e}");
                             }
@@ -121,6 +170,9 @@ impl BatchWriter {
 
                         // Batch write check
                         if last_flush.elapsed() >= batch_interval && !buffer.is_empty() {
+                            if let Some(ref svc) = unified_svc {
+                                dual_write_to_unified(&buffer, svc).await;
+                            }
                             if let Err(e) = repos.events.insert_batch(&buffer).await {
                                 warn!("BatchWriter: failed to batch write: {e}");
                             } else {

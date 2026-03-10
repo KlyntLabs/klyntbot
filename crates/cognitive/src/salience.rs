@@ -62,6 +62,7 @@ pub fn evaluate_salience(event: &DomainEvent) -> SalienceVerdict {
         } => SalienceVerdict::Accumulate,
         DomainEvent::NoteCreated { .. } => SalienceVerdict::Accumulate,
         DomainEvent::NoteUpdated { .. } => SalienceVerdict::Accumulate,
+        DomainEvent::ToolCallExecuted { .. } => SalienceVerdict::Accumulate,
     }
 }
 

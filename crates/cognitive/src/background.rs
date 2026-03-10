@@ -519,6 +519,7 @@ fn event_type_key(event: &DomainEvent) -> String {
         DomainEvent::NarrativeGenerated { .. } => "NarrativeGenerated".into(),
         DomainEvent::RuleEvolved { .. } => "RuleEvolved".into(),
         DomainEvent::VoiceJournalProcessed { .. } => "VoiceJournalProcessed".into(),
+        DomainEvent::ToolCallExecuted { .. } => "ToolCallExecuted".into(),
     }
 }
 
