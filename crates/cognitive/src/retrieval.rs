@@ -16,6 +16,9 @@ use crate::types::SemanticFact;
 /// Minimum vector results before fallback kicks in.
 const MIN_VECTOR_RESULTS: usize = 3;
 
+/// Default RRF k parameter (shared with tools-core rrf_merge).
+const DEFAULT_RRF_K: f64 = 60.0;
+
 /// A scored retrieval result with optional similarity from vector search.
 #[derive(Debug, Clone)]
 pub struct ScoredFact {
@@ -119,7 +122,13 @@ pub async fn retrieve_relevant_facts(
 
     // BM25 boost: add FTS5 signal for non-empty queries
     if !query.is_empty() {
-        if let Ok(bm25_hits) = repo.search_fts(query, None, params.limit * 2).await {
+        // Pass domain filter when scoped to a single domain to avoid cross-domain noise
+        let bm25_domain = if domains.len() == 1 {
+            Some(domains[0])
+        } else {
+            None
+        };
+        if let Ok(bm25_hits) = repo.search_fts(query, bm25_domain, params.limit * 2).await {
             let bm25_ids: std::collections::HashMap<String, usize> = bm25_hits
                 .iter()
                 .enumerate()
@@ -129,7 +138,7 @@ pub async fn retrieve_relevant_facts(
             for result in &mut scored {
                 if let Some(&rank) = bm25_ids.get(&result.fact.id) {
                     // BM25 boost: add RRF-style score contribution
-                    let bm25_boost = 1.0 / (60.0 + rank as f64 + 1.0);
+                    let bm25_boost = 1.0 / (DEFAULT_RRF_K + rank as f64 + 1.0);
                     result.score += bm25_boost;
                 }
             }

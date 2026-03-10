@@ -2,6 +2,7 @@
 
 use async_trait::async_trait;
 use cognitive::repos::AnnotationRepo;
+use cognitive::types::PRIORITY_CRITICAL;
 use context_engine::source::{ContextSource, SourceContext};
 
 pub struct AnnotationContextSource {
@@ -26,8 +27,11 @@ impl ContextSource for AnnotationContextSource {
     }
 
     async fn provide(&self, _ctx: &SourceContext) -> Option<String> {
-        // Get critical annotations (priority >= 2) unconditionally
-        let critical = self.repo.get_by_min_priority(2).await.ok()?;
+        let critical = self
+            .repo
+            .get_by_min_priority(PRIORITY_CRITICAL)
+            .await
+            .ok()?;
 
         if critical.is_empty() {
             return None;
@@ -39,9 +43,11 @@ impl ContextSource for AnnotationContextSource {
                 "- [{}] {}: {}\n",
                 ann.target_type, ann.target_id, ann.content
             ));
-            // Increment access count (fire and forget)
-            let _ = self.repo.increment_access(&ann.id).await;
         }
+
+        // Batch-increment access counts (single query instead of N)
+        let ids: Vec<&str> = critical.iter().map(|a| a.id.as_str()).collect();
+        let _ = self.repo.increment_access_batch(&ids).await;
 
         Some(text)
     }

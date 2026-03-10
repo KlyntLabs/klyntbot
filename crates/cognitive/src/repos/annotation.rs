@@ -66,6 +66,7 @@ impl AnnotationRepo {
             SELECT a.* FROM annotations a
             INNER JOIN annotations_fts fts ON a.id = fts.id
             WHERE annotations_fts MATCH ?1
+            AND (a.expires_at IS NULL OR a.expires_at >= datetime('now'))
             ORDER BY fts.rank
             LIMIT ?2
         "#;
@@ -78,7 +79,7 @@ impl AnnotationRepo {
 
     pub async fn list_all(&self) -> Result<Vec<Annotation>, sqlx::Error> {
         sqlx::query_as::<_, Annotation>(
-            "SELECT * FROM annotations ORDER BY priority DESC, updated_at DESC",
+            "SELECT * FROM annotations WHERE expires_at IS NULL OR expires_at >= datetime('now') ORDER BY priority DESC, updated_at DESC",
         )
         .fetch_all(&self.pool)
         .await
@@ -109,12 +110,30 @@ impl AnnotationRepo {
         Ok(())
     }
 
+    /// Batch-increment access counts for multiple annotations in a single query.
+    pub async fn increment_access_batch(&self, ids: &[&str]) -> Result<(), sqlx::Error> {
+        if ids.is_empty() {
+            return Ok(());
+        }
+        let placeholders: Vec<String> = (1..=ids.len()).map(|i| format!("?{i}")).collect();
+        let sql = format!(
+            "UPDATE annotations SET access_count = access_count + 1 WHERE id IN ({})",
+            placeholders.join(", ")
+        );
+        let mut query = sqlx::query(&sql);
+        for id in ids {
+            query = query.bind(id);
+        }
+        query.execute(&self.pool).await?;
+        Ok(())
+    }
+
     pub async fn get_by_min_priority(
         &self,
         min_priority: i32,
     ) -> Result<Vec<Annotation>, sqlx::Error> {
         sqlx::query_as::<_, Annotation>(
-            "SELECT * FROM annotations WHERE priority >= ?1 ORDER BY priority DESC, updated_at DESC",
+            "SELECT * FROM annotations WHERE priority >= ?1 AND (expires_at IS NULL OR expires_at >= datetime('now')) ORDER BY priority DESC, updated_at DESC",
         )
         .bind(min_priority)
         .fetch_all(&self.pool)

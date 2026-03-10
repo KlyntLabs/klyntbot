@@ -164,7 +164,7 @@ impl AnnotateTool {
 
     #[action(name = "search")]
     async fn handle_search(&self, params: SearchParams, _ctx: &RoutingContext) -> Result<String> {
-        let limit = params.limit.unwrap_or(10) as usize;
+        let limit = params.limit.unwrap_or(10).max(0) as usize;
         let results = self.repo.search(&params.query, limit).await.map_err(|e| {
             common::ToolError::ExecutionFailed(format!("Failed to search annotations: {e}"))
         })?;

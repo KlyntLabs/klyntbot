@@ -70,6 +70,9 @@ pub struct ProceduralRule {
     pub project_id: Option<String>,
 }
 
+/// Minimum priority level considered "critical" for context injection.
+pub const PRIORITY_CRITICAL: i32 = 2;
+
 /// A persistent annotation attached to any entity (tool, fact, rule, skill, project).
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct Annotation {

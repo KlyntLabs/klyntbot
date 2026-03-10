@@ -44,14 +44,19 @@ pub fn rrf_merge_triple<T: Searchable + Clone>(
     let mut ranked: Vec<_> = scores.into_iter().collect();
     ranked.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
+    // Build keyword lookup for O(1) item retrieval instead of linear scan
+    let keyword_map: HashMap<String, T> = keyword_results
+        .iter()
+        .map(|r| (r.search_id().to_string(), r.clone()))
+        .collect();
+
     ranked
         .into_iter()
         .filter_map(|(id, score)| {
-            let item = keyword_results
-                .iter()
-                .find(|r| r.search_id() == id)
-                .cloned()
-                .or_else(|| items_by_id.get(&id).cloned());
+            let item = keyword_map
+                .get(&id)
+                .or_else(|| items_by_id.get(&id))
+                .cloned();
 
             let source_bits = sources.get(&id).copied().unwrap_or(0);
             let source = match source_bits {
@@ -109,16 +114,20 @@ pub fn rrf_merge<T: Searchable + Clone>(
     let mut ranked: Vec<_> = scores.into_iter().collect();
     ranked.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
+    // Build keyword lookup for O(1) item retrieval instead of linear scan
+    let keyword_map: HashMap<String, T> = keyword_results
+        .iter()
+        .map(|r| (r.search_id().to_string(), r.clone()))
+        .collect();
+
     // Build final results with source labels
     ranked
         .into_iter()
         .filter_map(|(id, score)| {
-            // Retrieve the full item (prefer keyword results, fallback to lookup map)
-            let item = keyword_results
-                .iter()
-                .find(|r| r.search_id() == id)
-                .cloned()
-                .or_else(|| items_by_id.get(&id).cloned());
+            let item = keyword_map
+                .get(&id)
+                .or_else(|| items_by_id.get(&id))
+                .cloned();
 
             let source_bits = sources.get(&id).copied().unwrap_or(0);
             let source = match source_bits {
