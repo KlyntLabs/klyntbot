@@ -180,6 +180,21 @@ export type {
   RecommendedMcpServer,
 } from "./config";
 
+// ── Entity Link Types ─────────────────────────────────────
+
+export type {
+  ActionSummary,
+  EntityLink,
+  EntityLinkCreateParams,
+  KeyResultSummary,
+  LinkedEntities,
+  NoteSummary,
+  ObjectiveSummary,
+  ProjectSource,
+  ProjectSourceCreateParams,
+  SessionSummary,
+} from "./entity-links";
+
 // ── Agent Types ───────────────────────────────────────────
 
 export type { CoachingIntervention } from "./agent";

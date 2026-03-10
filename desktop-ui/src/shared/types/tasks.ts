@@ -53,6 +53,18 @@ export interface Project {
   completedCount: number;
   objectiveIds?: string[];
   workflowId?: string;
+  description?: string;
+  instructions?: {
+    context?: string;
+    guidelines?: string;
+    constraints?: string;
+    persona?: string;
+  };
+  aiPersonality?: string;
+  userRole?: string;
+  startDate?: string;
+  targetEndDate?: string;
+  settings?: Record<string, unknown>;
 }
 
 // ── Objective & Key Results ─────────────────────────────────
@@ -166,6 +178,13 @@ export interface ProjectUpdateParams {
   description?: string | null;
   tags?: string[];
   status?: string;
+  workflowId?: string | null;
+  instructions?: Record<string, unknown>;
+  aiPersonality?: string | null;
+  userRole?: string | null;
+  startDate?: string | null;
+  targetEndDate?: string | null;
+  settings?: Record<string, unknown>;
 }
 
 // ── Objective Mutation Parameters ───────────────────────────

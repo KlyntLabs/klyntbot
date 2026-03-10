@@ -200,4 +200,56 @@ impl AppCore {
         let response = build_project_response(self, &archived).await?;
         Ok((response, updates))
     }
+
+    pub async fn project_update_instructions(
+        &self,
+        id: String,
+        instructions: serde_json::Value,
+    ) -> HandlerResult<ProjectResponse> {
+        let json_str = serde_json::to_string(&instructions)
+            .map_err(|e| ApiError::new("SERIALIZATION", e.to_string()))?;
+        self.repos
+            .projects
+            .update_instructions(&id, &json_str)
+            .await
+            .map_err(map_storage_err)?;
+
+        let row = self
+            .repos
+            .projects
+            .get_or_err(&id)
+            .await
+            .map_err(map_storage_err)?;
+        let response = build_project_response(self, &row).await?;
+        let updates = vec![EntityUpdate {
+            kind: EntityKind::Project,
+            id,
+        }];
+        Ok((response, updates))
+    }
+
+    pub async fn project_update_role(
+        &self,
+        id: String,
+        role: String,
+    ) -> HandlerResult<ProjectResponse> {
+        self.repos
+            .projects
+            .update_user_role(&id, &role)
+            .await
+            .map_err(map_storage_err)?;
+
+        let row = self
+            .repos
+            .projects
+            .get_or_err(&id)
+            .await
+            .map_err(map_storage_err)?;
+        let response = build_project_response(self, &row).await?;
+        let updates = vec![EntityUpdate {
+            kind: EntityKind::Project,
+            id,
+        }];
+        Ok((response, updates))
+    }
 }

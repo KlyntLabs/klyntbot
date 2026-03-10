@@ -186,6 +186,16 @@ fn main() {
             commands::projects::project_update,
             commands::projects::project_delete,
             commands::projects::project_archive,
+            commands::projects::project_update_instructions,
+            commands::projects::project_update_role,
+            // Entity Links
+            commands::entity_links::entity_link_create,
+            commands::entity_links::entity_link_delete,
+            commands::entity_links::entity_links_for_entity,
+            // Project Sources
+            commands::project_sources::project_source_create,
+            commands::project_sources::project_source_delete,
+            commands::project_sources::project_source_list,
             // Objectives
             commands::objectives::objective_create,
             commands::objectives::objective_get,

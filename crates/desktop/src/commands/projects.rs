@@ -57,6 +57,30 @@ pub async fn project_archive(
     Ok(result)
 }
 
+#[tauri::command]
+pub async fn project_update_instructions(
+    state: State<'_, Arc<AppCore>>,
+    app: tauri::AppHandle,
+    id: String,
+    instructions: serde_json::Value,
+) -> Result<ProjectResponse, ApiError> {
+    let (result, updates) = state.project_update_instructions(id, instructions).await?;
+    super::emit_updates(&app, &updates);
+    Ok(result)
+}
+
+#[tauri::command]
+pub async fn project_update_role(
+    state: State<'_, Arc<AppCore>>,
+    app: tauri::AppHandle,
+    id: String,
+    role: String,
+) -> Result<ProjectResponse, ApiError> {
+    let (result, updates) = state.project_update_role(id, role).await?;
+    super::emit_updates(&app, &updates);
+    Ok(result)
+}
+
 // ── Dev server dispatch ─────────────────────────────────────────────
 
 #[cfg(test)]
@@ -66,6 +90,8 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "project_update",
     "project_delete",
     "project_archive",
+    "project_update_instructions",
+    "project_update_role",
 ];
 
 #[cfg(debug_assertions)]
@@ -95,6 +121,17 @@ pub(crate) async fn dispatch_dev(
         "project_archive" => {
             let id = try_field!(dev::get_str(body, "id"));
             dev::val_rh(core.project_archive(id).await)
+        }
+        "project_update_instructions" => {
+            let id = try_field!(dev::get_str(body, "id"));
+            let instructions: serde_json::Value =
+                try_field!(dev::require(body, "instructions"));
+            dev::val_rh(core.project_update_instructions(id, instructions).await)
+        }
+        "project_update_role" => {
+            let id = try_field!(dev::get_str(body, "id"));
+            let role = try_field!(dev::get_str(body, "role"));
+            dev::val_rh(core.project_update_role(id, role).await)
         }
         _ => return None,
     })
