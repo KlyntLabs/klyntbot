@@ -291,7 +291,7 @@ export function SlashMenu({ editor }: SlashMenuProps) {
   return createPortal(
     <div
       ref={menuRef}
-      className="fixed z-50 min-w-[220px] max-h-[300px] overflow-y-auto glass-panel rounded-xl p-1 shadow-lg"
+      className="fixed z-50 min-w-[220px] max-h-[300px] overflow-y-auto glass-dropdown rounded-xl p-1"
       style={{ left: x, top: y }}
     >
       {filtered.map((cmd, i) => {

@@ -105,10 +105,24 @@ export function toLocalISO(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+/** Format a Date as YYYY-MM-DDTHH:mm using local timezone (for datetime-local inputs). */
+export function toLocalDateTime(d: Date): string {
+  const date = toLocalISO(d);
+  const h = String(d.getHours()).padStart(2, "0");
+  const m = String(d.getMinutes()).padStart(2, "0");
+  return `${date}T${h}:${m}`;
+}
+
 /** Get today as YYYY-MM-DD in local timezone. */
 export function todayISO(): string {
   return toLocalISO(new Date());
 }
+
+/**
+ * JS-style timezone offset in minutes (e.g. -420 for UTC+7).
+ * Pass to backend APIs so they query the correct UTC range for a local date.
+ */
+export const TZ_OFFSET_MINS = new Date().getTimezoneOffset();
 
 /** Get the Monday of the week containing the given date */
 export function weekStartISO(iso: string): string {
@@ -152,6 +166,12 @@ export function formatLongDuration(secs: number): string {
   if (h > 0 && m > 0) return `${h} hr ${m} min`;
   if (h > 0) return `${h} hr`;
   return `${m} min`;
+}
+
+/** Minutes elapsed since midnight for an ISO timestamp (local timezone). */
+export function minutesSinceMidnight(isoStr: string): number {
+  const d = new Date(isoStr);
+  return d.getHours() * 60 + d.getMinutes();
 }
 
 /** Format an ISO timestamp as a compact relative time (e.g. "now", "5m", "3h", "2d", "1w", "3mo"). */

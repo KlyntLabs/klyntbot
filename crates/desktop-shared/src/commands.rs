@@ -668,6 +668,9 @@ pub struct ProductivitySummaryResponse {
     pub top_projects: Vec<ProjectUsageResponse>,
     pub ai_summary: Option<String>,
     pub productivity_score: Option<f64>,
+    pub score_trend: Option<f64>,
+    pub focus_time_trend: Option<f64>,
+    pub active_time_trend: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -681,8 +684,22 @@ pub struct AppUsageResponse {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CategoryUsageResponse {
+    pub category_id: String,
     pub category: String,
+    pub category_type: String,
     pub duration_secs: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrackedAppResponse {
+    pub display_name: String,
+    pub app_name: String,
+    pub site_name: Option<String>,
+    pub category_id: Option<String>,
+    pub category_name: Option<String>,
+    pub total_secs: i64,
+    pub event_count: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -724,6 +741,16 @@ pub struct FocusSessionResponse {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct FocusTimerStatusResponse {
+    pub active: bool,
+    pub mode: Option<String>,
+    pub remaining_secs: Option<u64>,
+    pub total_secs: Option<u64>,
+    pub session: Option<FocusSessionResponse>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ActivityTimelineResponse {
     pub app_name: String,
     pub window_title: Option<String>,
@@ -733,6 +760,7 @@ pub struct ActivityTimelineResponse {
     pub duration_secs: Option<i64>,
     pub is_idle: bool,
     pub project_id: Option<String>,
+    pub focus_session_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -744,6 +772,15 @@ pub struct ActivityCategoryResponse {
     pub color: Option<String>,
     pub icon: Option<String>,
     pub is_system: bool,
+    pub rules: Option<CategoryRulesResponse>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CategoryRulesResponse {
+    pub app_names: Vec<String>,
+    pub bundle_ids: Vec<String>,
+    pub url_patterns: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -785,6 +822,22 @@ pub struct InsightCardResponse {
     pub date: String,
     pub dismissed: bool,
     pub generated_at: DateTime<Utc>,
+}
+
+// ── Weekly Assessment ──────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WeeklyAssessmentResponse {
+    pub id: String,
+    pub week_start: String,
+    pub week_end: String,
+    pub avg_score: Option<f64>,
+    pub total_focus_mins: Option<i64>,
+    pub total_productive_secs: Option<i64>,
+    pub total_distracting_secs: Option<i64>,
+    pub top_apps: Option<String>,
+    pub summary: Option<String>,
 }
 
 // ── Distraction ────────────────────────────────────────────────────────
@@ -984,4 +1037,122 @@ pub struct KeyResultUpdateParams {
     pub description: Option<Option<String>>,
     pub status: Option<String>,
     pub due_date: Option<Option<String>>,
+}
+
+// ── Timeline / Dashboard ──────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TimelineQuery {
+    pub start_date: String,
+    pub end_date: String,
+    pub sources: Option<Vec<TimelineSource>>,
+    pub include_point_events: Option<bool>,
+    /// JS-style timezone offset in minutes (e.g. -420 for UTC+7).
+    /// Used to shift day boundaries so local-time events appear on the correct date.
+    pub tz_offset_mins: Option<i32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TimelineResponse {
+    pub entries: Vec<TimelineEntry>,
+    pub summary: TimelineSummary,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TimelineEntry {
+    pub id: String,
+    pub source: TimelineSource,
+    pub entry_type: TimelineEntryType,
+    pub title: String,
+    pub description: Option<String>,
+    pub started_at: String,
+    pub ended_at: Option<String>,
+    pub duration_secs: Option<i64>,
+    pub entity_id: Option<String>,
+    pub entity_route: Option<String>,
+    pub color: String,
+    pub metadata: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum TimelineSource {
+    Productivity,
+    Focus,
+    Task,
+    Todo,
+    Note,
+    Finance,
+    System,
+    Calendar,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum TimelineEntryType {
+    AppUsage,
+    FocusSession,
+    TaskTimeEntry,
+    TaskCreated,
+    TaskCompleted,
+    TaskUpdated,
+    TaskDue,
+    NoteCreated,
+    NoteUpdated,
+    TransactionRecorded,
+    ExpenseRecorded,
+    IncomeRecorded,
+    SystemEvent,
+    CalendarEvent,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TimelineSummary {
+    pub total_tracked_secs: i64,
+    pub focus_secs: i64,
+    pub tasks_completed: i64,
+    pub tasks_created: i64,
+    pub notes_touched: i64,
+    pub transactions_count: i64,
+    pub top_apps: Vec<TopAppSummary>,
+    pub source_breakdown: Vec<SourceBreakdown>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TopAppSummary {
+    pub app_name: String,
+    pub duration_secs: i64,
+    pub percentage: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SourceBreakdown {
+    pub source: TimelineSource,
+    pub duration_secs: i64,
+    pub count: i64,
+}
+
+// ── Calendar ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CalendarEventInput {
+    pub title: String,
+    pub started_at: String,
+    pub ended_at: String,
+    pub external_uid: String,
+    pub calendar_id: Option<String>,
+    pub description: Option<String>,
+    pub location: Option<String>,
+    pub attendees_count: Option<i64>,
+    pub is_recurring: Option<bool>,
+    pub recurrence_id: Option<String>,
+    pub source: Option<String>,
+    pub color: Option<String>,
 }

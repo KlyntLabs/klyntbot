@@ -1,6 +1,6 @@
 //! Usage repository — usage_records table.
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Datelike, NaiveTime, Utc};
 use sqlx::SqlitePool;
 
 use crate::error::StorageError;
@@ -94,6 +94,16 @@ impl UsageRepo {
             .into_iter()
             .map(|r| (r.day.unwrap_or_default(), r.total_cost.unwrap_or(0.0)))
             .collect())
+    }
+
+    /// Get total estimated cost for the current calendar month (UTC).
+    pub async fn total_cost_current_month(&self) -> Result<f64, StorageError> {
+        let now = Utc::now();
+        let first_of_month = now.date_naive().with_day(1).unwrap_or(now.date_naive());
+        let month_start = first_of_month.and_time(NaiveTime::MIN);
+        let month_start_utc = DateTime::<Utc>::from_naive_utc_and_offset(month_start, Utc);
+        let (_, cost) = self.totals_since(month_start_utc).await?;
+        Ok(cost)
     }
 
     /// Get total request count and cost since a timestamp.

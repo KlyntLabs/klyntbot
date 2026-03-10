@@ -328,7 +328,7 @@ export function EntityMentionMenu({ editor }: EntityMentionMenuProps) {
   return createPortal(
     <div
       ref={menuRef}
-      className="fixed z-50 glass-panel rounded-xl py-1 min-w-[220px] max-w-[320px] shadow-xl border border-border"
+      className="fixed z-50 glass-dropdown rounded-xl py-1 min-w-[220px] max-w-[320px]"
       style={{ left: coords.x, top: coords.y + 4 }}
     >
       {results.length === 0 && (

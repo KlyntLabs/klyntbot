@@ -38,6 +38,7 @@ async fn test_insert_and_list_activity_events() {
             is_idle: false,
             metadata: None,
             project_id: None,
+            focus_session_id: None,
         };
         repos.events.insert(&event).await.unwrap();
     }
@@ -77,6 +78,7 @@ async fn test_batch_insert_events() {
             is_idle: false,
             metadata: None,
             project_id: None,
+            focus_session_id: None,
         })
         .collect();
 
@@ -212,7 +214,9 @@ async fn test_daily_summary_upsert() {
             category: Some("coding".to_string()),
         }],
         top_categories: vec![CategoryUsage {
-            category: "coding".to_string(),
+            category_id: "coding".to_string(),
+            category: "Coding".to_string(),
+            category_type: "productive".to_string(),
             duration_secs: 2400,
         }],
         top_projects: vec![],
@@ -303,6 +307,7 @@ async fn test_context_switch_count() {
             is_idle: false,
             metadata: None,
             project_id: None,
+            focus_session_id: None,
         })
         .collect();
 
@@ -341,6 +346,7 @@ async fn test_purge_old_events() {
         is_idle: false,
         metadata: None,
         project_id: None,
+        focus_session_id: None,
     };
     let new_event = ActivityEvent {
         started_at: now,

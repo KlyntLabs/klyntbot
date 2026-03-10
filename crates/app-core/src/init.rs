@@ -4,7 +4,7 @@ use agent::{AgentLoop, PersonaManager};
 use bus::{DomainEventBus, MessageBus};
 use channels::ChannelManager;
 use chrono::{Duration, Timelike, Utc};
-use cognitive::situation::{SituationInputs, UserSituation, compute_situation};
+use cognitive::situation::{compute_situation, SituationInputs, UserSituation};
 use feature_coaching::{FeedbackTracker, InterventionRouter, PatternDetector, SignalAccumulator};
 use feature_notes::repo::NoteRepo;
 use feature_productivity::auto_focus::AutoFocusSession;
@@ -41,6 +41,18 @@ impl AppCore {
     /// receivers to their transport layer (Tauri events, SSE, etc.).
     pub async fn init(
         config_override: Option<config::Config>,
+    ) -> Result<(Self, EventChannels), String> {
+        Self::init_with_sender(config_override, None).await
+    }
+
+    /// Initialize with an optional custom notification sender.
+    ///
+    /// When `sender` is `Some`, OS-native notifications are routed through it
+    /// (e.g. Tauri's notification plugin, which shows the app icon). When
+    /// `None`, the default platform command (`osascript` / `notify-send`) is used.
+    pub async fn init_with_sender(
+        config_override: Option<config::Config>,
+        notification_sender: Option<Arc<dyn common::utils::notify::NotificationSender>>,
     ) -> Result<(Self, EventChannels), String> {
         // 1. Load config
         let mut config = match config_override {
@@ -114,10 +126,17 @@ impl AppCore {
             .await
             .map_err(|e| format!("cron start failed: {e}"))?;
 
-        let notification_dispatcher = Arc::new(agent::NotificationDispatcher::new(
-            bus.outbound_sender(),
-            config.todo.notifications.clone(),
-        ));
+        let notification_dispatcher = Arc::new(match &notification_sender {
+            Some(sender) => agent::NotificationDispatcher::with_sender(
+                bus.outbound_sender(),
+                config.todo.notifications.clone(),
+                Arc::clone(sender),
+            ),
+            None => agent::NotificationDispatcher::new(
+                bus.outbound_sender(),
+                config.todo.notifications.clone(),
+            ),
+        });
 
         register_cron_callbacks(
             &mut cron_service,
@@ -141,8 +160,25 @@ impl AppCore {
         let persona_manager = Arc::new(RwLock::new(persona_manager));
         info!("persona manager loaded");
 
+        // Run activity-log migrations (unified activity log).
+        StoragePool::run_feature_migrations(
+            storage_pool.inner(),
+            &activity_log::ActivityLog::migrations_static(),
+        )
+        .await
+        .map_err(|e| format!("activity-log migration failed: {e}"))?;
+        let activity_svc = Arc::new(activity_log::ActivityIngestionService::new(
+            storage_pool.clone(),
+            activity_log::PrivacyFilter::default(),
+        ));
+
         // 8. DomainEventBus for cross-feature communication (cognitive + coaching)
         let domain_event_bus = Arc::new(DomainEventBus::new(256));
+
+        // Pre-create user situation (defaults now, recomputed with real data below
+        // and every 2 min afterwards). Shared with CognitiveContextSource for
+        // situational_boost in memory retrieval.
+        let user_situation = Arc::new(Mutex::new(UserSituation::default()));
 
         // 8. Build AgentLoop
         let (pipeline_broadcast_tx, _) =
@@ -151,10 +187,19 @@ impl AppCore {
         let mut builder = AgentLoop::builder(bus.clone(), provider, config.clone())
             .with_pool(storage_pool.inner().clone())
             .with_cron_service(cron_service.clone())
-            .with_notification_handle(notification_dispatcher.last_active_handle())
+            .with_notification_handle(notification_dispatcher.last_active_handle());
+
+        // Thread the custom notification sender (if provided) to the agent's ReminderEngine
+        if let Some(ref sender) = notification_sender {
+            builder = builder.with_notification_sender(Arc::clone(sender));
+        }
+
+        let mut builder = builder
             .with_domain_bus(Arc::clone(&domain_event_bus))
             .with_cognitive_provider(cognitive_provider.clone())
-            .with_pipeline_tx(pipeline_tx);
+            .with_pipeline_tx(pipeline_tx)
+            .with_user_situation(user_situation.clone())
+            .with_activity_service(Arc::clone(&activity_svc));
 
         if let Some(vs) = vector_store {
             builder = builder.with_vector_store(vs);
@@ -222,11 +267,12 @@ impl AppCore {
                 // Build and start the productivity engine (tracker + all subscribers).
                 let categories = prod_repos.categories.list_all().await.unwrap_or_default();
                 let categorizer = Categorizer::new(categories);
-                let mut engine = ProductivityEngine::new_with_bus(
+                let mut engine = ProductivityEngine::new_full(
                     prod_config.clone(),
                     prod_repos.clone(),
                     categorizer,
                     Some(Arc::clone(&domain_event_bus)),
+                    Some(Arc::clone(&activity_svc)),
                 );
 
                 // Take auto-focus receiver — caller wires to transport.
@@ -236,6 +282,36 @@ impl AppCore {
                 let dashboard_tick_rx = Some(engine.subscribe());
 
                 engine.start();
+
+                // Wire ProductivityIntelligenceLayer — subscribes to tick broadcast
+                // for classification, session aggregation, quality scoring, and interventions.
+                {
+                    let prod_handler: Option<Arc<dyn feature_productivity::ProductivityHandler>> =
+                        cognitive_provider.as_ref().map(|cp| {
+                            let model = config.agents.defaults.model.clone();
+                            Arc::new(agent::ProductivityHandlerImpl::new(cp.clone(), model))
+                                as Arc<dyn feature_productivity::ProductivityHandler>
+                        });
+
+                    match feature_productivity::intelligence::ProductivityIntelligenceLayer::new(
+                        engine.tick_sender(),
+                        Arc::clone(&domain_event_bus),
+                        prod_repos.clone(),
+                        prod_handler,
+                        shutdown_token.child_token(),
+                    )
+                    .await
+                    {
+                        Ok(layer) => {
+                            layer.start();
+                            info!("productivity intelligence layer started");
+                        }
+                        Err(e) => {
+                            warn!("Failed to start intelligence layer: {e}");
+                        }
+                    }
+                }
+
                 let engine = Arc::new(Mutex::new(engine));
 
                 // Nudge service — break reminders + burnout alerts.
@@ -274,14 +350,17 @@ impl AppCore {
         let mut tracker = FeedbackTracker::new().with_repo(coaching_repo);
         tracker.load_from_db().await;
         let feedback_tracker = Arc::new(Mutex::new(tracker));
-        // Compute initial user situation from real productivity data.
-        let initial_situation = build_situation_inputs(
-            productivity_repos.as_ref(),
-            &repos,
-            None, // no router yet
-        )
-        .await;
-        let user_situation = Arc::new(Mutex::new(initial_situation));
+
+        // Compute real user situation now that productivity_repos is available.
+        {
+            let real_situation = build_situation_inputs(
+                productivity_repos.as_ref(),
+                &repos,
+                None, // router just created, no dismissals yet
+            )
+            .await;
+            *user_situation.lock().await = real_situation;
+        }
 
         // Start CoachingService — processes domain events through coaching pipeline.
         let coaching_reasoner: Arc<dyn feature_coaching::CoachingReasonerHandler> =
@@ -338,11 +417,17 @@ impl AppCore {
             coaching_service: Some(Arc::new(Mutex::new(coaching_service))),
             cognitive_provider,
             pipeline_broadcast: Some(pipeline_broadcast_tx),
-            event_log_repo: Some(cognitive::EventLogRepo::new(
-                storage_pool.inner().clone(),
-            )),
+            event_log_repo: Some(cognitive::EventLogRepo::new(storage_pool.inner().clone())),
             consecutive_coaching_ignores: Arc::new(std::sync::atomic::AtomicI32::new(0)),
+            activity_ingestion_service: Some(Arc::clone(&activity_svc)),
         };
+
+        // Start ActivityLogSubscriber for domain event normalization.
+        let _activity_subscriber = activity_log::ActivityLogSubscriber::start(
+            &domain_event_bus,
+            activity_svc,
+            shutdown_token.clone(),
+        );
 
         // Spawn background services (agent loop + channel manager).
         spawn_background(inbound_rx, channel_manager, &agent, &shutdown_token);
@@ -443,7 +528,21 @@ fn spawn_background(
     info!("background services spawned");
 }
 
-/// Register cron callbacks (must be called before wrapping CronService in Arc).
+// ── Cron job name constants ──────────────────────────────────────────────────
+// Shared between `register_cron_callbacks` and `ensure_cron_jobs` to prevent
+// silent mismatches from typos.
+const JOB_FOCUS_CHECK: &str = "todo_focus_check";
+const JOB_DAILY_DIGEST: &str = "todo_daily_digest";
+const JOB_OVERDUE_CHECK: &str = "todo_overdue_check";
+const JOB_WEEKLY_REFLECTION: &str = "__klyntbot_cognitive_weekly_reflection";
+const JOB_WEEKLY_REPORT: &str = "__klyntbot_weekly_report";
+const JOB_DAILY_PLANNING: &str = "__klyntbot_daily_planning";
+const JOB_FINANCE_DAILY_REVIEW: &str = "__klyntbot_finance_daily_review";
+const JOB_FINANCE_BUDGET_CHECK: &str = "__klyntbot_finance_budget_check";
+const JOB_FINANCE_PRICE_REFRESH: &str = "__klyntbot_finance_price_refresh";
+const JOB_FINANCE_HEALTH_CHECK: &str = "__klyntbot_finance_health_check";
+
+/// Register individual cron handlers (must be called before wrapping CronService in Arc).
 fn register_cron_callbacks(
     cron_service: &mut CronService,
     repos: &Repos,
@@ -452,29 +551,20 @@ fn register_cron_callbacks(
     bus: &Arc<MessageBus>,
     cognitive_provider: Option<providers::DynProvider>,
 ) {
-    let todo_repo = repos.actions.clone();
-    let dispatcher = Arc::clone(notification_dispatcher);
-    let config_focus = config.todo.focus.clone();
-    let bus_for_cron = bus.clone();
-    let pool_for_cron = repos.pool().clone();
-    let config_for_cron = config.clone();
-    let cognitive_provider_for_cron = cognitive_provider;
     let rt = tokio::runtime::Handle::current();
 
-    cron_service.set_callback(Arc::new(move |job: &scheduling::CronJob| {
-        let todo_repo = todo_repo.clone();
-        let dispatcher = Arc::clone(&dispatcher);
-        let config_focus = config_focus.clone();
-        let bus = Arc::clone(&bus_for_cron);
-        let job_name = job.name.clone();
-        let pool = pool_for_cron.clone();
-        let cog_config = config_for_cron.clone();
-        let cog_provider = cognitive_provider_for_cron.clone();
-
-        tokio::task::block_in_place(|| {
-            rt.block_on(async move {
-                match job_name.as_str() {
-                    "todo_focus_check" => {
+    // ── todo_focus_check ─────────────────────────────────────────────────
+    {
+        let todo_repo = repos.actions.clone();
+        let dispatcher = Arc::clone(notification_dispatcher);
+        let rt = rt.clone();
+        cron_service.register_handler(
+            JOB_FOCUS_CHECK,
+            Arc::new(move |_job: &scheduling::CronJob| {
+                let todo_repo = todo_repo.clone();
+                let dispatcher = Arc::clone(&dispatcher);
+                tokio::task::block_in_place(|| {
+                    rt.block_on(async move {
                         let focused: Vec<storage::ActionRow> = todo_repo.list_focused().await?;
                         for task in &focused {
                             if let Some(deadline) = task.focus_deadline {
@@ -508,8 +598,24 @@ fn register_cron_callbacks(
                             }
                         }
                         Ok(Some(format!("Checked {} focused tasks", focused.len())))
-                    }
-                    "todo_daily_digest" => {
+                    })
+                })
+            }),
+        );
+    }
+
+    // ── todo_daily_digest ────────────────────────────────────────────────
+    {
+        let todo_repo = repos.actions.clone();
+        let dispatcher = Arc::clone(notification_dispatcher);
+        let rt = rt.clone();
+        cron_service.register_handler(
+            JOB_DAILY_DIGEST,
+            Arc::new(move |_job: &scheduling::CronJob| {
+                let todo_repo = todo_repo.clone();
+                let dispatcher = Arc::clone(&dispatcher);
+                tokio::task::block_in_place(|| {
+                    rt.block_on(async move {
                         let summary = todo_repo.summary().await?;
                         let overdue: Vec<storage::ActionRow> = todo_repo.overdue().await?;
                         let body = format!(
@@ -522,8 +628,26 @@ fn register_cron_callbacks(
                         );
                         dispatcher.notify("📋 Daily Task Digest", &body).await.ok();
                         Ok(Some("Daily digest sent".to_string()))
-                    }
-                    "todo_overdue_check" => {
+                    })
+                })
+            }),
+        );
+    }
+
+    // ── todo_overdue_check ───────────────────────────────────────────────
+    {
+        let todo_repo = repos.actions.clone();
+        let dispatcher = Arc::clone(notification_dispatcher);
+        let config_focus = config.todo.focus.clone();
+        let rt = rt.clone();
+        cron_service.register_handler(
+            JOB_OVERDUE_CHECK,
+            Arc::new(move |_job: &scheduling::CronJob| {
+                let todo_repo = todo_repo.clone();
+                let dispatcher = Arc::clone(&dispatcher);
+                let config_focus = config_focus.clone();
+                tokio::task::block_in_place(|| {
+                    rt.block_on(async move {
                         let focused: Vec<storage::ActionRow> = todo_repo.list_focused().await?;
                         let now = chrono::Utc::now();
                         let mut expired_count = 0u32;
@@ -544,10 +668,26 @@ fn register_cron_callbacks(
                                 .ok();
                         }
                         Ok(Some("Overdue check complete".to_string()))
-                    }
-                    "__klyntbot_cognitive_weekly_reflection" => {
-                        // Call run_weekly_reflection() directly instead of
-                        // routing through chat (which can't invoke the function).
+                    })
+                })
+            }),
+        );
+    }
+
+    // ── __klyntbot_cognitive_weekly_reflection ───────────────────────────
+    {
+        let pool = repos.pool().clone();
+        let cog_config = config.clone();
+        let cog_provider = cognitive_provider;
+        let rt = rt.clone();
+        cron_service.register_handler(
+            JOB_WEEKLY_REFLECTION,
+            Arc::new(move |_job: &scheduling::CronJob| {
+                let pool = pool.clone();
+                let cog_config = cog_config.clone();
+                let cog_provider = cog_provider.clone();
+                tokio::task::block_in_place(|| {
+                    rt.block_on(async move {
                         let fact_repo = cognitive::SemanticFactRepo::new(pool.clone());
                         let episodic_repo = cognitive::EpisodicMemoryRepo::new(pool.clone());
                         let rule_repo = cognitive::ProceduralRuleRepo::new(pool.clone());
@@ -564,7 +704,7 @@ fn register_cron_callbacks(
                             &fact_repo,
                             &episodic_repo,
                             &rule_repo,
-                            None, // embedder — not needed for reflection
+                            None,
                         )
                         .await
                         {
@@ -586,48 +726,58 @@ fn register_cron_callbacks(
                                 Ok(Some(format!("Weekly reflection failed: {e}")))
                             }
                         }
-                    }
-                    name if name.starts_with("__klyntbot_") => {
-                        let (channel, msg_text) = match name {
-                            "__klyntbot_weekly_report" => (
-                                "weekly_report",
-                                "Generate weekly progress report using the weekly-report skill",
-                            ),
-                            "__klyntbot_daily_planning" => ("daily_planning", "/daily-planning"),
-                            "__klyntbot_finance_daily_review" => (
-                                "finance_daily_review",
-                                "Run finance daily review and send summary",
-                            ),
-                            "__klyntbot_finance_budget_check" => (
-                                "finance_budget_check",
-                                "Check budget thresholds and send alerts",
-                            ),
-                            "__klyntbot_finance_price_refresh" => {
-                                ("finance_price_refresh", "Refresh investment prices")
-                            }
-                            "__klyntbot_finance_health_check" => {
-                                ("finance_health_check", "Run finance data health check")
-                            }
-                            _ => return Ok(None),
-                        };
-                        let msg = bus::InboundMessage::new(
-                            "system",
-                            "cron",
-                            channel,
-                            msg_text.to_string(),
-                        );
-                        bus.publish_inbound(msg).await.map_err(|e| {
-                            common::KlyntbotError::Bus(format!(
-                                "Failed to publish {name} message: {e}"
-                            ))
-                        })?;
-                        Ok(Some(format!("{name} triggered")))
-                    }
-                    _ => Ok(None),
-                }
+                    })
+                })
+            }),
+        );
+    }
+
+    // ── __klyntbot_* bus-routed jobs (shared handler) ────────────────────
+    //
+    // These jobs publish an InboundMessage to the bus, routing to the agent.
+    // A single fallback handler dispatches by job name.
+    {
+        let bus = bus.clone();
+        let rt = rt.clone();
+        cron_service.set_callback(Arc::new(move |job: &scheduling::CronJob| {
+            let bus = Arc::clone(&bus);
+            let job_name = job.name.clone();
+            tokio::task::block_in_place(|| {
+                rt.block_on(async move {
+                    let (channel, msg_text) = match job_name.as_str() {
+                        JOB_WEEKLY_REPORT => (
+                            "weekly_report",
+                            "Generate weekly progress report using the weekly-report skill",
+                        ),
+                        JOB_DAILY_PLANNING => ("daily_planning", "/daily-planning"),
+                        JOB_FINANCE_DAILY_REVIEW => (
+                            "finance_daily_review",
+                            "Run finance daily review and send summary",
+                        ),
+                        JOB_FINANCE_BUDGET_CHECK => (
+                            "finance_budget_check",
+                            "Check budget thresholds and send alerts",
+                        ),
+                        JOB_FINANCE_PRICE_REFRESH => {
+                            ("finance_price_refresh", "Refresh investment prices")
+                        }
+                        JOB_FINANCE_HEALTH_CHECK => {
+                            ("finance_health_check", "Run finance data health check")
+                        }
+                        _ => return Ok(None),
+                    };
+                    let msg =
+                        bus::InboundMessage::new("system", "cron", channel, msg_text.to_string());
+                    bus.publish_inbound(msg).await.map_err(|e| {
+                        common::KlyntbotError::Bus(format!(
+                            "Failed to publish {job_name} message: {e}"
+                        ))
+                    })?;
+                    Ok(Some(format!("{job_name} triggered")))
+                })
             })
-        })
-    }));
+        }));
+    }
 }
 
 /// Register default cron jobs (idempotent — skips existing).
@@ -646,21 +796,30 @@ async fn ensure_cron_jobs(
         ($name:expr, $schedule:expr, $msg:expr) => {
             if !existing.contains($name) {
                 cron_service
-                    .add_job($name, $schedule, $msg, false, None, None, false)
+                    .add_job(
+                        $name,
+                        $schedule,
+                        $msg,
+                        false,
+                        None,
+                        None,
+                        false,
+                        scheduling::CronOrigin::System,
+                    )
                     .await?;
             }
         };
     }
 
     ensure_job!(
-        "todo_focus_check",
+        JOB_FOCUS_CHECK,
         scheduling::CronSchedule::Every {
             every_ms: 30 * 60 * 1000,
         },
         "Check focus task deadlines"
     );
     ensure_job!(
-        "todo_daily_digest",
+        JOB_DAILY_DIGEST,
         scheduling::CronSchedule::Cron {
             expr: "0 9 * * *".to_string(),
             tz: None,
@@ -668,14 +827,14 @@ async fn ensure_cron_jobs(
         "Daily task summary"
     );
     ensure_job!(
-        "todo_overdue_check",
+        JOB_OVERDUE_CHECK,
         scheduling::CronSchedule::Every {
             every_ms: 60 * 60 * 1000,
         },
         "Check for overdue focus tasks"
     );
     ensure_job!(
-        "__klyntbot_weekly_report",
+        JOB_WEEKLY_REPORT,
         scheduling::CronSchedule::Cron {
             expr: "0 18 * * 0".to_string(),
             tz: None,
@@ -687,7 +846,7 @@ async fn ensure_cron_jobs(
     if config.todo.daily_planning.enabled {
         if let Some(cron_expr) = parse_time_to_cron(&config.todo.daily_planning.planning_time) {
             ensure_job!(
-                "__klyntbot_daily_planning",
+                JOB_DAILY_PLANNING,
                 scheduling::CronSchedule::Cron {
                     expr: cron_expr,
                     tz: None,
@@ -705,7 +864,7 @@ async fn ensure_cron_jobs(
             .as_deref()
             .unwrap_or("0 9 * * 1"); // Monday 9am default
         ensure_job!(
-            "__klyntbot_cognitive_weekly_reflection",
+            JOB_WEEKLY_REFLECTION,
             scheduling::CronSchedule::Cron {
                 expr: reflection_schedule.to_string(),
                 tz: Some(config.timezone.clone()),
@@ -718,7 +877,7 @@ async fn ensure_cron_jobs(
     if config.finance.enabled && config.finance.proactivity_level != "reactive" {
         if let Some(cron_expr) = parse_time_to_cron(&config.finance.scheduling.daily_review_time) {
             ensure_job!(
-                "__klyntbot_finance_daily_review",
+                JOB_FINANCE_DAILY_REVIEW,
                 scheduling::CronSchedule::Cron {
                     expr: cron_expr,
                     tz: None,
@@ -727,7 +886,7 @@ async fn ensure_cron_jobs(
             );
         }
         ensure_job!(
-            "__klyntbot_finance_budget_check",
+            JOB_FINANCE_BUDGET_CHECK,
             scheduling::CronSchedule::Every {
                 every_ms: 6 * 60 * 60 * 1000,
             },
@@ -735,7 +894,7 @@ async fn ensure_cron_jobs(
         );
         if config.finance.price_refresh.enabled {
             ensure_job!(
-                "__klyntbot_finance_price_refresh",
+                JOB_FINANCE_PRICE_REFRESH,
                 scheduling::CronSchedule::Every {
                     every_ms: config.finance.price_refresh.interval_hours as u64 * 60 * 60 * 1000,
                 },
@@ -743,7 +902,7 @@ async fn ensure_cron_jobs(
             );
         }
         ensure_job!(
-            "__klyntbot_finance_health_check",
+            JOB_FINANCE_HEALTH_CHECK,
             scheduling::CronSchedule::Cron {
                 expr: "0 0 * * *".to_string(),
                 tz: None,
@@ -901,7 +1060,9 @@ async fn build_situation_inputs(
 ) -> UserSituation {
     let now = Utc::now();
     let hour_of_day = now.hour();
-    let today_start = now.date_naive().and_hms_opt(0, 0, 0)
+    let today_start = now
+        .date_naive()
+        .and_hms_opt(0, 0, 0)
         .map(|dt| dt.and_utc())
         .unwrap_or(now);
     let thirty_min_ago = now - Duration::minutes(30);
@@ -920,7 +1081,11 @@ async fn build_situation_inputs(
         }
 
         // Context switches in last 30 min
-        if let Ok(switches) = pr.events.count_context_switches(&thirty_min_ago, &now).await {
+        if let Ok(switches) = pr
+            .events
+            .count_context_switches(&thirty_min_ago, &now)
+            .await
+        {
             inputs.context_switches_last_30min = switches as i32;
         }
 
@@ -942,16 +1107,22 @@ async fn build_situation_inputs(
                 // Categories named "productive" or starting with "coding"/"development" are productive.
                 // For now, just use the ratio of non-idle time vs total, or check daily summary.
                 if let Ok(Some(summary)) = pr.summaries.get(&today_date).await {
-                    let total_work = summary.productive_secs + summary.distracting_secs + summary.neutral_secs;
+                    let total_work =
+                        summary.productive_secs + summary.distracting_secs + summary.neutral_secs;
                     if total_work > 0 {
-                        inputs.productive_ratio_today = summary.productive_secs as f64 / total_work as f64;
+                        inputs.productive_ratio_today =
+                            summary.productive_secs as f64 / total_work as f64;
                     }
                 }
             }
         }
 
         // Distraction count in last 30 min
-        if let Ok(patterns) = pr.distraction_patterns.list_range(&today_date, &today_date).await {
+        if let Ok(patterns) = pr
+            .distraction_patterns
+            .list_range(&today_date, &today_date)
+            .await
+        {
             let recent_count = patterns
                 .iter()
                 .filter(|p| p.created_at >= thirty_min_ago)
@@ -1073,11 +1244,20 @@ fn domain_for_event(event: &bus::DomainEvent) -> &'static str {
         | bus::DomainEvent::FocusSessionEnded { .. }
         | bus::DomainEvent::DistractionDetected { .. }
         | bus::DomainEvent::ProductivityScoreComputed { .. } => "energy",
-        bus::DomainEvent::TransactionRecorded { .. }
-        | bus::DomainEvent::BudgetAlert { .. } => "finance",
+        bus::DomainEvent::TransactionRecorded { .. } | bus::DomainEvent::BudgetAlert { .. } => {
+            "finance"
+        }
         bus::DomainEvent::UserStatedFact { .. } => "general",
         bus::DomainEvent::UserCorrectedAI { .. } => "learning",
         bus::DomainEvent::CoachingFeedback { .. } => "coaching",
         bus::DomainEvent::ChatTurnCompleted { .. } => "general",
+        bus::DomainEvent::NoteCreated { .. } | bus::DomainEvent::NoteUpdated { .. } => "notes",
+        bus::DomainEvent::SessionCreated { .. }
+        | bus::DomainEvent::SessionEnded { .. }
+        | bus::DomainEvent::QualityScored { .. } => "energy",
+        bus::DomainEvent::PredictiveAlert { .. } | bus::DomainEvent::NarrativeGenerated { .. } => {
+            "general"
+        }
+        _ => "general",
     }
 }

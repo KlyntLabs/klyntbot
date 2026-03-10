@@ -1,15 +1,18 @@
-import { LogicalSize } from "@tauri-apps/api/dpi";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { Check, Lightbulb, Send, X, XCircle } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Check, Lightbulb, LogOut, Monitor, Send, Settings, X, XCircle } from "lucide-react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useCoachingNudge } from "../../hooks/useCoachingNudge";
 import { useEvent } from "../../hooks/useEvent";
+import { useFocusTimer } from "../../hooks/useFocusTimer";
+import { ipc } from "../../hooks/useIpc";
 import { useMutation } from "../../hooks/useMutation";
 import { useQuery } from "../../hooks/useQuery";
 import { useSetToggle } from "../../hooks/useSetToggle";
 import { useTransparentBackground } from "../../hooks/useTransparentBackground";
+import { useWindowAutoResize } from "../../hooks/useWindowAutoResize";
 import type { AgentStatus as AgentStatusType, CalendarEvent, TodayTask } from "../../lib/types";
 import { isTauri } from "../../lib/utils";
+import { FocusControl } from "../tray/FocusControl";
 import { Badge } from "../ui/Badge";
 import { Checkbox } from "../ui/Checkbox";
 import { KlyntLogo } from "../ui/KlyntLogo";
@@ -52,7 +55,12 @@ export function SystemTray() {
     refetchTasks();
   });
 
-  const displayStatus: DisplayStatus = agentStatusData.status === "active" ? "active" : "idle";
+  const focusTimer = useFocusTimer();
+  const displayStatus: DisplayStatus = focusTimer.active
+    ? "active"
+    : agentStatusData.status === "active"
+      ? "active"
+      : "idle";
 
   const handleToggleTask = async (taskId: string) => {
     toggleCompletedId(taskId);
@@ -77,6 +85,35 @@ export function SystemTray() {
     setChatInput("");
   };
 
+  const handleOpenSettings = async () => {
+    if (isTauri) {
+      const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
+      const { emit } = await import("@tauri-apps/api/event");
+      const mainWindow = await WebviewWindow.getByLabel("main");
+      if (mainWindow) {
+        await emit("navigate", { path: "/settings" });
+        await mainWindow.show();
+        await mainWindow.setFocus();
+      }
+      await getCurrentWindow().hide();
+    }
+  };
+
+  const handleOpenDashboard = async () => {
+    await ipc("show_dashboard");
+    if (isTauri) {
+      await getCurrentWindow().hide();
+    }
+  };
+
+  const handleOpenGitHub = () => {
+    ipc("open_url", { url: "https://github.com/KlyntLabs/klyntbot" });
+  };
+
+  const handleQuit = () => {
+    ipc("quit_app");
+  };
+
   // Sort: active tasks first, completed (optimistic) at bottom
   const isTaskCompleted = useCallback(
     (t: TodayTask) => t.completed || completedIds.has(t.id),
@@ -92,37 +129,11 @@ export function SystemTray() {
     [sortedTasks, isTaskCompleted],
   );
 
-  useTransparentBackground();
+  useTransparentBackground({ nativeVibrancy: true });
 
-  // Auto-resize window to match content height
   const contentRef = useRef<HTMLDivElement>(null);
-  const lastHeight = useRef(0);
-
-  const TRAY_WIDTH = 320;
-
-  const syncSize = useCallback((entries?: ResizeObserverEntry[]) => {
-    if (!isTauri) return;
-
-    const h = Math.ceil(
-      entries?.[0]?.contentRect.height ?? contentRef.current?.getBoundingClientRect().height ?? 0,
-    );
-    if (h === lastHeight.current || h <= 0) return;
-    lastHeight.current = h;
-
-    getCurrentWindow()
-      .setSize(new LogicalSize(TRAY_WIDTH, h))
-      .catch((e: unknown) => console.error("tray resize failed", e));
-  }, []);
-
-  useEffect(() => {
-    const el = contentRef.current;
-    if (!el) return;
-
-    const observer = new ResizeObserver(syncSize);
-    observer.observe(el);
-    syncSize();
-    return () => observer.disconnect();
-  }, [syncSize]);
+  const MAX_TRAY_HEIGHT = 800;
+  useWindowAutoResize(contentRef, { width: 320, maxHeight: MAX_TRAY_HEIGHT });
 
   return (
     <div className="w-screen text-primary">
@@ -131,7 +142,10 @@ export function SystemTray() {
         className="w-full glass-floating overflow-hidden"
         style={{ animation: "glass-appear 0.2s ease-out" }}
       >
-        <div className="rounded-[var(--glass-radius-inner)] overflow-hidden">
+        <div
+          className="rounded-[var(--glass-radius-inner)] overflow-y-auto"
+          style={{ maxHeight: MAX_TRAY_HEIGHT }}
+        >
           {/* Header */}
           <div className="flex items-center gap-3 px-4 py-3">
             <div className="w-7 h-7 rounded-lg bg-white/90 flex items-center justify-center p-0.5 ">
@@ -147,7 +161,7 @@ export function SystemTray() {
                   }}
                 />
                 <span className="text-[11px] text-muted font-light capitalize">
-                  {displayStatus}
+                  {focusTimer.active ? "Focusing" : displayStatus}
                 </span>
               </div>
             </div>
@@ -196,6 +210,11 @@ export function SystemTray() {
               </div>
             </>
           )}
+
+          <div className="mx-4 glass-divider" />
+
+          {/* Focus Timer */}
+          <FocusControl timer={focusTimer} />
 
           <div className="mx-4 glass-divider" />
 
@@ -269,13 +288,13 @@ export function SystemTray() {
                 <div key={event.id} className="flex items-center gap-2.5">
                   <div
                     className="w-1 h-6 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: event.color }}
+                    style={{ backgroundColor: event.color ?? "var(--brand)" }}
                   />
                   <div className="flex-1 min-w-0">
                     <p className="text-[12px] font-light text-secondary truncate">{event.title}</p>
                   </div>
                   <span className="text-[11px] text-dim font-light flex-shrink-0">
-                    {new Date(event.startAt).toLocaleTimeString([], {
+                    {new Date(event.startedAt).toLocaleTimeString([], {
                       hour: "numeric",
                       minute: "2-digit",
                     })}
@@ -313,6 +332,51 @@ export function SystemTray() {
                 <Send className="w-3.5 h-3.5" strokeWidth={1.5} />
               </button>
             </div>
+          </div>
+
+          <div className="mx-4 glass-divider" />
+
+          {/* Footer Menu */}
+          <div className="flex items-center justify-end gap-1 px-3 py-2">
+            <button
+              type="button"
+              onClick={handleOpenDashboard}
+              title="Open Dashboard"
+              className="w-7 h-7 flex items-center justify-center rounded-lg text-muted hover:text-secondary hover:bg-white/[0.06] transition-colors"
+            >
+              <Monitor className="w-3.5 h-3.5" strokeWidth={1.5} />
+            </button>
+            <button
+              type="button"
+              onClick={handleOpenSettings}
+              title="Settings"
+              className="w-7 h-7 flex items-center justify-center rounded-lg text-muted hover:text-secondary hover:bg-white/[0.06] transition-colors"
+            >
+              <Settings className="w-3.5 h-3.5" strokeWidth={1.5} />
+            </button>
+            <button
+              type="button"
+              onClick={handleOpenGitHub}
+              title="GitHub"
+              className="w-7 h-7 flex items-center justify-center rounded-lg text-muted hover:text-secondary hover:bg-white/[0.06] transition-colors"
+            >
+              <svg
+                className="w-3.5 h-3.5"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.02 10.02 0 0 0 22 12.017C22 6.484 17.522 2 12 2Z" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              onClick={handleQuit}
+              title="Quit Klynt"
+              className="w-7 h-7 flex items-center justify-center rounded-lg text-muted hover:text-destructive hover:bg-white/[0.06] transition-colors"
+            >
+              <LogOut className="w-3.5 h-3.5" strokeWidth={1.5} />
+            </button>
           </div>
         </div>
       </div>

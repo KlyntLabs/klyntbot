@@ -120,11 +120,7 @@ async fn test_full_crud_lifecycle() {
     assert!(list_result.contains("1 note(s)"));
 
     // Delete
-    let delete_result = exec(
-        &registry,
-        json!({"action": "delete_note", "id": id}),
-    )
-    .await;
+    let delete_result = exec(&registry, json!({"action": "delete_note", "id": id})).await;
     assert!(delete_result.contains("Deleted note"));
 
     // Verify deleted

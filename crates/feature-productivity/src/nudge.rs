@@ -280,6 +280,7 @@ mod tests {
                 is_idle: false,
                 metadata: None,
                 project_id: None,
+                focus_session_id: None,
             };
             repos.events.insert(&event).await.unwrap();
         }
@@ -324,6 +325,7 @@ mod tests {
                 is_idle: false,
                 metadata: None,
                 project_id: None,
+                focus_session_id: None,
             };
             repos.events.insert(&event).await.unwrap();
         }
@@ -383,6 +385,7 @@ mod tests {
                 is_idle: false,
                 metadata: None,
                 project_id: None,
+                focus_session_id: None,
             };
             repos.events.insert(&event).await.unwrap();
         }

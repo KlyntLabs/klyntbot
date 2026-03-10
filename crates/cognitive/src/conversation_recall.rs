@@ -130,7 +130,9 @@ impl ConversationRecallService {
                     let created_at = chrono::DateTime::parse_from_rfc3339(&created_at_str)
                         .map(|dt| dt.with_timezone(&Utc))
                         .unwrap_or_else(|e| {
-                            tracing::warn!("Failed to parse recall timestamp '{created_at_str}': {e}");
+                            tracing::warn!(
+                                "Failed to parse recall timestamp '{created_at_str}': {e}"
+                            );
                             now
                         });
 
@@ -153,8 +155,11 @@ impl ConversationRecallService {
             )
             .collect();
 
-        results
-            .sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        results.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         results.truncate(limit);
         Ok(results)
     }
@@ -163,10 +168,7 @@ impl ConversationRecallService {
     pub async fn delete_older_than(&self, cutoff: DateTime<Utc>) -> common::Result<()> {
         let cutoff_str = sanitize_predicate_value(&cutoff.to_rfc3339())?;
         self.vector_store
-            .delete_where(
-                "conv_embeddings",
-                &format!("created_at < '{cutoff_str}'"),
-            )
+            .delete_where("conv_embeddings", &format!("created_at < '{cutoff_str}'"))
             .await?;
         Ok(())
     }
@@ -175,10 +177,7 @@ impl ConversationRecallService {
     pub async fn delete_by_session_key(&self, session_key: &str) -> common::Result<()> {
         let escaped = sanitize_predicate_value(session_key)?;
         self.vector_store
-            .delete_where(
-                "conv_embeddings",
-                &format!("session_key = '{escaped}'"),
-            )
+            .delete_where("conv_embeddings", &format!("session_key = '{escaped}'"))
             .await?;
         Ok(())
     }

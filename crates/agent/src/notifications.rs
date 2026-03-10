@@ -5,6 +5,7 @@ use tokio::sync::{mpsc, RwLock};
 use tracing::warn;
 
 use bus::OutboundMessage;
+use common::utils::notify::{NotificationSender, OsNotificationSender};
 use common::{ChannelName, ChatId, Result};
 use config::schema::TodoNotificationConfig;
 
@@ -13,15 +14,31 @@ pub struct NotificationDispatcher {
     outbound_tx: mpsc::Sender<OutboundMessage>,
     config: TodoNotificationConfig,
     last_active_channel: Arc<RwLock<Option<(ChannelName, ChatId)>>>,
+    sender: Arc<dyn NotificationSender>,
 }
 
 impl NotificationDispatcher {
-    /// Create a new notification dispatcher
+    /// Create a new notification dispatcher with the default OS notification sender.
     pub fn new(outbound_tx: mpsc::Sender<OutboundMessage>, config: TodoNotificationConfig) -> Self {
         Self {
             outbound_tx,
             config,
             last_active_channel: Arc::new(RwLock::new(None)),
+            sender: Arc::new(OsNotificationSender),
+        }
+    }
+
+    /// Create a dispatcher with a custom notification sender (e.g. Tauri native).
+    pub fn with_sender(
+        outbound_tx: mpsc::Sender<OutboundMessage>,
+        config: TodoNotificationConfig,
+        sender: Arc<dyn NotificationSender>,
+    ) -> Self {
+        Self {
+            outbound_tx,
+            config,
+            last_active_channel: Arc::new(RwLock::new(None)),
+            sender,
         }
     }
 
@@ -36,7 +53,7 @@ impl NotificationDispatcher {
             match target.as_str() {
                 "os_native" => {
                     // Don't fail entire notification if OS native fails
-                    if let Err(e) = common::utils::notify::send_os_notification(title, body).await {
+                    if let Err(e) = self.sender.send(title, body).await {
                         warn!("OS notification failed: {}", e);
                     }
                 }

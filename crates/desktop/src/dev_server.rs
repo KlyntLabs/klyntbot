@@ -23,8 +23,8 @@ use serde_json::Value;
 use tokio::sync::broadcast;
 use tracing::{error, info};
 
-use ::app_core::events::AppEventEmitter;
 use crate::app_core::AppCore;
+use ::app_core::events::AppEventEmitter;
 
 type SseChannels = Arc<DashMap<String, broadcast::Sender<(String, Value)>>>;
 
@@ -49,10 +49,7 @@ impl AppEventEmitter for SseEmitter {
 pub async fn start(core: Arc<AppCore>) {
     let sse_channels: SseChannels = Arc::new(DashMap::new());
 
-    let state = DevState {
-        core,
-        sse_channels,
-    };
+    let state = DevState { core, sse_channels };
 
     let app = Router::new()
         .route("/api/events/{sessionKey}", axum::routing::get(sse_handler))
@@ -194,10 +191,23 @@ async fn dispatch(
     if let Some(r) = commands::cognitive::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }
+    if let Some(r) = commands::timeline::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
+    if let Some(r) = commands::cron::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
 
     // ── chat_send (needs SSE channels, handled inline) ──────────────
     if cmd == "chat_send" {
         return dispatch_chat_send(core, &body, &state.sse_channels).await;
+    }
+
+    // ── open_url (desktop-like: opens URL in default browser) ───────
+    if cmd == "open_url" {
+        let url: String = dev::get_str(&body, "url").unwrap_or_default();
+        let _ = open::that(&url);
+        return ok(serde_json::json!(true));
     }
 
     err(ApiError::new(
@@ -208,11 +218,7 @@ async fn dispatch(
 
 /// Handle `chat_send` separately because it needs SSE channel state to relay
 /// streaming agent events back to the browser via Server-Sent Events.
-async fn dispatch_chat_send(
-    core: &AppCore,
-    body: &Value,
-    sse_channels: &SseChannels,
-) -> ApiResult {
+async fn dispatch_chat_send(core: &AppCore, body: &Value, sse_channels: &SseChannels) -> ApiResult {
     let content = match dev::get_str(body, "content") {
         Ok(v) => v,
         Err(e) => return err(e),
@@ -221,13 +227,9 @@ async fn dispatch_chat_send(
         Ok(v) => v,
         Err(e) => return err(e),
     };
-    let context: Option<desktop_shared::commands::SessionContextInput> =
-        dev::get(body, "context");
+    let context: Option<desktop_shared::commands::SessionContextInput> = dev::get(body, "context");
 
-    match core
-        .chat_send(content, session_key.clone(), context)
-        .await
-    {
+    match core.chat_send(content, session_key.clone(), context).await {
         Ok((user_msg, stream_info)) => {
             let tx = sse_channels
                 .entry(session_key)
@@ -388,13 +390,23 @@ fn domain_for_event(event: &bus::DomainEvent) -> &'static str {
         | bus::DomainEvent::FocusSessionStarted { .. }
         | bus::DomainEvent::FocusSessionEnded { .. }
         | bus::DomainEvent::DistractionDetected { .. }
-        | bus::DomainEvent::ProductivityScoreComputed { .. } => "energy",
-        bus::DomainEvent::TransactionRecorded { .. }
-        | bus::DomainEvent::BudgetAlert { .. } => "finance",
+        | bus::DomainEvent::ProductivityScoreComputed { .. }
+        | bus::DomainEvent::SessionCreated { .. }
+        | bus::DomainEvent::SessionEnded { .. }
+        | bus::DomainEvent::QualityScored { .. }
+        | bus::DomainEvent::PredictiveAlert { .. }
+        | bus::DomainEvent::NarrativeGenerated { .. }
+        | bus::DomainEvent::RuleEvolved { .. }
+        | bus::DomainEvent::VoiceJournalProcessed { .. } => "energy",
+        bus::DomainEvent::TransactionRecorded { .. } | bus::DomainEvent::BudgetAlert { .. } => {
+            "finance"
+        }
         bus::DomainEvent::UserStatedFact { .. } => "general",
         bus::DomainEvent::UserCorrectedAI { .. } => "learning",
         bus::DomainEvent::CoachingFeedback { .. } => "coaching",
         bus::DomainEvent::ChatTurnCompleted { .. } => "general",
+        bus::DomainEvent::NoteCreated { .. } | bus::DomainEvent::NoteUpdated { .. } => "notes",
+        bus::DomainEvent::ToolCallExecuted { .. } => "general",
     }
 }
 
@@ -413,6 +425,16 @@ mod tests {
         "permissions_check_accessibility",
         "permissions_open_accessibility",
         "resize_window",
+        "open_url",
+        "quit_app",
+        "show_dashboard",
+        "focus_timer_start",
+        "focus_timer_stop",
+        "focus_timer_status",
+        "focus_break_start",
+        "focus_timer_extend",
+        "focus_timer_pause",
+        "focus_timer_resume",
         "mcp_oauth_start",
         "mcp_oauth_disconnect",
     ];
@@ -451,6 +473,8 @@ mod tests {
             commands::workflows::DEV_COMMANDS,
             commands::columns::DEV_COMMANDS,
             commands::cognitive::DEV_COMMANDS,
+            commands::timeline::DEV_COMMANDS,
+            commands::cron::DEV_COMMANDS,
         ];
         // chat_send is handled inline in dev_server.rs
         let mut set: BTreeSet<String> = modules

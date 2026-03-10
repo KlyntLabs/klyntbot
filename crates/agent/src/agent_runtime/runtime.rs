@@ -24,9 +24,9 @@ const PROFILE_MIN_CONFIDENCE: f64 = 0.5;
 const PATTERN_MIN_SAMPLES: i32 = 5;
 use crate::execution::ExecutionParams;
 use crate::intent_pipeline::analysis::IntentAnalyzer;
-use crate::intent_pipeline::types::PipelineConfig;
 use crate::intent_pipeline::router::{ExecutionRouter, RouterResult};
 use crate::intent_pipeline::types::IntentAnalysis;
+use crate::intent_pipeline::types::PipelineConfig;
 use crate::output::cost_tracker::CostTracker;
 use crate::output::validator::{ResponseValidator, ValidationResult};
 
@@ -35,7 +35,6 @@ const MAX_DELEGATION_DEPTH: u32 = 2;
 
 /// The agent used as orchestrator for multi-agent requests.
 const ORCHESTRATOR_AGENT: &str = "general";
-
 
 /// Tools allowed for the orchestrator (in addition to `delegate`, which is injected separately).
 const ORCHESTRATOR_ALLOWED_TOOLS: &[&str] = &[tools::ask_user::ASK_USER_TOOL_NAME, "memory"];
@@ -624,6 +623,16 @@ impl AgentRuntime {
                     response_time_ms: pipeline_elapsed_ms,
                 })
                 .await;
+
+            if let Some(alert) = self.cost_tracker.check_budget().await {
+                let _ = tx
+                    .send(AgentEvent::BudgetWarning {
+                        monthly_spend_usd: alert.monthly_spend_usd,
+                        monthly_budget_usd: alert.monthly_budget_usd,
+                        usage_percent: alert.usage_percent,
+                    })
+                    .await;
+            }
         }
     }
 

@@ -10,6 +10,7 @@ use std::sync::Arc;
 use bus::{DomainEvent, DomainEventBus};
 
 use crate::handler::ProductivityHandler;
+use crate::intelligence::quality_scorer::QualityScorer;
 use crate::repos::ProductivityRepos;
 use crate::types::{AppUsage, CategoryUsage, DailySummary, ProjectUsage};
 
@@ -17,6 +18,7 @@ pub struct DailyAggregator {
     repos: ProductivityRepos,
     handler: Option<Arc<dyn ProductivityHandler>>,
     domain_bus: Option<Arc<DomainEventBus>>,
+    quality_scorer: Option<QualityScorer>,
 }
 
 impl DailyAggregator {
@@ -25,7 +27,13 @@ impl DailyAggregator {
             repos,
             handler: None,
             domain_bus: None,
+            quality_scorer: None,
         }
+    }
+
+    pub fn with_quality_scorer(mut self, scorer: QualityScorer) -> Self {
+        self.quality_scorer = Some(scorer);
+        self
     }
 
     pub fn with_handler(mut self, handler: Arc<dyn ProductivityHandler>) -> Self {
@@ -107,7 +115,9 @@ impl DailyAggregator {
                         crate::types::CategoryType::Distracting => distracting_secs += secs,
                     }
                     top_categories.push(CategoryUsage {
+                        category_id: cat.id.clone(),
                         category: cat.name.clone(),
+                        category_type: cat.category_type.to_string(),
                         duration_secs: *secs,
                     });
                 } else {
@@ -208,7 +218,16 @@ impl DailyAggregator {
             avg_recovery_secs,
         };
 
-        let score = compute_productivity_score(&summary);
+        // Prefer the intelligence layer's unified quality score when available,
+        // falling back to the legacy formula when no scored sessions exist.
+        let score = if let Some(ref scorer) = self.quality_scorer {
+            match scorer.score_day(date).await {
+                Ok(Some(daily_score)) => daily_score.overall_score,
+                _ => compute_productivity_score(&summary),
+            }
+        } else {
+            compute_productivity_score(&summary)
+        };
         summary.productivity_score = Some(score);
 
         // Preserve existing AI summary to avoid redundant LLM calls on recompute.
@@ -395,6 +414,7 @@ mod tests {
             is_idle: false,
             metadata: None,
             project_id: None,
+            focus_session_id: None,
         };
         repos.events.insert(&event).await.unwrap();
 
@@ -448,6 +468,7 @@ mod tests {
                 is_idle: false,
                 metadata: None,
                 project_id: None,
+                focus_session_id: None,
             };
             repos.events.insert(&event).await.unwrap();
         }
@@ -487,6 +508,7 @@ mod tests {
                 is_idle: false,
                 metadata: None,
                 project_id: None,
+                focus_session_id: None,
             })
             .await
             .unwrap();
@@ -508,6 +530,7 @@ mod tests {
                 is_idle: false,
                 metadata: None,
                 project_id: None,
+                focus_session_id: None,
             })
             .await
             .unwrap();

@@ -99,26 +99,30 @@ pub(crate) async fn dispatch_dev(
             let project_id = try_field!(dev::get_str(body, "projectId"));
             dev::val(core.custom_column_list(project_id).await)
         }
-        "custom_column_create" => {
-            dev::val(core.custom_column_create(try_field!(dev::parse_params(body))).await)
-        }
-        "custom_column_update" => {
-            dev::val(core.custom_column_update(try_field!(dev::parse_params(body))).await)
-        }
+        "custom_column_create" => dev::val(
+            core.custom_column_create(try_field!(dev::parse_params(body)))
+                .await,
+        ),
+        "custom_column_update" => dev::val(
+            core.custom_column_update(try_field!(dev::parse_params(body)))
+                .await,
+        ),
         "custom_column_delete" => {
             let id = try_field!(dev::get_str(body, "id"));
             dev::val(core.custom_column_delete(id).await)
         }
-        "custom_column_reorder" => {
-            dev::val(core.custom_column_reorder(try_field!(dev::parse_params(body))).await)
-        }
+        "custom_column_reorder" => dev::val(
+            core.custom_column_reorder(try_field!(dev::parse_params(body)))
+                .await,
+        ),
         "custom_column_values" => {
             let task_id = try_field!(dev::get_str(body, "taskId"));
             dev::val(core.custom_column_values(task_id).await)
         }
-        "custom_column_value_set" => {
-            dev::val(core.custom_column_value_set(try_field!(dev::parse_params(body))).await)
-        }
+        "custom_column_value_set" => dev::val(
+            core.custom_column_value_set(try_field!(dev::parse_params(body)))
+                .await,
+        ),
         "custom_column_value_delete" => {
             let task_id = try_field!(dev::get_str(body, "taskId"));
             let column_id = try_field!(dev::get_str(body, "columnId"));

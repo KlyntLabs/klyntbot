@@ -82,8 +82,12 @@ pub(crate) async fn dispatch_dev(
             let app_name = try_field!(dev::get_str(body, "app_name"));
             let classification = try_field!(dev::get_str(body, "classification"));
             dev::val(
-                core.distraction_allow_session(app_name, dev::get(body, "window_title"), classification)
-                    .await,
+                core.distraction_allow_session(
+                    app_name,
+                    dev::get(body, "window_title"),
+                    classification,
+                )
+                .await,
             )
         }
         "distraction_learned_rules" => dev::val(core.distraction_learned_rules().await),

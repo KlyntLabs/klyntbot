@@ -61,12 +61,10 @@ async fn test_full_focus_session_lifecycle() {
     // completed = actual_mins >= target. Since start/end are near-instant, actual_mins=0,
     // so completed=false. This is correct behavior — session didn't reach target duration.
     assert!(ended.ended_at.is_some());
-    assert!(ended.quality_score.is_some());
+    // quality_score is now computed by the intelligence layer's QualityScorer
+    assert!(ended.quality_score.is_none());
     assert!(ended.actual_mins.is_some());
     assert_eq!(ended.notes, Some("Good session".into()));
-
-    // Quality should be < 1.0 due to interruption and not reaching target
-    assert!(ended.quality_score.unwrap() < 1.0);
 
     // 5. No active session anymore
     assert!(repos.sessions.get_active().await.unwrap().is_none());
@@ -91,6 +89,7 @@ async fn test_full_focus_session_lifecycle() {
             is_idle: false,
             metadata: None,
             project_id: None,
+            focus_session_id: None,
         };
         repos.events.insert(&event).await.unwrap();
     }
@@ -101,7 +100,9 @@ async fn test_full_focus_session_lifecycle() {
 
     assert!(summary.total_active_secs > 0);
     assert_eq!(summary.focus_sessions_count, 1);
-    assert!(summary.avg_session_quality.is_some());
+    // quality_score is now computed by the intelligence layer's QualityScorer,
+    // so avg_session_quality may be None when no intelligence scoring has run.
+    // assert!(summary.avg_session_quality.is_some());
 }
 
 /// Categorizer loads categories from DB and matches apps correctly.
@@ -186,6 +187,7 @@ async fn test_daily_aggregation_accuracy() {
             is_idle: false,
             metadata: None,
             project_id: None,
+            focus_session_id: None,
         },
         ActivityEvent {
             id: None,
@@ -201,6 +203,7 @@ async fn test_daily_aggregation_accuracy() {
             is_idle: false,
             metadata: None,
             project_id: None,
+            focus_session_id: None,
         },
         ActivityEvent {
             id: None,
@@ -216,6 +219,7 @@ async fn test_daily_aggregation_accuracy() {
             is_idle: false,
             metadata: None,
             project_id: None,
+            focus_session_id: None,
         },
         ActivityEvent {
             id: None,
@@ -231,6 +235,7 @@ async fn test_daily_aggregation_accuracy() {
             is_idle: true,
             metadata: None,
             project_id: None,
+            focus_session_id: None,
         },
     ];
 
@@ -370,6 +375,7 @@ async fn test_nudge_service_delivers_break_reminder() {
         is_idle: false,
         metadata: None,
         project_id: None,
+        focus_session_id: None,
     };
     repos.events.insert(&event).await.unwrap();
 
@@ -548,7 +554,8 @@ async fn test_pomodoro_lifecycle() {
     // End it
     let ended = mgr.end_session(None).await.unwrap().unwrap();
     assert_eq!(ended.session_type, SessionType::Pomodoro);
-    assert!(ended.quality_score.is_some());
+    // quality_score is now computed by the intelligence layer's QualityScorer
+    assert!(ended.quality_score.is_none());
     assert!(ended.ended_at.is_some());
 }
 
@@ -593,6 +600,7 @@ async fn test_goal_tracking() {
             is_idle: false,
             metadata: None,
             project_id: None,
+            focus_session_id: None,
         })
         .await
         .unwrap();
@@ -710,6 +718,7 @@ async fn test_project_tracking_aggregation() {
         is_idle: false,
         metadata: None,
         project_id: Some("klyntbot".into()),
+        focus_session_id: None,
     };
     repos.events.insert(&event_with_project).await.unwrap();
 
@@ -728,6 +737,7 @@ async fn test_project_tracking_aggregation() {
         is_idle: false,
         metadata: None,
         project_id: None,
+        focus_session_id: None,
     };
     repos.events.insert(&event_no_project).await.unwrap();
 
@@ -771,6 +781,7 @@ async fn test_activity_export_csv() {
             is_idle: false,
             metadata: None,
             project_id: None,
+            focus_session_id: None,
         };
         repos.events.insert(&event).await.unwrap();
     }

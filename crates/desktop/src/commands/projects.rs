@@ -76,16 +76,18 @@ pub(crate) async fn dispatch_dev(
 ) -> Option<Result<serde_json::Value, ApiError>> {
     use super::dev_helpers::{self as dev, try_field};
     Some(match cmd {
-        "project_create" => {
-            dev::val_rh(core.project_create(try_field!(dev::parse_params(body))).await)
-        }
+        "project_create" => dev::val_rh(
+            core.project_create(try_field!(dev::parse_params(body)))
+                .await,
+        ),
         "project_get" => {
             let id = try_field!(dev::get_str(body, "id"));
             dev::val(core.project_get(id).await)
         }
-        "project_update" => {
-            dev::val_rh(core.project_update(try_field!(dev::parse_params(body))).await)
-        }
+        "project_update" => dev::val_rh(
+            core.project_update(try_field!(dev::parse_params(body)))
+                .await,
+        ),
         "project_delete" => {
             let id = try_field!(dev::get_str(body, "id"));
             dev::val_rh(core.project_delete(id).await)

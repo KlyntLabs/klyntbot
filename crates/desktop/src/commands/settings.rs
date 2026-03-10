@@ -97,18 +97,22 @@ pub(crate) async fn dispatch_dev(
     use super::dev_helpers::{self as dev, try_field};
     Some(match cmd {
         "mcp_get_config" => dev::val(core.mcp_get_config().await),
-        "mcp_add_server" => {
-            dev::val(core.mcp_add_server(try_field!(dev::parse_params(body))).await)
-        }
-        "mcp_remove_server" => {
-            dev::val(core.mcp_remove_server(try_field!(dev::parse_params(body))).await)
-        }
-        "mcp_toggle_server" => {
-            dev::val(core.mcp_toggle_server(try_field!(dev::parse_params(body))).await)
-        }
-        "mcp_update_server" => {
-            dev::val(core.mcp_update_server(try_field!(dev::parse_params(body))).await)
-        }
+        "mcp_add_server" => dev::val(
+            core.mcp_add_server(try_field!(dev::parse_params(body)))
+                .await,
+        ),
+        "mcp_remove_server" => dev::val(
+            core.mcp_remove_server(try_field!(dev::parse_params(body)))
+                .await,
+        ),
+        "mcp_toggle_server" => dev::val(
+            core.mcp_toggle_server(try_field!(dev::parse_params(body)))
+                .await,
+        ),
+        "mcp_update_server" => dev::val(
+            core.mcp_update_server(try_field!(dev::parse_params(body)))
+                .await,
+        ),
         "app_info" => dev::val(core.app_info().await),
         "config_get_section" => {
             let section = try_field!(dev::get_str(body, "section"));

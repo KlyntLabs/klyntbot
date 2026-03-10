@@ -56,9 +56,12 @@ pub struct AgentLoopBuilder {
     vector_store: Option<storage::VectorStore>,
     cron_service: Option<Arc<scheduling::CronService>>,
     notification_handle: Option<LastActiveChannel>,
+    notification_sender: Option<Arc<dyn common::utils::notify::NotificationSender>>,
     domain_event_bus: Option<Arc<bus::DomainEventBus>>,
     cognitive_provider: Option<DynProvider>,
     pipeline_tx: Option<tokio::sync::broadcast::Sender<cognitive::PipelineEvent>>,
+    user_situation: Option<Arc<tokio::sync::Mutex<cognitive::situation::UserSituation>>>,
+    activity_svc: Option<Arc<activity_log::ActivityIngestionService>>,
 }
 
 impl AgentLoopBuilder {
@@ -71,9 +74,12 @@ impl AgentLoopBuilder {
             vector_store: None,
             cron_service: None,
             notification_handle: None,
+            notification_sender: None,
             domain_event_bus: None,
             cognitive_provider: None,
             pipeline_tx: None,
+            user_situation: None,
+            activity_svc: None,
         }
     }
 
@@ -97,6 +103,14 @@ impl AgentLoopBuilder {
         self
     }
 
+    pub fn with_notification_sender(
+        mut self,
+        sender: Arc<dyn common::utils::notify::NotificationSender>,
+    ) -> Self {
+        self.notification_sender = Some(sender);
+        self
+    }
+
     pub fn with_domain_bus(mut self, bus: Arc<bus::DomainEventBus>) -> Self {
         self.domain_event_bus = Some(bus);
         self
@@ -112,6 +126,22 @@ impl AgentLoopBuilder {
         tx: tokio::sync::broadcast::Sender<cognitive::PipelineEvent>,
     ) -> Self {
         self.pipeline_tx = Some(tx);
+        self
+    }
+
+    pub fn with_user_situation(
+        mut self,
+        situation: Arc<tokio::sync::Mutex<cognitive::situation::UserSituation>>,
+    ) -> Self {
+        self.user_situation = Some(situation);
+        self
+    }
+
+    pub fn with_activity_service(
+        mut self,
+        svc: Arc<activity_log::ActivityIngestionService>,
+    ) -> Self {
+        self.activity_svc = Some(svc);
         self
     }
 
@@ -234,14 +264,25 @@ impl AgentLoopBuilder {
                     dynamic_fact_limit: config.cognitive.dynamic_fact_limit,
                     vector_top_k: config.cognitive.vector_top_k,
                     min_similarity: config.cognitive.min_similarity,
+                    max_stability: config.cognitive.max_stability,
+                    relevance_weight_semantic: config.cognitive.relevance_weight_semantic,
+                    relevance_weight_retrievability: config
+                        .cognitive
+                        .relevance_weight_retrievability,
+                    relevance_weight_importance: config.cognitive.relevance_weight_importance,
+                    relevance_weight_frequency: config.cognitive.relevance_weight_frequency,
+                    relevance_weight_situation: config.cognitive.relevance_weight_situation,
                 };
 
-                sources.push(Box::new(
+                let mut cog_source =
                     cognitive::CognitiveContextSource::new(fact_repo.clone(), rule_repo)
                         .with_embedder_opt(cognitive_embedder.clone())
                         .with_config(retrieval_config)
-                        .with_confidence_threshold(Arc::clone(&confidence_bits)),
-                ));
+                        .with_confidence_threshold(Arc::clone(&confidence_bits));
+                if let Some(ref sit) = self.user_situation {
+                    cog_source = cog_source.with_situation(Arc::clone(sit));
+                }
+                sources.push(Box::new(cog_source));
 
                 // Start background consolidation service if we have a DomainEventBus
                 if let Some(ref domain_bus) = self.domain_event_bus {
@@ -267,10 +308,8 @@ impl AgentLoopBuilder {
                             Arc::new(crate::cognitive_handlers::HeuristicConsolidationHandler),
                         )
                     };
-                    let episodic_repo =
-                        cognitive::EpisodicMemoryRepo::new(pool.clone());
-                    let accum_repo =
-                        cognitive::AccumulatedObservationRepo::new(pool.clone());
+                    let episodic_repo = cognitive::EpisodicMemoryRepo::new(pool.clone());
+                    let accum_repo = cognitive::AccumulatedObservationRepo::new(pool.clone());
                     let cancel = CancellationToken::new();
                     let bg_service = cognitive::background::BackgroundConsolidationService::start(
                         event_rx,
@@ -282,6 +321,8 @@ impl AgentLoopBuilder {
                         cancel.clone(),
                         self.pipeline_tx.take(),
                         Some(accum_repo),
+                        config.cognitive.accumulate_promote_threshold,
+                        config.cognitive.accumulate_min_days,
                     );
                     info!("Cognitive background consolidation service started");
                     Some(bg_service)
@@ -304,6 +345,44 @@ impl AgentLoopBuilder {
         if let Some(ref repos) = prod_repos {
             sources.push(Box::new(ProductivityContextSource::new(repos.clone())));
         }
+
+        // Work context source (optional — requires real pool + enabled config).
+        let _inference_loop_token: Option<CancellationToken> = if config.work_context.enabled {
+            if let Some(ref _pool) = self.pool {
+                sources.push(Box::new(activity_log::WorkContextSource::new(
+                    storage_pool.clone(),
+                )));
+
+                // Start inference engine + background loop
+                let text_embedder = Arc::new(crate::cognitive_embedder::TextEmbedderImpl::new(
+                    Arc::clone(&embedding_engine),
+                ));
+                let inference_config =
+                    activity_log::inference::ContextInferenceConfig::from_work_context_config(
+                        &config.work_context,
+                    );
+                let engine = Arc::new(activity_log::inference::ContextInferenceEngine::new(
+                    storage_pool.clone(),
+                    text_embedder,
+                    self.vector_store.clone(),
+                    inference_config,
+                ));
+
+                let token = CancellationToken::new();
+                let _handle = activity_log::inference_loop::ContextInferenceLoop::start(
+                    Arc::clone(&engine),
+                    config.work_context.inference_interval_mins,
+                    token.clone(),
+                );
+                info!("Work context inference loop started");
+
+                Some(token)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
 
         // Sort by priority (descending) — ensures correct ordering in prompt
         sources.sort_by_key(|s| std::cmp::Reverse(s.priority()));
@@ -400,10 +479,17 @@ impl AgentLoopBuilder {
 
         // ── Notification dispatcher ───────────────────────────────────────
         let notification_dispatcher = if !config.todo.notifications.targets.is_empty() {
-            Some(Arc::new(super::super::NotificationDispatcher::new(
-                bus.outbound_sender(),
-                config.todo.notifications.clone(),
-            )))
+            Some(Arc::new(match &self.notification_sender {
+                Some(sender) => super::super::NotificationDispatcher::with_sender(
+                    bus.outbound_sender(),
+                    config.todo.notifications.clone(),
+                    Arc::clone(sender),
+                ),
+                None => super::super::NotificationDispatcher::new(
+                    bus.outbound_sender(),
+                    config.todo.notifications.clone(),
+                ),
+            }))
         } else {
             None
         };
@@ -442,8 +528,7 @@ impl AgentLoopBuilder {
 
         // ── Wire automatic memory retrieval (CognitiveMemoryRetriever) ───
         let context_engine = if let Some(ref recall) = recall_service {
-            let retriever =
-                Arc::new(cognitive::CognitiveMemoryRetriever::new(Arc::clone(recall)));
+            let retriever = Arc::new(cognitive::CognitiveMemoryRetriever::new(Arc::clone(recall)));
             context_engine.with_memory_retriever(retriever)
         } else {
             context_engine
@@ -572,9 +657,7 @@ impl AgentLoopBuilder {
                     .with_threshold(config.conversation.search.semantic_threshold)
                     .with_rrf_k(config.todo.search.rrf_k);
 
-                if let (Some(ref h), Some(ref vs)) =
-                    (&todo_embedding_handler, &self.vector_store)
-                {
+                if let (Some(ref h), Some(ref vs)) = (&todo_embedding_handler, &self.vector_store) {
                     memory_tool = memory_tool
                         .with_todo_embedding_handler(Arc::clone(h))
                         .with_embedding_store(vs.clone());
@@ -624,6 +707,11 @@ impl AgentLoopBuilder {
             let note_repo = feature_notes::repo::NoteRepo::new(pool.clone());
             tool_registry.register(feature_notes::tool::NotesTool::new(note_repo));
             info!("Notes tool registered");
+        }
+
+        // ── Work context tool (requires real pool + enabled) ─────────────
+        if config.work_context.enabled && self.pool.is_some() {
+            tool_registry.register(activity_log::WorkContextTool::new(storage_pool.clone()));
         }
 
         // ── Productivity tool (reuses prod_repos from context source block) ──
@@ -688,6 +776,7 @@ impl AgentLoopBuilder {
                                     channel: None,
                                     to: None,
                                     internal: true,
+                                    origin: "plugin".to_string(),
                                 };
                                 match handler.add_job(params).await {
                                     Ok(job) => {
@@ -864,6 +953,9 @@ impl AgentLoopBuilder {
         if let Some(ref recorder) = outcome_recorder {
             execution_core = execution_core.with_outcome_recorder(Arc::clone(recorder));
         }
+        if let Some(ref domain_bus) = self.domain_event_bus {
+            execution_core = execution_core.with_domain_bus(Arc::clone(domain_bus));
+        }
         let execution_core = Arc::new(execution_core);
 
         let direct_engine =
@@ -883,9 +975,12 @@ impl AgentLoopBuilder {
         )
         .with_strategy_repo(repos.strategies.clone());
 
-        let cost_tracker = Arc::new(crate::output::CostTracker::from_repo(
-            storage::UsageRepo::new(storage_pool.inner().clone()),
-        ));
+        let cost_tracker = Arc::new(
+            crate::output::CostTracker::from_repo(storage::UsageRepo::new(
+                storage_pool.inner().clone(),
+            ))
+            .with_monthly_budget(config.agents.monthly_budget_usd),
+        );
 
         let runtime_config = crate::intent_pipeline::types::PipelineConfig {
             execution_model: config.agents.defaults.model.clone(),
@@ -993,6 +1088,8 @@ impl AgentLoopBuilder {
             mcp_manager: tokio::sync::Mutex::new(mcp_manager),
             _domain_event_bus: self.domain_event_bus,
             cognitive_bg_service: tokio::sync::Mutex::new(cognitive_bg_service),
+            _inference_loop_token,
+            activity_svc: self.activity_svc,
         })
     }
 }

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ipc } from "../../hooks/useIpc";
 import { formatHumanDuration } from "../../lib/dates";
 import type { ProductivitySummary } from "../../lib/types";
@@ -9,6 +9,13 @@ interface DistractionBannerProps {
 
 export function DistractionBanner({ summary }: DistractionBannerProps) {
   const [dismissed, setDismissed] = useState(false);
+  const [urgeSurfingCountdown, setUrgeSurfingCountdown] = useState(10);
+
+  useEffect(() => {
+    if (urgeSurfingCountdown <= 0 || dismissed) return;
+    const timer = setTimeout(() => setUrgeSurfingCountdown((c) => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [urgeSurfingCountdown, dismissed]);
 
   const distractingSecs = summary?.distractingSecs ?? 0;
   const totalActive = summary?.totalActiveSecs ?? 0;
@@ -24,10 +31,7 @@ export function DistractionBanner({ summary }: DistractionBannerProps) {
     // topApps with heuristic: if the app contributed to entertainment, list it
     // We check topCategories for the distracting category name
     return summary.topCategories
-      .filter((c) => {
-        const lower = c.category.toLowerCase();
-        return lower === "entertainment" || lower === "social media" || lower === "gaming";
-      })
+      .filter((c) => c.categoryType === "distracting")
       .map((c) => c.category);
   }, [summary]);
 
@@ -102,26 +106,24 @@ export function DistractionBanner({ summary }: DistractionBannerProps) {
           </span>
         )}
 
-        {/* Dismiss */}
+        {/* Dismiss with urge surfing */}
         <button
           type="button"
+          disabled={urgeSurfingCountdown > 0}
           onClick={() => {
             setDismissed(true);
             ipc("distraction_dismiss", { app_name: distractingApps[0] ?? "unknown" }).catch(
               () => {},
             );
           }}
-          className="flex-shrink-0 p-1 rounded-md text-dim hover:text-muted hover:bg-white/[0.08] transition-colors"
-          aria-label="Dismiss"
+          className={`flex-shrink-0 px-2 py-1 rounded-md text-[10px] transition-colors ${
+            urgeSurfingCountdown > 0
+              ? "text-dim cursor-not-allowed animate-[breathe_4s_ease-in-out_infinite]"
+              : "text-muted hover:text-secondary hover:bg-white/[0.08]"
+          }`}
+          aria-label={urgeSurfingCountdown > 0 ? "Pause and reflect" : "Dismiss"}
         >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-            <path
-              d="M10.5 3.5L3.5 10.5M3.5 3.5L10.5 10.5"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-            />
-          </svg>
+          {urgeSurfingCountdown > 0 ? `Pause and reflect... (${urgeSurfingCountdown}s)` : "Dismiss"}
         </button>
       </div>
     </div>

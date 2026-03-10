@@ -185,8 +185,7 @@ impl MemoryTool {
             .and_then(|v| v.as_f64())
             .unwrap_or(self.semantic_threshold);
 
-        let results: Vec<RecallSearchResult> =
-            handler.search(query, limit, threshold).await?;
+        let results: Vec<RecallSearchResult> = handler.search(query, limit, threshold).await?;
 
         if results.is_empty() {
             return Ok(format!(

@@ -3,18 +3,35 @@
 
 use chrono::Utc;
 use desktop_shared::commands::{
-    ActivityCategoryResponse, ActivityTimelineResponse, AppUsageResponse, CategoryUsageResponse,
-    FocusSessionResponse, GoalProgressResponse, InsightCardResponse, ProductivityProjectResponse,
-    ProductivitySummaryResponse, ProjectUsageResponse, TimeEntryResponse,
+    ActivityCategoryResponse, ActivityTimelineResponse, AppUsageResponse, CategoryRulesResponse,
+    CategoryUsageResponse, FocusSessionResponse, GoalProgressResponse, InsightCardResponse,
+    ProductivityProjectResponse, ProductivitySummaryResponse, ProjectUsageResponse,
+    TimeEntryResponse, TrackedAppResponse, WeeklyAssessmentResponse,
 };
 use desktop_shared::errors::ApiError;
 use feature_productivity::auto_focus::AutoFocusSession;
 use feature_productivity::types::{DailySummary, FocusSession, InsightCard};
 
-use crate::errors::{map_prod_err, parse_date_or_err};
+use crate::errors::{map_prod_err, parse_date_or_err, parse_local_day_range};
 use crate::state::AppCore;
 
 // ── Converters ────────────────────────────────────────────────────────
+
+fn rules_to_response(r: feature_productivity::types::CategoryRules) -> CategoryRulesResponse {
+    CategoryRulesResponse {
+        app_names: r.app_names,
+        bundle_ids: r.bundle_ids,
+        url_patterns: r.url_patterns,
+    }
+}
+
+fn rules_from_response(r: CategoryRulesResponse) -> feature_productivity::types::CategoryRules {
+    feature_productivity::types::CategoryRules {
+        app_names: r.app_names,
+        bundle_ids: r.bundle_ids,
+        url_patterns: r.url_patterns,
+    }
+}
 
 pub fn summary_to_response(s: DailySummary) -> ProductivitySummaryResponse {
     ProductivitySummaryResponse {
@@ -43,7 +60,9 @@ pub fn summary_to_response(s: DailySummary) -> ProductivitySummaryResponse {
             .top_categories
             .into_iter()
             .map(|c| CategoryUsageResponse {
+                category_id: c.category_id,
                 category: c.category,
+                category_type: c.category_type,
                 duration_secs: c.duration_secs,
             })
             .collect(),
@@ -59,6 +78,9 @@ pub fn summary_to_response(s: DailySummary) -> ProductivitySummaryResponse {
             .collect(),
         ai_summary: s.ai_summary,
         productivity_score: s.productivity_score,
+        score_trend: None,
+        focus_time_trend: None,
+        active_time_trend: None,
     }
 }
 
@@ -92,6 +114,22 @@ pub fn project_to_response(
     }
 }
 
+fn assessment_to_response(
+    a: feature_productivity::types::WeeklyAssessment,
+) -> WeeklyAssessmentResponse {
+    WeeklyAssessmentResponse {
+        id: a.id,
+        week_start: a.week_start,
+        week_end: a.week_end,
+        avg_score: a.avg_score,
+        total_focus_mins: a.total_focus_mins,
+        total_productive_secs: a.total_productive_secs,
+        total_distracting_secs: a.total_distracting_secs,
+        top_apps: a.top_apps,
+        summary: a.summary,
+    }
+}
+
 pub fn insight_to_response(c: InsightCard) -> InsightCardResponse {
     InsightCardResponse {
         id: c.id,
@@ -119,6 +157,7 @@ pub fn event_to_timeline(
         duration_secs: e.duration_secs,
         is_idle: e.is_idle,
         project_id: e.project_id,
+        focus_session_id: e.focus_session_id,
     }
 }
 
@@ -130,7 +169,25 @@ impl AppCore {
     ) -> Result<Option<ProductivitySummaryResponse>, ApiError> {
         let aggregator = self.aggregator()?;
         let summary = aggregator.compute_today().await.map_err(map_prod_err)?;
-        Ok(Some(summary_to_response(summary)))
+        let mut resp = summary_to_response(summary);
+
+        // Compute trend deltas vs 4-week rolling average
+        let repos = self.productivity_repos()?;
+        let today_str = Utc::now().format("%Y-%m-%d").to_string();
+        if let Ok(baseline) = repos.summaries.rolling_averages(&today_str, 28).await {
+            resp.score_trend = match (resp.productivity_score, baseline.avg_score) {
+                (Some(current), Some(avg)) => Some(current - avg),
+                _ => None,
+            };
+            resp.focus_time_trend = baseline
+                .avg_focus_secs
+                .map(|avg| resp.total_focus_secs as f64 - avg);
+            resp.active_time_trend = baseline
+                .avg_active_secs
+                .map(|avg| resp.total_active_secs as f64 - avg);
+        }
+
+        Ok(Some(resp))
     }
 
     pub async fn productivity_timeline(
@@ -138,10 +195,10 @@ impl AppCore {
         date: String,
         limit: Option<i64>,
         offset: Option<i64>,
+        tz_offset_mins: Option<i32>,
     ) -> Result<Vec<ActivityTimelineResponse>, ApiError> {
         let repos = self.productivity_repos()?;
-        let start = parse_date_or_err(&date)?;
-        let end = start + chrono::Duration::days(1);
+        let (start, end) = parse_local_day_range(&date, tz_offset_mins)?;
         let cap = limit.unwrap_or(10_000).min(10_000);
         let events = repos
             .events
@@ -207,15 +264,25 @@ impl AppCore {
     pub async fn productivity_weekly(&self) -> Result<Vec<ProductivitySummaryResponse>, ApiError> {
         let repos = self.productivity_repos()?;
         let today = Utc::now().date_naive();
+        let today_str = today.format("%Y-%m-%d").to_string();
         let week_start = today - chrono::Duration::days(6);
-        let summaries = repos
+        let mut summaries = repos
             .summaries
-            .list_range(
-                &week_start.format("%Y-%m-%d").to_string(),
-                &today.format("%Y-%m-%d").to_string(),
-            )
+            .list_range(&week_start.format("%Y-%m-%d").to_string(), &today_str)
             .await
             .map_err(map_prod_err)?;
+
+        // Live-override today's summary
+        if let Ok(aggregator) = self.aggregator() {
+            if let Ok(live) = aggregator.compute_today().await {
+                if let Some(idx) = summaries.iter().position(|s| s.date == today_str) {
+                    summaries[idx] = live;
+                } else {
+                    summaries.push(live);
+                }
+            }
+        }
+
         Ok(summaries.into_iter().map(summary_to_response).collect())
     }
 
@@ -231,6 +298,24 @@ impl AppCore {
                 color: c.color,
                 icon: c.icon,
                 is_system: c.is_system,
+                rules: c.rules.map(rules_to_response),
+            })
+            .collect())
+    }
+
+    pub async fn productivity_tracked_apps(&self) -> Result<Vec<TrackedAppResponse>, ApiError> {
+        let repos = self.productivity_repos()?;
+        let rows = repos.events.tracked_apps().await.map_err(map_prod_err)?;
+        Ok(rows
+            .into_iter()
+            .map(|r| TrackedAppResponse {
+                display_name: r.display_name,
+                app_name: r.app_name,
+                site_name: r.site_name,
+                category_id: r.category_id,
+                category_name: r.category_name,
+                total_secs: r.total_secs,
+                event_count: r.event_count,
             })
             .collect())
     }
@@ -263,7 +348,26 @@ impl AppCore {
             }
         }
 
-        Ok(summaries.into_iter().map(summary_to_response).collect())
+        let mut responses: Vec<ProductivitySummaryResponse> =
+            summaries.into_iter().map(summary_to_response).collect();
+
+        // Compute trend deltas for each day vs its own 28-day baseline
+        for resp in &mut responses {
+            if let Ok(baseline) = repos.summaries.rolling_averages(&resp.date, 28).await {
+                resp.score_trend = match (resp.productivity_score, baseline.avg_score) {
+                    (Some(current), Some(avg)) => Some(current - avg),
+                    _ => None,
+                };
+                resp.focus_time_trend = baseline
+                    .avg_focus_secs
+                    .map(|avg| resp.total_focus_secs as f64 - avg);
+                resp.active_time_trend = baseline
+                    .avg_active_secs
+                    .map(|avg| resp.total_active_secs as f64 - avg);
+            }
+        }
+
+        Ok(responses)
     }
 
     pub async fn productivity_activity_feed(
@@ -300,12 +404,41 @@ impl AppCore {
         work_mins: Option<i64>,
         break_mins: Option<i64>,
     ) -> Result<FocusSessionResponse, ApiError> {
+        self.productivity_pomodoro_start_with_action(None, None, work_mins, break_mins)
+            .await
+    }
+
+    pub async fn productivity_pomodoro_start_with_action(
+        &self,
+        action_id: Option<String>,
+        project_id: Option<String>,
+        work_mins: Option<i64>,
+        break_mins: Option<i64>,
+    ) -> Result<FocusSessionResponse, ApiError> {
         let focus_mgr = self.focus_manager()?;
         let session = focus_mgr
-            .start_pomodoro(None, None, work_mins, break_mins)
+            .start_pomodoro(action_id, project_id, work_mins, break_mins)
             .await
             .map_err(map_prod_err)?;
         Ok(session_to_response(session))
+    }
+
+    pub async fn productivity_break_start(
+        &self,
+        break_mins: i64,
+    ) -> Result<FocusSessionResponse, ApiError> {
+        let focus_mgr = self.focus_manager()?;
+        let session = focus_mgr
+            .start_break_session(break_mins)
+            .await
+            .map_err(map_prod_err)?;
+        Ok(session_to_response(session))
+    }
+
+    pub async fn productivity_break_end(&self) -> Result<Option<FocusSessionResponse>, ApiError> {
+        let focus_mgr = self.focus_manager()?;
+        let session = focus_mgr.end_break_session().await.map_err(map_prod_err)?;
+        Ok(session.map(session_to_response))
     }
 
     pub async fn productivity_time_entries(
@@ -437,6 +570,7 @@ impl AppCore {
         category_type: String,
         color: Option<String>,
         icon: Option<String>,
+        rules: Option<CategoryRulesResponse>,
     ) -> Result<ActivityCategoryResponse, ApiError> {
         let repos = self.productivity_repos()?;
         let ct: feature_productivity::types::CategoryType =
@@ -446,13 +580,14 @@ impl AppCore {
                     "Invalid category_type. Use: productive, neutral, distracting",
                 )
             })?;
+        let cat_rules = rules.map(rules_from_response);
         let cat = feature_productivity::types::ActivityCategory {
             id,
             name,
             category_type: ct,
             color,
             icon,
-            rules: None,
+            rules: cat_rules,
             is_system: false,
         };
         repos.categories.upsert(&cat).await.map_err(map_prod_err)?;
@@ -463,7 +598,13 @@ impl AppCore {
             color: cat.color,
             icon: cat.icon,
             is_system: false,
+            rules: cat.rules.map(rules_to_response),
         })
+    }
+
+    pub async fn productivity_category_delete(&self, id: String) -> Result<bool, ApiError> {
+        let repos = self.productivity_repos()?;
+        repos.categories.delete(&id).await.map_err(map_prod_err)
     }
 
     // ── V2: Insights & Auto-Focus ─────────────────────────────────────
@@ -475,8 +616,15 @@ impl AppCore {
         let repos = self.productivity_repos()?;
         let date = date.unwrap_or_else(|| Utc::now().format("%Y-%m-%d").to_string());
         let engine = feature_productivity::insights::InsightEngine::new(repos.clone());
-        let cards = engine
+        // Generate any missing insights (idempotent)
+        let _ = engine
             .generate_for_date(&date)
+            .await
+            .map_err(map_prod_err)?;
+        // Always return ALL stored (non-dismissed) insights for the date
+        let cards = repos
+            .insights
+            .list_for_date(&date)
             .await
             .map_err(map_prod_err)?;
         Ok(cards.into_iter().map(insight_to_response).collect())
@@ -558,5 +706,147 @@ impl AppCore {
         let repos = self.productivity_repos()?;
         repos.projects.delete(&id).await.map_err(map_prod_err)?;
         Ok(())
+    }
+
+    // ── Calendar Events ──────────────────────────────────────────────
+
+    pub async fn productivity_calendar_events(
+        &self,
+        date: String,
+    ) -> Result<Vec<feature_productivity::types::CalendarEvent>, ApiError> {
+        let repos = self.productivity_repos()?;
+        let _ = parse_date_or_err(&date)?;
+        repos
+            .calendar_events
+            .list_for_date(&date)
+            .await
+            .map_err(map_prod_err)
+    }
+
+    pub async fn calendar_sync_events(
+        &self,
+        events: Vec<desktop_shared::commands::CalendarEventInput>,
+    ) -> Result<Vec<feature_productivity::types::CalendarEvent>, ApiError> {
+        let repos = self.productivity_repos()?;
+        let now = Utc::now().to_rfc3339();
+        let mut results = Vec::new();
+
+        for input in events {
+            let event = feature_productivity::types::CalendarEvent {
+                id: uuid::Uuid::new_v4().to_string(),
+                calendar_id: input.calendar_id.unwrap_or_else(|| "primary".into()),
+                title: input.title,
+                description: input.description,
+                started_at: input.started_at,
+                ended_at: input.ended_at,
+                location: input.location,
+                attendees_count: input.attendees_count.unwrap_or(0),
+                is_recurring: input.is_recurring.unwrap_or(false),
+                recurrence_id: input.recurrence_id,
+                source: input.source.unwrap_or_else(|| "google".into()),
+                external_uid: input.external_uid,
+                session_id: None,
+                color: input.color,
+                synced_at: now.clone(),
+                created_at: now.clone(),
+                updated_at: now.clone(),
+            };
+            repos
+                .calendar_events
+                .upsert(&event)
+                .await
+                .map_err(map_prod_err)?;
+            results.push(event);
+        }
+
+        Ok(results)
+    }
+
+    // ── Weekly Assessment ───────────────────────────────────────────
+
+    pub async fn productivity_weekly_assessment(
+        &self,
+        week_start: String,
+    ) -> Result<WeeklyAssessmentResponse, ApiError> {
+        let repos = self.productivity_repos()?;
+        let start_date = parse_date_or_err(&week_start)?;
+        let end_date = start_date + chrono::Duration::days(6);
+        let end_str = end_date.format("%Y-%m-%d").to_string();
+
+        // Query daily summaries for the week
+        let summaries = repos
+            .summaries
+            .list_range(&week_start, &end_str)
+            .await
+            .map_err(map_prod_err)?;
+
+        // Aggregate
+        let days = summaries.len() as f64;
+        let total_focus_mins = summaries
+            .iter()
+            .map(|s| s.total_focus_secs / 60)
+            .sum::<i64>();
+        let total_productive_secs = summaries.iter().map(|s| s.productive_secs).sum::<i64>();
+        let total_distracting_secs = summaries.iter().map(|s| s.distracting_secs).sum::<i64>();
+
+        let scores: Vec<f64> = summaries
+            .iter()
+            .filter_map(|s| s.productivity_score)
+            .collect();
+        let avg_score = if scores.is_empty() {
+            None
+        } else {
+            Some(scores.iter().sum::<f64>() / scores.len() as f64)
+        };
+
+        // Aggregate top apps across the week
+        let mut app_map: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
+        for s in &summaries {
+            for app in &s.top_apps {
+                *app_map.entry(app.app_name.clone()).or_default() += app.duration_secs;
+            }
+        }
+        let mut top_apps_vec: Vec<_> = app_map.into_iter().collect();
+        top_apps_vec.sort_by(|a, b| b.1.cmp(&a.1));
+        top_apps_vec.truncate(10);
+        let top_apps_json = serde_json::to_string(&top_apps_vec).ok();
+
+        let summary_text = if days > 0.0 {
+            Some(format!(
+                "{} days tracked, {:.0}h focus, {:.0}% productive",
+                days as i64,
+                total_focus_mins as f64 / 60.0,
+                if total_productive_secs + total_distracting_secs > 0 {
+                    total_productive_secs as f64
+                        / (total_productive_secs + total_distracting_secs) as f64
+                        * 100.0
+                } else {
+                    0.0
+                }
+            ))
+        } else {
+            None
+        };
+
+        let assessment = feature_productivity::types::WeeklyAssessment {
+            id: format!("wa-{}", week_start),
+            week_start: week_start.clone(),
+            week_end: end_str,
+            avg_score,
+            total_focus_mins: Some(total_focus_mins),
+            total_productive_secs: Some(total_productive_secs),
+            total_distracting_secs: Some(total_distracting_secs),
+            top_apps: top_apps_json,
+            summary: summary_text,
+            created_at: Utc::now().to_rfc3339(),
+        };
+
+        repos
+            .weekly_assessments
+            .upsert(&assessment)
+            .await
+            .map_err(map_prod_err)?;
+
+        Ok(assessment_to_response(assessment))
     }
 }

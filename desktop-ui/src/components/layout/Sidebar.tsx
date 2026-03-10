@@ -3,9 +3,11 @@ import {
   Bug,
   CheckSquare,
   FileText,
+  LayoutDashboard,
   MessageCircle,
   MessageSquare,
   Settings,
+  Timer,
   Wallet,
 } from "lucide-react";
 import { useNavigate } from "react-router";
@@ -21,10 +23,12 @@ interface SidebarProps {
 
 const items: { key: SidebarItem; icon: typeof MessageSquare; path?: string; bottom?: boolean }[] = [
   { key: "Chat", icon: MessageSquare, path: "/chat" },
-  { key: "Tasks", icon: CheckSquare, path: "/" },
+  { key: "Dashboard", icon: LayoutDashboard, path: "/" },
+  { key: "Tasks", icon: CheckSquare, path: "/tasks" },
   { key: "Notes", icon: FileText, path: "/notes" },
   { key: "Finance", icon: Wallet, path: "/finance" },
-  { key: "Productivity", icon: Activity, path: "/productivity" },
+  { key: "Productivity", icon: Activity, path: "/categories" },
+  { key: "Automations", icon: Timer, path: "/automations" },
   { key: "Debug", icon: Bug, path: "/debug", bottom: true },
   { key: "Settings", icon: Settings, path: "/settings", bottom: true },
 ];

@@ -3,9 +3,9 @@
 use std::sync::Arc;
 
 use desktop_shared::commands::{
-    ActivityCategoryResponse, ActivityTimelineResponse, FocusSessionResponse, GoalProgressResponse,
-    InsightCardResponse, ProductivityProjectResponse, ProductivitySummaryResponse,
-    TimeEntryResponse,
+    ActivityCategoryResponse, ActivityTimelineResponse, CategoryRulesResponse,
+    FocusSessionResponse, GoalProgressResponse, InsightCardResponse, ProductivityProjectResponse,
+    ProductivitySummaryResponse, TimeEntryResponse, TrackedAppResponse, WeeklyAssessmentResponse,
 };
 use desktop_shared::errors::ApiError;
 use feature_productivity::auto_focus::AutoFocusSession;
@@ -26,8 +26,11 @@ pub async fn productivity_timeline(
     date: String,
     limit: Option<i64>,
     offset: Option<i64>,
+    tz_offset_mins: Option<i32>,
 ) -> Result<Vec<ActivityTimelineResponse>, ApiError> {
-    state.productivity_timeline(date, limit, offset).await
+    state
+        .productivity_timeline(date, limit, offset, tz_offset_mins)
+        .await
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -77,6 +80,13 @@ pub async fn productivity_categories(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<Vec<ActivityCategoryResponse>, ApiError> {
     state.productivity_categories().await
+}
+
+#[tauri::command]
+pub async fn productivity_tracked_apps(
+    state: State<'_, Arc<AppCore>>,
+) -> Result<Vec<TrackedAppResponse>, ApiError> {
+    state.productivity_tracked_apps().await
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -180,10 +190,19 @@ pub async fn productivity_category_upsert(
     category_type: String,
     color: Option<String>,
     icon: Option<String>,
+    rules: Option<CategoryRulesResponse>,
 ) -> Result<ActivityCategoryResponse, ApiError> {
     state
-        .productivity_category_upsert(id, name, category_type, color, icon)
+        .productivity_category_upsert(id, name, category_type, color, icon, rules)
         .await
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn productivity_category_delete(
+    state: State<'_, Arc<AppCore>>,
+    id: String,
+) -> Result<bool, ApiError> {
+    state.productivity_category_delete(id).await
 }
 
 // ── V2: Insights & Auto-Focus ─────────────────────────────────────────
@@ -243,6 +262,155 @@ pub async fn productivity_project_delete(
     state.productivity_project_delete(id).await
 }
 
+#[tauri::command(rename_all = "snake_case")]
+pub async fn productivity_weekly_assessment(
+    state: State<'_, Arc<AppCore>>,
+    week_start: String,
+) -> Result<WeeklyAssessmentResponse, ApiError> {
+    state.productivity_weekly_assessment(week_start).await
+}
+
+#[tauri::command]
+pub async fn productivity_calendar_events(
+    state: State<'_, Arc<AppCore>>,
+    date: String,
+) -> Result<Vec<feature_productivity::types::CalendarEvent>, ApiError> {
+    state.productivity_calendar_events(date).await
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn calendar_sync_events(
+    state: State<'_, Arc<AppCore>>,
+    events: Vec<desktop_shared::commands::CalendarEventInput>,
+) -> Result<Vec<feature_productivity::types::CalendarEvent>, ApiError> {
+    state.calendar_sync_events(events).await
+}
+
+// ── Focus Timer (tray-driven) ──────────────────────────────────────────
+
+use crate::focus_timer::{FocusTimer, TimerMode};
+use desktop_shared::commands::FocusTimerStatusResponse;
+
+#[allow(clippy::too_many_arguments)]
+#[tauri::command(rename_all = "snake_case")]
+pub async fn focus_timer_start(
+    state: State<'_, Arc<AppCore>>,
+    timer: State<'_, Arc<FocusTimer>>,
+    app: tauri::AppHandle,
+    mode: String,
+    work_mins: u64,
+    break_mins: Option<u64>,
+    action_id: Option<String>,
+    action_title: Option<String>,
+    sound_enabled: Option<bool>,
+    notification_enabled: Option<bool>,
+) -> Result<FocusSessionResponse, ApiError> {
+    let timer_mode = match mode.as_str() {
+        "pomodoro" => TimerMode::Pomodoro,
+        _ => TimerMode::Focus,
+    };
+
+    // Start the persistent session first
+    let session = if timer_mode == TimerMode::Pomodoro {
+        state
+            .productivity_pomodoro_start_with_action(
+                action_id,
+                None,
+                Some(work_mins as i64),
+                break_mins.map(|b| b as i64),
+            )
+            .await?
+    } else {
+        state
+            .productivity_focus_start(action_id, None, Some(work_mins as i64))
+            .await?
+    };
+
+    // Then start the desktop timer (tray title + countdown)
+    timer
+        .start(
+            app,
+            timer_mode,
+            work_mins,
+            break_mins,
+            action_title,
+            sound_enabled.unwrap_or(true),
+            notification_enabled.unwrap_or(true),
+        )
+        .await
+        .map_err(|e| ApiError::new("TIMER_ERROR", e.to_string()))?;
+
+    Ok(session)
+}
+
+#[tauri::command]
+pub async fn focus_timer_stop(
+    state: State<'_, Arc<AppCore>>,
+    timer: State<'_, Arc<FocusTimer>>,
+    app: tauri::AppHandle,
+    notes: Option<String>,
+) -> Result<Option<FocusSessionResponse>, ApiError> {
+    timer.stop(&app).await;
+    // Try ending a focus/pomodoro session first, then try a break session
+    let focus_result = state.productivity_focus_end(notes).await.unwrap_or(None);
+    if focus_result.is_some() {
+        return Ok(focus_result);
+    }
+    // During a break, end the break session instead
+    Ok(state.productivity_break_end().await.unwrap_or(None))
+}
+
+#[tauri::command]
+pub async fn focus_timer_status(
+    state: State<'_, Arc<AppCore>>,
+    timer: State<'_, Arc<FocusTimer>>,
+) -> Result<FocusTimerStatusResponse, ApiError> {
+    let session = state.productivity_focus_status().await?;
+    let timer_info = timer.status().await;
+
+    Ok(FocusTimerStatusResponse {
+        active: timer_info.is_some(),
+        mode: timer_info.map(|(m, _)| m.as_str().to_string()),
+        remaining_secs: None, // Remaining is pushed via events, not polled
+        total_secs: timer_info.map(|(_, t)| t),
+        session,
+    })
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn focus_break_start(
+    state: State<'_, Arc<AppCore>>,
+    timer: State<'_, Arc<FocusTimer>>,
+    app: tauri::AppHandle,
+    break_mins: u64,
+) -> Result<(), ApiError> {
+    // Persist break session to SQLite so it appears in daily summaries
+    state.productivity_break_start(break_mins as i64).await?;
+
+    timer
+        .start_break(app, break_mins)
+        .await
+        .map_err(|e| ApiError::new("TIMER_ERROR", e.to_string()))
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn focus_timer_extend(
+    timer: State<'_, Arc<FocusTimer>>,
+    extra_secs: u64,
+) -> Result<bool, ApiError> {
+    Ok(timer.extend(extra_secs).await)
+}
+
+#[tauri::command]
+pub async fn focus_timer_pause(timer: State<'_, Arc<FocusTimer>>) -> Result<bool, ApiError> {
+    Ok(timer.pause().await)
+}
+
+#[tauri::command]
+pub async fn focus_timer_resume(timer: State<'_, Arc<FocusTimer>>) -> Result<bool, ApiError> {
+    Ok(timer.resume().await)
+}
+
 // ── Dev server dispatch ─────────────────────────────────────────────
 
 #[cfg(test)]
@@ -266,12 +434,17 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "productivity_time_entry_create",
     "productivity_time_entry_delete",
     "productivity_category_upsert",
+    "productivity_tracked_apps",
+    "productivity_category_delete",
     "productivity_insights",
     "productivity_insight_dismiss",
     "productivity_auto_focus_confirm",
     "productivity_projects_list",
     "productivity_project_upsert",
     "productivity_project_delete",
+    "productivity_weekly_assessment",
+    "productivity_calendar_events",
+    "calendar_sync_events",
 ];
 
 #[cfg(debug_assertions)]
@@ -286,20 +459,23 @@ pub(crate) async fn dispatch_dev(
         "productivity_timeline" => {
             let date = try_field!(dev::get_str(body, "date"));
             dev::val(
-                core.productivity_timeline(date, dev::get(body, "limit"), dev::get(body, "offset"))
-                    .await,
-            )
-        }
-        "productivity_focus_start" => {
-            dev::val(
-                core.productivity_focus_start(
-                    dev::get(body, "action_id"),
-                    dev::get(body, "project_id"),
-                    dev::get(body, "target_mins"),
+                core.productivity_timeline(
+                    date,
+                    dev::get(body, "limit"),
+                    dev::get(body, "offset"),
+                    dev::get(body, "tzOffsetMins"),
                 )
                 .await,
             )
         }
+        "productivity_focus_start" => dev::val(
+            core.productivity_focus_start(
+                dev::get(body, "action_id"),
+                dev::get(body, "project_id"),
+                dev::get(body, "target_mins"),
+            )
+            .await,
+        ),
         "productivity_focus_end" => {
             dev::val(core.productivity_focus_end(dev::get(body, "notes")).await)
         }
@@ -315,19 +491,18 @@ pub(crate) async fn dispatch_dev(
             let end_date = try_field!(dev::get_str(body, "endDate"));
             dev::val(core.productivity_summary_range(start_date, end_date).await)
         }
-        "productivity_activity_feed" => {
-            dev::val(core.productivity_activity_feed(dev::get(body, "limit")).await)
-        }
-        "productivity_goals" => dev::val(core.productivity_goals().await),
-        "productivity_pomodoro_start" => {
-            dev::val(
-                core.productivity_pomodoro_start(
-                    dev::get(body, "work_mins"),
-                    dev::get(body, "break_mins"),
-                )
+        "productivity_activity_feed" => dev::val(
+            core.productivity_activity_feed(dev::get(body, "limit"))
                 .await,
+        ),
+        "productivity_goals" => dev::val(core.productivity_goals().await),
+        "productivity_pomodoro_start" => dev::val(
+            core.productivity_pomodoro_start(
+                dev::get(body, "work_mins"),
+                dev::get(body, "break_mins"),
             )
-        }
+            .await,
+        ),
         "productivity_time_entries" => {
             let date = try_field!(dev::get_str(body, "date"));
             dev::val(core.productivity_time_entries(date).await)
@@ -336,7 +511,10 @@ pub(crate) async fn dispatch_dev(
             let goal_type = try_field!(dev::get_str(body, "goal_type"));
             let metric = try_field!(dev::get_str(body, "metric"));
             let target_value: f64 = try_field!(dev::require(body, "target_value"));
-            dev::val(core.productivity_goal_create(goal_type, metric, target_value).await)
+            dev::val(
+                core.productivity_goal_create(goal_type, metric, target_value)
+                    .await,
+            )
         }
         "productivity_goal_delete" => {
             let id: i64 = try_field!(dev::require(body, "id"));
@@ -375,9 +553,15 @@ pub(crate) async fn dispatch_dev(
                     category_type,
                     dev::get(body, "color"),
                     dev::get(body, "icon"),
+                    dev::get(body, "rules"),
                 )
                 .await,
             )
+        }
+        "productivity_tracked_apps" => dev::val(core.productivity_tracked_apps().await),
+        "productivity_category_delete" => {
+            let id = try_field!(dev::get_str(body, "id"));
+            dev::val(core.productivity_category_delete(id).await)
         }
         "productivity_insights" => {
             dev::val(core.productivity_insights(dev::get(body, "date")).await)
@@ -386,9 +570,10 @@ pub(crate) async fn dispatch_dev(
             let id = try_field!(dev::get_str(body, "id"));
             dev::val(core.productivity_insight_dismiss(id).await)
         }
-        "productivity_auto_focus_confirm" => {
-            dev::val(core.productivity_auto_focus_confirm(try_field!(dev::parse_params(body))).await)
-        }
+        "productivity_auto_focus_confirm" => dev::val(
+            core.productivity_auto_focus_confirm(try_field!(dev::parse_params(body)))
+                .await,
+        ),
         "productivity_projects_list" => dev::val(core.productivity_projects_list().await),
         "productivity_project_upsert" => {
             let id = try_field!(dev::get_str(body, "id"));
@@ -409,6 +594,18 @@ pub(crate) async fn dispatch_dev(
             let id = try_field!(dev::get_str(body, "id"));
             dev::val(core.productivity_project_delete(id).await)
         }
+        "productivity_weekly_assessment" => {
+            let week_start = try_field!(dev::get_str(body, "weekStart"));
+            dev::val(core.productivity_weekly_assessment(week_start).await)
+        }
+        "productivity_calendar_events" => {
+            let date = try_field!(dev::get_str(body, "date"));
+            dev::val(core.productivity_calendar_events(date).await)
+        }
+        "calendar_sync_events" => dev::val(
+            core.calendar_sync_events(try_field!(dev::parse_params(body)))
+                .await,
+        ),
         _ => return None,
     })
 }

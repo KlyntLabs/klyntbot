@@ -27,6 +27,7 @@ members = [
     "crates/cognitive",
     "crates/feature-coaching",
     "crates/app-core",
+    "crates/activity-log",
 ]
 
 [workspace.package]
@@ -61,6 +62,7 @@ feature-coaching = { path = "crates/feature-coaching" }
 desktop-shared = { path = "crates/desktop-shared" }
 desktop = { path = "crates/desktop" }
 app-core = { path = "crates/app-core" }
+activity-log = { path = "crates/activity-log" }
 extism = "1"
 mcp = { path = "crates/mcp" }
 rmcp = { version = "0.17", default-features = false }

@@ -8,8 +8,8 @@ pub struct ActivityEventRepo {
     pool: SqlitePool,
 }
 
-const INSERT_SQL: &str = r#"INSERT INTO activity_events (app_name, window_title, site_name, bundle_id, url, category_id, started_at, ended_at, duration_secs, is_idle, metadata, project_id)
-VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)"#;
+const INSERT_SQL: &str = r#"INSERT INTO activity_events (app_name, window_title, site_name, bundle_id, url, category_id, started_at, ended_at, duration_secs, is_idle, metadata, project_id, focus_session_id)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)"#;
 
 fn bind_event<'a>(
     query: sqlx::query::Query<'a, sqlx::Sqlite, sqlx::sqlite::SqliteArguments<'a>>,
@@ -28,6 +28,7 @@ fn bind_event<'a>(
         .bind(event.is_idle)
         .bind(&event.metadata)
         .bind(&event.project_id)
+        .bind(&event.focus_session_id)
 }
 
 impl ActivityEventRepo {
@@ -85,7 +86,7 @@ impl ActivityEventRepo {
         let limit = limit.unwrap_or(10_000);
         let offset = offset.unwrap_or(0).max(0);
         let rows = sqlx::query_as::<_, ActivityEvent>(
-            r#"SELECT id, app_name, window_title, site_name, bundle_id, url, category_id, started_at, ended_at, duration_secs, is_idle, metadata, project_id
+            r#"SELECT id, app_name, window_title, site_name, bundle_id, url, category_id, started_at, ended_at, duration_secs, is_idle, metadata, project_id, focus_session_id
                FROM activity_events
                WHERE started_at >= ?1 AND started_at < ?2
                ORDER BY started_at ASC
@@ -104,7 +105,7 @@ impl ActivityEventRepo {
     /// Returns the most recent events (newest first), limited by `limit`.
     pub async fn list_recent(&self, limit: i64) -> common::Result<Vec<ActivityEvent>> {
         let rows = sqlx::query_as::<_, ActivityEvent>(
-            r#"SELECT id, app_name, window_title, site_name, bundle_id, url, category_id, started_at, ended_at, duration_secs, is_idle, metadata, project_id
+            r#"SELECT id, app_name, window_title, site_name, bundle_id, url, category_id, started_at, ended_at, duration_secs, is_idle, metadata, project_id, focus_session_id
                FROM activity_events
                ORDER BY started_at DESC
                LIMIT ?1"#,
@@ -260,6 +261,50 @@ impl ActivityEventRepo {
             .collect())
     }
 
+    /// Returns all distinct app/site combinations with their category name and total duration.
+    pub async fn tracked_apps(&self) -> common::Result<Vec<TrackedAppRow>> {
+        #[derive(Debug, Clone, sqlx::FromRow)]
+        struct Row {
+            display_name: String,
+            app_name: String,
+            site_name: Option<String>,
+            category_id: Option<String>,
+            category_name: Option<String>,
+            total_secs: i64,
+            event_count: i64,
+        }
+        let rows = sqlx::query_as::<_, Row>(
+            r#"SELECT
+                   COALESCE(ae.site_name, ae.app_name) AS display_name,
+                   ae.app_name,
+                   ae.site_name,
+                   ae.category_id,
+                   ac.name AS category_name,
+                   COALESCE(SUM(ae.duration_secs), 0) AS total_secs,
+                   COUNT(*) AS event_count
+               FROM activity_events ae
+               LEFT JOIN activity_categories ac ON ac.id = ae.category_id
+               WHERE ae.is_idle = FALSE
+               GROUP BY ae.app_name, ae.site_name
+               ORDER BY total_secs DESC"#,
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        Ok(rows
+            .into_iter()
+            .map(|r| TrackedAppRow {
+                display_name: r.display_name,
+                app_name: r.app_name,
+                site_name: r.site_name,
+                category_id: r.category_id,
+                category_name: r.category_name,
+                total_secs: r.total_secs,
+                event_count: r.event_count,
+            })
+            .collect())
+    }
+
     pub async fn total_active_secs(
         &self,
         start: &DateTime<Utc>,
@@ -277,4 +322,15 @@ impl ActivityEventRepo {
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         Ok(total)
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct TrackedAppRow {
+    pub display_name: String,
+    pub app_name: String,
+    pub site_name: Option<String>,
+    pub category_id: Option<String>,
+    pub category_name: Option<String>,
+    pub total_secs: i64,
+    pub event_count: i64,
 }

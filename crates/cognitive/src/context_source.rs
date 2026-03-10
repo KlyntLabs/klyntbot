@@ -14,6 +14,7 @@ use tracing::warn;
 
 use crate::embedder::SemanticFactEmbedder;
 use crate::repos::{load_user_model, ProceduralRuleRepo, SemanticFactRepo, RULE_DOMAINS};
+use crate::situation::UserSituation;
 use crate::types::UserModel;
 
 /// Cache TTL for user model data (seconds).
@@ -33,6 +34,12 @@ pub struct CognitiveRetrievalConfig {
     pub dynamic_fact_limit: usize,
     pub vector_top_k: usize,
     pub min_similarity: f64,
+    pub max_stability: f64,
+    pub relevance_weight_semantic: f64,
+    pub relevance_weight_retrievability: f64,
+    pub relevance_weight_importance: f64,
+    pub relevance_weight_frequency: f64,
+    pub relevance_weight_situation: f64,
 }
 
 impl Default for CognitiveRetrievalConfig {
@@ -43,6 +50,12 @@ impl Default for CognitiveRetrievalConfig {
             dynamic_fact_limit: 15,
             vector_top_k: 30,
             min_similarity: 0.55,
+            max_stability: 30.0,
+            relevance_weight_semantic: 0.3,
+            relevance_weight_retrievability: 0.2,
+            relevance_weight_importance: 0.15,
+            relevance_weight_frequency: 0.1,
+            relevance_weight_situation: 0.25,
         }
     }
 }
@@ -61,6 +74,7 @@ pub struct CognitiveContextSource {
     cache: Mutex<Option<CachedModel>>,
     config: CognitiveRetrievalConfig,
     confidence_bits: Option<Arc<AtomicU32>>,
+    situation: Option<Arc<Mutex<UserSituation>>>,
 }
 
 impl CognitiveContextSource {
@@ -72,6 +86,7 @@ impl CognitiveContextSource {
             cache: Mutex::new(None),
             config: CognitiveRetrievalConfig::default(),
             confidence_bits: None,
+            situation: None,
         }
     }
 
@@ -93,6 +108,28 @@ impl CognitiveContextSource {
     pub fn with_confidence_threshold(mut self, bits: Arc<AtomicU32>) -> Self {
         self.confidence_bits = Some(bits);
         self
+    }
+
+    pub fn with_situation(mut self, situation: Arc<Mutex<UserSituation>>) -> Self {
+        self.situation = Some(situation);
+        self
+    }
+
+    /// Derive a single 0.0–1.0 boost from the live `UserSituation`.
+    ///
+    /// Higher when the user is actively engaged (energetic, focused, under
+    /// deadline pressure, low distraction) — causing more facts to clear the
+    /// relevance threshold and appear in context.
+    async fn current_situational_boost(&self) -> f64 {
+        let Some(ref s) = self.situation else {
+            return 0.0;
+        };
+        let guard = s.lock().await;
+        (guard.energy_level * 0.25
+            + guard.focus_state * 0.30
+            + guard.deadline_pressure * 0.25
+            + (1.0 - guard.distraction_risk) * 0.20)
+            .clamp(0.0, 1.0)
     }
 
     async fn load_rules_text(&self) -> String {
@@ -213,11 +250,19 @@ impl ContextSource for CognitiveContextSource {
             use crate::repos::USER_MODEL_DOMAINS;
             let retrieval_domains = USER_MODEL_DOMAINS;
 
+            let situational_boost = self.current_situational_boost().await;
+
             let retrieval_params = crate::retrieval::RetrievalParams {
                 limit: self.config.dynamic_fact_limit,
                 vector_top_k: self.config.vector_top_k,
                 min_similarity: self.config.min_similarity,
-                situational_boost: 0.0,
+                situational_boost,
+                max_stability: self.config.max_stability,
+                relevance_weight_semantic: self.config.relevance_weight_semantic,
+                relevance_weight_retrievability: self.config.relevance_weight_retrievability,
+                relevance_weight_importance: self.config.relevance_weight_importance,
+                relevance_weight_frequency: self.config.relevance_weight_frequency,
+                relevance_weight_situation: self.config.relevance_weight_situation,
             };
             let results = retrieve_relevant_facts(
                 &self.fact_repo,
@@ -496,5 +541,59 @@ mod tests {
         let peak_pos = result.find("peak_hours").unwrap();
         let caffeine_pos = result.find("caffeine_sensitivity").unwrap();
         assert!(peak_pos < caffeine_pos);
+    }
+
+    #[tokio::test]
+    async fn test_situational_boost_from_active_situation() {
+        let pool = setup().await;
+        let source = CognitiveContextSource::new(
+            SemanticFactRepo::new(pool.clone()),
+            ProceduralRuleRepo::new(pool),
+        );
+
+        // No situation wired → boost is 0.0
+        let boost = source.current_situational_boost().await;
+        assert!((boost - 0.0).abs() < f64::EPSILON);
+
+        // Wire a high-activity situation
+        let sit = Arc::new(Mutex::new(UserSituation {
+            energy_level: 0.8,
+            focus_state: 0.9,
+            deadline_pressure: 0.6,
+            distraction_risk: 0.1,
+            ..Default::default()
+        }));
+        let source = source.with_situation(sit);
+        let boost = source.current_situational_boost().await;
+
+        // 0.8*0.25 + 0.9*0.30 + 0.6*0.25 + 0.9*0.20 = 0.2+0.27+0.15+0.18 = 0.80
+        assert!(
+            boost > 0.7,
+            "active situation should produce high boost: {boost}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_situational_boost_low_when_depleted() {
+        let pool = setup().await;
+        let sit = Arc::new(Mutex::new(UserSituation {
+            energy_level: 0.1,
+            focus_state: 0.1,
+            deadline_pressure: 0.0,
+            distraction_risk: 0.8,
+            ..Default::default()
+        }));
+        let source = CognitiveContextSource::new(
+            SemanticFactRepo::new(pool.clone()),
+            ProceduralRuleRepo::new(pool),
+        )
+        .with_situation(sit);
+
+        let boost = source.current_situational_boost().await;
+        // 0.1*0.25 + 0.1*0.30 + 0.0*0.25 + 0.2*0.20 = 0.025+0.03+0+0.04 = 0.095
+        assert!(
+            boost < 0.15,
+            "depleted situation should produce low boost: {boost}"
+        );
     }
 }

@@ -20,7 +20,9 @@ chrono = { workspace = true }
 uuid = { workspace = true }
 sqlx.workspace = true
 tokio-util.workspace = true
+activity-log.workspace = true
 dirs.workspace = true
+regex.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"

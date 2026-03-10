@@ -613,6 +613,8 @@ impl ActionRepo {
     ) -> Result<ActionTimeEntryRow, StorageError> {
         let ended_at = duration_secs.map(|d| started_at + chrono::Duration::seconds(d));
         let id = uuid::Uuid::new_v4();
+        let mut tx = self.pool.begin().await?;
+
         let row = sqlx::query_as::<_, ActionTimeEntryRow>(
             r#"
             INSERT INTO action_time_entries (id, action_id, source, started_at, ended_at, duration_secs, note)
@@ -627,7 +629,7 @@ impl ActionRepo {
         .bind(ended_at)
         .bind(duration_secs)
         .bind(note)
-        .fetch_one(&self.pool)
+        .fetch_one(&mut *tx)
         .await?;
 
         if let Some(secs) = duration_secs {
@@ -636,10 +638,11 @@ impl ActionRepo {
             )
             .bind(action_id)
             .bind(secs)
-            .execute(&self.pool)
+            .execute(&mut *tx)
             .await?;
         }
 
+        tx.commit().await?;
         Ok(row)
     }
 
@@ -649,6 +652,8 @@ impl ActionRepo {
         action_id: &str,
         entry_id: uuid::Uuid,
     ) -> Result<ActionTimeEntryRow, StorageError> {
+        let mut tx = self.pool.begin().await?;
+
         let row = sqlx::query_as::<_, ActionTimeEntryRow>(
             r#"
             UPDATE action_time_entries
@@ -660,7 +665,7 @@ impl ActionRepo {
         )
         .bind(entry_id)
         .bind(action_id)
-        .fetch_optional(&self.pool)
+        .fetch_optional(&mut *tx)
         .await?
         .ok_or_else(|| {
             StorageError::NotFound(format!("open time entry {entry_id} for action {action_id}"))
@@ -672,10 +677,11 @@ impl ActionRepo {
             )
             .bind(action_id)
             .bind(secs)
-            .execute(&self.pool)
+            .execute(&mut *tx)
             .await?;
         }
 
+        tx.commit().await?;
         Ok(row)
     }
 
@@ -688,6 +694,58 @@ impl ActionRepo {
             "SELECT * FROM action_time_entries WHERE action_id = ?1 ORDER BY started_at",
         )
         .bind(action_id)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
+    }
+
+    /// Fetch time entries within a date range (inclusive), oldest first.
+    /// Returns entries with their parent action's title for display.
+    pub async fn time_entries_in_range(
+        &self,
+        start_date: &str,
+        end_date: &str,
+    ) -> Result<Vec<TimeEntryWithTask>, StorageError> {
+        // Direct string comparison preserves index usage on started_at.
+        let rows = sqlx::query_as::<_, TimeEntryWithTask>(
+            r#"
+            SELECT te.id, te.action_id, a.title AS action_title,
+                   te.started_at, te.ended_at, te.duration_secs, te.note
+            FROM action_time_entries te
+            JOIN actions a ON a.id = te.action_id
+            WHERE te.started_at >= ?1
+              AND te.started_at < ?2
+            ORDER BY te.started_at ASC
+            "#,
+        )
+        .bind(start_date)
+        .bind(format!("{end_date}T23:59:59Z"))
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
+    }
+
+    /// Fetch tasks relevant to a date range for the timeline:
+    /// due on the date, created during the range, or completed during the range.
+    pub async fn tasks_for_timeline(
+        &self,
+        start_date: &str,
+        end_date: &str,
+    ) -> Result<Vec<ActionRow>, StorageError> {
+        let end_bound = format!("{end_date}T23:59:59Z");
+        let rows = sqlx::query_as::<_, ActionRow>(
+            r#"
+            SELECT * FROM actions
+            WHERE is_template = 0 AND (
+                (due_date >= ?1 AND due_date < ?2)
+                OR (created_at >= ?1 AND created_at < ?2)
+                OR (completed_at >= ?1 AND completed_at < ?2)
+            )
+            ORDER BY COALESCE(due_date, created_at) ASC
+            "#,
+        )
+        .bind(start_date)
+        .bind(&end_bound)
         .fetch_all(&self.pool)
         .await?;
         Ok(rows)
@@ -996,6 +1054,8 @@ impl ActionRepo {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
     fn test_get_by_ids_empty_input_short_circuits() {
         let ids: Vec<String> = vec![];
@@ -1004,6 +1064,106 @@ mod tests {
             "Empty ids should trigger early return in get_by_ids"
         );
     }
+
+    #[tokio::test]
+    async fn time_entries_in_range_filters_by_date() {
+        let pool = crate::StoragePool::connect_in_memory().await.unwrap();
+        let db = pool.inner().clone();
+        let repo = ActionRepo::new(db.clone());
+
+        // Create required area + action
+        sqlx::query(
+            "INSERT INTO areas (id, name, color, status) VALUES ('a', 'Test', '#000', 'active')",
+        )
+        .execute(&db)
+        .await
+        .unwrap();
+        let now = chrono::Utc::now();
+        let row = ActionRow {
+            id: "te-range-1".into(),
+            title: "Test Task".into(),
+            description: None,
+            area_id: "a".into(),
+            project_id: None,
+            key_result_id: None,
+            parent_id: None,
+            priority: None,
+            due_date: None,
+            tags: vec![],
+            status: "todo".into(),
+            focused_at: None,
+            focus_deadline: None,
+            focus_expired_count: 0,
+            created_at: now,
+            updated_at: now,
+            completed_at: None,
+            total_tracked_secs: 0,
+            estimated_minutes: None,
+            calendar_event_uid: None,
+            last_reminded_at: None,
+            recurrence_rule: None,
+            recurrence_parent_id: None,
+            is_template: false,
+            next_instance_date: None,
+            status_label_id: None,
+            position: 0,
+            group_id: None,
+        };
+        repo.add(&row).await.unwrap();
+
+        // Add time entries on different dates
+        let mar8 = chrono::NaiveDate::from_ymd_opt(2026, 3, 8)
+            .unwrap()
+            .and_hms_opt(10, 0, 0)
+            .unwrap()
+            .and_utc();
+        let mar9 = chrono::NaiveDate::from_ymd_opt(2026, 3, 9)
+            .unwrap()
+            .and_hms_opt(14, 0, 0)
+            .unwrap()
+            .and_utc();
+        let mar10 = chrono::NaiveDate::from_ymd_opt(2026, 3, 10)
+            .unwrap()
+            .and_hms_opt(9, 0, 0)
+            .unwrap()
+            .and_utc();
+
+        repo.add_time_entry("te-range-1", "manual", mar8, Some(3600), None)
+            .await
+            .unwrap();
+        repo.add_time_entry("te-range-1", "manual", mar9, Some(5400), None)
+            .await
+            .unwrap();
+        repo.add_time_entry("te-range-1", "manual", mar10, Some(2700), None)
+            .await
+            .unwrap();
+
+        let results = repo
+            .time_entries_in_range("2026-03-09", "2026-03-09")
+            .await
+            .unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].action_title, "Test Task");
+
+        let results = repo
+            .time_entries_in_range("2026-03-08", "2026-03-10")
+            .await
+            .unwrap();
+        assert_eq!(results.len(), 3);
+    }
+}
+
+/// A time entry joined with the parent action's title, for timeline display.
+#[derive(Debug, Clone, sqlx::FromRow, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TimeEntryWithTask {
+    pub id: uuid::Uuid,
+    pub action_id: String,
+    pub action_title: String,
+    pub started_at: DateTime<Utc>,
+    pub ended_at: Option<DateTime<Utc>>,
+    pub duration_secs: Option<i64>,
+    pub note: Option<String>,
 }
 
 /// Patch struct for partial updates.

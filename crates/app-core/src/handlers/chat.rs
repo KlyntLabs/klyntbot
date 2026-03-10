@@ -1088,6 +1088,17 @@ pub async fn relay_chat_stream(
                             }
                         );
                     }
+                    AgentEvent::BudgetWarning { monthly_spend_usd, monthly_budget_usd, usage_percent } => {
+                        emit!(
+                            events::AGENT_BUDGET_WARNING,
+                            events::BudgetWarningPayload {
+                                session_key: sk.to_string(),
+                                monthly_spend_usd,
+                                monthly_budget_usd,
+                                usage_percent,
+                            }
+                        );
+                    }
                 }
             }
             else => break,

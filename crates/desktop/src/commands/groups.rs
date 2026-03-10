@@ -70,7 +70,10 @@ pub(crate) async fn dispatch_dev(
             let id = try_field!(dev::get_str(body, "id"));
             dev::val(core.group_delete(id).await)
         }
-        "group_reorder" => dev::val(core.group_reorder(try_field!(dev::parse_params(body))).await),
+        "group_reorder" => dev::val(
+            core.group_reorder(try_field!(dev::parse_params(body)))
+                .await,
+        ),
         _ => return None,
     })
 }

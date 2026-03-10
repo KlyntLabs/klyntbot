@@ -285,6 +285,7 @@ pub struct ExecutionCore {
     pub provider: DynProvider,
     pub tool_registry: Arc<RwLock<ToolRegistry>>,
     pub outcome_recorder: Option<Arc<crate::learning::recorder::OutcomeRecorder>>,
+    pub domain_event_bus: Option<Arc<bus::DomainEventBus>>,
     tool_semaphore: Arc<Semaphore>,
 }
 
@@ -294,8 +295,15 @@ impl ExecutionCore {
             provider,
             tool_registry,
             outcome_recorder: None,
+            domain_event_bus: None,
             tool_semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_TOOLS)),
         }
+    }
+
+    /// Set the domain event bus for publishing tool execution events.
+    pub fn with_domain_bus(mut self, bus: Arc<bus::DomainEventBus>) -> Self {
+        self.domain_event_bus = Some(bus);
+        self
     }
 
     /// Set the outcome recorder for per-tool learning.
@@ -577,6 +585,24 @@ impl ExecutionCore {
                             session_key.as_str(),
                         )
                         .await;
+                }
+            }
+
+            // Publish tool execution events to domain bus for unified activity log
+            if let Some(ref domain_bus) = self.domain_event_bus {
+                for r in &results {
+                    domain_bus.publish(bus::DomainEvent::ToolCallExecuted {
+                        tool_name: r.tool_name.clone(),
+                        args_preview: Some(r.arguments.to_string()),
+                        session_key: Some(
+                            common::SessionKey::from_parts(
+                                routing_ctx.channel.as_str(),
+                                routing_ctx.chat_id.as_str(),
+                            )
+                            .to_string(),
+                        ),
+                        duration_ms: Some(r.duration_ms as i64),
+                    });
                 }
             }
 

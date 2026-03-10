@@ -123,7 +123,10 @@ pub(crate) async fn dispatch_dev(
         "chat_threads" => dev::val(core.chat_threads().await),
         "chat_messages" => {
             let session_key = try_field!(dev::get_str(body, "sessionKey"));
-            dev::val(core.chat_messages(session_key, dev::get(body, "limit")).await)
+            dev::val(
+                core.chat_messages(session_key, dev::get(body, "limit"))
+                    .await,
+            )
         }
         "chat_pin_thread" => {
             let session_key = try_field!(dev::get_str(body, "sessionKey"));

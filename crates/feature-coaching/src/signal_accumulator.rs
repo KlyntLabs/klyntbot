@@ -312,6 +312,55 @@ fn event_to_signal(event: &DomainEvent, timestamp: DateTime<Utc>) -> Signal {
                 ..Default::default()
             },
         ),
+        // -- Intelligence layer events --
+        DomainEvent::SessionCreated {
+            session_type,
+            dominant_category,
+            ..
+        } => (
+            "SessionCreated",
+            SignalMetadata {
+                category: Some(format!("{session_type}:{dominant_category}")),
+                ..Default::default()
+            },
+        ),
+        DomainEvent::SessionEnded {
+            duration_secs,
+            quality_score,
+            session_type,
+            ..
+        } => (
+            "SessionEnded",
+            SignalMetadata {
+                category: Some(session_type.clone()),
+                amount: quality_score.or(Some(*duration_secs as f64)),
+                ..Default::default()
+            },
+        ),
+        DomainEvent::QualityScored {
+            overall_score,
+            score_date,
+            ..
+        } => (
+            "QualityScored",
+            SignalMetadata {
+                category: Some(score_date.clone()),
+                amount: Some(*overall_score),
+                ..Default::default()
+            },
+        ),
+        DomainEvent::PredictiveAlert {
+            forecast_type,
+            predicted_value,
+            ..
+        } => (
+            "PredictiveAlert",
+            SignalMetadata {
+                category: Some(forecast_type.clone()),
+                amount: Some(*predicted_value),
+                ..Default::default()
+            },
+        ),
         _ => ("Other", SignalMetadata::default()),
     };
 
@@ -441,6 +490,57 @@ mod tests {
         };
         let fired = acc.evaluate(&sit);
         assert!(fired.iter().any(|t| t.condition_name == "task_avoidance"));
+    }
+
+    #[test]
+    fn test_session_ended_signal() {
+        let mut acc = SignalAccumulator::new();
+
+        acc.push_event(&DomainEvent::SessionEnded {
+            session_id: "s1".into(),
+            session_type: "focus".into(),
+            duration_secs: 3600,
+            quality_score: Some(85.0),
+            category_purity: 0.9,
+        });
+
+        assert_eq!(acc.window_size(), 1);
+        let signal = acc.signals().front().unwrap();
+        assert_eq!(signal.event_type, "SessionEnded");
+        assert_eq!(signal.metadata.amount, Some(85.0));
+    }
+
+    #[test]
+    fn test_quality_scored_signal() {
+        let mut acc = SignalAccumulator::new();
+
+        acc.push_event(&DomainEvent::QualityScored {
+            score_date: "2026-03-09".into(),
+            session_id: None,
+            overall_score: 25.0,
+            components: "{}".into(),
+        });
+
+        let signal = acc.signals().front().unwrap();
+        assert_eq!(signal.event_type, "QualityScored");
+        assert_eq!(signal.metadata.amount, Some(25.0));
+    }
+
+    #[test]
+    fn test_predictive_alert_signal() {
+        let mut acc = SignalAccumulator::new();
+
+        acc.push_event(&DomainEvent::PredictiveAlert {
+            forecast_type: "energy".into(),
+            window_start: "14:00".into(),
+            window_end: "16:00".into(),
+            predicted_value: 0.3,
+            suggested_action: Some("Take a break".into()),
+        });
+
+        let signal = acc.signals().front().unwrap();
+        assert_eq!(signal.event_type, "PredictiveAlert");
+        assert_eq!(signal.metadata.category, Some("energy".into()));
     }
 
     #[test]

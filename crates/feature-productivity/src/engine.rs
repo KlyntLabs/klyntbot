@@ -31,6 +31,7 @@ pub struct ProductivityEngine {
     auto_focus_rx: Option<mpsc::Receiver<AutoFocusSession>>,
     tick_sender: broadcast::Sender<ActivityTick>,
     domain_bus: Option<Arc<DomainEventBus>>,
+    repos: ProductivityRepos,
 }
 
 impl ProductivityEngine {
@@ -48,6 +49,16 @@ impl ProductivityEngine {
         categorizer: Categorizer,
         domain_bus: Option<Arc<DomainEventBus>>,
     ) -> Self {
+        Self::new_full(config, repos, categorizer, domain_bus, None)
+    }
+
+    pub fn new_full(
+        config: ProductivityConfig,
+        repos: ProductivityRepos,
+        categorizer: Categorizer,
+        domain_bus: Option<Arc<DomainEventBus>>,
+        unified_svc: Option<Arc<activity_log::ActivityIngestionService>>,
+    ) -> Self {
         let (tick_tx, _) = broadcast::channel(BROADCAST_CAPACITY);
         let cancel = CancellationToken::new();
 
@@ -60,13 +71,14 @@ impl ProductivityEngine {
             tick_tx.clone(),
         );
 
-        // BatchWriter
-        let batch_writer = BatchWriter::start(
+        // BatchWriter (with optional dual-write to unified activity log)
+        let batch_writer = BatchWriter::start_with_unified(
             tick_tx.subscribe(),
             repos.clone(),
             config.privacy.clone(),
             config.tracking.batch_write_interval_secs,
             cancel.child_token(),
+            unified_svc,
         );
 
         // BucketAggregator
@@ -109,12 +121,18 @@ impl ProductivityEngine {
             auto_focus_rx: Some(auto_focus_rx),
             tick_sender: tick_tx,
             domain_bus,
+            repos: repos.clone(),
         }
     }
 
     /// Take the auto-focus session receiver (for desktop crate to consume).
     pub fn take_auto_focus_rx(&mut self) -> Option<mpsc::Receiver<AutoFocusSession>> {
         self.auto_focus_rx.take()
+    }
+
+    /// Get a reference to the tick broadcast sender (for IntelligenceLayer subscription).
+    pub fn tick_sender(&self) -> &broadcast::Sender<ActivityTick> {
+        &self.tick_sender
     }
 
     /// Get a new broadcast subscriber (for DashboardEmitter).
@@ -124,6 +142,21 @@ impl ProductivityEngine {
 
     pub fn start(&mut self) {
         self.tracker.start();
+
+        // Periodic cache cleanup — purge expired categorization cache entries every hour
+        let repos = self.repos.clone();
+        let cancel = self.cancel_token.child_token();
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(3600));
+            loop {
+                tokio::select! {
+                    _ = cancel.cancelled() => break,
+                    _ = interval.tick() => {
+                        let _ = repos.categorization_cache.purge_expired().await;
+                    }
+                }
+            }
+        });
     }
 
     pub async fn stop(&mut self) {

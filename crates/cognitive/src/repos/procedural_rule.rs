@@ -66,10 +66,9 @@ impl ProceduralRuleRepo {
 
     /// Count all active rules across all domains.
     pub async fn count_all_active(&self) -> Result<i64, sqlx::Error> {
-        let row: (i64,) =
-            sqlx::query_as("SELECT COUNT(*) FROM procedural_rules WHERE active = 1")
-                .fetch_one(&self.pool)
-                .await?;
+        let row: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM procedural_rules WHERE active = 1")
+            .fetch_one(&self.pool)
+            .await?;
         Ok(row.0)
     }
 

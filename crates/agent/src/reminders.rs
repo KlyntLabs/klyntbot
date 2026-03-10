@@ -96,16 +96,16 @@ impl ReminderEngine {
                 let hours_left = time_left.num_hours();
                 let mins_left = time_left.num_minutes() % 60;
 
+                let time_str = if hours_left > 0 {
+                    format!("{}h {}m", hours_left, mins_left)
+                } else {
+                    format!("{}m", mins_left)
+                };
+
                 dispatcher
                     .notify(
-                        "📅 Task Due Soon",
-                        &format!(
-                            "{} is due in {}h {}m\nPriority: P{}",
-                            todo.title,
-                            hours_left,
-                            mins_left,
-                            todo.priority.unwrap_or(3)
-                        ),
+                        &format!("Due Soon: {}", todo.title),
+                        &format!("Due in {} · P{}", time_str, todo.priority.unwrap_or(3)),
                     )
                     .await?;
 
@@ -128,8 +128,8 @@ impl ReminderEngine {
 
                 dispatcher
                     .notify(
-                        "🎯 Focused Task Deadline Approaching",
-                        &format!("{} deadline in {} minutes!", todo.title, mins_left),
+                        &format!("Deadline: {}", todo.title),
+                        &format!("{} minutes remaining", mins_left),
                     )
                     .await?;
             }
@@ -139,15 +139,16 @@ impl ReminderEngine {
                 let overdue_by = Utc::now().signed_duration_since(todo.due_date.unwrap());
                 let days_overdue = overdue_by.num_days();
 
+                let overdue_str = if days_overdue == 1 {
+                    "1 day overdue".to_string()
+                } else {
+                    format!("{} days overdue", days_overdue)
+                };
+
                 dispatcher
                     .notify(
-                        "⚠️ Overdue Task",
-                        &format!(
-                            "{} is {} day(s) overdue\nPriority: P{}",
-                            todo.title,
-                            days_overdue,
-                            todo.priority.unwrap_or(3)
-                        ),
+                        &format!("Overdue: {}", todo.title),
+                        &format!("{} · P{}", overdue_str, todo.priority.unwrap_or(3)),
                     )
                     .await?;
             }

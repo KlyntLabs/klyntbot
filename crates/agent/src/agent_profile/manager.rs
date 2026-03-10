@@ -182,9 +182,8 @@ impl AgentManager {
                 }
             }
             if hits > 0 {
-                let dominated = best.is_some_and(|(_, bs, bh)| {
-                    score < bs || (score == bs && hits < bh)
-                });
+                let dominated =
+                    best.is_some_and(|(_, bs, bh)| score < bs || (score == bs && hits < bh));
                 if !dominated {
                     best = Some((name.as_str(), score, hits));
                 }
@@ -268,14 +267,20 @@ mod tests {
     fn test_match_agent_remind_routes_to_automation() {
         let mgr = make_test_manager();
         let matched = mgr.match_agent("remind me to buy groceries tomorrow");
-        assert_eq!(matched.name, "automation", "remind me should route to automation agent");
+        assert_eq!(
+            matched.name, "automation",
+            "remind me should route to automation agent"
+        );
     }
 
     #[test]
     fn test_match_agent_set_reminder_routes_to_automation() {
         let mgr = make_test_manager();
         let matched = mgr.match_agent("set a reminder for my meeting at 3pm");
-        assert_eq!(matched.name, "automation", "reminder should route to automation agent");
+        assert_eq!(
+            matched.name, "automation",
+            "reminder should route to automation agent"
+        );
     }
 
     #[test]

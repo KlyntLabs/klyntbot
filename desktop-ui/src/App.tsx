@@ -35,6 +35,11 @@ const ProductivityMonthPage = lazy(() =>
     default: m.ProductivityMonthPage,
   })),
 );
+const CategoriesPage = lazy(() =>
+  import("./components/productivity/pages/CategoriesPage").then((m) => ({
+    default: m.CategoriesPage,
+  })),
+);
 const NotesView = lazy(() => import("./components/notes/NotesView"));
 const Finance = lazy(() =>
   import("./components/views/Finance").then((m) => ({ default: m.Finance })),
@@ -58,6 +63,9 @@ const FinanceGoals = lazy(() =>
 );
 const FinanceLiabilities = lazy(() =>
   import("./components/views/FinanceLiabilities").then((m) => ({ default: m.FinanceLiabilities })),
+);
+const AutomationsPage = lazy(() =>
+  import("./components/views/AutomationsPage").then((m) => ({ default: m.AutomationsPage })),
 );
 const DebugDashboard = lazy(() =>
   import("./components/debug/DebugDashboard").then((m) => ({ default: m.DebugDashboard })),
@@ -96,6 +104,31 @@ const EnvironmentsSettings = lazy(() =>
 const ArchivedSettings = lazy(() =>
   import("./components/settings/pages/ArchivedSettings").then((m) => ({
     default: m.ArchivedSettings,
+  })),
+);
+const DashboardLayout = lazy(() =>
+  import("./components/dashboard/DashboardLayout").then((m) => ({
+    default: m.DashboardLayout,
+  })),
+);
+const DashboardDayPage = lazy(() =>
+  import("./components/dashboard/DayCalendarView").then((m) => ({
+    default: m.DayCalendarView,
+  })),
+);
+const DashboardWeekPage = lazy(() =>
+  import("./components/dashboard/WeekCalendarView").then((m) => ({
+    default: m.WeekCalendarView,
+  })),
+);
+const DashboardMonthPage = lazy(() =>
+  import("./components/dashboard/MonthCalendarView").then((m) => ({
+    default: m.MonthCalendarView,
+  })),
+);
+const DashboardYearPage = lazy(() =>
+  import("./components/dashboard/YearHeatmapView").then((m) => ({
+    default: m.YearHeatmapView,
   })),
 );
 const Launcher = lazy(() =>
@@ -140,6 +173,10 @@ const CompleteStep = lazy(() =>
   import("./components/setup/pages/CompleteStep").then((m) => ({ default: m.CompleteStep })),
 );
 
+function DashboardRedirect() {
+  return <Navigate to={`/day/${todayISO()}`} replace />;
+}
+
 function ProductivityRedirect() {
   return <Navigate to={`/productivity/day/${todayISO()}`} replace />;
 }
@@ -161,16 +198,59 @@ const router = createHashRouter([
   {
     element: <AppShell />,
     children: [
-      { path: "/", element: <MainApp /> },
+      { path: "/", element: <DashboardRedirect /> },
+      {
+        path: "/day/:date",
+        element: (
+          <DashboardLayout>
+            <DashboardDayPage />
+          </DashboardLayout>
+        ),
+      },
+      {
+        path: "/week/:date",
+        element: (
+          <DashboardLayout>
+            <DashboardWeekPage />
+          </DashboardLayout>
+        ),
+      },
+      {
+        path: "/month/:date",
+        element: (
+          <DashboardLayout>
+            <DashboardMonthPage />
+          </DashboardLayout>
+        ),
+      },
+      {
+        path: "/year/:year",
+        element: (
+          <DashboardLayout>
+            <DashboardYearPage />
+          </DashboardLayout>
+        ),
+      },
+      {
+        path: "/categories",
+        element: (
+          <DashboardLayout>
+            <CategoriesPage />
+          </DashboardLayout>
+        ),
+      },
+      { path: "/tasks", element: <MainApp /> },
       { path: "/chat", element: <Chat /> },
       { path: "/notes", element: <NotesView /> },
       { path: "/project/:id", element: <ProjectDetail /> },
       { path: "/task/:id", element: <TaskDetail /> },
       { path: "/objective/:id", element: <ObjectiveDetail /> },
-      { path: "/productivity", element: <ProductivityRedirect /> },
-      { path: "/productivity/day/:date", element: <ProductivityDayPage /> },
-      { path: "/productivity/week/:weekStart", element: <ProductivityWeekPage /> },
-      { path: "/productivity/month/:yearMonth", element: <ProductivityMonthPage /> },
+      // Redirect old productivity routes to dashboard
+      { path: "/productivity", element: <Navigate to="/" replace /> },
+      { path: "/productivity/day/:date", element: <Navigate to="/" replace /> },
+      { path: "/productivity/week/:weekStart", element: <Navigate to="/" replace /> },
+      { path: "/productivity/month/:yearMonth", element: <Navigate to="/" replace /> },
+      { path: "/productivity/categories", element: <Navigate to="/categories" replace /> },
       { path: "/finance", element: <Finance /> },
       { path: "/finance/accounts", element: <FinanceAccounts /> },
       { path: "/finance/transactions", element: <FinanceTransactions /> },
@@ -178,6 +258,7 @@ const router = createHashRouter([
       { path: "/finance/investments", element: <FinanceInvestments /> },
       { path: "/finance/goals", element: <FinanceGoals /> },
       { path: "/finance/liabilities", element: <FinanceLiabilities /> },
+      { path: "/automations", element: <AutomationsPage /> },
       { path: "/debug", element: <DebugDashboard /> },
       { path: "/settings", element: <Navigate to="/settings/general" replace /> },
       {

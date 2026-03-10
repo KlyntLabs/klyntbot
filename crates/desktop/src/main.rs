@@ -4,6 +4,8 @@ mod app_core;
 mod commands;
 #[cfg(debug_assertions)]
 mod dev_server;
+mod focus_timer;
+mod notify;
 mod oauth;
 
 use std::sync::Arc;
@@ -11,7 +13,7 @@ use std::sync::Arc;
 use commands::window::{WINDOW_LAUNCHER, WINDOW_TRAY};
 use tauri::image::Image;
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{Manager, PhysicalPosition};
+use tauri::Manager;
 use tauri_plugin_global_shortcut::{Code, Modifiers, ShortcutState};
 
 /// Register a dismiss-on-blur handler that hides the window when it loses focus.
@@ -28,12 +30,15 @@ fn main() {
     tauri::Builder::default()
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
-                .with_shortcuts(["alt+space"])
+                .with_shortcuts(["alt+space", "alt+shift+space"])
                 .expect("failed to parse shortcut")
                 .with_handler(|app, shortcut, event| {
-                    if event.state == ShortcutState::Pressed
-                        && shortcut.matches(Modifiers::ALT, Code::Space)
-                    {
+                    if event.state != ShortcutState::Pressed {
+                        return;
+                    }
+
+                    // Option+Space → toggle launcher
+                    if shortcut.matches(Modifiers::ALT, Code::Space) {
                         if let Some(window) = app.get_webview_window(WINDOW_LAUNCHER) {
                             if window.is_visible().unwrap_or(false) {
                                 let _ = window.hide();
@@ -44,9 +49,21 @@ fn main() {
                             }
                         }
                     }
+
+                    // Option+Shift+Space → toggle tray
+                    if shortcut.matches(Modifiers::ALT | Modifiers::SHIFT, Code::Space) {
+                        if let Some(window) = app.get_webview_window(WINDOW_TRAY) {
+                            if window.is_visible().unwrap_or(false) {
+                                let _ = window.hide();
+                            } else {
+                                focus_timer::open_tray_window(app);
+                            }
+                        }
+                    }
                 })
                 .build(),
         )
+        .plugin(tauri_plugin_notification::init())
         .setup(|app| {
             let handle = app.handle().clone();
             let core = Arc::new(
@@ -64,6 +81,28 @@ fn main() {
             }
 
             app.manage(core);
+            app.manage(Arc::new(focus_timer::FocusTimer::new()));
+
+            // Show the main window now that init is complete (starts hidden
+            // via tauri.conf.json to avoid a blank window during boot).
+            if let Some(main_window) = app.get_webview_window("main") {
+                let _ = main_window.show();
+                let _ = main_window.set_focus();
+
+                // Hide on close instead of quitting — keeps the tray alive
+                let mw = main_window.clone();
+                let app_handle = app.handle().clone();
+                main_window.on_window_event(move |event| {
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                        api.prevent_close();
+                        let _ = mw.hide();
+                        // Remove from Dock — pure tray app when main window is hidden
+                        #[cfg(target_os = "macos")]
+                        let _ =
+                            app_handle.set_activation_policy(tauri::ActivationPolicy::Accessory);
+                    }
+                });
+            }
 
             // Build system tray icon — click toggles the tray popup window
             let tray_icon = Image::from_bytes(include_bytes!("../icons/tray.png"))
@@ -77,7 +116,6 @@ fn main() {
                     if let TrayIconEvent::Click {
                         button: MouseButton::Left,
                         button_state: MouseButtonState::Up,
-                        rect,
                         ..
                     } = event
                     {
@@ -86,19 +124,7 @@ fn main() {
                             if window.is_visible().unwrap_or(false) {
                                 let _ = window.hide();
                             } else {
-                                // Position window directly below the tray icon
-                                if let Ok(win_size) = window.outer_size() {
-                                    let scale = window.scale_factor().unwrap_or(1.0);
-                                    let tray_pos = rect.position.to_physical::<f64>(scale);
-                                    let tray_size = rect.size.to_physical::<f64>(scale);
-                                    let x = tray_pos.x + (tray_size.width / 2.0)
-                                        - (win_size.width as f64 / 2.0);
-                                    let y = tray_pos.y + tray_size.height;
-                                    let _ = window
-                                        .set_position(PhysicalPosition::new(x as i32, y as i32));
-                                }
-                                let _ = window.show();
-                                let _ = window.set_focus();
+                                focus_timer::open_tray_window(app);
                             }
                         }
                     }
@@ -118,6 +144,8 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            // Timeline / Dashboard
+            commands::timeline::timeline_query,
             // Tasks
             commands::tasks::today_tasks,
             commands::tasks::task_get,
@@ -231,12 +259,25 @@ fn main() {
             commands::productivity::productivity_time_entry_create,
             commands::productivity::productivity_time_entry_delete,
             commands::productivity::productivity_category_upsert,
+            commands::productivity::productivity_tracked_apps,
+            commands::productivity::productivity_category_delete,
             commands::productivity::productivity_insights,
             commands::productivity::productivity_insight_dismiss,
             commands::productivity::productivity_auto_focus_confirm,
             commands::productivity::productivity_projects_list,
             commands::productivity::productivity_project_upsert,
             commands::productivity::productivity_project_delete,
+            commands::productivity::productivity_weekly_assessment,
+            commands::productivity::productivity_calendar_events,
+            commands::productivity::calendar_sync_events,
+            // Focus Timer
+            commands::productivity::focus_timer_start,
+            commands::productivity::focus_timer_stop,
+            commands::productivity::focus_timer_status,
+            commands::productivity::focus_break_start,
+            commands::productivity::focus_timer_extend,
+            commands::productivity::focus_timer_pause,
+            commands::productivity::focus_timer_resume,
             // Distraction
             commands::distraction::distraction_dismiss,
             commands::distraction::distraction_allow_temp,
@@ -312,11 +353,27 @@ fn main() {
             commands::cognitive::cognitive_inject_event,
             commands::cognitive::cognitive_event_log,
             commands::cognitive::cognitive_pipeline_log,
+            // Cron / Automations
+            commands::cron::cron_list,
+            commands::cron::cron_status,
+            commands::cron::cron_enable,
+            commands::cron::cron_run,
+            commands::cron::cron_delete,
+            commands::cron::cron_create,
+            commands::cron::cron_update,
             // Status
             commands::status::agent_status,
             // Window
             commands::window::resize_window,
+            commands::window::open_url,
+            commands::window::show_dashboard,
+            commands::window::quit_app,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running Klynt desktop");
+        .build(tauri::generate_context!())
+        .expect("error while building Klynt desktop")
+        .run(|_app, event| {
+            if let tauri::RunEvent::ExitRequested { api, .. } = event {
+                api.prevent_exit();
+            }
+        });
 }

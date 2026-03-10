@@ -38,6 +38,51 @@ pub enum DomainEvent {
         score: f64,
     },
 
+    // -- Productivity Intelligence Layer --
+    SessionCreated {
+        session_id: String,
+        session_type: String,
+        dominant_category: String,
+        predicted_energy: Option<f64>,
+    },
+    SessionEnded {
+        session_id: String,
+        session_type: String,
+        duration_secs: i64,
+        quality_score: Option<f64>,
+        category_purity: f64,
+    },
+    QualityScored {
+        score_date: String,
+        session_id: Option<String>,
+        overall_score: f64,
+        components: String,
+    },
+    PredictiveAlert {
+        forecast_type: String,
+        window_start: String,
+        window_end: String,
+        predicted_value: f64,
+        suggested_action: Option<String>,
+    },
+    NarrativeGenerated {
+        date: String,
+        sentiment: String,
+        excerpt: String,
+    },
+    RuleEvolved {
+        rule_id: String,
+        action: String,
+        category: String,
+        confidence: f64,
+        source: String,
+    },
+    VoiceJournalProcessed {
+        journal_id: String,
+        extracted_fact_count: usize,
+        sentiment: Option<String>,
+    },
+
     // -- Tasks --
     TaskCreated {
         task_id: String,
@@ -71,10 +116,28 @@ pub enum DomainEvent {
         limit: f64,
     },
 
+    // -- Notes --
+    NoteCreated {
+        note_id: String,
+        title: String,
+    },
+    NoteUpdated {
+        note_id: String,
+        title: String,
+    },
+
     // -- Chat --
     ChatTurnCompleted {
         user_message: String,
         session_key: String,
+    },
+
+    // -- Tool execution --
+    ToolCallExecuted {
+        tool_name: String,
+        args_preview: Option<String>,
+        session_key: Option<String>,
+        duration_ms: Option<i64>,
     },
 
     // -- Cross-domain --

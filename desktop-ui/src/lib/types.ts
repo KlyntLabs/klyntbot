@@ -95,10 +95,22 @@ export interface KeyResult {
 
 export interface CalendarEvent {
   id: string;
+  calendarId: string;
   title: string;
-  startAt: string;
-  endAt: string;
-  color: string;
+  description: string | null;
+  startedAt: string;
+  endedAt: string;
+  location: string | null;
+  attendeesCount: number;
+  isRecurring: boolean;
+  recurrenceId: string | null;
+  source: string;
+  externalUid: string;
+  sessionId: string | null;
+  color: string | null;
+  syncedAt: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export type MessageSegment =
@@ -656,6 +668,9 @@ export interface ProductivitySummary {
   topProjects: ProjectUsage[];
   aiSummary: string | null;
   productivityScore: number | null;
+  scoreTrend?: number | null;
+  focusTimeTrend?: number | null;
+  activeTimeTrend?: number | null;
 }
 
 export interface ProjectUsage {
@@ -681,7 +696,9 @@ export interface AppUsage {
 }
 
 export interface CategoryUsage {
+  categoryId: string;
   category: string;
+  categoryType: "productive" | "neutral" | "distracting";
   durationSecs: number;
 }
 
@@ -709,6 +726,13 @@ export interface ActivityTimeline {
   durationSecs: number | null;
   isIdle: boolean;
   projectId: string | null;
+  focusSessionId: string | null;
+}
+
+export interface CategoryRules {
+  appNames: string[];
+  bundleIds: string[];
+  urlPatterns: string[];
 }
 
 export interface ActivityCategory {
@@ -718,6 +742,17 @@ export interface ActivityCategory {
   color: string | null;
   icon: string | null;
   isSystem: boolean;
+  rules: CategoryRules | null;
+}
+
+export interface TrackedApp {
+  displayName: string;
+  appName: string;
+  siteName: string | null;
+  categoryId: string | null;
+  categoryName: string | null;
+  totalSecs: number;
+  eventCount: number;
 }
 
 export interface GoalProgress {
@@ -800,6 +835,41 @@ export interface InsightCard {
 
 export type InsightPayload = Pick<InsightCard, "id" | "insightType" | "title" | "sentiment">;
 
+export interface FocusTimerStatus {
+  active: boolean;
+  mode: string | null;
+  remainingSecs: number | null;
+  totalSecs: number | null;
+  session: FocusSession | null;
+}
+
+export interface FocusTickPayload {
+  remainingSecs: number;
+  totalSecs: number;
+  mode: string;
+  paused: boolean;
+  actionTitle: string | null;
+}
+
+export interface FocusCompletedPayload {
+  mode: string;
+  durationMins: number;
+  qualityScore: number | null;
+  breakMins: number | null;
+}
+
+export interface WeeklyAssessment {
+  id: string;
+  weekStart: string;
+  weekEnd: string;
+  avgScore: number | null;
+  totalFocusMins: number | null;
+  totalProductiveSecs: number | null;
+  totalDistractingSecs: number | null;
+  topApps: string | null;
+  summary: string | null;
+}
+
 export type ProductivityPeriod = "day" | "week" | "month";
 
 // ── Coaching ─────────────────────────────────────────────────────────
@@ -872,6 +942,7 @@ export interface ColumnValueSetParams {
 
 export type Tab = "All" | string;
 export type SidebarItem =
+  | "Dashboard"
   | "Chat"
   | "Tasks"
   | "OKR"
@@ -879,6 +950,7 @@ export type SidebarItem =
   | "Notes"
   | "Finance"
   | "Productivity"
+  | "Automations"
   | "Debug"
   | "Settings";
 export type ViewMode = "table" | "board" | "tree";
@@ -1036,4 +1108,159 @@ export interface AppInfoResponse {
   version: string;
   dataDir: string;
   setupCompleted: boolean;
+}
+
+// ── Timeline / Dashboard ──────────────────────────────────────────
+
+export type TimelineSource =
+  | "productivity"
+  | "focus"
+  | "task"
+  | "todo"
+  | "note"
+  | "finance"
+  | "system"
+  | "calendar";
+
+export type TimelineEntryType =
+  | "appUsage"
+  | "focusSession"
+  | "taskTimeEntry"
+  | "taskCreated"
+  | "taskCompleted"
+  | "taskUpdated"
+  | "taskDue"
+  | "noteCreated"
+  | "noteUpdated"
+  | "transactionRecorded"
+  | "expenseRecorded"
+  | "incomeRecorded"
+  | "systemEvent"
+  | "calendarEvent";
+
+export interface TimelineEntry {
+  id: string;
+  source: TimelineSource;
+  entryType: TimelineEntryType;
+  title: string;
+  description?: string;
+  startedAt: string;
+  endedAt?: string;
+  durationSecs?: number;
+  entityId?: string;
+  entityRoute?: string;
+  color: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface TopAppSummary {
+  appName: string;
+  durationSecs: number;
+  percentage: number;
+}
+
+export interface SourceBreakdown {
+  source: TimelineSource;
+  durationSecs: number;
+  count: number;
+}
+
+export interface TimelineSummary {
+  totalTrackedSecs: number;
+  focusSecs: number;
+  tasksCompleted: number;
+  tasksCreated: number;
+  notesTouched: number;
+  transactionsCount: number;
+  topApps: TopAppSummary[];
+  sourceBreakdown: SourceBreakdown[];
+}
+
+export interface TimelineResponse {
+  entries: TimelineEntry[];
+  summary: TimelineSummary;
+}
+
+export interface TimelineQuery {
+  startDate: string;
+  endDate: string;
+  sources?: TimelineSource[];
+  includePointEvents?: boolean;
+}
+
+export const EMPTY_TIMELINE_RESPONSE: TimelineResponse = {
+  entries: [],
+  summary: {
+    totalTrackedSecs: 0,
+    focusSecs: 0,
+    tasksCompleted: 0,
+    tasksCreated: 0,
+    notesTouched: 0,
+    transactionsCount: 0,
+    topApps: [],
+    sourceBreakdown: [],
+  },
+};
+
+// ── Cron / Automations ──────────────────────────────────────────────────
+
+export type CronOrigin = "system" | "user" | "ai" | "plugin";
+
+export type CronSchedule =
+  | { kind: "at"; atMs: number }
+  | { kind: "every"; everyMs: number }
+  | { kind: "cron"; expr: string; tz?: string };
+
+export interface CronPayload {
+  kind: string;
+  message: string;
+  deliver: boolean;
+  channel?: string;
+  to?: string;
+}
+
+export interface CronJobState {
+  nextRunAtMs?: number;
+  lastRunAtMs?: number;
+  lastStatus?: string;
+  lastError?: string;
+}
+
+export interface CronJob {
+  id: string;
+  name: string;
+  enabled: boolean;
+  origin: CronOrigin;
+  schedule: CronSchedule;
+  payload: CronPayload;
+  state: CronJobState;
+  createdAtMs: number;
+  updatedAtMs: number;
+  deleteAfterRun: boolean;
+}
+
+export interface CronJobCreateParams {
+  name: string;
+  schedule: CronSchedule;
+  message: string;
+  deliver?: boolean;
+  channel?: string;
+  to?: string;
+  deleteAfterRun?: boolean;
+}
+
+export interface CronJobUpdateParams {
+  id: string;
+  name?: string;
+  schedule?: CronSchedule;
+  message?: string;
+  deliver?: boolean;
+  channel?: string | null;
+  to?: string | null;
+}
+
+export interface CronStatusResponse {
+  enabled: boolean;
+  jobs: number;
+  nextWakeAtMs?: number;
 }

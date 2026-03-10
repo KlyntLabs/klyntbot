@@ -48,6 +48,7 @@ pub const AGENT_DELEGATION_STARTED: &str = "agent:delegation_started";
 pub const AGENT_DELEGATION_COMPLETED: &str = "agent:delegation_completed";
 pub const AGENT_PLAN_GENERATED: &str = "agent:plan_generated";
 pub const AGENT_PLAN_STEP_COMPLETED: &str = "agent:plan_step_completed";
+pub const AGENT_BUDGET_WARNING: &str = "agent:budget_warning";
 pub const ENTITY_UPDATED: &str = "entity:updated";
 pub const MCP_OAUTH_COMPLETE: &str = "mcp:oauth_complete";
 pub const MCP_OAUTH_ERROR: &str = "mcp:oauth_error";
@@ -59,6 +60,8 @@ pub const ACTIVITY_TICK: &str = "activity:tick";
 pub const ACTIVITY_SWITCH: &str = "activity:switch";
 pub const FOCUS_STATE_CHANGED: &str = "focus:state_changed";
 pub const FOCUS_AUTO_DETECTED: &str = "focus:auto_detected";
+pub const FOCUS_TICK: &str = "focus:tick";
+pub const FOCUS_COMPLETED: &str = "focus:completed";
 pub const SCORE_UPDATED: &str = "score:updated";
 pub const BUCKET_COMPLETED: &str = "bucket:completed";
 pub const INSIGHT_GENERATED: &str = "insight:generated";
@@ -324,6 +327,15 @@ pub struct PlanStepCompletedPayload {
     pub tool_name: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BudgetWarningPayload {
+    pub session_key: String,
+    pub monthly_spend_usd: f64,
+    pub monthly_budget_usd: f64,
+    pub usage_percent: f64,
+}
+
 /// Accumulated transparency data for an assistant message.
 /// Serialized into `SessionMessage.metadata.transparency`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -530,4 +542,23 @@ pub struct InsightPayload {
     pub insight_type: String,
     pub title: String,
     pub sentiment: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FocusTickPayload {
+    pub remaining_secs: u64,
+    pub total_secs: u64,
+    pub mode: String,
+    pub paused: bool,
+    pub action_title: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FocusCompletedPayload {
+    pub mode: String,
+    pub duration_mins: u64,
+    pub quality_score: Option<f64>,
+    pub break_mins: Option<u64>,
 }

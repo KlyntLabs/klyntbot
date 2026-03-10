@@ -75,6 +75,10 @@ pub struct AgentLoop {
     /// Wrapped in Mutex so `shutdown(&self)` can take ownership for graceful stop.
     pub(crate) cognitive_bg_service:
         tokio::sync::Mutex<Option<cognitive::background::BackgroundConsolidationService>>,
+    /// Cancellation token for the work context inference loop.
+    pub(crate) _inference_loop_token: Option<CancellationToken>,
+    /// Activity ingestion service for chat message logging.
+    pub(crate) activity_svc: Option<Arc<activity_log::ActivityIngestionService>>,
 }
 
 impl AgentLoop {
@@ -211,6 +215,11 @@ impl AgentLoop {
             token.cancel();
         }
 
+        // Stop the work context inference loop
+        if let Some(token) = &self._inference_loop_token {
+            token.cancel();
+        }
+
         // Stop the cognitive background consolidation service (cancels + awaits JoinHandle)
         if let Some(mut svc) = self.cognitive_bg_service.lock().await.take() {
             svc.stop().await;
@@ -272,6 +281,23 @@ impl AgentLoop {
         let mut manager_guard = self.mcp_manager.lock().await;
         if let Some(manager) = manager_guard.as_mut() {
             manager.disconnect_server(server_name).await;
+        }
+    }
+
+    /// Fire-and-forget ingestion of a chat message into the activity log.
+    fn ingest_chat_message(&self, session_key: &str, role: &str, content: &str) {
+        if let Some(ref svc) = self.activity_svc {
+            let input = activity_log::ChatMessageInput {
+                session_key: session_key.to_string(),
+                role: role.to_string(),
+                content: content.to_string(),
+            };
+            if let Some(entry) = activity_log::ActivityNormalizer::normalize(
+                &activity_log::ChatMessageNormalizer,
+                &input as &dyn std::any::Any,
+            ) {
+                svc.ingest_fire_and_forget(entry);
+            }
         }
     }
 
@@ -343,6 +369,9 @@ impl AgentLoop {
             self.spawn_embed_message(session_key.as_str(), "user", &msg.content, &msg_id);
         }
 
+        // Ingest user message into activity log (fire-and-forget)
+        self.ingest_chat_message(session_key.as_str(), "user", &msg.content);
+
         // Run through pipeline
         let routing_ctx = RoutingContext::new(msg.channel.clone(), msg.chat_id.clone());
         let response_content = self
@@ -352,6 +381,9 @@ impl AgentLoop {
         // Save assistant response to session
         self.save_to_session(session_key.as_str(), &response_content)
             .await;
+
+        // Ingest assistant response into activity log (fire-and-forget)
+        self.ingest_chat_message(session_key.as_str(), "assistant", &response_content);
 
         // Publish chat turn to cognitive consolidation pipeline
         if let Some(bus) = &self._domain_event_bus {

@@ -37,11 +37,38 @@
   --success: #34d399;
   --destructive: #f43f5e;
   --info: #60a5fa;
+  --warning: #fbbf24;
   --purple: #a78bfa;
+
+  /* ── Origin badges ───────────────────────────── */
+  --origin-system: #60a5fa;
+  --origin-ai: #a78bfa;
+  --origin-user: #34d399;
+  --origin-plugin: #fbbf24;
 
   /* ── Border ────────────────────────────────── */
   --border: rgba(255, 255, 255, 0.08);
   --border-subtle: rgba(255, 255, 255, 0.04);
+
+  /* ── Timeline / Dashboard ──────────────────── */
+  --timeline-app-productive: oklch(0.72 0.15 145);
+  --timeline-app-distracting: oklch(0.65 0.18 25);
+  --timeline-app-neutral: oklch(0.55 0.02 250);
+  --timeline-focus: oklch(0.65 0.18 290);
+  --timeline-task: oklch(0.68 0.16 240);
+  --timeline-note: oklch(0.75 0.14 80);
+  --timeline-finance: oklch(0.72 0.16 160);
+  --timeline-todo: oklch(0.7 0.16 200);
+  --timeline-finance-expense: oklch(0.65 0.18 25);
+  --timeline-finance-income: oklch(0.72 0.16 155);
+  --timeline-system: oklch(0.55 0.02 250);
+  --timeline-calendar: oklch(0.65 0.15 280);
+  --timeline-focus-high: oklch(0.58 0.22 290);
+  --timeline-focus-low: oklch(0.72 0.12 290);
+  --timeline-unfocused: rgba(255, 255, 255, 0.03);
+  --timeline-dot-note: oklch(0.7 0.14 250);
+  --timeline-dot-task-done: oklch(0.65 0.18 155);
+  --timeline-dot-finance: oklch(0.78 0.16 85);
 
   /* ── Overlay ───────────────────────────────── */
   --overlay: rgba(0, 0, 0, 0.25);
@@ -105,7 +132,14 @@
   --color-success: var(--success);
   --color-destructive: var(--destructive);
   --color-info: var(--info);
+  --color-warning: var(--warning);
   --color-purple: var(--purple);
+
+  /* Origin badges */
+  --color-origin-system: var(--origin-system);
+  --color-origin-ai: var(--origin-ai);
+  --color-origin-user: var(--origin-user);
+  --color-origin-plugin: var(--origin-plugin);
 
   /* Border */
   --color-border: var(--border);
@@ -114,6 +148,26 @@
   /* Overlay */
   --color-overlay: var(--overlay);
   --color-overlay-heavy: var(--overlay-heavy);
+
+  /* Timeline */
+  --color-timeline-app-productive: var(--timeline-app-productive);
+  --color-timeline-app-distracting: var(--timeline-app-distracting);
+  --color-timeline-app-neutral: var(--timeline-app-neutral);
+  --color-timeline-focus: var(--timeline-focus);
+  --color-timeline-task: var(--timeline-task);
+  --color-timeline-note: var(--timeline-note);
+  --color-timeline-finance: var(--timeline-finance);
+  --color-timeline-todo: var(--timeline-todo);
+  --color-timeline-finance-expense: var(--timeline-finance-expense);
+  --color-timeline-finance-income: var(--timeline-finance-income);
+  --color-timeline-system: var(--timeline-system);
+  --color-timeline-calendar: var(--timeline-calendar);
+  --color-timeline-focus-high: var(--timeline-focus-high);
+  --color-timeline-focus-low: var(--timeline-focus-low);
+  --color-timeline-unfocused: var(--timeline-unfocused);
+  --color-timeline-dot-note: var(--timeline-dot-note);
+  --color-timeline-dot-task-done: var(--timeline-dot-task-done);
+  --color-timeline-dot-finance: var(--timeline-dot-finance);
 
   /* Radius — Tahoe uses larger, pill-like radii */
   --radius-sm: calc(var(--radius) - 6px);
@@ -283,6 +337,30 @@
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: var(--radius-xl);
     box-shadow: none;
+    padding: var(--glass-padding);
+  }
+
+  /* When native vibrancy handles the blur (Tauri + macOS), disable the
+     CSS backdrop-filter (it flickers on transparent webview windows) and
+     lighten the overlay so the native material shows through. */
+  :root[data-vibrancy] .glass-floating {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: rgba(10, 10, 14, 0.45);
+  }
+
+  /* Dropdown glass — in-app floating menus / popovers.
+     More translucent than glass-floating so backdrop-blur is visible
+     over the app's own dark content (unlike native windows which blur
+     the desktop). */
+  .glass-dropdown {
+    @apply backdrop-blur-[80px] backdrop-saturate-[1.8];
+    background: rgba(10, 10, 14, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: var(--radius-xl);
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.5),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
     padding: var(--glass-padding);
   }
 
@@ -497,12 +575,10 @@
   from {
     opacity: 0;
     transform: scale(0.97) translateY(6px);
-    backdrop-filter: blur(0px);
   }
   to {
     opacity: 1;
     transform: scale(1) translateY(0);
-    backdrop-filter: blur(80px);
   }
 }
 
@@ -510,6 +586,27 @@
   from {
     opacity: 0;
     transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
   }
   to {
     opacity: 1;

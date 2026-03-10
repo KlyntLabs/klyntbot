@@ -88,13 +88,8 @@ impl FocusManager {
         session.completed = actual_mins >= target;
         session.notes = notes;
 
-        // Compute quality score
-        let on_task_ratio = compute_on_task_ratio(&session);
-        session.quality_score = Some(compute_quality(
-            &session,
-            on_task_ratio,
-            self.config.default_duration_mins,
-        ));
+        // Quality score is computed by the intelligence layer's QualityScorer
+        // after the session is persisted — leave it as None here.
 
         self.repos.sessions.update(&session).await?;
 
@@ -157,6 +152,50 @@ impl FocusManager {
         }
     }
 
+    /// Start a break session so it appears in daily summaries.
+    pub async fn start_break_session(&self, break_mins: i64) -> common::Result<FocusSession> {
+        // End any lingering active session first (defensive)
+        let _ = self.end_session(None).await;
+
+        let session = FocusSession {
+            id: Uuid::new_v4().to_string(),
+            action_id: None,
+            project_id: None,
+            session_type: SessionType::Break,
+            target_mins: Some(break_mins),
+            started_at: Utc::now(),
+            ended_at: None,
+            actual_mins: None,
+            interruptions: 0,
+            distraction_events: vec![],
+            quality_score: None,
+            completed: false,
+            notes: None,
+            source: SessionSource::Pomodoro,
+        };
+
+        self.repos.sessions.create(&session).await?;
+        Ok(session)
+    }
+
+    /// End the active break session.
+    pub async fn end_break_session(&self) -> common::Result<Option<FocusSession>> {
+        let Some(mut session) = self.repos.sessions.get_active().await? else {
+            return Ok(None);
+        };
+        if session.session_type != SessionType::Break {
+            return Ok(None);
+        }
+
+        let now = Utc::now();
+        session.ended_at = Some(now);
+        session.actual_mins = Some((now - session.started_at).num_minutes());
+        session.completed = true;
+        // No quality score for breaks
+        self.repos.sessions.update(&session).await?;
+        Ok(Some(session))
+    }
+
     /// Get the currently active focus session, if any.
     pub async fn get_active(&self) -> common::Result<Option<FocusSession>> {
         self.repos.sessions.get_active().await
@@ -190,6 +229,9 @@ impl FocusManager {
 
 /// Estimate on-task ratio from distraction events.
 /// Simple heuristic: each distraction costs ~2 minutes of focus time.
+///
+/// Legacy helper — retained for potential future use.
+#[allow(dead_code)]
 fn compute_on_task_ratio(session: &FocusSession) -> f64 {
     let elapsed_mins = session
         .actual_mins
@@ -287,7 +329,8 @@ mod tests {
         let session = ended.unwrap();
 
         assert!(session.ended_at.is_some());
-        assert!(session.quality_score.is_some());
+        // quality_score is now computed by the intelligence layer's QualityScorer
+        assert!(session.quality_score.is_none());
         assert!(session.notes.as_deref() == Some("good session"));
     }
 

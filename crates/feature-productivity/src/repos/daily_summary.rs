@@ -77,6 +77,15 @@ impl From<SummaryRow> for DailySummary {
 
 const SUMMARY_COLUMNS: &str = "date, total_active_secs, total_focus_secs, total_break_secs, total_idle_secs, productive_secs, neutral_secs, distracting_secs, focus_sessions_count, avg_session_quality, interruptions_count, context_switches, top_apps, top_categories, productivity_score, ai_summary, deep_work_blocks, deep_work_secs, avg_recovery_secs";
 
+#[derive(Debug, Clone, Default, sqlx::FromRow)]
+pub struct RollingAverages {
+    pub avg_score: Option<f64>,
+    pub avg_active_secs: Option<f64>,
+    pub avg_productive_secs: Option<f64>,
+    pub avg_context_switches: Option<f64>,
+    pub avg_focus_secs: Option<f64>,
+}
+
 #[derive(Debug, Clone)]
 pub struct DailySummaryRepo {
     pool: SqlitePool,
@@ -170,5 +179,28 @@ impl DailySummaryRepo {
             .await
             .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         Ok(rows.into_iter().map(DailySummary::from).collect())
+    }
+
+    pub async fn rolling_averages(
+        &self,
+        before_date: &str,
+        days: i64,
+    ) -> common::Result<RollingAverages> {
+        let row = sqlx::query_as::<_, RollingAverages>(
+            "SELECT
+                AVG(productivity_score) as avg_score,
+                AVG(total_active_secs) as avg_active_secs,
+                AVG(productive_secs) as avg_productive_secs,
+                AVG(context_switches) as avg_context_switches,
+                AVG(total_focus_secs) as avg_focus_secs
+             FROM daily_summaries
+             WHERE date < ?1 AND date >= date(?1, '-' || ?2 || ' days')",
+        )
+        .bind(before_date)
+        .bind(days)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        Ok(row.unwrap_or_default())
     }
 }

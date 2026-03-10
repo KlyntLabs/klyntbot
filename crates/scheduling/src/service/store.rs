@@ -60,7 +60,9 @@ impl CronService {
             .map_err(|e| CronError::ExecutionFailed(e.to_string()))?;
         for row in all_rows {
             if !current_ids.contains(row.id.as_str()) {
-                let _ = repo.delete(&row.id).await;
+                if let Err(e) = repo.delete(&row.id).await {
+                    error!("Failed to delete orphaned cron row '{}': {}", row.id, e);
+                }
             }
         }
 
@@ -71,6 +73,7 @@ impl CronService {
     pub(crate) async fn process_due_jobs(
         store: &Arc<RwLock<CronStore>>,
         repo: &Option<CronRepo>,
+        handlers: &std::collections::HashMap<String, super::JobCallback>,
         on_job: &Option<super::JobCallback>,
     ) {
         let now = super::now_ms();
@@ -92,7 +95,7 @@ impl CronService {
 
         // Execute due jobs
         for job in due_jobs {
-            super::executor::execute_job_static(store, on_job, &job).await;
+            super::executor::execute_job_static(store, handlers, on_job, &job).await;
         }
 
         // Save store via SQL (skip if no repo, e.g. in tests)

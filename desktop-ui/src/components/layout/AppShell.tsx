@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Navigate, Outlet, useLocation } from "react-router";
+import { Navigate, Outlet, useLocation, useNavigate } from "react-router";
 import { useEvent } from "../../hooks/useEvent";
 import { ipc } from "../../hooks/useIpc";
 import type { AppInfoResponse, SidebarItem } from "../../lib/types";
@@ -8,6 +8,7 @@ import { Sidebar } from "./Sidebar";
 
 export function AppShell() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [openSessionKey, setOpenSessionKey] = useState<string | null>(null);
   const [setupState, setSetupState] = useState<"loading" | "needed" | "ready">("loading");
@@ -37,11 +38,14 @@ export function AppShell() {
   const activeSidebarItem = useMemo((): SidebarItem => {
     const path = location.pathname;
     if (path.startsWith("/chat")) return "Chat";
+    if (path.startsWith("/tasks") || path.startsWith("/task/")) return "Tasks";
     if (path.startsWith("/notes")) return "Notes";
     if (path.startsWith("/finance")) return "Finance";
     if (path.startsWith("/productivity")) return "Productivity";
+    if (path.startsWith("/automations")) return "Automations";
     if (path.startsWith("/settings")) return "Settings";
-    return "Tasks";
+    if (path.startsWith("/debug")) return "Debug";
+    return "Dashboard";
   }, [location.pathname]);
 
   // Derive chat context from current route (detail pages handled by usePageContext inside SidebarChat)
@@ -49,10 +53,18 @@ export function AppShell() {
     const path = location.pathname;
     const search = new URLSearchParams(location.search);
 
-    if (path === "/") {
+    if (path.startsWith("/tasks")) {
       const tab = search.get("tab");
       if (tab) return { entityKind: `tasks.${tab.toLowerCase()}` };
       return { entityKind: "tasks" };
+    }
+    if (
+      path.startsWith("/day/") ||
+      path.startsWith("/week/") ||
+      path.startsWith("/month/") ||
+      path.startsWith("/year/")
+    ) {
+      return { entityKind: "dashboard" };
     }
     if (path.startsWith("/chat")) return { entityKind: "chat" };
     if (path.startsWith("/notes")) return { entityKind: "notes" };
@@ -68,6 +80,11 @@ export function AppShell() {
   useEvent<{ text?: string; sessionKey?: string }>("open-chat", (payload) => {
     setIsChatOpen(true);
     setOpenSessionKey(payload?.sessionKey ?? null);
+  });
+
+  // Listen for navigate events from tray / launcher
+  useEvent<{ path: string }>("navigate", (payload) => {
+    if (payload?.path) navigate(payload.path);
   });
 
   // Gate: redirect to setup wizard if setup not completed

@@ -21,3 +21,25 @@ pub fn resize_window(app: tauri::AppHandle, label: String, height: f64) {
         let _ = window.set_size(tauri::LogicalSize::new(width, height));
     }
 }
+
+#[tauri::command]
+pub fn open_url(url: String) {
+    let _ = open::that(&url);
+}
+
+#[tauri::command]
+pub fn show_dashboard(app: tauri::AppHandle) {
+    // Restore Dock icon before showing the window
+    #[cfg(target_os = "macos")]
+    let _ = app.set_activation_policy(tauri::ActivationPolicy::Regular);
+
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+}
+
+#[tauri::command]
+pub fn quit_app(app: tauri::AppHandle) {
+    app.exit(0);
+}

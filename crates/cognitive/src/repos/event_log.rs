@@ -129,21 +129,43 @@ impl EventLogRepo {
         .await
     }
 
+    /// Fetch domain events within a date range (inclusive), oldest first.
+    /// Dates are ISO date strings like "2026-03-09".
+    pub async fn query_domain_events_range(
+        &self,
+        start_date: &str,
+        end_date: &str,
+    ) -> Result<Vec<DomainEventRow>, sqlx::Error> {
+        // Use direct string comparison to allow idx_domain_event_log_timestamp.
+        // Timestamps are stored as ISO-8601 strings, so "YYYY-MM-DD" compares
+        // correctly against "YYYY-MM-DDThh:mm:ss".
+        sqlx::query_as::<_, DomainEventRow>(
+            r#"
+            SELECT id, event_type, domain, salience, payload, timestamp
+            FROM domain_event_log
+            WHERE timestamp >= ?1
+              AND timestamp < ?2
+            ORDER BY timestamp ASC
+            "#,
+        )
+        .bind(start_date)
+        .bind(format!("{end_date}T23:59:59Z"))
+        .fetch_all(&self.pool)
+        .await
+    }
+
     /// Delete events older than the given number of days.
     pub async fn prune_old_events(&self, older_than_days: i64) -> Result<u64, sqlx::Error> {
         let cutoff = format!("-{older_than_days} days");
-        let r1 = sqlx::query(
-            "DELETE FROM domain_event_log WHERE timestamp < datetime('now', ?1)",
-        )
-        .bind(&cutoff)
-        .execute(&self.pool)
-        .await?;
-        let r2 = sqlx::query(
-            "DELETE FROM pipeline_event_log WHERE timestamp < datetime('now', ?1)",
-        )
-        .bind(&cutoff)
-        .execute(&self.pool)
-        .await?;
+        let r1 = sqlx::query("DELETE FROM domain_event_log WHERE timestamp < datetime('now', ?1)")
+            .bind(&cutoff)
+            .execute(&self.pool)
+            .await?;
+        let r2 =
+            sqlx::query("DELETE FROM pipeline_event_log WHERE timestamp < datetime('now', ?1)")
+                .bind(&cutoff)
+                .execute(&self.pool)
+                .await?;
         Ok(r1.rows_affected() + r2.rows_affected())
     }
 }
@@ -187,6 +209,60 @@ mod tests {
         assert_eq!(events.len(), 2);
         assert_eq!(events[0].id, "evt-2"); // newest first
         assert_eq!(events[1].id, "evt-1");
+    }
+
+    #[tokio::test]
+    async fn query_range_filters_by_date() {
+        let pool = setup().await;
+        let repo = EventLogRepo::new(pool);
+
+        repo.insert_domain_event(
+            "evt-a",
+            "TaskCreated",
+            "tasks",
+            "extract",
+            r#"{"task_id":"t1"}"#,
+            "2026-03-08T10:00:00Z",
+        )
+        .await
+        .unwrap();
+
+        repo.insert_domain_event(
+            "evt-b",
+            "NoteCreated",
+            "notes",
+            "extract",
+            r#"{"note_id":"n1"}"#,
+            "2026-03-09T14:30:00Z",
+        )
+        .await
+        .unwrap();
+
+        repo.insert_domain_event(
+            "evt-c",
+            "TaskCompleted",
+            "tasks",
+            "extract",
+            r#"{"task_id":"t2"}"#,
+            "2026-03-10T08:00:00Z",
+        )
+        .await
+        .unwrap();
+
+        // Query only March 9
+        let results = repo
+            .query_domain_events_range("2026-03-09", "2026-03-09")
+            .await
+            .unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, "evt-b");
+
+        // Query March 8-9
+        let results = repo
+            .query_domain_events_range("2026-03-08", "2026-03-09")
+            .await
+            .unwrap();
+        assert_eq!(results.len(), 2);
     }
 
     #[tokio::test]

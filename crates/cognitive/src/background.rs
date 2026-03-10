@@ -38,11 +38,6 @@ pub enum PipelineEvent {
     Consolidation { operation: String, fact: String },
 }
 
-/// Minimum occurrences of an accumulated event type before promoting to extraction.
-const ACCUMULATE_PROMOTE_THRESHOLD: usize = 5;
-/// Minimum distinct days for accumulated events before promoting.
-const ACCUMULATE_MIN_DAYS: usize = 3;
-
 /// Tracks accumulated events for pattern promotion.
 #[derive(Debug, Clone)]
 struct AccumulatedEntry {
@@ -64,9 +59,8 @@ impl AccumulatedEntry {
         self.observations.push(obs);
     }
 
-    fn should_promote(&self) -> bool {
-        self.observations.len() >= ACCUMULATE_PROMOTE_THRESHOLD
-            && self.days_seen.len() >= ACCUMULATE_MIN_DAYS
+    fn should_promote(&self, promote_threshold: usize, min_days: usize) -> bool {
+        self.observations.len() >= promote_threshold && self.days_seen.len() >= min_days
     }
 }
 
@@ -94,6 +88,8 @@ impl BackgroundConsolidationService {
         cancel: CancellationToken,
         pipeline_tx: Option<tokio::sync::broadcast::Sender<PipelineEvent>>,
         accum_repo: Option<AccumulatedObservationRepo>,
+        promote_threshold: usize,
+        min_days: usize,
     ) -> Self {
         let cancel_clone = cancel.clone();
         let handle = tokio::spawn(async move {
@@ -210,7 +206,7 @@ impl BackgroundConsolidationService {
                                     entry.add(obs);
 
                                     // Check for promotion
-                                    if entry.should_promote() {
+                                    if entry.should_promote(promote_threshold, min_days) {
                                         debug!(
                                             "Promoting accumulated events for '{key}' ({} events, {} days)",
                                             entry.observations.len(),
@@ -397,6 +393,90 @@ fn event_to_observation(event: &DomainEvent) -> Option<Observation> {
             source_event: "CoachingFeedback".into(),
             timestamp: now,
         }),
+        DomainEvent::SessionEnded {
+            session_type,
+            duration_secs,
+            quality_score,
+            ..
+        } => {
+            let quality = quality_score.map_or("N/A".to_string(), |q| format!("{q:.0}"));
+            Some(Observation {
+                domain: "productivity".into(),
+                content: format!(
+                    "{session_type} session ended: {}min, quality {quality}",
+                    duration_secs / 60
+                ),
+                importance: if quality_score.is_some_and(|q| q >= 80.0) {
+                    0.7
+                } else {
+                    0.5
+                },
+                source_event: "SessionEnded".into(),
+                timestamp: now,
+            })
+        }
+        DomainEvent::QualityScored {
+            score_date,
+            overall_score,
+            ..
+        } => Some(Observation {
+            domain: "productivity".into(),
+            content: format!("Quality score for {score_date}: {overall_score:.1}"),
+            importance: if *overall_score >= 85.0 || *overall_score <= 30.0 {
+                0.8
+            } else {
+                0.4
+            },
+            source_event: "QualityScored".into(),
+            timestamp: now,
+        }),
+        DomainEvent::NarrativeGenerated {
+            date,
+            sentiment,
+            excerpt,
+        } => Some(Observation {
+            domain: "productivity".into(),
+            content: format!("Daily narrative ({date}, {sentiment}): {excerpt}"),
+            importance: 0.7,
+            source_event: "NarrativeGenerated".into(),
+            timestamp: now,
+        }),
+        DomainEvent::VoiceJournalProcessed {
+            extracted_fact_count,
+            sentiment,
+            ..
+        } => {
+            let sent = sentiment.as_deref().unwrap_or("unknown");
+            Some(Observation {
+                domain: "productivity".into(),
+                content: format!(
+                    "Voice journal processed: {extracted_fact_count} facts extracted, sentiment {sent}"
+                ),
+                importance: 0.6,
+                source_event: "VoiceJournalProcessed".into(),
+                timestamp: now,
+            })
+        }
+        // Intelligence layer events that are discarded by salience — avoid Debug formatting
+        DomainEvent::SessionCreated { .. } | DomainEvent::RuleEvolved { .. } => None,
+        DomainEvent::PredictiveAlert {
+            forecast_type,
+            predicted_value,
+            suggested_action,
+            ..
+        } => Some(Observation {
+            domain: "productivity".into(),
+            content: format!(
+                "Predictive alert ({forecast_type}): value={predicted_value:.2}{}",
+                suggested_action
+                    .as_deref()
+                    .map(|a| format!(", action: {a}"))
+                    .unwrap_or_default()
+            ),
+            importance: 0.5,
+            source_event: "PredictiveAlert".into(),
+            timestamp: now,
+        }),
         _ => {
             // TaskCreated, TaskDeferred, GoalProgress, ActivitySessionCompleted
             // Lower priority — convert generically
@@ -430,6 +510,16 @@ fn event_type_key(event: &DomainEvent) -> String {
         DomainEvent::UserStatedFact { .. } => "UserStatedFact".into(),
         DomainEvent::UserCorrectedAI { .. } => "UserCorrectedAI".into(),
         DomainEvent::CoachingFeedback { .. } => "CoachingFeedback".into(),
+        DomainEvent::NoteCreated { .. } => "NoteCreated".into(),
+        DomainEvent::NoteUpdated { .. } => "NoteUpdated".into(),
+        DomainEvent::SessionCreated { .. } => "SessionCreated".into(),
+        DomainEvent::SessionEnded { .. } => "SessionEnded".into(),
+        DomainEvent::QualityScored { .. } => "QualityScored".into(),
+        DomainEvent::PredictiveAlert { .. } => "PredictiveAlert".into(),
+        DomainEvent::NarrativeGenerated { .. } => "NarrativeGenerated".into(),
+        DomainEvent::RuleEvolved { .. } => "RuleEvolved".into(),
+        DomainEvent::VoiceJournalProcessed { .. } => "VoiceJournalProcessed".into(),
+        DomainEvent::ToolCallExecuted { .. } => "ToolCallExecuted".into(),
     }
 }
 
@@ -534,7 +624,7 @@ mod tests {
             });
         }
 
-        assert!(entry.should_promote());
+        assert!(entry.should_promote(5, 3));
         assert_eq!(entry.observations.len(), 5);
         assert_eq!(entry.days_seen.len(), 3);
     }
@@ -554,7 +644,7 @@ mod tests {
             });
         }
 
-        assert!(!entry.should_promote()); // Not enough days
+        assert!(!entry.should_promote(5, 3)); // Not enough days
     }
 
     #[test]

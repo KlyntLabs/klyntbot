@@ -23,3 +23,4 @@ tests/fixtures/hello_plugin/plugin.wasm
 .idea/
 *.swp
 *.swo
+.worktrees

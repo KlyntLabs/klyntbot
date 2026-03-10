@@ -6,10 +6,10 @@ pub mod compaction;
 pub mod consolidation;
 pub mod context_source;
 pub mod conversation_recall;
-pub mod memory_retriever;
 pub mod decay;
 pub mod embedder;
 pub mod extraction;
+pub mod memory_retriever;
 pub mod reflection;
 pub mod repos;
 pub mod retrieval;
@@ -21,15 +21,17 @@ pub use background::PipelineEvent;
 pub use compaction::CompactionResult;
 pub use consolidation::ConsolidationHandler;
 pub use context_source::{CognitiveContextSource, CognitiveRetrievalConfig};
-pub use conversation_recall::{ConversationRecallService, RecallConfig, RecallMetadata, RecallResult};
-pub use memory_retriever::CognitiveMemoryRetriever;
+pub use conversation_recall::{
+    ConversationRecallService, RecallConfig, RecallMetadata, RecallResult,
+};
 pub use embedder::{SemanticFactEmbedder, TextEmbedder};
 pub use extraction::{ExtractedFact, ExtractionHandler};
+pub use memory_retriever::CognitiveMemoryRetriever;
 pub use reflection::ReflectionHandler;
+pub use repos::event_log::{DomainEventRow, PipelineEventRow};
 pub use repos::{
     cognitive_migrations, AccumulatedObservationRepo, EpisodicMemoryRepo, EventLogRepo,
     ProceduralRuleRepo, SemanticFactRepo,
 };
-pub use repos::event_log::{DomainEventRow, PipelineEventRow};
 pub use situation::{compute_situation, SituationInputs, UserSituation};
 pub use types::*;

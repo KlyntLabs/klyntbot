@@ -242,6 +242,7 @@ mod tests {
                     id: "c".to_string(),
                     name: "n".to_string(),
                     enabled: true,
+                    origin: "system".to_string(),
                     schedule: serde_json::json!({}),
                     payload: serde_json::json!({}),
                     next_run_at_ms: None,

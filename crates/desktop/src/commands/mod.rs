@@ -2,6 +2,7 @@ pub mod areas;
 pub mod chat;
 pub mod cognitive;
 pub mod columns;
+pub mod cron;
 pub mod distraction;
 pub mod finance;
 pub mod groups;
@@ -14,6 +15,7 @@ pub mod projects;
 pub mod settings;
 pub mod status;
 pub mod tasks;
+pub mod timeline;
 pub mod window;
 pub mod workflows;
 

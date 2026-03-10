@@ -1,0 +1,191 @@
+import { Search } from "lucide-react";
+import { useMemo, useState } from "react";
+import { useMutation } from "../../hooks/useMutation";
+import { formatHumanDuration } from "../../lib/dates";
+import type { ActivityCategory, TrackedApp } from "../../lib/types";
+import { getCategoryColor } from "./shared";
+
+interface TrackedAppsListProps {
+  apps: TrackedApp[];
+  categories: ActivityCategory[];
+  onReassigned: () => void;
+}
+
+function appKey(app: TrackedApp): string {
+  return `${app.appName}:${app.siteName ?? ""}`;
+}
+
+export function TrackedAppsList({ apps, categories, onReassigned }: TrackedAppsListProps) {
+  const [search, setSearch] = useState("");
+  const [showUncategorized, setShowUncategorized] = useState(false);
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+
+  const reassignMut = useMutation("productivity_category_upsert");
+
+  const { filtered, uncategorizedCount } = useMemo(() => {
+    let result = apps;
+    let uncategorized = 0;
+    for (const a of apps) {
+      if (!a.categoryId) uncategorized++;
+    }
+    if (showUncategorized) {
+      result = result.filter((a) => !a.categoryId);
+    }
+    if (search) {
+      const q = search.toLowerCase();
+      result = result.filter(
+        (a) => a.displayName.toLowerCase().includes(q) || a.appName.toLowerCase().includes(q),
+      );
+    }
+    return { filtered: result, uncategorizedCount: uncategorized };
+  }, [apps, search, showUncategorized]);
+
+  const categoryColorMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const cat of categories) {
+      map.set(cat.id, cat.color ?? getCategoryColor(cat.id));
+    }
+    return map;
+  }, [categories]);
+
+  const handleReassign = async (app: TrackedApp, newCategoryId: string) => {
+    const cat = categories.find((c) => c.id === newCategoryId);
+    if (!cat) return;
+
+    const rules = cat.rules ?? { appNames: [], bundleIds: [], urlPatterns: [] };
+    const updatedRules = app.siteName
+      ? {
+          appNames: rules.appNames,
+          bundleIds: rules.bundleIds,
+          urlPatterns: [...new Set([...rules.urlPatterns, app.siteName])],
+        }
+      : {
+          appNames: [...new Set([...rules.appNames, app.appName])],
+          bundleIds: rules.bundleIds,
+          urlPatterns: rules.urlPatterns,
+        };
+
+    await reassignMut.mutate({
+      id: cat.id,
+      name: cat.name,
+      category_type: cat.categoryType,
+      color: cat.color,
+      icon: null,
+      rules: updatedRules,
+    });
+    setEditingKey(null);
+    onReassigned();
+  };
+
+  return (
+    <div className="glass-card p-3 flex flex-col gap-2">
+      <h3 className="text-[12px] font-medium text-secondary">Tracked Apps & Sites</h3>
+
+      {/* Search */}
+      <div className="relative">
+        <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted" />
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search..."
+          className="glass-input w-full pl-7 pr-2.5 py-1.5 text-[11px] rounded-lg"
+        />
+      </div>
+
+      {/* Filter toggle */}
+      {uncategorizedCount > 0 && (
+        <button
+          type="button"
+          onClick={() => setShowUncategorized(!showUncategorized)}
+          className={`text-[10px] font-light px-2 py-1 rounded-lg transition-colors ${
+            showUncategorized ? "bg-brand/20 text-brand" : "text-muted hover:bg-white/[0.04]"
+          }`}
+        >
+          Uncategorized ({uncategorizedCount})
+        </button>
+      )}
+
+      {/* App list */}
+      <div className="flex flex-col gap-0.5 max-h-[600px] overflow-y-auto">
+        {filtered.map((app) => {
+          const key = appKey(app);
+          return (
+            <TrackedAppRow
+              key={key}
+              app={app}
+              color={app.categoryId ? (categoryColorMap.get(app.categoryId) ?? null) : null}
+              categories={categories}
+              isEditing={editingKey === key}
+              onEdit={() => setEditingKey(key)}
+              onReassign={(catId) => handleReassign(app, catId)}
+              onCancel={() => setEditingKey(null)}
+            />
+          );
+        })}
+        {filtered.length === 0 && (
+          <p className="text-[11px] font-light text-dim py-4 text-center">No apps found</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TrackedAppRow({
+  app,
+  color,
+  categories,
+  isEditing,
+  onEdit,
+  onReassign,
+  onCancel,
+}: {
+  app: TrackedApp;
+  color: string | null;
+  categories: ActivityCategory[];
+  isEditing: boolean;
+  onEdit: () => void;
+  onReassign: (categoryId: string) => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-2 px-1.5 py-1 rounded-md hover:bg-white/[0.03] group">
+      {color ? (
+        <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ backgroundColor: color }} />
+      ) : (
+        <span className="w-2 h-2 rounded-sm flex-shrink-0 border border-dashed border-muted" />
+      )}
+      <div className="flex-1 min-w-0">
+        <div className="text-[11px] font-light text-primary truncate">{app.displayName}</div>
+        <div className="text-[9px] font-light text-dim">
+          {app.categoryName ?? "Uncategorized"} · {formatHumanDuration(app.totalSecs)}
+        </div>
+      </div>
+      {isEditing ? (
+        <select
+          className="glass-input text-[10px] px-1.5 py-0.5 rounded-md w-24"
+          defaultValue={app.categoryId ?? ""}
+          onChange={(e) => onReassign(e.target.value)}
+          onBlur={onCancel}
+        >
+          <option value="" disabled>
+            Pick...
+          </option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <button
+          type="button"
+          onClick={onEdit}
+          className="text-[9px] font-light text-dim opacity-0 group-hover:opacity-100 transition-opacity hover:text-primary"
+        >
+          Edit
+        </button>
+      )}
+    </div>
+  );
+}

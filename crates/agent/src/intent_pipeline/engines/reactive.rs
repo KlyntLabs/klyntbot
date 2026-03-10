@@ -124,9 +124,8 @@ impl ExecutionEngine for ReactiveEngine {
 
             // Planning iteration: on iteration 1 with a planning prompt, try to parse
             // the plan from LLM output before processing the outcome normally.
-            let is_planning_iteration = params.planning_prompt.is_some()
-                && iteration == 1
-                && scratchpad.plan().is_none();
+            let is_planning_iteration =
+                params.planning_prompt.is_some() && iteration == 1 && scratchpad.plan().is_none();
 
             match outcome {
                 CycleOutcome::FinalResponse { content } => {
@@ -238,9 +237,7 @@ impl ExecutionEngine for ReactiveEngine {
                     // Track plan step completion
                     let mut completed_step_index = None;
                     for tool_name in &tool_names {
-                        if let Some((idx, desc, name)) =
-                            scratchpad.mark_step_completed(tool_name)
-                        {
+                        if let Some((idx, desc, name)) = scratchpad.mark_step_completed(tool_name) {
                             completed_step_index = Some(idx);
                             if let Some(ref tx) = event_tx {
                                 let _ = tx
@@ -369,21 +366,13 @@ impl ExecutionEngine for ReactiveEngine {
                     other
                 );
                 // Fallback: summarize completed work from traces so the user gets *something*
-                let trace_summary: Vec<String> = scratchpad
-                    .traces()
-                    .iter()
-                    .filter(|t| t.actual_action == "tools_executed")
-                    .map(|t| format!("- {}: {}", t.planned_actions.join(", "), t.thought))
-                    .collect();
-                if trace_summary.is_empty() {
+                let summary = scratchpad.summarize();
+                if summary.is_empty() {
                     "I was unable to complete the request within the iteration limit. \
                      Please try rephrasing or breaking the task into smaller steps."
                         .to_string()
                 } else {
-                    format!(
-                        "I reached the iteration limit. Here's what I completed:\n{}",
-                        trace_summary.join("\n")
-                    )
+                    format!("I reached the iteration limit. Here's what I completed:\n{summary}")
                 }
             }
         };

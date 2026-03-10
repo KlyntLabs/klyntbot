@@ -101,12 +101,14 @@ pub(crate) async fn dispatch_dev(
             let id = try_field!(dev::get_str(body, "id"));
             dev::val(core.workflow_get(id).await)
         }
-        "workflow_get_effective" => {
-            dev::val(core.workflow_get_effective(dev::get(body, "projectId")).await)
-        }
-        "workflow_create" => {
-            dev::val(core.workflow_create(try_field!(dev::parse_params(body))).await)
-        }
+        "workflow_get_effective" => dev::val(
+            core.workflow_get_effective(dev::get(body, "projectId"))
+                .await,
+        ),
+        "workflow_create" => dev::val(
+            core.workflow_create(try_field!(dev::parse_params(body)))
+                .await,
+        ),
         "workflow_delete" => {
             let id = try_field!(dev::get_str(body, "id"));
             dev::val(core.workflow_delete(id).await)
@@ -117,7 +119,10 @@ pub(crate) async fn dispatch_dev(
             let id = try_field!(dev::get_str(body, "id"));
             dev::val(core.label_delete(id).await)
         }
-        "label_reorder" => dev::val(core.label_reorder(try_field!(dev::parse_params(body))).await),
+        "label_reorder" => dev::val(
+            core.label_reorder(try_field!(dev::parse_params(body)))
+                .await,
+        ),
         _ => return None,
     })
 }

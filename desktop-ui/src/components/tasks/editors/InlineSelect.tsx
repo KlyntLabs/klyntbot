@@ -60,7 +60,7 @@ export function InlineSelect({
         createPortal(
           <div
             ref={dropdownRef}
-            className="fixed z-[9999] min-w-[140px] glass-panel"
+            className="fixed z-[9999] min-w-[140px] glass-dropdown"
             style={{ top: pos.top, left: pos.left }}
             role="listbox"
           >

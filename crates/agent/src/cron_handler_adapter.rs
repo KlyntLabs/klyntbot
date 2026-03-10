@@ -32,6 +32,16 @@ fn convert_schedule(schedule: tools::cron_tool::CronSchedule) -> CronSchedule {
 impl CronHandler for CronHandlerAdapter {
     async fn add_job(&self, params: AddCronJobParams) -> Result<CronJobInfo> {
         let schedule = convert_schedule(params.schedule);
+        let origin = match params.origin.as_str() {
+            "system" => scheduling::CronOrigin::System,
+            "user" => scheduling::CronOrigin::User,
+            "ai" => scheduling::CronOrigin::Ai,
+            "plugin" => scheduling::CronOrigin::Plugin,
+            other => {
+                tracing::warn!("Unknown cron origin '{}', defaulting to Ai", other);
+                scheduling::CronOrigin::Ai
+            }
+        };
 
         let job = self
             .service
@@ -43,6 +53,7 @@ impl CronHandler for CronHandlerAdapter {
                 params.channel,
                 params.to,
                 false, // delete_after_run
+                origin,
             )
             .await?;
 
@@ -55,9 +66,13 @@ impl CronHandler for CronHandlerAdapter {
     }
 
     async fn list_jobs(&self, include_internal: bool) -> Vec<CronJobInfo> {
-        let jobs = self.service.list_jobs(!include_internal).await; // include_disabled = !include_internal
+        // Always include disabled jobs; filter by origin (internal = system) below
+        let jobs = self.service.list_jobs(true).await;
 
         jobs.into_iter()
+            .filter(|job| {
+                include_internal || job.origin != scheduling::CronOrigin::System
+            })
             .map(|job| CronJobInfo {
                 id: job.id,
                 name: job.name,
