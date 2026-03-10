@@ -268,6 +268,8 @@ fn main() {
             commands::productivity::productivity_project_upsert,
             commands::productivity::productivity_project_delete,
             commands::productivity::productivity_weekly_assessment,
+            commands::productivity::productivity_calendar_events,
+            commands::productivity::calendar_sync_events,
             // Focus Timer
             commands::productivity::focus_timer_start,
             commands::productivity::focus_timer_stop,

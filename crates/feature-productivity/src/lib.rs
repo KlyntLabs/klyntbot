@@ -71,6 +71,10 @@ impl ProductivityFeature {
         include_str!("../migrations/005_focus_activity_link.sql")
     }
 
+    fn migration_v6_sql() -> &'static str {
+        include_str!("../migrations/006_calendar_events.sql")
+    }
+
     pub fn migrations_static() -> Vec<FeatureMigration> {
         vec![
             FeatureMigration {
@@ -103,6 +107,12 @@ impl ProductivityFeature {
                 version: 5,
                 description: "Link activity events to focus sessions".to_string(),
                 sql: Self::migration_v5_sql().to_string(),
+            },
+            FeatureMigration {
+                feature_name: "productivity".to_string(),
+                version: 6,
+                description: "Add calendar events table".to_string(),
+                sql: Self::migration_v6_sql().to_string(),
             },
         ]
     }

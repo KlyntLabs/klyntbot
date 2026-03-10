@@ -271,6 +271,22 @@ pub async fn productivity_weekly_assessment(
     state.productivity_weekly_assessment(week_start).await
 }
 
+#[tauri::command]
+pub async fn productivity_calendar_events(
+    state: State<'_, Arc<AppCore>>,
+    date: String,
+) -> Result<Vec<feature_productivity::types::CalendarEvent>, ApiError> {
+    state.productivity_calendar_events(date).await
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn calendar_sync_events(
+    state: State<'_, Arc<AppCore>>,
+    events: Vec<desktop_shared::commands::CalendarEventInput>,
+) -> Result<Vec<feature_productivity::types::CalendarEvent>, ApiError> {
+    state.calendar_sync_events(events).await
+}
+
 // ── Focus Timer (tray-driven) ──────────────────────────────────────────
 
 use crate::focus_timer::{FocusTimer, TimerMode};
@@ -428,6 +444,8 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "productivity_project_upsert",
     "productivity_project_delete",
     "productivity_weekly_assessment",
+    "productivity_calendar_events",
+    "calendar_sync_events",
 ];
 
 #[cfg(debug_assertions)]
@@ -580,6 +598,13 @@ pub(crate) async fn dispatch_dev(
         "productivity_weekly_assessment" => {
             let week_start = try_field!(dev::get_str(body, "weekStart"));
             dev::val(core.productivity_weekly_assessment(week_start).await)
+        }
+        "productivity_calendar_events" => {
+            let date = try_field!(dev::get_str(body, "date"));
+            dev::val(core.productivity_calendar_events(date).await)
+        }
+        "calendar_sync_events" => {
+            dev::val(core.calendar_sync_events(try_field!(dev::parse_params(body))).await)
         }
         _ => return None,
     })
