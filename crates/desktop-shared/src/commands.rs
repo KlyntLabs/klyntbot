@@ -1377,3 +1377,83 @@ pub struct WorkContextUpdateParams {
     pub status: Option<String>,
     pub linked_project_id: Option<String>,
 }
+
+// ── Inference Stats ──────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InferenceStatsResponse {
+    pub active_context_count: i64,
+    pub archived_context_count: i64,
+    pub events_last_hour: i64,
+    pub events_last_24h: i64,
+    pub assignment_rate: f64,
+    pub avg_confidence: f64,
+    pub merges_last_24h: i64,
+    pub last_run_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InferenceConfigUpdate {
+    pub assignment_threshold: Option<f64>,
+    pub merge_threshold: Option<f64>,
+    pub semantic_weight: Option<f64>,
+    pub temporal_weight: Option<f64>,
+    pub resource_weight: Option<f64>,
+    pub inference_interval_mins: Option<u64>,
+    pub max_dormancy_days: Option<f64>,
+    pub max_active_contexts: Option<usize>,
+}
+
+// ── Dashboard Intelligence ───────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DashboardIntelligenceResponse {
+    pub active_context: Option<WorkContextSummary>,
+    pub focus_recommendation: Option<String>,
+    pub session_summary: Vec<SessionBlock>,
+    pub context_switches: i64,
+    pub switch_quality: String,
+    pub productivity_score: f64,
+    pub score_trend: f64,
+    pub patterns: Vec<String>,
+    pub nudges: Vec<DashboardNudge>,
+    pub resource_clusters: Vec<ResourceCluster>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkContextSummary {
+    pub id: String,
+    pub title: String,
+    pub context_type: String,
+    pub color: Option<String>,
+    pub duration_mins: i64,
+    pub confidence: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionBlock {
+    pub context_type: String,
+    pub total_duration_mins: i64,
+    pub session_count: i64,
+    pub color: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DashboardNudge {
+    pub message: String,
+    pub nudge_type: String,
+    pub priority: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResourceCluster {
+    pub resources: Vec<String>,
+    pub access_count: i64,
+}

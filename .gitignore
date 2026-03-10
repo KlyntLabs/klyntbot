@@ -18,6 +18,9 @@ tests/fixtures/hello_plugin/plugin.wasm
 # Build-time secrets (OAuth credentials for official builds)
 .cargo/config.toml
 
+# Superpowers brainstorm sessions
+.superpowers/
+
 # IDE/Editor
 .vscode/
 .idea/

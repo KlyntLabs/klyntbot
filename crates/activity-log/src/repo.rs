@@ -283,6 +283,31 @@ impl ActivityLogRepo {
         Ok(rows.into_iter().map(Into::into).collect())
     }
 
+    pub async fn count_since(pool: &StoragePool, since: DateTime<Utc>) -> common::Result<i64> {
+        let row: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM unified_activity_log WHERE timestamp >= ?1")
+                .bind(since.to_rfc3339())
+                .fetch_one(pool.inner())
+                .await
+                .map_err(StorageError::from)?;
+        Ok(row.0)
+    }
+
+    pub async fn count_assigned_since(
+        pool: &StoragePool,
+        since: DateTime<Utc>,
+    ) -> common::Result<i64> {
+        let row: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM unified_activity_log \
+             WHERE work_context_id IS NOT NULL AND timestamp >= ?1",
+        )
+        .bind(since.to_rfc3339())
+        .fetch_one(pool.inner())
+        .await
+        .map_err(StorageError::from)?;
+        Ok(row.0)
+    }
+
     pub async fn delete_older_than(pool: &StoragePool, days: i64) -> common::Result<u64> {
         let cutoff = Utc::now() - chrono::Duration::days(days);
         let result = sqlx::query("DELETE FROM unified_activity_log WHERE timestamp < ?1")

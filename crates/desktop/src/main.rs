@@ -374,6 +374,9 @@ fn main() {
             commands::work_context::search_work_contexts,
             commands::work_context::get_context_timeline,
             commands::work_context::get_context_resume_data,
+            commands::work_context::get_inference_stats,
+            commands::work_context::get_dashboard_intelligence,
+            commands::work_context::update_inference_config,
             // Capture
             commands::capture::capture_status,
             commands::capture::capture_shell_hook_status,

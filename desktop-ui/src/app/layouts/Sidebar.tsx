@@ -1,9 +1,8 @@
 import { KlyntLogo } from "@shared/components/ui/KlyntLogo";
 import type { SidebarItem } from "@shared/types";
 import {
-  Activity,
-  Bug,
   CheckSquare,
+  Cpu,
   FileText,
   LayoutDashboard,
   MessageCircle,
@@ -27,9 +26,8 @@ const items: { key: SidebarItem; icon: typeof MessageSquare; path?: string; bott
   { key: "Tasks", icon: CheckSquare, path: "/tasks" },
   { key: "Notes", icon: FileText, path: "/notes" },
   { key: "Finance", icon: Wallet, path: "/finance" },
-  { key: "Productivity", icon: Activity, path: "/categories" },
   { key: "Automations", icon: Timer, path: "/automations" },
-  { key: "Debug", icon: Bug, path: "/debug", bottom: true },
+  { key: "System", icon: Cpu, path: "/system", bottom: true },
   { key: "Settings", icon: Settings, path: "/settings", bottom: true },
 ];
 

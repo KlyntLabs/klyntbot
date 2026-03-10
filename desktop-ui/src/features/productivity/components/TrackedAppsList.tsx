@@ -49,10 +49,38 @@ export function TrackedAppsList({ apps, categories, onReassigned }: TrackedAppsL
   }, [categories]);
 
   const handleReassign = async (app: TrackedApp, newCategoryId: string) => {
-    const cat = categories.find((c) => c.id === newCategoryId);
-    if (!cat) return;
+    const newCat = categories.find((c) => c.id === newCategoryId);
+    if (!newCat) return;
 
-    const rules = cat.rules ?? { appNames: [], bundleIds: [], urlPatterns: [] };
+    // Step 1: Remove the app/site pattern from the OLD category (if any)
+    if (app.categoryId && app.categoryId !== newCategoryId) {
+      const oldCat = categories.find((c) => c.id === app.categoryId);
+      if (oldCat?.rules) {
+        const oldRules = oldCat.rules;
+        const cleanedRules = app.siteName
+          ? {
+              appNames: oldRules.appNames,
+              bundleIds: oldRules.bundleIds,
+              urlPatterns: oldRules.urlPatterns.filter((p) => p !== app.siteName),
+            }
+          : {
+              appNames: oldRules.appNames.filter((n) => n !== app.appName),
+              bundleIds: oldRules.bundleIds,
+              urlPatterns: oldRules.urlPatterns,
+            };
+        await reassignMut.mutate({
+          id: oldCat.id,
+          name: oldCat.name,
+          category_type: oldCat.categoryType,
+          color: oldCat.color,
+          icon: null,
+          rules: cleanedRules,
+        });
+      }
+    }
+
+    // Step 2: Add the app/site pattern to the NEW category
+    const rules = newCat.rules ?? { appNames: [], bundleIds: [], urlPatterns: [] };
     const updatedRules = app.siteName
       ? {
           appNames: rules.appNames,
@@ -66,13 +94,24 @@ export function TrackedAppsList({ apps, categories, onReassigned }: TrackedAppsL
         };
 
     await reassignMut.mutate({
-      id: cat.id,
-      name: cat.name,
-      category_type: cat.categoryType,
-      color: cat.color,
+      id: newCat.id,
+      name: newCat.name,
+      category_type: newCat.categoryType,
+      color: newCat.color,
       icon: null,
       rules: updatedRules,
     });
+
+    // Step 3: Re-categorize historical events for this app/site
+    await reassignMut.mutate(
+      {
+        app_name: app.appName,
+        site_name: app.siteName ?? null,
+        new_category_id: newCategoryId,
+      },
+      "productivity_recategorize_app",
+    );
+
     setEditingKey(null);
     onReassigned();
   };

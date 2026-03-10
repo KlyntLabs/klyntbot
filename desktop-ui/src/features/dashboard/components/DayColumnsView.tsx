@@ -15,6 +15,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type LayerKey, useEnabledLayers, useSidebarOpen } from "../lib/layers";
 import { ActivityTrack, type SessionBlock } from "./ActivityTrack";
 import { CalendarTrack } from "./CalendarTrack";
+import { ContextRibbon } from "./ContextRibbon";
+import { SmartSummary } from "./SmartSummary";
 import { SummaryPanel } from "./SummaryPanel";
 
 const DEFAULT_HOUR_HEIGHT = 60;
@@ -245,6 +247,9 @@ export function DayColumnsView({
   return (
     <div className="flex gap-2 h-full">
       <div className="flex-1 glass-card overflow-hidden flex flex-col">
+        {/* Context color ribbon — subtle work context indicator per hour */}
+        <ContextRibbon date={date} />
+
         {loading && <div className="px-4 py-2 text-xs text-muted">Loading...</div>}
 
         {/* Zoom indicator — shown when zoomed away from default */}
@@ -444,16 +449,19 @@ export function DayColumnsView({
       </div>
 
       {sidebarOpen && (
-        <SummaryPanel
-          summary={summary}
-          selectedEntry={selectedEntry}
-          selectedSession={selectedSession}
-          onClose={() => {
-            setSelectedEntry(null);
-            setSelectedSession(null);
-          }}
-          productivitySummary={productivitySummary}
-        />
+        <>
+          <SmartSummary date={date} />
+          <SummaryPanel
+            summary={summary}
+            selectedEntry={selectedEntry}
+            selectedSession={selectedSession}
+            onClose={() => {
+              setSelectedEntry(null);
+              setSelectedSession(null);
+            }}
+            productivitySummary={productivitySummary}
+          />
+        </>
       )}
     </div>
   );

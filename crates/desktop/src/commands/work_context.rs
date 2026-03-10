@@ -1,6 +1,7 @@
 use desktop_shared::commands::{
-    ContextResumeResponse, ContextTimelineBlockResponse, WorkContextDetailResponse,
-    WorkContextResponse, WorkContextUpdateParams,
+    ContextResumeResponse, ContextTimelineBlockResponse, DashboardIntelligenceResponse,
+    InferenceConfigUpdate, InferenceStatsResponse, WorkContextDetailResponse, WorkContextResponse,
+    WorkContextUpdateParams,
 };
 use desktop_shared::errors::ApiError;
 use std::sync::Arc;
@@ -82,6 +83,32 @@ pub async fn get_context_resume_data(
     state.get_context_resume_data(context_id).await
 }
 
+#[tauri::command]
+pub async fn get_inference_stats(
+    state: State<'_, Arc<AppCore>>,
+) -> Result<InferenceStatsResponse, ApiError> {
+    state.get_inference_stats().await
+}
+
+#[tauri::command]
+pub async fn get_dashboard_intelligence(
+    state: State<'_, Arc<AppCore>>,
+    date: String,
+    tz_offset_mins: Option<i32>,
+) -> Result<DashboardIntelligenceResponse, ApiError> {
+    state
+        .get_dashboard_intelligence(&date, tz_offset_mins)
+        .await
+}
+
+#[tauri::command]
+pub async fn update_inference_config(
+    state: State<'_, Arc<AppCore>>,
+    config: InferenceConfigUpdate,
+) -> Result<(), ApiError> {
+    state.update_inference_config(config).await
+}
+
 // ── Dev server dispatch ─────────────────────────────────────────────
 
 #[cfg(test)]
@@ -95,6 +122,9 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "search_work_contexts",
     "get_context_timeline",
     "get_context_resume_data",
+    "get_inference_stats",
+    "get_dashboard_intelligence",
+    "update_inference_config",
 ];
 
 #[cfg(debug_assertions)]
@@ -142,6 +172,18 @@ pub(crate) async fn dispatch_dev(
             let context_id = try_field!(dev::get_str(body, "contextId"));
             dev::val(core.get_context_resume_data(context_id).await)
         }
+        "get_inference_stats" => dev::val(core.get_inference_stats().await),
+        "get_dashboard_intelligence" => {
+            let date = try_field!(dev::get_str(body, "date"));
+            dev::val(
+                core.get_dashboard_intelligence(&date, dev::get(body, "tzOffsetMins"))
+                    .await,
+            )
+        }
+        "update_inference_config" => dev::val(
+            core.update_inference_config(try_field!(dev::parse_params(body)))
+                .await,
+        ),
         _ => return None,
     })
 }

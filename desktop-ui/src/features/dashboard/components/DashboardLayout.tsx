@@ -13,16 +13,14 @@ import {
   LAYERS,
   LayerContext,
   SidebarContext,
-  useDataMode,
   useLayerToggle,
   useSidebarToggle,
 } from "../lib/layers";
 import { CalendarSync } from "./CalendarSync";
 
-type ViewMode = "day" | "week" | "month" | "year" | "categories";
+type ViewMode = "day" | "week" | "month" | "year";
 
 function getViewMode(pathname: string): ViewMode {
-  if (pathname.startsWith("/categories")) return "categories";
   if (pathname.startsWith("/week/")) return "week";
   if (pathname.startsWith("/month/")) return "month";
   if (pathname.startsWith("/year/")) return "year";
@@ -70,13 +68,8 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
       case "year":
         navigate(`/year/${new Date().getFullYear()}`);
         break;
-      case "categories":
-        navigate("/categories");
-        break;
     }
   };
-
-  const isCategories = mode === "categories";
 
   const navigateBy = (dir: 1 | -1) => {
     const d = new Date(`${dateParam}T00:00:00`);
@@ -100,9 +93,6 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
 
   // Sidebar toggle
   const { sidebarOpen, toggleSidebar } = useSidebarToggle();
-
-  // Data mode toggle (Productivity vs Contexts)
-  const { dataMode, setDataMode } = useDataMode();
 
   // Layer toggle
   const { enabled, toggle, reset, enabledSources } = useLayerToggle();
@@ -162,19 +152,16 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
     { key: "week", label: "Week" },
     { key: "month", label: "Month" },
     { key: "year", label: "Year" },
-    { key: "categories", label: "Categories" },
   ];
 
   return (
     <div className="flex-1 flex flex-col gap-2 min-w-0">
       {/* Top bar */}
       <div className="glass-card px-4 py-2 flex items-center gap-4">
-        {/* Date label — hide on categories */}
-        {!isCategories && (
-          <span className="text-sm font-medium text-primary whitespace-nowrap">
-            {formatDateDisplay(mode, dateParam)}
-          </span>
-        )}
+        {/* Date label */}
+        <span className="text-sm font-medium text-primary whitespace-nowrap">
+          {formatDateDisplay(mode, dateParam)}
+        </span>
 
         {/* View switcher pill group */}
         <div className="flex items-center rounded-full bg-white/[0.06] p-0.5">
@@ -193,92 +180,71 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
           ))}
         </div>
 
-        {/* Date-specific controls — hide on categories */}
-        {!isCategories && (
-          <>
-            {/* Layers toggle */}
+        {/* Date-specific controls */}
+        <>
+          {/* Layers toggle */}
+          <button
+            ref={layersTriggerRef}
+            type="button"
+            onClick={() => setLayersOpen(!layersOpen)}
+            aria-haspopup="dialog"
+            aria-expanded={layersOpen}
+            className={cn(
+              "p-1.5 rounded-full text-muted hover:text-secondary hover:bg-white/[0.08] transition-colors",
+              layersOpen && "bg-white/[0.08] text-secondary",
+            )}
+            title="Toggle layers"
+          >
+            <Layers className="w-4 h-4" />
+          </button>
+
+          <CalendarSync />
+
+          {/* Nav pill group */}
+          <div className="flex items-center rounded-full bg-white/[0.06] p-0.5 ml-auto">
             <button
-              ref={layersTriggerRef}
               type="button"
-              onClick={() => setLayersOpen(!layersOpen)}
+              onClick={() => navigateBy(-1)}
+              className="p-1.5 rounded-full text-muted hover:text-secondary hover:bg-white/[0.08] transition-colors"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <button
+              ref={calTriggerRef}
+              type="button"
+              onClick={() => setCalOpen(!calOpen)}
               aria-haspopup="dialog"
-              aria-expanded={layersOpen}
+              aria-expanded={calOpen}
               className={cn(
                 "p-1.5 rounded-full text-muted hover:text-secondary hover:bg-white/[0.08] transition-colors",
-                layersOpen && "bg-white/[0.08] text-secondary",
+                calOpen && "bg-white/[0.08] text-secondary",
               )}
-              title="Toggle layers"
+              title="Pick date"
             >
-              <Layers className="w-4 h-4" />
+              <Calendar className="w-4 h-4" />
             </button>
-
-            {/* Data mode toggle */}
-            <div className="flex items-center rounded-full bg-white/[0.06] p-0.5">
-              {(["productivity", "contexts"] as const).map((dm) => (
-                <button
-                  key={dm}
-                  type="button"
-                  onClick={() => setDataMode(dm)}
-                  className={cn(
-                    "px-2.5 py-0.5 rounded-full text-[11px] font-medium transition-all capitalize",
-                    dataMode === dm
-                      ? "bg-white/[0.12] text-primary"
-                      : "text-muted hover:text-secondary",
-                  )}
-                >
-                  {dm}
-                </button>
-              ))}
-            </div>
-
-            <CalendarSync />
-
-            {/* Nav pill group */}
-            <div className="flex items-center rounded-full bg-white/[0.06] p-0.5 ml-auto">
-              <button
-                type="button"
-                onClick={() => navigateBy(-1)}
-                className="p-1.5 rounded-full text-muted hover:text-secondary hover:bg-white/[0.08] transition-colors"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button
-                ref={calTriggerRef}
-                type="button"
-                onClick={() => setCalOpen(!calOpen)}
-                aria-haspopup="dialog"
-                aria-expanded={calOpen}
-                className={cn(
-                  "p-1.5 rounded-full text-muted hover:text-secondary hover:bg-white/[0.08] transition-colors",
-                  calOpen && "bg-white/[0.08] text-secondary",
-                )}
-                title="Pick date"
-              >
-                <Calendar className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => navigateBy(1)}
-                className="p-1.5 rounded-full text-muted hover:text-secondary hover:bg-white/[0.08] transition-colors"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Sidebar toggle */}
             <button
               type="button"
-              onClick={toggleSidebar}
-              className={cn(
-                "p-1.5 rounded-full text-muted hover:text-secondary hover:bg-white/[0.08] transition-colors",
-                sidebarOpen && "bg-white/[0.08] text-secondary",
-              )}
-              title={sidebarOpen ? "Hide summary" : "Show summary"}
+              onClick={() => navigateBy(1)}
+              className="p-1.5 rounded-full text-muted hover:text-secondary hover:bg-white/[0.08] transition-colors"
             >
-              <PanelRight className="w-4 h-4" />
+              <ChevronRight className="w-4 h-4" />
             </button>
-          </>
-        )}
+          </div>
+
+          {/* Sidebar toggle */}
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            className={cn(
+              "p-1.5 rounded-full text-muted hover:text-secondary hover:bg-white/[0.08] transition-colors",
+              sidebarOpen && "bg-white/[0.08] text-secondary",
+            )}
+            title={sidebarOpen ? "Hide summary" : "Show summary"}
+          >
+            <PanelRight className="w-4 h-4" />
+          </button>
+        </>
       </div>
 
       {/* Layers dropdown popover */}
@@ -337,7 +303,7 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
       <AutoFocusToast />
 
       {/* Content */}
-      <DataModeContext.Provider value={dataMode}>
+      <DataModeContext.Provider value="productivity">
         <LayerContext.Provider value={{ enabled, enabledSources }}>
           <SidebarContext.Provider value={sidebarOpen}>
             <div className="flex-1 overflow-hidden">{children}</div>

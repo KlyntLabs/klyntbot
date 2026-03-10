@@ -46,9 +46,9 @@ const LiabilitiesPage = lazy(() =>
   import("../features/finance").then((m) => ({ default: m.LiabilitiesPage })),
 );
 
-// ── Productivity Feature ──────────────────────────────────────────
-const CategoriesPage = lazy(() =>
-  import("../features/productivity").then((m) => ({ default: m.CategoriesPage })),
+// ── System Feature ───────────────────────────────────────────────
+const SystemPage = lazy(() =>
+  import("../features/system").then((m) => ({ default: m.SystemPage })),
 );
 
 // ── Dashboard Feature ────────────────────────────────────────────
@@ -97,10 +97,7 @@ const IntegrationsSettings = lazy(() =>
   import("../features/settings").then((m) => ({ default: m.IntegrationsSettings })),
 );
 
-// ── Debug Feature ────────────────────────────────────────────────
-const DebugDashboardPage = lazy(() =>
-  import("../features/debug").then((m) => ({ default: m.DebugDashboardPage })),
-);
+// (Debug feature — now integrated into System page)
 
 // ── Tray Feature ─────────────────────────────────────────────────
 const LauncherPage = lazy(() =>
@@ -196,26 +193,22 @@ export const router = createHashRouter([
           </DashboardLayout>
         ),
       },
-      {
-        path: "/categories",
-        element: (
-          <DashboardLayout>
-            <CategoriesPage />
-          </DashboardLayout>
-        ),
-      },
+      // System page (contexts, categories, inference, debug tabs)
+      { path: "/system", element: <SystemPage /> },
+      { path: "/system/:tab", element: <SystemPage /> },
       { path: "/tasks", element: <TasksPage /> },
       { path: "/chat", element: <ChatPage /> },
       { path: "/notes", element: <NotesPage /> },
       { path: "/project/:id", element: <ProjectDetailPage /> },
       { path: "/task/:id", element: <TaskDetailPage /> },
       { path: "/objective/:id", element: <ObjectiveDetailPage /> },
-      // Redirect old productivity routes to dashboard
+      // Redirect old routes
       { path: "/productivity", element: <Navigate to="/" replace /> },
       { path: "/productivity/day/:date", element: <Navigate to="/" replace /> },
       { path: "/productivity/week/:weekStart", element: <Navigate to="/" replace /> },
       { path: "/productivity/month/:yearMonth", element: <Navigate to="/" replace /> },
-      { path: "/productivity/categories", element: <Navigate to="/categories" replace /> },
+      { path: "/productivity/categories", element: <Navigate to="/system/categories" replace /> },
+      { path: "/categories", element: <Navigate to="/system/categories" replace /> },
       { path: "/finance", element: <FinanceOverviewPage /> },
       { path: "/finance/accounts", element: <AccountsPage /> },
       { path: "/finance/transactions", element: <TransactionsPage /> },
@@ -223,7 +216,7 @@ export const router = createHashRouter([
       { path: "/finance/investments", element: <InvestmentsPage /> },
       { path: "/finance/goals", element: <GoalsPage /> },
       { path: "/finance/liabilities", element: <LiabilitiesPage /> },
-      { path: "/debug", element: <DebugDashboardPage /> },
+      { path: "/debug", element: <Navigate to="/system/events" replace /> },
       { path: "/settings", element: <Navigate to="/settings/general" replace /> },
       {
         path: "/settings/general",

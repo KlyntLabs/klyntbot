@@ -61,9 +61,8 @@ export type SidebarItem =
   | "Calendar"
   | "Notes"
   | "Finance"
-  | "Productivity"
   | "Automations"
-  | "Debug"
+  | "System"
   | "Settings";
 export type ViewMode = "table" | "board" | "tree";
 

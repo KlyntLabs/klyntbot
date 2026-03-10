@@ -242,6 +242,28 @@ impl WorkContextRepo {
         Ok(())
     }
 
+    pub async fn count_by_status(
+        pool: &StoragePool,
+        status: WorkContextStatus,
+    ) -> common::Result<i64> {
+        let row: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM work_contexts WHERE status = ?1")
+            .bind(status.as_str())
+            .fetch_one(pool.inner())
+            .await
+            .map_err(StorageError::from)?;
+        Ok(row.0)
+    }
+
+    pub async fn avg_confidence_active(pool: &StoragePool) -> common::Result<f64> {
+        let row: (f64,) = sqlx::query_as(
+            "SELECT COALESCE(AVG(confidence), 0.0) FROM work_contexts WHERE status = 'active'",
+        )
+        .fetch_one(pool.inner())
+        .await
+        .map_err(StorageError::from)?;
+        Ok(row.0)
+    }
+
     pub async fn search_by_title(
         pool: &StoragePool,
         query: &str,
