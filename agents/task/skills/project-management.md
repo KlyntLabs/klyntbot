@@ -1,8 +1,16 @@
 ---
 name: project-management
 description: Project, area, and OKR management with health scoring and stagnation detection
-always: false
-triggers: [project status, project health, how are my projects, stagnation, okr check]
+license: MIT
+metadata:
+  author: klyntbot
+  version: "1.0.0"
+  updated-on: "2026-03-10"
+  source: official
+  tags: "project,manage,plan,milestone"
+  always: false
+  triggers: "project status,project health,how are my projects,stagnation,okr check"
+  agent: task
 ---
 
 ## Framework

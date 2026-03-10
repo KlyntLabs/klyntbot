@@ -32,6 +32,15 @@ impl Tool for AreaTool {
         "Manage areas (top-level PARA containers). Actions: create, list, show, update, reorder."
     }
 
+    fn metadata(&self) -> tools_core::ToolMetadata {
+        tools_core::ToolMetadata {
+            category: tools_core::ToolCategory::Productivity,
+            tags: vec!["area".into(), "para".into(), "responsibility".into()],
+            cost_hint: tools_core::CostHint::Free,
+            ..Default::default()
+        }
+    }
+
     fn parameters(&self) -> Value {
         serde_json::json!({
             "type": "object",

@@ -38,7 +38,10 @@ pub struct GrepParams {
     name = "grep",
     description = "Search file contents using regex patterns within a directory scope. Returns matching lines with file path and line number.",
     params = "GrepParams",
-    permission = "read_only"
+    permission = "read_only",
+    category = "Search",
+    tags = "search,content,regex",
+    cost = "Free"
 )]
 pub struct GrepTool {
     base: FsToolBase,

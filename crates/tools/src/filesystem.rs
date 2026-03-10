@@ -76,7 +76,10 @@ pub struct ReadFileParams {
     name = "read_file",
     description = "Read the contents of a file at the given path.",
     params = "ReadFileParams",
-    permission = "read_only"
+    permission = "read_only",
+    category = "FileSystem",
+    tags = "file,read,content",
+    cost = "Free"
 )]
 pub struct ReadFileTool {
     base: FsToolBase,
@@ -131,7 +134,10 @@ pub struct WriteFileParams {
     name = "write_file",
     description = "Write content to a file at the given path. Creates parent directories if needed.",
     params = "WriteFileParams",
-    permission = "elevated"
+    permission = "elevated",
+    category = "FileSystem",
+    tags = "file,write,create",
+    cost = "Free"
 )]
 pub struct WriteFileTool {
     base: FsToolBase,
@@ -197,7 +203,10 @@ pub struct EditFileParams {
     name = "edit_file",
     description = "Edit a file by replacing old_text with new_text. The old_text must exist exactly in the file.",
     params = "EditFileParams",
-    permission = "elevated"
+    permission = "elevated",
+    category = "FileSystem",
+    tags = "file,edit,modify",
+    cost = "Free"
 )]
 pub struct EditFileTool {
     base: FsToolBase,
@@ -278,7 +287,10 @@ pub struct ListDirParams {
     name = "list_dir",
     description = "List the contents of a directory.",
     params = "ListDirParams",
-    permission = "read_only"
+    permission = "read_only",
+    category = "FileSystem",
+    tags = "file,directory,list",
+    cost = "Free"
 )]
 pub struct ListDirTool {
     base: FsToolBase,

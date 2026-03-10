@@ -1,7 +1,16 @@
 ---
 name: spending-analysis
 description: Analyze spending patterns, trends, and provide financial insights
-always: false
+license: MIT
+metadata:
+  author: klyntbot
+  version: "1.0.0"
+  updated-on: "2026-03-10"
+  source: official
+  tags: "finance,spending,analysis,report"
+  always: false
+  triggers: ""
+  agent: finance
 ---
 
 ## When to use

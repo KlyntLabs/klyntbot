@@ -1,7 +1,16 @@
 ---
 name: skill-creator
 description: Create or update agent skills with proper structure and metadata
-always: false
+license: MIT
+metadata:
+  author: klyntbot
+  version: "1.0.0"
+  updated-on: "2026-03-10"
+  source: official
+  tags: "skill,create,template,agent"
+  always: false
+  triggers: ""
+  agent: general
 ---
 
 ## About Skills

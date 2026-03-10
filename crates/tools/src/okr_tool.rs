@@ -47,6 +47,15 @@ impl Tool for OkrTool {
         "Manage OKR objectives and key results. Actions: objective.create, objective.list, objective.show, objective.update, objective.delete, kr.create, kr.list, kr.show, kr.update, kr.update_metric, kr.delete"
     }
 
+    fn metadata(&self) -> tools_core::ToolMetadata {
+        tools_core::ToolMetadata {
+            category: tools_core::ToolCategory::Productivity,
+            tags: vec!["okr".into(), "objective".into(), "goal".into()],
+            cost_hint: tools_core::CostHint::Free,
+            ..Default::default()
+        }
+    }
+
     fn parameters(&self) -> Value {
         serde_json::json!({
             "type": "object",

@@ -1,7 +1,16 @@
 ---
 name: search
 description: Web search and information retrieval
-always: false
+license: MIT
+metadata:
+  author: klyntbot
+  version: "1.0.0"
+  updated-on: "2026-03-10"
+  source: official
+  tags: "search,web,find,lookup"
+  always: false
+  triggers: ""
+  agent: general
 ---
 
 Use `web_search` and `web_fetch` for real-time information retrieval.

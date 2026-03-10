@@ -25,7 +25,10 @@ pub struct GlobParams {
     name = "glob",
     description = "Find files by glob pattern matching. Returns matching file paths sorted by modification time (most recent first).",
     params = "GlobParams",
-    permission = "read_only"
+    permission = "read_only",
+    category = "Search",
+    tags = "search,file,pattern",
+    cost = "Free"
 )]
 pub struct GlobTool {
     base: FsToolBase,

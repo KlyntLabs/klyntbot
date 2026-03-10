@@ -1,7 +1,16 @@
 ---
 name: summarize
 description: Summarize or extract text/transcripts from URLs, podcasts, and local files
-always: false
+license: MIT
+metadata:
+  author: klyntbot
+  version: "1.0.0"
+  updated-on: "2026-03-10"
+  source: official
+  tags: "summarize,summary,digest,tldr"
+  always: false
+  triggers: ""
+  agent: general
 ---
 
 Fast CLI to summarize URLs, local files, and YouTube links.

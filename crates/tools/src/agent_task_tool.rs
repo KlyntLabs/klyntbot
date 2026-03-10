@@ -54,6 +54,15 @@ impl Tool for AgentTaskTool {
         PermissionLevel::Standard
     }
 
+    fn metadata(&self) -> tools_core::ToolMetadata {
+        tools_core::ToolMetadata {
+            category: tools_core::ToolCategory::TaskManagement,
+            tags: vec!["task".into(), "todo".into(), "action".into(), "plan".into()],
+            cost_hint: tools_core::CostHint::Free,
+            ..Default::default()
+        }
+    }
+
     fn parameters(&self) -> Value {
         serde_json::json!({
             "type": "object",

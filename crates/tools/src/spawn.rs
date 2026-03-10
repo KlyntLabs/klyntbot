@@ -69,6 +69,15 @@ impl Tool for SpawnTool {
         PermissionLevel::Admin
     }
 
+    fn metadata(&self) -> tools_core::ToolMetadata {
+        tools_core::ToolMetadata {
+            category: tools_core::ToolCategory::System,
+            tags: vec!["agent".into(), "delegate".into(), "spawn".into()],
+            cost_hint: tools_core::CostHint::Variable,
+            ..Default::default()
+        }
+    }
+
     fn parameters(&self) -> Value {
         serde_json::json!({
             "type": "object",

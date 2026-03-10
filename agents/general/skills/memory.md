@@ -1,7 +1,16 @@
 ---
 name: memory
 description: Store and recall important user information and conversation context
-always: false
+license: MIT
+metadata:
+  author: klyntbot
+  version: "1.0.0"
+  updated-on: "2026-03-10"
+  source: official
+  tags: "memory,fact,recall,store"
+  always: false
+  triggers: ""
+  agent: general
 ---
 
 Use the `memory` tool to manage persistent user knowledge.

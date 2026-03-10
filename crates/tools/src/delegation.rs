@@ -97,6 +97,15 @@ impl Tool for DelegationTool {
         PermissionLevel::Standard
     }
 
+    fn metadata(&self) -> tools_core::ToolMetadata {
+        tools_core::ToolMetadata {
+            category: tools_core::ToolCategory::System,
+            tags: vec!["delegate".into(), "agent".into(), "spawn".into()],
+            cost_hint: tools_core::CostHint::Variable,
+            ..Default::default()
+        }
+    }
+
     /// Delegation runs a full sub-agent loop (multiple LLM calls + tool calls),
     /// so it needs a much longer timeout than the default 30s tool timeout.
     fn custom_timeout(&self) -> Option<std::time::Duration> {

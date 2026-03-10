@@ -1,7 +1,16 @@
 ---
 name: todo
 description: Task creation with smart defaults, confidence scoring, and multi-task capture
-always: true
+license: MIT
+metadata:
+  author: klyntbot
+  version: "1.0.0"
+  updated-on: "2026-03-10"
+  source: official
+  tags: "task,todo,create,productivity"
+  always: true
+  triggers: ""
+  agent: task
 ---
 
 # Todo Task Creation

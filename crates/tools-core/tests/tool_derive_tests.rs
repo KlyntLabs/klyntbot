@@ -3,7 +3,7 @@
 use async_trait::async_trait;
 use common::{ChannelName, ChatId};
 use serde_json::json;
-use tools_core::{RoutingContext, Tool as ToolTrait, ToolExecute, ToolParams};
+use tools_core::{RoutingContext, Tool as ToolTrait, ToolCategory, ToolExecute, ToolParams};
 
 // ── Params ──────────────────────────────────────────────────
 
@@ -53,6 +53,28 @@ impl ToolExecute for NoopTool {
 
     async fn execute(&self, _params: NoParams, _ctx: &RoutingContext) -> common::Result<String> {
         Ok("done".to_string())
+    }
+}
+
+// ── Tool with metadata ─────────────────────────────────────
+
+#[derive(tools_core::Tool)]
+#[tool(
+    name = "search_files",
+    description = "Search for files by pattern",
+    params = "NoParams",
+    category = "Search",
+    tags = "file,search,pattern",
+    cost = "Free"
+)]
+pub struct SearchFilesTool;
+
+#[async_trait]
+impl ToolExecute for SearchFilesTool {
+    type Params = NoParams;
+
+    async fn execute(&self, _params: NoParams, _ctx: &RoutingContext) -> common::Result<String> {
+        Ok("found".to_string())
     }
 }
 
@@ -140,4 +162,21 @@ fn test_to_schema_includes_all_metadata() {
     assert_eq!(schema["function"]["name"], "echo");
     assert_eq!(schema["function"]["description"], "Echoes text back");
     assert!(schema["function"]["parameters"]["properties"]["text"].is_object());
+}
+
+#[test]
+fn test_metadata_from_derive_attributes() {
+    let tool = SearchFilesTool;
+    let meta = tool.metadata();
+    assert_eq!(meta.category, ToolCategory::Search);
+    assert_eq!(meta.tags, vec!["file", "search", "pattern"]);
+    assert!(matches!(meta.cost_hint, tools_core::CostHint::Free));
+}
+
+#[test]
+fn test_default_metadata_when_no_attributes() {
+    let tool = NoopTool;
+    let meta = tool.metadata();
+    assert_eq!(meta.category, ToolCategory::General);
+    assert!(meta.tags.is_empty());
 }

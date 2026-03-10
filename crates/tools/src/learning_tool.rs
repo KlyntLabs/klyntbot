@@ -83,6 +83,15 @@ impl Tool for LearningTool {
          Actions: status (current data), analyze (fresh analysis), history (last N threshold changes)."
     }
 
+    fn metadata(&self) -> tools_core::ToolMetadata {
+        tools_core::ToolMetadata {
+            category: tools_core::ToolCategory::Memory,
+            tags: vec!["learn".into(), "preference".into(), "behavior".into()],
+            cost_hint: tools_core::CostHint::Free,
+            ..Default::default()
+        }
+    }
+
     fn parameters(&self) -> Value {
         serde_json::json!({
             "type": "object",

@@ -1,8 +1,16 @@
 ---
 name: task-decompose
 description: Break complex tasks or goals into structured subtask plans
-always: false
-triggers: [break down, break this down, decompose, subtasks, plan out, how should i approach, workback]
+license: MIT
+metadata:
+  author: klyntbot
+  version: "1.0.0"
+  updated-on: "2026-03-10"
+  source: official
+  tags: "task,decompose,break-down,subtask"
+  always: false
+  triggers: "break down,break this down,decompose,subtasks,plan out,how should i approach,workback"
+  agent: task
 ---
 
 ## When to Use

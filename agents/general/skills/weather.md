@@ -1,7 +1,16 @@
 ---
 name: weather
 description: Get current weather and forecasts (no API key required)
-always: false
+license: MIT
+metadata:
+  author: klyntbot
+  version: "1.0.0"
+  updated-on: "2026-03-10"
+  source: official
+  tags: "weather,forecast,temperature"
+  always: false
+  triggers: ""
+  agent: general
 ---
 
 Two free services, no API keys needed.

@@ -232,6 +232,15 @@ impl Tool for BrowserTool {
         PermissionLevel::Elevated
     }
 
+    fn metadata(&self) -> tools_core::ToolMetadata {
+        tools_core::ToolMetadata {
+            category: tools_core::ToolCategory::Web,
+            tags: vec!["browser".into(), "navigate".into(), "scrape".into()],
+            cost_hint: tools_core::CostHint::Low,
+            ..Default::default()
+        }
+    }
+
     fn parameters(&self) -> Value {
         serde_json::json!({
             "type": "object",

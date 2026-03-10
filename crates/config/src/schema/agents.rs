@@ -14,6 +14,11 @@ pub struct AgentsConfig {
     /// When set, the system emits warnings at 80% and 100% of budget.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub monthly_budget_usd: Option<f64>,
+
+    /// Optional directory for runtime-loaded external skills.
+    /// Defaults to `~/.klyntbot/.agents/skills/` if not set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub skills_dir: Option<String>,
 }
 
 /// Default agent configuration

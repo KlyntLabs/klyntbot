@@ -26,7 +26,10 @@ pub struct WebSearchParams {
 #[tool(
     name = "web_search",
     description = "Search the web using Brave Search API. Returns titles, URLs, and snippets.",
-    params = "WebSearchParams"
+    params = "WebSearchParams",
+    category = "Web",
+    tags = "search,web,internet",
+    cost = "Low"
 )]
 pub struct WebSearchTool {
     api_key: Option<String>,
@@ -148,7 +151,10 @@ pub struct WebFetchParams {
 #[tool(
     name = "web_fetch",
     description = "Fetch URL and extract readable content (HTML -> text/markdown).",
-    params = "WebFetchParams"
+    params = "WebFetchParams",
+    category = "Web",
+    tags = "web,fetch,url,scrape",
+    cost = "Low"
 )]
 pub struct WebFetchTool {
     client: Client,

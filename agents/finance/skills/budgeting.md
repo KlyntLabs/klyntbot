@@ -1,7 +1,16 @@
 ---
 name: budgeting
 description: Personal finance management — accounts, transactions, budgets, investments, goals, and reports
-always: true
+license: MIT
+metadata:
+  author: klyntbot
+  version: "1.0.0"
+  updated-on: "2026-03-10"
+  source: official
+  tags: "finance,budget,money,spending"
+  always: true
+  triggers: ""
+  agent: finance
 ---
 
 ## Agent Instructions

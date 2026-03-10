@@ -43,9 +43,20 @@ impl Default for AgentProfile {
 pub struct AgentSkill {
     pub name: String,
     pub description: String,
+    pub content: String,
+
+    // Agent Skills spec fields
+    pub license: Option<String>,
+    pub author: Option<String>,
+    pub version: Option<String>,
+    pub updated_on: Option<String>,
+    pub source: Option<String>,
+    pub tags: Vec<String>,
+
+    // Klyntbot extensions
     pub always: bool,
     pub triggers: Vec<String>,
-    pub content: String,
+    pub agent: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -71,11 +82,40 @@ fn default_max_iterations() -> u32 {
     DEFAULT_MAX_ITERATIONS
 }
 
+/// Nested metadata block in Agent Skills spec format.
+#[derive(Deserialize, Default)]
+struct SkillMetadataBlock {
+    #[serde(default)]
+    author: Option<String>,
+    #[serde(default)]
+    version: Option<String>,
+    #[serde(default, rename = "updated-on")]
+    updated_on: Option<String>,
+    #[serde(default)]
+    source: Option<String>,
+    #[serde(default)]
+    tags: Option<String>,
+    #[serde(default)]
+    always: Option<bool>,
+    #[serde(default)]
+    triggers: Option<String>,
+    #[serde(default)]
+    agent: Option<String>,
+}
+
 #[derive(Deserialize)]
 struct SkillFrontmatter {
     name: String,
     #[serde(default)]
     description: String,
+    #[serde(default)]
+    license: Option<String>,
+
+    // New format: nested metadata block
+    #[serde(default)]
+    metadata: Option<SkillMetadataBlock>,
+
+    // Legacy flat fields (still supported)
     #[serde(default)]
     always: bool,
     #[serde(default)]
@@ -176,13 +216,43 @@ impl AgentSkill {
         let fm: SkillFrontmatter = serde_yaml::from_str(&frontmatter_str)
             .map_err(|e| common::ConfigError::Invalid(format!("Skill {name} frontmatter: {e}")))?;
 
-        Ok(Self {
+        // Shared fields for both formats
+        let mut skill = Self {
             name: fm.name,
             description: fm.description,
-            always: fm.always,
-            triggers: fm.triggers.into_iter().map(|t| t.to_lowercase()).collect(),
             content: body.trim().to_string(),
-        })
+            license: fm.license,
+            ..Default::default()
+        };
+
+        if let Some(meta) = fm.metadata {
+            // New format: extract fields from nested metadata block
+            skill.author = meta.author;
+            skill.version = meta.version;
+            skill.updated_on = meta.updated_on;
+            skill.source = meta.source;
+            skill.agent = meta.agent;
+            skill.always = meta.always.unwrap_or(false);
+            skill.tags = meta
+                .tags
+                .map(|t| t.split(',').map(|s| s.trim().to_string()).collect())
+                .unwrap_or_default();
+            skill.triggers = meta
+                .triggers
+                .map(|t| {
+                    t.split(',')
+                        .map(|s| s.trim().to_lowercase())
+                        .filter(|s| !s.is_empty())
+                        .collect()
+                })
+                .unwrap_or_default();
+        } else {
+            // Legacy format: flat keys
+            skill.always = fm.always;
+            skill.triggers = fm.triggers.into_iter().map(|t| t.to_lowercase()).collect();
+        }
+
+        Ok(skill)
     }
 }
 
@@ -473,5 +543,57 @@ Instructions here.
         };
         assert!(!profile.allows_mcp_server("linear"));
         assert!(!profile.allows_mcp_server("github"));
+    }
+
+    #[test]
+    fn test_parse_agent_skills_spec_format() {
+        let content = r#"---
+name: todo
+description: Task creation with confidence scoring
+license: MIT
+metadata:
+  author: klyntbot
+  version: "1.0.0"
+  updated-on: "2026-03-10"
+  source: official
+  tags: "task,todo,productivity"
+  always: true
+  triggers: "create task,add todo"
+  agent: task
+---
+
+Task creation instructions here.
+"#;
+
+        let skill = AgentSkill::parse("todo", content).unwrap();
+        assert_eq!(skill.name, "todo");
+        assert_eq!(skill.author.as_deref(), Some("klyntbot"));
+        assert_eq!(skill.version.as_deref(), Some("1.0.0"));
+        assert_eq!(skill.updated_on.as_deref(), Some("2026-03-10"));
+        assert_eq!(skill.source.as_deref(), Some("official"));
+        assert_eq!(skill.license.as_deref(), Some("MIT"));
+        assert!(skill.always);
+        assert_eq!(skill.triggers, vec!["create task", "add todo"]);
+        assert_eq!(skill.tags, vec!["task", "todo", "productivity"]);
+        assert_eq!(skill.agent.as_deref(), Some("task"));
+    }
+
+    #[test]
+    fn test_parse_legacy_format_still_works() {
+        let content = r#"---
+name: todo
+description: Task creation
+always: true
+triggers: []
+---
+
+Legacy content.
+"#;
+
+        let skill = AgentSkill::parse("todo", content).unwrap();
+        assert_eq!(skill.name, "todo");
+        assert!(skill.always);
+        assert!(skill.author.is_none());
+        assert!(skill.tags.is_empty());
     }
 }

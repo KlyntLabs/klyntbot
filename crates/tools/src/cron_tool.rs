@@ -99,6 +99,15 @@ impl Tool for CronTool {
         "Schedule reminders and recurring tasks. Actions: add, list, remove."
     }
 
+    fn metadata(&self) -> tools_core::ToolMetadata {
+        tools_core::ToolMetadata {
+            category: tools_core::ToolCategory::System,
+            tags: vec!["schedule".into(), "cron".into(), "recurring".into()],
+            cost_hint: tools_core::CostHint::Free,
+            ..Default::default()
+        }
+    }
+
     fn parameters(&self) -> Value {
         serde_json::json!({
             "type": "object",

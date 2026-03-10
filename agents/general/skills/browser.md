@@ -1,7 +1,16 @@
 ---
 name: browser
 description: Browser automation for navigating web pages and performing real-world tasks
-always: false
+license: MIT
+metadata:
+  author: klyntbot
+  version: "1.0.0"
+  updated-on: "2026-03-10"
+  source: official
+  tags: "browser,web,navigate,scrape"
+  always: false
+  triggers: ""
+  agent: general
 ---
 
 Use the `browser` tool to navigate web pages and perform real-world tasks like booking tickets, shopping, and managing accounts.

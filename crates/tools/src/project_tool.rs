@@ -36,6 +36,15 @@ impl Tool for ProjectTool {
         "Manage projects. Actions: create, list, show, update, archive, tasks."
     }
 
+    fn metadata(&self) -> tools_core::ToolMetadata {
+        tools_core::ToolMetadata {
+            category: tools_core::ToolCategory::TaskManagement,
+            tags: vec!["project".into(), "manage".into(), "plan".into()],
+            cost_hint: tools_core::CostHint::Free,
+            ..Default::default()
+        }
+    }
+
     fn parameters(&self) -> Value {
         serde_json::json!({
             "type": "object",

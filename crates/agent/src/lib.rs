@@ -6,6 +6,7 @@ pub mod agent_loop;
 pub mod agent_profile;
 pub mod agent_runtime;
 pub mod agent_task_handler;
+pub mod skill_loader;
 
 pub mod cognitive_embedder;
 pub mod cognitive_handlers;

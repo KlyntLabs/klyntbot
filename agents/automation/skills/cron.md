@@ -1,7 +1,16 @@
 ---
 name: cron
 description: Schedule reminders and recurring tasks
-always: true
+license: MIT
+metadata:
+  author: klyntbot
+  version: "1.0.0"
+  updated-on: "2026-03-10"
+  source: official
+  tags: "schedule,cron,recurring,automation"
+  always: true
+  triggers: ""
+  agent: automation
 ---
 
 Use the `cron` tool to schedule reminders or recurring tasks.

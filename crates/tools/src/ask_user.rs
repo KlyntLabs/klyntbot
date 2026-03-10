@@ -34,6 +34,15 @@ impl Tool for AskUserTool {
          tools in the same turn - it blocks execution until the user responds."
     }
 
+    fn metadata(&self) -> tools_core::ToolMetadata {
+        tools_core::ToolMetadata {
+            category: tools_core::ToolCategory::Communication,
+            tags: vec!["ask".into(), "input".into(), "confirm".into()],
+            cost_hint: tools_core::CostHint::Free,
+            ..Default::default()
+        }
+    }
+
     fn parameters(&self) -> Value {
         // Flat schema — no oneOf, no nested answer_type objects.
         // The question `type` field determines which extra fields are used.

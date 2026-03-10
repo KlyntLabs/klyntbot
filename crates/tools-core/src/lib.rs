@@ -6,6 +6,7 @@
 
 pub mod config_persistence;
 pub mod feature;
+pub mod metadata;
 pub mod pagination;
 pub mod params;
 pub mod permissions;
@@ -25,6 +26,7 @@ use common::{ChannelName, ChatId, FormResponse, InteractionRequest, Result};
 // Re-export submodule types
 pub use config_persistence::ConfigPersistence;
 pub use feature::{FeatureMigration, FeaturePackage, HealthStatus};
+pub use metadata::{CostHint, ToolCategory, ToolExample, ToolMetadata, ToolSource};
 pub use pagination::Page;
 pub use params::ParamExtractor;
 pub use permissions::{PermissionLevel, ToolPermissions};
@@ -171,6 +173,11 @@ pub trait Tool: Send + Sync {
     /// Defaults to `Standard`. Override for sensitive tools.
     fn permission_level(&self) -> PermissionLevel {
         PermissionLevel::Standard
+    }
+
+    /// Rich metadata for discovery. Override to provide category, tags, etc.
+    fn metadata(&self) -> ToolMetadata {
+        ToolMetadata::default()
     }
 
     /// Optional per-tool timeout override.

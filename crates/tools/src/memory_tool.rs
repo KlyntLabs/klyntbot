@@ -97,6 +97,20 @@ impl Tool for MemoryTool {
         "Search past conversations using semantic similarity. Actions: search_conversations (search conversation history), search_all (unified search across todos and conversations), purge (clear embeddings), status (show memory stats)."
     }
 
+    fn metadata(&self) -> tools_core::ToolMetadata {
+        tools_core::ToolMetadata {
+            category: tools_core::ToolCategory::Memory,
+            tags: vec![
+                "memory".into(),
+                "fact".into(),
+                "recall".into(),
+                "learn".into(),
+            ],
+            cost_hint: tools_core::CostHint::Free,
+            ..Default::default()
+        }
+    }
+
     fn parameters(&self) -> Value {
         json!({
             "type": "object",

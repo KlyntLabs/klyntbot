@@ -1,7 +1,16 @@
 ---
 name: daily-planner
 description: Morning plan with top 3 tasks and evening wrap-up
-always: true
+license: MIT
+metadata:
+  author: klyntbot
+  version: "1.0.0"
+  updated-on: "2026-03-10"
+  source: official
+  tags: "planning,daily,schedule,focus"
+  always: true
+  triggers: ""
+  agent: task
 ---
 
 ## Morning Plan

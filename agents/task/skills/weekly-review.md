@@ -1,8 +1,16 @@
 ---
 name: weekly-review
 description: Interactive GTD-style weekly review — walk through projects, triage overdue, plan next week
-always: false
-triggers: [weekly review, review my week, weekly check-in, how's my week, week in review]
+license: MIT
+metadata:
+  author: klyntbot
+  version: "1.0.0"
+  updated-on: "2026-03-10"
+  source: official
+  tags: "weekly,review,reflect,plan"
+  always: false
+  triggers: "weekly review,review my week,weekly check-in,how's my week,week in review"
+  agent: task
 ---
 
 ## When to Use

@@ -1,8 +1,16 @@
 ---
 name: retrospective
 description: Monthly OKR retrospective and quarterly planning cycle
-always: false
-triggers: [retrospective, monthly review, quarter review, okr review, score my okrs, quarterly planning]
+license: MIT
+metadata:
+  author: klyntbot
+  version: "1.0.0"
+  updated-on: "2026-03-10"
+  source: official
+  tags: "retrospective,review,reflect"
+  always: false
+  triggers: "retrospective,monthly review,quarter review,okr review,score my okrs,quarterly planning"
+  agent: task
 ---
 
 ## When to Use

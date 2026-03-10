@@ -26,7 +26,10 @@ pub struct MessageParams {
 #[tool(
     name = "message",
     description = "Send a message to a specific channel (Telegram, Discord, etc.). In CLI/dashboard sessions, respond with text directly instead of calling this tool — your text is streamed to the user automatically.",
-    params = "MessageParams"
+    params = "MessageParams",
+    category = "Communication",
+    tags = "message,send,reply",
+    cost = "Free"
 )]
 pub struct MessageTool {
     outbound_tx: mpsc::Sender<OutboundMessage>,
