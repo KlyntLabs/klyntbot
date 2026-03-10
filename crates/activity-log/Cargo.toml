@@ -9,6 +9,7 @@ license.workspace = true
 common.workspace = true
 cognitive.workspace = true
 config.workspace = true
+context_engine.workspace = true
 storage.workspace = true
 bus.workspace = true
 tools-core.workspace = true

@@ -125,13 +125,12 @@ impl ContextResourceRepo {
         pool: &StoragePool,
         context_id: &str,
     ) -> common::Result<Vec<String>> {
-        let rows: Vec<(String,)> = sqlx::query_as(
-            "SELECT resource_id FROM work_context_resources WHERE context_id = ?1",
-        )
-        .bind(context_id)
-        .fetch_all(pool.inner())
-        .await
-        .map_err(StorageError::from)?;
+        let rows: Vec<(String,)> =
+            sqlx::query_as("SELECT resource_id FROM work_context_resources WHERE context_id = ?1")
+                .bind(context_id)
+                .fetch_all(pool.inner())
+                .await
+                .map_err(StorageError::from)?;
         Ok(rows.into_iter().map(|(id,)| id).collect())
     }
 }

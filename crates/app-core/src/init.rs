@@ -198,7 +198,8 @@ impl AppCore {
             .with_domain_bus(Arc::clone(&domain_event_bus))
             .with_cognitive_provider(cognitive_provider.clone())
             .with_pipeline_tx(pipeline_tx)
-            .with_user_situation(user_situation.clone());
+            .with_user_situation(user_situation.clone())
+            .with_activity_service(Arc::clone(&activity_svc));
 
         if let Some(vs) = vector_store {
             builder = builder.with_vector_store(vs);

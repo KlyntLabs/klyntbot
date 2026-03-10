@@ -4,11 +4,7 @@ use storage::{StorageError, StoragePool};
 pub struct ContextActionRepo;
 
 impl ContextActionRepo {
-    pub async fn link(
-        pool: &StoragePool,
-        context_id: &str,
-        action_id: &str,
-    ) -> common::Result<()> {
+    pub async fn link(pool: &StoragePool, context_id: &str, action_id: &str) -> common::Result<()> {
         sqlx::query(
             "INSERT INTO work_context_actions (context_id, action_id, linked_at) \
              VALUES (?1,?2,?3) \

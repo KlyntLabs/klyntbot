@@ -66,11 +66,11 @@ impl ResourceEdgeRepo {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::Utc;
     use crate::normalizers::new_ulid;
     use crate::types::ResourceEdge;
     use crate::work_resource_repo::tests::make_resource;
     use crate::work_resource_repo::WorkResourceRepo;
+    use chrono::Utc;
 
     fn make_edge(source: &str, target: &str) -> ResourceEdge {
         let now = Utc::now();

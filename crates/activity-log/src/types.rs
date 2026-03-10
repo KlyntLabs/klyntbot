@@ -276,7 +276,10 @@ mod tests {
 
     #[test]
     fn test_work_context_status_parse() {
-        assert_eq!(WorkContextStatus::parse("active"), Some(WorkContextStatus::Active));
+        assert_eq!(
+            WorkContextStatus::parse("active"),
+            Some(WorkContextStatus::Active)
+        );
         assert_eq!(WorkContextStatus::parse("invalid"), None);
     }
 
@@ -288,7 +291,10 @@ mod tests {
 
     #[test]
     fn test_work_context_type_parse() {
-        assert_eq!(WorkContextType::parse("coding"), Some(WorkContextType::Coding));
+        assert_eq!(
+            WorkContextType::parse("coding"),
+            Some(WorkContextType::Coding)
+        );
         assert_eq!(WorkContextType::parse("invalid"), None);
     }
 }

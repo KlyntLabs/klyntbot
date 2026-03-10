@@ -6,6 +6,7 @@ rust-version.workspace = true
 license.workspace = true
 
 [dependencies]
+activity-log.workspace = true
 common.workspace = true
 bus.workspace = true
 config.workspace = true

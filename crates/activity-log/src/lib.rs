@@ -1,6 +1,8 @@
 pub mod context_action_repo;
 pub mod context_resource_repo;
+pub mod context_source;
 pub mod inference;
+pub mod inference_loop;
 pub mod normalizers;
 pub mod privacy;
 pub mod repo;
@@ -9,26 +11,29 @@ pub mod service;
 pub mod subscriber;
 pub mod types;
 pub mod work_context_repo;
+pub mod work_context_tool;
 pub mod work_resource_repo;
 
+pub use context_action_repo::ContextActionRepo;
+pub use context_resource_repo::ContextResourceRepo;
+pub use context_source::WorkContextSource;
 pub use normalizers::{
     normalize_domain_event, parse_rfc3339, ActivityNormalizer, ChatMessageInput,
     ChatMessageNormalizer, DomainEventNormalizer, ToolCallInput, ToolCallNormalizer,
     WindowEventInput, WindowEventNormalizer,
 };
-pub use context_action_repo::ContextActionRepo;
-pub use context_resource_repo::ContextResourceRepo;
 pub use privacy::PrivacyFilter;
 pub use repo::ActivityLogRepo;
 pub use resource_edge_repo::ResourceEdgeRepo;
 pub use service::ActivityIngestionService;
 pub use subscriber::ActivityLogSubscriber;
-pub use work_context_repo::WorkContextRepo;
-pub use work_resource_repo::WorkResourceRepo;
 pub use types::{
-    ActivityActor, ActivityLogEntry, ActivitySource, ContextAssignment, ResourceEdge,
-    WorkContext, WorkContextStatus, WorkContextType, WorkResource, MAX_PREVIEW_LEN,
+    ActivityActor, ActivityLogEntry, ActivitySource, ContextAssignment, ResourceEdge, WorkContext,
+    WorkContextStatus, WorkContextType, WorkResource, MAX_PREVIEW_LEN,
 };
+pub use work_context_repo::WorkContextRepo;
+pub use work_context_tool::WorkContextTool;
+pub use work_resource_repo::WorkResourceRepo;
 
 use tools_core::FeatureMigration;
 

@@ -61,6 +61,7 @@ pub struct AgentLoopBuilder {
     cognitive_provider: Option<DynProvider>,
     pipeline_tx: Option<tokio::sync::broadcast::Sender<cognitive::PipelineEvent>>,
     user_situation: Option<Arc<tokio::sync::Mutex<cognitive::situation::UserSituation>>>,
+    activity_svc: Option<Arc<activity_log::ActivityIngestionService>>,
 }
 
 impl AgentLoopBuilder {
@@ -78,6 +79,7 @@ impl AgentLoopBuilder {
             cognitive_provider: None,
             pipeline_tx: None,
             user_situation: None,
+            activity_svc: None,
         }
     }
 
@@ -132,6 +134,14 @@ impl AgentLoopBuilder {
         situation: Arc<tokio::sync::Mutex<cognitive::situation::UserSituation>>,
     ) -> Self {
         self.user_situation = Some(situation);
+        self
+    }
+
+    pub fn with_activity_service(
+        mut self,
+        svc: Arc<activity_log::ActivityIngestionService>,
+    ) -> Self {
+        self.activity_svc = Some(svc);
         self
     }
 
@@ -335,6 +345,44 @@ impl AgentLoopBuilder {
         if let Some(ref repos) = prod_repos {
             sources.push(Box::new(ProductivityContextSource::new(repos.clone())));
         }
+
+        // Work context source (optional — requires real pool + enabled config).
+        let _inference_loop_token: Option<CancellationToken> = if config.work_context.enabled {
+            if let Some(ref _pool) = self.pool {
+                sources.push(Box::new(activity_log::WorkContextSource::new(
+                    storage_pool.clone(),
+                )));
+
+                // Start inference engine + background loop
+                let text_embedder = Arc::new(crate::cognitive_embedder::TextEmbedderImpl::new(
+                    Arc::clone(&embedding_engine),
+                ));
+                let inference_config =
+                    activity_log::inference::ContextInferenceConfig::from_work_context_config(
+                        &config.work_context,
+                    );
+                let engine = Arc::new(activity_log::inference::ContextInferenceEngine::new(
+                    storage_pool.clone(),
+                    text_embedder,
+                    self.vector_store.clone(),
+                    inference_config,
+                ));
+
+                let token = CancellationToken::new();
+                let _handle = activity_log::inference_loop::ContextInferenceLoop::start(
+                    Arc::clone(&engine),
+                    config.work_context.inference_interval_mins,
+                    token.clone(),
+                );
+                info!("Work context inference loop started");
+
+                Some(token)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
 
         // Sort by priority (descending) — ensures correct ordering in prompt
         sources.sort_by_key(|s| std::cmp::Reverse(s.priority()));
@@ -659,6 +707,11 @@ impl AgentLoopBuilder {
             let note_repo = feature_notes::repo::NoteRepo::new(pool.clone());
             tool_registry.register(feature_notes::tool::NotesTool::new(note_repo));
             info!("Notes tool registered");
+        }
+
+        // ── Work context tool (requires real pool + enabled) ─────────────
+        if config.work_context.enabled && self.pool.is_some() {
+            tool_registry.register(activity_log::WorkContextTool::new(storage_pool.clone()));
         }
 
         // ── Productivity tool (reuses prod_repos from context source block) ──
@@ -1035,6 +1088,8 @@ impl AgentLoopBuilder {
             mcp_manager: tokio::sync::Mutex::new(mcp_manager),
             _domain_event_bus: self.domain_event_bus,
             cognitive_bg_service: tokio::sync::Mutex::new(cognitive_bg_service),
+            _inference_loop_token,
+            activity_svc: self.activity_svc,
         })
     }
 }

@@ -12,6 +12,7 @@ dependencies = [
  "cognitive",
  "common",
  "config",
+ "context_engine",
  "serde",
  "serde_json",
  "sha2",
@@ -43,6 +44,7 @@ checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 name = "agent"
 version = "0.1.0"
 dependencies = [
+ "activity-log",
  "async-trait",
  "base64 0.22.1",
  "bus",

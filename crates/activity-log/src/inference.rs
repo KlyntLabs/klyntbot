@@ -81,7 +81,10 @@ impl ContextInferenceEngine {
     async fn ensure_centroids(&self, contexts: &[WorkContext]) {
         let missing: Vec<&WorkContext> = {
             let cache = self.centroids.read().await;
-            contexts.iter().filter(|c| !cache.contains_key(&c.id)).collect()
+            contexts
+                .iter()
+                .filter(|c| !cache.contains_key(&c.id))
+                .collect()
         };
         for ctx in missing {
             let text = format!("{} {}", ctx.title, ctx.context_type.as_str());
@@ -114,7 +117,10 @@ impl ContextInferenceEngine {
 
         let mut assignments = Vec::new();
         for event in &events {
-            match self.assign_event_with_contexts(event, &active_contexts).await {
+            match self
+                .assign_event_with_contexts(event, &active_contexts)
+                .await
+            {
                 Ok(assignment) => {
                     ActivityLogRepo::set_work_context_id(
                         &self.pool,
@@ -138,7 +144,8 @@ impl ContextInferenceEngine {
         event: &ActivityLogEntry,
     ) -> common::Result<ContextAssignment> {
         let active_contexts = WorkContextRepo::list_active(&self.pool).await?;
-        self.assign_event_with_contexts(event, &active_contexts).await
+        self.assign_event_with_contexts(event, &active_contexts)
+            .await
     }
 
     async fn assign_event_with_contexts(
@@ -160,8 +167,7 @@ impl ContextInferenceEngine {
                         .get(&ctx.id)
                         .map(|c| cosine_similarity(&event_vec, c))
                         .unwrap_or(0.0);
-                    let hours_since =
-                        (now - ctx.last_active_at).num_minutes().max(0) as f64 / 60.0;
+                    let hours_since = (now - ctx.last_active_at).num_minutes().max(0) as f64 / 60.0;
                     let temporal = (-self.config.temporal_decay_lambda * hours_since).exp();
                     (ctx, semantic, temporal)
                 })
@@ -241,16 +247,14 @@ impl ContextInferenceEngine {
     async fn compute_resource_overlap(&self, event: &ActivityLogEntry, context_id: &str) -> f64 {
         // Only compare resource IDs (not names) to avoid false positives from
         // a name coincidentally matching another resource's ID.
-        let event_resources: HashSet<String> =
-            event.resource_id.iter().cloned().collect();
+        let event_resources: HashSet<String> = event.resource_id.iter().cloned().collect();
 
         if event_resources.is_empty() {
             return 0.0;
         }
 
         let ctx_resource_ids = match ContextResourceRepo::list_resource_ids_for_context(
-            &self.pool,
-            context_id,
+            &self.pool, context_id,
         )
         .await
         {
@@ -319,10 +323,7 @@ impl ContextInferenceEngine {
     ) -> common::Result<()> {
         // Extract resource from event and upsert + link
         if let Some(ref res_name) = event.resource_name {
-            let res_id = event
-                .resource_id
-                .clone()
-                .unwrap_or_else(new_ulid);
+            let res_id = event.resource_id.clone().unwrap_or_else(new_ulid);
             let now = Utc::now();
             let resource = WorkResource {
                 id: res_id.clone(),
@@ -419,9 +420,7 @@ mod tests {
             let mut rng_state = seed;
             let vec: Vec<f32> = (0..384)
                 .map(|_| {
-                    rng_state = rng_state
-                        .wrapping_mul(6364136223846793005)
-                        .wrapping_add(1);
+                    rng_state = rng_state.wrapping_mul(6364136223846793005).wrapping_add(1);
                     ((rng_state >> 33) as f32 / u32::MAX as f32) * 2.0 - 1.0
                 })
                 .collect();

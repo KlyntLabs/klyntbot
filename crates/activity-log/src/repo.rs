@@ -248,14 +248,12 @@ impl ActivityLogRepo {
         event_id: &str,
         context_id: &str,
     ) -> common::Result<()> {
-        sqlx::query(
-            "UPDATE unified_activity_log SET work_context_id = ?2 WHERE id = ?1",
-        )
-        .bind(event_id)
-        .bind(context_id)
-        .execute(pool.inner())
-        .await
-        .map_err(StorageError::from)?;
+        sqlx::query("UPDATE unified_activity_log SET work_context_id = ?2 WHERE id = ?1")
+            .bind(event_id)
+            .bind(context_id)
+            .execute(pool.inner())
+            .await
+            .map_err(StorageError::from)?;
         Ok(())
     }
 

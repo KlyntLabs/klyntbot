@@ -47,10 +47,7 @@ impl WorkResourceRepo {
         Ok(row.map(Into::into))
     }
 
-    pub async fn find_by_name(
-        pool: &StoragePool,
-        name: &str,
-    ) -> common::Result<Vec<WorkResource>> {
+    pub async fn find_by_name(pool: &StoragePool, name: &str) -> common::Result<Vec<WorkResource>> {
         let rows = sqlx::query_as::<_, WrRawRow>(&format!(
             "SELECT {WR_COLS} FROM work_resources WHERE resource_name = ?1"
         ))
@@ -61,10 +58,7 @@ impl WorkResourceRepo {
         Ok(rows.into_iter().map(Into::into).collect())
     }
 
-    pub async fn find_by_path(
-        pool: &StoragePool,
-        path: &str,
-    ) -> common::Result<Vec<WorkResource>> {
+    pub async fn find_by_path(pool: &StoragePool, path: &str) -> common::Result<Vec<WorkResource>> {
         let rows = sqlx::query_as::<_, WrRawRow>(&format!(
             "SELECT {WR_COLS} FROM work_resources WHERE resource_path = ?1"
         ))
@@ -75,10 +69,7 @@ impl WorkResourceRepo {
         Ok(rows.into_iter().map(Into::into).collect())
     }
 
-    pub async fn find_by_uri(
-        pool: &StoragePool,
-        uri: &str,
-    ) -> common::Result<Vec<WorkResource>> {
+    pub async fn find_by_uri(pool: &StoragePool, uri: &str) -> common::Result<Vec<WorkResource>> {
         let rows = sqlx::query_as::<_, WrRawRow>(&format!(
             "SELECT {WR_COLS} FROM work_resources WHERE resource_uri = ?1"
         ))
@@ -89,10 +80,7 @@ impl WorkResourceRepo {
         Ok(rows.into_iter().map(Into::into).collect())
     }
 
-    pub async fn list_recent(
-        pool: &StoragePool,
-        limit: i64,
-    ) -> common::Result<Vec<WorkResource>> {
+    pub async fn list_recent(pool: &StoragePool, limit: i64) -> common::Result<Vec<WorkResource>> {
         let rows = sqlx::query_as::<_, WrRawRow>(&format!(
             "SELECT {WR_COLS} FROM work_resources ORDER BY last_seen_at DESC LIMIT ?1"
         ))
@@ -153,8 +141,8 @@ impl From<WrRawRow> for WorkResource {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use chrono::Utc;
     use crate::normalizers::new_ulid;
+    use chrono::Utc;
 
     pub(crate) fn make_resource(name: &str, path: Option<&str>) -> WorkResource {
         let now = Utc::now();
@@ -183,7 +171,10 @@ pub(crate) mod tests {
 
         // Upsert again — access_count should increment
         WorkResourceRepo::upsert(&pool, &res).await.unwrap();
-        let loaded = WorkResourceRepo::get(&pool, &res.id).await.unwrap().unwrap();
+        let loaded = WorkResourceRepo::get(&pool, &res.id)
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(loaded.access_count, 2);
     }
 
