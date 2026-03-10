@@ -1,10 +1,12 @@
 pub mod accumulated_observation;
+pub mod annotation;
 pub mod episodic_memory;
 pub mod event_log;
 pub mod procedural_rule;
 pub mod semantic_fact;
 
 pub use accumulated_observation::AccumulatedObservationRepo;
+pub use annotation::AnnotationRepo;
 pub use episodic_memory::EpisodicMemoryRepo;
 pub use event_log::EventLogRepo;
 pub use procedural_rule::ProceduralRuleRepo;
@@ -65,6 +67,12 @@ pub fn cognitive_migrations() -> Vec<FeatureMigration> {
             version: 5,
             description: "Add FTS5 virtual tables for BM25 full-text search".to_string(),
             sql: include_str!("../../migrations/005_fts5_tables.sql").to_string(),
+        },
+        FeatureMigration {
+            feature_name: "cognitive".to_string(),
+            version: 6,
+            description: "Add annotations table with FTS5 search".to_string(),
+            sql: include_str!("../../migrations/006_annotations.sql").to_string(),
         },
     ]
 }

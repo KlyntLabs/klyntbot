@@ -4,6 +4,7 @@
 //! provides a section of the system prompt. Caching is handled per-source.
 
 pub mod agent;
+pub mod annotation;
 pub mod area;
 pub mod bootstrap;
 pub mod confidence;
@@ -15,6 +16,7 @@ pub mod project;
 pub mod todo;
 
 pub use agent::AgentContextSource;
+pub use annotation::AnnotationContextSource;
 pub use area::AreaSource;
 pub use bootstrap::BootstrapSource;
 pub use confidence::ConfidenceSource;

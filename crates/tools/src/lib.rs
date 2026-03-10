@@ -18,6 +18,7 @@ pub use tools_core::{
 
 // ── Core tool implementations ────────────────────────────────────────────────
 pub mod agent_task_tool;
+pub mod annotate;
 pub mod ask_user;
 pub mod browser;
 pub mod cron_tool;
@@ -56,6 +57,9 @@ pub use params::ParamExtractor;
 
 // Agent task
 pub use agent_task_tool::{AgentTaskHandler, AgentTaskTool};
+
+// Annotate
+pub use annotate::AnnotateTool;
 
 // Area
 pub use area_tool::AreaTool;

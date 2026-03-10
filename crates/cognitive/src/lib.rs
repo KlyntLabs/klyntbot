@@ -31,8 +31,8 @@ pub use memory_retriever::CognitiveMemoryRetriever;
 pub use reflection::ReflectionHandler;
 pub use repos::event_log::{DomainEventRow, PipelineEventRow};
 pub use repos::{
-    cognitive_migrations, AccumulatedObservationRepo, EpisodicMemoryRepo, EventLogRepo,
-    ProceduralRuleRepo, SemanticFactRepo,
+    cognitive_migrations, AccumulatedObservationRepo, AnnotationRepo, EpisodicMemoryRepo,
+    EventLogRepo, ProceduralRuleRepo, SemanticFactRepo,
 };
 pub use situation::{compute_situation, SituationInputs, UserSituation};
 pub use types::*;

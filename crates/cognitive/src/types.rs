@@ -70,6 +70,22 @@ pub struct ProceduralRule {
     pub project_id: Option<String>,
 }
 
+/// A persistent annotation attached to any entity (tool, fact, rule, skill, project).
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct Annotation {
+    pub id: String,
+    pub target_type: String,
+    pub target_id: String,
+    pub content: String,
+    pub tags: String,
+    pub author: String,
+    pub priority: i32,
+    pub created_at: String,
+    pub updated_at: String,
+    pub expires_at: Option<String>,
+    pub access_count: i64,
+}
+
 /// Salience verdict for event filtering.
 #[derive(Debug, Clone, PartialEq)]
 pub enum SalienceVerdict {

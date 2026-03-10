@@ -15,6 +15,7 @@ common.workspace = true
 tools-core.workspace = true
 config.workspace = true
 storage.workspace = true
+cognitive.workspace = true
 feature-todo.workspace = true
 bus.workspace = true
 domain.workspace = true
