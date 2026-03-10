@@ -25,6 +25,19 @@ pub fn project_to_response(
             Some(objective_ids)
         },
         workflow_id: row.workflow_id.clone(),
+        description: row.description.clone(),
+        instructions: row
+            .instructions
+            .as_deref()
+            .and_then(|s| serde_json::from_str(s).ok()),
+        ai_personality: row.ai_personality.clone(),
+        user_role: row.user_role.clone(),
+        start_date: row.start_date.clone(),
+        target_end_date: row.target_end_date.clone(),
+        settings: row
+            .settings
+            .as_deref()
+            .and_then(|s| serde_json::from_str(s).ok()),
     }
 }
 
@@ -76,6 +89,12 @@ impl AppCore {
             created_at: now,
             updated_at: now,
             workflow_id: None,
+            instructions: None,
+            ai_personality: None,
+            user_role: None,
+            start_date: None,
+            target_end_date: None,
+            settings: None,
         };
 
         let created = self
@@ -117,6 +136,16 @@ impl AppCore {
             tags: params.tags,
             status: params.status,
             workflow_id: params.workflow_id,
+            instructions: params
+                .instructions
+                .map(|v| Some(serde_json::to_string(&v).unwrap_or_default())),
+            ai_personality: params.ai_personality,
+            user_role: params.user_role,
+            start_date: params.start_date,
+            target_end_date: params.target_end_date,
+            settings: params
+                .settings
+                .map(|v| Some(serde_json::to_string(&v).unwrap_or_default())),
         };
 
         let updated = self

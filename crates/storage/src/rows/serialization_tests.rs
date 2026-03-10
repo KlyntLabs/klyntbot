@@ -95,6 +95,12 @@ mod tests {
             created_at: Utc::now(),
             updated_at: Utc::now(),
             workflow_id: None,
+            instructions: None,
+            ai_personality: None,
+            user_role: None,
+            start_date: None,
+            target_end_date: None,
+            settings: None,
         }
     }
 
@@ -208,6 +214,9 @@ mod tests {
                     metadata: serde_json::json!({}),
                     created_at: now,
                     updated_at: now,
+                    project_id: None,
+                    conversation_type: None,
+                    pinned: false,
                 })
                 .unwrap(),
             ),
@@ -233,6 +242,9 @@ mod tests {
                     created_at: now,
                     updated_at: now,
                     message_count: 0,
+                    project_id: None,
+                    conversation_type: None,
+                    pinned: false,
                 })
                 .unwrap(),
             ),

@@ -15,7 +15,9 @@ CREATE TABLE IF NOT EXISTS semantic_facts (
     superseded_by   TEXT,
     stability       REAL NOT NULL DEFAULT 1.0,
     last_accessed   TEXT,
-    access_count    INTEGER NOT NULL DEFAULT 0
+    access_count    INTEGER NOT NULL DEFAULT 0,
+    project_id      TEXT,  -- logical FK to projects.id (not enforced, separate database)
+    memory_type     TEXT DEFAULT 'fact'
 );
 
 CREATE INDEX IF NOT EXISTS idx_semantic_facts_domain ON semantic_facts(domain);
@@ -32,7 +34,8 @@ CREATE TABLE IF NOT EXISTS episodic_memories (
     recorded_at     TEXT NOT NULL DEFAULT (datetime('now')),
     stability       REAL NOT NULL DEFAULT 1.0,
     last_accessed   TEXT,
-    access_count    INTEGER NOT NULL DEFAULT 0
+    access_count    INTEGER NOT NULL DEFAULT 0,
+    project_id      TEXT   -- logical FK to projects.id (not enforced, separate database)
 );
 
 CREATE INDEX IF NOT EXISTS idx_episodic_domain ON episodic_memories(domain);
@@ -47,7 +50,8 @@ CREATE TABLE IF NOT EXISTS procedural_rules (
     signal_count    INTEGER NOT NULL DEFAULT 0,
     created_at      TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
-    active          INTEGER NOT NULL DEFAULT 1
+    active          INTEGER NOT NULL DEFAULT 1,
+    project_id      TEXT   -- logical FK to projects.id (not enforced, separate database)
 );
 
 CREATE INDEX IF NOT EXISTS idx_procedural_domain ON procedural_rules(domain);
@@ -70,6 +74,8 @@ CREATE TABLE IF NOT EXISTS semantic_facts_archive (
     stability       REAL NOT NULL,
     last_accessed   TEXT,
     access_count    INTEGER NOT NULL,
+    project_id      TEXT,
+    memory_type     TEXT DEFAULT 'fact',
     archived_at     TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -85,3 +91,7 @@ CREATE TABLE IF NOT EXISTS coaching_strategies (
     last_used       TEXT,
     created_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE INDEX IF NOT EXISTS idx_semantic_facts_project ON semantic_facts(project_id);
+CREATE INDEX IF NOT EXISTS idx_episodic_memories_project ON episodic_memories(project_id);
+CREATE INDEX IF NOT EXISTS idx_procedural_rules_project ON procedural_rules(project_id);

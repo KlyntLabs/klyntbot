@@ -45,8 +45,9 @@ impl ProjectRepo {
     pub async fn create(&self, row: &ProjectRow) -> Result<ProjectRow, StorageError> {
         let inserted = sqlx::query_as::<_, ProjectRow>(
             r#"
-            INSERT INTO projects (id, area_id, name, description, color, tags, status, created_at, updated_at, workflow_id)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+            INSERT INTO projects (id, area_id, name, description, color, tags, status, created_at, updated_at, workflow_id,
+                                  instructions, ai_personality, user_role, start_date, target_end_date, settings)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
             RETURNING *
             "#,
         )
@@ -60,6 +61,12 @@ impl ProjectRepo {
         .bind(row.created_at)
         .bind(row.updated_at)
         .bind(&row.workflow_id)
+        .bind(&row.instructions)
+        .bind(&row.ai_personality)
+        .bind(&row.user_role)
+        .bind(&row.start_date)
+        .bind(&row.target_end_date)
+        .bind(&row.settings)
         .fetch_one(&self.pool)
         .await?;
         Ok(inserted)
@@ -86,14 +93,20 @@ impl ProjectRepo {
         let row = sqlx::query_as::<_, ProjectRow>(
             r#"
             UPDATE projects SET
-                area_id     = COALESCE(?2, area_id),
-                name        = COALESCE(?3, name),
-                description = CASE WHEN ?4 THEN ?5 ELSE description END,
-                color       = COALESCE(?6, color),
-                tags        = COALESCE(?7, tags),
-                status      = COALESCE(?8, status),
-                workflow_id = CASE WHEN ?9 THEN ?10 ELSE workflow_id END,
-                updated_at  = datetime('now')
+                area_id         = COALESCE(?2, area_id),
+                name            = COALESCE(?3, name),
+                description     = CASE WHEN ?4 THEN ?5 ELSE description END,
+                color           = COALESCE(?6, color),
+                tags            = COALESCE(?7, tags),
+                status          = COALESCE(?8, status),
+                workflow_id     = CASE WHEN ?9 THEN ?10 ELSE workflow_id END,
+                instructions    = CASE WHEN ?11 THEN ?12 ELSE instructions END,
+                ai_personality  = CASE WHEN ?13 THEN ?14 ELSE ai_personality END,
+                user_role       = CASE WHEN ?15 THEN ?16 ELSE user_role END,
+                start_date      = CASE WHEN ?17 THEN ?18 ELSE start_date END,
+                target_end_date = CASE WHEN ?19 THEN ?20 ELSE target_end_date END,
+                settings        = CASE WHEN ?21 THEN ?22 ELSE settings END,
+                updated_at      = datetime('now')
             WHERE id = ?1
             RETURNING *
             "#,
@@ -114,6 +127,18 @@ impl ProjectRepo {
         .bind(&patch.status)
         .bind(patch.workflow_id.is_some())
         .bind(patch.workflow_id.as_ref().and_then(|w| w.as_deref()))
+        .bind(patch.instructions.is_some())
+        .bind(patch.instructions.as_ref().and_then(|v| v.as_deref()))
+        .bind(patch.ai_personality.is_some())
+        .bind(patch.ai_personality.as_ref().and_then(|v| v.as_deref()))
+        .bind(patch.user_role.is_some())
+        .bind(patch.user_role.as_ref().and_then(|v| v.as_deref()))
+        .bind(patch.start_date.is_some())
+        .bind(patch.start_date.as_ref().and_then(|v| v.as_deref()))
+        .bind(patch.target_end_date.is_some())
+        .bind(patch.target_end_date.as_ref().and_then(|v| v.as_deref()))
+        .bind(patch.settings.is_some())
+        .bind(patch.settings.as_ref().and_then(|v| v.as_deref()))
         .fetch_optional(&self.pool)
         .await?
         .ok_or_not_found(&format!("project {}", patch.id))?;
@@ -249,4 +274,10 @@ pub struct ProjectPatch {
     pub tags: Option<Vec<String>>,
     pub status: Option<String>,
     pub workflow_id: Option<Option<String>>,
+    pub instructions: Option<Option<String>>,
+    pub ai_personality: Option<Option<String>>,
+    pub user_role: Option<Option<String>>,
+    pub start_date: Option<Option<String>>,
+    pub target_end_date: Option<Option<String>>,
+    pub settings: Option<Option<String>>,
 }

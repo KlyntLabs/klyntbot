@@ -16,7 +16,7 @@ interface ProductivityScoreRingProps {
   } | null;
 }
 
-function ScoreBar({ label, value }: { label: string; value: number }) {
+export function ScoreBar({ label, value }: { label: string; value: number }) {
   const pct = Math.round(Math.min(Math.max(value, 0), 1) * 100);
   return (
     <div className="flex items-center gap-2 text-[10px] font-light">
@@ -152,20 +152,7 @@ export function ProductivityScoreRing({ score, size = 110, summary }: Productivi
         {scoreLabel(score)}
       </span>
 
-      {summary && summary.totalActiveSecs > 0 && (
-        <div className="w-full flex flex-col gap-1.5 mt-2">
-          <ScoreBar label="Deep focus" value={summary.productiveSecs / summary.totalActiveSecs} />
-          <ScoreBar label="Quality" value={summary.avgSessionQuality ?? 0} />
-          <ScoreBar
-            label="Low distraction"
-            value={1 - summary.distractingSecs / Math.max(summary.totalActiveSecs, 1)}
-          />
-          <ScoreBar
-            label="Alignment"
-            value={summary.contextSwitches > 0 ? Math.max(0, 1 - summary.contextSwitches / 100) : 1}
-          />
-        </div>
-      )}
+      {/* Score bars rendered externally via <ScoreBar /> */}
     </div>
   );
 }

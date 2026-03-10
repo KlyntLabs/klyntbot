@@ -23,7 +23,7 @@ export function computeDayStats(entries: TimelineEntry[]): {
       focusSecs += e.durationSecs ?? 0;
     }
     if (isActiveAppEntry(e)) {
-      activeSecs += e.durationSecs;
+      activeSecs += e.durationSecs ?? 0;
     }
   }
   return { activeSecs, focusSecs };

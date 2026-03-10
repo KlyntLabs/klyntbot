@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use chrono::Utc;
 use tracing::{debug, warn};
 
-use crate::types::{Observation, SemanticFact};
+use crate::types::{Observation, SemanticFact, DEFAULT_MEMORY_TYPE};
 
 /// A candidate fact extracted from an observation, before consolidation.
 #[derive(Debug, Clone)]
@@ -52,6 +52,8 @@ pub fn to_semantic_fact(candidate: &ExtractedFact, observation: &Observation) ->
         stability: 1.0,
         last_accessed: None,
         access_count: 0,
+        project_id: None,
+        memory_type: DEFAULT_MEMORY_TYPE.to_string(),
     }
 }
 

@@ -325,7 +325,7 @@ impl ContextSource for CognitiveContextSource {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{ProceduralRule, SemanticFact};
+    use crate::types::{ProceduralRule, SemanticFact, DEFAULT_MEMORY_TYPE};
 
     async fn setup() -> sqlx::SqlitePool {
         crate::repos::cognitive_test_pool().await
@@ -348,6 +348,8 @@ mod tests {
             stability: 1.0,
             last_accessed: None,
             access_count: 0,
+            project_id: None,
+            memory_type: DEFAULT_MEMORY_TYPE.to_string(),
         }
     }
 
@@ -362,6 +364,7 @@ mod tests {
             created_at: "2026-03-06".into(),
             updated_at: "2026-03-06".into(),
             active: true,
+            project_id: None,
         }
     }
 

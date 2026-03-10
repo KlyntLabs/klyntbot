@@ -97,7 +97,7 @@ pub async fn run_compaction_with_params(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{EpisodicMemory, SemanticFact};
+    use crate::types::{EpisodicMemory, SemanticFact, DEFAULT_MEMORY_TYPE};
 
     async fn setup() -> sqlx::SqlitePool {
         crate::repos::cognitive_test_pool().await
@@ -120,6 +120,8 @@ mod tests {
             stability: 0.05,
             last_accessed: None,
             access_count: 0,
+            project_id: None,
+            memory_type: DEFAULT_MEMORY_TYPE.to_string(),
         }
     }
 
@@ -135,6 +137,7 @@ mod tests {
             stability: 1.0,
             last_accessed: None,
             access_count,
+            project_id: None,
         }
     }
 

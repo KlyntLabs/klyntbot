@@ -20,8 +20,8 @@ impl SemanticFactRepo {
             r#"
             INSERT INTO semantic_facts (id, domain, subject, predicate, object, confidence, source,
                 valid_from, valid_until, recorded_at, superseded_at, superseded_by,
-                stability, last_accessed, access_count)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)
+                stability, last_accessed, access_count, project_id, memory_type)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)
             ON CONFLICT (id) DO UPDATE SET
                 domain = excluded.domain,
                 subject = excluded.subject,
@@ -35,7 +35,9 @@ impl SemanticFactRepo {
                 superseded_by = excluded.superseded_by,
                 stability = excluded.stability,
                 last_accessed = excluded.last_accessed,
-                access_count = excluded.access_count
+                access_count = excluded.access_count,
+                project_id = excluded.project_id,
+                memory_type = excluded.memory_type
             "#,
         )
         .bind(&fact.id)
@@ -53,6 +55,8 @@ impl SemanticFactRepo {
         .bind(fact.stability)
         .bind(&fact.last_accessed)
         .bind(fact.access_count)
+        .bind(&fact.project_id)
+        .bind(&fact.memory_type)
         .execute(&self.pool)
         .await?;
         Ok(())
@@ -196,7 +200,7 @@ impl SemanticFactRepo {
         let sql = format!(
             "SELECT id, domain, subject, predicate, object, confidence, source, \
              valid_from, valid_until, recorded_at, superseded_at, superseded_by, \
-             stability, last_accessed, access_count \
+             stability, last_accessed, access_count, project_id, memory_type \
              FROM semantic_facts_archive {where_clause} ORDER BY recorded_at DESC LIMIT {limit_param}"
         );
         let mut query = sqlx::query_as::<_, SemanticFact>(&sql);
@@ -219,10 +223,10 @@ impl SemanticFactRepo {
             INSERT INTO semantic_facts
                 (id, domain, subject, predicate, object, confidence, source,
                  valid_from, valid_until, recorded_at, superseded_at, superseded_by,
-                 stability, last_accessed, access_count)
+                 stability, last_accessed, access_count, project_id, memory_type)
             SELECT id, domain, subject, predicate, object, confidence, source,
                    valid_from, NULL, recorded_at, NULL, NULL,
-                   stability, last_accessed, access_count
+                   stability, last_accessed, access_count, project_id, memory_type
             FROM semantic_facts_archive
             WHERE id = ?1
             "#,
@@ -252,10 +256,10 @@ impl SemanticFactRepo {
             INSERT INTO semantic_facts_archive
                 (id, domain, subject, predicate, object, confidence, source,
                  valid_from, valid_until, recorded_at, superseded_at, superseded_by,
-                 stability, last_accessed, access_count)
+                 stability, last_accessed, access_count, project_id, memory_type)
             SELECT id, domain, subject, predicate, object, confidence, source,
                    valid_from, valid_until, recorded_at, superseded_at, superseded_by,
-                   stability, last_accessed, access_count
+                   stability, last_accessed, access_count, project_id, memory_type
             FROM semantic_facts
             WHERE superseded_at IS NOT NULL
               AND julianday('now') - julianday(superseded_at) > ?1
@@ -287,6 +291,7 @@ impl SemanticFactRepo {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::DEFAULT_MEMORY_TYPE;
 
     async fn setup() -> SqlitePool {
         crate::repos::cognitive_test_pool().await
@@ -309,6 +314,8 @@ mod tests {
             stability: 1.0,
             last_accessed: None,
             access_count: 0,
+            project_id: None,
+            memory_type: DEFAULT_MEMORY_TYPE.to_string(),
         }
     }
 

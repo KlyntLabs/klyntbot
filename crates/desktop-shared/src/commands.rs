@@ -69,6 +69,13 @@ pub struct ProjectResponse {
     pub completed_count: u32,
     pub objective_ids: Option<Vec<String>>,
     pub workflow_id: Option<String>,
+    pub description: Option<String>,
+    pub instructions: Option<serde_json::Value>,
+    pub ai_personality: Option<String>,
+    pub user_role: Option<String>,
+    pub start_date: Option<String>,
+    pub target_end_date: Option<String>,
+    pub settings: Option<serde_json::Value>,
 }
 
 // ── Objective / Key Result ──────────────────────────────────────────────
@@ -552,6 +559,12 @@ pub struct ProjectUpdateParams {
     pub tags: Option<Vec<String>>,
     pub status: Option<String>,
     pub workflow_id: Option<Option<String>>,
+    pub instructions: Option<serde_json::Value>,
+    pub ai_personality: Option<Option<String>>,
+    pub user_role: Option<Option<String>>,
+    pub start_date: Option<Option<String>>,
+    pub target_end_date: Option<Option<String>>,
+    pub settings: Option<serde_json::Value>,
 }
 
 // ── Objective Params ───────────────────────────────────────────────────

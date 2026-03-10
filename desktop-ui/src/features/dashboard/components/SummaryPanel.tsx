@@ -1,17 +1,54 @@
-import { AiSummaryCard } from "@features/productivity/components/AiSummaryCard";
-import { DistractionBanner } from "@features/productivity/components/DistractionBanner";
 import { FocusSessionsList } from "@features/productivity/components/FocusSessionsList";
 import { GoalsProgress } from "@features/productivity/components/GoalsProgress";
-import { InsightCardList } from "@features/productivity/components/InsightCardList";
-import { ProductivityScoreRing } from "@features/productivity/components/ProductivityScoreRing";
-import { WorkHoursCard } from "@features/productivity/components/WorkHoursCard";
+import {
+  ProductivityScoreRing,
+  ScoreBar,
+} from "@features/productivity/components/ProductivityScoreRing";
 import { resolveActivityColor, resolveCategoryLabel } from "@features/productivity/shared";
+import { CONTEXT_TYPE_COLORS } from "@features/work-contexts";
 import { useQuery } from "@shared/hooks/useQuery";
-import { formatHumanDuration, todayISO } from "@shared/lib/dates";
+import { formatHumanDuration, TZ_OFFSET_MINS, todayISO } from "@shared/lib/dates";
 import type { ProductivitySummary, TimelineEntry, TimelineSummary } from "@shared/types";
-import { CheckCircle, DollarSign, ExternalLink, FileText, ListTodo, X } from "lucide-react";
+import { Brain, ExternalLink, Lightbulb, X } from "lucide-react";
 import { useNavigate } from "react-router";
 import type { SessionBlock } from "./ActivityTrack";
+
+/* ─── Intelligence types ──────────────────────────────── */
+
+interface WorkContextSummary {
+  id: string;
+  title: string;
+  contextType: string;
+  color: string | null;
+  durationMins: number;
+  confidence: number;
+}
+
+interface DashboardNudge {
+  message: string;
+  nudgeType: string;
+  priority: string;
+}
+
+interface DashboardIntelligence {
+  activeContext: WorkContextSummary | null;
+  focusRecommendation: string | null;
+  sessionSummary: {
+    contextType: string;
+    totalDurationMins: number;
+    sessionCount: number;
+    color: string;
+  }[];
+  contextSwitches: number;
+  switchQuality: string;
+  productivityScore: number;
+  scoreTrend: number;
+  patterns: string[];
+  nudges: DashboardNudge[];
+  resourceClusters: { resources: string[]; accessCount: number }[];
+}
+
+/* ─── Props ───────────────────────────────────────────── */
 
 interface SummaryPanelProps {
   summary: TimelineSummary | null;
@@ -19,6 +56,7 @@ interface SummaryPanelProps {
   selectedSession?: SessionBlock | null;
   onClose: () => void;
   productivitySummary?: ProductivitySummary | null;
+  date?: string;
 }
 
 export function SummaryPanel({
@@ -27,6 +65,7 @@ export function SummaryPanel({
   selectedSession,
   onClose,
   productivitySummary,
+  date,
 }: SummaryPanelProps) {
   const navigate = useNavigate();
 
@@ -37,215 +76,329 @@ export function SummaryPanel({
     return <EntryDetail entry={selectedEntry} onClose={onClose} onNavigate={navigate} />;
   }
   if (!summary) return null;
-  return <DefaultSummary summary={summary} productivitySummary={productivitySummary} />;
+  return (
+    <DaySummary
+      summary={summary}
+      productivitySummary={productivitySummary}
+      date={date || todayISO()}
+    />
+  );
 }
 
-const SOURCE_ORDER: Record<string, number> = {
-  focus: 0,
-  task: 1,
-  todo: 2,
-  note: 3,
-  finance: 4,
-};
+/* ════════════════════════════════════════════════════════════
+   Main Day Summary — single unified sidebar
+   ════════════════════════════════════════════════════════════ */
 
-function DefaultSummary({
+function DaySummary({
   summary,
   productivitySummary,
+  date,
 }: {
   summary: TimelineSummary;
   productivitySummary?: ProductivitySummary | null;
+  date: string;
 }) {
-  const sortedBreakdown = [...summary.sourceBreakdown].sort(
-    (a, b) => (SOURCE_ORDER[a.source] ?? 9) - (SOURCE_ORDER[b.source] ?? 9),
-  );
-
   const ps = productivitySummary;
   const hasProductivity = ps != null && ps.totalActiveSecs > 0;
   const productivePct = hasProductivity
     ? Math.round((ps.productiveSecs / ps.totalActiveSecs) * 100)
     : 0;
 
+  // Intelligence data
+  const { data: intel } = useQuery<DashboardIntelligence>(
+    "get_dashboard_intelligence",
+    { date, tzOffsetMins: TZ_OFFSET_MINS },
+    undefined,
+    30_000,
+  );
+
+  // Weekly trend for sparkline
+  const { data: weeklyData } = useQuery<ProductivitySummary[]>("productivity_weekly", undefined);
+
   return (
-    <div className="w-72 glass-card p-4 flex flex-col gap-4 overflow-y-auto [&>*]:animate-[fade-in-up_0.3s_ease-out_both]">
-      <h3 className="text-xs font-semibold text-muted uppercase tracking-wider">Summary</h3>
-
-      {/* Productivity score ring */}
-      {hasProductivity && ps.productivityScore != null && (
-        <div className="flex flex-col items-center py-1 gap-1">
-          <ProductivityScoreRing
-            score={ps.productivityScore}
-            size={100}
-            summary={{
-              productiveSecs: ps.productiveSecs,
-              neutralSecs: ps.neutralSecs,
-              distractingSecs: ps.distractingSecs,
-              totalActiveSecs: ps.totalActiveSecs,
-              avgSessionQuality: ps.avgSessionQuality,
-              focusSessionsCount: ps.focusSessionsCount,
-              contextSwitches: ps.contextSwitches,
-            }}
+    <div className="w-80 px-4 py-3 flex flex-col gap-3 overflow-y-auto shrink-0">
+      {/* ── 1. Metrics bars — compact at-a-glance quality breakdown ── */}
+      {hasProductivity && ps.totalActiveSecs > 0 && (
+        <div className="flex flex-col gap-1">
+          <ScoreBar label="Deep focus" value={ps.productiveSecs / ps.totalActiveSecs} />
+          <ScoreBar label="Quality" value={ps.avgSessionQuality ?? 0} />
+          <ScoreBar
+            label="Low distraction"
+            value={1 - ps.distractingSecs / Math.max(ps.totalActiveSecs, 1)}
           />
-          <TrendArrow value={ps.scoreTrend} label="vs 4-week avg" />
+          <ScoreBar
+            label="Alignment"
+            value={ps.contextSwitches > 0 ? Math.max(0, 1 - ps.contextSwitches / 100) : 1}
+          />
         </div>
       )}
 
-      {/* Activity ratio bar */}
-      {hasProductivity && (
-        <div className="p-2.5 rounded-lg border border-success/20 bg-success/[0.06]">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-1.5">
-              <div className="text-sm font-semibold text-primary tabular-nums">
-                {formatHumanDuration(ps.totalActiveSecs)}
+      {/* ── 2. Score ring + Active Time ── */}
+      {hasProductivity && ps.productivityScore != null && (
+        <section className="flex items-center gap-3">
+          <ProductivityScoreRing score={ps.productivityScore} size={72} />
+          <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+            {/* Active time */}
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-semibold text-primary tabular-nums">
+                  {formatHumanDuration(ps.totalActiveSecs)}
+                </span>
+                <TrendArrow value={ps.activeTimeTrend} />
+                <span className="text-[9px] text-dim">active</span>
               </div>
-              <TrendArrow value={ps.activeTimeTrend} />
+              {/* Ratio bar */}
+              <div className="flex h-1.5 rounded-full overflow-hidden bg-white/[0.06] mt-1">
+                {ps.productiveSecs > 0 && (
+                  <div
+                    className="h-full"
+                    style={{
+                      width: `${(ps.productiveSecs / ps.totalActiveSecs) * 100}%`,
+                      backgroundColor: "var(--success)",
+                    }}
+                  />
+                )}
+                {ps.neutralSecs > 0 && (
+                  <div
+                    className="h-full"
+                    style={{
+                      width: `${(ps.neutralSecs / ps.totalActiveSecs) * 100}%`,
+                      backgroundColor: "var(--text-muted)",
+                    }}
+                  />
+                )}
+                {ps.distractingSecs > 0 && (
+                  <div
+                    className="h-full"
+                    style={{
+                      width: `${(ps.distractingSecs / ps.totalActiveSecs) * 100}%`,
+                      backgroundColor: "var(--destructive)",
+                    }}
+                  />
+                )}
+              </div>
+              <div className="flex items-center justify-between mt-0.5 text-[9px]">
+                <span className="text-success">{productivePct}% productive</span>
+                {ps.distractingSecs > 0 && (
+                  <span className="text-destructive">
+                    {Math.round((ps.distractingSecs / ps.totalActiveSecs) * 100)}%
+                  </span>
+                )}
+              </div>
             </div>
-            <div className="text-[10px] text-muted">active time</div>
-          </div>
-          <div className="flex h-1.5 rounded-full overflow-hidden bg-white/[0.06]">
-            {ps.productiveSecs > 0 && (
-              <div
-                className="h-full"
-                style={{
-                  width: `${(ps.productiveSecs / ps.totalActiveSecs) * 100}%`,
-                  backgroundColor: "var(--success)",
-                }}
-              />
-            )}
-            {ps.neutralSecs > 0 && (
-              <div
-                className="h-full"
-                style={{
-                  width: `${(ps.neutralSecs / ps.totalActiveSecs) * 100}%`,
-                  backgroundColor: "var(--text-muted)",
-                }}
-              />
-            )}
-            {ps.distractingSecs > 0 && (
-              <div
-                className="h-full"
-                style={{
-                  width: `${(ps.distractingSecs / ps.totalActiveSecs) * 100}%`,
-                  backgroundColor: "var(--destructive)",
-                }}
-              />
-            )}
-          </div>
-          <div className="flex items-center justify-between mt-1.5 text-[9px]">
-            <span className="text-success">{productivePct}% productive</span>
-            {ps.distractingSecs > 0 && (
-              <span className="text-destructive">
-                {Math.round((ps.distractingSecs / ps.totalActiveSecs) * 100)}% distracting
+
+            {/* Focus time */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-medium text-primary tabular-nums">
+                {formatHumanDuration(summary.focusSecs)}
               </span>
-            )}
+              {hasProductivity && <TrendArrow value={ps.focusTimeTrend} />}
+              <span className="text-[9px] text-dim">focus</span>
+              {summary.totalTrackedSecs > 0 && (
+                <span className="text-[9px] text-brand ml-auto">
+                  {Math.round((summary.focusSecs / summary.totalTrackedSecs) * 100)}%
+                </span>
+              )}
+            </div>
           </div>
-        </div>
+        </section>
       )}
 
-      {/* 7-day trend */}
-      {hasProductivity && <WeeklyTrend />}
-
-      {/* Focus — primary stat */}
-      <div className="p-2 rounded-lg bg-timeline-focus/10 border border-timeline-focus/20">
-        <div className="flex items-center gap-1.5">
-          <div className="text-lg font-semibold text-primary">
+      {/* Fallback when no productivity data */}
+      {!hasProductivity && (
+        <section>
+          <div className="text-sm font-semibold text-primary">
             {formatHumanDuration(summary.focusSecs)}
           </div>
-          {hasProductivity && <TrendArrow value={ps.focusTimeTrend} />}
-        </div>
-        <div className="text-[10px] text-muted">Focus time</div>
-        {summary.totalTrackedSecs > 0 && (
-          <div className="text-[10px] text-brand mt-0.5">
-            {Math.round((summary.focusSecs / summary.totalTrackedSecs) * 100)}% focus ratio
+          <div className="text-[10px] text-muted">Focus time</div>
+        </section>
+      )}
+
+      {/* ── 3. Active Focus Context ── */}
+      {intel?.activeContext && (
+        <section>
+          <h4 className="text-[10px] font-medium text-dim uppercase tracking-wider mb-1.5">
+            Currently Working On
+          </h4>
+          <div className="flex items-start gap-2.5">
+            <div
+              className="w-2 h-2 rounded-full mt-1 shrink-0"
+              style={{
+                backgroundColor:
+                  intel.activeContext.color ??
+                  (CONTEXT_TYPE_COLORS as Record<string, string>)[
+                    intel.activeContext.contextType
+                  ] ??
+                  "#6B7280",
+              }}
+            />
+            <div className="flex-1 min-w-0">
+              <p className="text-[12px] font-medium text-primary truncate">
+                {intel.activeContext.title}
+              </p>
+              <p className="text-[10px] text-muted">
+                {intel.activeContext.contextType} · {intel.activeContext.durationMins}m
+              </p>
+            </div>
           </div>
-        )}
-      </div>
+          {intel.focusRecommendation && (
+            <p className="mt-1 text-[10px] text-muted italic leading-relaxed">
+              {intel.focusRecommendation}
+            </p>
+          )}
+        </section>
+      )}
 
-      {/* Total tracked */}
-      <div>
-        <div className="text-sm font-semibold text-primary">
-          {formatHumanDuration(summary.totalTrackedSecs)}
-        </div>
-        <div className="text-[10px] text-muted">total tracked</div>
-      </div>
+      {/* ── 4. Weekly sparkline ── */}
+      {weeklyData && weeklyData.length >= 2 && <WeeklySparkline data={weeklyData} />}
 
-      {/* Quick stats */}
-      <div className="grid grid-cols-2 gap-2">
-        <Stat
-          icon={<CheckCircle className="w-3.5 h-3.5" />}
-          label="Completed"
-          value={String(summary.tasksCompleted)}
-        />
-        <Stat
-          icon={<ListTodo className="w-3.5 h-3.5" />}
-          label="Created"
-          value={String(summary.tasksCreated)}
-        />
-        <Stat
-          icon={<FileText className="w-3.5 h-3.5" />}
-          label="Notes"
-          value={String(summary.notesTouched)}
-        />
-        <Stat
-          icon={<DollarSign className="w-3.5 h-3.5" />}
-          label="Transactions"
-          value={String(summary.transactionsCount)}
-        />
-      </div>
-
-      {/* Top apps */}
+      {/* ── 5. Top Apps — visual bar chart ── */}
       {hasProductivity && ps.topApps.length > 0 && (
-        <div>
-          <h4 className="text-xs font-medium text-muted mb-2">Top Apps</h4>
-          <div className="flex flex-col gap-1.5">
-            {ps.topApps.slice(0, 5).map((app) => (
-              <div key={app.appName} className="flex items-center gap-2 text-xs">
-                <span className="text-secondary truncate flex-1">{app.appName}</span>
-                <span className="text-dim tabular-nums text-[10px]">
-                  {formatHumanDuration(app.durationSecs)}
-                </span>
+        <section>
+          <h4 className="text-[10px] font-medium text-dim uppercase tracking-wider mb-2">
+            Top Apps
+          </h4>
+          <TopAppsChart apps={ps.topApps} maxSecs={ps.topApps[0]?.durationSecs ?? 1} />
+        </section>
+      )}
+
+      {/* ── 6. Insights & Nudges ── */}
+      {intel && (intel.patterns.length > 0 || intel.nudges.length > 0) && (
+        <section>
+          <h4 className="text-[10px] font-medium text-dim uppercase tracking-wider mb-2">
+            Insights
+          </h4>
+          <div className="flex flex-col gap-2">
+            {intel.patterns.map((p, i) => (
+              <div key={`p-${i}`} className="flex items-start gap-2 text-[11px]">
+                <Brain className="w-3 h-3 text-muted mt-0.5 shrink-0" />
+                <span className="text-secondary">{p}</span>
+              </div>
+            ))}
+            {intel.nudges.map((n, i) => (
+              <div key={`n-${i}`} className="flex items-start gap-2 text-[11px]">
+                <Lightbulb className="w-3 h-3 text-amber-400 mt-0.5 shrink-0" />
+                <span className="text-secondary">{n.message}</span>
               </div>
             ))}
           </div>
-        </div>
+        </section>
       )}
 
-      {/* Source breakdown */}
-      {sortedBreakdown.length > 0 && (
-        <div>
-          <h4 className="text-xs font-medium text-muted mb-2">Breakdown</h4>
-          <div className="flex flex-col gap-1.5">
-            {sortedBreakdown.map((s) => (
-              <div key={s.source} className="flex items-center justify-between text-xs">
-                <span className="text-secondary capitalize">{s.source}</span>
-                <span className="text-muted">{s.count} items</span>
-              </div>
-            ))}
-          </div>
-        </div>
+      {/* ── 7. AI Summary ── */}
+      {ps?.aiSummary && (
+        <section className="rounded-lg bg-brand/[0.06] border border-brand/15 p-2.5">
+          <p className="text-[11px] text-secondary leading-relaxed">{ps.aiSummary}</p>
+        </section>
       )}
 
-      {/* Distraction banner */}
-      {hasProductivity && <DistractionBanner summary={ps} />}
+      {/* ── 7. Focus Sessions ── */}
+      <FocusSessionsList date={date} />
 
-      {/* Work hours progress */}
-      {hasProductivity && <WorkHoursCard totalActiveSecs={ps.totalActiveSecs} />}
-
-      {/* Focus sessions */}
-      <FocusSessionsList date={todayISO()} />
-
-      {/* Goals */}
+      {/* ── 8. Goals ── */}
       <GoalsProgress />
-
-      {/* Insights */}
-      <InsightCardList date={todayISO()} />
-
-      {/* AI Summary */}
-      {ps?.aiSummary && <AiSummaryCard summary={ps.aiSummary} />}
     </div>
   );
 }
 
-/** Session detail panel — shown when clicking an activity session block */
+/* ════════════════════════════════════════════════════════════
+   Top Apps visual bar chart
+   ════════════════════════════════════════════════════════════ */
+
+function TopAppsChart({
+  apps,
+  maxSecs,
+}: {
+  apps: { appName: string; durationSecs: number; category?: string | null }[];
+  maxSecs: number;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      {apps.slice(0, 5).map((app) => {
+        const pct = maxSecs > 0 ? (app.durationSecs / maxSecs) * 100 : 0;
+        return (
+          <div key={app.appName} className="flex items-center gap-2">
+            <span className="text-[11px] text-secondary truncate w-20 shrink-0">{app.appName}</span>
+            <div className="flex-1 h-[6px] rounded-full bg-white/[0.06] overflow-hidden">
+              <div
+                className="h-full rounded-full"
+                style={{
+                  width: `${Math.max(pct, 4)}%`,
+                  backgroundColor: "var(--success)",
+                  opacity: 0.6 + (pct / 100) * 0.4,
+                }}
+              />
+            </div>
+            <span className="text-[10px] text-dim tabular-nums w-10 text-right shrink-0">
+              {formatHumanDuration(app.durationSecs)}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════
+   Weekly sparkline — compact 7-day score trend
+   ════════════════════════════════════════════════════════════ */
+
+function WeeklySparkline({ data }: { data: ProductivitySummary[] }) {
+  const scores = data.map((d) => d.productivityScore ?? 0);
+  if (scores.length < 2) return null;
+
+  const halfLen = Math.floor(scores.length / 2);
+  const recentAvg = scores.slice(halfLen).reduce((a, b) => a + b, 0) / (scores.length - halfLen);
+  const olderAvg = scores.slice(0, halfLen).reduce((a, b) => a + b, 0) / halfLen;
+  const changePct = olderAvg > 0 ? Math.round(((recentAvg - olderAvg) / olderAvg) * 100) : 0;
+
+  const w = 200;
+  const h = 32;
+  const pad = 2;
+  const max = Math.max(...scores, 1);
+  const min = Math.min(...scores, 0);
+  const range = max - min || 1;
+
+  const points = scores
+    .map((v, i) => {
+      const x = pad + (i / (scores.length - 1)) * (w - pad * 2);
+      const y = h - pad - ((v - min) / range) * (h - pad * 2);
+      return `${x},${y}`;
+    })
+    .join(" ");
+
+  const lastX = w - pad;
+  const lastY = h - pad - ((scores[scores.length - 1] - min) / range) * (h - pad * 2);
+
+  return (
+    <div className="flex items-center gap-3">
+      <svg width={w} height={h} className="flex-1">
+        <polyline
+          points={points}
+          fill="none"
+          stroke="var(--brand)"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <circle cx={lastX} cy={lastY} r="2.5" fill="var(--brand)" />
+      </svg>
+      {changePct !== 0 && (
+        <span
+          className={`text-[10px] font-medium shrink-0 ${changePct > 0 ? "text-success" : "text-destructive"}`}
+        >
+          {changePct > 0 ? "↑" : "↓"}
+          {Math.abs(changePct)}%
+        </span>
+      )}
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════
+   Session Detail — shown when clicking an activity session block
+   ════════════════════════════════════════════════════════════ */
+
 function SessionDetail({ session, onClose }: { session: SessionBlock; onClose: () => void }) {
   const startH = Math.floor(session.startMin / 60);
   const startM = Math.floor(session.startMin % 60);
@@ -259,7 +412,7 @@ function SessionDetail({ session, onClose }: { session: SessionBlock; onClose: (
   const matched = session.intelligence;
 
   return (
-    <div className="w-72 glass-card p-4 flex flex-col gap-3 overflow-y-auto">
+    <div className="w-80 px-4 py-3 flex flex-col gap-3 overflow-y-auto shrink-0">
       <div className="flex items-center justify-between">
         <h3 className="text-xs font-semibold text-muted uppercase tracking-wider">
           Activity Session
@@ -282,7 +435,6 @@ function SessionDetail({ session, onClose }: { session: SessionBlock; onClose: (
 
       {/* Quality score + Category badge row */}
       <div className="flex items-center gap-2 flex-wrap">
-        {/* Quality score badge */}
         {matched?.qualityScore != null && (
           <div
             className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold w-fit"
@@ -295,8 +447,6 @@ function SessionDetail({ session, onClose }: { session: SessionBlock; onClose: (
             Q: {Math.round(matched.qualityScore)}/100
           </div>
         )}
-
-        {/* Category badge */}
         <div
           className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium w-fit"
           style={{
@@ -363,6 +513,10 @@ function SessionDetail({ session, onClose }: { session: SessionBlock; onClose: (
   );
 }
 
+/* ════════════════════════════════════════════════════════════
+   Entry Detail — shown when clicking any other timeline entry
+   ════════════════════════════════════════════════════════════ */
+
 function EntryDetail({
   entry,
   onClose,
@@ -373,7 +527,7 @@ function EntryDetail({
   onNavigate: (path: string) => void;
 }) {
   return (
-    <div className="w-72 glass-card p-4 flex flex-col gap-3 overflow-y-auto">
+    <div className="w-80 px-4 py-3 flex flex-col gap-3 overflow-y-auto shrink-0">
       <div className="flex items-center justify-between">
         <h3 className="text-xs font-semibold text-muted uppercase tracking-wider">Details</h3>
         <button type="button" onClick={onClose} className="text-muted hover:text-secondary">
@@ -411,54 +565,7 @@ function EntryDetail({
   );
 }
 
-function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
-  return (
-    <div className="glass-card p-2 flex flex-col gap-0.5">
-      <div className="flex items-center gap-1 text-muted">
-        {icon}
-        <span className="text-[10px]">{label}</span>
-      </div>
-      <div className="text-sm font-semibold text-primary">{value}</div>
-    </div>
-  );
-}
-
-function Sparkline({ values }: { values: number[] }) {
-  if (values.length < 2) return null;
-  const w = 120;
-  const h = 28;
-  const pad = 2;
-  const max = Math.max(...values, 1);
-  const min = Math.min(...values, 0);
-  const range = max - min || 1;
-  const points = values
-    .map((v, i) => {
-      const x = pad + (i / (values.length - 1)) * (w - pad * 2);
-      const y = h - pad - ((v - min) / range) * (h - pad * 2);
-      return `${x},${y}`;
-    })
-    .join(" ");
-
-  return (
-    <svg width={w} height={h} className="block">
-      <polyline
-        points={points}
-        fill="none"
-        stroke="var(--brand)"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      {/* Dot on last point */}
-      {values.length > 0 &&
-        (() => {
-          const lastX = pad + ((values.length - 1) / (values.length - 1)) * (w - pad * 2);
-          const lastY = h - pad - ((values[values.length - 1] - min) / range) * (h - pad * 2);
-          return <circle cx={lastX} cy={lastY} r="2.5" fill="var(--brand)" />;
-        })()}
-    </svg>
-  );
-}
+/* ── Shared helpers ───────────────────────────────────────── */
 
 function TrendArrow({ value, label }: { value?: number | null; label?: string }) {
   if (value == null || Math.abs(value) < 0.5) return null;
@@ -469,43 +576,8 @@ function TrendArrow({ value, label }: { value?: number | null; label?: string })
       className={`inline-flex items-center gap-0.5 text-[10px] font-medium ${isUp ? "text-success" : "text-destructive"}`}
       title={label ? `${isUp ? "+" : "-"}${pct}% ${label}` : undefined}
     >
-      {isUp ? "\u2191" : "\u2193"}
+      {isUp ? "↑" : "↓"}
       {pct > 0 && `${pct}%`}
     </span>
-  );
-}
-
-function WeeklyTrend() {
-  const { data: weeklyData } = useQuery<ProductivitySummary[]>("productivity_weekly", undefined);
-
-  if (!weeklyData || weeklyData.length < 2) return null;
-
-  const scores = weeklyData.map((d) => d.productivityScore ?? 0);
-
-  // Compare this week's avg vs prior week's avg
-  const halfLen = Math.floor(scores.length / 2);
-  const recentScores = scores.slice(halfLen);
-  const olderScores = scores.slice(0, halfLen);
-  const recentAvg =
-    recentScores.length > 0 ? recentScores.reduce((a, b) => a + b, 0) / recentScores.length : 0;
-  const olderAvg =
-    olderScores.length > 0 ? olderScores.reduce((a, b) => a + b, 0) / olderScores.length : 0;
-
-  const changePct = olderAvg > 0 ? Math.round(((recentAvg - olderAvg) / olderAvg) * 100) : 0;
-  const isUp = changePct >= 0;
-
-  return (
-    <div className="p-2.5 rounded-lg border border-brand/15 bg-brand/[0.04]">
-      <h4 className="text-[10px] font-medium text-muted mb-1.5">7-day trend</h4>
-      <Sparkline values={scores} />
-      {changePct !== 0 && (
-        <div className="flex items-center gap-1 mt-1.5">
-          <span className={`text-[10px] font-medium ${isUp ? "text-success" : "text-destructive"}`}>
-            {isUp ? "\u2191" : "\u2193"} {Math.abs(changePct)}%
-          </span>
-          <span className="text-[9px] text-dim">vs last week</span>
-        </div>
-      )}
-    </div>
   );
 }

@@ -19,14 +19,15 @@ impl ProceduralRuleRepo {
         sqlx::query(
             r#"
             INSERT INTO procedural_rules (id, domain, rule_text, confidence, source,
-                signal_count, created_at, updated_at, active)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+                signal_count, created_at, updated_at, active, project_id)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
             ON CONFLICT (id) DO UPDATE SET
                 rule_text = excluded.rule_text,
                 confidence = excluded.confidence,
                 signal_count = excluded.signal_count,
                 updated_at = datetime('now'),
-                active = excluded.active
+                active = excluded.active,
+                project_id = excluded.project_id
             "#,
         )
         .bind(&rule.id)
@@ -38,6 +39,7 @@ impl ProceduralRuleRepo {
         .bind(&rule.created_at)
         .bind(&rule.updated_at)
         .bind(rule.active)
+        .bind(&rule.project_id)
         .execute(&self.pool)
         .await?;
         Ok(())
@@ -103,6 +105,7 @@ mod tests {
             created_at: "2026-03-06".into(),
             updated_at: "2026-03-06".into(),
             active: true,
+            project_id: None,
         }
     }
 

@@ -138,6 +138,7 @@ pub async fn run_weekly_reflection(
         stability: 5.0, // Reflections start with higher stability
         last_accessed: None,
         access_count: 0,
+        project_id: None,
     };
 
     if let Err(e) = episodic_repo.insert(&reflection_memory).await {
@@ -156,6 +157,7 @@ pub async fn run_weekly_reflection(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::DEFAULT_MEMORY_TYPE;
 
     struct MockReflectionHandler {
         output: ReflectionOutput,
@@ -247,6 +249,7 @@ mod tests {
                     created_at: "2026-03-06".into(),
                     updated_at: "2026-03-06".into(),
                     active: true,
+                    project_id: None,
                 }],
                 summary: "Discovered exercise-productivity correlation.".into(),
             },
@@ -293,6 +296,8 @@ mod tests {
                     stability: 1.0,
                     last_accessed: None,
                     access_count: 0,
+                    project_id: None,
+                    memory_type: DEFAULT_MEMORY_TYPE.to_string(),
                 }],
                 rule_updates: vec![],
                 summary: "Updated peak hours based on weekly patterns.".into(),

@@ -262,6 +262,7 @@ pub async fn retrieve_all_domains(
 mod tests {
     use super::*;
     use crate::embedder::SemanticFactEmbedder;
+    use crate::types::DEFAULT_MEMORY_TYPE;
     use std::sync::atomic::{AtomicBool, Ordering};
 
     fn default_params(limit: usize) -> RetrievalParams {
@@ -293,6 +294,8 @@ mod tests {
             stability,
             last_accessed: None,
             access_count,
+            project_id: None,
+            memory_type: DEFAULT_MEMORY_TYPE.to_string(),
         }
     }
 

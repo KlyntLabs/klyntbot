@@ -16,7 +16,6 @@ import { type LayerKey, useEnabledLayers, useSidebarOpen } from "../lib/layers";
 import { ActivityTrack, type SessionBlock } from "./ActivityTrack";
 import { CalendarTrack } from "./CalendarTrack";
 import { ContextRibbon } from "./ContextRibbon";
-import { SmartSummary } from "./SmartSummary";
 import { SummaryPanel } from "./SummaryPanel";
 
 const DEFAULT_HOUR_HEIGHT = 60;
@@ -449,19 +448,17 @@ export function DayColumnsView({
       </div>
 
       {sidebarOpen && (
-        <>
-          <SmartSummary date={date} />
-          <SummaryPanel
-            summary={summary}
-            selectedEntry={selectedEntry}
-            selectedSession={selectedSession}
-            onClose={() => {
-              setSelectedEntry(null);
-              setSelectedSession(null);
-            }}
-            productivitySummary={productivitySummary}
-          />
-        </>
+        <SummaryPanel
+          summary={summary}
+          selectedEntry={selectedEntry}
+          selectedSession={selectedSession}
+          onClose={() => {
+            setSelectedEntry(null);
+            setSelectedSession(null);
+          }}
+          productivitySummary={productivitySummary}
+          date={date}
+        />
       )}
     </div>
   );

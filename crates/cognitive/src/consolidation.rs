@@ -130,6 +130,7 @@ pub async fn consolidate_batch(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::DEFAULT_MEMORY_TYPE;
 
     struct MockConsolidationHandler {
         decision: MemoryOp,
@@ -163,6 +164,8 @@ mod tests {
             stability: 1.0,
             last_accessed: None,
             access_count: 0,
+            project_id: None,
+            memory_type: DEFAULT_MEMORY_TYPE.to_string(),
         }
     }
 

@@ -9,7 +9,7 @@ use serde_json::json;
 
 use cognitive::extraction::ExtractedFact;
 use cognitive::reflection::{ReflectionHandler, ReflectionInput, ReflectionOutput};
-use cognitive::types::{MemoryOp, Observation, ProceduralRule, SemanticFact};
+use cognitive::types::{MemoryOp, Observation, ProceduralRule, SemanticFact, DEFAULT_MEMORY_TYPE};
 use cognitive::{ConsolidationHandler, ExtractionHandler};
 use feature_coaching::reasoner::{
     CoachingDecision, CoachingReasonerHandler, InterventionType, ReasonerInput,
@@ -487,6 +487,8 @@ impl ReflectionHandler for LlmReflectionHandler {
                 stability: 1.0,
                 last_accessed: None,
                 access_count: 0,
+                project_id: None,
+                memory_type: DEFAULT_MEMORY_TYPE.to_string(),
             })
             .collect();
 
@@ -503,6 +505,7 @@ impl ReflectionHandler for LlmReflectionHandler {
                 created_at: now.clone(),
                 updated_at: now.clone(),
                 active: true,
+                project_id: None,
             })
             .collect();
 
@@ -766,6 +769,8 @@ mod tests {
             stability: 1.0,
             last_accessed: None,
             access_count: 0,
+            project_id: None,
+            memory_type: DEFAULT_MEMORY_TYPE.to_string(),
         }
     }
 
@@ -851,6 +856,7 @@ mod tests {
                 stability: 1.0,
                 last_accessed: None,
                 access_count: 0,
+                project_id: None,
             }],
             user_model: UserModel::default(),
             procedural_rules: vec![],

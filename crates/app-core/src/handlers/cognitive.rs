@@ -2,7 +2,7 @@
 
 use cognitive::decay::retrievability;
 use cognitive::repos::{load_user_model, SemanticFactRepo, RULE_DOMAINS};
-use cognitive::types::{ProceduralRule, SemanticFact};
+use cognitive::types::{ProceduralRule, SemanticFact, DEFAULT_MEMORY_TYPE};
 use desktop_shared::cognitive_commands::*;
 use desktop_shared::errors::ApiError;
 
@@ -417,6 +417,8 @@ impl AppCore {
             stability: 1.0,
             last_accessed: None,
             access_count: 0,
+            project_id: None,
+            memory_type: DEFAULT_MEMORY_TYPE.to_string(),
         };
 
         fact_repo.upsert(&fact).await.map_err(map_cognitive_err)?;
@@ -480,6 +482,7 @@ impl AppCore {
             created_at: now.clone(),
             updated_at: now,
             active: true,
+            project_id: None,
         };
 
         repo.upsert(&rule).await.map_err(map_cognitive_err)?;

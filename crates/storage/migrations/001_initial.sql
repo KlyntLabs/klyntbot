@@ -28,7 +28,13 @@ CREATE TABLE projects (
     tags        TEXT NOT NULL DEFAULT '[]',
     status      TEXT NOT NULL DEFAULT 'active',
     created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    instructions    TEXT,
+    ai_personality  TEXT,
+    user_role       TEXT,
+    start_date      TEXT,
+    target_end_date TEXT,
+    settings        TEXT
 );
 CREATE INDEX idx_projects_area_id ON projects(area_id);
 CREATE INDEX idx_projects_status ON projects(status);
@@ -159,7 +165,10 @@ CREATE TABLE sessions (
     key        TEXT PRIMARY KEY,
     metadata   TEXT NOT NULL DEFAULT '{}',
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    project_id        TEXT REFERENCES projects(id),
+    conversation_type TEXT DEFAULT 'general',
+    pinned            INTEGER DEFAULT 0
 );
 
 -- ============================================================
@@ -572,3 +581,41 @@ CREATE TABLE archive_items (
     archived_reason TEXT
 );
 CREATE INDEX idx_archive_items_source ON archive_items(source_type, source_id);
+
+-- ============================================================
+-- Entity Links (cross-feature linking)
+-- ============================================================
+CREATE TABLE entity_links (
+    id          TEXT PRIMARY KEY,
+    source_kind TEXT NOT NULL,
+    source_id   TEXT NOT NULL,
+    target_kind TEXT NOT NULL,
+    target_id   TEXT NOT NULL,
+    link_type   TEXT NOT NULL DEFAULT 'related',
+    metadata    TEXT,
+    created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    UNIQUE(source_kind, source_id, target_kind, target_id, link_type)
+);
+
+CREATE INDEX idx_entity_links_source ON entity_links(source_kind, source_id);
+CREATE INDEX idx_entity_links_target ON entity_links(target_kind, target_id);
+
+-- ============================================================
+-- Project Sources (AI context sources per project)
+-- ============================================================
+CREATE TABLE project_sources (
+    id          TEXT PRIMARY KEY,
+    project_id  TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    source_type TEXT NOT NULL,
+    title       TEXT NOT NULL,
+    content     TEXT,
+    url         TEXT,
+    file_path   TEXT,
+    embedding_id TEXT,
+    metadata    TEXT,
+    tags        TEXT DEFAULT '[]',
+    created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+);
+
+CREATE INDEX idx_project_sources_project ON project_sources(project_id);

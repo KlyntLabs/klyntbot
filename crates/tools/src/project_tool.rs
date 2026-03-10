@@ -111,6 +111,12 @@ impl Tool for ProjectTool {
                     created_at: now,
                     updated_at: now,
                     workflow_id: None,
+                    instructions: None,
+                    ai_personality: None,
+                    user_role: None,
+                    start_date: None,
+                    target_end_date: None,
+                    settings: None,
                 };
 
                 let created = self.project_repo.create(&row).await?;
@@ -218,6 +224,7 @@ impl Tool for ProjectTool {
                     },
                     status: p.optional_str("status")?.map(String::from),
                     workflow_id: None,
+                    ..Default::default()
                 };
 
                 let updated = self.project_repo.update(&patch).await?;

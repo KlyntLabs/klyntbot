@@ -5,11 +5,13 @@ pub mod agent_task;
 pub mod area;
 pub mod cron;
 pub mod custom_column;
+pub mod entity_link;
 pub mod finance;
 pub mod key_result;
 pub mod learning;
 pub mod objective;
 pub mod project;
+pub mod project_source;
 pub mod session;
 pub mod session_context;
 pub mod status;
@@ -17,6 +19,8 @@ pub mod task_group;
 pub mod usage;
 
 pub use custom_column::{CustomColumnRow, CustomColumnValueRow};
+pub use entity_link::EntityLinkRow;
+pub use project_source::ProjectSourceRow;
 pub use status::{StatusLabelRow, StatusWorkflowRow};
 pub use task_group::TaskGroupRow;
 

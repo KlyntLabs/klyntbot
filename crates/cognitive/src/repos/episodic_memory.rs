@@ -19,8 +19,8 @@ impl EpisodicMemoryRepo {
         sqlx::query(
             r#"
             INSERT INTO episodic_memories (id, domain, content, summary, importance,
-                occurred_at, recorded_at, stability, last_accessed, access_count)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+                occurred_at, recorded_at, stability, last_accessed, access_count, project_id)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
             "#,
         )
         .bind(&mem.id)
@@ -33,6 +33,7 @@ impl EpisodicMemoryRepo {
         .bind(mem.stability)
         .bind(&mem.last_accessed)
         .bind(mem.access_count)
+        .bind(&mem.project_id)
         .execute(&self.pool)
         .await?;
         Ok(())
@@ -139,6 +140,7 @@ mod tests {
             stability: 1.0,
             last_accessed: None,
             access_count: 0,
+            project_id: None,
         }
     }
 

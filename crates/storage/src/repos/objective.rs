@@ -189,6 +189,12 @@ mod tests {
                 created_at: chrono::Utc::now(),
                 updated_at: chrono::Utc::now(),
                 workflow_id: None,
+                instructions: None,
+                ai_personality: None,
+                user_role: None,
+                start_date: None,
+                target_end_date: None,
+                settings: None,
             })
             .await
             .unwrap();

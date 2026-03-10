@@ -19,4 +19,10 @@ pub struct ProjectRow {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub workflow_id: Option<String>,
+    pub instructions: Option<String>,
+    pub ai_personality: Option<String>,
+    pub user_role: Option<String>,
+    pub start_date: Option<String>,
+    pub target_end_date: Option<String>,
+    pub settings: Option<String>,
 }

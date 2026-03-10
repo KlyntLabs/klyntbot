@@ -183,6 +183,7 @@ impl BackgroundConsolidationService {
                                                 stability: 1.0,
                                                 last_accessed: None,
                                                 access_count: 0,
+                                                project_id: None,
                                             };
                                             if let Err(e) = ep_repo.insert(&mem).await {
                                                 warn!("BackgroundConsolidation: failed to store episodic memory: {e}");

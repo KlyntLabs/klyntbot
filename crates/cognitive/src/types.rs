@@ -12,6 +12,9 @@ pub enum MemoryOp {
     Noop,
 }
 
+/// Default value for `SemanticFact::memory_type`.
+pub const DEFAULT_MEMORY_TYPE: &str = "fact";
+
 /// A semantic fact with bi-temporal markers and FSRS decay.
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct SemanticFact {
@@ -32,6 +35,8 @@ pub struct SemanticFact {
     pub stability: f64,
     pub last_accessed: Option<String>,
     pub access_count: i64,
+    pub project_id: Option<String>,
+    pub memory_type: String,
 }
 
 /// An episodic memory entry.
@@ -47,6 +52,7 @@ pub struct EpisodicMemory {
     pub stability: f64,
     pub last_accessed: Option<String>,
     pub access_count: i64,
+    pub project_id: Option<String>,
 }
 
 /// A procedural rule learned from reflection.
@@ -61,6 +67,7 @@ pub struct ProceduralRule {
     pub created_at: String,
     pub updated_at: String,
     pub active: bool,
+    pub project_id: Option<String>,
 }
 
 /// Salience verdict for event filtering.

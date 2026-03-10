@@ -12,6 +12,9 @@ pub struct SessionRow {
     pub metadata: serde_json::Value,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub project_id: Option<String>,
+    pub conversation_type: Option<String>,
+    pub pinned: bool,
 }
 
 /// Row struct for the `session_messages` table.
@@ -37,4 +40,7 @@ pub struct SessionListRow {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub message_count: i64,
+    pub project_id: Option<String>,
+    pub conversation_type: Option<String>,
+    pub pinned: bool,
 }
