@@ -71,7 +71,7 @@ function DefaultSummary({
 
       {/* Productivity score ring */}
       {hasProductivity && ps.productivityScore != null && (
-        <div className="flex justify-center py-1">
+        <div className="flex flex-col items-center py-1 gap-1">
           <ProductivityScoreRing
             score={ps.productivityScore}
             size={100}
@@ -85,6 +85,7 @@ function DefaultSummary({
               contextSwitches: ps.contextSwitches,
             }}
           />
+          <TrendArrow value={ps.scoreTrend} label="vs 4-week avg" />
         </div>
       )}
 
@@ -92,8 +93,11 @@ function DefaultSummary({
       {hasProductivity && (
         <div className="p-2.5 rounded-lg border border-success/20 bg-success/[0.06]">
           <div className="flex items-center justify-between mb-2">
-            <div className="text-sm font-semibold text-primary tabular-nums">
-              {formatHumanDuration(ps.totalActiveSecs)}
+            <div className="flex items-center gap-1.5">
+              <div className="text-sm font-semibold text-primary tabular-nums">
+                {formatHumanDuration(ps.totalActiveSecs)}
+              </div>
+              <TrendArrow value={ps.activeTimeTrend} />
             </div>
             <div className="text-[10px] text-muted">active time</div>
           </div>
@@ -142,8 +146,11 @@ function DefaultSummary({
 
       {/* Focus — primary stat */}
       <div className="p-2 rounded-lg bg-timeline-focus/10 border border-timeline-focus/20">
-        <div className="text-lg font-semibold text-primary">
-          {formatHumanDuration(summary.focusSecs)}
+        <div className="flex items-center gap-1.5">
+          <div className="text-lg font-semibold text-primary">
+            {formatHumanDuration(summary.focusSecs)}
+          </div>
+          {hasProductivity && <TrendArrow value={ps.focusTimeTrend} />}
         </div>
         <div className="text-[10px] text-muted">Focus time</div>
         {summary.totalTrackedSecs > 0 && (
@@ -409,6 +416,21 @@ function Sparkline({ values }: { values: number[] }) {
           return <circle cx={lastX} cy={lastY} r="2.5" fill="var(--brand)" />;
         })()}
     </svg>
+  );
+}
+
+function TrendArrow({ value, label }: { value?: number | null; label?: string }) {
+  if (value == null || Math.abs(value) < 0.5) return null;
+  const isUp = value > 0;
+  const pct = Math.round(Math.abs(value));
+  return (
+    <span
+      className={`inline-flex items-center gap-0.5 text-[10px] font-medium ${isUp ? "text-success" : "text-destructive"}`}
+      title={label ? `${isUp ? "+" : "-"}${pct}% ${label}` : undefined}
+    >
+      {isUp ? "\u2191" : "\u2193"}
+      {pct > 0 && `${pct}%`}
+    </span>
   );
 }
 
