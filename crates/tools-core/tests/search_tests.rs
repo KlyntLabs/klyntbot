@@ -1,7 +1,7 @@
 //! Tests for generic `Searchable` trait and `rrf_merge<T>` (AC 1.8).
 
 use std::collections::HashMap;
-use tools_core::{rrf_merge, Searchable};
+use tools_core::{rrf_merge, rrf_merge_triple, Searchable};
 
 // --- Test type implementing Searchable ---
 
@@ -165,4 +165,67 @@ fn test_searchable_trait_is_object_safe() {
         title: "Test".to_string(),
     };
     assert_eq!(accepts_searchable(&item), "xyz");
+}
+
+// ============================================================
+// rrf_merge_triple: 3-signal fusion (keyword + semantic + BM25)
+// ============================================================
+
+#[test]
+fn test_rrf_merge_triple_combines_three_signals() {
+    let kw = vec![item("a", "A"), item("b", "B")];
+    let sem = vec![("b".to_string(), 0.9), ("c".to_string(), 0.8)];
+    let bm25 = vec![("a".to_string(), 5.0), ("c".to_string(), 3.0)];
+
+    let mut lookup: HashMap<String, TestItem> = HashMap::new();
+    lookup.insert("a".into(), item("a", "A"));
+    lookup.insert("b".into(), item("b", "B"));
+    lookup.insert("c".into(), item("c", "C"));
+
+    let results = rrf_merge_triple(&kw, &sem, &bm25, 60, &lookup);
+    assert_eq!(results.len(), 3, "All three items should appear");
+
+    let ids: Vec<&str> = results.iter().map(|(item, _, _)| item.search_id()).collect();
+    assert!(ids.contains(&"a"));
+    assert!(ids.contains(&"b"));
+    assert!(ids.contains(&"c"));
+}
+
+#[test]
+fn test_rrf_merge_triple_item_in_all_three_ranks_highest() {
+    let kw = vec![item("x", "X"), item("y", "Y")];
+    let sem = vec![("x".to_string(), 0.9), ("z".to_string(), 0.5)];
+    let bm25 = vec![("x".to_string(), 5.0), ("w".to_string(), 2.0)];
+
+    let mut lookup: HashMap<String, TestItem> = HashMap::new();
+    for id in ["x", "y", "z", "w"] {
+        lookup.insert(id.into(), item(id, id));
+    }
+
+    let results = rrf_merge_triple(&kw, &sem, &bm25, 60, &lookup);
+    // "x" appears in all 3 signals — should be rank 1
+    assert_eq!(results[0].0.search_id(), "x");
+    assert_eq!(results[0].2, "all");
+}
+
+#[test]
+fn test_rrf_merge_triple_source_labels() {
+    let kw = vec![item("a", "A")];
+    let sem = vec![("b".to_string(), 0.9)];
+    let bm25 = vec![("c".to_string(), 5.0), ("a".to_string(), 3.0)];
+
+    let mut lookup: HashMap<String, TestItem> = HashMap::new();
+    for id in ["a", "b", "c"] {
+        lookup.insert(id.into(), item(id, id));
+    }
+
+    let results = rrf_merge_triple(&kw, &sem, &bm25, 60, &lookup);
+    let source_map: HashMap<&str, &str> = results
+        .iter()
+        .map(|(item, _, source)| (item.search_id(), *source))
+        .collect();
+
+    assert_eq!(source_map["a"], "keyword+bm25");
+    assert_eq!(source_map["b"], "semantic");
+    assert_eq!(source_map["c"], "bm25");
 }

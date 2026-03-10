@@ -60,6 +60,12 @@ pub fn cognitive_migrations() -> Vec<FeatureMigration> {
             description: "Persist accumulated observations across restarts".to_string(),
             sql: include_str!("../../migrations/004_accumulated_observations.sql").to_string(),
         },
+        FeatureMigration {
+            feature_name: "cognitive".to_string(),
+            version: 5,
+            description: "Add FTS5 virtual tables for BM25 full-text search".to_string(),
+            sql: include_str!("../../migrations/005_fts5_tables.sql").to_string(),
+        },
     ]
 }
 

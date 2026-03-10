@@ -184,6 +184,30 @@ impl SemanticFactRepo {
         .await
     }
 
+    /// Full-text search via FTS5 with BM25 ranking.
+    pub async fn search_fts(
+        &self,
+        query: &str,
+        domain: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<SemanticFact>, sqlx::Error> {
+        let sql = r#"
+            SELECT f.* FROM semantic_facts f
+            INNER JOIN semantic_facts_fts fts ON f.id = fts.id
+            WHERE semantic_facts_fts MATCH ?1
+            AND (?2 IS NULL OR f.domain = ?2)
+            AND f.superseded_at IS NULL
+            ORDER BY fts.rank
+            LIMIT ?3
+        "#;
+        sqlx::query_as::<_, SemanticFact>(sql)
+            .bind(query)
+            .bind(domain)
+            .bind(limit as i64)
+            .fetch_all(&self.pool)
+            .await
+    }
+
     /// Count facts in the archive table.
     pub async fn count_archived(&self) -> Result<u64, sqlx::Error> {
         let row: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM semantic_facts_archive")
@@ -529,6 +553,39 @@ mod tests {
 
         // Archive is empty
         assert_eq!(repo.count_archived().await.unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_search_fts_basic() {
+        let pool = setup().await;
+        let repo = SemanticFactRepo::new(pool);
+
+        let f1 = test_fact("f1", "productivity", "peak_hours", "morning routine at 9am");
+        let f2 = test_fact("f2", "productivity", "break_pattern", "every 90 minutes");
+        repo.upsert(&f1).await.unwrap();
+        repo.upsert(&f2).await.unwrap();
+
+        let results = repo.search_fts("morning routine", None, 10).await.unwrap();
+        assert!(!results.is_empty());
+        assert_eq!(results[0].id, "f1");
+    }
+
+    #[tokio::test]
+    async fn test_search_fts_with_domain_filter() {
+        let pool = setup().await;
+        let repo = SemanticFactRepo::new(pool);
+
+        let f1 = test_fact("f1", "productivity", "peak_hours", "morning");
+        let f2 = test_fact("f2", "finance", "budget", "morning expenses");
+        repo.upsert(&f1).await.unwrap();
+        repo.upsert(&f2).await.unwrap();
+
+        let results = repo
+            .search_fts("morning", Some("productivity"), 10)
+            .await
+            .unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, "f1");
     }
 
     #[tokio::test]

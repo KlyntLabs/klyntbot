@@ -99,6 +99,29 @@ impl EpisodicMemoryRepo {
         .await
     }
 
+    /// Full-text search via FTS5.
+    pub async fn search_fts(
+        &self,
+        query: &str,
+        domain: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<EpisodicMemory>, sqlx::Error> {
+        let sql = r#"
+            SELECT e.* FROM episodic_memories e
+            INNER JOIN episodic_memories_fts fts ON e.id = fts.id
+            WHERE episodic_memories_fts MATCH ?1
+            AND (?2 IS NULL OR e.domain = ?2)
+            ORDER BY fts.rank
+            LIMIT ?3
+        "#;
+        sqlx::query_as::<_, EpisodicMemory>(sql)
+            .bind(query)
+            .bind(domain)
+            .bind(limit as i64)
+            .fetch_all(&self.pool)
+            .await
+    }
+
     /// Delete old episodic memories with low access count (for archival).
     pub async fn delete_old(
         &self,

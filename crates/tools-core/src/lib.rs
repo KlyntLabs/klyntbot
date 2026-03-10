@@ -29,7 +29,7 @@ pub use pagination::Page;
 pub use params::ParamExtractor;
 pub use permissions::{PermissionLevel, ToolPermissions};
 pub use registry::ToolRegistry;
-pub use search::{rrf_merge, Searchable};
+pub use search::{rrf_merge, rrf_merge_triple, Searchable};
 
 /// Bundle sent from ask_user tool to the CLI.
 /// Each request carries its own response channel.

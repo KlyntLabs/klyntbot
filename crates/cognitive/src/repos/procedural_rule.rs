@@ -74,6 +74,30 @@ impl ProceduralRuleRepo {
         Ok(row.0)
     }
 
+    /// Full-text search via FTS5.
+    pub async fn search_fts(
+        &self,
+        query: &str,
+        domain: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<ProceduralRule>, sqlx::Error> {
+        let sql = r#"
+            SELECT r.* FROM procedural_rules r
+            INNER JOIN procedural_rules_fts fts ON r.id = fts.id
+            WHERE procedural_rules_fts MATCH ?1
+            AND (?2 IS NULL OR r.domain = ?2)
+            AND r.active = 1
+            ORDER BY fts.rank
+            LIMIT ?3
+        "#;
+        sqlx::query_as::<_, ProceduralRule>(sql)
+            .bind(query)
+            .bind(domain)
+            .bind(limit as i64)
+            .fetch_all(&self.pool)
+            .await
+    }
+
     /// Deactivate a rule.
     pub async fn deactivate(&self, id: &str) -> Result<(), sqlx::Error> {
         sqlx::query(

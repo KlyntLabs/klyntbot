@@ -13,6 +13,7 @@ pub mod memory_retriever;
 pub mod reflection;
 pub mod repos;
 pub mod retrieval;
+pub mod search;
 pub mod salience;
 pub mod situation;
 pub mod types;

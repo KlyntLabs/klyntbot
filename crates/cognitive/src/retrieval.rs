@@ -117,6 +117,25 @@ pub async fn retrieve_relevant_facts(
         fallback_path(repo, domains, params.situational_boost, &weights).await?
     };
 
+    // BM25 boost: add FTS5 signal for non-empty queries
+    if !query.is_empty() {
+        if let Ok(bm25_hits) = repo.search_fts(query, None, params.limit * 2).await {
+            let bm25_ids: std::collections::HashMap<String, usize> = bm25_hits
+                .iter()
+                .enumerate()
+                .map(|(rank, f)| (f.id.clone(), rank))
+                .collect();
+
+            for result in &mut scored {
+                if let Some(&rank) = bm25_ids.get(&result.fact.id) {
+                    // BM25 boost: add RRF-style score contribution
+                    let bm25_boost = 1.0 / (60.0 + rank as f64 + 1.0);
+                    result.score += bm25_boost;
+                }
+            }
+        }
+    }
+
     // Sort by FSRS score regardless of path (vector re-ranking can change order)
     scored.sort_by(|a, b| {
         b.score
@@ -529,6 +548,35 @@ mod tests {
                 .await
                 .unwrap();
         assert!(results.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_retrieval_uses_bm25_when_query_non_empty() {
+        let pool = setup().await;
+        let repo = SemanticFactRepo::new(pool);
+
+        // Insert facts with distinctive text for BM25 matching
+        let mut f1 = test_fact("f1", "morning routine", 1.0, 0);
+        f1.object = "wakes up early for deep work".to_string();
+        repo.upsert(&f1).await.unwrap();
+        let mut f2 = test_fact("f2", "afternoon break", 1.0, 0);
+        f2.object = "take a walk after lunch".to_string();
+        repo.upsert(&f2).await.unwrap();
+
+        // Without vector search, BM25 should still boost relevant facts
+        let results = retrieve_relevant_facts(
+            &repo,
+            None,
+            "morning routine",
+            &["productivity"],
+            &default_params(10),
+        )
+        .await
+        .unwrap();
+
+        assert!(!results.is_empty());
+        // f1 should rank higher because "morning routine" matches query via BM25
+        assert_eq!(results[0].fact.id, "f1");
     }
 
     #[tokio::test]
