@@ -6,6 +6,7 @@ use desktop_shared::commands::{
     ActivityCategoryResponse, ActivityTimelineResponse, CategoryRulesResponse,
     FocusSessionResponse, GoalProgressResponse, InsightCardResponse, ProductivityProjectResponse,
     ProductivitySummaryResponse, TimeEntryResponse, TrackedAppResponse,
+    WeeklyAssessmentResponse,
 };
 use desktop_shared::errors::ApiError;
 use feature_productivity::auto_focus::AutoFocusSession;
@@ -262,6 +263,14 @@ pub async fn productivity_project_delete(
     state.productivity_project_delete(id).await
 }
 
+#[tauri::command(rename_all = "snake_case")]
+pub async fn productivity_weekly_assessment(
+    state: State<'_, Arc<AppCore>>,
+    week_start: String,
+) -> Result<WeeklyAssessmentResponse, ApiError> {
+    state.productivity_weekly_assessment(week_start).await
+}
+
 // ── Focus Timer (tray-driven) ──────────────────────────────────────────
 
 use crate::focus_timer::{FocusTimer, TimerMode};
@@ -418,6 +427,7 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "productivity_projects_list",
     "productivity_project_upsert",
     "productivity_project_delete",
+    "productivity_weekly_assessment",
 ];
 
 #[cfg(debug_assertions)]
@@ -566,6 +576,10 @@ pub(crate) async fn dispatch_dev(
         "productivity_project_delete" => {
             let id = try_field!(dev::get_str(body, "id"));
             dev::val(core.productivity_project_delete(id).await)
+        }
+        "productivity_weekly_assessment" => {
+            let week_start = try_field!(dev::get_str(body, "weekStart"));
+            dev::val(core.productivity_weekly_assessment(week_start).await)
         }
         _ => return None,
     })
