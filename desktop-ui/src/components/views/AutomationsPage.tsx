@@ -5,8 +5,7 @@ import { createPortal } from "react-dom";
 import { useMutation } from "../../hooks/useMutation";
 import { invalidateQueries, useQuery } from "../../hooks/useQuery";
 import { humanizeJobName, humanizeSchedule, ORIGIN_STYLES, relativeTime } from "../../lib/cron";
-import { toLocalISO } from "../../lib/dates";
-import { MiniCalendar } from "../tasks/editors/MiniCalendar";
+import { toLocalDateTime, toLocalISO } from "../../lib/dates";
 import type {
   CronJob,
   CronJobCreateParams,
@@ -16,6 +15,7 @@ import type {
 } from "../../lib/types";
 import { cn } from "../../lib/utils";
 import { Toggle } from "../shared/Toggle";
+import { MiniCalendar } from "../tasks/editors/MiniCalendar";
 import { DataTable, type DataTableColumn } from "../ui/DataTable";
 
 type OriginFilter = "all" | CronOrigin;
@@ -139,7 +139,7 @@ const DEFAULT_FIELDS: ScheduleFields = {
   weekdays: [true, true, true, true, true, false, false],
   time: "09:00",
   date: toLocalISO(new Date()),
-  dateTime: new Date(Date.now() + 3600000).toISOString().slice(0, 16),
+  dateTime: toLocalDateTime(new Date(Date.now() + 3600000)),
 };
 
 function parseSchedule(s: CronSchedule): ScheduleFields {
@@ -150,7 +150,7 @@ function parseSchedule(s: CronSchedule): ScheduleFields {
       mode: "once",
       date: toLocalISO(d),
       time: `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`,
-      dateTime: d.toISOString().slice(0, 16),
+      dateTime: toLocalDateTime(d),
     };
   }
 
@@ -228,7 +228,7 @@ function SchedulePanel({
     update({ weekdays: next });
   };
 
-  const showCalendar = fields.mode === "once" || fields.mode === "cron";
+  const showCalendar = fields.mode === "once";
   const showRepeatEvery = fields.mode === "interval";
   const showDayPicker =
     (fields.mode === "interval" && fields.intervalUnit === "weeks") ||
@@ -453,7 +453,9 @@ function InlineScheduleCell({
             <div
               className="fixed inset-0 z-[9998]"
               onClick={() => setOpen(false)}
-              onKeyDown={() => {}}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") setOpen(false);
+              }}
             />
             <div
               className="fixed z-[9999] glass-dropdown p-5 w-[310px] max-h-[calc(100vh-32px)] overflow-y-auto rounded-xl"
@@ -526,7 +528,11 @@ function AutomationCreateForm({
     kind: "every",
     everyMs: 3600000,
   });
-  const { mutate, loading } = useMutation<CronJob, CronJobCreateParams>("cron_create", "params");
+  const {
+    mutate,
+    loading,
+    error: createError,
+  } = useMutation<CronJob, CronJobCreateParams>("cron_create", "params");
 
   const handleSubmit = async () => {
     if (!name.trim() || !message.trim()) return;
@@ -564,6 +570,7 @@ function AutomationCreateForm({
         <JobScheduleBuilder value={schedule} onChange={setSchedule} />
       </div>
 
+      {createError && <p className="text-destructive text-xs font-light">{createError.message}</p>}
       <div className="flex justify-end gap-2">
         <button type="button" onClick={onClose} className="glass-button px-3 py-1.5 text-xs">
           Cancel
@@ -645,36 +652,44 @@ export function AutomationsPage() {
 
   const handleEnable = useCallback(
     async (id: string, enabled: boolean) => {
-      await enableJob({ id, enabled });
-      invalidateQueries("cron_");
-      refetch();
+      const result = await enableJob({ id, enabled });
+      if (result) {
+        invalidateQueries("cron_");
+        refetch();
+      }
     },
     [enableJob, refetch],
   );
 
   const handleRun = useCallback(
     async (id: string) => {
-      await runJob({ id });
-      invalidateQueries("cron_");
-      refetch();
+      const result = await runJob({ id });
+      if (result !== undefined) {
+        invalidateQueries("cron_");
+        refetch();
+      }
     },
     [runJob, refetch],
   );
 
   const handleDelete = useCallback(
     async (id: string) => {
-      await deleteJob({ id });
-      invalidateQueries("cron_");
-      refetch();
+      const result = await deleteJob({ id });
+      if (result) {
+        invalidateQueries("cron_");
+        refetch();
+      }
     },
     [deleteJob, refetch],
   );
 
   const handleUpdate = useCallback(
     async (id: string, field: Partial<CronJobUpdateParams>) => {
-      await updateJob({ id, ...field });
-      invalidateQueries("cron_");
-      refetch();
+      const result = await updateJob({ id, ...field });
+      if (result) {
+        invalidateQueries("cron_");
+        refetch();
+      }
     },
     [updateJob, refetch],
   );

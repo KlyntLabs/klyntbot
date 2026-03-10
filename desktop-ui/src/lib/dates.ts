@@ -105,6 +105,14 @@ export function toLocalISO(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+/** Format a Date as YYYY-MM-DDTHH:mm using local timezone (for datetime-local inputs). */
+export function toLocalDateTime(d: Date): string {
+  const date = toLocalISO(d);
+  const h = String(d.getHours()).padStart(2, "0");
+  const m = String(d.getMinutes()).padStart(2, "0");
+  return `${date}T${h}:${m}`;
+}
+
 /** Get today as YYYY-MM-DD in local timezone. */
 export function todayISO(): string {
   return toLocalISO(new Date());

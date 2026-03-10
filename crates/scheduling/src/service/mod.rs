@@ -400,11 +400,17 @@ impl CronService {
             id: job.id.clone(),
             name: job.name.clone(),
             enabled: job.enabled,
-            origin: serde_json::to_value(&job.origin)
-                .and_then(|v| serde_json::from_value(v))
-                .unwrap_or_else(|_| "system".to_string()),
-            schedule: serde_json::to_value(&job.schedule).unwrap_or_default(),
-            payload: serde_json::to_value(&job.payload).unwrap_or_default(),
+            origin: match &job.origin {
+                CronOrigin::System => "system",
+                CronOrigin::User => "user",
+                CronOrigin::Ai => "ai",
+                CronOrigin::Plugin => "plugin",
+            }
+            .to_string(),
+            schedule: serde_json::to_value(&job.schedule)
+                .expect("CronSchedule serialization is infallible"),
+            payload: serde_json::to_value(&job.payload)
+                .expect("CronPayload serialization is infallible"),
             next_run_at_ms: job.state.next_run_at_ms,
             last_run_at_ms: job.state.last_run_at_ms,
             last_status: job.state.last_status.clone(),
@@ -417,18 +423,35 @@ impl CronService {
 
     /// Convert a CronJobRow from SQL back to a domain CronJob.
     fn row_to_job(row: CronJobRow) -> CronJob {
-        let schedule =
-            serde_json::from_value(row.schedule).unwrap_or(CronSchedule::Every { every_ms: 0 });
+        let (schedule, schedule_corrupt) = match serde_json::from_value(row.schedule) {
+            Ok(s) => (s, false),
+            Err(e) => {
+                tracing::error!(
+                    "Corrupt schedule for cron job '{}': {}; disabling job",
+                    row.id,
+                    e
+                );
+                (CronSchedule::Every { every_ms: 86_400_000 }, true)
+            }
+        };
         let payload = serde_json::from_value(row.payload).unwrap_or_default();
         CronJob {
-            id: row.id,
+            id: row.id.clone(),
             name: row.name,
-            enabled: row.enabled,
+            enabled: row.enabled && !schedule_corrupt,
             origin: match row.origin.as_str() {
+                "system" => CronOrigin::System,
                 "user" => CronOrigin::User,
                 "ai" => CronOrigin::Ai,
                 "plugin" => CronOrigin::Plugin,
-                _ => CronOrigin::System,
+                other => {
+                    tracing::warn!(
+                        "Unknown cron origin '{}' for job '{}', defaulting to User",
+                        other,
+                        row.id
+                    );
+                    CronOrigin::User
+                }
             },
             schedule,
             payload,
@@ -445,16 +468,16 @@ impl CronService {
     }
 
     /// Get service status
-    pub async fn status(&self) -> serde_json::Value {
+    pub async fn status(&self) -> crate::types::CronServiceStatus {
         let store = self.store.read().await;
         let running = *self.running.read().await;
         let next_wake_ms = self.get_next_wake_ms().await;
 
-        serde_json::json!({
-            "enabled": running,
-            "jobs": store.jobs.len(),
-            "nextWakeAtMs": next_wake_ms,
-        })
+        crate::types::CronServiceStatus {
+            enabled: running,
+            jobs: store.jobs.len(),
+            next_wake_at_ms: next_wake_ms,
+        }
     }
 }
 
@@ -938,8 +961,8 @@ mod tests {
             .unwrap();
 
         let status = service.status().await;
-        assert_eq!(status["jobs"], 1);
-        assert!(status["nextWakeAtMs"].is_number());
+        assert_eq!(status.jobs, 1);
+        assert!(status.next_wake_at_ms.is_some());
     }
 
     #[test]

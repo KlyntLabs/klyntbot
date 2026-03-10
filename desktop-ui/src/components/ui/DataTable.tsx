@@ -207,14 +207,18 @@ function DataTableRow<T>({
     else if (onRowClick) onRowClick(item);
   }, [onToggleExpand, onRowClick, itemKey, item]);
 
+  const isInteractive = !!onToggleExpand || !!onRowClick;
+
   return (
     <>
       <tr
-        tabIndex={0}
-        onClick={handleClick}
-        onKeyDown={(e) => e.key === "Enter" && handleClick()}
+        tabIndex={isInteractive ? 0 : undefined}
+        onClick={isInteractive ? handleClick : undefined}
+        onKeyDown={isInteractive ? (e) => e.key === "Enter" && handleClick() : undefined}
         className={cn(
-          "hover:bg-white/[0.04] transition-colors border-b border-white/[0.04] last:border-b-0 cursor-pointer whitespace-nowrap",
+          "transition-colors border-b border-white/[0.04] last:border-b-0 whitespace-nowrap",
+          isInteractive && "hover:bg-white/[0.04] cursor-pointer",
+          !isInteractive && "hover:bg-white/[0.02]",
           rowClassName?.(item),
         )}
       >

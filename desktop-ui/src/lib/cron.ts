@@ -15,10 +15,10 @@ export function humanizeSchedule(schedule: CronSchedule): string {
       if (ms < 60_000) return `Every ${Math.round(ms / 1000)}s`;
       if (ms < 3_600_000) return `Every ${Math.round(ms / 60_000)} min`;
       if (ms < 86_400_000) {
-        const h = ms / 3_600_000;
+        const h = Math.round(ms / 3_600_000);
         return h === 1 ? "Every hour" : `Every ${h} hours`;
       }
-      const d = ms / 86_400_000;
+      const d = Math.round(ms / 86_400_000);
       return d === 1 ? "Every day" : `Every ${d} days`;
     }
     case "cron":
@@ -120,10 +120,10 @@ export function relativeTime(ms: number): string {
   return `${prefix}${Math.round(abs / 86_400_000)}d${suffix}`;
 }
 
-/** Origin badge config */
+/** Origin badge config — uses CSS token variables from theme.css */
 export const ORIGIN_STYLES: Record<CronOrigin, { label: string; className: string }> = {
-  system: { label: "System", className: "bg-blue-500/20 text-blue-400" },
-  ai: { label: "AI", className: "bg-purple-500/20 text-purple-400" },
-  user: { label: "User", className: "bg-emerald-500/20 text-emerald-400" },
-  plugin: { label: "Plugin", className: "bg-amber-500/20 text-amber-400" },
+  system: { label: "System", className: "bg-origin-system/20 text-origin-system" },
+  ai: { label: "AI", className: "bg-origin-ai/20 text-origin-ai" },
+  user: { label: "User", className: "bg-origin-user/20 text-origin-user" },
+  plugin: { label: "Plugin", className: "bg-origin-plugin/20 text-origin-plugin" },
 };

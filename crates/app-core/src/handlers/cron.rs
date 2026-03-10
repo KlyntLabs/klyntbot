@@ -21,7 +21,8 @@ fn to_response(job: &scheduling::CronJob) -> CronJobResponse {
             scheduling::CronOrigin::Plugin => "plugin",
         }
         .to_string(),
-        schedule: serde_json::to_value(&job.schedule).unwrap_or_default(),
+        schedule: serde_json::to_value(&job.schedule)
+            .expect("CronSchedule serialization is infallible"),
         payload: CronPayloadResponse {
             kind: job.payload.kind.clone(),
             message: job.payload.message.clone(),
@@ -53,9 +54,9 @@ impl AppCore {
     pub async fn cron_status(&self) -> Result<CronStatusResponse, ApiError> {
         let status = self.cron_service.status().await;
         Ok(CronStatusResponse {
-            enabled: status["enabled"].as_bool().unwrap_or(false),
-            jobs: status["jobs"].as_u64().unwrap_or(0) as usize,
-            next_wake_at_ms: status["nextWakeAtMs"].as_i64(),
+            enabled: status.enabled,
+            jobs: status.jobs,
+            next_wake_at_ms: status.next_wake_at_ms,
         })
     }
 
@@ -142,11 +143,7 @@ impl AppCore {
         };
         let origin = existing.origin.clone();
 
-        self.cron_service
-            .remove_job(&params.id)
-            .await
-            .map_err(|e| ApiError::new("CRON_ERROR", &e.to_string()))?;
-
+        // Add new job first, then remove old — avoids data loss if add fails
         let job = self
             .cron_service
             .add_job(
@@ -159,6 +156,11 @@ impl AppCore {
                 existing.delete_after_run,
                 origin,
             )
+            .await
+            .map_err(|e| ApiError::new("CRON_ERROR", &e.to_string()))?;
+
+        self.cron_service
+            .remove_job(&params.id)
             .await
             .map_err(|e| ApiError::new("CRON_ERROR", &e.to_string()))?;
 

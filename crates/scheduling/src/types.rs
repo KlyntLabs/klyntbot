@@ -135,6 +135,14 @@ fn default_enabled() -> bool {
     true
 }
 
+/// Status snapshot for the cron service
+#[derive(Debug, Clone)]
+pub struct CronServiceStatus {
+    pub enabled: bool,
+    pub jobs: usize,
+    pub next_wake_at_ms: Option<i64>,
+}
+
 /// Persistent store for cron jobs
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CronStore {
