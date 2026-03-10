@@ -305,6 +305,40 @@ impl ActivityEventRepo {
             .collect())
     }
 
+    /// Re-assign all historical events for a given app/site to a new category.
+    pub async fn recategorize_app(
+        &self,
+        app_name: &str,
+        site_name: Option<&str>,
+        new_category_id: &str,
+    ) -> common::Result<u64> {
+        let result = match site_name {
+            Some(site) => {
+                sqlx::query(
+                    "UPDATE activity_events SET category_id = ?1 WHERE app_name = ?2 AND site_name = ?3",
+                )
+                .bind(new_category_id)
+                .bind(app_name)
+                .bind(site)
+                .execute(&self.pool)
+                .await
+            }
+            None => {
+                sqlx::query(
+                    "UPDATE activity_events SET category_id = ?1 WHERE app_name = ?2 AND site_name IS NULL",
+                )
+                .bind(new_category_id)
+                .bind(app_name)
+                .execute(&self.pool)
+                .await
+            }
+        };
+        let rows = result
+            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?
+            .rows_affected();
+        Ok(rows)
+    }
+
     pub async fn total_active_secs(
         &self,
         start: &DateTime<Utc>,

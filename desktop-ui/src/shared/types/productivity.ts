@@ -220,6 +220,25 @@ export interface FocusCompletedPayload {
   breakMins: number | null;
 }
 
+// ── Intelligence Sessions (backend-scored productivity sessions) ─
+
+export interface IntelligenceSession {
+  id: string;
+  sessionType: string;
+  startedAt: string;
+  endedAt: string | null;
+  durationSecs: number | null;
+  dominantCategory: string | null;
+  categoryPurity: number | null;
+  qualityScore: number | null;
+  title: string | null;
+  description: string | null;
+  appBreakdown: string | null;
+  contextSwitches: number;
+  distractionCount: number;
+  source: string;
+}
+
 // ── Weekly Assessment ───────────────────────────────────────
 
 export interface WeeklyAssessment {

@@ -141,6 +141,7 @@ export type {
   GoalProgress,
   InsightCard,
   InsightPayload,
+  IntelligenceSession,
   LearnedRule,
   ProductivityPeriod,
   ProductivityProject,

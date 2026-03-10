@@ -5,8 +5,8 @@ use chrono::Utc;
 use desktop_shared::commands::{
     ActivityCategoryResponse, ActivityTimelineResponse, AppUsageResponse, CategoryRulesResponse,
     CategoryUsageResponse, FocusSessionResponse, GoalProgressResponse, InsightCardResponse,
-    ProductivityProjectResponse, ProductivitySummaryResponse, ProjectUsageResponse,
-    TimeEntryResponse, TrackedAppResponse, WeeklyAssessmentResponse,
+    IntelligenceSessionResponse, ProductivityProjectResponse, ProductivitySummaryResponse,
+    ProjectUsageResponse, TimeEntryResponse, TrackedAppResponse, WeeklyAssessmentResponse,
 };
 use desktop_shared::errors::ApiError;
 use feature_productivity::auto_focus::AutoFocusSession;
@@ -259,6 +259,63 @@ impl AppCore {
             .await
             .map_err(map_prod_err)?;
         Ok(sessions.into_iter().map(session_to_response).collect())
+    }
+
+    pub async fn productivity_intelligence_sessions(
+        &self,
+        date: String,
+        tz_offset_mins: Option<i32>,
+    ) -> Result<Vec<IntelligenceSessionResponse>, ApiError> {
+        let repos = self.productivity_repos()?;
+        let (start, end) = parse_local_day_range(&date, tz_offset_mins)?;
+        let start_str = start.to_rfc3339();
+        let end_str = end.to_rfc3339();
+        let next_date = end.date_naive().format("%Y-%m-%d").to_string();
+
+        // Fetch sessions and quality scores in parallel
+        let (sessions_res, scores_res) = tokio::join!(
+            repos.intelligence_sessions.list_range(&start_str, &end_str),
+            repos.quality_scores.list_range(&date, &next_date),
+        );
+        let sessions = sessions_res.map_err(map_prod_err)?;
+        let scores = scores_res.map_err(map_prod_err)?;
+        let score_map: std::collections::HashMap<String, f64> = scores
+            .into_iter()
+            .filter_map(|s| s.session_id.map(|sid| (sid, s.overall_score)))
+            .collect();
+
+        Ok(sessions
+            .into_iter()
+            .map(|s| {
+                let quality = s
+                    .quality_score
+                    .or_else(|| score_map.get(&s.id).copied());
+                let title = s
+                    .tags
+                    .clone()
+                    .unwrap_or_else(|| s.fallback_title());
+                let description = s
+                    .notes
+                    .clone()
+                    .or_else(|| s.fallback_description(quality));
+                IntelligenceSessionResponse {
+                    id: s.id,
+                    session_type: s.session_type,
+                    started_at: s.started_at,
+                    ended_at: s.ended_at,
+                    duration_secs: s.duration_secs,
+                    dominant_category: s.dominant_category,
+                    category_purity: s.category_purity,
+                    quality_score: quality,
+                    title: Some(title),
+                    description,
+                    app_breakdown: s.app_breakdown,
+                    context_switches: s.context_switches,
+                    distraction_count: s.distraction_count,
+                    source: s.source,
+                }
+            })
+            .collect())
     }
 
     pub async fn productivity_weekly(&self) -> Result<Vec<ProductivitySummaryResponse>, ApiError> {
@@ -607,6 +664,22 @@ impl AppCore {
         repos.categories.delete(&id).await.map_err(map_prod_err)
     }
 
+    /// Re-assign all historical events for a given app/site to a new category.
+    pub async fn productivity_recategorize_app(
+        &self,
+        app_name: String,
+        site_name: Option<String>,
+        new_category_id: String,
+    ) -> Result<u64, ApiError> {
+        let repos = self.productivity_repos()?;
+        let rows = repos
+            .events
+            .recategorize_app(&app_name, site_name.as_deref(), &new_category_id)
+            .await
+            .map_err(map_prod_err)?;
+        Ok(rows)
+    }
+
     // ── V2: Insights & Auto-Focus ─────────────────────────────────────
 
     pub async fn productivity_insights(
@@ -850,3 +923,4 @@ impl AppCore {
         Ok(assessment_to_response(assessment))
     }
 }
+

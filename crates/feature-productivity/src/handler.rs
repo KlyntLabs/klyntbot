@@ -3,6 +3,15 @@
 
 use async_trait::async_trait;
 
+/// LLM-generated session summary.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SessionSummary {
+    /// Short title, e.g. "Deep TypeScript refactoring"
+    pub title: String,
+    /// One-line description, e.g. "Focused on ActivityTrack component with minimal distractions"
+    pub description: String,
+}
+
 #[async_trait]
 pub trait ProductivityHandler: Send + Sync {
     /// Generate a natural language summary of the day's productivity data.
@@ -18,4 +27,18 @@ pub trait ProductivityHandler: Send + Sync {
         title: &str,
         url: Option<&str>,
     ) -> common::Result<String>;
+
+    /// Generate a short title + description for a completed productivity session.
+    /// Context includes: duration, category, apps, quality, switches.
+    /// Returns a JSON object: `{"title": "...", "description": "..."}`.
+    async fn generate_session_summary(
+        &self,
+        context: &str,
+    ) -> common::Result<SessionSummary> {
+        // Default implementation: parse the context for a fallback
+        let _ = context;
+        Err(common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(
+            "Session summary generation not implemented".into(),
+        )))
+    }
 }

@@ -167,6 +167,26 @@ impl IntelligenceSessionRepo {
         Ok(rows)
     }
 
+    /// Store an LLM-generated title + description for a session.
+    /// Uses the `tags` column for title and `notes` for description.
+    pub async fn update_summary(
+        &self,
+        id: &str,
+        title: &str,
+        description: &str,
+    ) -> common::Result<()> {
+        sqlx::query(
+            "UPDATE productivity_sessions SET tags = ?2, notes = ?3, updated_at = datetime('now') WHERE id = ?1",
+        )
+        .bind(id)
+        .bind(title)
+        .bind(description)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        Ok(())
+    }
+
     pub async fn today_summary(&self) -> common::Result<TodaySummary> {
         let row = sqlx::query_as::<_, TodaySummaryRow>(
             r#"SELECT

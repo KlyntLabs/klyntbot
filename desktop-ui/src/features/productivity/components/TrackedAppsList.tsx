@@ -1,3 +1,4 @@
+import { ipc } from "@shared/hooks/useIpc";
 import { useMutation } from "@shared/hooks/useMutation";
 import { formatHumanDuration } from "@shared/lib/dates";
 import type { ActivityCategory, TrackedApp } from "@shared/types";
@@ -103,14 +104,20 @@ export function TrackedAppsList({ apps, categories, onReassigned }: TrackedAppsL
     });
 
     // Step 3: Re-categorize historical events for this app/site
-    await reassignMut.mutate(
-      {
+    try {
+      await ipc("productivity_recategorize_app", {
         app_name: app.appName,
         site_name: app.siteName ?? null,
         new_category_id: newCategoryId,
-      },
-      "productivity_recategorize_app",
-    );
+      });
+    } catch (e) {
+      // Tolerate missing command (not yet deployed) — new events will still be categorized correctly.
+      // Log other errors so storage/network failures are visible.
+      const msg = e instanceof Error ? e.message : String(e);
+      if (!msg.includes("unknown command") && !msg.includes("not found")) {
+        console.warn("recategorize_app failed:", msg);
+      }
+    }
 
     setEditingKey(null);
     onReassigned();

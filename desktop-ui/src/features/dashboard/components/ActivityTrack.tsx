@@ -2,6 +2,9 @@
  * ActivityTrack — renders merged productivity sessions as vertical blocks
  * inside the day column grid. Focus sessions render as thin left-edge
  * indicator bars, and activity blocks during focus get a focus border.
+ *
+ * V2: Intelligence-enriched sessions — quality-based coloring, LLM titles,
+ * and purity-based opacity for effective-period intensity.
  */
 
 import { useEvent } from "@shared/hooks/useEvent";
@@ -14,10 +17,11 @@ import type {
   ActivityCategory,
   ActivitySwitchPayload,
   ActivityTimeline,
+  IntelligenceSession,
   TimelineEntry,
 } from "@shared/types";
 import { useEffect, useMemo, useState } from "react";
-import { resolveActivityColor } from "../productivity/shared";
+import { purityToOpacity, qualityToColor, resolveActivityColor } from "../productivity/shared";
 
 const FOCUS_BAR_WIDTH = 4; // px — left-edge focus indicator
 
@@ -31,6 +35,8 @@ export interface SessionBlock {
   appBreakdown: { app: string; dur: number; catType: string }[];
   /** True if this session overlaps with a focus period */
   duringFocus: boolean;
+  /** Matched intelligence session (quality, title, etc.) */
+  intelligence: IntelligenceSession | null;
 }
 
 interface FocusRange {
@@ -54,6 +60,40 @@ interface ActivityTrackProps {
   timelineEntries?: ActivityTimeline[];
 }
 
+// ── Intelligence session matching ──────────────────────────────
+
+/** Match a merged session block to the closest overlapping intelligence session. */
+function matchIntelligence(
+  startMin: number,
+  endMin: number,
+  sessions: IntelligenceSession[],
+): IntelligenceSession | null {
+  let best: IntelligenceSession | null = null;
+  let bestOverlap = 0;
+  const sessionDur = endMin - startMin;
+  if (sessionDur <= 0) return null;
+
+  for (const is of sessions) {
+    const isStart = minutesSinceMidnight(is.startedAt);
+    const isEnd = is.endedAt
+      ? minutesSinceMidnight(is.endedAt)
+      : isStart + (is.durationSecs ?? 0) / 60;
+    const overlapStart = Math.max(startMin, isStart);
+    const overlapEnd = Math.min(endMin, isEnd);
+    const overlap = Math.max(0, overlapEnd - overlapStart);
+
+    if (overlap > bestOverlap) {
+      bestOverlap = overlap;
+      best = is;
+    }
+  }
+
+  // Require >= 30% overlap to avoid spurious matches
+  return best && bestOverlap / sessionDur > 0.3 ? best : null;
+}
+
+// ── Component ──────────────────────────────────────────────────
+
 export function ActivityTrack({
   date,
   hourHeight,
@@ -69,7 +109,6 @@ export function ActivityTrack({
   const parentOwnsData = timelineEntries != null;
 
   // Fallback fetch — only used when parent doesn't provide timeline data.
-  // Pass `null` args to skip the IPC call when parent owns the data.
   const { data: fetchedEvents, refetch: refetchEvents } = useQuery<ActivityTimeline[]>(
     "productivity_timeline",
     parentOwnsData ? null : { date, tzOffsetMins: TZ_OFFSET_MINS },
@@ -81,8 +120,15 @@ export function ActivityTrack({
     [],
   );
 
+  // Fetch intelligence sessions for quality/title overlay
+  // Skip when parent owns data (parent handles refetching)
+  const { data: intellSessions } = useQuery<IntelligenceSession[]>(
+    "productivity_intelligence_sessions",
+    parentOwnsData ? null : { date, tzOffsetMins: TZ_OFFSET_MINS },
+    [],
+  );
+
   // Real-time: refetch on app switch and productivity entity changes.
-  // No-op handlers when parent owns the data — parent handles refetching.
   useEvent<ActivitySwitchPayload>("activity:switch", () => {
     if (!parentOwnsData) refetchEvents();
   });
@@ -143,7 +189,7 @@ export function ActivityTrack({
 
     const merged = mergeActivitySessions(parsed);
 
-    // Convert to SessionBlock with focus overlap detection
+    // Convert to SessionBlock with focus overlap detection + intelligence matching
     return merged.map((session) => {
       const sessionStartMin = session.startSecs / 60;
       const sessionEndMin = session.endSecs / 60;
@@ -151,18 +197,25 @@ export function ActivityTrack({
         session.events.some((ev) => ev.hasFocus) ||
         focusRanges.some((f) => sessionStartMin < f.endMin && sessionEndMin > f.startMin);
 
+      const matched = matchIntelligence(sessionStartMin, sessionEndMin, intellSessions);
+
+      // Use quality-based color when available, fallback to category color
+      const color =
+        matched?.qualityScore != null ? qualityToColor(matched.qualityScore) : session.color;
+
       return {
         startMin: sessionStartMin,
         endMin: sessionEndMin,
-        color: session.color,
-        label: session.label,
+        color,
+        label: matched?.title || session.label,
         duration: session.duration,
         dominantCategory: session.dominantCategory,
         appBreakdown: session.appBreakdown,
         duringFocus,
+        intelligence: matched,
       };
     });
-  }, [events, categoryMap, focusRanges]);
+  }, [events, categoryMap, focusRanges, intellSessions]);
 
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
 
@@ -207,7 +260,7 @@ export function ActivityTrack({
         );
       })}
 
-      {/* Activity session blocks — offset left to make room for focus bar */}
+      {/* Activity session blocks — quality-colored with intelligence overlay */}
       {sessions.map((session, idx) => {
         const top = session.startMin * pxPerMin;
         const height = Math.max((session.endMin - session.startMin) * pxPerMin, 8);
@@ -215,6 +268,18 @@ export function ActivityTrack({
           selectedSession?.startMin === session.startMin &&
           selectedSession?.label === session.label;
         const leftOffset = session.duringFocus ? FOCUS_BAR_WIDTH + 2 : 2;
+        const matched = session.intelligence;
+
+        // Purity-based opacity: higher purity = more solid (sustained focus indicator)
+        const baseOpacity = purityToOpacity(matched?.categoryPurity);
+        const opacity = hoveredIdx !== null && hoveredIdx !== idx ? 0.3 : baseOpacity;
+
+        // Build rich tooltip
+        const qualityLabel =
+          matched?.qualityScore != null ? ` · Q:${Math.round(matched.qualityScore)}` : "";
+        const tooltip = matched?.title
+          ? `${matched.title} · ${formatHumanDuration(session.duration)}${qualityLabel}${session.duringFocus ? " (focus)" : ""}`
+          : `${session.label} · ${formatHumanDuration(session.duration)}${session.duringFocus ? " (focus)" : ""}`;
 
         return (
           <button
@@ -223,26 +288,44 @@ export function ActivityTrack({
             className={cn(
               "absolute right-0.5 rounded-sm cursor-pointer transition-opacity overflow-hidden",
               isSelected && "ring-1 ring-brand",
+              matched && "shadow-sm",
             )}
             style={{
               top,
               height,
               left: leftOffset,
               backgroundColor: session.color,
-              opacity: hoveredIdx !== null && hoveredIdx !== idx ? 0.3 : 0.75,
+              opacity,
             }}
             onClick={() => onSelectSession(session)}
             onMouseEnter={() => setHoveredIdx(idx)}
             onMouseLeave={() => setHoveredIdx(null)}
-            title={`${session.label} · ${formatHumanDuration(session.duration)}${session.duringFocus ? " (focus)" : ""}`}
+            title={tooltip}
           >
+            {/* Quality badge — top-right pill */}
+            {matched?.qualityScore != null && height > 24 && (
+              <span className="absolute top-0.5 right-0.5 text-[7px] font-bold text-white/90 bg-black/20 rounded-full px-1 leading-tight">
+                {Math.round(matched.qualityScore)}
+              </span>
+            )}
+
+            {/* Session title (LLM-generated or app name) */}
             {height > 18 && (
               <span className="text-[9px] text-white/90 font-medium px-1 truncate block leading-tight mt-0.5">
                 {session.label}
               </span>
             )}
+
+            {/* Description or duration */}
             {height > 32 && (
               <span className="text-[8px] text-white/60 px-1 truncate block">
+                {matched?.description || formatHumanDuration(session.duration)}
+              </span>
+            )}
+
+            {/* Duration when there's space and description is shown */}
+            {height > 48 && matched?.description && (
+              <span className="text-[7px] text-white/40 px-1 truncate block">
                 {formatHumanDuration(session.duration)}
               </span>
             )}

@@ -761,6 +761,57 @@ pub struct ProductivitySession {
     pub updated_at: String,
 }
 
+impl ProductivitySession {
+    /// Extract the most-used app from the JSON `app_breakdown` field.
+    pub fn top_app(&self) -> String {
+        self.app_breakdown
+            .as_deref()
+            .and_then(|ab| serde_json::from_str::<serde_json::Value>(ab).ok())
+            .and_then(|v| {
+                v.as_object().and_then(|m| {
+                    m.iter()
+                        .max_by_key(|(_, v)| v.as_i64().unwrap_or(0))
+                        .map(|(k, _)| k.clone())
+                })
+            })
+            .unwrap_or_else(|| "Unknown".to_string())
+    }
+
+    /// Generate a template-based title from category + top app.
+    pub fn fallback_title(&self) -> String {
+        let app = self.top_app();
+        let category = self.dominant_category.as_deref().unwrap_or("Activity");
+        match category {
+            "coding" | "Coding" => format!("Coding in {app}"),
+            "design" | "Design" => format!("Design in {app}"),
+            "communication" | "Communication" => format!("{app} comms"),
+            "research" | "Research" => format!("Research in {app}"),
+            "meeting" | "Meeting" => format!("Meeting in {app}"),
+            "writing" | "Writing" => format!("Writing in {app}"),
+            cat => format!("{cat} · {app}"),
+        }
+    }
+
+    /// Generate a template-based description from duration, quality, and context switches.
+    pub fn fallback_description(&self, quality: Option<f64>) -> Option<String> {
+        let dur_mins = self.duration_secs.unwrap_or(0) / 60;
+        if dur_mins == 0 {
+            return None;
+        }
+        let quality_desc = match quality.or(self.quality_score) {
+            Some(q) if q >= 80.0 => "excellent focus",
+            Some(q) if q >= 60.0 => "good focus",
+            Some(q) if q >= 40.0 => "moderate focus",
+            Some(_) => "scattered",
+            None => "unscored",
+        };
+        Some(format!(
+            "{}min · {} · {} switches",
+            dur_mins, quality_desc, self.context_switches
+        ))
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 #[serde(rename_all = "camelCase")]
 pub struct QualityScore {

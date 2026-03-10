@@ -751,6 +751,25 @@ pub struct FocusTimerStatusResponse {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct IntelligenceSessionResponse {
+    pub id: String,
+    pub session_type: String,
+    pub started_at: String,
+    pub ended_at: Option<String>,
+    pub duration_secs: Option<i64>,
+    pub dominant_category: Option<String>,
+    pub category_purity: Option<f64>,
+    pub quality_score: Option<f64>,
+    pub title: Option<String>,
+    pub description: Option<String>,
+    pub app_breakdown: Option<String>,
+    pub context_switches: i64,
+    pub distraction_count: i64,
+    pub source: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ActivityTimelineResponse {
     pub app_name: String,
     pub window_title: Option<String>,

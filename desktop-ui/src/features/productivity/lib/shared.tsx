@@ -487,6 +487,30 @@ export function resolveActivityColor(categoryType: string | undefined, isIdle: b
   return "var(--brand)";
 }
 
+/**
+ * Map a quality score (0–100) to a perceptually smooth color.
+ * 0 → red, 50 → amber/yellow, 100 → green.
+ * Uses oklch for perceptual uniformity.
+ */
+export function qualityToColor(score: number): string {
+  const clamped = Math.max(0, Math.min(100, score));
+  // Hue: 25° (red-orange) → 85° (yellow-green) → 145° (green)
+  const hue = 25 + (clamped / 100) * 120;
+  // Lightness: slightly brighter for higher scores
+  const lightness = 0.52 + (clamped / 100) * 0.1;
+  const chroma = 0.16 + (clamped / 100) * 0.04;
+  return `oklch(${lightness.toFixed(2)} ${chroma.toFixed(2)} ${hue.toFixed(0)})`;
+}
+
+/**
+ * Compute opacity from category purity (0.0–1.0).
+ * Higher purity = more opaque (clearer signal of sustained focus).
+ */
+export function purityToOpacity(purity: number | null | undefined): number {
+  if (purity == null) return 0.65;
+  return 0.5 + Math.min(1, purity) * 0.4; // range: 0.5 – 0.9
+}
+
 /** Resolve category type to a human-readable label. */
 export function resolveCategoryLabel(categoryType: string): string {
   if (categoryType === "productive") return "Productive";
@@ -495,13 +519,8 @@ export function resolveCategoryLabel(categoryType: string): string {
   return "Uncategorized";
 }
 
-/** Score color thresholds — shared between ScoreRing and stats widgets. */
-export function scoreColor(score: number): string {
-  if (score >= 80) return "var(--success)";
-  if (score >= 60) return "var(--brand)";
-  if (score >= 40) return "var(--text-muted)";
-  return "var(--destructive)";
-}
+// scoreColor lives in constants.tsx — import from there.
+export { scoreColor } from "./constants";
 
 /** Build the standard Focus/Active/Breaks donut segments. */
 export function buildBreakdownSegments(

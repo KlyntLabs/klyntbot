@@ -4,8 +4,9 @@ use std::sync::Arc;
 
 use desktop_shared::commands::{
     ActivityCategoryResponse, ActivityTimelineResponse, CategoryRulesResponse,
-    FocusSessionResponse, GoalProgressResponse, InsightCardResponse, ProductivityProjectResponse,
-    ProductivitySummaryResponse, TimeEntryResponse, TrackedAppResponse, WeeklyAssessmentResponse,
+    FocusSessionResponse, GoalProgressResponse, InsightCardResponse, IntelligenceSessionResponse,
+    ProductivityProjectResponse, ProductivitySummaryResponse, TimeEntryResponse,
+    TrackedAppResponse, WeeklyAssessmentResponse,
 };
 use desktop_shared::errors::ApiError;
 use feature_productivity::auto_focus::AutoFocusSession;
@@ -66,6 +67,17 @@ pub async fn productivity_sessions(
     date: String,
 ) -> Result<Vec<FocusSessionResponse>, ApiError> {
     state.productivity_sessions(date).await
+}
+
+#[tauri::command]
+pub async fn productivity_intelligence_sessions(
+    state: State<'_, Arc<AppCore>>,
+    date: String,
+    tz_offset_mins: Option<i32>,
+) -> Result<Vec<IntelligenceSessionResponse>, ApiError> {
+    state
+        .productivity_intelligence_sessions(date, tz_offset_mins)
+        .await
 }
 
 #[tauri::command]
@@ -203,6 +215,18 @@ pub async fn productivity_category_delete(
     id: String,
 ) -> Result<bool, ApiError> {
     state.productivity_category_delete(id).await
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn productivity_recategorize_app(
+    state: State<'_, Arc<AppCore>>,
+    app_name: String,
+    site_name: Option<String>,
+    new_category_id: String,
+) -> Result<u64, ApiError> {
+    state
+        .productivity_recategorize_app(app_name, site_name, new_category_id)
+        .await
 }
 
 // ── V2: Insights & Auto-Focus ─────────────────────────────────────────
@@ -421,6 +445,7 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "productivity_focus_end",
     "productivity_focus_status",
     "productivity_sessions",
+    "productivity_intelligence_sessions",
     "productivity_weekly",
     "productivity_categories",
     "productivity_summary_range",
@@ -436,6 +461,7 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "productivity_category_upsert",
     "productivity_tracked_apps",
     "productivity_category_delete",
+    "productivity_recategorize_app",
     "productivity_insights",
     "productivity_insight_dismiss",
     "productivity_auto_focus_confirm",
@@ -483,6 +509,13 @@ pub(crate) async fn dispatch_dev(
         "productivity_sessions" => {
             let date = try_field!(dev::get_str(body, "date"));
             dev::val(core.productivity_sessions(date).await)
+        }
+        "productivity_intelligence_sessions" => {
+            let date = try_field!(dev::get_str(body, "date"));
+            dev::val(
+                core.productivity_intelligence_sessions(date, dev::get(body, "tzOffsetMins"))
+                    .await,
+            )
         }
         "productivity_weekly" => dev::val(core.productivity_weekly().await),
         "productivity_categories" => dev::val(core.productivity_categories().await),
@@ -562,6 +595,15 @@ pub(crate) async fn dispatch_dev(
         "productivity_category_delete" => {
             let id = try_field!(dev::get_str(body, "id"));
             dev::val(core.productivity_category_delete(id).await)
+        }
+        "productivity_recategorize_app" => {
+            let app_name = try_field!(dev::get_str(body, "app_name"));
+            let site_name: Option<String> = dev::get(body, "site_name");
+            let new_category_id = try_field!(dev::get_str(body, "new_category_id"));
+            dev::val(
+                core.productivity_recategorize_app(app_name, site_name, new_category_id)
+                    .await,
+            )
         }
         "productivity_insights" => {
             dev::val(core.productivity_insights(dev::get(body, "date")).await)

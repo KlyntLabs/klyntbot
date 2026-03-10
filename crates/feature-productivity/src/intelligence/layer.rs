@@ -27,6 +27,10 @@ pub struct ProductivityIntelligenceLayer {
     quality_scorer: QualityScorer,
     intervention_router: InterventionRouter,
     cancel: CancellationToken,
+    /// Optional handler for LLM-powered session summaries.
+    summary_handler: Option<Arc<dyn ProductivityHandler>>,
+    /// Session repo for reading/updating session data after scoring.
+    session_repo: crate::repos::IntelligenceSessionRepo,
 }
 
 impl ProductivityIntelligenceLayer {
@@ -45,6 +49,10 @@ impl ProductivityIntelligenceLayer {
             repos.rule_evolution_log.clone(),
         )
         .await?;
+
+        // Clone the handler for session summary generation before consuming it for classification
+        let summary_handler = handler.clone();
+        let session_repo = repos.intelligence_sessions.clone();
 
         let categorization = CategorizationService::new(
             rules_engine,
@@ -72,6 +80,8 @@ impl ProductivityIntelligenceLayer {
             quality_scorer,
             intervention_router,
             cancel,
+            summary_handler,
+            session_repo,
         })
     }
 
@@ -134,15 +144,65 @@ impl ProductivityIntelligenceLayer {
         // 2. Feed to session aggregator
         let session_event = self.session_agg.process_tick(classified.clone()).await;
 
-        // 3. On session end, score quality
+        // 3. On session end, score quality, then generate summary
         if let Some(SessionEvent::Ended { ref session_id, .. }) = session_event {
             if let Err(e) = self.quality_scorer.score_session(session_id).await {
                 warn!(error = %e, "Failed to score session {session_id}");
             }
+
+            // 3b. Generate LLM session summary (title + description)
+            self.generate_session_summary(session_id).await;
         }
 
         // 4. Check for interventions
         let _intervention = self.intervention_router.evaluate(&classified);
+    }
+
+    /// Generate and store a human-readable title + description for a session.
+    /// Uses LLM when available, falls back to template-based generation.
+    async fn generate_session_summary(&self, session_id: &str) {
+        let session = match self.session_repo.get(session_id).await {
+            Ok(Some(s)) => s,
+            _ => return,
+        };
+
+        let dur_mins = session.duration_secs.unwrap_or(0) / 60;
+        let category = session.dominant_category.as_deref().unwrap_or("unknown");
+        let apps = session.app_breakdown.as_deref().unwrap_or("{}");
+        let quality = session.quality_score.map(|q| format!("{q:.0}")).unwrap_or_else(|| "N/A".into());
+        let switches = session.context_switches;
+
+        let context = format!(
+            "Session: {dur_mins}min, Category: {category}, Apps: {apps}, Quality: {quality}/100, Context switches: {switches}"
+        );
+
+        let (title, description) = if let Some(ref handler) = self.summary_handler {
+            match handler.generate_session_summary(&context).await {
+                Ok(summary) => (summary.title, summary.description),
+                Err(_) => self.fallback_summary(&session),
+            }
+        } else {
+            self.fallback_summary(&session)
+        };
+
+        // Store: tags = title, notes = description
+        if let Err(e) = self
+            .session_repo
+            .update_summary(session_id, &title, &description)
+            .await
+        {
+            warn!(error = %e, "Failed to store session summary for {session_id}");
+        } else {
+            info!(session_id = %session_id, title = %title, "session summary generated");
+        }
+    }
+
+    fn fallback_summary(&self, session: &ProductivitySession) -> (String, String) {
+        let title = session.fallback_title();
+        let description = session
+            .fallback_description(None)
+            .unwrap_or_default();
+        (title, description)
     }
 }
 

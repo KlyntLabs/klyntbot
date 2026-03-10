@@ -256,6 +256,7 @@ function SessionDetail({ session, onClose }: { session: SessionBlock; onClose: (
 
   const categoryLabel = resolveCategoryLabel(session.dominantCategory);
   const categoryColor = resolveActivityColor(session.dominantCategory, false);
+  const matched = session.intelligence;
 
   return (
     <div className="w-72 glass-card p-4 flex flex-col gap-3 overflow-y-auto">
@@ -274,18 +275,58 @@ function SessionDetail({ session, onClose }: { session: SessionBlock; onClose: (
         <span className="text-sm font-medium text-primary">{session.label}</span>
       </div>
 
-      {/* Category badge */}
-      <div
-        className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium w-fit"
-        style={{
-          backgroundColor: `color-mix(in oklch, ${categoryColor} 15%, transparent)`,
-          color: categoryColor,
-          border: `1px solid color-mix(in oklch, ${categoryColor} 25%, transparent)`,
-        }}
-      >
-        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: categoryColor }} />
-        {categoryLabel}
+      {/* Intelligence description */}
+      {matched?.description && (
+        <p className="text-xs text-secondary leading-relaxed">{matched.description}</p>
+      )}
+
+      {/* Quality score + Category badge row */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {/* Quality score badge */}
+        {matched?.qualityScore != null && (
+          <div
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold w-fit"
+            style={{
+              backgroundColor: `color-mix(in oklch, ${session.color} 20%, transparent)`,
+              color: session.color,
+              border: `1px solid color-mix(in oklch, ${session.color} 30%, transparent)`,
+            }}
+          >
+            Q: {Math.round(matched.qualityScore)}/100
+          </div>
+        )}
+
+        {/* Category badge */}
+        <div
+          className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium w-fit"
+          style={{
+            backgroundColor: `color-mix(in oklch, ${categoryColor} 15%, transparent)`,
+            color: categoryColor,
+            border: `1px solid color-mix(in oklch, ${categoryColor} 25%, transparent)`,
+          }}
+        >
+          <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: categoryColor }} />
+          {categoryLabel}
+        </div>
       </div>
+
+      {/* Intelligence stats */}
+      {matched && (
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px]">
+          {matched.categoryPurity != null && (
+            <>
+              <span className="text-dim">Focus purity</span>
+              <span className="text-secondary tabular-nums text-right">
+                {Math.round(matched.categoryPurity * 100)}%
+              </span>
+            </>
+          )}
+          <span className="text-dim">Context switches</span>
+          <span className="text-secondary tabular-nums text-right">{matched.contextSwitches}</span>
+          <span className="text-dim">Distractions</span>
+          <span className="text-secondary tabular-nums text-right">{matched.distractionCount}</span>
+        </div>
+      )}
 
       {/* Time info */}
       <div className="text-xs text-muted space-y-1">
