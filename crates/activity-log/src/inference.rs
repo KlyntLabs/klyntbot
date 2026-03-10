@@ -28,7 +28,7 @@ pub struct ContextInferenceConfig {
 impl Default for ContextInferenceConfig {
     fn default() -> Self {
         Self {
-            assignment_threshold: 0.55,
+            assignment_threshold: 0.45,
             merge_threshold: 0.85,
             merge_resource_overlap_min: 0.50,
             temporal_decay_lambda: 0.1,
@@ -181,13 +181,24 @@ impl ContextInferenceEngine {
         }; // read lock dropped here
 
         // Phase 2: Compute resource overlap (async DB queries) without holding lock
+        // Also apply title-similarity boosting (FIX 6)
+        let inferred_title = infer_title(event).to_lowercase();
         let mut best_score = 0.0_f64;
         let mut best_ctx_id: Option<String> = None;
         for (ctx, semantic, temporal) in &partial_scores {
             let resource = self.compute_resource_overlap(event, &ctx.id).await;
-            let score = self.config.semantic_weight * semantic
+            let mut score = self.config.semantic_weight * semantic
                 + self.config.temporal_weight * temporal
                 + self.config.resource_weight * resource;
+
+            // Title-similarity boost: matching titles get a bonus
+            let ctx_title = ctx.title.to_lowercase();
+            if inferred_title == ctx_title {
+                score += 0.20; // Exact match
+            } else if inferred_title.contains(&ctx_title) || ctx_title.contains(&inferred_title) {
+                score += 0.10; // Partial match
+            }
+
             if score > best_score {
                 best_score = score;
                 best_ctx_id = Some(ctx.id.clone());
@@ -198,11 +209,36 @@ impl ContextInferenceEngine {
             let ctx_id = best_ctx_id.unwrap();
             // Update centroid via EMA
             self.update_centroid(&ctx_id, &event_vec).await;
-            // Update context stats
-            let duration = event.duration_secs.unwrap_or(0);
+
+            // Infer duration from event gap if not explicitly set (FIX 3)
+            let duration = if let Some(explicit) = event.duration_secs {
+                explicit
+            } else {
+                let ctx = active_contexts.iter().find(|c| c.id == ctx_id);
+                match ctx {
+                    Some(c) => {
+                        let gap_secs = (event.timestamp - c.last_active_at).num_seconds().max(0);
+                        gap_secs.min(30 * 60) // Cap at 30 minutes
+                    }
+                    None => 0,
+                }
+            };
             WorkContextRepo::update_stats(&self.pool, &ctx_id, Utc::now(), duration, 1).await?;
+
             // Link resources
             self.link_event_resources(event, &ctx_id).await?;
+
+            // Recalculate confidence (FIX 1)
+            let resource_count = ContextResourceRepo::count_for_context(&self.pool, &ctx_id).await;
+            let ctx = WorkContextRepo::get(&self.pool, &ctx_id).await?;
+            if let Some(ctx) = ctx {
+                let new_confidence =
+                    calculate_confidence(ctx.event_count, best_score, resource_count as usize);
+                WorkContextRepo::update_confidence(&self.pool, &ctx_id, new_confidence).await?;
+            }
+
+            // Auto-enrich with tags, description, color (FIX 5)
+            self.auto_enrich_context(&ctx_id).await;
 
             Ok(ContextAssignment {
                 event_id: event.id.clone(),
@@ -214,18 +250,19 @@ impl ContextInferenceEngine {
             // Create new context
             let ctx_id = new_ulid();
             let title = infer_title(event);
+            let context_type = infer_context_type(event);
             let now = Utc::now();
             let new_ctx = WorkContext {
                 id: ctx_id.clone(),
                 title,
                 description: None,
                 status: WorkContextStatus::Active,
-                context_type: infer_context_type(event),
+                context_type,
                 embedding_id: None,
                 linked_project_id: event.project_id.clone(),
-                color: None,
+                color: Some(default_color_for_type(&context_type).to_string()),
                 tags: vec![],
-                confidence: 0.5,
+                confidence: 0.3, // Start low, grows with evidence (FIX 1)
                 first_seen_at: event.timestamp,
                 last_active_at: now,
                 total_duration_secs: event.duration_secs.unwrap_or(0),
@@ -366,12 +403,14 @@ impl ContextInferenceEngine {
     }
 
     /// Check pairs of active contexts for merge candidates.
-    /// Merges when centroid similarity > merge_threshold AND resource overlap > 50%.
+    /// Merges when (centroid similarity > merge_threshold AND resource overlap > 50%)
+    /// OR when titles match exactly (regardless of centroid similarity).
+    /// Collects all candidates first, then executes merges in a second pass.
     pub async fn check_merge_candidates(&self) -> common::Result<Vec<(String, String)>> {
         let active = WorkContextRepo::list_active(&self.pool).await?;
         self.ensure_centroids(&active).await;
 
-        // Bulk-fetch resource IDs for all active contexts (avoids N² queries in the pair loop)
+        // Bulk-fetch resource IDs for all active contexts
         let mut resource_map: HashMap<String, HashSet<String>> = HashMap::new();
         for ctx in &active {
             let ids = ContextResourceRepo::list_resource_ids_for_context(&self.pool, &ctx.id)
@@ -380,54 +419,187 @@ impl ContextInferenceEngine {
             resource_map.insert(ctx.id.clone(), ids.into_iter().collect());
         }
 
-        let centroids = self.centroids.read().await;
-        let mut merged = Vec::new();
+        // Phase 1: Collect all merge candidates under read lock (no mutations)
+        let candidates: Vec<(String, String)> = {
+            let centroids = self.centroids.read().await;
+            let mut found = Vec::new();
 
-        for i in 0..active.len() {
-            for j in (i + 1)..active.len() {
-                let ctx_a = &active[i];
-                let ctx_b = &active[j];
+            for i in 0..active.len() {
+                for j in (i + 1)..active.len() {
+                    let ctx_a = &active[i];
+                    let ctx_b = &active[j];
 
-                // Check centroid similarity
-                let sim = match (centroids.get(&ctx_a.id), centroids.get(&ctx_b.id)) {
-                    (Some(a), Some(b)) => cosine_similarity(a, b),
-                    _ => continue,
-                };
+                    let sim = match (centroids.get(&ctx_a.id), centroids.get(&ctx_b.id)) {
+                        (Some(a), Some(b)) => cosine_similarity(a, b),
+                        _ => continue,
+                    };
 
-                if sim < self.config.merge_threshold {
-                    continue;
+                    // Title-match fast path: identical titles always merge
+                    let title_match = ctx_a.title == ctx_b.title;
+
+                    if !title_match && sim < self.config.merge_threshold {
+                        continue;
+                    }
+
+                    if !title_match {
+                        // Only check resource overlap for non-title matches
+                        let empty = HashSet::new();
+                        let res_a = resource_map.get(&ctx_a.id).unwrap_or(&empty);
+                        let res_b = resource_map.get(&ctx_b.id).unwrap_or(&empty);
+                        let overlap = jaccard_similarity(res_a, res_b);
+
+                        if overlap < self.config.merge_resource_overlap_min {
+                            continue;
+                        }
+                    }
+
+                    let (keep, remove) = if ctx_a.event_count >= ctx_b.event_count {
+                        (ctx_a.id.clone(), ctx_b.id.clone())
+                    } else {
+                        (ctx_b.id.clone(), ctx_a.id.clone())
+                    };
+                    found.push((keep, remove));
                 }
-
-                // Check resource overlap (Jaccard)
-                let empty = HashSet::new();
-                let res_a = resource_map.get(&ctx_a.id).unwrap_or(&empty);
-                let res_b = resource_map.get(&ctx_b.id).unwrap_or(&empty);
-                let overlap = jaccard_similarity(res_a, res_b);
-
-                if overlap < self.config.merge_resource_overlap_min {
-                    continue;
-                }
-
-                // Merge: keep the one with more events
-                let (keep, remove) = if ctx_a.event_count >= ctx_b.event_count {
-                    (&ctx_a.id, &ctx_b.id)
-                } else {
-                    (&ctx_b.id, &ctx_a.id)
-                };
-
-                drop(centroids);
-                WorkContextRepo::merge(&self.pool, keep, remove).await?;
-
-                // Remove merged centroid from cache
-                self.centroids.write().await.remove(remove);
-
-                merged.push((keep.clone(), remove.clone()));
-                // After mutation, return early to avoid stale iteration
-                return Ok(merged);
             }
+            found
+        }; // read lock dropped
+
+        // Phase 2: Execute merges
+        let mut merged = Vec::new();
+        let mut already_removed: HashSet<String> = HashSet::new();
+
+        for (keep, remove) in candidates {
+            if already_removed.contains(&keep) || already_removed.contains(&remove) {
+                continue;
+            }
+
+            if let Err(e) = WorkContextRepo::merge(&self.pool, &keep, &remove).await {
+                warn!("Failed to merge contexts {keep} <- {remove}: {e}");
+                continue;
+            }
+            self.centroids.write().await.remove(&remove);
+            already_removed.insert(remove.clone());
+            merged.push((keep, remove));
         }
 
         Ok(merged)
+    }
+
+    /// Auto-enrich context with tags, description, and color if missing (FIX 5).
+    async fn auto_enrich_context(&self, context_id: &str) {
+        let ctx = match WorkContextRepo::get(&self.pool, context_id).await {
+            Ok(Some(c)) => c,
+            _ => return,
+        };
+
+        let mut ctx = ctx;
+        let mut updated = false;
+
+        // Auto-color based on context type (only if no color set)
+        if ctx.color.is_none() {
+            ctx.color = Some(default_color_for_type(&ctx.context_type).to_string());
+            updated = true;
+        }
+
+        // Auto-tags from resources (only if fewer than 3 tags)
+        if ctx.tags.len() < 3 {
+            let resource_ids =
+                ContextResourceRepo::list_resource_ids_for_context(&self.pool, context_id)
+                    .await
+                    .unwrap_or_default();
+
+            let resources = WorkResourceRepo::get_by_ids(&self.pool, &resource_ids)
+                .await
+                .unwrap_or_default();
+
+            let mut new_tags: HashSet<String> = ctx.tags.iter().cloned().collect();
+            for res in &resources {
+                let name = res.resource_name.to_lowercase();
+                if let Some(ext) = name.rsplit('.').next() {
+                    if CODE_EXTENSIONS.contains(&ext) {
+                        new_tags.insert(ext.to_string());
+                    }
+                }
+            }
+            if let Some(ref proj) = ctx.linked_project_id {
+                new_tags.insert(proj.clone());
+            }
+
+            let tags_vec: Vec<String> = new_tags.into_iter().take(5).collect();
+            if tags_vec != ctx.tags {
+                ctx.tags = tags_vec;
+                updated = true;
+            }
+        }
+
+        // Auto-description (only if missing and we have enough events)
+        if ctx.description.is_none() && ctx.event_count >= 3 {
+            let resource_ids =
+                ContextResourceRepo::list_resource_ids_for_context(&self.pool, context_id)
+                    .await
+                    .unwrap_or_default();
+
+            let res_names: Vec<String> = WorkResourceRepo::get_by_ids(&self.pool, &resource_ids)
+                .await
+                .unwrap_or_default()
+                .into_iter()
+                .take(3)
+                .map(|r| r.resource_name)
+                .collect();
+
+            if !res_names.is_empty() {
+                ctx.description = Some(format!(
+                    "{} activity involving {}",
+                    ctx.context_type.as_str(),
+                    res_names.join(", ")
+                ));
+                updated = true;
+            }
+        }
+
+        if updated {
+            let _ = WorkContextRepo::update(&self.pool, &ctx).await;
+        }
+    }
+
+    /// Reclassify contexts currently typed as "general" using improved heuristics (FIX 4).
+    /// Called once at startup.
+    pub async fn reclassify_general_contexts(&self) -> common::Result<usize> {
+        let active = WorkContextRepo::list_active(&self.pool).await?;
+        let general_contexts: Vec<&WorkContext> = active
+            .iter()
+            .filter(|c| c.context_type == WorkContextType::General)
+            .collect();
+
+        let mut reclassified = 0;
+        for ctx in general_contexts {
+            let events = ActivityLogRepo::query_by_context(&self.pool, &ctx.id, 5).await?;
+            if events.is_empty() {
+                continue;
+            }
+
+            // Majority vote from recent events
+            let mut type_counts: HashMap<WorkContextType, usize> = HashMap::new();
+            for event in &events {
+                let inferred = infer_context_type(event);
+                *type_counts.entry(inferred).or_default() += 1;
+            }
+
+            let best_type = type_counts
+                .into_iter()
+                .max_by_key(|(_, count)| *count)
+                .map(|(t, _)| t)
+                .unwrap_or(WorkContextType::General);
+
+            if best_type != WorkContextType::General {
+                let mut updated = ctx.clone();
+                updated.context_type = best_type;
+                updated.color = Some(default_color_for_type(&best_type).to_string());
+                WorkContextRepo::update(&self.pool, &updated).await?;
+                reclassified += 1;
+            }
+        }
+        Ok(reclassified)
     }
 }
 
@@ -456,25 +628,138 @@ fn infer_title(event: &ActivityLogEntry) -> String {
     }
 }
 
+const CODE_EXTENSIONS: &[&str] = &[
+    "rs", "ts", "tsx", "js", "jsx", "py", "go", "java", "swift", "kt", "cpp", "c", "h", "hpp",
+    "toml", "json", "yaml", "yml", "css", "html", "sql", "sh", "rb", "ex", "exs",
+];
+
 fn infer_context_type(event: &ActivityLogEntry) -> WorkContextType {
     let action = event.action.to_lowercase();
     let resource_type = event.resource_type.as_deref().unwrap_or("");
     let app = event.app_name.as_deref().unwrap_or("").to_lowercase();
+    let resource = event.resource_name.as_deref().unwrap_or("").to_lowercase();
 
-    if resource_type == "file" || action.contains("edit") || action.contains("code") {
+    // 1. Coding: file resources, code editors, terminal
+    if resource_type == "file"
+        || action.contains("edit")
+        || action.contains("code")
+        || app.contains("visual studio")
+        || app.contains("vscode")
+        || app.contains("intellij")
+        || app.contains("xcode")
+        || app.contains("terminal")
+        || app.contains("iterm")
+        || app.contains("warp")
+        || app.contains("alacritty")
+        || app.contains("kitty")
+        || resource
+            .rsplit('.')
+            .next()
+            .is_some_and(|ext| CODE_EXTENSIONS.contains(&ext))
+        || resource.contains("cargo")
+        || resource.contains("npm")
+        || resource.contains("git")
+    {
         WorkContextType::Coding
-    } else if action.contains("search") || action.contains("browse") || action.contains("read") {
+    }
+    // 2. Research: browsers, search, reading, documentation
+    else if action.contains("search")
+        || action.contains("browse")
+        || action.contains("read")
+        || app.contains("chrome")
+        || app.contains("firefox")
+        || app.contains("safari")
+        || app.contains("arc")
+        || app.contains("brave")
+        || resource.contains("stackoverflow")
+        || resource.contains("github.com")
+        || resource.contains("docs.")
+        || resource.contains("wiki")
+    {
         WorkContextType::Research
-    } else if action.contains("chat") || action.contains("message") || app.contains("slack") {
+    }
+    // 3. Communication: chat, email, messaging
+    else if action.contains("chat")
+        || action.contains("message")
+        || action.contains("email")
+        || action.contains("reply")
+        || action.contains("prompt")
+        || app.contains("slack")
+        || app.contains("discord")
+        || app.contains("telegram")
+        || app.contains("teams")
+        || app.contains("mail")
+        || app.contains("outlook")
+        || app.contains("messages")
+        || resource_type == "conversation"
+    {
         WorkContextType::Communication
-    } else if action.contains("review") || action.contains("pr") {
+    }
+    // 4. Review: PR review, code review
+    else if action.contains("review")
+        || resource.contains("pull request")
+        || resource.contains("review")
+    {
         WorkContextType::Review
-    } else if action.contains("plan") || action.contains("design") {
+    }
+    // 5. Planning: design, planning tools
+    else if action.contains("plan")
+        || action.contains("design")
+        || app.contains("figma")
+        || app.contains("notion")
+        || app.contains("linear")
+        || app.contains("jira")
+        || app.contains("miro")
+        || app.contains("trello")
+    {
         WorkContextType::Planning
-    } else if action.contains("meet") || app.contains("zoom") || app.contains("meet") {
+    }
+    // 6. Meeting: video calls, calendar
+    else if action.contains("meet")
+        || app.contains("zoom")
+        || app.contains("meet")
+        || app.contains("facetime")
+        || app.contains("loom")
+        || app.contains("webex")
+    {
         WorkContextType::Meeting
-    } else {
+    }
+    // 7. Learning: educational content
+    else if resource.contains("course")
+        || resource.contains("tutorial")
+        || resource.contains("learn")
+        || resource.contains("udemy")
+        || resource.contains("youtube")
+        || app.contains("anki")
+    {
+        WorkContextType::Learning
+    }
+    // Fallback
+    else {
         WorkContextType::General
+    }
+}
+
+/// Recalculate confidence for a context based on accumulated evidence (FIX 1).
+/// Formula: base + event_factor + similarity_factor + resource_factor, clamped to [0.1, 0.99].
+fn calculate_confidence(event_count: i64, avg_similarity: f64, resource_count: usize) -> f64 {
+    let base = 0.25;
+    let event_factor = 0.25 * (1.0 - (-0.15 * event_count as f64).exp());
+    let similarity_factor = 0.30 * avg_similarity;
+    let resource_factor = 0.20 * (1.0 - (-0.3 * resource_count as f64).exp());
+    (base + event_factor + similarity_factor + resource_factor).clamp(0.1, 0.99)
+}
+
+fn default_color_for_type(ct: &WorkContextType) -> &'static str {
+    match ct {
+        WorkContextType::Coding => "#8B5CF6",
+        WorkContextType::Research => "#3B82F6",
+        WorkContextType::Communication => "#10B981",
+        WorkContextType::Review => "#F59E0B",
+        WorkContextType::Planning => "#EC4899",
+        WorkContextType::Meeting => "#EF4444",
+        WorkContextType::Learning => "#06B6D4",
+        WorkContextType::General => "#6B7280",
     }
 }
 
@@ -700,6 +985,72 @@ mod tests {
         let mut event = make_event("chat", None);
         event.resource_type = None;
         assert_eq!(infer_context_type(&event), WorkContextType::Communication);
+    }
+
+    #[test]
+    fn test_infer_context_type_vscode() {
+        let mut event = make_event("view", Some("main.rs"));
+        event.app_name = Some("Visual Studio Code".to_string());
+        event.resource_type = None;
+        assert_eq!(infer_context_type(&event), WorkContextType::Coding);
+    }
+
+    #[test]
+    fn test_infer_context_type_chrome_is_research() {
+        let mut event = make_event("view", Some("Some Blog Post"));
+        event.app_name = Some("Google Chrome".to_string());
+        event.resource_type = None;
+        assert_eq!(infer_context_type(&event), WorkContextType::Research);
+    }
+
+    #[test]
+    fn test_infer_context_type_terminal() {
+        let mut event = make_event("view", Some("cargo build"));
+        event.app_name = Some("Terminal".to_string());
+        event.resource_type = None;
+        assert_eq!(infer_context_type(&event), WorkContextType::Coding);
+    }
+
+    #[test]
+    fn test_infer_context_type_youtube_is_learning() {
+        let mut event = make_event("view", Some("Rust Tutorial - YouTube"));
+        event.app_name = None;
+        event.resource_type = None;
+        assert_eq!(infer_context_type(&event), WorkContextType::Learning);
+    }
+
+    #[test]
+    fn test_infer_context_type_conversation_is_communication() {
+        let mut event = make_event("prompt", None);
+        event.resource_type = Some("conversation".to_string());
+        assert_eq!(infer_context_type(&event), WorkContextType::Communication);
+    }
+
+    #[test]
+    fn test_calculate_confidence_grows_with_events() {
+        let c1 = calculate_confidence(1, 0.5, 1);
+        let c5 = calculate_confidence(5, 0.5, 3);
+        let c20 = calculate_confidence(20, 0.8, 8);
+        assert!(c1 < c5, "Confidence should grow with event count");
+        assert!(
+            c5 < c20,
+            "Confidence should grow with more events and better similarity"
+        );
+        assert!(c20 < 1.0, "Confidence should never reach 1.0");
+        assert!(c1 >= 0.1, "Confidence should never go below 0.1");
+    }
+
+    #[test]
+    fn test_calculate_confidence_clamps() {
+        let low = calculate_confidence(0, 0.0, 0);
+        assert!(low >= 0.1);
+        assert!(low <= 0.99);
+    }
+
+    #[test]
+    fn test_default_color_for_type() {
+        assert_eq!(default_color_for_type(&WorkContextType::Coding), "#8B5CF6");
+        assert_eq!(default_color_for_type(&WorkContextType::General), "#6B7280");
     }
 
     #[test]

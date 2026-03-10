@@ -121,6 +121,15 @@ impl ContextResourceRepo {
         Ok(())
     }
 
+    pub async fn count_for_context(pool: &StoragePool, context_id: &str) -> i64 {
+        let row: Result<(i64,), _> =
+            sqlx::query_as("SELECT COUNT(*) FROM work_context_resources WHERE context_id = ?1")
+                .bind(context_id)
+                .fetch_one(pool.inner())
+                .await;
+        row.map(|(c,)| c).unwrap_or(0)
+    }
+
     pub async fn list_resource_ids_for_context(
         pool: &StoragePool,
         context_id: &str,

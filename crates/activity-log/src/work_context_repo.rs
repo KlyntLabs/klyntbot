@@ -151,6 +151,21 @@ impl WorkContextRepo {
         Ok(())
     }
 
+    pub async fn update_confidence(
+        pool: &StoragePool,
+        id: &str,
+        confidence: f64,
+    ) -> common::Result<()> {
+        sqlx::query("UPDATE work_contexts SET confidence = ?2, updated_at = ?3 WHERE id = ?1")
+            .bind(id)
+            .bind(confidence)
+            .bind(Utc::now().to_rfc3339())
+            .execute(pool.inner())
+            .await
+            .map_err(StorageError::from)?;
+        Ok(())
+    }
+
     pub async fn update_embedding(
         pool: &StoragePool,
         id: &str,

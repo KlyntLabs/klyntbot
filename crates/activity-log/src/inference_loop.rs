@@ -22,6 +22,13 @@ impl ContextInferenceLoop {
         cancel: CancellationToken,
     ) -> JoinHandle<()> {
         tokio::spawn(async move {
+            // One-time startup: reclassify "general" contexts with improved heuristics
+            match engine.reclassify_general_contexts().await {
+                Ok(0) => {}
+                Ok(n) => info!("Reclassified {n} general context(s) with improved heuristics"),
+                Err(e) => warn!("Context reclassification error: {e}"),
+            }
+
             let mut inference_interval =
                 tokio::time::interval(Duration::from_secs(interval_mins * 60));
             // Run archival check every 6 hours, deferring the first tick

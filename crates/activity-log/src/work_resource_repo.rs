@@ -91,6 +91,23 @@ impl WorkResourceRepo {
         Ok(rows.into_iter().map(Into::into).collect())
     }
 
+    pub async fn get_by_ids(
+        pool: &StoragePool,
+        ids: &[String],
+    ) -> common::Result<Vec<WorkResource>> {
+        if ids.is_empty() {
+            return Ok(vec![]);
+        }
+        // Use individual queries to avoid dynamic SQL placeholder issues
+        let mut results = Vec::with_capacity(ids.len());
+        for id in ids {
+            if let Some(res) = Self::get(pool, id).await? {
+                results.push(res);
+            }
+        }
+        Ok(results)
+    }
+
     pub async fn list_by_context(
         pool: &StoragePool,
         context_id: &str,
