@@ -1,6 +1,6 @@
-import { Check, MessageSquare, X } from "lucide-react";
 import { formatRelativeTime } from "@shared/lib/dates";
 import type { ChatThread } from "@shared/types";
+import { Check, MessageSquare, X } from "lucide-react";
 
 interface ThreadButtonProps {
   thread: ChatThread;

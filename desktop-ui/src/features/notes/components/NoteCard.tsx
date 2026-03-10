@@ -1,9 +1,9 @@
-import { Pin, PinOff, Trash2 } from "lucide-react";
-import { memo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { useClickOutside } from "@shared/hooks/useClickOutside";
 import { formatDate } from "@shared/lib/dates";
 import type { Note } from "@shared/types";
+import { Pin, PinOff, Trash2 } from "lucide-react";
+import { memo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 interface NoteCardProps {
   note: Note;

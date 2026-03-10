@@ -1,3 +1,5 @@
+import { ipc } from "@shared/hooks/useIpc";
+import { isTauri } from "@shared/lib/utils";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 import Color from "@tiptap/extension-color";
@@ -19,8 +21,6 @@ import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { common, createLowlight } from "lowlight";
 import { useEffect } from "react";
-import { ipc } from "@shared/hooks/useIpc";
-import { isTauri } from "@shared/lib/utils";
 import { EntityMentionAutocomplete, EntityMentionMark } from "./EntityMention";
 import { MathBlock, MathInline } from "./MathNode";
 import { SlashCommandsExtension } from "./SlashCommandMenu";

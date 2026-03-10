@@ -1,12 +1,12 @@
-import { useMemo } from "react";
 import { useQuery } from "@shared/hooks/useQuery";
 import { monthEndISO } from "@shared/lib/dates";
 import type { ProductivitySummary } from "@shared/types";
+import { useMemo } from "react";
+import { buildBreakdownSegments } from "../lib/constants";
 import { BreakdownDonuts } from "./BreakdownDonuts";
 import { CategoriesList } from "./CategoriesList";
 import { MonthlyChart } from "./MonthlyChart";
 import { MonthlyStats } from "./MonthlyStats";
-import { buildBreakdownSegments } from "../lib/constants";
 
 interface MonthViewProps {
   yearMonth: string;
@@ -27,7 +27,15 @@ export function MonthView({ yearMonth }: MonthViewProps) {
     const focus = summaries.reduce((s, d) => s + d.totalFocusSecs, 0);
     const brk = summaries.reduce((s, d) => s + d.totalBreakSecs, 0);
 
-    const allCats = new Map<string, { categoryId: string; category: string; categoryType: "productive" | "neutral" | "distracting"; durationSecs: number }>();
+    const allCats = new Map<
+      string,
+      {
+        categoryId: string;
+        category: string;
+        categoryType: "productive" | "neutral" | "distracting";
+        durationSecs: number;
+      }
+    >();
     for (const s of summaries) {
       for (const c of s.topCategories) {
         const key = c.category;
@@ -39,8 +47,7 @@ export function MonthView({ yearMonth }: MonthViewProps) {
         }
       }
     }
-    const cats = Array.from(allCats.values())
-      .sort((a, b) => b.durationSecs - a.durationSecs);
+    const cats = Array.from(allCats.values()).sort((a, b) => b.durationSecs - a.durationSecs);
 
     return { totalActive: active, totalFocus: focus, totalBreak: brk, topCats: cats };
   }, [summaries]);

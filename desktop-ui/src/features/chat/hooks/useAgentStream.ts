@@ -1,4 +1,3 @@
-import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   ActiveInteraction,
   AgentDonePayload,
@@ -23,6 +22,7 @@ import type {
   TransparencyData,
   UsageReportPayload,
 } from "@shared/types";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { DEV_SSE_BASE, isTauri, qualifiedToolName } from "../lib/utils";
 import { useEvent } from "./useEvent";
 

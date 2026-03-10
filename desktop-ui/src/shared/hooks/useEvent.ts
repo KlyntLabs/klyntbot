@@ -1,6 +1,6 @@
+import { isTauri } from "@shared/lib/utils";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { useEffect, useRef } from "react";
-import { isTauri } from "@shared/lib/utils";
 
 /**
  * Subscribe to a Tauri event, auto-cleanup on unmount.

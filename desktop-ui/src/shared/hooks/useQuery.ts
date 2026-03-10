@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
 import type { ApiError } from "@shared/types";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { parseApiError } from "../lib/errors";
 import { ipc } from "./useIpc";
 

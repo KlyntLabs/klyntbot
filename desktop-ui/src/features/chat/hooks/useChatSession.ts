@@ -1,14 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@shared/hooks/useQuery";
+import { parseApiError } from "@shared/lib/utils";
 import type {
   ActiveInteraction,
   ChatMessage,
   MessageSegment,
   TransparencyData,
 } from "@shared/types";
-import { parseApiError } from "@shared/lib/utils";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAgentStream } from "./useAgentStream";
 import { ipc } from "./useIpc";
-import { useQuery } from "@shared/hooks/useQuery";
 
 interface ChatSession {
   messages: ChatMessage[];

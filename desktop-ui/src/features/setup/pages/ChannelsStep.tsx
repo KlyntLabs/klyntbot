@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
-import { useOutletContext } from "react-router";
 import { ipc } from "@shared/hooks/useIpc";
 import { SecretInput, Toggle } from "@shared/ui";
+import { useEffect, useState } from "react";
+import { useOutletContext } from "react-router";
 import type { SetupContext } from "../hooks/steps";
 
 interface ChannelDef {

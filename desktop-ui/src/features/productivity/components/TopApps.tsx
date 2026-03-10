@@ -1,6 +1,6 @@
-import { useMemo } from "react";
 import { formatHumanDuration } from "@shared/lib/dates";
 import type { AppUsage } from "@shared/types";
+import { useMemo } from "react";
 import { AppIcon, getAppColor } from "../lib/constants";
 
 interface TopAppsProps {

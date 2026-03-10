@@ -1,8 +1,8 @@
-import { Search } from "lucide-react";
-import { useMemo, useState } from "react";
 import { useMutation } from "@shared/hooks/useMutation";
 import { formatHumanDuration } from "@shared/lib/dates";
 import type { ActivityCategory, TrackedApp } from "@shared/types";
+import { Search } from "lucide-react";
+import { useMemo, useState } from "react";
 import { getCategoryColor } from "../lib/constants";
 
 interface TrackedAppsListProps {

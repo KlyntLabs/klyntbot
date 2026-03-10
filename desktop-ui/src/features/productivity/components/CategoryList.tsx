@@ -1,7 +1,7 @@
-import { Plus } from "lucide-react";
-import { useMemo } from "react";
 import { useMutation } from "@shared/hooks/useMutation";
 import type { ActivityCategory } from "@shared/types";
+import { Plus } from "lucide-react";
+import { useMemo } from "react";
 import {
   CATEGORY_TYPE_GROUPS,
   DEFAULT_CATEGORY_COLOR,

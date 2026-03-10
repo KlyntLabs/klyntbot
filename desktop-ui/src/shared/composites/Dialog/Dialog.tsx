@@ -1,12 +1,7 @@
-import { X } from "lucide-react";
-import {
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useRef,
-} from "react";
-import { createPortal } from "react-dom";
 import { cn } from "@shared/lib/cn";
+import { X } from "lucide-react";
+import { type ReactNode, useCallback, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 
 export interface DialogProps {
   open: boolean;
@@ -24,14 +19,7 @@ const sizeClasses = {
   xl: "max-w-xl",
 };
 
-export function Dialog({
-  open,
-  onClose,
-  title,
-  children,
-  size = "md",
-  className,
-}: DialogProps) {
+export function Dialog({ open, onClose, title, children, size = "md", className }: DialogProps) {
   const backdropRef = useRef<HTMLDivElement>(null);
 
   const handleKeyDown = useCallback(
@@ -60,11 +48,7 @@ export function Dialog({
       className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 backdrop-blur-sm pt-[15vh]"
     >
       <div
-        className={cn(
-          "glass-panel w-full",
-          sizeClasses[size],
-          className,
-        )}
+        className={cn("glass-panel w-full", sizeClasses[size], className)}
         style={{ animation: "glass-appear 0.2s ease-out" }}
       >
         <div className="bg-white/[0.04] rounded-[var(--glass-radius-inner)]">

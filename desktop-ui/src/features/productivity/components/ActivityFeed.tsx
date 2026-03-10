@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from "react";
 import { useEvent } from "@shared/hooks/useEvent";
 import { useQuery } from "@shared/hooks/useQuery";
 import { formatTime } from "@shared/lib/dates";
 import type { ActivitySwitchPayload, ActivityTimeline } from "@shared/types";
+import { useEffect, useRef, useState } from "react";
 import { AppIcon, getAppColor } from "../lib/constants";
 
 const BROWSER_RE =

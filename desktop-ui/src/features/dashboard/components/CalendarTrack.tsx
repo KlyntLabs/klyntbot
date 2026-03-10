@@ -3,11 +3,11 @@
  * Events are fetched from the productivity_calendar_events command.
  */
 
-import { useMemo } from "react";
 import { useQuery } from "@shared/hooks/useQuery";
 import { formatHumanDuration, minutesSinceMidnight } from "@shared/lib/dates";
-import type { CalendarEvent } from "@shared/types";
 import { cn } from "@shared/lib/utils";
+import type { CalendarEvent } from "@shared/types";
+import { useMemo } from "react";
 
 interface CalendarTrackProps {
   date: string;

@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from "react";
 import type {
   ActiveInteraction,
   ChatMessage,
   MessageSegment,
   TransparencyData,
 } from "@shared/types";
+import { useEffect, useRef, useState } from "react";
 import { CollapsedInteraction } from "./CollapsedInteraction";
 import { InteractionCard } from "./InteractionCard";
 import { MarkdownContent } from "./MarkdownContent";

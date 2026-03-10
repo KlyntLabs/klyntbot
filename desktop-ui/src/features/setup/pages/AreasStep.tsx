@@ -1,7 +1,7 @@
+import { ipc } from "@shared/hooks/useIpc";
 import { Plus, X } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import { useOutletContext } from "react-router";
-import { ipc } from "@shared/hooks/useIpc";
 import type { SetupContext } from "../hooks/steps";
 
 interface AreaEntry {

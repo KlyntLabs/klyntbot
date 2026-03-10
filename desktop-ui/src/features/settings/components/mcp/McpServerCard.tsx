@@ -1,5 +1,5 @@
-import { Check, Loader2, Power, Settings2, Trash2 } from "lucide-react";
 import type { McpServerConfig, RecommendedMcpServer } from "@shared/types";
+import { Check, Loader2, Power, Settings2, Trash2 } from "lucide-react";
 import { McpServerIcon } from "./McpServerIcon";
 
 interface CustomServerCardProps {

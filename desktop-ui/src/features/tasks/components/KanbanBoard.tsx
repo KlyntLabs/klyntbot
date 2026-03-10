@@ -17,11 +17,11 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useCallback, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router";
 import { formatDate } from "@shared/lib/dates";
 import type { Area, Project, StatusLabel, Task, TaskUpdateParams } from "@shared/types";
 import { Badge } from "@shared/ui";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router";
 
 interface KanbanBoardProps {
   tasks: Task[];
@@ -86,7 +86,9 @@ function CardContent({
       {task.tags.length > 0 && (
         <div className="flex items-center gap-1 mt-2 flex-wrap">
           {task.tags.map((tag) => (
-            <Badge key={tag} variant="default">{tag}</Badge>
+            <Badge key={tag} variant="default">
+              {tag}
+            </Badge>
           ))}
         </div>
       )}

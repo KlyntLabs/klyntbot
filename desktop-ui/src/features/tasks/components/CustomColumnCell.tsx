@@ -1,7 +1,7 @@
-import { Check } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
 import { useClickOutside } from "@shared/hooks/useClickOutside";
 import type { ColumnValueSetParams, CustomColumn } from "@shared/types";
+import { Check } from "lucide-react";
+import { useCallback, useRef, useState } from "react";
 import { ColumnRenderer } from "./ColumnRenderer";
 
 interface CustomColumnCellProps {

@@ -1,6 +1,6 @@
+import type { Note } from "@shared/types";
 import { Plus, X } from "lucide-react";
 import { useMemo, useState } from "react";
-import type { Note } from "@shared/types";
 import { NoteCard } from "./NoteCard";
 
 interface NoteListProps {

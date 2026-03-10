@@ -1,114 +1,128 @@
-/* ── RETRO CRT TERMINAL THEME ──────────────────────────────────────────
-   A nostalgic green phosphor CRT display aesthetic with scanlines,
-   vignette, and amber accent colors. All variables are overridden to
-   match the retro feel while maintaining component structure. */
+/* ── RETRO 90s THEME ──────────────────────────────────────────────────────
+   Inspired by Windows 95/98, 90s gaming UIs, retro web design.
+   Warm cream backgrounds, chunky black borders, hard drop shadows,
+   solid opaque surfaces (NO glassmorphism), bold accent colors,
+   pixel-perfect aesthetic with a playful personality.
+   ──────────────────────────────────────────────────────────────────────── */
 
 [data-theme="retro"] {
-  /* ── Background — Deep dark green CRT ─────────────────────────────── */
-  --background: #0a0f0a;
+  /* ── Background — Warm cream paper ──────────────────────────────────── */
+  --background: #f5f0e1;
 
-  /* ── Surface staircase — Green phosphor tinted ────────────────────── */
-  --surface-lowest: rgba(0, 255, 65, 0.02);
-  --surface-low: rgba(0, 255, 65, 0.04);
-  --surface-base: rgba(0, 255, 65, 0.06);
-  --surface-raised: rgba(0, 255, 65, 0.09);
-  --surface-highest: rgba(0, 255, 65, 0.14);
+  /* ── Surface staircase — Solid opaque warm tones (NO alpha/glass) ──── */
+  --surface-lowest: #ebe6d5;
+  --surface-low: #e8e2cf;
+  --surface-base: #e3dcc9;
+  --surface-raised: #ddd5bf;
+  --surface-highest: #d4ccb5;
 
-  /* ── Text — Green phosphor glow ──────────────────────────────────── */
-  --text-primary: #33ff66;
-  --text-secondary: #29cc52;
-  --text-muted: #1a8035;
-  --text-dim: #0f4d20;
+  /* ── Text — High contrast on cream ─────────────────────────────────── */
+  --text-primary: #1a1a1a;
+  --text-secondary: #3d3929;
+  --text-muted: #7a7260;
+  --text-dim: #a69e8c;
 
-  /* ── Brand — Amber CRT accent ────────────────────────────────────── */
-  --brand: #ffb000;
-  --brand-hover: #ffc940;
-  --brand-glow: rgba(255, 176, 0, 0.25);
+  /* ── Brand — Bold warm orange ──────────────────────────────────────── */
+  --brand: #e8740c;
+  --brand-hover: #d4680a;
+  --brand-glow: rgba(232, 116, 12, 0.3);
 
-  /* ── Semantic colors — Retro compatible ──────────────────────────── */
-  --success: #00ff41;
-  --destructive: #ff4444;
-  --info: #ffb000;
-  --warning: #ffaa00;
-  --purple: #ff00ff;
+  /* ── Semantic colors — Saturated retro palette ─────────────────────── */
+  --success: #2d8c3c;
+  --destructive: #cc2936;
+  --info: #2663b0;
+  --warning: #d4950a;
+  --purple: #7b3fa0;
 
-  /* ── Origin badges — Retro style ─────────────────────────────────── */
-  --origin-system: #ffb000;
-  --origin-ai: #ff00ff;
-  --origin-user: #00ff41;
-  --origin-plugin: #ffaa00;
+  /* ── Origin badges — Bold retro colors ─────────────────────────────── */
+  --origin-system: #2663b0;
+  --origin-ai: #7b3fa0;
+  --origin-user: #2d8c3c;
+  --origin-plugin: #d4950a;
 
-  /* ── Border — Green tinted ───────────────────────────────────────── */
-  --border: rgba(0, 255, 65, 0.15);
-  --border-subtle: rgba(0, 255, 65, 0.08);
+  /* ── Border — Solid black/dark outlines ────────────────────────────── */
+  --border: #2a2520;
+  --border-subtle: #c4b89e;
 
-  /* ── Timeline / Dashboard — Retro colors ─────────────────────────── */
-  --timeline-app-productive: #00ff41;
-  --timeline-app-distracting: #ff4444;
-  --timeline-app-neutral: #888888;
-  --timeline-focus: #ffb000;
-  --timeline-task: #00ccff;
-  --timeline-note: #ffff00;
-  --timeline-finance: #ffaa00;
-  --timeline-todo: #00ffff;
-  --timeline-finance-expense: #ff4444;
-  --timeline-finance-income: #00ff41;
-  --timeline-system: #888888;
-  --timeline-calendar: #ff00ff;
-  --timeline-focus-high: #ffb000;
-  --timeline-focus-low: #ffaa00;
-  --timeline-unfocused: rgba(0, 255, 65, 0.03);
-  --timeline-dot-note: #ffff00;
-  --timeline-dot-task-done: #00ff41;
-  --timeline-dot-finance: #ffaa00;
+  /* ── Timeline / Dashboard — Muted retro palette ────────────────────── */
+  --timeline-app-productive: #2d8c3c;
+  --timeline-app-distracting: #cc2936;
+  --timeline-app-neutral: #8c8476;
+  --timeline-focus: #7b3fa0;
+  --timeline-task: #2663b0;
+  --timeline-note: #d4950a;
+  --timeline-finance: #2d8c3c;
+  --timeline-todo: #2663b0;
+  --timeline-finance-expense: #cc2936;
+  --timeline-finance-income: #2d8c3c;
+  --timeline-system: #8c8476;
+  --timeline-calendar: #7b3fa0;
+  --timeline-focus-high: #5c2680;
+  --timeline-focus-low: #a06ac0;
+  --timeline-unfocused: #e3dcc9;
+  --timeline-dot-note: #d4950a;
+  --timeline-dot-task-done: #2d8c3c;
+  --timeline-dot-finance: #d4950a;
 
-  /* ── Overlay — Dark and contrasty ────────────────────────────────── */
-  --overlay: rgba(0, 0, 0, 0.4);
-  --overlay-heavy: rgba(0, 0, 0, 0.6);
+  /* ── Overlay — Paper-colored ───────────────────────────────────────── */
+  --overlay: rgba(42, 37, 32, 0.35);
+  --overlay-heavy: rgba(42, 37, 32, 0.6);
 
-  /* ── Shadows ────────────────────────────────────────────────────── */
-  --shadow-tooltip: 0 0 20px rgba(0, 255, 65, 0.2);
+  /* ── Shadows — Hard pixel-style drop shadows ───────────────────────── */
+  --shadow-tooltip: 3px 3px 0px #2a2520;
 
-  /* ── Floating / glass ────────────────────────────────────────────– */
-  --surface-floating: rgba(10, 15, 10, 0.95);
+  /* ── Floating / surfaces — Solid opaque, NO glass ──────────────────── */
+  --surface-floating: #f0eadb;
 
-  /* Glass material — primary tier — green tinted */
-  --surface-glass: rgba(0, 255, 65, 0.08);
-  --glass-border: rgba(0, 255, 65, 0.15);
-  --glass-border-strong: rgba(0, 255, 65, 0.25);
-  --glass-shadow: 0 0 15px rgba(0, 255, 65, 0.1);
+  /* Glass → Solid surface overrides (retro uses opaque, not translucent) */
+  --surface-glass: #e8e2cf;
+  --glass-border: #2a2520;
+  --glass-border-strong: #1a1510;
+  --glass-shadow: 3px 3px 0px #2a2520;
 
-  /* Glass material — sidebar tier */
-  --surface-glass-sidebar: rgba(0, 255, 65, 0.06);
+  --surface-glass-sidebar: #ebe6d5;
+  --surface-glass-subtle: #e3dcc9;
+  --surface-glass-subtle-hover: #ddd5bf;
+  --surface-glass-elevated: #d4ccb5;
 
-  /* Glass material — subtle tier */
-  --surface-glass-subtle: rgba(0, 255, 65, 0.06);
-  --surface-glass-subtle-hover: rgba(0, 255, 65, 0.1);
+  --glass-tint-brand: #fcefd5;
+  --glass-tint-info: #dde8f5;
+  --glass-tint-success: #d9f0dd;
+  --glass-tint-destructive: #f8dce0;
 
-  /* Glass material — elevated tier */
-  --surface-glass-elevated: rgba(0, 255, 65, 0.14);
+  /* ── Retro-specific structural overrides ────────────────────────────── */
+  --radius: 4px;
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: 4px;
+  --radius-xl: 6px;
+  --radius-2xl: 8px;
+  --radius-pill: 4px;
+  --glass-padding: 3px;
+  --glass-radius-inner: 3px;
 
-  /* Glass material — tint tier */
-  --glass-tint-brand: rgba(255, 176, 0, 0.08);
-  --glass-tint-info: rgba(255, 176, 0, 0.06);
-  --glass-tint-success: rgba(0, 255, 65, 0.06);
-  --glass-tint-destructive: rgba(255, 68, 68, 0.06);
+  /* ── Typography — Chunky pixel-inspired ────────────────────────────── */
+  --font-sans: "Space Grotesk", "DM Sans", "Inter", system-ui, sans-serif;
 
-  /* ── Retro-specific tokens ───────────────────────────────────────– */
-  --retro-scanline: rgba(0, 0, 0, 0.08);
-  --retro-glow: 0 0 10px rgba(0, 255, 65, 0.3);
-  --retro-text-shadow: 0 0 8px rgba(51, 255, 102, 0.5);
-
-  /* ── Override font to monospace ──────────────────────────────────– */
-  --font-sans: "IBM Plex Mono", "SF Mono", "Fira Code", monospace;
+  /* ── Retro design tokens ───────────────────────────────────────────── */
+  --retro-border: 2px solid #2a2520;
+  --retro-border-thin: 1.5px solid #2a2520;
+  --retro-shadow: 3px 3px 0px #2a2520;
+  --retro-shadow-sm: 2px 2px 0px #2a2520;
+  --retro-shadow-lg: 5px 5px 0px #2a2520;
+  --retro-shadow-inset: inset 2px 2px 0px rgba(0, 0, 0, 0.08);
+  --retro-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  --retro-title-bar: #2663b0;
+  --retro-title-bar-text: #ffffff;
+  --retro-title-bar-secondary: #8c8476;
+  --retro-bg-pattern: url("data:image/svg+xml,%3Csvg width='8' height='8' viewBox='0 0 8 8' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%232a2520' fill-opacity='0.04'%3E%3Cpath d='M0 0h4v4H0V0zm4 4h4v4H4V4z'/%3E%3C/g%3E%3C/svg%3E");
 }
 
-/* Tailwind @theme inline registration for retro theme colors */
+/* ═══════════════════════════════════════════════════════════════════════
+   RETRO @theme inline — Register Tailwind color utilities
+   ═══════════════════════════════════════════════════════════════════════ */
 @theme inline {
-  /* Background */
   --color-background: var(--background);
-
-  /* Surface staircase */
   --color-surface-lowest: var(--surface-lowest);
   --color-surface-low: var(--surface-low);
   --color-surface-base: var(--surface-base);
@@ -116,39 +130,25 @@
   --color-surface-highest: var(--surface-highest);
   --color-surface-floating: var(--surface-floating);
   --color-surface-glass: var(--surface-glass);
-
-  /* Text hierarchy */
   --color-primary: var(--text-primary);
   --color-secondary: var(--text-secondary);
   --color-muted: var(--text-muted);
   --color-dim: var(--text-dim);
-
-  /* Brand */
   --color-brand: var(--brand);
   --color-brand-hover: var(--brand-hover);
-
-  /* Semantic */
   --color-success: var(--success);
   --color-destructive: var(--destructive);
   --color-info: var(--info);
   --color-warning: var(--warning);
   --color-purple: var(--purple);
-
-  /* Origin badges */
   --color-origin-system: var(--origin-system);
   --color-origin-ai: var(--origin-ai);
   --color-origin-user: var(--origin-user);
   --color-origin-plugin: var(--origin-plugin);
-
-  /* Border */
   --color-border: var(--border);
   --color-border-subtle: var(--border-subtle);
-
-  /* Overlay */
   --color-overlay: var(--overlay);
   --color-overlay-heavy: var(--overlay-heavy);
-
-  /* Timeline */
   --color-timeline-app-productive: var(--timeline-app-productive);
   --color-timeline-app-distracting: var(--timeline-app-distracting);
   --color-timeline-app-neutral: var(--timeline-app-neutral);
@@ -169,206 +169,340 @@
   --color-timeline-dot-finance: var(--timeline-dot-finance);
 }
 
-/* CRT Scanline overlay — horizontal lines for authentic CRT look */
+/* ═══════════════════════════════════════════════════════════════════════
+   RETRO STRUCTURAL OVERRIDES — radius, shadows for Tailwind @theme
+   ═══════════════════════════════════════════════════════════════════════ */
+[data-theme="retro"] {
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: 4px;
+  --radius-xl: 6px;
+  --radius-2xl: 8px;
+  --radius-pill: 4px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   BODY & ROOT — Checkerboard pattern background, no pseudo-element effects
+   ═══════════════════════════════════════════════════════════════════════ */
+[data-theme="retro"] body {
+  background-color: var(--background);
+  background-image: var(--retro-bg-pattern);
+}
+
+/* Kill any dark-theme pseudo effects */
+[data-theme="retro"] body::before,
 [data-theme="retro"] body::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 9999;
-  background: repeating-linear-gradient(
-    0deg,
-    var(--retro-scanline) 0px,
-    var(--retro-scanline) 1px,
-    transparent 1px,
-    transparent 3px
-  );
+  content: none;
+  display: none;
 }
 
-/* CRT Vignette — darkened edges for tube monitor effect */
-[data-theme="retro"] body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 9998;
-  background: radial-gradient(
-    ellipse at center,
-    transparent 60%,
-    rgba(0, 0, 0, 0.4) 100%
-  );
-}
+/* ═══════════════════════════════════════════════════════════════════════
+   GLASS → SOLID — Override all glass/blur classes to be opaque + bordered
+   ═══════════════════════════════════════════════════════════════════════ */
 
-/* Text glow on interactive elements — green phosphor glow */
-[data-theme="retro"] button,
-[data-theme="retro"] a,
-[data-theme="retro"] input {
-  text-shadow: var(--retro-text-shadow);
-}
-
-/* Retro-specific glass card styling */
-[data-theme="retro"] .glass-card {
-  border-color: rgba(0, 255, 65, 0.15);
-  box-shadow:
-    inset 0 0 20px rgba(0, 255, 65, 0.03),
-    0 0 15px rgba(0, 255, 65, 0.05);
-}
-
-/* Retro-specific glass panel styling */
+/* ── Panel (dialogs, popovers) ─────────────────────────────────────── */
 [data-theme="retro"] .glass-panel {
-  border-color: rgba(0, 255, 65, 0.15);
-  box-shadow:
-    inset 0 0 20px rgba(0, 255, 65, 0.03),
-    0 0 15px rgba(0, 255, 65, 0.05);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: #f0eadb;
+  border: 2px solid #2a2520;
+  border-radius: 6px;
+  box-shadow: var(--retro-shadow-lg);
+  padding: 3px;
 }
 
-/* Retro-specific glass button styling */
-[data-theme="retro"] .glass-button {
-  border-color: rgba(0, 255, 65, 0.12);
-  box-shadow: 0 0 10px rgba(0, 255, 65, 0.08);
+/* ── Sidebar ───────────────────────────────────────────────────────── */
+[data-theme="retro"] .glass-sidebar {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: #ebe6d5;
+  border: 2px solid #2a2520;
+  border-radius: 6px;
+  border-right: 2px solid #2a2520;
 }
 
-[data-theme="retro"] .glass-button:hover {
-  border-color: rgba(0, 255, 65, 0.18);
-  box-shadow: 0 0 12px rgba(0, 255, 65, 0.12);
+/* ── Toolbar ───────────────────────────────────────────────────────── */
+[data-theme="retro"] .glass-toolbar {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: #e8e2cf;
+  border: 2px solid #2a2520;
+  border-radius: 4px;
+  box-shadow: var(--retro-highlight);
 }
 
-/* Retro-specific glass input styling */
+/* ── Input ──────────────────────────────────────────────────────────── */
 [data-theme="retro"] .glass-input {
-  border-color: rgba(0, 255, 65, 0.12);
-  box-shadow: 0 0 10px rgba(0, 255, 65, 0.05);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: #ffffff;
+  border: 2px solid #2a2520;
+  border-radius: 3px;
+  box-shadow: var(--retro-shadow-inset);
 }
 
 [data-theme="retro"] .glass-input:focus-within {
-  border-color: rgba(0, 255, 65, 0.2);
-  box-shadow: 0 0 15px rgba(0, 255, 65, 0.1);
-}
-
-/* Retro-specific glass dropdown styling */
-[data-theme="retro"] .glass-dropdown {
-  border-color: rgba(0, 255, 65, 0.15);
+  background: #ffffff;
+  border-color: var(--brand);
   box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.6),
-    inset 0 1px 0 rgba(0, 255, 65, 0.1),
-    0 0 20px rgba(0, 255, 65, 0.1);
+    var(--retro-shadow-inset),
+    0 0 0 1px var(--brand);
 }
 
-/* Retro-specific glass bubble styling */
+/* ── Button ─────────────────────────────────────────────────────────── */
+[data-theme="retro"] .glass-button {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: #e8e2cf;
+  border: 2px solid #2a2520;
+  border-radius: 4px;
+  box-shadow: var(--retro-shadow-sm), var(--retro-highlight);
+}
+
+[data-theme="retro"] .glass-button:hover {
+  background: #ddd5bf;
+  border-color: #1a1510;
+}
+
+[data-theme="retro"] .glass-button:active,
+[data-theme="retro"] .glass-button-active {
+  background: #d4ccb5;
+  box-shadow: var(--retro-shadow-inset);
+  transform: translate(1px, 1px);
+}
+
+/* ── Floating (launcher, tray) ──────────────────────────────────────── */
+[data-theme="retro"] .glass-floating {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: #f0eadb;
+  border: 2px solid #2a2520;
+  border-radius: 6px;
+  box-shadow: var(--retro-shadow-lg);
+  padding: 3px;
+}
+
+[data-theme="retro"] :root[data-vibrancy] .glass-floating {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: #f0eadb;
+}
+
+/* ── Dropdown ───────────────────────────────────────────────────────── */
+[data-theme="retro"] .glass-dropdown {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: #f5f0e1;
+  border: 2px solid #2a2520;
+  border-radius: 4px;
+  box-shadow: var(--retro-shadow);
+  padding: 3px;
+}
+
+/* ── Card ───────────────────────────────────────────────────────────── */
+[data-theme="retro"] .glass-card {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: #f0eadb;
+  border: 2px solid #2a2520;
+  border-radius: 6px;
+  box-shadow: var(--retro-shadow-sm);
+}
+
+[data-theme="retro"] .glass-card:hover {
+  box-shadow: var(--retro-shadow);
+}
+
+/* ── Chat bubbles ──────────────────────────────────────────────────── */
 [data-theme="retro"] .glass-bubble {
-  border-color: rgba(0, 255, 65, 0.12);
-  box-shadow: 0 0 15px rgba(0, 255, 65, 0.08);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: #f5f0e1;
+  border: 2px solid #2a2520;
+  border-radius: 6px 6px 6px 2px;
+  box-shadow: var(--retro-shadow-sm);
 }
 
 [data-theme="retro"] .glass-bubble-user {
-  border-color: rgba(255, 176, 0, 0.12);
-  box-shadow: 0 0 15px rgba(255, 176, 0, 0.05);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: #fcefd5;
+  border: 2px solid #2a2520;
+  border-radius: 6px 6px 2px 6px;
+  box-shadow: var(--retro-shadow-sm);
 }
 
-/* Retro-specific badge styling */
+/* ── Context menu ──────────────────────────────────────────────────── */
+[data-theme="retro"] .context-menu {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: #f5f0e1;
+  border: 2px solid #2a2520;
+  border-radius: 4px;
+  box-shadow: var(--retro-shadow);
+}
+
+/* ── Badge ──────────────────────────────────────────────────────────── */
 [data-theme="retro"] .glass-badge {
-  border-color: rgba(0, 255, 65, 0.12);
-  box-shadow: 0 0 8px rgba(0, 255, 65, 0.05);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: #e8e2cf;
+  border: 1.5px solid #2a2520;
+  border-radius: 3px;
 }
 
-/* Retro-specific divider styling */
+/* ── Divider ───────────────────────────────────────────────────────── */
 [data-theme="retro"] .glass-divider {
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(0, 255, 65, 0.15) 20%,
-    rgba(0, 255, 65, 0.15) 80%,
-    transparent 100%
-  );
+  height: 2px;
+  background: #2a2520;
 }
 
-/* Retro-specific version dot styling */
-[data-theme="retro"] .version-dot {
-  background: rgba(0, 255, 65, 0.2);
-  border-color: rgba(0, 255, 65, 0.3);
-  box-shadow: 0 0 8px rgba(0, 255, 65, 0.15);
-}
+/* ═══════════════════════════════════════════════════════════════════════
+   COMPONENT-LEVEL RETRO OVERRIDES
+   ═══════════════════════════════════════════════════════════════════════ */
 
-[data-theme="retro"] .version-dot-active {
-  background: #ffb000;
-  border-color: #ffb000;
-  box-shadow: 0 0 12px rgba(255, 176, 0, 0.4);
-}
-
-/* Retro-specific version line styling */
-[data-theme="retro"] .version-line {
-  background: linear-gradient(
-    180deg,
-    rgba(0, 255, 65, 0.15) 0%,
-    rgba(0, 255, 65, 0.08) 100%
-  );
-}
-
-/* Retro-specific tag pill styling */
-[data-theme="retro"] .tag-pill {
-  background: rgba(0, 255, 65, 0.08);
-  border-color: rgba(0, 255, 65, 0.12);
-  color: #33ff66;
-}
-
-[data-theme="retro"] .tag-pill:hover {
-  background: rgba(0, 255, 65, 0.12);
-  color: #33ff66;
-  box-shadow: 0 0 8px rgba(0, 255, 65, 0.1);
-}
-
-[data-theme="retro"] .tag-pill-active {
-  background: rgba(255, 176, 0, 0.15);
-  border-color: rgba(255, 176, 0, 0.25);
-  color: #ffb000;
-  box-shadow: 0 0 8px rgba(255, 176, 0, 0.1);
-}
-
-/* Retro-specific note card styling */
+/* ── Note cards — Solid paper cards ────────────────────────────────── */
 [data-theme="retro"] .note-card {
-  transition:
-    background 0.18s ease,
-    transform 0.18s ease,
-    box-shadow 0.18s ease;
+  border: 1.5px solid #c4b89e;
+  border-radius: 4px;
+  background: #f5f0e1;
 }
 
 [data-theme="retro"] .note-card:hover {
-  background: rgba(0, 255, 65, 0.08);
-  box-shadow:
-    0 2px 12px rgba(0, 255, 65, 0.1),
-    inset 0 0 15px rgba(0, 255, 65, 0.02);
+  border-color: #2a2520;
+  background: #f0eadb;
+  transform: none;
+  box-shadow: var(--retro-shadow-sm);
 }
 
 [data-theme="retro"] .note-card-active {
-  background: rgba(0, 255, 65, 0.1);
+  background: #fcefd5;
+  border-color: #2a2520;
   box-shadow:
-    inset 3px 0 0 0 #ffb000,
-    0 2px 12px rgba(0, 255, 65, 0.1);
+    inset 3px 0 0 0 var(--brand),
+    var(--retro-shadow-sm);
 }
 
-/* Retro-specific context menu styling */
-[data-theme="retro"] .context-menu {
-  background: rgba(10, 15, 10, 0.95);
-  border-color: rgba(0, 255, 65, 0.15);
-  box-shadow:
-    0 8px 40px rgba(0, 0, 0, 0.7),
-    0 0 20px rgba(0, 255, 65, 0.1),
-    inset 0 0.5px 0 rgba(0, 255, 65, 0.1);
+/* ── Tag pills — Solid bordered tags ──────────────────────────────── */
+[data-theme="retro"] .tag-pill {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: #e8e2cf;
+  border: 1.5px solid #2a2520;
+  border-radius: 3px;
+  color: var(--text-secondary);
 }
 
-/* Retro-specific focus ring */
+[data-theme="retro"] .tag-pill:hover {
+  background: #ddd5bf;
+  color: var(--text-primary);
+  box-shadow: 1px 1px 0px #2a2520;
+}
+
+[data-theme="retro"] .tag-pill-active {
+  background: #fcefd5;
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+/* ── Version dots — Square pixels ─────────────────────────────────── */
+[data-theme="retro"] .version-dot {
+  border-radius: 2px;
+  background: #c4b89e;
+  border: 1.5px solid #2a2520;
+}
+
+[data-theme="retro"] .version-dot-active {
+  background: var(--brand);
+  border-color: #2a2520;
+  box-shadow: none;
+}
+
+[data-theme="retro"] .version-line {
+  background: #2a2520;
+  width: 2px;
+}
+
+/* ── Streaming cursor — Solid block cursor ────────────────────────── */
+[data-theme="retro"] .streaming-cursor > div > *:last-child::after {
+  background: var(--brand);
+  box-shadow: none;
+  border-radius: 1px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   INTERACTIVE STATE OVERRIDES — Retro push-button feel
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── Focus ring — Bold double outline ─────────────────────────────── */
 [data-theme="retro"] button:focus-visible,
 [data-theme="retro"] input:focus-visible,
 [data-theme="retro"] textarea:focus-visible,
 [data-theme="retro"] select:focus-visible,
 [data-theme="retro"] [role="button"]:focus-visible,
 [data-theme="retro"] [tabindex="0"]:focus-visible {
-  outline: 2px solid #ffb000;
+  outline: 2px solid #2a2520;
   outline-offset: 2px;
-  box-shadow: 0 0 12px rgba(255, 176, 0, 0.3);
+  box-shadow: none;
 }
 
-/* Retro-specific streaming cursor */
-[data-theme="retro"] .streaming-cursor > div > *:last-child::after {
-  background: #ffb000;
-  box-shadow: 0 0 8px rgba(255, 176, 0, 0.5);
+/* ── Scrollbar — Chunky retro style ──────────────────────────────── */
+[data-theme="retro"] ::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+
+[data-theme="retro"] ::-webkit-scrollbar-track {
+  background: #e3dcc9;
+  border-left: 1px solid #2a2520;
+}
+
+[data-theme="retro"] ::-webkit-scrollbar-thumb {
+  background: #c4b89e;
+  border: 1px solid #2a2520;
+  border-radius: 0;
+}
+
+[data-theme="retro"] ::-webkit-scrollbar-thumb:hover {
+  background: #b0a78f;
+}
+
+[data-theme="retro"] ::-webkit-scrollbar-button {
+  display: block;
+  height: 14px;
+  width: 14px;
+  background: #e3dcc9;
+  border: 1px solid #2a2520;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   TYPOGRAPHY — Override alpha-based text colors for solid dark-on-light
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* Many components use bg-white/[0.04] etc inline — override those to solid */
+[data-theme="retro"] [class*="bg-white/"],
+[data-theme="retro"] [class*="bg-white\\/"] {
+  background-color: var(--surface-base) !important;
+}
+
+/* Fix border colors that use white alpha */
+[data-theme="retro"] [class*="border-white/"],
+[data-theme="retro"] [class*="border-white\\/"] {
+  border-color: var(--border) !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PERFORMANCE — Remove expensive blur effects entirely
+   ═══════════════════════════════════════════════════════════════════════ */
+[data-theme="retro"] * {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   SELECTION — Retro highlight
+   ═══════════════════════════════════════════════════════════════════════ */
+[data-theme="retro"] ::selection {
+  background: var(--brand);
+  color: white;
 }

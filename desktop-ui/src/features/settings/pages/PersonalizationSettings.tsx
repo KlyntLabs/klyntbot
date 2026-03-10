@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { SettingsCard } from "@shared/composites";
 import { ipc } from "@shared/hooks/useIpc";
 import { useQuery } from "@shared/hooks/useQuery";
 import { SaveButton, SecretInput, Toggle } from "@shared/ui";
-import { SettingsCard } from "@shared/composites";
+import { useState } from "react";
+import { ThemeSwitcher } from "../components/ThemeSwitcher";
 
 // ── Provider list ────────────────────────────────────────────────────
 
@@ -239,6 +240,11 @@ export function PersonalizationSettings() {
       </div>
 
       <div className="space-y-4">
+        {/* ── Theme ──────────────────────────────────────────── */}
+        <SettingsCard title="Theme">
+          <ThemeSwitcher />
+        </SettingsCard>
+
         {/* ── Provider & Model ─────────────────────────────────── */}
         <SettingsCard title="Provider & Model">
           <div className="space-y-3">

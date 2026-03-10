@@ -47,67 +47,25 @@ export function Card({
   );
 }
 
-export function CardHeader({
-  className,
-  children,
-}: {
-  className?: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className={cn("flex items-center justify-between gap-2", className)}>
-      {children}
-    </div>
-  );
+export function CardHeader({ className, children }: { className?: string; children: ReactNode }) {
+  return <div className={cn("flex items-center justify-between gap-2", className)}>{children}</div>;
 }
 
-export function CardTitle({
-  className,
-  children,
-}: {
-  className?: string;
-  children: ReactNode;
-}) {
+export function CardTitle({ className, children }: { className?: string; children: ReactNode }) {
   return (
-    <h3
-      className={cn(
-        "text-xs font-medium text-muted uppercase tracking-wider",
-        className,
-      )}
-    >
+    <h3 className={cn("text-xs font-medium text-muted uppercase tracking-wider", className)}>
       {children}
     </h3>
   );
 }
 
-export function CardContent({
-  className,
-  children,
-}: {
-  className?: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className={cn("mt-3", className)}>
-      {children}
-    </div>
-  );
+export function CardContent({ className, children }: { className?: string; children: ReactNode }) {
+  return <div className={cn("mt-3", className)}>{children}</div>;
 }
 
-export function CardFooter({
-  className,
-  children,
-}: {
-  className?: string;
-  children: ReactNode;
-}) {
+export function CardFooter({ className, children }: { className?: string; children: ReactNode }) {
   return (
-    <div
-      className={cn(
-        "mt-4 pt-3 border-t border-border flex items-center gap-2",
-        className,
-      )}
-    >
+    <div className={cn("mt-4 pt-3 border-t border-border flex items-center gap-2", className)}>
       {children}
     </div>
   );

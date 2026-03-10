@@ -1,7 +1,7 @@
+import { useClickOutside } from "@shared/hooks/useClickOutside";
 import { Check } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useClickOutside } from "@shared/hooks/useClickOutside";
 
 interface Option {
   value: string | null;

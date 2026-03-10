@@ -1,5 +1,5 @@
-import { useState } from "react";
 import { formatHumanDuration } from "@shared/lib/dates";
+import { useState } from "react";
 import { scoreColor } from "../lib/constants";
 
 interface ProductivityScoreRingProps {

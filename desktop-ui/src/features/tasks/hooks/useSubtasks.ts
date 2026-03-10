@@ -1,7 +1,7 @@
-import { useCallback, useRef, useState } from "react";
-import type { Task } from "@shared/types";
 import { ipc } from "@shared/hooks/useIpc";
 import { useSetToggle } from "@shared/hooks/useSetToggle";
+import type { Task } from "@shared/types";
+import { useCallback, useRef, useState } from "react";
 
 export function useSubtasks() {
   const [childrenCache, setChildrenCache] = useState<Map<string, Task[]>>(new Map());

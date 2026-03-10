@@ -1,5 +1,3 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router";
 import { useQuery } from "@shared/hooks/useQuery";
 import {
   formatHumanDuration,
@@ -8,9 +6,11 @@ import {
   todayISO,
   toLocalISO,
 } from "@shared/lib/dates";
+import { cn } from "@shared/lib/utils";
 import type { TimelineEntry } from "@shared/types";
 import { EMPTY_TIMELINE_RESPONSE } from "@shared/types";
-import { cn } from "@shared/lib/utils";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useParams } from "react-router";
 import { useEnabledLayers, useSidebarOpen } from "../lib/layers";
 import { SummaryPanel } from "./SummaryPanel";
 

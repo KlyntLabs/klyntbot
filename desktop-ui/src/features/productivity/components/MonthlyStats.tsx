@@ -1,7 +1,7 @@
-import { useMemo } from "react";
 import { useQuery } from "@shared/hooks/useQuery";
 import { formatHumanDuration, monthEndISO, shiftMonth } from "@shared/lib/dates";
 import type { ProductivitySummary } from "@shared/types";
+import { useMemo } from "react";
 
 interface MonthlyStatsProps {
   yearMonth: string;

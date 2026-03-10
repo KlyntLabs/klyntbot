@@ -1,6 +1,6 @@
-import type { TaskGroup } from "@shared/types";
 import { useMutation } from "@shared/hooks/useMutation";
 import { useQuery } from "@shared/hooks/useQuery";
+import type { TaskGroup } from "@shared/types";
 
 /** Fetch groups for a project (or all if null) */
 export function useGroups(projectId: string | null) {

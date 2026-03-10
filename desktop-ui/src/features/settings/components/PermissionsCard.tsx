@@ -1,6 +1,6 @@
+import { ipc } from "@shared/hooks/useIpc";
 import { Check, ExternalLink, ShieldAlert, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ipc } from "@shared/hooks/useIpc";
 
 interface PermissionRow {
   label: string;

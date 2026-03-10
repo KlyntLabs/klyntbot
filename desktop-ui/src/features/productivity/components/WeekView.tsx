@@ -1,11 +1,11 @@
-import { useMemo } from "react";
 import { useQuery } from "@shared/hooks/useQuery";
 import { shiftDate } from "@shared/lib/dates";
 import type { ProductivitySummary } from "@shared/types";
+import { useMemo } from "react";
+import { buildBreakdownSegments } from "../lib/constants";
 import { BreakdownDonuts } from "./BreakdownDonuts";
 import { CategoriesList } from "./CategoriesList";
 import { GoalsProgress } from "./GoalsProgress";
-import { buildBreakdownSegments } from "../lib/constants";
 import { TopApps } from "./TopApps";
 import { WeeklyChart } from "./WeeklyChart";
 import { WeeklyStats } from "./WeeklyStats";
@@ -39,7 +39,15 @@ export function WeekView({ weekStart }: WeekViewProps) {
       .slice(0, 10)
       .map(([appName, durationSecs]) => ({ appName, durationSecs, category: null }));
 
-    const allCats = new Map<string, { categoryId: string; category: string; categoryType: "productive" | "neutral" | "distracting"; durationSecs: number }>();
+    const allCats = new Map<
+      string,
+      {
+        categoryId: string;
+        category: string;
+        categoryType: "productive" | "neutral" | "distracting";
+        durationSecs: number;
+      }
+    >();
     for (const s of summaries) {
       for (const c of s.topCategories) {
         const key = c.category;
@@ -51,8 +59,7 @@ export function WeekView({ weekStart }: WeekViewProps) {
         }
       }
     }
-    const cats = Array.from(allCats.values())
-      .sort((a, b) => b.durationSecs - a.durationSecs);
+    const cats = Array.from(allCats.values()).sort((a, b) => b.durationSecs - a.durationSecs);
 
     return {
       totalActive: active,

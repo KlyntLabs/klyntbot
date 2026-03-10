@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Navigate, Outlet, useLocation, useNavigate } from "react-router";
+import { SidebarChat } from "@shared/components/chat/SidebarChat";
 import { useEvent } from "@shared/hooks/useEvent";
 import { ipc } from "@shared/hooks/useIpc";
 import type { AppInfoResponse, SidebarItem } from "@shared/types";
-import { SidebarChat } from "@shared/components/chat/SidebarChat";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Navigate, Outlet, useLocation, useNavigate } from "react-router";
 import { Sidebar } from "./Sidebar";
 
 export function AppShell() {

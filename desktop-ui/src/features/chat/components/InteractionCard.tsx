@@ -1,8 +1,8 @@
+import { ipc } from "@shared/hooks/useIpc";
+import { cn } from "@shared/lib/utils";
+import type { Answer, AnswerValue, InteractionRequest, Question } from "@shared/types";
 import { Check, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ipc } from "@shared/hooks/useIpc";
-import type { Answer, AnswerValue, InteractionRequest, Question } from "@shared/types";
-import { cn } from "@shared/lib/utils";
 
 interface InteractionCardProps {
   sessionKey: string;

@@ -1,6 +1,3 @@
-import { FileText, GitGraph, PenLine } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router";
 import { useEvent } from "@shared/hooks/useEvent";
 import { useMutation } from "@shared/hooks/useMutation";
 import { useQuery } from "@shared/hooks/useQuery";
@@ -11,6 +8,9 @@ import type {
   NoteCreateParams,
   NoteUpdateParams,
 } from "@shared/types";
+import { FileText, GitGraph, PenLine } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router";
 import { FileTree } from "../components/FileTree";
 import { GraphView } from "../components/GraphView";
 import { NoteEditor } from "../components/NoteEditor";

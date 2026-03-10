@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEvent } from "@shared/hooks/useEvent";
+import { useMutation } from "@shared/hooks/useMutation";
+import { useQuery } from "@shared/hooks/useQuery";
 import { todayISO } from "@shared/lib/dates";
 import type {
   FocusCompletedPayload,
@@ -6,9 +8,7 @@ import type {
   FocusTickPayload,
   FocusTimerStatus,
 } from "@shared/types";
-import { useEvent } from "@shared/hooks/useEvent";
-import { useMutation } from "@shared/hooks/useMutation";
-import { useQuery } from "@shared/hooks/useQuery";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 // ── Settings persistence ────────────────────────────────────────────
 

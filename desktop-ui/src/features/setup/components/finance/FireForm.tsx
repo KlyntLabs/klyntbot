@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
 import { ipc } from "@shared/hooks/useIpc";
 import { Toggle } from "@shared/ui";
+import { useEffect, useState } from "react";
 
 const FIRE_TYPES = [
   { value: "lean", label: "Lean FIRE", desc: "Minimal expenses, frugal lifestyle" },

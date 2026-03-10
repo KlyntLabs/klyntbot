@@ -1,7 +1,7 @@
-import { useState } from "react";
 import { ipc } from "@shared/hooks/useIpc";
 import { useQuery } from "@shared/hooks/useQuery";
 import type { AgentStatus, AppInfoResponse } from "@shared/types";
+import { useState } from "react";
 import { PermissionsCard } from "../components/PermissionsCard";
 
 interface AgentDefaults {

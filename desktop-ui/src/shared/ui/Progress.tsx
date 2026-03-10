@@ -15,18 +15,11 @@ const colors = {
   info: "bg-info",
 };
 
-export function Progress({
-  value,
-  className,
-  color = "brand",
-}: ProgressProps) {
+export function Progress({ value, className, color = "brand" }: ProgressProps) {
   return (
     <ProgressPrimitive.Root
       value={value}
-      className={cn(
-        "h-1.5 w-full bg-white/[0.08] rounded-full overflow-hidden",
-        className,
-      )}
+      className={cn("h-1.5 w-full bg-white/[0.08] rounded-full overflow-hidden", className)}
     >
       <ProgressPrimitive.Indicator
         className={cn(colors[color], "h-full rounded-full transition-[width] duration-500")}

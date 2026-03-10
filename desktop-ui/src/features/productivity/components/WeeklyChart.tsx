@@ -1,7 +1,7 @@
-import { useMemo } from "react";
-import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { formatDayLabel } from "@shared/lib/dates";
 import type { ProductivitySummary } from "@shared/types";
+import { useMemo } from "react";
+import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ChartTooltip, PRODUCTIVITY_LEGEND } from "../lib/constants";
 
 interface WeeklyChartProps {

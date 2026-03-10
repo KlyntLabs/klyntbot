@@ -1,5 +1,5 @@
-import { useEffect } from "react";
 import { isTauri } from "@shared/lib/utils";
+import { useEffect } from "react";
 
 /**
  * Sets the document background to transparent so the window content

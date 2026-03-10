@@ -3,9 +3,9 @@
  * Shows merged session blocks with auto-zoom + a mini score gauge.
  */
 
-import { useState } from "react";
 import { formatHumanDuration } from "@shared/lib/dates";
 import type { ProductivitySummary } from "@shared/types";
+import { useState } from "react";
 import { scoreColor } from "../productivity/shared";
 
 interface ProductivityStripProps {

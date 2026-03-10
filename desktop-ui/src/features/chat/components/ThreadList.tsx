@@ -1,5 +1,5 @@
-import { FolderOpen, Globe, Plus, RotateCcw, Settings, Wallet } from "lucide-react";
 import type { ChatThread } from "@shared/types";
+import { FolderOpen, Globe, Plus, RotateCcw, Settings, Wallet } from "lucide-react";
 import { GroupHeader } from "./GroupHeader";
 import { ThreadButton } from "./ThreadButton";
 

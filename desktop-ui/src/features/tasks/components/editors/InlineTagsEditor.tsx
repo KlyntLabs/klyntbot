@@ -1,6 +1,6 @@
+import { Badge } from "@shared/ui";
 import { X } from "lucide-react";
 import { useRef, useState } from "react";
-import { Badge } from "@shared/ui";
 
 interface InlineTagsEditorProps {
   tags: string[];
@@ -80,7 +80,9 @@ export function InlineTagsEditor({ tags, onSave }: InlineTagsEditorProps) {
       className="flex items-center gap-1 flex-wrap cursor-text rounded px-1 -mx-1 min-h-[24px] transition-colors text-left"
     >
       {tags.map((tag) => (
-        <Badge key={tag} variant="default">{tag}</Badge>
+        <Badge key={tag} variant="default">
+          {tag}
+        </Badge>
       ))}
       {tags.length === 0 && <span className="text-[11px] text-dim">—</span>}
     </button>

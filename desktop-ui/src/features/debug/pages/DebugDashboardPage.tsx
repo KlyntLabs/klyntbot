@@ -1,6 +1,6 @@
+import { DEV_SSE_BASE, isTauri } from "@shared/lib/utils";
 import { Activity, Brain, GitBranch, Radio } from "lucide-react";
 import { useEffect, useState } from "react";
-import { DEV_SSE_BASE, isTauri } from "@shared/lib/utils";
 import { CoachingTab } from "../components/tabs/CoachingTab";
 import { EventsTab } from "../components/tabs/EventsTab";
 import { MemoryTab } from "../components/tabs/MemoryTab";

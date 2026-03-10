@@ -1,7 +1,7 @@
-import { useEffect, useId, useState } from "react";
-import { useOutletContext } from "react-router";
 import { ipc } from "@shared/hooks/useIpc";
 import { SecretInput } from "@shared/ui";
+import { useEffect, useId, useState } from "react";
+import { useOutletContext } from "react-router";
 import type { SetupContext } from "../hooks/steps";
 
 interface ProviderDef {

@@ -1,6 +1,6 @@
-import { useMemo } from "react";
 import { formatHumanDuration } from "@shared/lib/dates";
 import type { ProductivitySummary } from "@shared/types";
+import { useMemo } from "react";
 import { scoreColor } from "../lib/constants";
 
 interface WeeklyStatsProps {

@@ -1,16 +1,16 @@
-import { CheckCircle, DollarSign, ExternalLink, FileText, ListTodo, X } from "lucide-react";
-import { useNavigate } from "react-router";
-import { useQuery } from "@shared/hooks/useQuery";
-import { formatHumanDuration, todayISO } from "@shared/lib/dates";
-import type { ProductivitySummary, TimelineEntry, TimelineSummary } from "@shared/types";
 import { AiSummaryCard } from "@features/productivity/components/AiSummaryCard";
 import { DistractionBanner } from "@features/productivity/components/DistractionBanner";
 import { FocusSessionsList } from "@features/productivity/components/FocusSessionsList";
 import { GoalsProgress } from "@features/productivity/components/GoalsProgress";
 import { InsightCardList } from "@features/productivity/components/InsightCardList";
 import { ProductivityScoreRing } from "@features/productivity/components/ProductivityScoreRing";
-import { resolveActivityColor, resolveCategoryLabel } from "@features/productivity/shared";
 import { WorkHoursCard } from "@features/productivity/components/WorkHoursCard";
+import { resolveActivityColor, resolveCategoryLabel } from "@features/productivity/shared";
+import { useQuery } from "@shared/hooks/useQuery";
+import { formatHumanDuration, todayISO } from "@shared/lib/dates";
+import type { ProductivitySummary, TimelineEntry, TimelineSummary } from "@shared/types";
+import { CheckCircle, DollarSign, ExternalLink, FileText, ListTodo, X } from "lucide-react";
+import { useNavigate } from "react-router";
 import type { SessionBlock } from "./ActivityTrack";
 
 interface SummaryPanelProps {

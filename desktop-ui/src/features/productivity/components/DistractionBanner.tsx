@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
 import { ipc } from "@shared/hooks/useIpc";
 import { formatHumanDuration } from "@shared/lib/dates";
 import type { ProductivitySummary } from "@shared/types";
+import { useEffect, useMemo, useState } from "react";
 
 interface DistractionBannerProps {
   summary: ProductivitySummary | null;

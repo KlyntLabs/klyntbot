@@ -1,15 +1,23 @@
+import { AutoFocusToast } from "@features/productivity/components/AutoFocusToast";
+import { FocusStateIndicator } from "@features/productivity/components/FocusStateIndicator";
+import { MiniCalendar } from "@features/tasks/components/editors/MiniCalendar";
+import { useClickOutside } from "@shared/hooks/useClickOutside";
+import { todayISO, toLocalISO } from "@shared/lib/dates";
+import { cn } from "@shared/lib/utils";
 import { Calendar, ChevronLeft, ChevronRight, Layers, PanelRight } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate, useParams } from "react-router";
-import { useClickOutside } from "@shared/hooks/useClickOutside";
-import { todayISO, toLocalISO } from "@shared/lib/dates";
-import { cn } from "@shared/lib/utils";
-import { AutoFocusToast } from "@features/productivity/components/AutoFocusToast";
-import { FocusStateIndicator } from "@features/productivity/components/FocusStateIndicator";
-import { MiniCalendar } from "@features/tasks/components/editors/MiniCalendar";
+import {
+  DataModeContext,
+  LAYERS,
+  LayerContext,
+  SidebarContext,
+  useDataMode,
+  useLayerToggle,
+  useSidebarToggle,
+} from "../lib/layers";
 import { CalendarSync } from "./CalendarSync";
-import { LAYERS, LayerContext, SidebarContext, useLayerToggle, useSidebarToggle } from "../lib/layers";
 
 type ViewMode = "day" | "week" | "month" | "year" | "categories";
 
@@ -92,6 +100,9 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
 
   // Sidebar toggle
   const { sidebarOpen, toggleSidebar } = useSidebarToggle();
+
+  // Data mode toggle (Productivity vs Contexts)
+  const { dataMode, setDataMode } = useDataMode();
 
   // Layer toggle
   const { enabled, toggle, reset, enabledSources } = useLayerToggle();
@@ -201,6 +212,25 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
               <Layers className="w-4 h-4" />
             </button>
 
+            {/* Data mode toggle */}
+            <div className="flex items-center rounded-full bg-white/[0.06] p-0.5">
+              {(["productivity", "contexts"] as const).map((dm) => (
+                <button
+                  key={dm}
+                  type="button"
+                  onClick={() => setDataMode(dm)}
+                  className={cn(
+                    "px-2.5 py-0.5 rounded-full text-[11px] font-medium transition-all capitalize",
+                    dataMode === dm
+                      ? "bg-white/[0.12] text-primary"
+                      : "text-muted hover:text-secondary",
+                  )}
+                >
+                  {dm}
+                </button>
+              ))}
+            </div>
+
             <CalendarSync />
 
             {/* Nav pill group */}
@@ -307,11 +337,13 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
       <AutoFocusToast />
 
       {/* Content */}
-      <LayerContext.Provider value={{ enabled, enabledSources }}>
-        <SidebarContext.Provider value={sidebarOpen}>
-          <div className="flex-1 overflow-hidden">{children}</div>
-        </SidebarContext.Provider>
-      </LayerContext.Provider>
+      <DataModeContext.Provider value={dataMode}>
+        <LayerContext.Provider value={{ enabled, enabledSources }}>
+          <SidebarContext.Provider value={sidebarOpen}>
+            <div className="flex-1 overflow-hidden">{children}</div>
+          </SidebarContext.Provider>
+        </LayerContext.Provider>
+      </DataModeContext.Provider>
     </div>
   );
 }

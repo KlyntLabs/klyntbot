@@ -1,7 +1,7 @@
-import { FileText } from "lucide-react";
-import { useNavigate } from "react-router";
 import { useQuery } from "@shared/hooks/useQuery";
 import type { Note } from "@shared/types";
+import { FileText } from "lucide-react";
+import { useNavigate } from "react-router";
 
 interface LinkedNotesProps {
   entityType: string;

@@ -1,6 +1,6 @@
 import * as CheckboxPrimitive from "@radix-ui/react-checkbox";
-import { Check } from "lucide-react";
 import { cn } from "@shared/lib/cn";
+import { Check } from "lucide-react";
 
 export interface CheckboxProps {
   checked: boolean;
@@ -9,12 +9,7 @@ export interface CheckboxProps {
   disabled?: boolean;
 }
 
-export function Checkbox({
-  checked,
-  onCheckedChange,
-  className,
-  disabled,
-}: CheckboxProps) {
+export function Checkbox({ checked, onCheckedChange, className, disabled }: CheckboxProps) {
   return (
     <CheckboxPrimitive.Root
       checked={checked}

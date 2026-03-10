@@ -1,6 +1,3 @@
-import { ArrowLeft, Plus, Trash2 } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router";
 import { useEvent } from "@shared/hooks/useEvent";
 import { useMutation } from "@shared/hooks/useMutation";
 import { useQuery } from "@shared/hooks/useQuery";
@@ -12,6 +9,9 @@ import type {
   Project,
 } from "@shared/types";
 import { Progress } from "@shared/ui";
+import { ArrowLeft, Plus, Trash2 } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router";
 
 const STATUSES = ["active", "paused", "completed", "abandoned"] as const;
 

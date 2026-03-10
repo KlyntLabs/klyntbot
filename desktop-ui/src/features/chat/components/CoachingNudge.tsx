@@ -1,5 +1,5 @@
-import { Check, Lightbulb, X, XCircle } from "lucide-react";
 import { useCoachingNudge } from "@shared/hooks/useCoachingNudge";
+import { Check, Lightbulb, X, XCircle } from "lucide-react";
 
 const AUTO_COLLAPSE_MS = 60_000;
 

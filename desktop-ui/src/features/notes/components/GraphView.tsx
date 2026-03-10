@@ -1,3 +1,5 @@
+import { useQuery } from "@shared/hooks/useQuery";
+import type { Note, NoteLink } from "@shared/types";
 import {
   forceCenter,
   forceCollide,
@@ -9,8 +11,6 @@ import {
 } from "d3-force";
 import { Maximize2, Minus, Plus } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useQuery } from "@shared/hooks/useQuery";
-import type { Note, NoteLink } from "@shared/types";
 
 // ── Types ────────────────────────────────────────────────────────────────
 

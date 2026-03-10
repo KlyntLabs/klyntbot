@@ -1,7 +1,7 @@
+import { formatDuration, formatTokens, groupBy, qualifiedToolName } from "@shared/lib/utils";
+import type { DelegationInfo, TransparencyData } from "@shared/types";
 import { Bot, Brain, ChevronDown, Cpu, Database, FileText, Package } from "lucide-react";
 import { useMemo, useState } from "react";
-import type { DelegationInfo, TransparencyData } from "@shared/types";
-import { formatDuration, formatTokens, groupBy, qualifiedToolName } from "@shared/lib/utils";
 
 interface CollapsibleBoxProps {
   title: string;

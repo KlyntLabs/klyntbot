@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
 import { cn } from "@shared/lib/cn";
+import { useEffect, useState } from "react";
 
 export interface ProgressRingProps {
   value: number;
@@ -44,12 +44,7 @@ export function ProgressRing({
             opacity: value > 0 ? 1 : 0,
           }}
         />
-        <svg
-          width={size}
-          height={size}
-          className="-rotate-90"
-          aria-hidden="true"
-        >
+        <svg width={size} height={size} className="-rotate-90" aria-hidden="true">
           <circle
             cx={center}
             cy={center}
@@ -75,20 +70,14 @@ export function ProgressRing({
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span
-            className="text-[26px] font-light tabular-nums leading-none"
-            style={{ color }}
-          >
+          <span className="text-[26px] font-light tabular-nums leading-none" style={{ color }}>
             {Math.round(value)}
           </span>
           <span className="text-[9px] font-light text-dim mt-0.5">/100</span>
         </div>
       </div>
       {label && (
-        <span
-          className="text-[10px] font-medium tracking-wide uppercase"
-          style={{ color }}
-        >
+        <span className="text-[10px] font-medium tracking-wide uppercase" style={{ color }}>
           {label}
         </span>
       )}

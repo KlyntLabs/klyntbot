@@ -1,6 +1,4 @@
-import { Archive, ArrowLeft, ChevronDown, ChevronRight, Plus, Target } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router";
+import { LinkedNotes } from "@features/notes/components/LinkedNotes";
 import { useEvent } from "@shared/hooks/useEvent";
 import { useMutation } from "@shared/hooks/useMutation";
 import { useQuery } from "@shared/hooks/useQuery";
@@ -13,8 +11,10 @@ import type {
   ProjectUpdateParams,
   Task,
 } from "@shared/types";
-import { LinkedNotes } from "@features/notes/components/LinkedNotes";
 import { Badge, Checkbox, Progress } from "@shared/ui";
+import { Archive, ArrowLeft, ChevronDown, ChevronRight, Plus, Target } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router";
 
 const PROJECT_COLORS = [
   "#3b82f6",
@@ -474,7 +474,9 @@ export function ProjectDetailPage() {
                   </div>
                   <div className="flex items-center gap-1.5">
                     {task.tags.map((tag) => (
-                      <Badge key={tag} variant="default">{tag}</Badge>
+                      <Badge key={tag} variant="default">
+                        {tag}
+                      </Badge>
                     ))}
                   </div>
                 </div>

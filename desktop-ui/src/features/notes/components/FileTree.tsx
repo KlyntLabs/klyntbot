@@ -1,3 +1,7 @@
+import { useClickOutside } from "@shared/hooks/useClickOutside";
+import { formatDate } from "@shared/lib/dates";
+import type { Note, Notebook } from "@shared/types";
+import { ContextMenu, ContextMenuItem, ContextMenuSeparator, ContextMenuSubmenu } from "@shared/ui";
 import {
   ChevronRight,
   FileText,
@@ -12,15 +16,6 @@ import {
   Trash2,
 } from "lucide-react";
 import { type DragEvent, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useClickOutside } from "@shared/hooks/useClickOutside";
-import { formatDate } from "@shared/lib/dates";
-import type { Note, Notebook } from "@shared/types";
-import {
-  ContextMenu,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuSubmenu,
-} from "@shared/ui";
 
 // ── Types ────────────────────────────────────────────────────────────────
 

@@ -1,10 +1,5 @@
 import { X } from "lucide-react";
-import {
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useState,
-} from "react";
+import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
 export interface SlidePanelProps {
@@ -73,9 +68,7 @@ export function SlidePanel({
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-5 py-4">
-            {children}
-          </div>
+          <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
         </div>
       </div>
     </>,

@@ -1,17 +1,19 @@
-import { useCallback, useEffect, useMemo } from "react";
-import { useParams } from "react-router";
+import { ContextDayView } from "@features/work-contexts/components/ContextDayView";
 import { useEvent } from "@shared/hooks/useEvent";
 import { useQuery } from "@shared/hooks/useQuery";
 import { TZ_OFFSET_MINS, todayISO } from "@shared/lib/dates";
 import type { FocusCompletedPayload, ProductivitySummary } from "@shared/types";
 import { EMPTY_TIMELINE_RESPONSE } from "@shared/types";
+import { useCallback, useEffect, useMemo } from "react";
+import { useParams } from "react-router";
+import { useDataModeValue, useEnabledLayers } from "../lib/layers";
 import { DayColumnsView } from "./DayColumnsView";
-import { useEnabledLayers } from "../lib/layers";
 
 export function DayCalendarView() {
   const { date } = useParams<{ date: string }>();
   const dateStr = date || todayISO();
   const isToday = dateStr === todayISO();
+  const dataMode = useDataModeValue();
 
   const { enabledSources } = useEnabledLayers();
   const queryArgs = useMemo(
@@ -81,6 +83,10 @@ export function DayCalendarView() {
     const id = setInterval(refetchAll, 30_000);
     return () => clearInterval(id);
   }, [isToday, refetchAll]);
+
+  if (dataMode === "contexts") {
+    return <ContextDayView date={dateStr} isToday={isToday} />;
+  }
 
   return (
     <DayColumnsView

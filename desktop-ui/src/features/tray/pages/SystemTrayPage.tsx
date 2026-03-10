@@ -1,6 +1,3 @@
-import { getCurrentWindow } from "@tauri-apps/api/window";
-import { Check, Lightbulb, LogOut, Monitor, Send, Settings, X, XCircle } from "lucide-react";
-import { useCallback, useMemo, useRef, useState } from "react";
 import { useCoachingNudge } from "@shared/hooks/useCoachingNudge";
 import { useEvent } from "@shared/hooks/useEvent";
 import { useFocusTimer } from "@shared/hooks/useFocusTimer";
@@ -10,10 +7,13 @@ import { useQuery } from "@shared/hooks/useQuery";
 import { useSetToggle } from "@shared/hooks/useSetToggle";
 import { useTransparentBackground } from "@shared/hooks/useTransparentBackground";
 import { useWindowAutoResize } from "@shared/hooks/useWindowAutoResize";
-import type { AgentStatus as AgentStatusType, CalendarEvent, TodayTask } from "@shared/types";
 import { isTauri } from "@shared/lib/utils";
-import { FocusControl } from "../components/FocusControl";
+import type { AgentStatus as AgentStatusType, CalendarEvent, TodayTask } from "@shared/types";
 import { Badge, Checkbox, KlyntLogo } from "@shared/ui";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { Check, Lightbulb, LogOut, Monitor, Send, Settings, X, XCircle } from "lucide-react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { FocusControl } from "../components/FocusControl";
 
 type DisplayStatus = "active" | "idle";
 
@@ -252,10 +252,7 @@ export function SystemTray() {
                         {task.title}
                       </span>
                       {!done && task.priority && (
-                        <Badge
-                          variant="brand"
-                          className="text-[10px] px-1.5 py-0"
-                        >
+                        <Badge variant="brand" className="text-[10px] px-1.5 py-0">
                           {task.priority}
                         </Badge>
                       )}

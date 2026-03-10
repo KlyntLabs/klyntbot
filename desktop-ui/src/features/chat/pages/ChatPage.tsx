@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router";
-import { useChatSession } from "../hooks/useChatSession";
 import { ipc } from "@shared/hooks/useIpc";
 import { useQuery } from "@shared/hooks/useQuery";
 import { useSetToggle } from "@shared/hooks/useSetToggle";
-import type { ChatThread } from "@shared/types";
+import type { ChatThread, ContextResumeData } from "@shared/types";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useSearchParams } from "react-router";
 import { ChatInput } from "../components/ChatInput";
 import { CoachingNudge } from "../components/CoachingNudge";
 import { MessageList } from "../components/MessageList";
@@ -12,6 +11,7 @@ import { ThreadContextMenu } from "../components/ThreadContextMenu";
 import { type AreaGroup, featurePrefix, ThreadList } from "../components/ThreadList";
 import { TransparencyPanel } from "../components/TransparencyPanel";
 import { TransparencyToggle } from "../components/TransparencyToggle";
+import { useChatSession } from "../hooks/useChatSession";
 
 interface GroupedThreads {
   areas: AreaGroup[];
@@ -49,6 +49,21 @@ export function ChatPage() {
 
   // Chat session
   const chat = useChatSession(selectedThread, refetchThreads);
+
+  // Context resume — pre-fill input from navigation state
+  const location = useLocation();
+  const resumeContext = (location.state as { resumeContext?: ContextResumeData } | null)
+    ?.resumeContext;
+  const [resumeBanner, setResumeBanner] = useState<string | null>(null);
+  const didApplyResume = useRef(false);
+  useEffect(() => {
+    if (resumeContext && !didApplyResume.current) {
+      didApplyResume.current = true;
+      chat.setInput(resumeContext.suggestedPrompt);
+      setResumeBanner(resumeContext.contextTitle);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chat ref is unstable; didApplyResume guards double-apply
+  }, [resumeContext]);
 
   const [showTransparency, setShowTransparency] = useState(() => {
     try {
@@ -246,7 +261,21 @@ export function ChatPage() {
 
       {/* Right Panel — Conversation */}
       <div className="flex-1 flex flex-col overflow-hidden rounded-xl relative">
-        <div className="flex items-center justify-end px-4 py-2 border-b border-white/[0.06]">
+        <div className="flex items-center justify-between px-4 py-2 border-b border-white/[0.06]">
+          {resumeBanner ? (
+            <div className="flex items-center gap-2 text-[12px]">
+              <span className="text-brand font-medium">Resuming: {resumeBanner}</span>
+              <button
+                type="button"
+                onClick={() => setResumeBanner(null)}
+                className="text-muted hover:text-secondary"
+              >
+                ×
+              </button>
+            </div>
+          ) : (
+            <div />
+          )}
           <TransparencyToggle enabled={showTransparency} onToggle={toggleTransparency} />
         </div>
 

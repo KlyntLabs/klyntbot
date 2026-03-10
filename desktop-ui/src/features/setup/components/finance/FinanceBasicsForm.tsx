@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
 import { ipc } from "@shared/hooks/useIpc";
+import { useEffect, useState } from "react";
 
 const CURRENCIES = [
   "USD",

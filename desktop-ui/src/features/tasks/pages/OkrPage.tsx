@@ -1,12 +1,12 @@
-import { ChevronDown, ChevronRight, Plus, Target } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
-import { useNavigate } from "react-router";
 import { useEvent } from "@shared/hooks/useEvent";
 import { useMutation } from "@shared/hooks/useMutation";
 import { useQuery } from "@shared/hooks/useQuery";
 import { useSetToggle } from "@shared/hooks/useSetToggle";
 import type { Objective, ObjectiveCreateParams, Project } from "@shared/types";
 import { Badge, Progress } from "@shared/ui";
+import { ChevronDown, ChevronRight, Plus, Target } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
+import { useNavigate } from "react-router";
 
 export function OkrPage() {
   const navigate = useNavigate();

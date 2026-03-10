@@ -23,18 +23,12 @@ export function FormField({
       {label && (
         <label className="text-xs font-medium text-secondary">
           {label}
-          {required && (
-            <span className="text-destructive ml-0.5">*</span>
-          )}
+          {required && <span className="text-destructive ml-0.5">*</span>}
         </label>
       )}
-      {description && (
-        <p className="text-xs text-muted">{description}</p>
-      )}
+      {description && <p className="text-xs text-muted">{description}</p>}
       {children}
-      {error && (
-        <p className="text-xs text-destructive">{error}</p>
-      )}
+      {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   );
 }

@@ -1,8 +1,9 @@
-import { useMemo } from "react";
 import { useEvent } from "@shared/hooks/useEvent";
 import { useQuery } from "@shared/hooks/useQuery";
 import { todayISO } from "@shared/lib/dates";
 import type { ProductivitySummary } from "@shared/types";
+import { useMemo } from "react";
+import { buildBreakdownSegments } from "../lib/constants";
 import { ActivityFeed } from "./ActivityFeed";
 import { AiSummaryCard } from "./AiSummaryCard";
 import { AutoFocusToast } from "./AutoFocusToast";
@@ -16,7 +17,6 @@ import { InsightCardList } from "./InsightCardList";
 import { LearnedRulesCard } from "./LearnedRulesCard";
 import { LiveScoreRing } from "./LiveScoreRing";
 import { ProjectsCard } from "./ProjectsCard";
-import { buildBreakdownSegments } from "../lib/constants";
 import { TimeEntrySection } from "./TimeEntrySection";
 import { TimelineBar } from "./Timeline";
 import { TopApps } from "./TopApps";

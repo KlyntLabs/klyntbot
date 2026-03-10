@@ -1,6 +1,6 @@
-import { useState } from "react";
 import { useEvent } from "@shared/hooks/useEvent";
 import type { FocusStatePayload } from "@shared/types";
+import { useState } from "react";
 
 const STATE_CONFIG: Record<string, { label: string; color: string; pulse: boolean }> = {
   building: { label: "Building focus", color: "var(--brand)", pulse: true },

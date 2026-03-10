@@ -1,6 +1,6 @@
+import { ipc } from "@shared/hooks/useIpc";
 import { Plus, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { ipc } from "@shared/hooks/useIpc";
 
 const ACCOUNT_TYPES = ["checking", "savings", "credit", "investment", "cash", "other"] as const;
 const ACCOUNT_TYPE_OPTIONS = ACCOUNT_TYPES.map((t) => ({

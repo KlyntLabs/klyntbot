@@ -1,2 +1,2 @@
-export { router } from "./router";
 export { AppShell, Sidebar } from "./layouts";
+export { router } from "./router";

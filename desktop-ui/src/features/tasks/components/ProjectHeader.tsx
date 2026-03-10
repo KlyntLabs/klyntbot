@@ -1,6 +1,6 @@
+import type { Objective, Project, Task } from "@shared/types";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router";
-import type { Objective, Project, Task } from "@shared/types";
 
 interface ProjectHeaderProps {
   project: Project;

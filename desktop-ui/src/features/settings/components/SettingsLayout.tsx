@@ -1,6 +1,7 @@
 import {
   Archive,
   ArrowLeft,
+  Cable,
   Container,
   GitBranch,
   Plug,
@@ -21,6 +22,7 @@ const sections = [
   { label: "MCP servers", path: "/settings/mcp", icon: Plug },
   { label: "Git", path: "/settings/git", icon: GitBranch },
   { label: "Environments", path: "/settings/environments", icon: Container },
+  { label: "Integrations", path: "/settings/integrations", icon: Cable },
   { label: "Archived threads", path: "/settings/archived", icon: Archive },
 ];
 

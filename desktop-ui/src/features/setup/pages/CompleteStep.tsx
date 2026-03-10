@@ -1,8 +1,8 @@
-import { CheckCircle } from "lucide-react";
-import { useNavigate } from "react-router";
 import { ipc } from "@shared/hooks/useIpc";
 import { useQuery } from "@shared/hooks/useQuery";
 import type { McpConfigResponse } from "@shared/types";
+import { CheckCircle } from "lucide-react";
+import { useNavigate } from "react-router";
 
 interface ConfigSummary {
   provider?: string;

@@ -1,8 +1,8 @@
+import { ipc } from "@shared/hooks/useIpc";
+import type { Note } from "@shared/types";
 import { Search, X } from "lucide-react";
 import type { Ref } from "react";
 import { useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
-import { ipc } from "@shared/hooks/useIpc";
-import type { Note } from "@shared/types";
 
 export interface NoteSearchBarHandle {
   focus: () => void;

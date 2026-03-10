@@ -1,5 +1,5 @@
-import { createContext, useContext, useMemo, useState } from "react";
 import type { TimelineSource } from "@shared/types";
+import { createContext, useCallback, useContext, useMemo, useState } from "react";
 
 export type LayerKey = "activity" | "calendar" | "timeEntries" | "tasks" | "transactions" | "notes";
 
@@ -112,6 +112,34 @@ export function useEnabledLayers() {
 }
 
 export const SidebarContext = createContext<boolean>(true);
+
+// ── Data Mode ────────────────────────────────────────────────
+export type DataMode = "productivity" | "contexts";
+
+const DATA_MODE_KEY = "dashboard-data-mode";
+
+export function useDataMode() {
+  const [mode, setMode] = useState<DataMode>(() => {
+    try {
+      return (localStorage.getItem(DATA_MODE_KEY) as DataMode) || "productivity";
+    } catch {
+      return "productivity";
+    }
+  });
+
+  const setDataMode = useCallback((next: DataMode) => {
+    setMode(next);
+    localStorage.setItem(DATA_MODE_KEY, next);
+  }, []);
+
+  return { dataMode: mode, setDataMode };
+}
+
+export const DataModeContext = createContext<DataMode>("productivity");
+
+export function useDataModeValue() {
+  return useContext(DataModeContext);
+}
 
 export function useSidebarOpen() {
   return useContext(SidebarContext);

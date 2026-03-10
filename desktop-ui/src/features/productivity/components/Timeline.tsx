@@ -1,9 +1,9 @@
-import { useMemo, useState } from "react";
 import { useQuery } from "@shared/hooks/useQuery";
 import type { MergeableEvent } from "@shared/lib/activity-sessions";
 import { mergeActivitySessions } from "@shared/lib/activity-sessions";
 import { formatHumanDuration, todayISO } from "@shared/lib/dates";
 import type { ActivityCategory, ActivityTimeline } from "@shared/types";
+import { useMemo, useState } from "react";
 import { resolveActivityColor } from "../lib/constants";
 
 interface TimelineBarProps {

@@ -1,8 +1,8 @@
-import { Check, RefreshCw, Trash2, X, XCircle } from "lucide-react";
-import { useEffect } from "react";
 import { useMutation } from "@shared/hooks/useMutation";
 import { invalidateQueries, useQuery } from "@shared/hooks/useQuery";
 import type { CoachingIntervention } from "@shared/types";
+import { Check, RefreshCw, Trash2, X, XCircle } from "lucide-react";
+import { useEffect } from "react";
 
 interface UserSituation {
   energyLevel: number;

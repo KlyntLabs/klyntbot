@@ -1,7 +1,7 @@
-import * as tauriWindow from "@tauri-apps/api/window";
-import { useState } from "react";
 import { useEvent } from "@shared/hooks/useEvent";
 import { ipc } from "@shared/hooks/useIpc";
+import * as tauriWindow from "@tauri-apps/api/window";
+import { useState } from "react";
 
 interface InterventionPayload {
   appName: string;

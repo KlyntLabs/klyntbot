@@ -8,13 +8,7 @@ export interface ToggleProps {
   className?: string;
 }
 
-export function Toggle({
-  checked,
-  onChange,
-  disabled,
-  size = "default",
-  className,
-}: ToggleProps) {
+export function Toggle({ checked, onChange, disabled, size = "default", className }: ToggleProps) {
   const isSmall = size === "sm";
   return (
     <button

@@ -1,4 +1,4 @@
-import type { StatusLabel, ColumnType } from "./common";
+import type { ColumnType, StatusLabel } from "./common";
 
 // ── Task Core Types ─────────────────────────────────────────
 

@@ -1,5 +1,3 @@
-import type { NavigateFunction } from "react-router";
-import { useLocation, useNavigate } from "react-router";
 import {
   formatFullDate,
   formatMonthLabel,
@@ -11,6 +9,8 @@ import {
   weekStartISO,
 } from "@shared/lib/dates";
 import type { ProductivityPeriod } from "@shared/types";
+import type { NavigateFunction } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { DateNavigator } from "./DateNavigator";
 
 interface ProductivityLayoutProps {

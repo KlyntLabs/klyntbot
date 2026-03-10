@@ -1,7 +1,7 @@
+import { formatDuration, formatTokens, qualifiedToolName } from "@shared/lib/utils";
+import type { MessageSegment, PlanData } from "@shared/types";
 import { Check, ChevronRight, X } from "lucide-react";
 import { useMemo, useState } from "react";
-import type { MessageSegment, PlanData } from "@shared/types";
-import { formatDuration, formatTokens, qualifiedToolName } from "@shared/lib/utils";
 import { MarkdownContent } from "./MarkdownContent";
 import { PlanProgress } from "./PlanProgress";
 
@@ -219,7 +219,9 @@ export function SegmentedMessage({
 
   // During streaming, detect if delegate is the active parent tool
   const isDelegateActive = activeTools?.includes("delegate") && !!activeDelegateAgent;
-  const subAgentActiveTools = isDelegateActive ? activeTools?.filter((t) => t !== "delegate") ?? [] : [];
+  const subAgentActiveTools = isDelegateActive
+    ? (activeTools?.filter((t) => t !== "delegate") ?? [])
+    : [];
 
   // During streaming with delegate active, completed sub-agent tool segments
   // (trailing items with agent set) should be shown nested under the delegate spinner

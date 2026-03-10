@@ -1,7 +1,7 @@
-import { GitBranch } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
 import { useEvent } from "@shared/hooks/useEvent";
 import { ipc } from "@shared/hooks/useIpc";
+import { GitBranch } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 interface ExtractionEvent {
   observation: string;

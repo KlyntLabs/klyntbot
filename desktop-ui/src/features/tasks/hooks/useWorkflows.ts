@@ -1,6 +1,6 @@
-import type { StatusLabel, StatusWorkflow } from "@shared/types";
 import { useMutation } from "@shared/hooks/useMutation";
 import { useQuery } from "@shared/hooks/useQuery";
+import type { StatusLabel, StatusWorkflow } from "@shared/types";
 
 /** Fetch all workflows (including templates) */
 export function useWorkflows() {

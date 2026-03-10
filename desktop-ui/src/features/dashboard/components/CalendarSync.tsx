@@ -3,11 +3,11 @@
  * Shows sync status and triggers sync on click.
  */
 
-import { Calendar, Loader2, RefreshCw } from "lucide-react";
-import { useState } from "react";
 import { useMutation } from "@shared/hooks/useMutation";
 import { formatTime } from "@shared/lib/dates";
 import { cn } from "@shared/lib/utils";
+import { Calendar, Loader2, RefreshCw } from "lucide-react";
+import { useState } from "react";
 
 export function CalendarSync() {
   const { mutate, loading } = useMutation("calendar_sync_events");

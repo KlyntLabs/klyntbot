@@ -1,0 +1,186 @@
+import { SettingsCard } from "@shared/composites/SettingsCard/SettingsCard";
+import { ipc } from "@shared/hooks/useIpc";
+import { useQuery } from "@shared/hooks/useQuery";
+import { Check, Copy, RefreshCw, Terminal, X } from "lucide-react";
+import { useState } from "react";
+
+interface ShellHookStatus {
+  installed: boolean;
+  shell: string;
+  rcFile: string;
+}
+
+interface CaptureStatus {
+  shellHookActive: boolean;
+  eventCountLast24h: Record<string, number>;
+}
+
+export function IntegrationsSettings() {
+  const { data: hookStatus, refetch: refetchHook } = useQuery<ShellHookStatus | null>(
+    "capture_shell_hook_status",
+    undefined,
+    null,
+  );
+  const { data: captureStatus } = useQuery<CaptureStatus | null>("capture_status", undefined, null);
+  const { data: token, refetch: refetchToken } = useQuery<string | null>(
+    "capture_get_ingestion_token",
+    undefined,
+    null,
+  );
+
+  const [installing, setInstalling] = useState(false);
+  const [tokenVisible, setTokenVisible] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleInstall = async () => {
+    setInstalling(true);
+    try {
+      await ipc("capture_install_shell_hook");
+      refetchHook();
+    } finally {
+      setInstalling(false);
+    }
+  };
+
+  const handleUninstall = async () => {
+    setInstalling(true);
+    try {
+      await ipc("capture_uninstall_shell_hook");
+      refetchHook();
+    } finally {
+      setInstalling(false);
+    }
+  };
+
+  const handleRegenerateToken = async () => {
+    await ipc("capture_regenerate_ingestion_token");
+    refetchToken();
+  };
+
+  const handleCopyToken = () => {
+    if (token) {
+      navigator.clipboard.writeText(token);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-6">
+      <h2 className="text-lg font-medium text-primary">Integrations</h2>
+      <p className="text-[13px] text-muted -mt-4">
+        Configure external capture sources to enrich your activity timeline.
+      </p>
+
+      {/* Shell Integration */}
+      <SettingsCard title="Shell Integration">
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Terminal className="w-4 h-4 text-muted" strokeWidth={1.5} />
+              <span className="text-[13px] text-secondary">
+                {hookStatus?.installed ? "Installed" : "Not installed"}
+              </span>
+              {hookStatus?.installed && <span className="w-2 h-2 rounded-full bg-green-500" />}
+            </div>
+            {hookStatus?.installed ? (
+              <button
+                type="button"
+                onClick={handleUninstall}
+                disabled={installing}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] rounded-lg text-muted hover:text-secondary hover:bg-white/[0.06] transition-colors"
+              >
+                <X className="w-3 h-3" />
+                Uninstall
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleInstall}
+                disabled={installing}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] rounded-lg bg-brand/20 text-brand hover:bg-brand/30 transition-colors"
+              >
+                Install
+              </button>
+            )}
+          </div>
+          {hookStatus && (
+            <div className="text-[11px] text-muted">
+              Shell: {hookStatus.shell} · RC file: {hookStatus.rcFile}
+            </div>
+          )}
+        </div>
+      </SettingsCard>
+
+      {/* Ingestion API */}
+      <SettingsCard title="Ingestion API">
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <span className="text-[13px] text-secondary">Endpoint</span>
+            <code className="text-[12px] text-muted bg-white/[0.06] px-2 py-0.5 rounded">
+              http://127.0.0.1:3456/api/v1/ingest
+            </code>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-[13px] text-secondary">Auth Token</span>
+            <div className="flex items-center gap-2">
+              <code className="text-[12px] text-muted bg-white/[0.06] px-2 py-0.5 rounded max-w-[200px] truncate">
+                {tokenVisible ? (token ?? "—") : "••••••••••••"}
+              </code>
+              <button
+                type="button"
+                onClick={() => setTokenVisible(!tokenVisible)}
+                className="text-[11px] text-muted hover:text-secondary"
+              >
+                {tokenVisible ? "Hide" : "Show"}
+              </button>
+              <button
+                type="button"
+                onClick={handleCopyToken}
+                className="text-muted hover:text-secondary"
+                title="Copy token"
+              >
+                {copied ? (
+                  <Check className="w-3.5 h-3.5 text-green-500" />
+                ) : (
+                  <Copy className="w-3.5 h-3.5" />
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={handleRegenerateToken}
+                className="text-muted hover:text-secondary"
+                title="Regenerate token"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </SettingsCard>
+
+      {/* Event Counts */}
+      {captureStatus?.eventCountLast24h &&
+        Object.keys(captureStatus.eventCountLast24h).length > 0 && (
+          <SettingsCard title="Event Sources (Last 24h)">
+            <div className="flex flex-col gap-1.5">
+              {Object.entries(captureStatus.eventCountLast24h).map(([source, count]) => (
+                <div key={source} className="flex items-center justify-between text-[12px]">
+                  <span className="text-secondary capitalize">{source.replace(/_/g, " ")}</span>
+                  <span className="text-muted tabular-nums">{count}</span>
+                </div>
+              ))}
+            </div>
+          </SettingsCard>
+        )}
+
+      {/* Browser Extension placeholder */}
+      <SettingsCard title="Browser Extension">
+        <p className="text-[12px] text-muted">
+          Chrome extension coming soon. In the meantime, external plugins can send events to the
+          ingestion API endpoint above.
+        </p>
+      </SettingsCard>
+    </div>
+  );
+}

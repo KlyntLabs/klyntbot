@@ -1,5 +1,5 @@
 import { cn } from "@shared/lib/cn";
-import { useState, type ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 
 export interface TooltipProps {
   content: ReactNode;
@@ -8,12 +8,7 @@ export interface TooltipProps {
   className?: string;
 }
 
-export function Tooltip({
-  content,
-  side = "top",
-  children,
-  className,
-}: TooltipProps) {
+export function Tooltip({ content, side = "top", children, className }: TooltipProps) {
   const [isVisible, setIsVisible] = useState(false);
 
   const sideClasses = {

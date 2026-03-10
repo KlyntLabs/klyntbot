@@ -1,5 +1,3 @@
-import { Plug, Plus } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
 import { useEvent } from "@shared/hooks/useEvent";
 import { useMutation } from "@shared/hooks/useMutation";
 import { useQuery } from "@shared/hooks/useQuery";
@@ -10,6 +8,8 @@ import type {
   OAuthStartParams,
   RecommendedMcpServer,
 } from "@shared/types";
+import { Plug, Plus } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AddServerDialog } from "../components/mcp/AddServerDialog";
 import { CustomServerCard, RecommendedServerCard } from "../components/mcp/McpServerCard";
 import { recommendedServers } from "../components/mcp/recommendedServers";

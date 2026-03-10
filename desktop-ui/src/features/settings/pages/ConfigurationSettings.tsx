@@ -1,9 +1,9 @@
-import { ChevronDown, ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { SettingsCard } from "@shared/composites";
 import { ipc } from "@shared/hooks/useIpc";
 import { useQuery } from "@shared/hooks/useQuery";
 import { SaveButton, SecretInput, Toggle } from "@shared/ui";
-import { SettingsCard } from "@shared/composites";
+import { ChevronDown, ChevronRight } from "lucide-react";
+import { useState } from "react";
 
 // ── Channel definitions ──────────────────────────────────────────────
 

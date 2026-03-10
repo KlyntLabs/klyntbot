@@ -1,8 +1,8 @@
+import { ipc } from "@shared/hooks/useIpc";
+import type { Note, NoteUpdateParams } from "@shared/types";
 import { GitGraph, History, PenLine, Plus } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
-import { ipc } from "@shared/hooks/useIpc";
-import type { Note, NoteUpdateParams } from "@shared/types";
 import { EditorContentWrapper, useEntityResolution, useNoteEditor } from "./editor/EditorCore";
 import { EditorToolbar } from "./editor/EditorToolbar";
 import { EntityMentionMenu } from "./editor/EntityMention";

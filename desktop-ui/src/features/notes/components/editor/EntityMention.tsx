@@ -1,9 +1,9 @@
+import { ipc } from "@shared/hooks/useIpc";
+import type { Project, Task } from "@shared/types";
 import { Mark, mergeAttributes } from "@tiptap/core";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ipc } from "@shared/hooks/useIpc";
-import type { Project, Task } from "@shared/types";
 
 // ── EntityMention Mark ──────────────────────────────────────────────────
 

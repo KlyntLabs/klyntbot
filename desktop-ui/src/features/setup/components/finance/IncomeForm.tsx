@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
 import { ipc } from "@shared/hooks/useIpc";
+import { useEffect, useState } from "react";
 
 const BUDGET_METHODS = [
   { value: "standard", label: "Standard", desc: "Track spending by custom categories" },

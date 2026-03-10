@@ -43,12 +43,7 @@ export function DonutChart({
   return (
     <div className="flex flex-col items-center">
       <div className="relative" style={{ width: size, height: size }}>
-        <svg
-          width={size}
-          height={size}
-          viewBox={`0 0 ${size} ${size}`}
-          aria-hidden="true"
-        >
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
           {segments.map((seg, i) => {
             const frac = seg.value / total;
             const dash = frac * circ;
@@ -97,18 +92,13 @@ export function DonutChart({
           )}
         </svg>
         {children && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            {children}
-          </div>
+          <div className="absolute inset-0 flex items-center justify-center">{children}</div>
         )}
       </div>
       <div className="flex flex-wrap gap-x-3 gap-y-0.5 justify-center mt-2">
         {segments.map((seg) => (
           <div key={seg.name} className="flex items-center gap-1">
-            <div
-              className="w-1.5 h-1.5 rounded-full"
-              style={{ backgroundColor: seg.color }}
-            />
+            <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: seg.color }} />
             <span className="text-[9px] text-dim font-light">{seg.name}</span>
           </div>
         ))}

@@ -1,5 +1,3 @@
-import { ChevronDown, ChevronRight } from "lucide-react";
-import { useMemo } from "react";
 import type {
   Area,
   Objective,
@@ -10,6 +8,8 @@ import type {
   TaskGroup,
   TaskUpdateParams,
 } from "@shared/types";
+import { ChevronDown, ChevronRight } from "lucide-react";
+import { useMemo } from "react";
 import { AddSubtaskRow } from "./AddSubtaskRow";
 import { ProjectHeader } from "./ProjectHeader";
 import { RootTaskRow, SubtaskRow } from "./TaskRow";

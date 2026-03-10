@@ -1,5 +1,5 @@
-import { ChevronDown, Columns3, Filter, GitBranch, List, Plus } from "lucide-react";
 import type { ViewMode } from "@shared/types";
+import { ChevronDown, Columns3, Filter, GitBranch, List, Plus } from "lucide-react";
 
 interface ToolbarProps {
   viewMode: ViewMode;

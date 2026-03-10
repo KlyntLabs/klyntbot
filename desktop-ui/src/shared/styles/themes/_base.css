@@ -21,8 +21,9 @@
 
   /* ── Typography ────────────────────────────────────────────────────── */
   --font-size: 15px;
-  --font-sans: "SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont,
-    system-ui, "Helvetica Neue", sans-serif;
+  --font-sans:
+    "SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, "Helvetica Neue",
+    sans-serif;
   --font-weight-semibold: 600;
   --font-weight-medium: 500;
   --font-weight-normal: 400;

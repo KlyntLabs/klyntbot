@@ -1,6 +1,6 @@
-import { Pencil, Trash2 } from "lucide-react";
 import type { ChatThread } from "@shared/types";
 import { ContextMenu, ContextMenuItem, ContextMenuSeparator } from "@shared/ui";
+import { Pencil, Trash2 } from "lucide-react";
 
 interface ThreadContextMenuProps {
   x: number;

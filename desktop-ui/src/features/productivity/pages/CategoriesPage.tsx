@@ -1,6 +1,6 @@
-import { useState } from "react";
 import { useQuery } from "@shared/hooks/useQuery";
 import type { ActivityCategory, TrackedApp } from "@shared/types";
+import { useState } from "react";
 import { CategoryEditor } from "../components/CategoryEditor";
 import { CategoryList } from "../components/CategoryList";
 import { TrackedAppsList } from "../components/TrackedAppsList";

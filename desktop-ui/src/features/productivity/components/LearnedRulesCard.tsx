@@ -1,7 +1,7 @@
-import { Shield, Trash2 } from "lucide-react";
 import { useMutation } from "@shared/hooks/useMutation";
 import { useQuery } from "@shared/hooks/useQuery";
 import type { LearnedRule } from "@shared/types";
+import { Shield, Trash2 } from "lucide-react";
 
 export function LearnedRulesCard() {
   const { data: rules, refetch } = useQuery<LearnedRule[]>(

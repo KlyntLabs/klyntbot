@@ -1,7 +1,7 @@
+import { isTauri } from "@shared/lib/utils";
 import { LogicalSize } from "@tauri-apps/api/dpi";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { type RefObject, useCallback, useEffect, useRef } from "react";
-import { isTauri } from "@shared/lib/utils";
 
 /**
  * Auto-resize a Tauri window to match its content element's height.

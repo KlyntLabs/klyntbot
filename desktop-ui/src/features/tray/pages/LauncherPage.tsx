@@ -1,3 +1,8 @@
+import { KlyntLogo } from "@shared/components/ui/KlyntLogo";
+import { useTransparentBackground } from "@shared/hooks/useTransparentBackground";
+import { useWindowAutoResize } from "@shared/hooks/useWindowAutoResize";
+import { isTauri } from "@shared/lib/utils";
+import type { LauncherItem } from "@shared/types";
 import { emit } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
@@ -12,11 +17,6 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useTransparentBackground } from "@shared/hooks/useTransparentBackground";
-import { useWindowAutoResize } from "@shared/hooks/useWindowAutoResize";
-import type { LauncherItem } from "@shared/types";
-import { isTauri } from "@shared/lib/utils";
-import { KlyntLogo } from "@shared/components/ui/KlyntLogo";
 import { LauncherChat } from "../components/LauncherChat";
 
 const launcherItems: LauncherItem[] = [

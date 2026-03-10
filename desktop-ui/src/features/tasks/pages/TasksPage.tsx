@@ -1,5 +1,3 @@
-import { useCallback, useEffect, useMemo, useOptimistic, useState, useTransition } from "react";
-import { useSearchParams } from "react-router";
 import { useEvent } from "@shared/hooks/useEvent";
 import { useGroups } from "@shared/hooks/useGroups";
 import { useMutation } from "@shared/hooks/useMutation";
@@ -17,6 +15,8 @@ import type {
   TaskUpdateParams,
   ViewMode,
 } from "@shared/types";
+import { useCallback, useEffect, useMemo, useOptimistic, useState, useTransition } from "react";
+import { useSearchParams } from "react-router";
 import { KanbanBoard } from "../components/KanbanBoard";
 import { TaskTable } from "../components/TaskTable";
 import { TaskTableSkeleton } from "../components/TaskTableSkeleton";

@@ -1,7 +1,7 @@
-import { ChevronDown, ChevronRight, Target } from "lucide-react";
-import { useNavigate } from "react-router";
 import type { Task, TaskUpdateParams } from "@shared/types";
 import { Badge, Checkbox } from "@shared/ui";
+import { ChevronDown, ChevronRight, Target } from "lucide-react";
+import { useNavigate } from "react-router";
 import { InlineDatePicker } from "./editors/InlineDatePicker";
 import { InlineSelect } from "./editors/InlineSelect";
 import { InlineTagsEditor } from "./editors/InlineTagsEditor";

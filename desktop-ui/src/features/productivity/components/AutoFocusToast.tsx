@@ -1,7 +1,7 @@
-import { useCallback, useState } from "react";
 import { useEvent } from "@shared/hooks/useEvent";
 import { ipc } from "@shared/hooks/useIpc";
 import type { AutoFocusPayload } from "@shared/types";
+import { useCallback, useState } from "react";
 import { AppIcon, getAppColor } from "../lib/constants";
 
 export function AutoFocusToast() {

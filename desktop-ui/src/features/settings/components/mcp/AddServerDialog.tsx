@@ -1,6 +1,6 @@
+import type { McpAddServerParams, RecommendedMcpServer } from "@shared/types";
 import { Minus, Plus, X } from "lucide-react";
 import { useState } from "react";
-import type { McpAddServerParams, RecommendedMcpServer } from "@shared/types";
 
 interface AddServerDialogProps {
   open: boolean;

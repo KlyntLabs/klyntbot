@@ -1,11 +1,11 @@
-import { getCurrentWindow } from "@tauri-apps/api/window";
-import { ArrowLeft, ArrowUpRight, Send, Sparkles } from "lucide-react";
-import { useCallback, useEffect, useRef } from "react";
-import { useChatSession } from "@shared/hooks/useChatSession";
-import { isTauri } from "@shared/lib/utils";
 import { InteractionCard } from "@features/chat/components/InteractionCard";
 import { MarkdownContent } from "@features/chat/components/MarkdownContent";
 import { ActiveToolIndicator } from "@features/chat/components/SegmentedMessage";
+import { useChatSession } from "@shared/hooks/useChatSession";
+import { isTauri } from "@shared/lib/utils";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { ArrowLeft, ArrowUpRight, Send, Sparkles } from "lucide-react";
+import { useCallback, useEffect, useRef } from "react";
 
 interface LauncherChatProps {
   sessionKey: string;

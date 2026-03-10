@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
 import { useEvent } from "@shared/hooks/useEvent";
 import type { ProductivitySummary, ScorePayload } from "@shared/types";
+import { useMemo, useState } from "react";
 import { ProductivityScoreRing } from "./ProductivityScoreRing";
 
 interface LiveScoreRingProps {

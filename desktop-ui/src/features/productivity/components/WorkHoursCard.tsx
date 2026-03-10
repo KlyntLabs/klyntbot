@@ -1,5 +1,5 @@
-import { useState } from "react";
 import { formatLongDuration } from "@shared/lib/dates";
+import { useState } from "react";
 
 interface WorkHoursCardProps {
   totalActiveSecs: number;

@@ -1,9 +1,9 @@
 import { ChevronLeft, ChevronRight, SkipForward } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Outlet } from "react-router";
-import { SetupProgress } from "./SetupProgress";
 import type { SetupContext } from "../hooks/steps";
 import { useSetupNavigation } from "../hooks/useSetupNavigation";
+import { SetupProgress } from "./SetupProgress";
 
 export function SetupLayout() {
   const { currentStep, currentIndex, isFirst, next, back } = useSetupNavigation();

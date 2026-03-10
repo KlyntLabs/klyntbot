@@ -2,8 +2,8 @@
  * Shared constants and components for productivity widgets.
  */
 
-import type { JSX } from "react";
 import { AppWindow } from "lucide-react";
+import type { JSX } from "react";
 
 // ── App brand colors & icons ──────────────────────────────────────────
 

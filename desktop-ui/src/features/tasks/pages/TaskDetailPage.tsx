@@ -1,6 +1,4 @@
-import { ArrowLeft, Trash2 } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router";
+import { LinkedNotes } from "@features/notes/components/LinkedNotes";
 import {
   useColumnMutations,
   useColumnValues,
@@ -11,9 +9,11 @@ import { useMutation } from "@shared/hooks/useMutation";
 import { useQuery } from "@shared/hooks/useQuery";
 import { useEffectiveLabels } from "@shared/hooks/useWorkflows";
 import type { Project, StatusLabel, Task, TaskUpdateParams } from "@shared/types";
-import { LinkedNotes } from "@features/notes/components/LinkedNotes";
-import { CustomColumnCell } from "../components/CustomColumnCell";
 import { Badge } from "@shared/ui";
+import { ArrowLeft, Trash2 } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router";
+import { CustomColumnCell } from "../components/CustomColumnCell";
 
 const PRIORITIES = ["P1", "P2", "P3", "P4", null] as const;
 
@@ -192,7 +192,11 @@ export function TaskDetailPage() {
           <span className="text-[12px] text-muted font-light self-center">Tags</span>
           <div className="flex items-center gap-1.5">
             {task.tags.length > 0 ? (
-              task.tags.map((tag) => <Badge key={tag} variant="default">{tag}</Badge>)
+              task.tags.map((tag) => (
+                <Badge key={tag} variant="default">
+                  {tag}
+                </Badge>
+              ))
             ) : (
               <span className="text-[12px] text-dim font-light">None</span>
             )}

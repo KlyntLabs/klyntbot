@@ -1,8 +1,8 @@
-import { RotateCcw } from "lucide-react";
-import { useCallback, useState } from "react";
 import { ipc } from "@shared/hooks/useIpc";
 import { useQuery } from "@shared/hooks/useQuery";
 import type { Note, NoteVersion } from "@shared/types";
+import { RotateCcw } from "lucide-react";
+import { useCallback, useState } from "react";
 
 interface NoteVersionHistoryProps {
   noteId: string;

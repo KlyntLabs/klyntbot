@@ -1,18 +1,14 @@
-import { lazy, useEffect, useState } from "react";
-import { createHashRouter, Navigate } from "react-router";
 import { ipc } from "@shared/hooks/useIpc";
 import { todayISO } from "@shared/lib/dates";
 import type { AppInfoResponse } from "@shared/types";
+import { lazy, useEffect, useState } from "react";
+import { createHashRouter, Navigate } from "react-router";
 
 // ── App Shell & Layouts ───────────────────────────────────────────
-const AppShell = lazy(() =>
-  import("./layouts/AppShell").then((m) => ({ default: m.AppShell })),
-);
+const AppShell = lazy(() => import("./layouts/AppShell").then((m) => ({ default: m.AppShell })));
 
 // ── Tasks Feature ─────────────────────────────────────────────────
-const TasksPage = lazy(() =>
-  import("../features/tasks").then((m) => ({ default: m.TasksPage })),
-);
+const TasksPage = lazy(() => import("../features/tasks").then((m) => ({ default: m.TasksPage })));
 const ProjectDetailPage = lazy(() =>
   import("../features/tasks").then((m) => ({ default: m.ProjectDetailPage })),
 );
@@ -24,14 +20,10 @@ const ObjectiveDetailPage = lazy(() =>
 );
 
 // ── Chat Feature ──────────────────────────────────────────────────
-const ChatPage = lazy(() =>
-  import("../features/chat").then((m) => ({ default: m.ChatPage })),
-);
+const ChatPage = lazy(() => import("../features/chat").then((m) => ({ default: m.ChatPage })));
 
 // ── Notes Feature ────────────────────────────────────────────────
-const NotesPage = lazy(() =>
-  import("../features/notes").then((m) => ({ default: m.NotesPage })),
-);
+const NotesPage = lazy(() => import("../features/notes").then((m) => ({ default: m.NotesPage })));
 
 // ── Finance Feature ──────────────────────────────────────────────
 const FinanceOverviewPage = lazy(() =>
@@ -49,9 +41,7 @@ const BudgetsPage = lazy(() =>
 const InvestmentsPage = lazy(() =>
   import("../features/finance").then((m) => ({ default: m.InvestmentsPage })),
 );
-const GoalsPage = lazy(() =>
-  import("../features/finance").then((m) => ({ default: m.GoalsPage })),
-);
+const GoalsPage = lazy(() => import("../features/finance").then((m) => ({ default: m.GoalsPage })));
 const LiabilitiesPage = lazy(() =>
   import("../features/finance").then((m) => ({ default: m.LiabilitiesPage })),
 );
@@ -103,6 +93,9 @@ const EnvironmentsSettings = lazy(() =>
 const ArchivedSettings = lazy(() =>
   import("../features/settings").then((m) => ({ default: m.ArchivedSettings })),
 );
+const IntegrationsSettings = lazy(() =>
+  import("../features/settings").then((m) => ({ default: m.IntegrationsSettings })),
+);
 
 // ── Debug Feature ────────────────────────────────────────────────
 const DebugDashboardPage = lazy(() =>
@@ -135,18 +128,14 @@ const ProviderStep = lazy(() =>
 const ChannelsStep = lazy(() =>
   import("../features/setup").then((m) => ({ default: m.ChannelsStep })),
 );
-const AreasStep = lazy(() =>
-  import("../features/setup").then((m) => ({ default: m.AreasStep })),
-);
+const AreasStep = lazy(() => import("../features/setup").then((m) => ({ default: m.AreasStep })));
 const ProductivityStep = lazy(() =>
   import("../features/setup").then((m) => ({ default: m.ProductivityStep })),
 );
 const FinanceStep = lazy(() =>
   import("../features/setup").then((m) => ({ default: m.FinanceStep })),
 );
-const McpStep = lazy(() =>
-  import("../features/setup").then((m) => ({ default: m.McpStep })),
-);
+const McpStep = lazy(() => import("../features/setup").then((m) => ({ default: m.McpStep })));
 const CompleteStep = lazy(() =>
   import("../features/setup").then((m) => ({ default: m.CompleteStep })),
 );
@@ -281,6 +270,14 @@ export const router = createHashRouter([
         element: (
           <SettingsLayout>
             <EnvironmentsSettings />
+          </SettingsLayout>
+        ),
+      },
+      {
+        path: "/settings/integrations",
+        element: (
+          <SettingsLayout>
+            <IntegrationsSettings />
           </SettingsLayout>
         ),
       },

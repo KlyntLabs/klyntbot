@@ -1,6 +1,6 @@
+import type { ProductivitySummary } from "@shared/types";
 import { useMemo } from "react";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import type { ProductivitySummary } from "@shared/types";
 import { ChartTooltip, PRODUCTIVITY_LEGEND } from "../lib/constants";
 
 interface MonthlyChartProps {

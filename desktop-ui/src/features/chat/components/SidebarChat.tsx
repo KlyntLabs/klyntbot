@@ -1,9 +1,9 @@
-import { Pin, Send, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
 import { useAutoResizeTextarea } from "@shared/hooks/useAutoResizeTextarea";
 import { useChatSession } from "@shared/hooks/useChatSession";
 import { useMutation } from "@shared/hooks/useMutation";
 import { usePageContext } from "@shared/hooks/usePageContext";
+import { Pin, Send, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { MessageList } from "./MessageList";
 
 interface SidebarChatProps {

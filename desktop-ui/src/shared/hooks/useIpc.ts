@@ -1,5 +1,5 @@
-import { invoke } from "@tauri-apps/api/core";
 import { isTauri } from "@shared/lib/utils";
+import { invoke } from "@tauri-apps/api/core";
 
 const DEV_API_BASE = "/api";
 

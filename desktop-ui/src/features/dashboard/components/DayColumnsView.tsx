@@ -1,8 +1,8 @@
-import { ChevronDown, ChevronUp } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ActivityFeed } from "@features/productivity/components/ActivityFeed";
 import { useEvent } from "@shared/hooks/useEvent";
 import { useQuery } from "@shared/hooks/useQuery";
 import { formatHumanDuration, minutesSinceMidnight, TZ_OFFSET_MINS } from "@shared/lib/dates";
+import { cn } from "@shared/lib/utils";
 import type {
   ActivitySwitchPayload,
   ActivityTimeline,
@@ -10,11 +10,11 @@ import type {
   TimelineEntry,
   TimelineSummary,
 } from "@shared/types";
-import { cn } from "@shared/lib/utils";
-import { ActivityFeed } from "@features/productivity/components/ActivityFeed";
+import { ChevronDown, ChevronUp } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type LayerKey, useEnabledLayers, useSidebarOpen } from "../lib/layers";
 import { ActivityTrack, type SessionBlock } from "./ActivityTrack";
 import { CalendarTrack } from "./CalendarTrack";
-import { type LayerKey, useEnabledLayers, useSidebarOpen } from "../lib/layers";
 import { SummaryPanel } from "./SummaryPanel";
 
 const DEFAULT_HOUR_HEIGHT = 60;

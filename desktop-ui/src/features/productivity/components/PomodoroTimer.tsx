@@ -1,10 +1,10 @@
-import { Play, Square, Timer } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
 import { useEvent } from "@shared/hooks/useEvent";
 import { useMutation } from "@shared/hooks/useMutation";
 import { useQuery } from "@shared/hooks/useQuery";
 import { formatElapsed } from "@shared/lib/dates";
 import type { FocusSession } from "@shared/types";
+import { Play, Square, Timer } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 
 export function PomodoroTimer() {
   const { data: session, refetch } = useQuery<FocusSession | null>(

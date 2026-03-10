@@ -1,7 +1,7 @@
+import { formatCost, formatDuration, formatTokens } from "@shared/lib/utils";
+import type { TransparencyData } from "@shared/types";
 import { ChevronDown, Loader2 } from "lucide-react";
 import { useState } from "react";
-import type { TransparencyData } from "@shared/types";
-import { formatCost, formatDuration, formatTokens } from "@shared/lib/utils";
 
 interface TokenBadgeProps {
   transparency: TransparencyData;

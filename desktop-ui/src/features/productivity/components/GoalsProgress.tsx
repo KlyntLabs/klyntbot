@@ -1,9 +1,9 @@
-import { Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
 import { useEvent } from "@shared/hooks/useEvent";
 import { useMutation } from "@shared/hooks/useMutation";
 import { useQuery } from "@shared/hooks/useQuery";
 import type { GoalProgress } from "@shared/types";
+import { Plus, Trash2 } from "lucide-react";
+import { useState } from "react";
 import { AddGoalDialog } from "./AddGoalDialog";
 
 function metricLabel(metric: string): string {

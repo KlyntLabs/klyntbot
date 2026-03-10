@@ -1,3 +1,5 @@
+import { KlyntLogo } from "@shared/components/ui/KlyntLogo";
+import type { SidebarItem } from "@shared/types";
 import {
   Activity,
   Bug,
@@ -11,8 +13,6 @@ import {
   Wallet,
 } from "lucide-react";
 import { useNavigate } from "react-router";
-import type { SidebarItem } from "@shared/types";
-import { KlyntLogo } from "@shared/components/ui/KlyntLogo";
 
 interface SidebarProps {
   active: SidebarItem;

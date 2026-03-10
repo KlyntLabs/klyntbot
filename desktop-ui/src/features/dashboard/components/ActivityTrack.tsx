@@ -4,19 +4,19 @@
  * indicator bars, and activity blocks during focus get a focus border.
  */
 
-import { useEffect, useMemo, useState } from "react";
 import { useEvent } from "@shared/hooks/useEvent";
 import { useQuery } from "@shared/hooks/useQuery";
 import type { MergeableEvent } from "@shared/lib/activity-sessions";
 import { mergeActivitySessions } from "@shared/lib/activity-sessions";
 import { formatHumanDuration, minutesSinceMidnight, TZ_OFFSET_MINS } from "@shared/lib/dates";
+import { cn } from "@shared/lib/utils";
 import type {
   ActivityCategory,
   ActivitySwitchPayload,
   ActivityTimeline,
   TimelineEntry,
 } from "@shared/types";
-import { cn } from "@shared/lib/utils";
+import { useEffect, useMemo, useState } from "react";
 import { resolveActivityColor } from "../productivity/shared";
 
 const FOCUS_BAR_WIDTH = 4; // px — left-edge focus indicator

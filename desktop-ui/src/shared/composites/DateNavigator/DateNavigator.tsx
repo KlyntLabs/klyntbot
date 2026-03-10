@@ -1,5 +1,5 @@
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@shared/lib/cn";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 export interface DateNavigatorProps {
   label: string;
@@ -8,12 +8,7 @@ export interface DateNavigatorProps {
   className?: string;
 }
 
-export function DateNavigator({
-  label,
-  onPrev,
-  onNext,
-  className,
-}: DateNavigatorProps) {
+export function DateNavigator({ label, onPrev, onNext, className }: DateNavigatorProps) {
   return (
     <div className={cn("flex items-center gap-2", className)}>
       <button
@@ -32,9 +27,7 @@ export function DateNavigator({
       >
         <ChevronRight className="w-4 h-4" strokeWidth={1.5} />
       </button>
-      <span className="text-[13px] font-medium text-primary ml-1">
-        {label}
-      </span>
+      <span className="text-[13px] font-medium text-primary ml-1">{label}</span>
     </div>
   );
 }

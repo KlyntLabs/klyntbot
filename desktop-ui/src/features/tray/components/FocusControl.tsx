@@ -1,3 +1,8 @@
+import { FOCUS_PRESETS, type FocusSettings, type useFocusTimer } from "@shared/hooks/useFocusTimer";
+import { useQuery } from "@shared/hooks/useQuery";
+import { formatElapsed, formatHumanDuration } from "@shared/lib/dates";
+import type { TodayTask } from "@shared/types";
+import { Checkbox } from "@shared/ui";
 import {
   ChevronRight,
   Coffee,
@@ -10,11 +15,6 @@ import {
   X,
 } from "lucide-react";
 import { useRef, useState } from "react";
-import { FOCUS_PRESETS, type FocusSettings, type useFocusTimer } from "@shared/hooks/useFocusTimer";
-import { useQuery } from "@shared/hooks/useQuery";
-import { formatElapsed, formatHumanDuration } from "@shared/lib/dates";
-import type { TodayTask } from "@shared/types";
-import { Checkbox } from "@shared/ui";
 
 // ── SVG ring geometry ───────────────────────────────────────────────
 

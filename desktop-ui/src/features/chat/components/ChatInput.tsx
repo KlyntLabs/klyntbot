@@ -1,5 +1,5 @@
-import { ChevronDown, FolderOpen, Mic, Plus, Send, Server, Shield } from "lucide-react";
 import { useAutoResizeTextarea } from "@shared/hooks/useAutoResizeTextarea";
+import { ChevronDown, FolderOpen, Mic, Plus, Send, Server, Shield } from "lucide-react";
 
 interface ChatInputProps {
   input: string;

@@ -1,10 +1,10 @@
-import { Clock, Plus, Trash2 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
 import { useEvent } from "@shared/hooks/useEvent";
 import { useMutation } from "@shared/hooks/useMutation";
 import { useQuery } from "@shared/hooks/useQuery";
 import { formatHumanDuration } from "@shared/lib/dates";
 import type { ActivityCategory, TimeEntry } from "@shared/types";
+import { Clock, Plus, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 interface CreateEntryParams {
   description: string;

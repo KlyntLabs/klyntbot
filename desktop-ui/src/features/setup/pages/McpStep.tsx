@@ -1,14 +1,10 @@
+import { recommendedServers } from "@features/settings/components/mcp/recommendedServers";
+import { useMutation } from "@shared/hooks/useMutation";
+import { useQuery } from "@shared/hooks/useQuery";
+import type { McpAddServerParams, McpConfigResponse, RecommendedMcpServer } from "@shared/types";
 import { Check, Download } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useOutletContext } from "react-router";
-import { useMutation } from "@shared/hooks/useMutation";
-import { useQuery } from "@shared/hooks/useQuery";
-import type {
-  McpAddServerParams,
-  McpConfigResponse,
-  RecommendedMcpServer,
-} from "@shared/types";
-import { recommendedServers } from "@features/settings/components/mcp/recommendedServers";
 import type { SetupContext } from "../hooks/steps";
 
 export function McpStep() {

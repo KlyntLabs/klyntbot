@@ -1,6 +1,6 @@
+import { ipc } from "@shared/hooks/useIpc";
 import { Plus, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { ipc } from "@shared/hooks/useIpc";
 
 const GOAL_TYPES = ["savings", "debt_payoff", "investment", "purchase", "other"] as const;
 const GOAL_TYPE_OPTIONS = GOAL_TYPES.map((t) => ({

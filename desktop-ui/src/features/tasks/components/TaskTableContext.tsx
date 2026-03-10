@@ -1,12 +1,5 @@
+import type { Area, Project, StatusLabel, Task, TaskGroup, TaskUpdateParams } from "@shared/types";
 import { createContext, use } from "react";
-import type {
-  Area,
-  Project,
-  StatusLabel,
-  Task,
-  TaskGroup,
-  TaskUpdateParams,
-} from "@shared/types";
 
 export interface TaskTableCtx {
   completedTasks: Set<string>;

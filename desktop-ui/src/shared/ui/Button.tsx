@@ -1,5 +1,5 @@
 import { cn } from "@shared/lib/cn";
-import { forwardRef, type ButtonHTMLAttributes } from "react";
+import { type ButtonHTMLAttributes, forwardRef } from "react";
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: "primary" | "secondary" | "ghost" | "destructive" | "outline";
@@ -23,7 +23,10 @@ const sizes = {
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ variant = "secondary", size = "md", loading, className, disabled, children, ...props }, ref) => (
+  (
+    { variant = "secondary", size = "md", loading, className, disabled, children, ...props },
+    ref,
+  ) => (
     <button
       ref={ref}
       disabled={disabled || loading}

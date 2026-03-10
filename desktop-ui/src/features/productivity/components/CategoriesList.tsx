@@ -1,7 +1,7 @@
-import { useMemo } from "react";
-import { Cell, Pie, PieChart } from "recharts";
 import { formatHumanDuration } from "@shared/lib/dates";
 import type { CategoryUsage } from "@shared/types";
+import { useMemo } from "react";
+import { Cell, Pie, PieChart } from "recharts";
 import { CATEGORY_TYPE_GROUPS, getCategoryColor, getCategoryTypeColor } from "../lib/constants";
 
 interface CategoriesListProps {

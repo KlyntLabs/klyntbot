@@ -1,5 +1,5 @@
-import { useLocation } from "react-router";
 import type { SessionContext } from "@shared/types";
+import { useLocation } from "react-router";
 
 /**
  * Derives a SessionContext from the current route path.
