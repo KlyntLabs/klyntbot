@@ -75,6 +75,10 @@ impl ProductivityFeature {
         include_str!("../migrations/006_calendar_events.sql")
     }
 
+    fn migration_v7_sql() -> &'static str {
+        include_str!("../migrations/007_score_components.sql")
+    }
+
     pub fn migrations_static() -> Vec<FeatureMigration> {
         vec![
             FeatureMigration {
@@ -113,6 +117,12 @@ impl ProductivityFeature {
                 version: 6,
                 description: "Add calendar events table".to_string(),
                 sql: Self::migration_v6_sql().to_string(),
+            },
+            FeatureMigration {
+                feature_name: "productivity".to_string(),
+                version: 7,
+                description: "Add deep_work_ratio, avg_session_length, meeting_focus_ratio to quality scores".to_string(),
+                sql: Self::migration_v7_sql().to_string(),
             },
         ]
     }

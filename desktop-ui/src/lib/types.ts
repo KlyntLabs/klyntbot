@@ -1118,7 +1118,8 @@ export type TimelineSource =
   | "todo"
   | "note"
   | "finance"
-  | "system";
+  | "system"
+  | "calendar";
 
 export type TimelineEntryType =
   | "appUsage"
@@ -1133,7 +1134,8 @@ export type TimelineEntryType =
   | "transactionRecorded"
   | "expenseRecorded"
   | "incomeRecorded"
-  | "systemEvent";
+  | "systemEvent"
+  | "calendarEvent";
 
 export interface TimelineEntry {
   id: string;

@@ -50,6 +50,8 @@ interface ActivityTrackProps {
   onSelectEntry: (entry: TimelineEntry) => void;
   selectedSession: SessionBlock | null;
   selectedEntryId: string | null;
+  /** When provided, skip independent fetch and event listeners — parent owns the data. */
+  timelineEntries?: ActivityTimeline[];
 }
 
 export function ActivityTrack({
@@ -61,12 +63,16 @@ export function ActivityTrack({
   onSelectEntry,
   selectedSession,
   selectedEntryId,
+  timelineEntries,
 }: ActivityTrackProps) {
   const pxPerMin = hourHeight / 60;
+  const parentOwnsData = timelineEntries != null;
 
-  const { data: events, refetch: refetchEvents } = useQuery<ActivityTimeline[]>(
+  // Fallback fetch — only used when parent doesn't provide timeline data.
+  // Pass `null` args to skip the IPC call when parent owns the data.
+  const { data: fetchedEvents, refetch: refetchEvents } = useQuery<ActivityTimeline[]>(
     "productivity_timeline",
-    { date, tzOffsetMins: TZ_OFFSET_MINS },
+    parentOwnsData ? null : { date, tzOffsetMins: TZ_OFFSET_MINS },
     [],
   );
   const { data: categories } = useQuery<ActivityCategory[]>(
@@ -75,14 +81,16 @@ export function ActivityTrack({
     [],
   );
 
-  // Real-time: refetch on app switch and productivity entity changes
-  useEvent<ActivitySwitchPayload>("activity:switch", () => refetchEvents());
+  // Real-time: refetch on app switch and productivity entity changes.
+  // No-op handlers when parent owns the data — parent handles refetching.
+  useEvent<ActivitySwitchPayload>("activity:switch", () => {
+    if (!parentOwnsData) refetchEvents();
+  });
   useEvent<{ entityKind: string }>("entity:updated", (payload) => {
-    if (payload?.entityKind === "productivity") refetchEvents();
+    if (!parentOwnsData && payload?.entityKind === "productivity") refetchEvents();
   });
 
-  // No periodic polling here — DayCalendarView already polls every 30s
-  // and event listeners above handle real-time updates
+  const events = parentOwnsData ? timelineEntries : fetchedEvents;
 
   const categoryMap = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
 

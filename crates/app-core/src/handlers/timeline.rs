@@ -97,6 +97,22 @@ impl AppCore {
             entries.extend(notes.into_iter().map(|n| normalize_note_activity(n, start)));
         }
 
+        // 7. Calendar events
+        if want(sources, TimelineSource::Calendar) {
+            if let Ok(repos) = self.productivity_repos() {
+                if let Ok(cal_events) = repos
+                    .calendar_events
+                    .list_range(
+                        &format!("{start}T00:00:00Z"),
+                        &format!("{end}T23:59:59Z"),
+                    )
+                    .await
+                {
+                    entries.extend(cal_events.into_iter().map(normalize_calendar_event));
+                }
+            }
+        }
+
         // 3. Domain event log (point-in-time events — may produce Task/Note/Finance/System)
         if include_point {
             if let Some(ref repo) = self.event_log_repo {
@@ -433,6 +449,31 @@ fn normalize_note_activity(note: feature_notes::models::NoteRow, start: &str) ->
         entity_id: Some(note.id),
         entity_route: Some("/notes".into()),
         color: "var(--timeline-note)".into(),
+        metadata: None,
+    }
+}
+
+fn normalize_calendar_event(e: feature_productivity::CalendarEvent) -> TimelineEntry {
+    let duration_secs = {
+        let start = chrono::DateTime::parse_from_rfc3339(&e.started_at).ok();
+        let end = chrono::DateTime::parse_from_rfc3339(&e.ended_at).ok();
+        match (start, end) {
+            (Some(s), Some(e)) => Some((e - s).num_seconds()),
+            _ => None,
+        }
+    };
+    TimelineEntry {
+        id: e.id,
+        source: TimelineSource::Calendar,
+        entry_type: TimelineEntryType::CalendarEvent,
+        title: e.title,
+        description: e.description,
+        started_at: e.started_at,
+        ended_at: Some(e.ended_at),
+        duration_secs,
+        entity_id: e.session_id,
+        entity_route: None,
+        color: "var(--timeline-calendar)".into(),
         metadata: None,
     }
 }

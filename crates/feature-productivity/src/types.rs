@@ -773,6 +773,9 @@ pub struct QualityScore {
     pub distraction_inv: f64,
     pub task_completion: f64,
     pub continuity: f64,
+    pub deep_work_ratio: f64,
+    pub avg_session_length: f64,
+    pub meeting_focus_ratio: f64,
     pub weights_json: Option<String>,
     pub explanation: Option<String>,
     pub created_at: String,
@@ -1022,16 +1025,22 @@ pub struct ScoreWeights {
     pub distraction_inv: f64,
     pub task_completion: f64,
     pub continuity: f64,
+    pub deep_work_ratio: f64,
+    pub avg_session_length: f64,
+    pub meeting_focus_ratio: f64,
 }
 
 impl Default for ScoreWeights {
     fn default() -> Self {
         Self {
-            focus_depth: 0.30,
-            okr_alignment: 0.25,
-            distraction_inv: 0.20,
-            task_completion: 0.15,
+            focus_depth: 0.20,
+            okr_alignment: 0.10,
+            distraction_inv: 0.15,
+            task_completion: 0.10,
             continuity: 0.10,
+            deep_work_ratio: 0.15,
+            avg_session_length: 0.10,
+            meeting_focus_ratio: 0.10,
         }
     }
 }

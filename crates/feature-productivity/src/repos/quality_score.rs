@@ -14,8 +14,8 @@ impl QualityScoreRepo {
 
     pub async fn upsert(&self, score: &QualityScore) -> common::Result<()> {
         sqlx::query(
-            r#"INSERT INTO productivity_quality_scores (id, score_date, session_id, overall_score, focus_depth, okr_alignment, distraction_inv, task_completion, continuity, weights_json, explanation, created_at)
-               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
+            r#"INSERT INTO productivity_quality_scores (id, score_date, session_id, overall_score, focus_depth, okr_alignment, distraction_inv, task_completion, continuity, deep_work_ratio, avg_session_length, meeting_focus_ratio, weights_json, explanation, created_at)
+               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)
                ON CONFLICT(id) DO UPDATE SET
                    overall_score = excluded.overall_score,
                    focus_depth = excluded.focus_depth,
@@ -23,6 +23,9 @@ impl QualityScoreRepo {
                    distraction_inv = excluded.distraction_inv,
                    task_completion = excluded.task_completion,
                    continuity = excluded.continuity,
+                   deep_work_ratio = excluded.deep_work_ratio,
+                   avg_session_length = excluded.avg_session_length,
+                   meeting_focus_ratio = excluded.meeting_focus_ratio,
                    weights_json = excluded.weights_json,
                    explanation = excluded.explanation"#,
         )
@@ -35,6 +38,9 @@ impl QualityScoreRepo {
         .bind(score.distraction_inv)
         .bind(score.task_completion)
         .bind(score.continuity)
+        .bind(score.deep_work_ratio)
+        .bind(score.avg_session_length)
+        .bind(score.meeting_focus_ratio)
         .bind(&score.weights_json)
         .bind(&score.explanation)
         .bind(&score.created_at)
@@ -119,6 +125,9 @@ mod tests {
             distraction_inv: 0.8,
             task_completion: 0.75,
             continuity: 0.95,
+            deep_work_ratio: 0.6,
+            avg_session_length: 0.8,
+            meeting_focus_ratio: 1.0,
             weights_json: None,
             explanation: Some("Good focus day".to_string()),
             created_at: "2026-03-09T12:00:00Z".to_string(),

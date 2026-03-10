@@ -154,14 +154,14 @@ export function ProductivityScoreRing({ score, size = 110, summary }: Productivi
 
       {summary && summary.totalActiveSecs > 0 && (
         <div className="w-full flex flex-col gap-1.5 mt-2">
-          <ScoreBar label="Focus" value={summary.productiveSecs / summary.totalActiveSecs} />
+          <ScoreBar label="Deep focus" value={summary.productiveSecs / summary.totalActiveSecs} />
           <ScoreBar label="Quality" value={summary.avgSessionQuality ?? 0} />
           <ScoreBar
             label="Low distraction"
             value={1 - summary.distractingSecs / Math.max(summary.totalActiveSecs, 1)}
           />
           <ScoreBar
-            label="Continuity"
+            label="Alignment"
             value={summary.contextSwitches > 0 ? Math.max(0, 1 - summary.contextSwitches / 100) : 1}
           />
         </div>

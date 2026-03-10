@@ -23,9 +23,9 @@ export const LAYERS: LayerConfig[] = [
   {
     key: "calendar",
     label: "Calendar",
-    sources: [],
+    sources: ["calendar"],
     defaultOn: true,
-    color: "var(--timeline-focus)",
+    color: "var(--timeline-calendar)",
   },
   {
     key: "timeEntries",

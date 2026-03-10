@@ -1,7 +1,15 @@
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { formatHumanDuration, minutesSinceMidnight } from "../../lib/dates";
-import type { ProductivitySummary, TimelineEntry, TimelineSummary } from "../../lib/types";
+import { useEvent } from "../../hooks/useEvent";
+import { useQuery } from "../../hooks/useQuery";
+import { formatHumanDuration, minutesSinceMidnight, TZ_OFFSET_MINS } from "../../lib/dates";
+import type {
+  ActivitySwitchPayload,
+  ActivityTimeline,
+  ProductivitySummary,
+  TimelineEntry,
+  TimelineSummary,
+} from "../../lib/types";
 import { cn } from "../../lib/utils";
 import { ActivityFeed } from "../productivity/ActivityFeed";
 import { ActivityTrack, type SessionBlock } from "./ActivityTrack";
@@ -99,6 +107,17 @@ export function DayColumnsView({
   loading,
   productivitySummary,
 }: DayColumnsViewProps) {
+  // Centralized activity timeline fetch — passed to ActivityTrack to avoid duplicate IPC
+  const { data: activityTimeline, refetch: refetchTimeline } = useQuery<ActivityTimeline[]>(
+    "productivity_timeline",
+    { date, tzOffsetMins: TZ_OFFSET_MINS },
+    [],
+  );
+  useEvent<ActivitySwitchPayload>("activity:switch", () => refetchTimeline());
+  useEvent<{ entityKind: string }>("entity:updated", (payload) => {
+    if (payload?.entityKind === "productivity") refetchTimeline();
+  });
+
   const { enabled } = useEnabledLayers();
   const sidebarOpen = useSidebarOpen();
   const [selectedEntry, setSelectedEntry] = useState<TimelineEntry | null>(null);
@@ -335,6 +354,7 @@ export function DayColumnsView({
                         onSelectEntry={handleSelectEntry}
                         selectedSession={selectedSession}
                         selectedEntryId={selectedEntry?.id ?? null}
+                        timelineEntries={activityTimeline}
                       />
                     </div>
                   );

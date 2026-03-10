@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { useQuery } from "../../hooks/useQuery";
 import { formatHumanDuration, todayISO, toLocalISO } from "../../lib/dates";
@@ -78,9 +78,11 @@ const SOURCE_COLORS: Record<TimelineSource, string> = {
   productivity: "var(--timeline-app-neutral)",
   focus: "var(--timeline-focus)",
   task: "var(--timeline-task)",
+  todo: "var(--timeline-todo)",
   note: "var(--timeline-note)",
   finance: "var(--timeline-finance)",
   system: "var(--timeline-system)",
+  calendar: "var(--timeline-calendar)",
 };
 
 function focusIntensityBg(secs: number, maxSecs: number): string {
@@ -108,6 +110,29 @@ export function MonthCalendarView() {
   const weeks = useMemo(
     () => buildCalendarGrid(year, month, data.entries),
     [year, month, data.entries],
+  );
+
+  const [focusedDate, setFocusedDate] = useState(today);
+
+  const handleGridKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      let delta = 0;
+      if (e.key === "ArrowLeft") delta = -1;
+      else if (e.key === "ArrowRight") delta = 1;
+      else if (e.key === "ArrowUp") delta = -7;
+      else if (e.key === "ArrowDown") delta = 7;
+      else if (e.key === "Enter") {
+        navigate(`/day/${focusedDate}`);
+        e.preventDefault();
+        return;
+      } else return;
+
+      e.preventDefault();
+      const next = new Date(`${focusedDate}T00:00:00`);
+      next.setDate(next.getDate() + delta);
+      setFocusedDate(toLocalISO(next));
+    },
+    [focusedDate, navigate],
   );
 
   const { focusByDay, maxFocusSecs } = useMemo(() => {
@@ -139,7 +164,14 @@ export function MonthCalendarView() {
         </div>
 
         {/* Calendar grid */}
-        <div className="flex-1 grid grid-rows-6 gap-px">
+        {/* biome-ignore lint/a11y/useSemanticElements: CSS grid layout requires div, not table */}
+        <div
+          className="flex-1 grid grid-rows-6 gap-px outline-none"
+          role="grid"
+          aria-label="Month calendar"
+          tabIndex={0}
+          onKeyDown={handleGridKeyDown}
+        >
           {weeks.map((week) => (
             <div key={week[0].date} className="grid grid-cols-7 gap-px">
               {week.map((cell) => {
@@ -154,6 +186,7 @@ export function MonthCalendarView() {
                       "hover:bg-white/[0.05] cursor-pointer",
                       cell.isCurrentMonth ? "text-primary" : "text-muted/40",
                       cell.date === today && "ring-1 ring-brand/50",
+                      cell.date === focusedDate && cell.date !== today && "ring-1 ring-white/30",
                     )}
                     style={{
                       backgroundColor: focusIntensityBg(focusSecs, maxFocusSecs),

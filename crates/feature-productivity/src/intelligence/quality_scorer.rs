@@ -42,7 +42,7 @@ impl QualityScorer {
         self.weights = weights;
     }
 
-    /// Score a single session. Computes 5 components and a weighted sum.
+    /// Score a single session. Computes 8 components and a weighted sum.
     pub async fn score_session(&self, session_id: &str) -> common::Result<Option<QualityScore>> {
         let session = match self.session_repo.get(session_id).await? {
             Some(s) => s,
@@ -65,13 +65,23 @@ impl QualityScorer {
         let continuity = (1.0 - context_switches / CONTEXT_SWITCH_BASELINE).max(0.0);
         // Use okr_alignment as a proxy for task completion until explicit tracking exists
         let task_completion = session.okr_alignment.unwrap_or(0.5);
+        // deep_work_ratio: linear scale to 90 min (5400s) threshold
+        let deep_work_ratio = (duration / 5400.0).min(1.0);
+        // avg_session_length: normalized to target 45 min = 1.0
+        let duration_mins = duration / 60.0;
+        let avg_session_length = (duration_mins / 45.0).min(1.0);
+        // meeting_focus_ratio: default 1.0 for individual sessions (meetings scored at daily level)
+        let meeting_focus_ratio = 1.0;
 
         let w = &self.weights;
         let overall = (focus_depth * w.focus_depth
             + okr_alignment * w.okr_alignment
             + distraction_inv * w.distraction_inv
             + task_completion * w.task_completion
-            + continuity * w.continuity)
+            + continuity * w.continuity
+            + deep_work_ratio * w.deep_work_ratio
+            + avg_session_length * w.avg_session_length
+            + meeting_focus_ratio * w.meeting_focus_ratio)
             .clamp(0.0, 1.0);
 
         // Scale to 0–100
@@ -96,12 +106,17 @@ impl QualityScorer {
             distraction_inv,
             task_completion,
             continuity,
+            deep_work_ratio,
+            avg_session_length,
+            meeting_focus_ratio,
             weights_json,
             explanation: Some(format!(
-                "focus={:.0}% distraction_inv={:.0}% continuity={:.0}%",
+                "focus={:.0}% distraction_inv={:.0}% continuity={:.0}% deep_work={:.0}% session_len={:.0}%",
                 focus_depth * 100.0,
                 distraction_inv * 100.0,
                 continuity * 100.0,
+                deep_work_ratio * 100.0,
+                avg_session_length * 100.0,
             )),
             created_at: now,
         };
@@ -118,13 +133,7 @@ impl QualityScorer {
             score_date,
             session_id: Some(session_id.to_string()),
             overall_score: overall_100,
-            components: format_components(
-                focus_depth,
-                okr_alignment,
-                distraction_inv,
-                task_completion,
-                continuity,
-            ),
+            components: format_components(&score),
         });
 
         Ok(Some(score))
@@ -152,6 +161,17 @@ impl QualityScorer {
         let distraction_inv = avg(|s| s.distraction_inv);
         let task_completion = avg(|s| s.task_completion);
         let continuity = avg(|s| s.continuity);
+        let avg_session_length = avg(|s| s.avg_session_length);
+        let meeting_focus_ratio = avg(|s| s.meeting_focus_ratio);
+
+        // deep_work_ratio at daily level: fraction of sessions >= 90 min
+        let deep_work_ratio = {
+            let deep_count = session_scores
+                .iter()
+                .filter(|s| s.deep_work_ratio >= 1.0)
+                .count() as f64;
+            deep_count / n
+        };
 
         let now = Utc::now().to_rfc3339();
         let daily = QualityScore {
@@ -164,6 +184,9 @@ impl QualityScorer {
             distraction_inv,
             task_completion,
             continuity,
+            deep_work_ratio,
+            avg_session_length,
+            meeting_focus_ratio,
             weights_json: serde_json::to_string(&self.weights).ok(),
             explanation: Some(format!("Averaged from {} sessions", session_scores.len())),
             created_at: now,
@@ -175,21 +198,25 @@ impl QualityScorer {
             score_date: date.to_string(),
             session_id: None,
             overall_score: daily.overall_score,
-            components: format_components(
-                focus_depth,
-                okr_alignment,
-                distraction_inv,
-                task_completion,
-                continuity,
-            ),
+            components: format_components(&daily),
         });
 
         Ok(Some(daily))
     }
 }
 
-fn format_components(fd: f64, okr: f64, di: f64, tc: f64, co: f64) -> String {
-    format!("fd={fd:.2} okr={okr:.2} di={di:.2} tc={tc:.2} co={co:.2}")
+fn format_components(score: &QualityScore) -> String {
+    format!(
+        "fd={:.2} okr={:.2} di={:.2} tc={:.2} co={:.2} dw={:.2} asl={:.2} mfr={:.2}",
+        score.focus_depth,
+        score.okr_alignment,
+        score.distraction_inv,
+        score.task_completion,
+        score.continuity,
+        score.deep_work_ratio,
+        score.avg_session_length,
+        score.meeting_focus_ratio,
+    )
 }
 
 fn next_day(date: &str) -> String {
@@ -327,8 +354,14 @@ mod tests {
     #[tokio::test]
     async fn test_weights_default() {
         let w = ScoreWeights::default();
-        let sum =
-            w.focus_depth + w.okr_alignment + w.distraction_inv + w.task_completion + w.continuity;
+        let sum = w.focus_depth
+            + w.okr_alignment
+            + w.distraction_inv
+            + w.task_completion
+            + w.continuity
+            + w.deep_work_ratio
+            + w.avg_session_length
+            + w.meeting_focus_ratio;
         assert!((sum - 1.0).abs() < 0.001);
     }
 
@@ -355,6 +388,9 @@ mod tests {
             distraction_inv: 0.0,
             task_completion: 0.0,
             continuity: 0.0,
+            deep_work_ratio: 0.0,
+            avg_session_length: 0.0,
+            meeting_focus_ratio: 0.0,
         });
 
         // Need a new session since we already scored this one

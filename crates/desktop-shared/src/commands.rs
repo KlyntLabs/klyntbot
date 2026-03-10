@@ -1087,6 +1087,7 @@ pub enum TimelineSource {
     Note,
     Finance,
     System,
+    Calendar,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1105,6 +1106,7 @@ pub enum TimelineEntryType {
     ExpenseRecorded,
     IncomeRecorded,
     SystemEvent,
+    CalendarEvent,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
