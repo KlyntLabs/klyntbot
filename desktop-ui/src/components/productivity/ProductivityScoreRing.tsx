@@ -50,15 +50,16 @@ export function ProductivityScoreRing({ score, size = 110, summary }: Productivi
   const center = size / 2;
   const color = scoreColor(score);
 
-  const focusRatio = summary && summary.totalActiveSecs > 0
-    ? Math.round((summary.productiveSecs / summary.totalActiveSecs) * 100)
-    : null;
-  const distractionRatio = summary && summary.totalActiveSecs > 0
-    ? Math.round((summary.distractingSecs / summary.totalActiveSecs) * 100)
-    : null;
-  const qualityAvg = summary?.avgSessionQuality != null
-    ? Math.round(summary.avgSessionQuality * 100)
-    : null;
+  const focusRatio =
+    summary && summary.totalActiveSecs > 0
+      ? Math.round((summary.productiveSecs / summary.totalActiveSecs) * 100)
+      : null;
+  const distractionRatio =
+    summary && summary.totalActiveSecs > 0
+      ? Math.round((summary.distractingSecs / summary.totalActiveSecs) * 100)
+      : null;
+  const qualityAvg =
+    summary?.avgSessionQuality != null ? Math.round(summary.avgSessionQuality * 100) : null;
 
   return (
     <div className="flex flex-col items-center gap-2">

@@ -15,7 +15,12 @@ export function DayCalendarView() {
 
   const { enabledSources } = useEnabledLayers();
   const queryArgs = useMemo(
-    () => ({ startDate: dateStr, endDate: dateStr, sources: enabledSources, tzOffsetMins: TZ_OFFSET_MINS }),
+    () => ({
+      startDate: dateStr,
+      endDate: dateStr,
+      sources: enabledSources,
+      tzOffsetMins: TZ_OFFSET_MINS,
+    }),
     [dateStr, enabledSources],
   );
 

@@ -123,9 +123,7 @@ export function DistractionBanner({ summary }: DistractionBannerProps) {
           }`}
           aria-label={urgeSurfingCountdown > 0 ? "Pause and reflect" : "Dismiss"}
         >
-          {urgeSurfingCountdown > 0
-            ? `Pause and reflect... (${urgeSurfingCountdown}s)`
-            : "Dismiss"}
+          {urgeSurfingCountdown > 0 ? `Pause and reflect... (${urgeSurfingCountdown}s)` : "Dismiss"}
         </button>
       </div>
     </div>

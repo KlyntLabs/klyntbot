@@ -4,9 +4,9 @@
  */
 
 import { useMemo } from "react";
+import { useQuery } from "../../hooks/useQuery";
 import { formatHumanDuration, minutesSinceMidnight } from "../../lib/dates";
 import type { CalendarEvent } from "../../lib/types";
-import { useQuery } from "../../hooks/useQuery";
 import { cn } from "../../lib/utils";
 
 interface CalendarTrackProps {
@@ -24,11 +24,7 @@ export function CalendarTrack({
 }: CalendarTrackProps) {
   const pxPerMin = hourHeight / 60;
 
-  const { data: events } = useQuery<CalendarEvent[]>(
-    "productivity_calendar_events",
-    { date },
-    [],
-  );
+  const { data: events } = useQuery<CalendarEvent[]>("productivity_calendar_events", { date }, []);
 
   const blocks = useMemo(() => {
     return events.map((event) => {

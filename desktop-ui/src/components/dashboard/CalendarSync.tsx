@@ -5,8 +5,8 @@
 
 import { Calendar, Loader2, RefreshCw } from "lucide-react";
 import { useState } from "react";
-import { formatTime } from "../../lib/dates";
 import { useMutation } from "../../hooks/useMutation";
+import { formatTime } from "../../lib/dates";
 import { cn } from "../../lib/utils";
 
 export function CalendarSync() {
@@ -50,9 +50,7 @@ export function CalendarSync() {
         <Calendar className="w-3.5 h-3.5" />
       )}
       <span className="hidden sm:inline">Sync</span>
-      {lastSynced && !loading && (
-        <RefreshCw className="w-3 h-3 text-success" />
-      )}
+      {lastSynced && !loading && <RefreshCw className="w-3 h-3 text-success" />}
     </button>
   );
 }

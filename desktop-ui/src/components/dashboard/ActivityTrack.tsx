@@ -9,7 +9,7 @@ import { useEvent } from "../../hooks/useEvent";
 import { useQuery } from "../../hooks/useQuery";
 import type { MergeableEvent } from "../../lib/activity-sessions";
 import { mergeActivitySessions } from "../../lib/activity-sessions";
-import { TZ_OFFSET_MINS, formatHumanDuration, minutesSinceMidnight } from "../../lib/dates";
+import { formatHumanDuration, minutesSinceMidnight, TZ_OFFSET_MINS } from "../../lib/dates";
 import type {
   ActivityCategory,
   ActivitySwitchPayload,

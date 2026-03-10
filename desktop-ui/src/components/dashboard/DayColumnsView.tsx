@@ -234,7 +234,12 @@ export function DayColumnsView({
             <span className="tabular-nums">
               Zoom: {Math.round((hourHeight / DEFAULT_HOUR_HEIGHT) * 100)}%
             </span>
-            <button type="button" onClick={resetZoom} className="text-brand hover:underline" aria-label="Reset zoom to default level">
+            <button
+              type="button"
+              onClick={resetZoom}
+              className="text-brand hover:underline"
+              aria-label="Reset zoom to default level"
+            >
               Reset
             </button>
           </div>
@@ -280,19 +285,23 @@ export function DayColumnsView({
                   className="text-[10px] text-muted text-right pr-2 select-none cursor-ns-resize"
                   style={{ width: HOUR_GUTTER }}
                   onMouseDown={handleGutterMouseDown}
-                  onKeyDown={h === 0 ? (e) => {
-                    if (e.key === "ArrowUp") {
-                      e.preventDefault();
-                      const next = Math.min(MAX_HOUR_HEIGHT, hourHeightRef.current + 10);
-                      hourHeightRef.current = next;
-                      setHourHeight(next);
-                    } else if (e.key === "ArrowDown") {
-                      e.preventDefault();
-                      const next = Math.max(MIN_HOUR_HEIGHT, hourHeightRef.current - 10);
-                      hourHeightRef.current = next;
-                      setHourHeight(next);
-                    }
-                  } : undefined}
+                  onKeyDown={
+                    h === 0
+                      ? (e) => {
+                          if (e.key === "ArrowUp") {
+                            e.preventDefault();
+                            const next = Math.min(MAX_HOUR_HEIGHT, hourHeightRef.current + 10);
+                            hourHeightRef.current = next;
+                            setHourHeight(next);
+                          } else if (e.key === "ArrowDown") {
+                            e.preventDefault();
+                            const next = Math.max(MIN_HOUR_HEIGHT, hourHeightRef.current - 10);
+                            hourHeightRef.current = next;
+                            setHourHeight(next);
+                          }
+                        }
+                      : undefined
+                  }
                 >
                   {h === 0 ? "" : formatHour(h)}
                 </div>
@@ -389,13 +398,20 @@ export function DayColumnsView({
 
         {/* Collapsible activity feed — only for today */}
         {isToday && (
-          <div className="border-t border-border transition-[max-height] duration-300 ease-in-out" style={{ maxHeight: feedExpanded ? 260 : 36, overflow: "hidden" }}>
+          <div
+            className="border-t border-border transition-[max-height] duration-300 ease-in-out"
+            style={{ maxHeight: feedExpanded ? 260 : 36, overflow: "hidden" }}
+          >
             <button
               type="button"
               onClick={() => setFeedExpanded(!feedExpanded)}
               className="flex items-center gap-2 px-3 py-2 text-xs text-muted hover:text-secondary transition-colors w-full"
             >
-              {feedExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
+              {feedExpanded ? (
+                <ChevronDown className="w-3.5 h-3.5" />
+              ) : (
+                <ChevronUp className="w-3.5 h-3.5" />
+              )}
               Live Activity Feed
             </button>
             {feedExpanded && (

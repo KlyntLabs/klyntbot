@@ -1,12 +1,8 @@
 import { CheckCircle, DollarSign, ExternalLink, FileText, ListTodo, X } from "lucide-react";
 import { useNavigate } from "react-router";
-import { formatHumanDuration, todayISO } from "../../lib/dates";
 import { useQuery } from "../../hooks/useQuery";
-import type {
-  ProductivitySummary,
-  TimelineEntry,
-  TimelineSummary,
-} from "../../lib/types";
+import { formatHumanDuration, todayISO } from "../../lib/dates";
+import type { ProductivitySummary, TimelineEntry, TimelineSummary } from "../../lib/types";
 import { AiSummaryCard } from "../productivity/AiSummaryCard";
 import { DistractionBanner } from "../productivity/DistractionBanner";
 import { FocusSessionsList } from "../productivity/FocusSessionsList";
@@ -406,11 +402,12 @@ function Sparkline({ values }: { values: number[] }) {
         strokeLinejoin="round"
       />
       {/* Dot on last point */}
-      {values.length > 0 && (() => {
-        const lastX = pad + ((values.length - 1) / (values.length - 1)) * (w - pad * 2);
-        const lastY = h - pad - ((values[values.length - 1] - min) / range) * (h - pad * 2);
-        return <circle cx={lastX} cy={lastY} r="2.5" fill="var(--brand)" />;
-      })()}
+      {values.length > 0 &&
+        (() => {
+          const lastX = pad + ((values.length - 1) / (values.length - 1)) * (w - pad * 2);
+          const lastY = h - pad - ((values[values.length - 1] - min) / range) * (h - pad * 2);
+          return <circle cx={lastX} cy={lastY} r="2.5" fill="var(--brand)" />;
+        })()}
     </svg>
   );
 }

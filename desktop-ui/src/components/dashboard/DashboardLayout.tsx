@@ -5,9 +5,9 @@ import { useLocation, useNavigate, useParams } from "react-router";
 import { useClickOutside } from "../../hooks/useClickOutside";
 import { todayISO, toLocalISO } from "../../lib/dates";
 import { cn } from "../../lib/utils";
-import { MiniCalendar } from "../tasks/editors/MiniCalendar";
 import { AutoFocusToast } from "../productivity/AutoFocusToast";
 import { FocusStateIndicator } from "../productivity/FocusStateIndicator";
+import { MiniCalendar } from "../tasks/editors/MiniCalendar";
 import { CalendarSync } from "./CalendarSync";
 import { LAYERS, LayerContext, SidebarContext, useLayerToggle, useSidebarToggle } from "./layers";
 
