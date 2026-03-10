@@ -26,8 +26,11 @@ impl AppCore {
 
         let mut entries = Vec::new();
 
-        // 1. Activity events + Focus sessions (productivity repos)
-        if want(sources, TimelineSource::Productivity) || want(sources, TimelineSource::Focus) {
+        // 1. Activity events, Focus sessions, Calendar events (productivity repos)
+        let need_prod_repos = want(sources, TimelineSource::Productivity)
+            || want(sources, TimelineSource::Focus)
+            || want(sources, TimelineSource::Calendar);
+        if need_prod_repos {
             if let Ok(repos) = self.productivity_repos() {
                 // Use timezone-aware range: start_date 00:00 local → end_date+1 00:00 local (in UTC)
                 let (start_utc, _) = parse_local_day_range(start, tz)?;
@@ -46,6 +49,18 @@ impl AppCore {
                         repos.sessions.list_range(&start_utc, &end_utc, None).await
                     {
                         entries.extend(sessions.into_iter().map(normalize_focus_session));
+                    }
+                }
+
+                if want(sources, TimelineSource::Calendar) {
+                    let start_rfc = start_utc.to_rfc3339();
+                    let end_rfc = end_utc.to_rfc3339();
+                    if let Ok(cal_events) = repos
+                        .calendar_events
+                        .list_range(&start_rfc, &end_rfc)
+                        .await
+                    {
+                        entries.extend(cal_events.into_iter().map(normalize_calendar_event));
                     }
                 }
             }
@@ -95,22 +110,6 @@ impl AppCore {
         }
         if let Some(notes) = notes_res {
             entries.extend(notes.into_iter().map(|n| normalize_note_activity(n, start)));
-        }
-
-        // 7. Calendar events
-        if want(sources, TimelineSource::Calendar) {
-            if let Ok(repos) = self.productivity_repos() {
-                if let Ok(cal_events) = repos
-                    .calendar_events
-                    .list_range(
-                        &format!("{start}T00:00:00Z"),
-                        &format!("{end}T23:59:59Z"),
-                    )
-                    .await
-                {
-                    entries.extend(cal_events.into_iter().map(normalize_calendar_event));
-                }
-            }
         }
 
         // 3. Domain event log (point-in-time events — may produce Task/Note/Finance/System)
