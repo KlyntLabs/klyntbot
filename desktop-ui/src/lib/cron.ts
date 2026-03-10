@@ -49,7 +49,10 @@ function humanizeCronExpr(expr: string, tz?: string): string {
     if (!Number.isNaN(h) && !Number.isNaN(m)) {
       const time = formatTime(h, m);
       const dayName = dayOfWeek(dow);
-      return dayName ? `${dayName}s at ${time}${tzSuffix}` : `${expr}${tzSuffix}`;
+      if (!dayName) return `${expr}${tzSuffix}`;
+      // Multi-day: "Mon, Wed, Fri at 10 AM"; single day: "Mondays at 10 AM"
+      const dayLabel = dow.includes(",") ? dayName : `${dayName}s`;
+      return `${dayLabel} at ${time}${tzSuffix}`;
     }
   }
 
@@ -62,8 +65,25 @@ function formatTime(h: number, m: number): string {
   return m === 0 ? `${h12} ${ampm}` : `${h12}:${String(m).padStart(2, "0")} ${ampm}`;
 }
 
+const DAY_NAMES: Record<string, string> = {
+  "0": "Sun",
+  "1": "Mon",
+  "2": "Tue",
+  "3": "Wed",
+  "4": "Thu",
+  "5": "Fri",
+  "6": "Sat",
+  "7": "Sun",
+};
+
 function dayOfWeek(dow: string): string | null {
-  const days: Record<string, string> = {
+  // Handle comma-separated days like "1,3,5"
+  if (dow.includes(",")) {
+    const names = dow.split(",").map((d) => DAY_NAMES[d.trim()]);
+    if (names.every(Boolean)) return names.join(", ");
+    return null;
+  }
+  const FULL_NAMES: Record<string, string> = {
     "0": "Sunday",
     "1": "Monday",
     "2": "Tuesday",
@@ -73,7 +93,7 @@ function dayOfWeek(dow: string): string | null {
     "6": "Saturday",
     "7": "Sunday",
   };
-  return days[dow] ?? null;
+  return FULL_NAMES[dow] ?? null;
 }
 
 /** Humanize a job name by stripping prefixes and converting to title case */
