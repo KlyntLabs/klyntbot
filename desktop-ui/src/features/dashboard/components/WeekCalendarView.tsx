@@ -12,6 +12,7 @@ import { EMPTY_TIMELINE_RESPONSE } from "@shared/types";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { useEnabledLayers, useSidebarOpen } from "../lib/layers";
+import { computeDayStats, DAY_LABELS, IDLE_APPS } from "../lib/timeline-utils";
 import { SummaryPanel } from "./SummaryPanel";
 
 const HOUR_HEIGHT = 48;
@@ -19,7 +20,10 @@ const TOTAL_HEIGHT = 24 * HOUR_HEIGHT;
 const MIN_BLOCK_HEIGHT = 4;
 const HOUR_GUTTER = 40;
 const PX_PER_MIN = HOUR_HEIGHT / 60;
-const MERGE_GAP_MIN = 3; // merge blocks within 3 minutes
+const SESSION_GAP_MIN = 10; // aggressive merge for week overview (day view has 2min precision)
+const MIN_ENTRY_SECS = 30; // ignore entries shorter than 30 seconds
+const MIN_SESSION_SECS = 120; // hide merged sessions shorter than 2 minutes in week overview
+const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
 function getWeekRange(dateStr: string): { start: string; end: string; days: string[] } {
   const d = new Date(`${dateStr}T00:00:00`);
@@ -37,8 +41,6 @@ function getWeekRange(dateStr: string): { start: string; end: string; days: stri
   return { start: days[0], end: days[6], days };
 }
 
-const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
 function formatHour(h: number): string {
   if (h === 0) return "";
   if (h < 12) return `${h}a`;
@@ -46,98 +48,132 @@ function formatHour(h: number): string {
   return `${h - 12}p`;
 }
 
-/** Assign a hue-based color per app name for visual differentiation */
-const PALETTE = [
-  "oklch(0.65 0.15 250)", // blue
-  "oklch(0.65 0.15 160)", // teal
-  "oklch(0.65 0.15 300)", // purple
-  "oklch(0.65 0.15 30)", // orange
-  "oklch(0.65 0.15 130)", // green
-  "oklch(0.65 0.15 350)", // pink
-  "oklch(0.65 0.15 60)", // yellow
-  "oklch(0.65 0.15 200)", // cyan
-];
-
-function appColor(appName: string): string {
-  const lower = appName.toLowerCase();
-  if (lower === "loginwindow" || lower === "idle" || lower === "screensaver") {
-    return "var(--surface-highest)";
-  }
-  // Stable hash so the same app always gets the same color
-  let hash = 0;
-  for (let i = 0; i < appName.length; i++) {
-    hash = (hash * 31 + appName.charCodeAt(i)) | 0;
-  }
-  return PALETTE[((hash % PALETTE.length) + PALETTE.length) % PALETTE.length];
-}
-
-interface WeekBlock {
+interface WeekSession {
   startMin: number;
   endMin: number;
-  color: string;
-  label: string;
   totalSecs: number;
+  label: string;
+  appCount: number;
   type: "activity" | "focus";
+  hasFocus?: boolean;
 }
 
-const IDLE_APPS = new Set(["loginwindow", "idle", "screensaver", "lock screen", "desktop"]);
+interface BuildingSession {
+  startMin: number;
+  endMin: number;
+  totalSecs: number;
+  appDurations: Map<string, number>;
+}
 
-/** Merge adjacent same-app activity entries into visual blocks */
-function buildWeekBlocks(entries: TimelineEntry[]): WeekBlock[] {
-  const activityEntries = entries.filter(
-    (e) => e.entryType === "appUsage" && e.durationSecs && !IDLE_APPS.has(e.title.toLowerCase()),
-  );
-  const focusEntries = entries.filter((e) => e.entryType === "focusSession");
+/**
+ * Merge ALL adjacent activity entries into consolidated sessions.
+ * Unlike the old approach (same-app only), this merges across apps
+ * to produce clean, unfragmented session blocks.
+ */
+function buildWeekSessions(entries: TimelineEntry[]): WeekSession[] {
+  const activityEntries: TimelineEntry[] = [];
+  const focusEntries: TimelineEntry[] = [];
 
-  // Sort activity by start time
-  const sorted = [...activityEntries].sort(
-    (a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime(),
-  );
-
-  // Merge adjacent entries for the same app within MERGE_GAP_MIN
-  const blocks: WeekBlock[] = [];
-  for (const entry of sorted) {
-    const startMin = minutesSinceMidnight(entry.startedAt);
-    const endMin = startMin + (entry.durationSecs ?? 0) / 60;
-    const color = appColor(entry.title);
-
-    const last = blocks[blocks.length - 1];
-    if (
-      last &&
-      last.type === "activity" &&
-      last.label === entry.title &&
-      startMin - last.endMin <= MERGE_GAP_MIN
+  for (const e of entries) {
+    if (e.entryType === "focusSession") {
+      focusEntries.push(e);
+    } else if (
+      e.entryType === "appUsage" &&
+      (e.durationSecs ?? 0) >= MIN_ENTRY_SECS &&
+      !IDLE_APPS.has(e.title.toLowerCase())
     ) {
-      // Merge into previous block (same app)
-      last.endMin = Math.max(last.endMin, endMin);
-      last.totalSecs += entry.durationSecs ?? 0;
-    } else {
-      blocks.push({
-        startMin,
-        endMin,
-        color,
-        label: entry.title,
-        totalSecs: entry.durationSecs ?? 0,
-        type: "activity",
-      });
+      activityEntries.push(e);
     }
   }
+  activityEntries.sort((a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime());
+
+  // Merge adjacent activity regardless of app within SESSION_GAP_MIN
+  const sessions: WeekSession[] = [];
+  let cur: BuildingSession | null = null;
+
+  for (const entry of activityEntries) {
+    const startMin = minutesSinceMidnight(entry.startedAt);
+    const dur = (entry.durationSecs ?? 0) / 60;
+    const endMin = startMin + dur;
+
+    if (cur && startMin - cur.endMin <= SESSION_GAP_MIN) {
+      // Extend current session
+      cur.endMin = Math.max(cur.endMin, endMin);
+      cur.totalSecs += entry.durationSecs ?? 0;
+      cur.appDurations.set(
+        entry.title,
+        (cur.appDurations.get(entry.title) || 0) + (entry.durationSecs ?? 0),
+      );
+    } else {
+      // Flush previous session
+      if (cur) {
+        sessions.push(finishSession(cur));
+      }
+      const appDurations = new Map<string, number>();
+      appDurations.set(entry.title, entry.durationSecs ?? 0);
+      cur = { startMin, endMin, totalSecs: entry.durationSecs ?? 0, appDurations };
+    }
+  }
+  if (cur) {
+    sessions.push(finishSession(cur));
+  }
+
+  // Filter out very short sessions that clutter the week overview
+  const filtered = sessions.filter((s) => s.totalSecs >= MIN_SESSION_SECS);
 
   // Add focus sessions as separate overlay blocks
   for (const entry of focusEntries) {
     const startMin = minutesSinceMidnight(entry.startedAt);
     const endMin = startMin + (entry.durationSecs ?? 0) / 60;
-    blocks.push({
+    filtered.push({
       startMin,
       endMin: Math.max(endMin, startMin + 1),
-      color: "var(--timeline-focus)",
-      label: entry.title || "Focus",
       totalSecs: entry.durationSecs ?? 0,
+      label: entry.title || "Focus",
+      appCount: 1,
       type: "focus",
     });
   }
 
-  return blocks;
+  return filtered;
+}
+
+function finishSession(cur: {
+  startMin: number;
+  endMin: number;
+  totalSecs: number;
+  appDurations: Map<string, number>;
+}): WeekSession {
+  // Find dominant app (longest duration)
+  let dominantApp = "Activity";
+  let maxDur = 0;
+  for (const [app, dur] of cur.appDurations) {
+    if (dur > maxDur) {
+      maxDur = dur;
+      dominantApp = app;
+    }
+  }
+
+  return {
+    startMin: cur.startMin,
+    endMin: cur.endMin,
+    totalSecs: cur.totalSecs,
+    label: dominantApp,
+    appCount: cur.appDurations.size,
+    type: "activity",
+  };
+}
+
+/**
+ * Session density → opacity. Longer sessions = more opaque.
+ * Short sessions (<5min) are lighter, long sessions (>30min) are solid.
+ */
+function sessionOpacity(totalSecs: number): number {
+  const mins = totalSecs / 60;
+  if (mins >= 30) return 0.85;
+  if (mins >= 15) return 0.75;
+  if (mins >= 5) return 0.65;
+  return 0.5;
 }
 
 export function WeekCalendarView() {
@@ -170,40 +206,57 @@ export function WeekCalendarView() {
     }
   }, [dateStr]);
 
-  // Build visual blocks per day from raw entries
-  const blocksByDay = useMemo(() => {
+  // Group entries by day, build merged sessions, pre-split by type, compute active time
+  const { dayData, activeByDay } = useMemo(() => {
     const entryMap = new Map<string, TimelineEntry[]>();
     for (const day of days) entryMap.set(day, []);
     for (const entry of data.entries) {
       const day = toLocalISO(new Date(entry.startedAt));
       entryMap.get(day)?.push(entry);
     }
-    const result = new Map<string, WeekBlock[]>();
+    const dMap = new Map<string, { activity: WeekSession[]; focus: WeekSession[] }>();
+    const actMap = new Map<string, number>();
     for (const [day, dayEntries] of entryMap) {
-      result.set(day, buildWeekBlocks(dayEntries));
+      const sessions = buildWeekSessions(dayEntries);
+      const activity = sessions.filter((s) => s.type === "activity");
+      const focus = sessions.filter((s) => s.type === "focus");
+      // Pre-compute hasFocus per activity session
+      for (const a of activity) {
+        a.hasFocus = focus.some((f) => f.startMin <= a.endMin && f.endMin >= a.startMin);
+      }
+      dMap.set(day, { activity, focus });
+      actMap.set(day, computeDayStats(dayEntries).activeSecs);
     }
-    return result;
+    return { dayData: dMap, activeByDay: actMap };
   }, [data.entries, days]);
-
-  const hours = Array.from({ length: 24 }, (_, i) => i);
 
   return (
     <div className="flex gap-2 h-full">
       <div className="flex-1 glass-card overflow-hidden flex flex-col">
-        {/* Day header */}
+        {/* Day header with active time */}
         <div className="flex border-b border-border" style={{ paddingLeft: HOUR_GUTTER }}>
-          {days.map((day, i) => (
-            <div
-              key={day}
-              className={cn(
-                "flex-1 text-center py-1.5 text-xs",
-                day === today ? "text-brand font-semibold" : "text-muted",
-              )}
-            >
-              <div>{DAY_LABELS[i]}</div>
-              <div className="text-[10px]">{new Date(`${day}T00:00:00`).getDate()}</div>
-            </div>
-          ))}
+          {days.map((day, i) => {
+            const activeSecs = activeByDay.get(day) || 0;
+            return (
+              <button
+                type="button"
+                key={day}
+                onClick={() => navigate(`/day/${day}`)}
+                className={cn(
+                  "flex-1 text-center py-1.5 text-xs cursor-pointer hover:bg-white/[0.03] transition-colors",
+                  day === today ? "text-brand font-semibold" : "text-muted",
+                )}
+              >
+                <div>{DAY_LABELS[i]}</div>
+                <div className="text-[10px]">{new Date(`${day}T00:00:00`).getDate()}</div>
+                {activeSecs > 0 && (
+                  <div className="text-[9px] text-secondary/60 mt-0.5">
+                    {formatHumanDuration(activeSecs)}
+                  </div>
+                )}
+              </button>
+            );
+          })}
         </div>
 
         {loading && <div className="px-4 py-1 text-xs text-muted">Loading...</div>}
@@ -211,7 +264,7 @@ export function WeekCalendarView() {
         <div ref={scrollRef} className="flex-1 overflow-y-auto">
           <div className="relative" style={{ height: TOTAL_HEIGHT }}>
             {/* Hour lines */}
-            {hours.map((h) => (
+            {HOURS.map((h) => (
               <div
                 key={h}
                 className="absolute w-full flex items-start"
@@ -230,37 +283,48 @@ export function WeekCalendarView() {
             {/* Day columns */}
             <div className="absolute inset-0 flex" style={{ left: HOUR_GUTTER }}>
               {days.map((day) => {
-                const dayBlocks = blocksByDay.get(day) || [];
-                const activityBlocks = dayBlocks.filter((b) => b.type === "activity");
-                const focusBlocks = dayBlocks.filter((b) => b.type === "focus");
+                const { activity: activitySessions, focus: focusSessions } = dayData.get(day) || {
+                  activity: [],
+                  focus: [],
+                };
 
                 return (
                   <div key={day} className="flex-1 relative border-r border-border last:border-r-0">
-                    {/* Activity blocks — colored by category */}
-                    {activityBlocks.map((block) => {
-                      const top = block.startMin * PX_PER_MIN;
+                    {/* Activity session blocks — clean, merged bars */}
+                    {activitySessions.map((session) => {
+                      const top = session.startMin * PX_PER_MIN;
                       const height = Math.max(
-                        (block.endMin - block.startMin) * PX_PER_MIN,
+                        (session.endMin - session.startMin) * PX_PER_MIN,
                         MIN_BLOCK_HEIGHT,
                       );
+                      const leftOffset = session.hasFocus ? 5 : 2;
+                      const durationLabel = formatHumanDuration(session.totalSecs);
+                      const appSuffix = session.appCount > 1 ? ` +${session.appCount - 1}` : "";
 
                       return (
                         <button
                           type="button"
-                          key={`a-${block.label}-${block.startMin}`}
+                          key={`s-${session.startMin}`}
                           onClick={() => navigate(`/day/${day}`)}
-                          className="absolute left-0.5 right-0.5 rounded-sm cursor-pointer hover:brightness-110 transition-all"
+                          className="absolute rounded-[3px] cursor-pointer hover:brightness-125 transition-all overflow-hidden"
                           style={{
                             top,
                             height,
-                            backgroundColor: block.color,
-                            opacity: 0.8,
+                            left: leftOffset,
+                            right: 2,
+                            backgroundColor: "var(--success)",
+                            opacity: sessionOpacity(session.totalSecs),
                           }}
-                          title={`${block.label} · ${formatHumanDuration(block.totalSecs)}`}
+                          title={`${session.label}${appSuffix} · ${durationLabel}`}
                         >
-                          {height > 16 && (
-                            <span className="text-[8px] text-white/90 font-medium px-0.5 truncate block leading-tight">
-                              {block.label}
+                          {height > 20 && (
+                            <span className="text-[8px] text-white/90 font-medium px-1 truncate block leading-tight mt-0.5">
+                              {session.label}
+                            </span>
+                          )}
+                          {height > 32 && (
+                            <span className="text-[7px] text-white/60 px-1 truncate block">
+                              {durationLabel}
                             </span>
                           )}
                         </button>
@@ -268,21 +332,21 @@ export function WeekCalendarView() {
                     })}
 
                     {/* Focus session overlays — thin left accent bar */}
-                    {focusBlocks.map((block) => {
-                      const top = block.startMin * PX_PER_MIN;
+                    {focusSessions.map((session) => {
+                      const top = session.startMin * PX_PER_MIN;
                       const height = Math.max(
-                        (block.endMin - block.startMin) * PX_PER_MIN,
+                        (session.endMin - session.startMin) * PX_PER_MIN,
                         MIN_BLOCK_HEIGHT,
                       );
 
                       return (
                         <div
-                          key={`f-${block.startMin}`}
+                          key={`f-${session.startMin}`}
                           className="absolute left-0 w-[3px] rounded-sm pointer-events-none"
                           style={{
                             top,
                             height,
-                            backgroundColor: block.color,
+                            backgroundColor: "var(--timeline-focus)",
                             opacity: 0.9,
                           }}
                         />
@@ -317,7 +381,7 @@ function WeekNowLine() {
     return () => clearInterval(id);
   }, []);
   const mins = now.getHours() * 60 + now.getMinutes();
-  const top = mins * (HOUR_HEIGHT / 60);
+  const top = mins * PX_PER_MIN;
   return (
     <div className="absolute w-full pointer-events-none z-10" style={{ top }}>
       <div className="border-t border-red-500" />

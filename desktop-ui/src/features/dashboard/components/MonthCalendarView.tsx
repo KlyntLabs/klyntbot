@@ -1,10 +1,11 @@
 import { useQuery } from "@shared/hooks/useQuery";
 import { formatHumanDuration, todayISO, toLocalISO } from "@shared/lib/dates";
 import { cn } from "@shared/lib/utils";
-import type { TimelineEntry, TimelineSource } from "@shared/types";
+import type { TimelineEntry } from "@shared/types";
 import { EMPTY_TIMELINE_RESPONSE } from "@shared/types";
 import { useCallback, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router";
+import { computeDayStats, DAY_LABELS } from "../lib/timeline-utils";
 import { SummaryPanel } from "./SummaryPanel";
 
 function getMonthRange(dateStr: string): {
@@ -74,17 +75,13 @@ function buildCalendarGrid(year: number, month: number, entries: TimelineEntry[]
   return weeks;
 }
 
-const SOURCE_COLORS: Record<TimelineSource, string> = {
-  productivity: "var(--timeline-app-neutral)",
-  focus: "var(--timeline-focus)",
-  task: "var(--timeline-task)",
-  todo: "var(--timeline-todo)",
-  note: "var(--timeline-note)",
-  finance: "var(--timeline-finance)",
-  system: "var(--timeline-system)",
-  calendar: "var(--timeline-calendar)",
-};
+/** Active time → fill ratio for the activity bar (0–1) */
+function activeRatio(activeSecs: number, maxActiveSecs: number): number {
+  if (maxActiveSecs === 0) return 0;
+  return Math.min(1, activeSecs / maxActiveSecs);
+}
 
+/** Focus intensity → background tint */
 function focusIntensityBg(secs: number, maxSecs: number): string {
   if (secs === 0 || maxSecs === 0) return "transparent";
   const ratio = secs / maxSecs;
@@ -93,8 +90,6 @@ function focusIntensityBg(secs: number, maxSecs: number): string {
   if (ratio > 0.25) return "color-mix(in oklch, var(--timeline-focus) 10%, transparent)";
   return "color-mix(in oklch, var(--timeline-focus) 5%, transparent)";
 }
-
-const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 export function MonthCalendarView() {
   const { date } = useParams<{ date: string }>();
@@ -135,19 +130,21 @@ export function MonthCalendarView() {
     [focusedDate, navigate],
   );
 
-  const { focusByDay, maxFocusSecs } = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const entry of data.entries) {
-      if (entry.source !== "focus") continue;
-      const day = toLocalISO(new Date(entry.startedAt));
-      map.set(day, (map.get(day) || 0) + (entry.durationSecs ?? 0));
+  // Compute per-day stats and find maximums for normalization
+  const { dayStats, maxActiveSecs, maxFocusSecs } = useMemo(() => {
+    const statsMap = new Map<string, { activeSecs: number; focusSecs: number }>();
+    let maxA = 0;
+    let maxF = 0;
+    for (const week of weeks) {
+      for (const cell of week) {
+        const stats = computeDayStats(cell.entries);
+        statsMap.set(cell.date, stats);
+        if (stats.activeSecs > maxA) maxA = stats.activeSecs;
+        if (stats.focusSecs > maxF) maxF = stats.focusSecs;
+      }
     }
-    let max = 0;
-    for (const v of map.values()) {
-      if (v > max) max = v;
-    }
-    return { focusByDay: map, maxFocusSecs: max };
-  }, [data.entries]);
+    return { dayStats: statsMap, maxActiveSecs: maxA, maxFocusSecs: maxF };
+  }, [weeks]);
 
   return (
     <div className="flex gap-2 h-full">
@@ -175,60 +172,59 @@ export function MonthCalendarView() {
           {weeks.map((week) => (
             <div key={week[0].date} className="grid grid-cols-7 gap-px">
               {week.map((cell) => {
-                const focusSecs = focusByDay.get(cell.date) || 0;
+                const stats = dayStats.get(cell.date) || { activeSecs: 0, focusSecs: 0 };
+                const aRatio = activeRatio(stats.activeSecs, maxActiveSecs);
+
                 return (
                   <button
                     type="button"
                     key={cell.date}
                     onClick={() => navigate(`/day/${cell.date}`)}
                     className={cn(
-                      "rounded-lg p-1 flex flex-col items-start text-left transition-colors min-h-[60px]",
+                      "rounded-lg p-1.5 flex flex-col items-start text-left transition-colors min-h-[64px]",
                       "hover:bg-white/[0.05] cursor-pointer",
                       cell.isCurrentMonth ? "text-primary" : "text-muted/40",
                       cell.date === today && "ring-1 ring-brand/50",
                       cell.date === focusedDate && cell.date !== today && "ring-1 ring-white/30",
                     )}
                     style={{
-                      backgroundColor: focusIntensityBg(focusSecs, maxFocusSecs),
+                      backgroundColor: focusIntensityBg(stats.focusSecs, maxFocusSecs),
                     }}
                   >
+                    {/* Date + focus time */}
                     <div className="flex items-center justify-between w-full">
                       <span
                         className={cn(
-                          "text-[11px] font-medium mb-0.5",
+                          "text-[11px] font-medium",
                           cell.date === today && "text-brand",
                         )}
                       >
                         {cell.day}
                       </span>
-                      {focusSecs > 0 && (
-                        <span className="text-[9px] text-muted/60">
-                          {formatHumanDuration(focusSecs)}
+                      {stats.focusSecs > 0 && (
+                        <span className="text-[8px] text-muted/60">
+                          {formatHumanDuration(stats.focusSecs)}
                         </span>
                       )}
                     </div>
 
-                    {/* Source color bars */}
-                    {cell.entries.length > 0 && (
-                      <div className="flex gap-px flex-wrap w-full">
-                        {getSourceBars(cell.entries).map(({ source, count }) => (
+                    {/* Activity bar — proportional to active time */}
+                    {stats.activeSecs > 0 && (
+                      <div className="w-full mt-auto flex flex-col gap-0.5">
+                        <div className="w-full h-[3px] rounded-full bg-white/[0.06] overflow-hidden">
                           <div
-                            key={source}
-                            className="h-1 rounded-full"
+                            className="h-full rounded-full"
                             style={{
-                              backgroundColor: SOURCE_COLORS[source],
-                              width: `${Math.min(count * 3, 100)}%`,
-                              minWidth: 4,
+                              width: `${Math.max(aRatio * 100, 8)}%`,
+                              backgroundColor: "var(--success)",
+                              opacity: 0.7 + aRatio * 0.3,
                             }}
-                            title={`${source}: ${count}`}
                           />
-                        ))}
+                        </div>
+                        <span className="text-[8px] text-secondary/50">
+                          {formatHumanDuration(stats.activeSecs)}
+                        </span>
                       </div>
-                    )}
-
-                    {/* Entry count badge */}
-                    {cell.entries.length > 0 && (
-                      <span className="text-[9px] text-muted mt-auto">{cell.entries.length}</span>
                     )}
                   </button>
                 );
@@ -241,14 +237,4 @@ export function MonthCalendarView() {
       <SummaryPanel summary={data.summary} selectedEntry={null} onClose={() => {}} />
     </div>
   );
-}
-
-function getSourceBars(entries: TimelineEntry[]): { source: TimelineSource; count: number }[] {
-  const counts = new Map<TimelineSource, number>();
-  for (const e of entries) {
-    counts.set(e.source, (counts.get(e.source) || 0) + 1);
-  }
-  return Array.from(counts.entries())
-    .map(([source, count]) => ({ source, count }))
-    .sort((a, b) => b.count - a.count);
 }
