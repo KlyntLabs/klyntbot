@@ -1,5 +1,5 @@
 //! AutoFocusDetector — FSM that detects sustained productive work
-//! and emits `AutoFocusSession` events for user confirmation.
+//! and emits `AutoFocusEvent` events for real-time focus session creation.
 
 use std::collections::HashMap;
 
@@ -12,7 +12,7 @@ use tracing::{debug, warn};
 use crate::config::FocusConfig;
 use crate::types::{ActivityTick, CategoryType};
 
-/// A detected auto-focus session awaiting user confirmation.
+/// A detected auto-focus session awaiting user confirmation (kept for backward compat).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutoFocusSession {
@@ -22,6 +22,27 @@ pub struct AutoFocusSession {
     pub dominant_category: Option<String>,
     pub productive_ratio: f64,
     pub total_secs: i64,
+}
+
+/// Real-time events emitted by the AutoFocusDetector FSM.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase", tag = "event")]
+pub enum AutoFocusEvent {
+    /// Emitted when FSM transitions from Building → Focused (focus session starts)
+    Started {
+        started_at: DateTime<Utc>,
+        dominant_app: String,
+        dominant_category: Option<String>,
+    },
+    /// Emitted when cooldown grace expires (focus session ends)
+    Ended {
+        started_at: DateTime<Utc>,
+        ended_at: DateTime<Utc>,
+        dominant_app: String,
+        dominant_category: Option<String>,
+        productive_ratio: f64,
+        total_secs: i64,
+    },
 }
 
 /// FSM states for auto-focus detection.
@@ -76,7 +97,7 @@ pub struct AutoFocusDetector {
 impl AutoFocusDetector {
     pub fn start(
         mut tick_rx: broadcast::Receiver<ActivityTick>,
-        session_tx: mpsc::Sender<AutoFocusSession>,
+        event_tx: mpsc::Sender<AutoFocusEvent>,
         config: FocusConfig,
         poll_interval_secs: u64,
         cancel: CancellationToken,
@@ -169,7 +190,8 @@ impl AutoFocusDetector {
                                 }
                             }
                             FocusState::Building { since } => {
-                                let elapsed = (tick.timestamp - *since).num_seconds();
+                                let since_ts = *since;
+                                let elapsed = (tick.timestamp - since_ts).num_seconds();
                                 if !is_productive_window {
                                     state = FocusState::Unfocused;
                                     consecutive_productive_windows = 0;
@@ -179,8 +201,21 @@ impl AutoFocusDetector {
                                     session_category_counts.clear();
                                     debug!("AutoFocus: Building → Unfocused (non-productive window)");
                                 } else if elapsed >= min_secs {
-                                    state = FocusState::Focused { since: *since };
+                                    state = FocusState::Focused { since: since_ts };
                                     debug!("AutoFocus: Building → Focused ({}min elapsed)", elapsed / 60);
+
+                                    // Emit Started event immediately
+                                    let dominant_app = crate::bucket_aggregator::dominant_key(&session_app_counts)
+                                        .unwrap_or_else(|| "Unknown".to_string());
+                                    let dominant_category = crate::bucket_aggregator::dominant_key(&session_category_counts);
+                                    let event = AutoFocusEvent::Started {
+                                        started_at: since_ts,
+                                        dominant_app,
+                                        dominant_category,
+                                    };
+                                    if event_tx.send(event).await.is_err() {
+                                        warn!("AutoFocus: event receiver dropped (Started)");
+                                    }
                                 }
                             }
                             FocusState::Focused { since: _ } => {
@@ -201,7 +236,7 @@ impl AutoFocusDetector {
                                     state = FocusState::Focused { since: focus_since };
                                     debug!("AutoFocus: Cooldown → Focused (recovered)");
                                 } else if cooldown_elapsed >= grace_secs {
-                                    // Emit session
+                                    // Emit Ended event
                                     let dominant_app = crate::bucket_aggregator::dominant_key(&session_app_counts)
                                         .unwrap_or_else(|| "Unknown".to_string());
                                     let dominant_category = crate::bucket_aggregator::dominant_key(&session_category_counts);
@@ -212,7 +247,7 @@ impl AutoFocusDetector {
                                     };
                                     let total_secs = (tick.timestamp - *focus_since).num_seconds();
 
-                                    let session = AutoFocusSession {
+                                    let event = AutoFocusEvent::Ended {
                                         started_at: *focus_since,
                                         ended_at: *since, // cooldown start = focus end
                                         dominant_app,
@@ -221,8 +256,8 @@ impl AutoFocusDetector {
                                         total_secs,
                                     };
 
-                                    if session_tx.send(session).await.is_err() {
-                                        warn!("AutoFocus: session receiver dropped");
+                                    if event_tx.send(event).await.is_err() {
+                                        warn!("AutoFocus: event receiver dropped (Ended)");
                                     }
 
                                     // Reset

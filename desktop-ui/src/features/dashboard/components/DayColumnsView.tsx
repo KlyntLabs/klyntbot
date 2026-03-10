@@ -43,7 +43,7 @@ const COLUMNS: ColumnDef[] = [
     icon: "⬡",
     color: "var(--timeline-app-productive)",
     flex: 1.2,
-    filter: (e) => e.entryType === "appUsage" || e.entryType === "focusSession",
+    filter: (e) => e.entryType === "appUsage",
   },
   {
     key: "calendar",
@@ -339,11 +339,8 @@ export function DayColumnsView({
             <div className="absolute inset-0 grid" style={{ gridTemplateColumns: gridTemplate }}>
               <div />
               {visibleColumns.map((col) => {
-                // Activity column: merged app sessions + focus session overlays
+                // Activity column: merged app sessions with unified focus rendering
                 if (col.key === "activity") {
-                  const focusEntries = (columnEntries.get(col.key) ?? []).filter(
-                    (e) => e.entryType === "focusSession",
-                  );
                   return (
                     <div
                       key={col.key}
@@ -353,7 +350,6 @@ export function DayColumnsView({
                         date={date}
                         hourHeight={hourHeight}
                         isToday={isToday}
-                        focusEntries={focusEntries}
                         onSelectSession={handleSelectSession}
                         onSelectEntry={handleSelectEntry}
                         selectedSession={selectedSession}

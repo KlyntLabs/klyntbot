@@ -44,13 +44,16 @@ impl AppCore {
                     }
                 }
 
-                if want(sources, TimelineSource::Focus) {
-                    if let Ok(sessions) =
-                        repos.sessions.list_range(&start_utc, &end_utc, None).await
-                    {
-                        entries.extend(sessions.into_iter().map(normalize_focus_session));
-                    }
-                }
+                // CRITICAL: Do NOT add focus sessions as separate timeline entries.
+                // Instead, they enrich activity events via the inFocusMode flag in metadata.
+                // This prevents timeline duplication and keeps the focus context with its activities.
+                // if want(sources, TimelineSource::Focus) {
+                //     if let Ok(sessions) =
+                //         repos.sessions.list_range(&start_utc, &end_utc, None).await
+                //     {
+                //         entries.extend(sessions.into_iter().map(normalize_focus_session));
+                //     }
+                // }
 
                 if want(sources, TimelineSource::Calendar) {
                     let start_rfc = start_utc.to_rfc3339();
@@ -158,10 +161,11 @@ impl AppCore {
 // ── Normalization functions ─────────────────────────────────────────
 
 fn normalize_app_event(e: feature_productivity::ActivityEvent) -> TimelineEntry {
-    let metadata = e
-        .focus_session_id
-        .as_ref()
-        .map(|fid| serde_json::json!({ "focusSessionId": fid }));
+    let mut metadata = serde_json::json!({});
+    if let Some(fid) = e.focus_session_id.as_ref() {
+        metadata["focusSessionId"] = serde_json::json!(fid);
+        metadata["inFocusMode"] = serde_json::json!(true);
+    }
     TimelineEntry {
         id: e.id.map(|i| i.to_string()).unwrap_or_default(),
         source: TimelineSource::Productivity,
@@ -174,7 +178,11 @@ fn normalize_app_event(e: feature_productivity::ActivityEvent) -> TimelineEntry 
         entity_id: None,
         entity_route: Some("/productivity".into()),
         color: "var(--timeline-app-neutral)".into(),
-        metadata,
+        metadata: if metadata.is_object() && !metadata.as_object().unwrap().is_empty() {
+            Some(metadata)
+        } else {
+            None
+        },
     }
 }
 

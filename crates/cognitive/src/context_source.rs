@@ -381,6 +381,7 @@ mod tests {
             chat_id: "c1".into(),
             message: None,
             intent_summary: None,
+            project_id: None,
         };
         let result = source.provide(&ctx).await;
         assert!(result.is_none());
@@ -407,6 +408,7 @@ mod tests {
             chat_id: "c1".into(),
             message: None,
             intent_summary: None,
+            project_id: None,
         };
 
         let result = source.provide(&ctx).await.unwrap();
@@ -436,6 +438,7 @@ mod tests {
             chat_id: "c1".into(),
             message: None,
             intent_summary: None,
+            project_id: None,
         };
 
         let result = source.provide(&ctx).await.unwrap();
@@ -470,6 +473,7 @@ mod tests {
             chat_id: "c1".into(),
             message: None,
             intent_summary: None,
+            project_id: None,
         };
 
         let result = source.provide(&ctx).await.unwrap();
@@ -506,6 +510,7 @@ mod tests {
             chat_id: "c1".into(),
             message: Some("what are my peak hours".into()),
             intent_summary: None,
+            project_id: None,
         };
 
         let result = source.provide(&ctx).await.unwrap();
@@ -537,6 +542,7 @@ mod tests {
             chat_id: "c1".into(),
             message: None,
             intent_summary: None,
+            project_id: None,
         };
 
         let result = source.provide(&ctx).await.unwrap();

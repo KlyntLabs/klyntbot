@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 use ::app_core::EventChannels;
 use desktop_shared::events;
+use feature_productivity::auto_focus::AutoFocusEvent;
 use feature_productivity::dashboard_emitter::{DashboardEmitter, DashboardEvent};
 use tauri::{Emitter, Manager};
 use tokio::sync::mpsc;
@@ -27,18 +28,45 @@ pub async fn init(app_handle: tauri::AppHandle) -> Result<AppCore, String> {
 fn wire_event_channels(core: &AppCore, channels: EventChannels, app_handle: &tauri::AppHandle) {
     let shutdown = &core.shutdown_token;
 
-    // Auto-focus sessions → Tauri event
+    // Auto-focus events → Tauri event
     if let Some(auto_focus_rx) = channels.auto_focus_rx {
-        spawn_channel_forwarder(auto_focus_rx, app_handle, shutdown, |handle, session| {
-            let payload = events::AutoFocusPayload {
-                started_at: session.started_at.to_rfc3339(),
-                ended_at: session.ended_at.to_rfc3339(),
-                duration_mins: session.total_secs / 60,
-                dominant_app: session.dominant_app,
-                productive_ratio: session.productive_ratio,
-            };
-            if let Err(e) = handle.emit(events::FOCUS_AUTO_DETECTED, payload) {
-                warn!("failed to emit auto-focus event: {e}");
+        spawn_channel_forwarder(auto_focus_rx, app_handle, shutdown, |handle, event| {
+            match event {
+                AutoFocusEvent::Started {
+                    started_at,
+                    dominant_app,
+                    dominant_category,
+                } => {
+                    // Focus session started — emit event and call handler to create DB session
+                    let payload = serde_json::json!({
+                        "startedAt": started_at.to_rfc3339(),
+                        "dominantApp": dominant_app,
+                        "dominantCategory": dominant_category,
+                    });
+                    if let Err(e) = handle.emit(events::FOCUS_AUTO_STARTED, payload) {
+                        warn!("failed to emit auto-focus started event: {e}");
+                    }
+                }
+                AutoFocusEvent::Ended {
+                    started_at,
+                    ended_at,
+                    dominant_app,
+                    dominant_category,
+                    productive_ratio,
+                    total_secs,
+                } => {
+                    // Focus session ended — emit event and call handler to end DB session
+                    let payload = events::AutoFocusPayload {
+                        started_at: started_at.to_rfc3339(),
+                        ended_at: ended_at.to_rfc3339(),
+                        duration_mins: total_secs / 60,
+                        dominant_app,
+                        productive_ratio,
+                    };
+                    if let Err(e) = handle.emit(events::FOCUS_AUTO_DETECTED, payload) {
+                        warn!("failed to emit auto-focus ended event: {e}");
+                    }
+                }
             }
         });
     }

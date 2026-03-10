@@ -7,7 +7,7 @@ use chrono::{Duration, Timelike, Utc};
 use cognitive::situation::{compute_situation, SituationInputs, UserSituation};
 use feature_coaching::{FeedbackTracker, InterventionRouter, PatternDetector, SignalAccumulator};
 use feature_notes::repo::NoteRepo;
-use feature_productivity::auto_focus::AutoFocusSession;
+use feature_productivity::auto_focus::AutoFocusEvent;
 use feature_productivity::repos::ProductivityRepos;
 use feature_productivity::tracker::categorizer::Categorizer;
 use feature_productivity::{DailyAggregator, FocusManager, NudgeService, ProductivityEngine};
@@ -24,7 +24,7 @@ pub struct EventChannels {
     pub intervention_rx: mpsc::Receiver<feature_coaching::router::DeliveredIntervention>,
     pub domain_event_bus: Arc<DomainEventBus>,
     pub pipeline_rx: tokio::sync::broadcast::Receiver<cognitive::PipelineEvent>,
-    pub auto_focus_rx: Option<mpsc::Receiver<AutoFocusSession>>,
+    pub auto_focus_rx: Option<mpsc::Receiver<AutoFocusEvent>>,
     pub nudge_rx: Option<mpsc::Receiver<feature_productivity::types::NudgeRecord>>,
     pub dashboard_tick_rx:
         Option<tokio::sync::broadcast::Receiver<feature_productivity::ActivityTick>>,

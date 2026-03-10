@@ -2,17 +2,7 @@ import { SlidePanel } from "@shared/composites/SlidePanel/SlidePanel";
 import { invalidateQueries } from "@shared/hooks/useQuery";
 import { formatHumanDuration, formatTime } from "@shared/lib/dates";
 import type { ActivityEvent, WorkContextDetail, WorkResource } from "@shared/types";
-import {
-  Archive,
-  Clock,
-  Edit3,
-  ExternalLink,
-  FileText,
-  Globe,
-  Layers,
-  Play,
-  Terminal,
-} from "lucide-react";
+import { Archive, Edit3, FileText, Globe, Layers, Play, Terminal } from "lucide-react";
 import { useCallback, useState } from "react";
 import { useContextResume } from "../hooks/useContextResume";
 import { useContextMutations } from "../hooks/useWorkContexts";

@@ -13,6 +13,8 @@ pub mod notes;
 pub mod objectives;
 pub mod permissions;
 pub mod productivity;
+pub mod project_conversations;
+pub mod project_memories;
 pub mod project_sources;
 pub mod projects;
 pub mod settings;

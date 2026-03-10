@@ -192,6 +192,11 @@ fn main() {
             commands::entity_links::entity_link_create,
             commands::entity_links::entity_link_delete,
             commands::entity_links::entity_links_for_entity,
+            // Project Memories
+            commands::project_memories::project_memories_list,
+            commands::project_memories::project_memories_by_type,
+            // Project Conversations
+            commands::project_conversations::project_conversations_list,
             // Project Sources
             commands::project_sources::project_source_create,
             commands::project_sources::project_source_delete,
@@ -275,7 +280,9 @@ fn main() {
             commands::productivity::productivity_recategorize_app,
             commands::productivity::productivity_insights,
             commands::productivity::productivity_insight_dismiss,
-            commands::productivity::productivity_auto_focus_confirm,
+            commands::productivity::productivity_auto_focus_start,
+            commands::productivity::productivity_auto_focus_end,
+            commands::productivity::distraction_respond,
             commands::productivity::productivity_projects_list,
             commands::productivity::productivity_project_upsert,
             commands::productivity::productivity_project_delete,

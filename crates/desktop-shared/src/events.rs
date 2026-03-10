@@ -60,8 +60,10 @@ pub const ACTIVITY_TICK: &str = "activity:tick";
 pub const ACTIVITY_SWITCH: &str = "activity:switch";
 pub const FOCUS_STATE_CHANGED: &str = "focus:state_changed";
 pub const FOCUS_AUTO_DETECTED: &str = "focus:auto_detected";
+pub const FOCUS_AUTO_STARTED: &str = "focus:auto_started";
 pub const FOCUS_TICK: &str = "focus:tick";
 pub const FOCUS_COMPLETED: &str = "focus:completed";
+pub const DISTRACTION_DETECTED: &str = "distraction:detected";
 pub const SCORE_UPDATED: &str = "score:updated";
 pub const BUCKET_COMPLETED: &str = "bucket:completed";
 pub const INSIGHT_GENERATED: &str = "insight:generated";
@@ -561,4 +563,14 @@ pub struct FocusCompletedPayload {
     pub duration_mins: u64,
     pub quality_score: Option<f64>,
     pub break_mins: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DistractionDetectedPayload {
+    pub app_name: String,
+    pub session_id: String,
+    pub previous_app: String,
+    pub previous_context: String,
+    pub elapsed_secs: u64,
 }

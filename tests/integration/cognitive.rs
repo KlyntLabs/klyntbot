@@ -348,6 +348,7 @@ async fn test_cognitive_context_source_with_facts() {
         chat_id: "c1".into(),
         message: None,
         intent_summary: None,
+        project_id: None,
     };
 
     let result = source.provide(&ctx).await;
@@ -370,6 +371,7 @@ async fn test_cognitive_context_source_empty_returns_none() {
         chat_id: "c1".into(),
         message: None,
         intent_summary: None,
+        project_id: None,
     };
     assert!(source.provide(&ctx).await.is_none());
 }

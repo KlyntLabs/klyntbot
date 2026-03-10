@@ -3,13 +3,13 @@
 use std::sync::Arc;
 
 use desktop_shared::commands::{
-    ActivityCategoryResponse, ActivityTimelineResponse, CategoryRulesResponse,
+    ActivityCategoryResponse, ActivityTimelineResponse, CategoryRulesResponse, DistractionResponse,
     FocusSessionResponse, GoalProgressResponse, InsightCardResponse, IntelligenceSessionResponse,
     ProductivityProjectResponse, ProductivitySummaryResponse, TimeEntryResponse,
     TrackedAppResponse, WeeklyAssessmentResponse,
 };
 use desktop_shared::errors::ApiError;
-use feature_productivity::auto_focus::AutoFocusSession;
+use feature_productivity::auto_focus::AutoFocusEvent;
 use tauri::State;
 
 use crate::app_core::AppCore;
@@ -247,12 +247,28 @@ pub async fn productivity_insight_dismiss(
     state.productivity_insight_dismiss(id).await
 }
 
-#[tauri::command]
-pub async fn productivity_auto_focus_confirm(
+#[tauri::command(rename_all = "snake_case")]
+pub async fn productivity_auto_focus_start(
     state: State<'_, Arc<AppCore>>,
-    session: AutoFocusSession,
 ) -> Result<FocusSessionResponse, ApiError> {
-    state.productivity_auto_focus_confirm(session).await
+    state.productivity_auto_focus_start().await
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn productivity_auto_focus_end(
+    state: State<'_, Arc<AppCore>>,
+    event: AutoFocusEvent,
+) -> Result<FocusSessionResponse, ApiError> {
+    state.productivity_auto_focus_end(event).await
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn distraction_respond(
+    state: State<'_, Arc<AppCore>>,
+    _response: DistractionResponse,
+) -> Result<(), ApiError> {
+    // Stub for now — will be populated with actual distraction handling logic
+    Ok(())
 }
 
 // ── V3: Project Tracking ─────────────────────────────────────────────
@@ -464,13 +480,15 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "productivity_recategorize_app",
     "productivity_insights",
     "productivity_insight_dismiss",
-    "productivity_auto_focus_confirm",
     "productivity_projects_list",
     "productivity_project_upsert",
     "productivity_project_delete",
     "productivity_weekly_assessment",
     "productivity_calendar_events",
     "calendar_sync_events",
+    "productivity_auto_focus_start",
+    "productivity_auto_focus_end",
+    "distraction_respond",
 ];
 
 #[cfg(debug_assertions)]
@@ -612,10 +630,6 @@ pub(crate) async fn dispatch_dev(
             let id = try_field!(dev::get_str(body, "id"));
             dev::val(core.productivity_insight_dismiss(id).await)
         }
-        "productivity_auto_focus_confirm" => dev::val(
-            core.productivity_auto_focus_confirm(try_field!(dev::parse_params(body)))
-                .await,
-        ),
         "productivity_projects_list" => dev::val(core.productivity_projects_list().await),
         "productivity_project_upsert" => {
             let id = try_field!(dev::get_str(body, "id"));
@@ -648,6 +662,14 @@ pub(crate) async fn dispatch_dev(
             core.calendar_sync_events(try_field!(dev::parse_params(body)))
                 .await,
         ),
+        "productivity_auto_focus_start" => {
+            dev::val(core.productivity_auto_focus_start().await)
+        }
+        "productivity_auto_focus_end" => dev::val(
+            core.productivity_auto_focus_end(try_field!(dev::parse_params(body)))
+                .await,
+        ),
+        "distraction_respond" => Ok(serde_json::Value::Null),
         _ => return None,
     })
 }

@@ -19,6 +19,8 @@ pub struct SourceContext {
     /// Condensed intent summary for relevance-filtered sources.
     /// Falls back to `message` if not set.
     pub intent_summary: Option<String>,
+    /// Project ID for project-scoped context sources.
+    pub project_id: Option<String>,
 }
 
 /// A pluggable provider of context sections for the system prompt.

@@ -764,6 +764,13 @@ pub struct FocusTimerStatusResponse {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct DistractionResponse {
+    pub action: String,
+    pub app_name: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct IntelligenceSessionResponse {
     pub id: String,
     pub session_type: String,

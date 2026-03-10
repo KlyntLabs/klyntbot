@@ -32,10 +32,47 @@ pub trait ExtractionHandler: Send + Sync {
     async fn extract_facts(&self, observation: &Observation) -> common::Result<Vec<ExtractedFact>>;
 }
 
+/// Classify a fact's memory type based on trigger phrases in the object text.
+///
+/// Returns one of: `"decision"`, `"milestone"`, `"pattern"`, `"insight"`, or `"fact"` (default).
+pub fn classify_memory_type(text: &str) -> &'static str {
+    let lower = text.to_lowercase();
+
+    const DECISION_TRIGGERS: &[&str] = &["decided to", "let's go with", "we'll use", "agreed on"];
+    const MILESTONE_TRIGGERS: &[&str] =
+        &["completed", "shipped", "released", "launched", "finished"];
+    const PATTERN_TRIGGERS: &[&str] = &["noticed that", "pattern", "tends to", "usually"];
+    const INSIGHT_TRIGGERS: &[&str] = &["realized", "learned", "discovered"];
+
+    for trigger in DECISION_TRIGGERS {
+        if lower.contains(trigger) {
+            return "decision";
+        }
+    }
+    for trigger in MILESTONE_TRIGGERS {
+        if lower.contains(trigger) {
+            return "milestone";
+        }
+    }
+    for trigger in PATTERN_TRIGGERS {
+        if lower.contains(trigger) {
+            return "pattern";
+        }
+    }
+    for trigger in INSIGHT_TRIGGERS {
+        if lower.contains(trigger) {
+            return "insight";
+        }
+    }
+
+    DEFAULT_MEMORY_TYPE
+}
+
 /// Converts `ExtractedFact` candidates into full `SemanticFact` records
 /// ready for consolidation.
 pub fn to_semantic_fact(candidate: &ExtractedFact, observation: &Observation) -> SemanticFact {
     let now = Utc::now();
+    let combined_text = format!("{} {} {}", candidate.subject, candidate.predicate, candidate.object);
     SemanticFact {
         id: uuid::Uuid::new_v4().to_string(),
         domain: candidate.domain.clone(),
@@ -53,7 +90,7 @@ pub fn to_semantic_fact(candidate: &ExtractedFact, observation: &Observation) ->
         last_accessed: None,
         access_count: 0,
         project_id: None,
-        memory_type: DEFAULT_MEMORY_TYPE.to_string(),
+        memory_type: classify_memory_type(&combined_text).to_string(),
     }
 }
 
@@ -165,6 +202,46 @@ mod tests {
         assert_eq!(facts.len(), 2);
         assert_eq!(facts[0].predicate, "peak_hours");
         assert_eq!(facts[1].predicate, "focus_style");
+    }
+
+    #[test]
+    fn test_classify_decision() {
+        assert_eq!(classify_memory_type("decided to use PostgreSQL"), "decision");
+        assert_eq!(classify_memory_type("let's go with React"), "decision");
+        assert_eq!(classify_memory_type("agreed on the API design"), "decision");
+    }
+
+    #[test]
+    fn test_classify_milestone() {
+        assert_eq!(
+            classify_memory_type("completed the auth module"),
+            "milestone"
+        );
+        assert_eq!(classify_memory_type("shipped v2.0"), "milestone");
+        assert_eq!(classify_memory_type("launched the beta"), "milestone");
+    }
+
+    #[test]
+    fn test_classify_pattern() {
+        assert_eq!(
+            classify_memory_type("noticed that builds are slower"),
+            "pattern"
+        );
+        assert_eq!(classify_memory_type("tends to break on Mondays"), "pattern");
+    }
+
+    #[test]
+    fn test_classify_insight() {
+        assert_eq!(
+            classify_memory_type("realized the bottleneck is I/O"),
+            "insight"
+        );
+        assert_eq!(classify_memory_type("learned that caching helps"), "insight");
+    }
+
+    #[test]
+    fn test_classify_default() {
+        assert_eq!(classify_memory_type("the sky is blue"), "fact");
     }
 
     #[test]

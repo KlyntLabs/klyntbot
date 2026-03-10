@@ -104,6 +104,7 @@ fn test_source_ctx() -> SourceContext {
         chat_id: "chat123".to_string(),
         message: None,
         intent_summary: None,
+        project_id: None,
     }
 }
 

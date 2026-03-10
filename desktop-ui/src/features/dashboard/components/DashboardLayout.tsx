@@ -1,5 +1,7 @@
 import { AutoFocusToast } from "@features/productivity/components/AutoFocusToast";
+import { DistractionInterventionBanner } from "@features/productivity/components/DistractionInterventionBanner";
 import { FocusStateIndicator } from "@features/productivity/components/FocusStateIndicator";
+import { FocusTrayIndicator } from "@features/productivity/components/FocusTrayIndicator";
 import { MiniCalendar } from "@features/tasks/components/editors/MiniCalendar";
 import { useClickOutside } from "@shared/hooks/useClickOutside";
 import { todayISO, toLocalISO } from "@shared/lib/dates";
@@ -163,6 +165,9 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
           {formatDateDisplay(mode, dateParam)}
         </span>
 
+        {/* Focus tray indicator */}
+        <FocusTrayIndicator />
+
         {/* View switcher pill group */}
         <div className="flex items-center rounded-full bg-white/[0.06] p-0.5">
           {views.map((v) => (
@@ -301,6 +306,7 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
       {/* Real-time overlays */}
       <FocusStateIndicator />
       <AutoFocusToast />
+      <DistractionInterventionBanner />
 
       {/* Content */}
       <DataModeContext.Provider value="productivity">

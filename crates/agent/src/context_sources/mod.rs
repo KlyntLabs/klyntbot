@@ -11,6 +11,7 @@ pub mod identity;
 pub mod page_context;
 pub mod persona;
 pub mod productivity;
+pub mod project;
 pub mod todo;
 
 pub use agent::AgentContextSource;
@@ -21,4 +22,5 @@ pub use identity::IdentitySource;
 pub use page_context::PageContextSource;
 pub use persona::PersonaContextSource;
 pub use productivity::ProductivityContextSource;
+pub use project::ProjectContextSource;
 pub use todo::TodoSource;

@@ -1,7 +1,7 @@
 /**
- * ActivityTrack — renders merged productivity sessions as vertical blocks
- * inside the day column grid. Focus sessions render as thin left-edge
- * indicator bars, and activity blocks during focus get a focus border.
+ * ActivityTrack — renders merged productivity sessions as full-width vertical blocks
+ * inside the day column grid. Activity blocks during focus get a subtle left-edge
+ * focus indicator (2px border in timeline-focus color).
  *
  * V2: Intelligence-enriched sessions — quality-based coloring, LLM titles,
  * and purity-based opacity for effective-period intensity.
@@ -20,10 +20,8 @@ import type {
   IntelligenceSession,
   TimelineEntry,
 } from "@shared/types";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { purityToOpacity, qualityToColor, resolveActivityColor } from "../productivity/shared";
-
-const FOCUS_BAR_WIDTH = 4; // px — left-edge focus indicator
 
 export interface SessionBlock {
   startMin: number;
@@ -39,19 +37,10 @@ export interface SessionBlock {
   intelligence: IntelligenceSession | null;
 }
 
-interface FocusRange {
-  startMin: number;
-  endMin: number;
-  entryId: string;
-  title: string;
-  isLive: boolean;
-}
-
 interface ActivityTrackProps {
   date: string;
   hourHeight: number;
   isToday: boolean;
-  focusEntries: TimelineEntry[];
   onSelectSession: (session: SessionBlock) => void;
   onSelectEntry: (entry: TimelineEntry) => void;
   selectedSession: SessionBlock | null;
@@ -97,12 +86,11 @@ function matchIntelligence(
 export function ActivityTrack({
   date,
   hourHeight,
-  isToday,
-  focusEntries,
+  isToday: _isToday,
   onSelectSession,
-  onSelectEntry,
+  onSelectEntry: _onSelectEntry,
   selectedSession,
-  selectedEntryId,
+  selectedEntryId: _selectedEntryId,
   timelineEntries,
 }: ActivityTrackProps) {
   const pxPerMin = hourHeight / 60;
@@ -140,29 +128,6 @@ export function ActivityTrack({
 
   const categoryMap = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
 
-  // Compute focus time ranges from focus entries
-  const [now, setNow] = useState(new Date());
-  useEffect(() => {
-    if (!isToday) return;
-    const id = setInterval(() => setNow(new Date()), 10_000);
-    return () => clearInterval(id);
-  }, [isToday]);
-
-  const focusRanges: FocusRange[] = useMemo(() => {
-    return focusEntries.map((e) => {
-      const startMin = minutesSinceMidnight(e.startedAt);
-      const isLive = isToday && !e.endedAt;
-      let endMin: number;
-      if (isLive) {
-        endMin = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
-      } else {
-        const dur = e.durationSecs ?? 0;
-        endMin = startMin + dur / 60;
-      }
-      return { startMin, endMin, entryId: e.id, title: e.title, isLive };
-    });
-  }, [focusEntries, isToday, now]);
-
   const sessions: SessionBlock[] = useMemo(() => {
     if (events.length === 0) return [];
 
@@ -189,13 +154,11 @@ export function ActivityTrack({
 
     const merged = mergeActivitySessions(parsed);
 
-    // Convert to SessionBlock with focus overlap detection + intelligence matching
+    // Convert to SessionBlock with focus detection from event metadata
     return merged.map((session) => {
       const sessionStartMin = session.startSecs / 60;
       const sessionEndMin = session.endSecs / 60;
-      const duringFocus =
-        session.events.some((ev) => ev.hasFocus) ||
-        focusRanges.some((f) => sessionStartMin < f.endMin && sessionEndMin > f.startMin);
+      const duringFocus = session.events.some((ev) => ev.hasFocus);
 
       const matched = matchIntelligence(sessionStartMin, sessionEndMin, intellSessions);
 
@@ -215,59 +178,19 @@ export function ActivityTrack({
         intelligence: matched,
       };
     });
-  }, [events, categoryMap, focusRanges, intellSessions]);
+  }, [events, categoryMap, intellSessions]);
 
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
 
   return (
     <>
-      {/* Focus indicator bars — thin left-edge bars showing focus periods */}
-      {focusRanges.map((f) => {
-        const top = f.startMin * pxPerMin;
-        const height = Math.max((f.endMin - f.startMin) * pxPerMin, 8);
-        const focusEntry = focusEntries.find((e) => e.id === f.entryId);
-        const isSelected = selectedEntryId === f.entryId;
-
-        return (
-          <button
-            type="button"
-            key={f.entryId}
-            className={cn(
-              "absolute left-0 rounded-sm cursor-pointer z-10",
-              isSelected && "ring-1 ring-brand",
-            )}
-            style={{
-              top,
-              height,
-              width: FOCUS_BAR_WIDTH,
-              backgroundColor: "var(--timeline-focus)",
-              opacity: f.isLive ? 1 : 0.8,
-              boxShadow: f.isLive
-                ? "0 0 6px color-mix(in oklch, var(--timeline-focus) 50%, transparent)"
-                : undefined,
-            }}
-            onClick={() => focusEntry && onSelectEntry(focusEntry)}
-            aria-label={`Focus session: ${f.title || "Untitled"}${f.isLive ? " (in progress)" : ""}, ${formatHumanDuration(Math.round((f.endMin - f.startMin) * 60))}`}
-            title={`${f.title}${f.isLive ? " (in progress)" : ""}`}
-          >
-            {f.isLive && (
-              <span
-                className="absolute -top-0.5 -left-0.5 w-[5px] h-[5px] rounded-full animate-pulse"
-                style={{ backgroundColor: "var(--timeline-focus)" }}
-              />
-            )}
-          </button>
-        );
-      })}
-
-      {/* Activity session blocks — quality-colored with intelligence overlay */}
+      {/* Activity session blocks — full-width with focus indicator border when duringFocus */}
       {sessions.map((session, idx) => {
         const top = session.startMin * pxPerMin;
         const height = Math.max((session.endMin - session.startMin) * pxPerMin, 8);
         const isSelected =
           selectedSession?.startMin === session.startMin &&
           selectedSession?.label === session.label;
-        const leftOffset = session.duringFocus ? FOCUS_BAR_WIDTH + 2 : 2;
         const matched = session.intelligence;
 
         // Purity-based opacity: higher purity = more solid (sustained focus indicator)
@@ -286,16 +209,17 @@ export function ActivityTrack({
             type="button"
             key={`${session.label}-${session.startMin}`}
             className={cn(
-              "absolute right-0.5 rounded-sm cursor-pointer transition-opacity overflow-hidden",
+              "absolute left-0.5 right-0.5 rounded-sm cursor-pointer transition-opacity overflow-hidden",
               isSelected && "ring-1 ring-brand",
               matched && "shadow-sm",
+              session.duringFocus && "border-l-2",
             )}
             style={{
               top,
               height,
-              left: leftOffset,
               backgroundColor: session.color,
               opacity,
+              borderLeftColor: session.duringFocus ? "var(--timeline-focus)" : undefined,
             }}
             onClick={() => onSelectSession(session)}
             onMouseEnter={() => setHoveredIdx(idx)}

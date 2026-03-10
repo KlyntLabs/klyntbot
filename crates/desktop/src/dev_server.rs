@@ -157,6 +157,12 @@ async fn dispatch(
     if let Some(r) = commands::project_sources::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }
+    if let Some(r) = commands::project_memories::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
+    if let Some(r) = commands::project_conversations::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
     if let Some(r) = commands::areas::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }
@@ -528,6 +534,8 @@ mod tests {
             commands::work_context::DEV_COMMANDS,
             commands::entity_links::DEV_COMMANDS,
             commands::project_sources::DEV_COMMANDS,
+            commands::project_memories::DEV_COMMANDS,
+            commands::project_conversations::DEV_COMMANDS,
         ];
         // chat_send is handled inline in dev_server.rs
         let mut set: BTreeSet<String> = modules

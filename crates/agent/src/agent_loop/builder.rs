@@ -31,7 +31,7 @@ use tools_core::FeaturePackage;
 use super::super::confidence::ConfidenceEvaluator;
 use super::super::context_sources::{
     AgentContextSource, AreaSource, BootstrapSource, IdentitySource, PageContextSource,
-    PersonaContextSource, ProductivityContextSource, TodoSource,
+    PersonaContextSource, ProductivityContextSource, ProjectContextSource, TodoSource,
 };
 use super::super::{CronHandlerAdapter, SubagentManager};
 use super::{AgentLoop, LastActiveChannel};
@@ -283,6 +283,12 @@ impl AgentLoopBuilder {
                     cog_source = cog_source.with_situation(Arc::clone(sit));
                 }
                 sources.push(Box::new(cog_source));
+
+                // Project context source — injects project instructions, role, and memories.
+                sources.push(Box::new(ProjectContextSource::new(
+                    repos.clone(),
+                    fact_repo.clone(),
+                )));
 
                 // Start background consolidation service if we have a DomainEventBus
                 if let Some(ref domain_bus) = self.domain_event_bus {

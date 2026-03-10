@@ -132,7 +132,12 @@ export interface TimelineEntry {
   entityId?: string;
   entityRoute?: string;
   color: string;
-  metadata?: Record<string, unknown>;
+  focusSessionId?: string;
+  metadata?: {
+    focusSessionId?: string;
+    inFocusMode?: boolean;
+    [key: string]: unknown;
+  };
 }
 
 export interface TopAppSummary {

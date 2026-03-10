@@ -113,7 +113,7 @@ export function InferenceTab() {
 
   const handleSave = useCallback(async () => {
     if (!draft) return;
-    await saveMutation.mutate(draft);
+    await saveMutation.mutate(draft as unknown as Record<string, unknown>);
     invalidateQueries("config_get_section");
   }, [draft, saveMutation]);
 

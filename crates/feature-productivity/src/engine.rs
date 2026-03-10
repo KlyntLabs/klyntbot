@@ -8,7 +8,7 @@ use tokio_util::sync::CancellationToken;
 
 use bus::DomainEventBus;
 
-use crate::auto_focus::{AutoFocusDetector, AutoFocusSession};
+use crate::auto_focus::{AutoFocusDetector, AutoFocusEvent};
 use crate::batch_writer::BatchWriter;
 use crate::bucket_aggregator::BucketAggregator;
 use crate::config::ProductivityConfig;
@@ -28,7 +28,7 @@ pub struct ProductivityEngine {
     auto_focus: Option<AutoFocusDetector>,
     distraction_analyzer: Option<DistractionAnalyzer>,
     cancel_token: CancellationToken,
-    auto_focus_rx: Option<mpsc::Receiver<AutoFocusSession>>,
+    auto_focus_rx: Option<mpsc::Receiver<AutoFocusEvent>>,
     tick_sender: broadcast::Sender<ActivityTick>,
     domain_bus: Option<Arc<DomainEventBus>>,
     repos: ProductivityRepos,
@@ -90,7 +90,7 @@ impl ProductivityEngine {
         );
 
         // AutoFocusDetector
-        let (auto_focus_tx, auto_focus_rx) = mpsc::channel(16);
+        let (auto_focus_tx, auto_focus_rx) = mpsc::channel(32);
         let auto_focus = if config.focus.auto_detect_enabled {
             Some(AutoFocusDetector::start(
                 tick_tx.subscribe(),
@@ -125,8 +125,8 @@ impl ProductivityEngine {
         }
     }
 
-    /// Take the auto-focus session receiver (for desktop crate to consume).
-    pub fn take_auto_focus_rx(&mut self) -> Option<mpsc::Receiver<AutoFocusSession>> {
+    /// Take the auto-focus event receiver (for desktop crate to consume).
+    pub fn take_auto_focus_rx(&mut self) -> Option<mpsc::Receiver<AutoFocusEvent>> {
         self.auto_focus_rx.take()
     }
 
