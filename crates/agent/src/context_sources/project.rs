@@ -38,23 +38,18 @@ impl ContextSource for ProjectContextSource {
 
         // 1. Instructions
         if let Some(instructions_json) = &project.instructions {
-            if let Ok(instructions) =
-                serde_json::from_str::<serde_json::Value>(instructions_json)
-            {
+            if let Ok(instructions) = serde_json::from_str::<serde_json::Value>(instructions_json) {
                 if let Some(context) = instructions.get("context").and_then(|v| v.as_str()) {
                     if !context.is_empty() {
                         sections.push(format!("## Project Context\n{context}"));
                     }
                 }
-                if let Some(guidelines) =
-                    instructions.get("guidelines").and_then(|v| v.as_str())
-                {
+                if let Some(guidelines) = instructions.get("guidelines").and_then(|v| v.as_str()) {
                     if !guidelines.is_empty() {
                         sections.push(format!("## Guidelines\n{guidelines}"));
                     }
                 }
-                if let Some(constraints) =
-                    instructions.get("constraints").and_then(|v| v.as_str())
+                if let Some(constraints) = instructions.get("constraints").and_then(|v| v.as_str())
                 {
                     if !constraints.is_empty() {
                         sections.push(format!("## Constraints\n{constraints}"));

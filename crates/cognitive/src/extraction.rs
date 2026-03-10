@@ -72,7 +72,10 @@ pub fn classify_memory_type(text: &str) -> &'static str {
 /// ready for consolidation.
 pub fn to_semantic_fact(candidate: &ExtractedFact, observation: &Observation) -> SemanticFact {
     let now = Utc::now();
-    let combined_text = format!("{} {} {}", candidate.subject, candidate.predicate, candidate.object);
+    let combined_text = format!(
+        "{} {} {}",
+        candidate.subject, candidate.predicate, candidate.object
+    );
     SemanticFact {
         id: uuid::Uuid::new_v4().to_string(),
         domain: candidate.domain.clone(),
@@ -206,7 +209,10 @@ mod tests {
 
     #[test]
     fn test_classify_decision() {
-        assert_eq!(classify_memory_type("decided to use PostgreSQL"), "decision");
+        assert_eq!(
+            classify_memory_type("decided to use PostgreSQL"),
+            "decision"
+        );
         assert_eq!(classify_memory_type("let's go with React"), "decision");
         assert_eq!(classify_memory_type("agreed on the API design"), "decision");
     }
@@ -236,7 +242,10 @@ mod tests {
             classify_memory_type("realized the bottleneck is I/O"),
             "insight"
         );
-        assert_eq!(classify_memory_type("learned that caching helps"), "insight");
+        assert_eq!(
+            classify_memory_type("learned that caching helps"),
+            "insight"
+        );
     }
 
     #[test]

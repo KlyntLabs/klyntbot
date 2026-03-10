@@ -11214,6 +11214,7 @@ dependencies = [
  "async-trait",
  "bus",
  "chrono",
+ "cognitive",
  "common",
  "config",
  "domain",

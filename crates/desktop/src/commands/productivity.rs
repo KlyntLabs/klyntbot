@@ -662,9 +662,7 @@ pub(crate) async fn dispatch_dev(
             core.calendar_sync_events(try_field!(dev::parse_params(body)))
                 .await,
         ),
-        "productivity_auto_focus_start" => {
-            dev::val(core.productivity_auto_focus_start().await)
-        }
+        "productivity_auto_focus_start" => dev::val(core.productivity_auto_focus_start().await),
         "productivity_auto_focus_end" => dev::val(
             core.productivity_auto_focus_end(try_field!(dev::parse_params(body)))
                 .await,

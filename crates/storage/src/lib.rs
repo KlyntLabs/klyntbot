@@ -27,16 +27,16 @@ pub use repos::area::AreaRepo;
 pub use repos::key_result::KeyResultRepo;
 pub use repos::objective::ObjectiveRepo;
 pub use repos::project_repo::{ProjectFilter, ProjectPatch, ProjectRepo, ProjectWithStats};
-pub use repos::EntityLinkRepo;
-pub use repos::ProjectSourceRepo;
 pub use repos::AgentAdaptationRepo;
 pub use repos::AgentTaskRepo;
 pub use repos::BehavioralPatternRepo;
 pub use repos::CronRepo;
 pub use repos::DecisionLogRepo;
+pub use repos::EntityLinkRepo;
 pub use repos::InteractionLogRepo;
 pub use repos::LearningStateRepo;
 pub use repos::OutcomeRepo;
+pub use repos::ProjectSourceRepo;
 pub use repos::SessionRepo;
 pub use repos::UsageRepo;
 pub use repos::UserProfileRepo;
@@ -57,6 +57,7 @@ pub use rows::action::{ActionAttachmentRow, ActionDependencyRow, ActionRow, Acti
 pub use rows::agent_task::AgentTaskRow;
 pub use rows::area::AreaRow;
 pub use rows::cron::CronJobRow;
+pub use rows::entity_link::EntityLinkRow;
 pub use rows::key_result::KeyResultRow;
 pub use rows::learning::{
     AgentAdaptationRow, BehavioralPatternRow, DecisionLogRow, EnrichmentFeedbackRow,
@@ -64,7 +65,6 @@ pub use rows::learning::{
     UserProfileRow,
 };
 pub use rows::objective::ObjectiveRow;
-pub use rows::entity_link::EntityLinkRow;
 pub use rows::project::ProjectRow;
 pub use rows::project_source::ProjectSourceRow;
 pub use rows::session::{SessionListRow, SessionMessageRow, SessionRow};

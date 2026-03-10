@@ -97,7 +97,9 @@ impl AppCore {
                             priority: priority_label(action.priority),
                         });
                     }
-                    Err(e) => warn!(kind = other_kind, id = other_id, error = %e, "Failed to fetch linked task"),
+                    Err(e) => {
+                        warn!(kind = other_kind, id = other_id, error = %e, "Failed to fetch linked task")
+                    }
                     _ => {}
                 },
                 Some(EntityKind::Note) => match self.note_repo.get_note(other_id).await {
@@ -108,25 +110,31 @@ impl AppCore {
                             updated_at: note.updated_at,
                         });
                     }
-                    Err(e) => warn!(kind = other_kind, id = other_id, error = %e, "Failed to fetch linked note"),
+                    Err(e) => {
+                        warn!(kind = other_kind, id = other_id, error = %e, "Failed to fetch linked note")
+                    }
                     _ => {}
                 },
-                Some(EntityKind::Conversation) => match self.repos.sessions.get_session(other_id).await {
-                    Ok(session) => {
-                        conversations.push(SessionSummaryResponse {
-                            key: session.key,
-                            title: session
-                                .metadata
-                                .as_object()
-                                .and_then(|m| m.get("title"))
-                                .and_then(|v| v.as_str())
-                                .map(|s| s.to_string()),
-                            conversation_type: session.conversation_type,
-                            updated_at: session.updated_at.to_rfc3339(),
-                        });
+                Some(EntityKind::Conversation) => {
+                    match self.repos.sessions.get_session(other_id).await {
+                        Ok(session) => {
+                            conversations.push(SessionSummaryResponse {
+                                key: session.key,
+                                title: session
+                                    .metadata
+                                    .as_object()
+                                    .and_then(|m| m.get("title"))
+                                    .and_then(|v| v.as_str())
+                                    .map(|s| s.to_string()),
+                                conversation_type: session.conversation_type,
+                                updated_at: session.updated_at.to_rfc3339(),
+                            });
+                        }
+                        Err(e) => {
+                            warn!(kind = other_kind, id = other_id, error = %e, "Failed to fetch linked conversation")
+                        }
                     }
-                    Err(e) => warn!(kind = other_kind, id = other_id, error = %e, "Failed to fetch linked conversation"),
-                },
+                }
                 Some(EntityKind::Objective) => match self.repos.objectives.get(other_id).await {
                     Ok(Some(obj)) => {
                         objectives.push(ObjectiveSummaryResponse {
@@ -136,7 +144,9 @@ impl AppCore {
                             status: obj.status,
                         });
                     }
-                    Err(e) => warn!(kind = other_kind, id = other_id, error = %e, "Failed to fetch linked objective"),
+                    Err(e) => {
+                        warn!(kind = other_kind, id = other_id, error = %e, "Failed to fetch linked objective")
+                    }
                     _ => {}
                 },
                 Some(EntityKind::KeyResult) => match self.repos.key_results.get(other_id).await {
@@ -147,14 +157,18 @@ impl AppCore {
                             progress: kr.progress,
                         });
                     }
-                    Err(e) => warn!(kind = other_kind, id = other_id, error = %e, "Failed to fetch linked key result"),
+                    Err(e) => {
+                        warn!(kind = other_kind, id = other_id, error = %e, "Failed to fetch linked key result")
+                    }
                     _ => {}
                 },
                 Some(EntityKind::Source) => match self.repos.project_sources.get(other_id).await {
                     Ok(Some(src)) => {
                         sources.push(source_row_to_response(&src));
                     }
-                    Err(e) => warn!(kind = other_kind, id = other_id, error = %e, "Failed to fetch linked source"),
+                    Err(e) => {
+                        warn!(kind = other_kind, id = other_id, error = %e, "Failed to fetch linked source")
+                    }
                     _ => {}
                 },
                 _ => {}

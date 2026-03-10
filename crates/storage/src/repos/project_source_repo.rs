@@ -196,7 +196,10 @@ mod tests {
             .create("proj-1", "snippet", "Auth flow", Some("old"), None, None)
             .await
             .unwrap();
-        let updated = repo.update_content(&source.id, "new content").await.unwrap();
+        let updated = repo
+            .update_content(&source.id, "new content")
+            .await
+            .unwrap();
         assert!(updated);
         let fetched = repo.get(&source.id).await.unwrap().unwrap();
         assert_eq!(fetched.content.as_deref(), Some("new content"));

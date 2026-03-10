@@ -293,9 +293,7 @@ impl AgentLoopBuilder {
                 // Annotation context source — injects critical annotations into prompt.
                 let annotation_repo = cognitive::AnnotationRepo::new(pool.clone());
                 sources.push(Box::new(
-                    crate::context_sources::AnnotationContextSource::new(
-                        annotation_repo.clone(),
-                    ),
+                    crate::context_sources::AnnotationContextSource::new(annotation_repo.clone()),
                 ));
 
                 // Start background consolidation service if we have a DomainEventBus
@@ -656,9 +654,9 @@ impl AgentLoopBuilder {
             repos.actions.clone(),
         ));
         // ── Annotate tool ──────────────────────────────────────────────────
-        tool_registry.register(tools::AnnotateTool::new(
-            cognitive::AnnotationRepo::new(storage_pool.inner().clone()),
-        ));
+        tool_registry.register(tools::AnnotateTool::new(cognitive::AnnotationRepo::new(
+            storage_pool.inner().clone(),
+        )));
 
         // ── Conversation recall handler ──────────────────────────────────
         let conversation_recall_handler: Option<Arc<dyn tools::ConversationRecallHandler>> =

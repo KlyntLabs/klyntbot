@@ -287,17 +287,9 @@ impl AppCore {
         Ok(sessions
             .into_iter()
             .map(|s| {
-                let quality = s
-                    .quality_score
-                    .or_else(|| score_map.get(&s.id).copied());
-                let title = s
-                    .tags
-                    .clone()
-                    .unwrap_or_else(|| s.fallback_title());
-                let description = s
-                    .notes
-                    .clone()
-                    .or_else(|| s.fallback_description(quality));
+                let quality = s.quality_score.or_else(|| score_map.get(&s.id).copied());
+                let title = s.tags.clone().unwrap_or_else(|| s.fallback_title());
+                let description = s.notes.clone().or_else(|| s.fallback_description(quality));
                 IntelligenceSessionResponse {
                     id: s.id,
                     session_type: s.session_type,
@@ -710,14 +702,14 @@ impl AppCore {
     }
 
     /// Create or get an active auto-detected focus session (called when auto-focus starts).
-    pub async fn productivity_auto_focus_start(
-        &self,
-    ) -> Result<FocusSessionResponse, ApiError> {
+    pub async fn productivity_auto_focus_start(&self) -> Result<FocusSessionResponse, ApiError> {
         let repos = self.productivity_repos()?;
 
         // Check if there's already an active auto-detected session
         if let Ok(Some(active)) = repos.sessions.get_active().await {
-            if active.source == feature_productivity::types::SessionSource::AutoDetected && active.ended_at.is_none() {
+            if active.source == feature_productivity::types::SessionSource::AutoDetected
+                && active.ended_at.is_none()
+            {
                 return Ok(session_to_response(active));
             }
         }
@@ -989,4 +981,3 @@ impl AppCore {
         Ok(assessment_to_response(assessment))
     }
 }
-

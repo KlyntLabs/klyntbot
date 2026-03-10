@@ -169,7 +169,10 @@ impl ProductivityIntelligenceLayer {
         let dur_mins = session.duration_secs.unwrap_or(0) / 60;
         let category = session.dominant_category.as_deref().unwrap_or("unknown");
         let apps = session.app_breakdown.as_deref().unwrap_or("{}");
-        let quality = session.quality_score.map(|q| format!("{q:.0}")).unwrap_or_else(|| "N/A".into());
+        let quality = session
+            .quality_score
+            .map(|q| format!("{q:.0}"))
+            .unwrap_or_else(|| "N/A".into());
         let switches = session.context_switches;
 
         let context = format!(
@@ -199,9 +202,7 @@ impl ProductivityIntelligenceLayer {
 
     fn fallback_summary(&self, session: &ProductivitySession) -> (String, String) {
         let title = session.fallback_title();
-        let description = session
-            .fallback_description(None)
-            .unwrap_or_default();
+        let description = session.fallback_description(None).unwrap_or_default();
         (title, description)
     }
 }

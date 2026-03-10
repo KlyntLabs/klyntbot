@@ -75,11 +75,7 @@ impl AnnotateTool {
 )]
 impl AnnotateTool {
     #[action(name = "create")]
-    async fn handle_create(
-        &self,
-        params: CreateParams,
-        _ctx: &RoutingContext,
-    ) -> Result<String> {
+    async fn handle_create(&self, params: CreateParams, _ctx: &RoutingContext) -> Result<String> {
         let id = uuid::Uuid::new_v4().to_string();
         let now = chrono::Utc::now().to_rfc3339();
 
@@ -116,11 +112,7 @@ impl AnnotateTool {
     }
 
     #[action(name = "get")]
-    async fn handle_get(
-        &self,
-        params: GetParams,
-        _ctx: &RoutingContext,
-    ) -> Result<String> {
+    async fn handle_get(&self, params: GetParams, _ctx: &RoutingContext) -> Result<String> {
         let annotations = self
             .repo
             .get_for_target(&params.target_type, &params.target_id)
@@ -140,11 +132,7 @@ impl AnnotateTool {
     }
 
     #[action(name = "list")]
-    async fn handle_list(
-        &self,
-        params: ListParams,
-        _ctx: &RoutingContext,
-    ) -> Result<String> {
+    async fn handle_list(&self, params: ListParams, _ctx: &RoutingContext) -> Result<String> {
         let annotations = if let Some(min_p) = params.min_priority {
             self.repo.get_by_min_priority(min_p).await
         } else {
@@ -162,11 +150,7 @@ impl AnnotateTool {
     }
 
     #[action(name = "delete")]
-    async fn handle_delete(
-        &self,
-        params: DeleteParams,
-        _ctx: &RoutingContext,
-    ) -> Result<String> {
+    async fn handle_delete(&self, params: DeleteParams, _ctx: &RoutingContext) -> Result<String> {
         let deleted = self.repo.delete(&params.id).await.map_err(|e| {
             common::ToolError::ExecutionFailed(format!("Failed to delete annotation: {e}"))
         })?;
@@ -179,19 +163,11 @@ impl AnnotateTool {
     }
 
     #[action(name = "search")]
-    async fn handle_search(
-        &self,
-        params: SearchParams,
-        _ctx: &RoutingContext,
-    ) -> Result<String> {
+    async fn handle_search(&self, params: SearchParams, _ctx: &RoutingContext) -> Result<String> {
         let limit = params.limit.unwrap_or(10) as usize;
-        let results = self
-            .repo
-            .search(&params.query, limit)
-            .await
-            .map_err(|e| {
-                common::ToolError::ExecutionFailed(format!("Failed to search annotations: {e}"))
-            })?;
+        let results = self.repo.search(&params.query, limit).await.map_err(|e| {
+            common::ToolError::ExecutionFailed(format!("Failed to search annotations: {e}"))
+        })?;
 
         if results.is_empty() {
             return Ok(format!("No annotations matching '{}'", params.query));

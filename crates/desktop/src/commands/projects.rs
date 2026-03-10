@@ -124,8 +124,7 @@ pub(crate) async fn dispatch_dev(
         }
         "project_update_instructions" => {
             let id = try_field!(dev::get_str(body, "id"));
-            let instructions: serde_json::Value =
-                try_field!(dev::require(body, "instructions"));
+            let instructions: serde_json::Value = try_field!(dev::require(body, "instructions"));
             dev::val_rh(core.project_update_instructions(id, instructions).await)
         }
         "project_update_role" => {

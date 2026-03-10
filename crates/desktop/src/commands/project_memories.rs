@@ -27,10 +27,7 @@ pub async fn project_memories_by_type(
 // ── Dev server dispatch ─────────────────────────────────────────────
 
 #[cfg(test)]
-pub(crate) const DEV_COMMANDS: &[&str] = &[
-    "project_memories_list",
-    "project_memories_by_type",
-];
+pub(crate) const DEV_COMMANDS: &[&str] = &["project_memories_list", "project_memories_by_type"];
 
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(

@@ -160,7 +160,10 @@ impl SemanticFactRepo {
     }
 
     /// List all active facts for a project (non-superseded, non-expired).
-    pub async fn list_by_project(&self, project_id: &str) -> Result<Vec<SemanticFact>, sqlx::Error> {
+    pub async fn list_by_project(
+        &self,
+        project_id: &str,
+    ) -> Result<Vec<SemanticFact>, sqlx::Error> {
         sqlx::query_as::<_, SemanticFact>(
             "SELECT * FROM semantic_facts WHERE project_id = ?1 AND valid_until IS NULL AND superseded_at IS NULL ORDER BY recorded_at DESC",
         )

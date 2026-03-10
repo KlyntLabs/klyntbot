@@ -185,7 +185,10 @@ fn test_rrf_merge_triple_combines_three_signals() {
     let results = rrf_merge_triple(&kw, &sem, &bm25, 60, &lookup);
     assert_eq!(results.len(), 3, "All three items should appear");
 
-    let ids: Vec<&str> = results.iter().map(|(item, _, _)| item.search_id()).collect();
+    let ids: Vec<&str> = results
+        .iter()
+        .map(|(item, _, _)| item.search_id())
+        .collect();
     assert!(ids.contains(&"a"));
     assert!(ids.contains(&"b"));
     assert!(ids.contains(&"c"));

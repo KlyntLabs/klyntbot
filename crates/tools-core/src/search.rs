@@ -59,7 +59,7 @@ pub fn rrf_merge_triple<T: Searchable + Clone>(
                 6 => "semantic+bm25",
                 5 => "keyword+bm25",
                 4 => "bm25",
-                3 => "both",     // keyword+semantic (backward compat)
+                3 => "both", // keyword+semantic (backward compat)
                 2 => "semantic",
                 1 => "keyword",
                 _ => "unknown",

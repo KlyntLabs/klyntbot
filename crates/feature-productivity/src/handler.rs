@@ -31,14 +31,11 @@ pub trait ProductivityHandler: Send + Sync {
     /// Generate a short title + description for a completed productivity session.
     /// Context includes: duration, category, apps, quality, switches.
     /// Returns a JSON object: `{"title": "...", "description": "..."}`.
-    async fn generate_session_summary(
-        &self,
-        context: &str,
-    ) -> common::Result<SessionSummary> {
+    async fn generate_session_summary(&self, context: &str) -> common::Result<SessionSummary> {
         // Default implementation: parse the context for a fallback
         let _ = context;
-        Err(common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(
-            "Session summary generation not implemented".into(),
-        )))
+        Err(common::KlyntbotError::Tool(
+            common::ToolError::ExecutionFailed("Session summary generation not implemented".into()),
+        ))
     }
 }

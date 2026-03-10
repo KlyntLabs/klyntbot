@@ -27,8 +27,9 @@ pub(crate) async fn dispatch_dev(
     use super::dev_helpers::{self as dev, try_field};
     Some(match cmd {
         "project_conversations_list" => {
-            let project_id = try_field!(dev::get_str(body, "projectId")
-                .or_else(|_| dev::get_str(body, "project_id")));
+            let project_id = try_field!(
+                dev::get_str(body, "projectId").or_else(|_| dev::get_str(body, "project_id"))
+            );
             dev::val(core.project_conversations_list(project_id).await)
         }
         _ => return None,

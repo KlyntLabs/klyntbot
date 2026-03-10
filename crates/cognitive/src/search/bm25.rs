@@ -135,7 +135,11 @@ pub async fn bm25_search_all(
     all.extend(rules);
 
     // Sort by score descending
-    all.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    all.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     all.truncate(limit);
 
     Ok(all)
@@ -224,7 +228,10 @@ mod tests {
         let results = search_semantic_facts(&pool, "morning hours", None, 10)
             .await
             .unwrap();
-        assert!(!results.is_empty(), "Should find facts matching 'morning hours'");
+        assert!(
+            !results.is_empty(),
+            "Should find facts matching 'morning hours'"
+        );
         assert_eq!(results[0].source_table, "semantic_facts");
     }
 
@@ -373,9 +380,13 @@ mod tests {
         let repo = SemanticFactRepo::new(pool.clone());
 
         for i in 0..10 {
-            repo.upsert(&test_fact(&format!("f{i}"), "coding", &format!("project {i}")))
-                .await
-                .unwrap();
+            repo.upsert(&test_fact(
+                &format!("f{i}"),
+                "coding",
+                &format!("project {i}"),
+            ))
+            .await
+            .unwrap();
         }
 
         let results = bm25_search_all(&pool, "coding project", None, 3)
@@ -408,9 +419,7 @@ mod tests {
             .unwrap();
 
         // "run" should match "running" and "runs" via porter stemmer
-        let results = search_semantic_facts(&pool, "run", None, 10)
-            .await
-            .unwrap();
+        let results = search_semantic_facts(&pool, "run", None, 10).await.unwrap();
         assert!(
             !results.is_empty(),
             "Porter stemmer should match 'run' to 'running'/'runs'"
