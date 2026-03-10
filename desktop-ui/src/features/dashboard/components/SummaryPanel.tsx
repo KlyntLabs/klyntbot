@@ -1,11 +1,9 @@
-import { FocusSessionsList } from "@features/productivity/components/FocusSessionsList";
 import { GoalsProgress } from "@features/productivity/components/GoalsProgress";
 import {
   ProductivityScoreRing,
   ScoreBar,
 } from "@features/productivity/components/ProductivityScoreRing";
 import { resolveActivityColor, resolveCategoryLabel } from "@features/productivity/shared";
-import { CONTEXT_TYPE_COLORS } from "@features/work-contexts";
 import { useQuery } from "@shared/hooks/useQuery";
 import { formatHumanDuration, TZ_OFFSET_MINS, todayISO } from "@shared/lib/dates";
 import type { ProductivitySummary, TimelineEntry, TimelineSummary } from "@shared/types";
@@ -117,28 +115,12 @@ function DaySummary({
 
   return (
     <div className="w-80 px-4 py-3 flex flex-col gap-3 overflow-y-auto shrink-0">
-      {/* ── 1. Metrics bars — compact at-a-glance quality breakdown ── */}
-      {hasProductivity && ps.totalActiveSecs > 0 && (
-        <div className="flex flex-col gap-1">
-          <ScoreBar label="Deep focus" value={ps.productiveSecs / ps.totalActiveSecs} />
-          <ScoreBar label="Quality" value={ps.avgSessionQuality ?? 0} />
-          <ScoreBar
-            label="Low distraction"
-            value={1 - ps.distractingSecs / Math.max(ps.totalActiveSecs, 1)}
-          />
-          <ScoreBar
-            label="Alignment"
-            value={ps.contextSwitches > 0 ? Math.max(0, 1 - ps.contextSwitches / 100) : 1}
-          />
-        </div>
-      )}
-
-      {/* ── 2. Score ring + Active Time ── */}
+      {/* ── 1. Score ring (left) + Metrics & active time (right) ── */}
       {hasProductivity && ps.productivityScore != null && (
-        <section className="flex items-center gap-3">
+        <section className="flex items-start gap-3">
           <ProductivityScoreRing score={ps.productivityScore} size={72} />
-          <div className="flex-1 min-w-0 flex flex-col gap-1.5">
-            {/* Active time */}
+          <div className="flex-1 min-w-0 flex flex-col gap-1.5 pt-0.5">
+            {/* Active time + ratio bar */}
             <div>
               <div className="flex items-center gap-1.5">
                 <span className="text-sm font-semibold text-primary tabular-nums">
@@ -147,8 +129,7 @@ function DaySummary({
                 <TrendArrow value={ps.activeTimeTrend} />
                 <span className="text-[9px] text-dim">active</span>
               </div>
-              {/* Ratio bar */}
-              <div className="flex h-1.5 rounded-full overflow-hidden bg-white/[0.06] mt-1">
+              <div className="flex h-1 rounded-full overflow-hidden bg-white/[0.06] mt-1">
                 {ps.productiveSecs > 0 && (
                   <div
                     className="h-full"
@@ -177,76 +158,39 @@ function DaySummary({
                   />
                 )}
               </div>
-              <div className="flex items-center justify-between mt-0.5 text-[9px]">
-                <span className="text-success">{productivePct}% productive</span>
-                {ps.distractingSecs > 0 && (
-                  <span className="text-destructive">
-                    {Math.round((ps.distractingSecs / ps.totalActiveSecs) * 100)}%
-                  </span>
-                )}
+              <span className="text-[9px] text-success mt-0.5 block">{productivePct}% productive</span>
+            </div>
+            {/* 4 metric bars — compact */}
+            {ps.totalActiveSecs > 0 && (
+              <div className="flex flex-col gap-0.5">
+                <ScoreBar label="Deep focus" value={ps.productiveSecs / ps.totalActiveSecs} />
+                <ScoreBar label="Quality" value={ps.avgSessionQuality ?? 0} />
+                <ScoreBar
+                  label="Low distraction"
+                  value={1 - ps.distractingSecs / Math.max(ps.totalActiveSecs, 1)}
+                />
+                <ScoreBar
+                  label="Alignment"
+                  value={ps.contextSwitches > 0 ? Math.max(0, 1 - ps.contextSwitches / 100) : 1}
+                />
               </div>
-            </div>
-
-            {/* Focus time */}
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs font-medium text-primary tabular-nums">
-                {formatHumanDuration(summary.focusSecs)}
-              </span>
-              {hasProductivity && <TrendArrow value={ps.focusTimeTrend} />}
-              <span className="text-[9px] text-dim">focus</span>
-              {summary.totalTrackedSecs > 0 && (
-                <span className="text-[9px] text-brand ml-auto">
-                  {Math.round((summary.focusSecs / summary.totalTrackedSecs) * 100)}%
-                </span>
-              )}
-            </div>
+            )}
           </div>
         </section>
       )}
 
       {/* Fallback when no productivity data */}
       {!hasProductivity && (
-        <section>
-          <div className="text-sm font-semibold text-primary">
-            {formatHumanDuration(summary.focusSecs)}
-          </div>
-          <div className="text-[10px] text-muted">Focus time</div>
+        <section className="text-sm font-semibold text-primary">
+          {formatHumanDuration(summary.totalTrackedSecs)} tracked
         </section>
       )}
 
-      {/* ── 3. Active Focus Context ── */}
-      {intel?.activeContext && (
-        <section>
-          <h4 className="text-[10px] font-medium text-dim uppercase tracking-wider mb-1.5">
-            Currently Working On
-          </h4>
-          <div className="flex items-start gap-2.5">
-            <div
-              className="w-2 h-2 rounded-full mt-1 shrink-0"
-              style={{
-                backgroundColor:
-                  intel.activeContext.color ??
-                  (CONTEXT_TYPE_COLORS as Record<string, string>)[
-                    intel.activeContext.contextType
-                  ] ??
-                  "#6B7280",
-              }}
-            />
-            <div className="flex-1 min-w-0">
-              <p className="text-[12px] font-medium text-primary truncate">
-                {intel.activeContext.title}
-              </p>
-              <p className="text-[10px] text-muted">
-                {intel.activeContext.contextType} · {intel.activeContext.durationMins}m
-              </p>
-            </div>
-          </div>
-          {intel.focusRecommendation && (
-            <p className="mt-1 text-[10px] text-muted italic leading-relaxed">
-              {intel.focusRecommendation}
-            </p>
-          )}
-        </section>
+      {/* ── 3. LLM suggestion ── */}
+      {intel?.focusRecommendation && (
+        <p className="text-[10px] text-muted italic leading-relaxed">
+          {intel.focusRecommendation}
+        </p>
       )}
 
       {/* ── 4. Weekly sparkline ── */}
@@ -292,10 +236,7 @@ function DaySummary({
         </section>
       )}
 
-      {/* ── 7. Focus Sessions ── */}
-      <FocusSessionsList date={date} />
-
-      {/* ── 8. Goals ── */}
+      {/* ── 7. Goals ── */}
       <GoalsProgress />
     </div>
   );

@@ -233,6 +233,34 @@ impl ProjectRepo {
         Ok(rows)
     }
 
+    /// Update only the instructions JSON field on a project.
+    pub async fn update_instructions(
+        &self,
+        id: &str,
+        instructions: &str,
+    ) -> Result<bool, StorageError> {
+        let result = sqlx::query(
+            "UPDATE projects SET instructions = ?2, updated_at = datetime('now') WHERE id = ?1",
+        )
+        .bind(id)
+        .bind(instructions)
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected() > 0)
+    }
+
+    /// Update only the user_role field on a project.
+    pub async fn update_user_role(&self, id: &str, role: &str) -> Result<bool, StorageError> {
+        let result = sqlx::query(
+            "UPDATE projects SET user_role = ?2, updated_at = datetime('now') WHERE id = ?1",
+        )
+        .bind(id)
+        .bind(role)
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected() > 0)
+    }
+
     /// Get a project with aggregated task statistics.
     pub async fn get_with_stats(&self, id: &str) -> Result<Option<ProjectWithStats>, StorageError> {
         let project = match self.get(id).await? {

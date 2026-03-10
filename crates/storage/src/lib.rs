@@ -27,6 +27,8 @@ pub use repos::area::AreaRepo;
 pub use repos::key_result::KeyResultRepo;
 pub use repos::objective::ObjectiveRepo;
 pub use repos::project_repo::{ProjectFilter, ProjectPatch, ProjectRepo, ProjectWithStats};
+pub use repos::EntityLinkRepo;
+pub use repos::ProjectSourceRepo;
 pub use repos::AgentAdaptationRepo;
 pub use repos::AgentTaskRepo;
 pub use repos::BehavioralPatternRepo;
@@ -62,7 +64,9 @@ pub use rows::learning::{
     UserProfileRow,
 };
 pub use rows::objective::ObjectiveRow;
+pub use rows::entity_link::EntityLinkRow;
 pub use rows::project::ProjectRow;
+pub use rows::project_source::ProjectSourceRow;
 pub use rows::session::{SessionListRow, SessionMessageRow, SessionRow};
 pub use rows::task_group::TaskGroupRow;
 pub use rows::usage::UsageRecordRow;

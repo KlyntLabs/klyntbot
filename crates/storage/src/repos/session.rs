@@ -52,7 +52,8 @@ impl SessionRepo {
     pub async fn list_sessions(&self) -> Result<Vec<SessionListRow>, StorageError> {
         let rows = sqlx::query_as::<_, SessionListRow>(
             "SELECT s.key, s.metadata, s.created_at, s.updated_at,
-                    COALESCE(counts.cnt, 0) AS message_count
+                    COALESCE(counts.cnt, 0) AS message_count,
+                    s.project_id, s.conversation_type, s.pinned
              FROM sessions s
              LEFT JOIN (
                  SELECT session_key, COUNT(*) AS cnt
@@ -288,6 +289,27 @@ impl SessionRepo {
         .execute(&self.pool)
         .await?;
         Ok(result.rows_affected() > 0)
+    }
+
+    /// List sessions associated with a project, ordered by updated_at descending.
+    pub async fn list_by_project(
+        &self,
+        project_id: &str,
+    ) -> Result<Vec<SessionListRow>, StorageError> {
+        let rows = sqlx::query_as::<_, SessionListRow>(
+            "SELECT s.key, s.metadata, s.created_at, s.updated_at,
+                    COUNT(sm.id) AS message_count,
+                    s.project_id, s.conversation_type, s.pinned
+             FROM sessions s
+             LEFT JOIN session_messages sm ON sm.session_key = s.key
+             WHERE s.project_id = ?1
+             GROUP BY s.key
+             ORDER BY s.updated_at DESC",
+        )
+        .bind(project_id)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
     }
 
     /// Delete all sessions that have not been updated within the given TTL.

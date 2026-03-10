@@ -9,6 +9,8 @@ pub mod coaching_strategy;
 pub mod cron;
 pub mod custom_column;
 pub mod decision_log;
+pub mod entity_link_repo;
+
 pub mod finance_account_repo;
 pub mod finance_budget_repo;
 pub mod finance_goal_repo;
@@ -21,6 +23,7 @@ pub mod learning_state;
 pub mod objective;
 pub mod outcome;
 pub mod project_repo;
+pub mod project_source_repo;
 pub mod session;
 pub mod session_context;
 pub mod status_workflow;
@@ -41,6 +44,7 @@ pub use coaching_strategy::{CoachingStrategyRepo, CoachingStrategyRow, UpsertCoa
 pub use cron::CronRepo;
 pub use custom_column::CustomColumnRepo;
 pub use decision_log::DecisionLogRepo;
+pub use entity_link_repo::EntityLinkRepo;
 pub use finance_account_repo::FinanceAccountRepo;
 pub use finance_budget_repo::FinanceBudgetRepo;
 pub use finance_goal_repo::FinanceGoalRepo;
@@ -53,6 +57,7 @@ pub use learning_state::LearningStateRepo;
 pub use objective::ObjectiveRepo;
 pub use outcome::OutcomeRepo;
 pub use project_repo::{ProjectFilter, ProjectPatch, ProjectRepo, ProjectWithStats};
+pub use project_source_repo::ProjectSourceRepo;
 pub use session::SessionRepo;
 pub use session_context::SessionContextRepo;
 pub use status_workflow::StatusWorkflowRepo;
@@ -89,6 +94,8 @@ pub struct Repos {
     pub status_workflows: StatusWorkflowRepo,
     pub task_groups: TaskGroupRepo,
     pub custom_columns: CustomColumnRepo,
+    pub entity_links: EntityLinkRepo,
+    pub project_sources: ProjectSourceRepo,
 }
 
 impl Repos {
@@ -118,6 +125,8 @@ impl Repos {
             status_workflows: StatusWorkflowRepo::new(db.clone()),
             task_groups: TaskGroupRepo::new(db.clone()),
             custom_columns: CustomColumnRepo::new(db.clone()),
+            entity_links: EntityLinkRepo::new(db.clone()),
+            project_sources: ProjectSourceRepo::new(db.clone()),
             pool: db,
         }
     }

@@ -159,6 +159,31 @@ impl SemanticFactRepo {
         .await
     }
 
+    /// List all active facts for a project (non-superseded, non-expired).
+    pub async fn list_by_project(&self, project_id: &str) -> Result<Vec<SemanticFact>, sqlx::Error> {
+        sqlx::query_as::<_, SemanticFact>(
+            "SELECT * FROM semantic_facts WHERE project_id = ?1 AND valid_until IS NULL AND superseded_at IS NULL ORDER BY recorded_at DESC",
+        )
+        .bind(project_id)
+        .fetch_all(&self.pool)
+        .await
+    }
+
+    /// List active facts for a project filtered by memory type.
+    pub async fn list_by_project_and_type(
+        &self,
+        project_id: &str,
+        memory_type: &str,
+    ) -> Result<Vec<SemanticFact>, sqlx::Error> {
+        sqlx::query_as::<_, SemanticFact>(
+            "SELECT * FROM semantic_facts WHERE project_id = ?1 AND memory_type = ?2 AND valid_until IS NULL AND superseded_at IS NULL ORDER BY recorded_at DESC",
+        )
+        .bind(project_id)
+        .bind(memory_type)
+        .fetch_all(&self.pool)
+        .await
+    }
+
     /// Count facts in the archive table.
     pub async fn count_archived(&self) -> Result<u64, sqlx::Error> {
         let row: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM semantic_facts_archive")

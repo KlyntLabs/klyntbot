@@ -19,15 +19,15 @@ interface ProductivityScoreRingProps {
 export function ScoreBar({ label, value }: { label: string; value: number }) {
   const pct = Math.round(Math.min(Math.max(value, 0), 1) * 100);
   return (
-    <div className="flex items-center gap-2 text-[10px] font-light">
-      <span className="w-20 text-muted text-right">{label}</span>
+    <div className="flex items-center gap-1.5 text-[9px] font-light">
+      <span className="w-[68px] text-muted text-right shrink-0 truncate">{label}</span>
       <div className="flex-1 h-1 rounded-full bg-white/[0.08] overflow-hidden">
         <div
           className="h-full rounded-full bg-brand/60 transition-[width]"
           style={{ width: `${pct}%` }}
         />
       </div>
-      <span className="w-8 text-dim tabular-nums">{pct}%</span>
+      <span className="w-7 text-dim tabular-nums shrink-0">{pct}%</span>
     </div>
   );
 }
