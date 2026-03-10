@@ -950,6 +950,7 @@ export type SidebarItem =
   | "Notes"
   | "Finance"
   | "Productivity"
+  | "Automations"
   | "Debug"
   | "Settings";
 export type ViewMode = "table" | "board" | "tree";
@@ -1200,3 +1201,66 @@ export const EMPTY_TIMELINE_RESPONSE: TimelineResponse = {
     sourceBreakdown: [],
   },
 };
+
+// ── Cron / Automations ──────────────────────────────────────────────────
+
+export type CronOrigin = "system" | "user" | "ai" | "plugin";
+
+export type CronSchedule =
+  | { kind: "at"; atMs: number }
+  | { kind: "every"; everyMs: number }
+  | { kind: "cron"; expr: string; tz?: string };
+
+export interface CronPayload {
+  kind: string;
+  message: string;
+  deliver: boolean;
+  channel?: string;
+  to?: string;
+}
+
+export interface CronJobState {
+  nextRunAtMs?: number;
+  lastRunAtMs?: number;
+  lastStatus?: string;
+  lastError?: string;
+}
+
+export interface CronJob {
+  id: string;
+  name: string;
+  enabled: boolean;
+  origin: CronOrigin;
+  schedule: CronSchedule;
+  payload: CronPayload;
+  state: CronJobState;
+  createdAtMs: number;
+  updatedAtMs: number;
+  deleteAfterRun: boolean;
+}
+
+export interface CronJobCreateParams {
+  name: string;
+  schedule: CronSchedule;
+  message: string;
+  deliver?: boolean;
+  channel?: string;
+  to?: string;
+  deleteAfterRun?: boolean;
+}
+
+export interface CronJobUpdateParams {
+  id: string;
+  name?: string;
+  schedule?: CronSchedule;
+  message?: string;
+  deliver?: boolean;
+  channel?: string | null;
+  to?: string | null;
+}
+
+export interface CronStatusResponse {
+  enabled: boolean;
+  jobs: number;
+  nextWakeAtMs?: number;
+}

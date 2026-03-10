@@ -723,6 +723,7 @@ impl AgentLoopBuilder {
                                     channel: None,
                                     to: None,
                                     internal: true,
+                                    origin: "plugin".to_string(),
                                 };
                                 match handler.add_job(params).await {
                                     Ok(job) => {

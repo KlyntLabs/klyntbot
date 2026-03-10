@@ -19,13 +19,14 @@ impl CronRepo {
     /// Create or replace a cron job.
     pub async fn upsert(&self, row: &CronJobRow) -> Result<CronJobRow, StorageError> {
         let result = sqlx::query_as::<_, CronJobRow>(
-            "INSERT INTO cron_jobs (id, name, enabled, schedule, payload, next_run_at_ms,
+            "INSERT INTO cron_jobs (id, name, enabled, origin, schedule, payload, next_run_at_ms,
                                     last_run_at_ms, last_status, last_error,
                                     created_at_ms, updated_at_ms, delete_after_run)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
              ON CONFLICT (id) DO UPDATE SET
                  name = EXCLUDED.name,
                  enabled = EXCLUDED.enabled,
+                 origin = EXCLUDED.origin,
                  schedule = EXCLUDED.schedule,
                  payload = EXCLUDED.payload,
                  next_run_at_ms = EXCLUDED.next_run_at_ms,
@@ -39,6 +40,7 @@ impl CronRepo {
         .bind(&row.id)
         .bind(&row.name)
         .bind(row.enabled)
+        .bind(&row.origin)
         .bind(&row.schedule)
         .bind(&row.payload)
         .bind(row.next_run_at_ms)

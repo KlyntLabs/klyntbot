@@ -117,7 +117,7 @@ export function MiniCalendar({
 
   return (
     <fieldset
-      className="w-[252px] border-none p-0 m-0"
+      className="w-full min-w-[252px] border-none p-0 m-0"
       onClick={(e) => e.stopPropagation()}
       onKeyDown={(e) => e.stopPropagation()}
     >

@@ -84,6 +84,22 @@ pub struct CronJobState {
     pub last_error: Option<String>,
 }
 
+/// Origin of a cron job — who created it
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum CronOrigin {
+    System,
+    User,
+    Ai,
+    Plugin,
+}
+
+impl Default for CronOrigin {
+    fn default() -> Self {
+        Self::System
+    }
+}
+
 /// A scheduled job
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -93,6 +109,9 @@ pub struct CronJob {
 
     #[serde(default = "default_enabled")]
     pub enabled: bool,
+
+    #[serde(default)]
+    pub origin: CronOrigin,
 
     pub schedule: CronSchedule,
 
@@ -114,6 +133,14 @@ pub struct CronJob {
 
 fn default_enabled() -> bool {
     true
+}
+
+/// Status snapshot for the cron service
+#[derive(Debug, Clone)]
+pub struct CronServiceStatus {
+    pub enabled: bool,
+    pub jobs: usize,
+    pub next_wake_at_ms: Option<i64>,
 }
 
 /// Persistent store for cron jobs
@@ -146,12 +173,14 @@ impl CronJob {
         name: impl Into<String>,
         schedule: CronSchedule,
         message: impl Into<String>,
+        origin: CronOrigin,
     ) -> Self {
         let now_ms = Utc::now().timestamp_millis();
         Self {
             id: id.into(),
             name: name.into(),
             enabled: true,
+            origin,
             schedule,
             payload: CronPayload {
                 kind: "agent_turn".to_string(),
@@ -233,7 +262,13 @@ mod tests {
     #[test]
     fn test_cron_job_serialization() {
         let schedule = CronSchedule::At { at_ms: 1234567890 };
-        let job = CronJob::new("job1", "Test Job", schedule, "Test message");
+        let job = CronJob::new(
+            "job1",
+            "Test Job",
+            schedule,
+            "Test message",
+            CronOrigin::System,
+        );
 
         let json = serde_json::to_value(&job).unwrap();
         assert_eq!(json["id"], "job1");
@@ -265,7 +300,7 @@ mod tests {
     #[test]
     fn test_cron_store_serialization() {
         let schedule = CronSchedule::Every { every_ms: 60000 };
-        let job = CronJob::new("job1", "Test Job", schedule, "Test");
+        let job = CronJob::new("job1", "Test Job", schedule, "Test", CronOrigin::System);
 
         let store = CronStore {
             version: 1,
@@ -286,7 +321,7 @@ mod tests {
     #[test]
     fn test_cron_job_camel_case_serialization() {
         let schedule = CronSchedule::Every { every_ms: 60000 };
-        let mut job = CronJob::new("job1", "Test", schedule, "Test");
+        let mut job = CronJob::new("job1", "Test", schedule, "Test", CronOrigin::System);
         job.delete_after_run = true;
 
         let json = serde_json::to_string(&job).unwrap();
@@ -294,5 +329,14 @@ mod tests {
         assert!(json.contains("deleteAfterRun"));
         assert!(json.contains("createdAtMs"));
         assert!(json.contains("updatedAtMs"));
+    }
+
+    #[test]
+    fn test_cron_origin_serde() {
+        let origin = CronOrigin::Ai;
+        let json = serde_json::to_value(&origin).unwrap();
+        assert_eq!(json, "ai");
+        let deserialized: CronOrigin = serde_json::from_value(json).unwrap();
+        assert_eq!(deserialized, CronOrigin::Ai);
     }
 }

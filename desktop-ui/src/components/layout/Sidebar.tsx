@@ -7,6 +7,7 @@ import {
   MessageCircle,
   MessageSquare,
   Settings,
+  Timer,
   Wallet,
 } from "lucide-react";
 import { useNavigate } from "react-router";
@@ -27,6 +28,7 @@ const items: { key: SidebarItem; icon: typeof MessageSquare; path?: string; bott
   { key: "Notes", icon: FileText, path: "/notes" },
   { key: "Finance", icon: Wallet, path: "/finance" },
   { key: "Productivity", icon: Activity, path: "/categories" },
+  { key: "Automations", icon: Timer, path: "/automations" },
   { key: "Debug", icon: Bug, path: "/debug", bottom: true },
   { key: "Settings", icon: Settings, path: "/settings", bottom: true },
 ];

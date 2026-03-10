@@ -60,7 +60,9 @@ impl CronService {
             .map_err(|e| CronError::ExecutionFailed(e.to_string()))?;
         for row in all_rows {
             if !current_ids.contains(row.id.as_str()) {
-                let _ = repo.delete(&row.id).await;
+                if let Err(e) = repo.delete(&row.id).await {
+                    error!("Failed to delete orphaned cron row '{}': {}", row.id, e);
+                }
             }
         }
 

@@ -795,7 +795,16 @@ async fn ensure_cron_jobs(
         ($name:expr, $schedule:expr, $msg:expr) => {
             if !existing.contains($name) {
                 cron_service
-                    .add_job($name, $schedule, $msg, false, None, None, false)
+                    .add_job(
+                        $name,
+                        $schedule,
+                        $msg,
+                        false,
+                        None,
+                        None,
+                        false,
+                        scheduling::CronOrigin::System,
+                    )
                     .await?;
             }
         };

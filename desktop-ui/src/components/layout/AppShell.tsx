@@ -42,6 +42,7 @@ export function AppShell() {
     if (path.startsWith("/notes")) return "Notes";
     if (path.startsWith("/finance")) return "Finance";
     if (path.startsWith("/productivity")) return "Productivity";
+    if (path.startsWith("/automations")) return "Automations";
     if (path.startsWith("/settings")) return "Settings";
     if (path.startsWith("/debug")) return "Debug";
     return "Dashboard";

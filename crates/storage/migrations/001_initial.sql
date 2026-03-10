@@ -258,6 +258,7 @@ CREATE TABLE cron_jobs (
     id               TEXT PRIMARY KEY,
     name             TEXT NOT NULL,
     enabled          INTEGER NOT NULL DEFAULT 1,
+    origin           TEXT NOT NULL DEFAULT 'system',
     schedule         TEXT NOT NULL,
     payload          TEXT NOT NULL DEFAULT '{}',
     next_run_at_ms   INTEGER,

@@ -194,6 +194,9 @@ async fn dispatch(
     if let Some(r) = commands::timeline::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }
+    if let Some(r) = commands::cron::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
 
     // ── chat_send (needs SSE channels, handled inline) ──────────────
     if cmd == "chat_send" {
@@ -471,6 +474,7 @@ mod tests {
             commands::columns::DEV_COMMANDS,
             commands::cognitive::DEV_COMMANDS,
             commands::timeline::DEV_COMMANDS,
+            commands::cron::DEV_COMMANDS,
         ];
         // chat_send is handled inline in dev_server.rs
         let mut set: BTreeSet<String> = modules
