@@ -9,6 +9,7 @@ use super::agents::AgentsConfig;
 use super::capture::CaptureConfig;
 use super::channels::ChannelsConfig;
 use super::cognitive::CognitiveConfig;
+use super::content::ContentConfig;
 use super::confidence::ConfidenceConfig;
 use super::conversation::ConversationConfig;
 use super::finance::FinanceConfig;
@@ -153,6 +154,10 @@ pub struct Config {
     /// External capture sources configuration (shell hook, file watcher, ingestion API).
     #[serde(default)]
     pub capture: CaptureConfig,
+
+    /// Content registry: multi-source documentation and skills.
+    #[serde(default)]
+    pub content: ContentConfig,
 
     /// MCP (Model Context Protocol) server connections and server settings.
     #[serde(default)]
