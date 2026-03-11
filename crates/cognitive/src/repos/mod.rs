@@ -2,6 +2,7 @@ pub mod accumulated_observation;
 pub mod annotation;
 pub mod episodic_memory;
 pub mod event_log;
+pub mod failed_observation;
 pub mod procedural_rule;
 pub mod semantic_fact;
 
@@ -9,6 +10,7 @@ pub use accumulated_observation::AccumulatedObservationRepo;
 pub use annotation::AnnotationRepo;
 pub use episodic_memory::EpisodicMemoryRepo;
 pub use event_log::EventLogRepo;
+pub use failed_observation::FailedObservationRepo;
 pub use procedural_rule::ProceduralRuleRepo;
 pub use semantic_fact::SemanticFactRepo;
 
@@ -73,6 +75,12 @@ pub fn cognitive_migrations() -> Vec<FeatureMigration> {
             version: 6,
             description: "Add annotations table with FTS5 search".to_string(),
             sql: include_str!("../../migrations/006_annotations.sql").to_string(),
+        },
+        FeatureMigration {
+            feature_name: "cognitive".to_string(),
+            version: 7,
+            description: "Add dead-letter queue for failed observations".to_string(),
+            sql: include_str!("../../migrations/007_failed_observations.sql").to_string(),
         },
     ]
 }

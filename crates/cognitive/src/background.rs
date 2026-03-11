@@ -16,10 +16,13 @@ use tracing::{debug, info, warn};
 
 use bus::DomainEvent;
 
-use crate::consolidation::{consolidate_batch, ConsolidationHandler};
+use futures_util::future::join_all;
+
+use crate::consolidation::ConsolidationHandler;
 use crate::embedder::SemanticFactEmbedder;
-use crate::extraction::{extract_from_observation, ExtractionHandler};
+use crate::extraction::ExtractionHandler;
 use crate::repos::accumulated_observation::AccumulatedObservationRepo;
+use crate::repos::failed_observation::FailedObservationRepo;
 use crate::repos::{EpisodicMemoryRepo, SemanticFactRepo};
 use crate::salience::evaluate_salience;
 use crate::types::{EpisodicMemory, Observation, SalienceVerdict};
@@ -28,14 +31,33 @@ use crate::types::{EpisodicMemory, Observation, SalienceVerdict};
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "type")]
 pub enum PipelineEvent {
+    /// A new batch processing cycle started.
+    BatchStarted {
+        #[serde(rename = "observationCount")]
+        observation_count: usize,
+    },
     /// An extraction step completed.
     Extraction {
         observation: String,
         #[serde(rename = "factsExtracted")]
         facts_extracted: usize,
+        #[serde(rename = "usedFallback")]
+        used_fallback: bool,
     },
     /// A consolidation operation was performed.
     Consolidation { operation: String, fact: String },
+    /// An observation was queued in the dead-letter table.
+    DeadLetterQueued {
+        observation: String,
+        #[serde(rename = "failureReason")]
+        failure_reason: String,
+    },
+    /// A dead-letter observation was successfully reprocessed.
+    DeadLetterReprocessed {
+        observation: String,
+        #[serde(rename = "factsExtracted")]
+        facts_extracted: usize,
+    },
 }
 
 /// Tracks accumulated events for pattern promotion.
@@ -64,6 +86,105 @@ impl AccumulatedEntry {
     }
 }
 
+/// Collect domain events into a batch.
+///
+/// Waits up to `timeout` for events, returns once either `max_events` are
+/// collected or the timer fires. Handles broadcast lag and channel close gracefully.
+async fn collect_batch(
+    event_rx: &mut broadcast::Receiver<DomainEvent>,
+    cancel: &CancellationToken,
+    timeout: std::time::Duration,
+    max_events: usize,
+) -> Vec<DomainEvent> {
+    let mut batch = Vec::new();
+    let deadline = tokio::time::sleep(timeout);
+    tokio::pin!(deadline);
+
+    loop {
+        if batch.len() >= max_events {
+            break;
+        }
+        tokio::select! {
+            _ = cancel.cancelled() => break,
+            _ = &mut deadline => break,
+            result = event_rx.recv() => {
+                match result {
+                    Ok(event) => batch.push(event),
+                    Err(broadcast::error::RecvError::Lagged(n)) => {
+                        warn!("BackgroundConsolidation lagged, skipped {n} events");
+                    }
+                    Err(broadcast::error::RecvError::Closed) => break,
+                }
+            }
+        }
+    }
+    batch
+}
+
+/// Split a batch of domain events into extraction vs accumulation buckets.
+fn classify_batch(events: Vec<DomainEvent>) -> (Vec<Observation>, Vec<(String, Observation)>) {
+    let mut to_extract = Vec::new();
+    let mut to_accumulate = Vec::new();
+
+    for event in events {
+        let verdict = evaluate_salience(&event);
+        let key = event_type_key(&event);
+        if let Some(obs) = event_to_observation(&event) {
+            match verdict {
+                SalienceVerdict::Extract => to_extract.push(obs),
+                SalienceVerdict::Accumulate => to_accumulate.push((key, obs)),
+                SalienceVerdict::Discard => {}
+            }
+        }
+    }
+    (to_extract, to_accumulate)
+}
+
+/// For each extracted fact, concurrently look up existing similar facts from the repo.
+async fn prefetch_existing(
+    extractions: &[crate::extraction::BatchExtraction],
+    observations: &[Observation],
+    repo: &SemanticFactRepo,
+) -> Vec<crate::consolidation::ConsolidationCandidate> {
+    let mut all_facts: Vec<(crate::types::SemanticFact, _)> = Vec::new();
+
+    for batch_ext in extractions {
+        let Some(obs) = observations.get(batch_ext.observation_index) else {
+            warn!(
+                "Skipping extraction with out-of-bounds observation_index {}",
+                batch_ext.observation_index
+            );
+            continue;
+        };
+        for extracted in &batch_ext.facts {
+            let fact = crate::extraction::to_semantic_fact(extracted, obs);
+            let subject = fact.subject.clone();
+            let predicate = fact.predicate.clone();
+            let repo = repo.clone();
+            let fut = Box::pin(async move {
+                repo.find_similar(&subject, &predicate)
+                    .await
+                    .unwrap_or_default()
+            });
+            all_facts.push((fact, fut));
+        }
+    }
+
+    let (facts, futs): (Vec<_>, Vec<_>) = all_facts.into_iter().unzip();
+    let existing_results = join_all(futs).await;
+
+    facts
+        .into_iter()
+        .zip(existing_results)
+        .map(
+            |(candidate, existing)| crate::consolidation::ConsolidationCandidate {
+                candidate,
+                existing,
+            },
+        )
+        .collect()
+}
+
 /// Background service that processes domain events into cognitive memory.
 pub struct BackgroundConsolidationService {
     cancel_token: CancellationToken,
@@ -88,6 +209,7 @@ impl BackgroundConsolidationService {
         cancel: CancellationToken,
         pipeline_tx: Option<tokio::sync::broadcast::Sender<PipelineEvent>>,
         accum_repo: Option<AccumulatedObservationRepo>,
+        failed_obs_repo: Option<FailedObservationRepo>,
         promote_threshold: usize,
         min_days: usize,
     ) -> Self {
@@ -118,146 +240,227 @@ impl BackgroundConsolidationService {
                     HashMap::new()
                 };
 
+            // DLQ retries — paired vecs (observation + row ID at same index)
+            let mut dlq_reprocess_queue: Vec<Observation> = Vec::new();
+            let mut dlq_reprocess_ids: Vec<String> = Vec::new();
+            // Accumulator promotions — separate from DLQ to avoid index corruption
+            let mut promotion_queue: Vec<Observation> = Vec::new();
+
             loop {
-                tokio::select! {
-                    _ = cancel_clone.cancelled() => break,
-                    result = event_rx.recv() => {
-                        let event = match result {
-                            Ok(e) => e,
-                            Err(broadcast::error::RecvError::Lagged(n)) => {
-                                warn!("BackgroundConsolidation lagged, skipped {n} events");
-                                continue;
+                // Collect batch (3s window, max 10 events)
+                let batch = collect_batch(
+                    &mut event_rx,
+                    &cancel_clone,
+                    std::time::Duration::from_secs(3),
+                    10,
+                )
+                .await;
+
+                if cancel_clone.is_cancelled() && batch.is_empty() {
+                    break;
+                }
+                if batch.is_empty() {
+                    continue;
+                }
+
+                let (mut to_extract, to_accumulate) = classify_batch(batch);
+
+                // Prepend DLQ retries at indices 0..dlq_count, then promotions, then new events
+                let dlq_ids_this_batch = std::mem::take(&mut dlq_reprocess_ids);
+                let dlq_items = std::mem::take(&mut dlq_reprocess_queue);
+                let promotion_items = std::mem::take(&mut promotion_queue);
+                let dlq_count = dlq_ids_this_batch.len();
+                if !dlq_items.is_empty() || !promotion_items.is_empty() {
+                    let mut combined = dlq_items;
+                    combined.extend(promotion_items);
+                    combined.append(&mut to_extract);
+                    to_extract = combined;
+                }
+
+                if !to_extract.is_empty() {
+                    if let Some(tx) = &pipeline_tx {
+                        let _ = tx.send(PipelineEvent::BatchStarted {
+                            observation_count: to_extract.len(),
+                        });
+                    }
+
+                    // Batch extraction
+                    let result = match extraction.extract_facts_batch(&to_extract).await {
+                        Ok(r) => r,
+                        Err(e) => {
+                            warn!("Batch extraction failed: {e}");
+                            continue;
+                        }
+                    };
+
+                    // Build fallback set once for O(1) lookups
+                    let fallback_set: std::collections::HashSet<usize> =
+                        result.fallback_indices.iter().copied().collect();
+
+                    // Emit extraction pipeline events
+                    if let Some(tx) = &pipeline_tx {
+                        for ext in &result.extractions {
+                            if let Some(obs) = to_extract.get(ext.observation_index) {
+                                let _ = tx.send(PipelineEvent::Extraction {
+                                    observation: obs.content.clone(),
+                                    facts_extracted: ext.facts.len(),
+                                    used_fallback: fallback_set
+                                        .contains(&ext.observation_index),
+                                });
                             }
-                            Err(broadcast::error::RecvError::Closed) => break,
-                        };
+                        }
+                    }
 
-                        let verdict = evaluate_salience(&event);
-                        let obs = event_to_observation(&event);
-
-                        match verdict {
-                            SalienceVerdict::Extract => {
-                                // Hot path: immediate extraction + consolidation
-                                if let Some(obs) = obs {
-                                    let facts = extract_from_observation(
-                                        extraction.as_ref(),
-                                        &obs,
-                                    ).await;
-
-                                    if let Some(tx) = &pipeline_tx {
-                                        let _ = tx.send(PipelineEvent::Extraction {
+                    // Resolve DLQ items from previous cycle that were in this batch
+                    // DLQ items were prepended at indices 0..dlq_count
+                    if let Some(ref dlq) = failed_obs_repo {
+                        for (i, dlq_id) in dlq_ids_this_batch.iter().enumerate() {
+                            if fallback_set.contains(&i) {
+                                // Still failing — increment retry count
+                                dlq.mark_failed(dlq_id).await;
+                            } else {
+                                // Successfully reprocessed by LLM
+                                dlq.mark_succeeded(dlq_id).await;
+                                if let Some(tx) = &pipeline_tx {
+                                    if let Some(obs) = to_extract.get(i) {
+                                        let facts_count = result
+                                            .extractions
+                                            .iter()
+                                            .find(|e| e.observation_index == i)
+                                            .map(|e| e.facts.len())
+                                            .unwrap_or(0);
+                                        let _ = tx.send(PipelineEvent::DeadLetterReprocessed {
                                             observation: obs.content.clone(),
-                                            facts_extracted: facts.len(),
+                                            facts_extracted: facts_count,
                                         });
                                     }
+                                }
+                            }
+                        }
+                    }
 
-                                    if !facts.is_empty() {
-                                        let ops = consolidate_batch(
-                                            &facts,
-                                            &repo,
-                                            consolidation.as_ref(),
-                                            embedder.as_deref(),
-                                        ).await;
-
-                                        if let Some(tx) = &pipeline_tx {
-                                            for (fact, op) in facts.iter().zip(ops.iter()) {
-                                                let _ = tx.send(PipelineEvent::Consolidation {
-                                                    operation: op_to_string(op),
-                                                    fact: format!("{}.{} = {}", fact.subject, fact.predicate, fact.object),
-                                                });
-                                            }
-                                        }
-                                    }
-
-                                    // Store high-importance observations as episodic memories
-                                    if obs.importance >= 0.7 {
-                                        if let Some(ep_repo) = &episodic_repo {
-                                            let ts = Utc::now().format("%Y-%m-%dT%H:%M:%S").to_string();
-                                            let mem = EpisodicMemory {
-                                                id: uuid::Uuid::new_v4().to_string(),
-                                                domain: obs.domain.clone(),
-                                                content: obs.content.clone(),
-                                                summary: None,
-                                                importance: obs.importance,
-                                                occurred_at: ts.clone(),
-                                                recorded_at: ts,
-                                                stability: 1.0,
-                                                last_accessed: None,
-                                                access_count: 0,
-                                                project_id: None,
-                                            };
-                                            if let Err(e) = ep_repo.insert(&mem).await {
-                                                warn!("BackgroundConsolidation: failed to store episodic memory: {e}");
-                                            }
-                                        }
+                    // Queue NEW fallback observations to dead-letter (skip DLQ items — already tracked above)
+                    if let Some(ref dlq) = failed_obs_repo {
+                        for &idx in &result.fallback_indices {
+                            if idx >= dlq_count {
+                                // This is a new observation (not a DLQ reprocess)
+                                if let Some(obs) = to_extract.get(idx) {
+                                    dlq.insert(obs, "extraction", "llm_fallback").await;
+                                    if let Some(tx) = &pipeline_tx {
+                                        let _ = tx.send(PipelineEvent::DeadLetterQueued {
+                                            observation: obs.content.clone(),
+                                            failure_reason: "llm_fallback".into(),
+                                        });
                                     }
                                 }
                             }
-                            SalienceVerdict::Accumulate => {
-                                if let Some(obs) = obs {
-                                    let key = event_type_key(&event);
+                        }
+                    }
 
-                                    // Persist observation before adding to in-memory buffer
-                                    if let Some(ref ar) = accum_repo {
-                                        ar.insert(&key, &obs).await;
+                    // Episodic memory for high-importance observations
+                    for obs in &to_extract {
+                        if obs.importance >= 0.7 {
+                            if let Some(ref ep_repo) = episodic_repo {
+                                let ts = Utc::now().format("%Y-%m-%dT%H:%M:%S").to_string();
+                                let mem = EpisodicMemory {
+                                    id: uuid::Uuid::new_v4().to_string(),
+                                    domain: obs.domain.clone(),
+                                    content: obs.content.clone(),
+                                    summary: None,
+                                    importance: obs.importance,
+                                    occurred_at: ts.clone(),
+                                    recorded_at: ts,
+                                    stability: 1.0,
+                                    last_accessed: None,
+                                    access_count: 0,
+                                    project_id: None,
+                                };
+                                if let Err(e) = ep_repo.insert(&mem).await {
+                                    warn!("Failed to store episodic memory: {e}");
+                                }
+                            }
+                        }
+                    }
+
+                    // Prefetch existing facts + batch consolidation
+                    let candidates =
+                        prefetch_existing(&result.extractions, &to_extract, &repo).await;
+
+                    if !candidates.is_empty() {
+                        let ops = match consolidation.decide_batch(&candidates).await {
+                            Ok(o) => o,
+                            Err(e) => {
+                                warn!("Batch consolidation failed: {e}");
+                                vec![crate::types::MemoryOp::Noop; candidates.len()]
+                            }
+                        };
+
+                        // Emit consolidation pipeline events
+                        if let Some(tx) = &pipeline_tx {
+                            for (c, op) in candidates.iter().zip(ops.iter()) {
+                                let _ = tx.send(PipelineEvent::Consolidation {
+                                    operation: op_to_string(op),
+                                    fact: format!(
+                                        "{}.{} = {}",
+                                        c.candidate.subject,
+                                        c.candidate.predicate,
+                                        c.candidate.object
+                                    ),
+                                });
+                            }
+                        }
+
+                        crate::consolidation::execute_memory_ops(
+                            &ops,
+                            &candidates,
+                            &repo,
+                            embedder.as_deref(),
+                        )
+                        .await;
+                    }
+
+                    // Self-healing: drain dead-letter if LLM is healthy (no fallbacks this batch)
+                    if fallback_set.is_empty() {
+                        if let Some(ref dlq) = failed_obs_repo {
+                            let eligible = dlq.list_eligible(5).await;
+                            for row in eligible {
+                                match serde_json::from_str::<Observation>(&row.observation_json) {
+                                    Ok(obs) => {
+                                        dlq_reprocess_queue.push(obs);
+                                        dlq_reprocess_ids.push(row.id.clone());
                                     }
-
-                                    let entry = accumulator
-                                        .entry(key.clone())
-                                        .or_insert_with(AccumulatedEntry::new);
-                                    entry.add(obs);
-
-                                    // Check for promotion
-                                    if entry.should_promote(promote_threshold, min_days) {
-                                        debug!(
-                                            "Promoting accumulated events for '{key}' ({} events, {} days)",
-                                            entry.observations.len(),
-                                            entry.days_seen.len()
-                                        );
-                                        // Create a summary observation for extraction
-                                        let summary = summarize_accumulated(
-                                            &key,
-                                            &entry.observations,
-                                        );
-                                        let facts = extract_from_observation(
-                                            extraction.as_ref(),
-                                            &summary,
-                                        ).await;
-
-                                        if let Some(tx) = &pipeline_tx {
-                                            let _ = tx.send(PipelineEvent::Extraction {
-                                                observation: summary.content.clone(),
-                                                facts_extracted: facts.len(),
-                                            });
-                                        }
-
-                                        if !facts.is_empty() {
-                                            let ops = consolidate_batch(
-                                                &facts,
-                                                &repo,
-                                                consolidation.as_ref(),
-                                                embedder.as_deref(),
-                                            ).await;
-
-                                            if let Some(tx) = &pipeline_tx {
-                                                for (fact, op) in facts.iter().zip(ops.iter()) {
-                                                    let _ = tx.send(PipelineEvent::Consolidation {
-                                                        operation: op_to_string(op),
-                                                        fact: format!("{}.{} = {}", fact.subject, fact.predicate, fact.object),
-                                                    });
-                                                }
-                                            }
-                                        }
-                                        accumulator.remove(&key);
-                                        // Clear persisted rows after promotion
-                                        if let Some(ref ar) = accum_repo {
-                                            ar.delete_by_key(&key).await;
-                                        }
+                                    Err(e) => {
+                                        warn!("Failed to deserialize dead-letter observation: {e}");
+                                        dlq.mark_failed(&row.id).await;
                                     }
                                 }
                             }
-                            SalienceVerdict::Discard => {
-                                // Intentionally dropped
-                            }
+                        }
+                    }
+                }
+
+                // Handle accumulation
+                for (key, obs) in to_accumulate {
+                    if let Some(ref ar) = accum_repo {
+                        ar.insert(&key, &obs).await;
+                    }
+
+                    let entry = accumulator
+                        .entry(key.clone())
+                        .or_insert_with(AccumulatedEntry::new);
+                    entry.add(obs);
+
+                    if entry.should_promote(promote_threshold, min_days) {
+                        debug!(
+                            "Promoting accumulated events for '{key}' ({} events, {} days)",
+                            entry.observations.len(),
+                            entry.days_seen.len()
+                        );
+                        let summary = summarize_accumulated(&key, &entry.observations);
+                        promotion_queue.push(summary);
+                        accumulator.remove(&key);
+                        if let Some(ref ar) = accum_repo {
+                            ar.delete_by_key(&key).await;
                         }
                     }
                 }

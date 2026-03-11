@@ -5,7 +5,6 @@
 
 use async_trait::async_trait;
 use chrono::Utc;
-use tracing::{debug, warn};
 
 use crate::types::{Observation, SemanticFact, DEFAULT_MEMORY_TYPE};
 
@@ -20,16 +19,36 @@ pub struct ExtractedFact {
     pub source: String,
 }
 
-/// Trait for LLM-backed fact extraction from observations.
+/// Maps extracted facts back to their source observation in a batch.
+#[derive(Debug, Clone)]
+pub struct BatchExtraction {
+    pub observation_index: usize,
+    pub facts: Vec<ExtractedFact>,
+}
+
+/// Result of batch extraction, including fallback tracking.
+#[derive(Debug, Clone)]
+pub struct BatchExtractionResult {
+    /// Facts grouped by source observation index.
+    pub extractions: Vec<BatchExtraction>,
+    /// Indices of observations that used heuristic fallback (LLM failed).
+    pub fallback_indices: Vec<usize>,
+}
+
+/// Trait for fact extraction from observations.
 ///
 /// Defined here (L3), implemented in the agent crate (L5) with actual LLM
 /// providers. This follows the same dependency inversion pattern as
 /// `EnrichmentHandler` and `SpawnHandler`.
 #[async_trait]
 pub trait ExtractionHandler: Send + Sync {
-    /// Extract structured semantic facts from a free-text observation.
-    /// Returns zero or more candidate facts.
-    async fn extract_facts(&self, observation: &Observation) -> common::Result<Vec<ExtractedFact>>;
+    /// Extract structured semantic facts from a batch of observations.
+    /// Returns facts grouped by observation index, plus indices of any
+    /// observations that fell back to heuristic extraction.
+    async fn extract_facts_batch(
+        &self,
+        observations: &[Observation],
+    ) -> common::Result<BatchExtractionResult>;
 }
 
 /// Classify a fact's memory type based on trigger phrases in the object text.
@@ -97,49 +116,10 @@ pub fn to_semantic_fact(candidate: &ExtractedFact, observation: &Observation) ->
     }
 }
 
-/// Run extraction on an observation using the provided handler.
-/// Returns full `SemanticFact` records ready for consolidation.
-pub async fn extract_from_observation(
-    handler: &dyn ExtractionHandler,
-    observation: &Observation,
-) -> Vec<SemanticFact> {
-    match handler.extract_facts(observation).await {
-        Ok(candidates) => {
-            debug!(
-                "Extracted {} fact candidates from observation in domain '{}'",
-                candidates.len(),
-                observation.domain
-            );
-            candidates
-                .iter()
-                .map(|c| to_semantic_fact(c, observation))
-                .collect()
-        }
-        Err(e) => {
-            warn!("Extraction failed for observation: {e}");
-            Vec::new()
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::types::Observation;
-
-    struct MockExtractionHandler {
-        facts: Vec<ExtractedFact>,
-    }
-
-    #[async_trait]
-    impl ExtractionHandler for MockExtractionHandler {
-        async fn extract_facts(
-            &self,
-            _observation: &Observation,
-        ) -> common::Result<Vec<ExtractedFact>> {
-            Ok(self.facts.clone())
-        }
-    }
 
     fn test_observation() -> Observation {
         Observation {
@@ -151,60 +131,31 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_extract_from_observation_returns_facts() {
-        let handler = MockExtractionHandler {
-            facts: vec![ExtractedFact {
-                domain: "productivity".into(),
-                subject: "user".into(),
-                predicate: "peak_hours".into(),
-                object: "10am-12pm".into(),
-                confidence: 0.8,
-                source: "observed".into(),
-            }],
-        };
-
-        let facts = extract_from_observation(&handler, &test_observation()).await;
-        assert_eq!(facts.len(), 1);
-        assert_eq!(facts[0].predicate, "peak_hours");
-        assert_eq!(facts[0].object, "10am-12pm");
-        assert_eq!(facts[0].stability, 1.0);
-    }
-
-    #[tokio::test]
-    async fn test_extract_from_observation_handles_empty() {
-        let handler = MockExtractionHandler { facts: vec![] };
-        let facts = extract_from_observation(&handler, &test_observation()).await;
-        assert!(facts.is_empty());
-    }
-
-    #[tokio::test]
-    async fn test_extract_from_observation_handles_multiple() {
-        let handler = MockExtractionHandler {
-            facts: vec![
-                ExtractedFact {
-                    domain: "productivity".into(),
-                    subject: "user".into(),
-                    predicate: "peak_hours".into(),
-                    object: "10am-12pm".into(),
-                    confidence: 0.8,
-                    source: "observed".into(),
+    #[test]
+    fn test_batch_extraction_result_structure() {
+        let result = BatchExtractionResult {
+            extractions: vec![
+                BatchExtraction {
+                    observation_index: 0,
+                    facts: vec![ExtractedFact {
+                        domain: "productivity".into(),
+                        subject: "user".into(),
+                        predicate: "peak_hours".into(),
+                        object: "10am-12pm".into(),
+                        confidence: 0.8,
+                        source: "observed".into(),
+                    }],
                 },
-                ExtractedFact {
-                    domain: "productivity".into(),
-                    subject: "user".into(),
-                    predicate: "focus_style".into(),
-                    object: "deep_work".into(),
-                    confidence: 0.6,
-                    source: "inferred".into(),
+                BatchExtraction {
+                    observation_index: 1,
+                    facts: vec![],
                 },
             ],
+            fallback_indices: vec![1],
         };
-
-        let facts = extract_from_observation(&handler, &test_observation()).await;
-        assert_eq!(facts.len(), 2);
-        assert_eq!(facts[0].predicate, "peak_hours");
-        assert_eq!(facts[1].predicate, "focus_style");
+        assert_eq!(result.extractions.len(), 2);
+        assert_eq!(result.extractions[0].facts.len(), 1);
+        assert_eq!(result.fallback_indices, vec![1]);
     }
 
     #[test]

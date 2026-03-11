@@ -491,10 +491,7 @@ impl AgentRuntime {
     }
 
     /// Emit learning context summary events for transparency panel.
-    async fn emit_learning_summary(
-        &self,
-        tx: &tokio::sync::mpsc::Sender<AgentEvent>,
-    ) {
+    async fn emit_learning_summary(&self, tx: &tokio::sync::mpsc::Sender<AgentEvent>) {
         // Learned procedural rules (from L5 cognitive pipeline)
         if let Some(ref rule_repo) = self.procedural_rule_repo {
             if let Ok(rules) = rule_repo.list_all_active().await {

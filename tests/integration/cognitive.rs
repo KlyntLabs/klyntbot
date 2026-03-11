@@ -7,13 +7,14 @@
 use klyntbot::agent::cognitive_handlers::{
     HeuristicConsolidationHandler, HeuristicExtractionHandler,
 };
-use klyntbot::cognitive::consolidation::{consolidate_batch, consolidate_fact};
+use klyntbot::cognitive::consolidation::{execute_memory_ops, ConsolidationCandidate};
 use klyntbot::cognitive::context_source::CognitiveContextSource;
-use klyntbot::cognitive::extraction::extract_from_observation;
+use klyntbot::cognitive::extraction::to_semantic_fact;
 use klyntbot::cognitive::repos::{cognitive_migrations, ProceduralRuleRepo, SemanticFactRepo};
 use klyntbot::cognitive::retrieval::{retrieve_relevant_facts, RetrievalParams};
 use klyntbot::cognitive::salience::evaluate_salience;
 use klyntbot::cognitive::types::*;
+use klyntbot::cognitive::{ConsolidationHandler, ExtractionHandler};
 
 use super::common::test_pool;
 use bus::{DomainEvent, FeedbackResponse};
@@ -137,7 +138,12 @@ fn test_salience_productivity_score_is_accumulate() {
 async fn test_heuristic_extraction_user_stated() {
     let handler = HeuristicExtractionHandler;
     let obs = test_observation("UserStatedFact", "I prefer mornings for deep work", 1.0);
-    let facts = extract_from_observation(&handler, &obs).await;
+    let result = handler.extract_facts_batch(&[obs]).await.unwrap();
+    let facts: Vec<_> = result
+        .extractions
+        .into_iter()
+        .flat_map(|e| e.facts)
+        .collect();
 
     assert_eq!(facts.len(), 1);
     assert_eq!(facts[0].source, "user_stated");
@@ -149,7 +155,12 @@ async fn test_heuristic_extraction_user_stated() {
 async fn test_heuristic_extraction_low_importance_skipped() {
     let handler = HeuristicExtractionHandler;
     let obs = test_observation("ProductivityScoreComputed", "Score: 72", 0.5);
-    let facts = extract_from_observation(&handler, &obs).await;
+    let result = handler.extract_facts_batch(&[obs]).await.unwrap();
+    let facts: Vec<_> = result
+        .extractions
+        .into_iter()
+        .flat_map(|e| e.facts)
+        .collect();
 
     assert!(
         facts.is_empty(),
@@ -167,7 +178,12 @@ async fn test_heuristic_extraction_accumulated_pattern() {
         source_event: "accumulated:ProductivityScoreComputed".into(),
         timestamp: Utc::now(),
     };
-    let facts = extract_from_observation(&handler, &obs).await;
+    let result = handler.extract_facts_batch(&[obs]).await.unwrap();
+    let facts: Vec<_> = result
+        .extractions
+        .into_iter()
+        .flat_map(|e| e.facts)
+        .collect();
 
     assert_eq!(facts.len(), 1);
     assert_eq!(facts[0].source, "inferred");
@@ -183,11 +199,14 @@ async fn test_consolidation_add_new_fact() {
     let handler = HeuristicConsolidationHandler;
 
     let candidate = test_fact("f1", "peak_hours", "10am-12pm");
-    let op = consolidate_fact(&candidate, &repo, &handler, None)
-        .await
-        .unwrap();
+    let candidates = vec![ConsolidationCandidate {
+        candidate: candidate.clone(),
+        existing: vec![],
+    }];
+    let ops = handler.decide_batch(&candidates).await.unwrap();
+    execute_memory_ops(&ops, &candidates, &repo, None).await;
 
-    assert!(matches!(op, MemoryOp::Add { ref id } if id == "f1"));
+    assert!(matches!(ops[0], MemoryOp::Add { ref id } if id == "f1"));
 
     let stored = repo.get("f1").await.unwrap().unwrap();
     assert_eq!(stored.object, "10am-12pm");
@@ -205,11 +224,14 @@ async fn test_consolidation_update_on_changed_value() {
 
     // Candidate with updated value
     let candidate = test_fact("f2", "peak_hours", "2pm-4pm");
-    let op = consolidate_fact(&candidate, &repo, &handler, None)
-        .await
-        .unwrap();
+    let candidates = vec![ConsolidationCandidate {
+        candidate: candidate.clone(),
+        existing: vec![old.clone()],
+    }];
+    let ops = handler.decide_batch(&candidates).await.unwrap();
+    execute_memory_ops(&ops, &candidates, &repo, None).await;
 
-    assert!(matches!(op, MemoryOp::Update { .. }));
+    assert!(matches!(ops[0], MemoryOp::Update { .. }));
 
     // Old fact should be superseded
     let old_fact = repo.get("f1").await.unwrap().unwrap();
@@ -232,11 +254,13 @@ async fn test_consolidation_noop_on_duplicate() {
 
     // Same predicate + same object = NOOP
     let candidate = test_fact("f2", "peak_hours", "10am-12pm");
-    let op = consolidate_fact(&candidate, &repo, &handler, None)
-        .await
-        .unwrap();
+    let candidates = vec![ConsolidationCandidate {
+        candidate: candidate.clone(),
+        existing: vec![old.clone()],
+    }];
+    let ops = handler.decide_batch(&candidates).await.unwrap();
 
-    assert_eq!(op, MemoryOp::Noop);
+    assert_eq!(ops[0], MemoryOp::Noop);
 }
 
 // ── Full pipeline: extraction → consolidation → retrieval ──────
@@ -250,14 +274,34 @@ async fn test_full_pipeline_event_to_retrieval() {
 
     // 1. Extract from a user-stated fact observation
     let obs = test_observation("UserStatedFact", "I work best between 10am and noon", 1.0);
-    let facts = extract_from_observation(&extraction, &obs).await;
+    let observations = [obs];
+    let batch_result = extraction.extract_facts_batch(&observations).await.unwrap();
+    let facts: Vec<_> = batch_result
+        .extractions
+        .iter()
+        .flat_map(|e| {
+            e.facts
+                .iter()
+                .map(|f| to_semantic_fact(f, &observations[e.observation_index]))
+        })
+        .collect();
     assert!(!facts.is_empty());
 
-    // 2. Consolidate into storage
-    let ops = consolidate_batch(&facts, &repo, &consolidation, None).await;
+    // 2. Build consolidation candidates (no existing facts yet → direct ADD)
+    let candidates: Vec<_> = facts
+        .iter()
+        .map(|f| ConsolidationCandidate {
+            candidate: f.clone(),
+            existing: vec![],
+        })
+        .collect();
+    let ops = consolidation.decide_batch(&candidates).await.unwrap();
     assert!(ops.iter().any(|op| matches!(op, MemoryOp::Add { .. })));
 
-    // 3. Retrieve the stored fact
+    // 3. Execute ops into storage
+    execute_memory_ops(&ops, &candidates, &repo, None).await;
+
+    // 4. Retrieve the stored fact
     let results = retrieve_relevant_facts(
         &repo,
         None,
@@ -283,18 +327,68 @@ async fn test_full_pipeline_update_replaces_old_fact() {
     let extraction = HeuristicExtractionHandler;
     let consolidation = HeuristicConsolidationHandler;
 
-    // First fact
+    // First fact — extract and store
     let obs1 = test_observation("UserStatedFact", "I prefer mornings", 1.0);
-    let facts1 = extract_from_observation(&extraction, &obs1).await;
-    consolidate_batch(&facts1, &repo, &consolidation, None).await;
+    let observations1 = [obs1];
+    let batch1 = extraction
+        .extract_facts_batch(&observations1)
+        .await
+        .unwrap();
+    let facts1: Vec<_> = batch1
+        .extractions
+        .iter()
+        .flat_map(|e| {
+            e.facts
+                .iter()
+                .map(|f| to_semantic_fact(f, &observations1[e.observation_index]))
+        })
+        .collect();
+    let candidates1: Vec<_> = facts1
+        .iter()
+        .map(|f| ConsolidationCandidate {
+            candidate: f.clone(),
+            existing: vec![],
+        })
+        .collect();
+    let ops1 = consolidation.decide_batch(&candidates1).await.unwrap();
+    execute_memory_ops(&ops1, &candidates1, &repo, None).await;
 
     // Second fact (same predicate "stated" → triggers UPDATE in heuristic handler)
     let obs2 = test_observation("UserStatedFact", "Actually I prefer afternoons", 1.0);
-    let facts2 = extract_from_observation(&extraction, &obs2).await;
-    let ops = consolidate_batch(&facts2, &repo, &consolidation, None).await;
+    let observations2 = [obs2];
+    let batch2 = extraction
+        .extract_facts_batch(&observations2)
+        .await
+        .unwrap();
+    let facts2: Vec<_> = batch2
+        .extractions
+        .iter()
+        .flat_map(|e| {
+            e.facts
+                .iter()
+                .map(|f| to_semantic_fact(f, &observations2[e.observation_index]))
+        })
+        .collect();
+
+    // Look up existing facts for consolidation candidates
+    let mut candidates2 = Vec::new();
+    for fact in &facts2 {
+        let existing = repo
+            .find_similar(&fact.subject, &fact.predicate)
+            .await
+            .unwrap_or_default();
+        candidates2.push(ConsolidationCandidate {
+            candidate: fact.clone(),
+            existing,
+        });
+    }
+    let ops2 = consolidation.decide_batch(&candidates2).await.unwrap();
 
     // Should be an UPDATE since the predicate "stated" matches
-    assert!(ops.iter().any(|op| matches!(op, MemoryOp::Update { .. })));
+    assert!(ops2.iter().any(|op| matches!(op, MemoryOp::Update { .. })));
+
+    // Execute the update
+    execute_memory_ops(&ops2, &candidates2, &repo, None).await;
 
     // Only the new fact should be active
     let results = retrieve_relevant_facts(
@@ -312,6 +406,146 @@ async fn test_full_pipeline_update_replaces_old_fact() {
     .unwrap();
     assert_eq!(results.len(), 1);
     assert!(results[0].fact.object.contains("afternoons"));
+}
+
+// ── Live batch pipeline: BackgroundConsolidationService E2E ────
+
+#[tokio::test]
+async fn test_batch_pipeline_processes_domain_events_end_to_end() {
+    use klyntbot::cognitive::background::{BackgroundConsolidationService, PipelineEvent};
+    use klyntbot::cognitive::{
+        AccumulatedObservationRepo, EpisodicMemoryRepo, FailedObservationRepo,
+    };
+    use tokio_util::sync::CancellationToken;
+
+    let (_, inner) = cognitive_pool().await;
+    let repo = SemanticFactRepo::new(inner.clone());
+    let episodic_repo = EpisodicMemoryRepo::new(inner.clone());
+    let accum_repo = AccumulatedObservationRepo::new(inner.clone());
+    let failed_obs_repo = FailedObservationRepo::new(inner.clone());
+
+    // Wire up broadcast channels (same as agent_loop/builder.rs)
+    let (domain_tx, domain_rx) = tokio::sync::broadcast::channel::<DomainEvent>(64);
+    let (pipeline_tx, mut pipeline_rx) = tokio::sync::broadcast::channel::<PipelineEvent>(64);
+
+    let cancel = CancellationToken::new();
+
+    // Start the real background service with heuristic handlers
+    let extraction: std::sync::Arc<dyn ExtractionHandler> =
+        std::sync::Arc::new(HeuristicExtractionHandler);
+    let consolidation: std::sync::Arc<dyn ConsolidationHandler> =
+        std::sync::Arc::new(HeuristicConsolidationHandler);
+
+    let _service = BackgroundConsolidationService::start(
+        domain_rx,
+        extraction,
+        consolidation,
+        repo.clone(),
+        Some(episodic_repo),
+        None, // no embedder needed for heuristic
+        cancel.clone(),
+        Some(pipeline_tx),
+        Some(accum_repo),
+        Some(failed_obs_repo),
+        3, // promote_threshold
+        2, // min_days
+    );
+
+    // Verify DB is empty before we begin
+    let before = retrieve_relevant_facts(
+        &repo,
+        None,
+        "",
+        &["productivity"],
+        &RetrievalParams {
+            limit: 10,
+            situational_boost: 0.5,
+            ..RetrievalParams::new(0)
+        },
+    )
+    .await
+    .unwrap();
+    assert!(before.is_empty(), "DB should be empty before pipeline runs");
+
+    // Send two UserStatedFact events (will be batched together)
+    domain_tx
+        .send(DomainEvent::UserStatedFact {
+            fact: "I work best between 10am and noon".into(),
+            domain: "productivity".into(),
+        })
+        .unwrap();
+    domain_tx
+        .send(DomainEvent::UserStatedFact {
+            fact: "I prefer dark mode in my IDE".into(),
+            domain: "productivity".into(),
+        })
+        .unwrap();
+
+    // Wait for pipeline events — we should see BatchStarted + Extractions + Consolidations
+    let mut saw_batch_started = false;
+    let mut extraction_count = 0;
+    let mut consolidation_count = 0;
+    let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(10);
+
+    loop {
+        tokio::select! {
+            result = pipeline_rx.recv() => {
+                match result {
+                    Ok(PipelineEvent::BatchStarted { observation_count }) => {
+                        saw_batch_started = true;
+                        assert!(observation_count > 0, "Batch should have observations");
+                    }
+                    Ok(PipelineEvent::Extraction { facts_extracted, .. }) => {
+                        extraction_count += facts_extracted;
+                    }
+                    Ok(PipelineEvent::Consolidation { .. }) => {
+                        consolidation_count += 1;
+                    }
+                    Ok(_) => {} // DeadLetter events etc.
+                    Err(_) => break,
+                }
+                // Once we've seen extraction + consolidation, give execute_memory_ops
+                // time to flush to SQLite (events emit before DB write)
+                if saw_batch_started && extraction_count > 0 && consolidation_count > 0 {
+                    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+                    break;
+                }
+            }
+            _ = tokio::time::sleep_until(deadline) => {
+                panic!(
+                    "Timed out waiting for pipeline events (batch={}, extractions={}, consolidations={})",
+                    saw_batch_started, extraction_count, consolidation_count
+                );
+            }
+        }
+    }
+
+    // Verify facts were actually stored in the database
+    let after = retrieve_relevant_facts(
+        &repo,
+        None,
+        "",
+        &["productivity"],
+        &RetrievalParams {
+            limit: 10,
+            situational_boost: 0.5,
+            ..RetrievalParams::new(0)
+        },
+    )
+    .await
+    .unwrap();
+    assert!(
+        !after.is_empty(),
+        "Facts should be stored after pipeline processes events"
+    );
+    assert!(
+        after.len() >= 2,
+        "Should have at least 2 facts from 2 events, got {}",
+        after.len()
+    );
+
+    // Shut down cleanly
+    cancel.cancel();
 }
 
 // ── CognitiveContextSource integration ─────────────────────────

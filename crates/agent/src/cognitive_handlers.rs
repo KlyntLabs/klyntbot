@@ -22,9 +22,9 @@ use providers::{ChatParams, DynProvider, Message, ResponseFormat};
 /// using pattern matching rather than LLM calls.
 pub struct HeuristicExtractionHandler;
 
-#[async_trait]
-impl ExtractionHandler for HeuristicExtractionHandler {
-    async fn extract_facts(&self, observation: &Observation) -> common::Result<Vec<ExtractedFact>> {
+impl HeuristicExtractionHandler {
+    /// Single-observation extraction logic (used by both heuristic and LLM fallback).
+    pub(crate) fn extract_single(&self, observation: &Observation) -> Vec<ExtractedFact> {
         let fact = |domain: &str, predicate: &str, confidence: f64, source: &str| ExtractedFact {
             domain: domain.into(),
             subject: "user".into(),
@@ -35,7 +35,7 @@ impl ExtractionHandler for HeuristicExtractionHandler {
         };
         let od = observation.domain.as_str();
 
-        let facts = match observation.source_event.as_str() {
+        match observation.source_event.as_str() {
             "UserStatedFact" => vec![fact(od, "stated", 1.0, "user_stated")],
             "UserCorrectedAI" => vec![fact(od, "corrected", 1.0, "user_stated")],
             "ChatTurnCompleted" => {
@@ -68,9 +68,39 @@ impl ExtractionHandler for HeuristicExtractionHandler {
                 )]
             }
             _ => vec![],
-        };
+        }
+    }
+}
 
-        Ok(facts)
+impl HeuristicExtractionHandler {
+    /// Synchronous batch extraction (no async needed for heuristic).
+    /// Used directly by `LlmExtractionHandler::fallback_all`.
+    pub(crate) fn extract_facts_batch_sync(
+        &self,
+        observations: &[Observation],
+    ) -> cognitive::BatchExtractionResult {
+        let extractions = observations
+            .iter()
+            .enumerate()
+            .map(|(i, obs)| cognitive::BatchExtraction {
+                observation_index: i,
+                facts: self.extract_single(obs),
+            })
+            .collect();
+        cognitive::BatchExtractionResult {
+            extractions,
+            fallback_indices: Vec::new(), // Heuristic IS the fallback
+        }
+    }
+}
+
+#[async_trait]
+impl ExtractionHandler for HeuristicExtractionHandler {
+    async fn extract_facts_batch(
+        &self,
+        observations: &[Observation],
+    ) -> common::Result<cognitive::BatchExtractionResult> {
+        Ok(self.extract_facts_batch_sync(observations))
     }
 }
 
@@ -78,19 +108,18 @@ impl ExtractionHandler for HeuristicExtractionHandler {
 /// simple text matching on subject+predicate pairs.
 pub struct HeuristicConsolidationHandler;
 
-#[async_trait]
-impl ConsolidationHandler for HeuristicConsolidationHandler {
-    async fn decide(
+impl HeuristicConsolidationHandler {
+    /// Single-candidate consolidation logic (used by both heuristic and LLM fallback).
+    pub(crate) fn decide_single(
         &self,
-        candidate: &SemanticFact,
-        existing: &[SemanticFact],
-    ) -> common::Result<MemoryOp> {
-        // Single pass: find exact duplicate or predicate-only match
-        let mut update_from: Option<&SemanticFact> = None;
+        candidate: &cognitive::types::SemanticFact,
+        existing: &[cognitive::types::SemanticFact],
+    ) -> MemoryOp {
+        let mut update_from: Option<&cognitive::types::SemanticFact> = None;
         for fact in existing {
             if fact.predicate == candidate.predicate {
                 if fact.object == candidate.object {
-                    return Ok(MemoryOp::Noop);
+                    return MemoryOp::Noop;
                 }
                 if update_from.is_none() {
                     update_from = Some(fact);
@@ -99,15 +128,30 @@ impl ConsolidationHandler for HeuristicConsolidationHandler {
         }
 
         if let Some(old) = update_from {
-            return Ok(MemoryOp::Update {
+            return MemoryOp::Update {
                 id: candidate.id.clone(),
                 old_id: old.id.clone(),
-            });
+            };
         }
 
-        Ok(MemoryOp::Add {
+        MemoryOp::Add {
             id: candidate.id.clone(),
-        })
+        }
+    }
+}
+
+#[async_trait]
+impl ConsolidationHandler for HeuristicConsolidationHandler {
+    async fn decide_batch(
+        &self,
+        candidates: &[cognitive::ConsolidationCandidate],
+    ) -> common::Result<Vec<MemoryOp>> {
+        let mut ops = Vec::with_capacity(candidates.len());
+        for entry in candidates {
+            let op = self.decide_single(&entry.candidate, &entry.existing);
+            ops.push(op);
+        }
+        Ok(ops)
     }
 }
 
@@ -186,7 +230,13 @@ impl LlmExtractionHandler {
 }
 
 #[derive(serde::Deserialize)]
-struct ExtractionResult {
+struct BatchExtractionLlmResult {
+    results: Vec<ObservationExtraction>,
+}
+
+#[derive(serde::Deserialize)]
+struct ObservationExtraction {
+    observation_index: usize,
     facts: Vec<ExtractedFactJson>,
 }
 
@@ -200,15 +250,46 @@ struct ExtractedFactJson {
     source: String,
 }
 
+impl LlmExtractionHandler {
+    fn fallback_all(&self, observations: &[Observation]) -> cognitive::BatchExtractionResult {
+        // Delegate to the heuristic handler (same logic), then mark all as fallback
+        let mut result = self.fallback.extract_facts_batch_sync(observations);
+        result.fallback_indices = (0..observations.len()).collect();
+        result
+    }
+}
+
 #[async_trait]
 impl ExtractionHandler for LlmExtractionHandler {
-    async fn extract_facts(&self, observation: &Observation) -> common::Result<Vec<ExtractedFact>> {
-        let user_msg = format!(
-            "Domain: {}\nSource: {}\nImportance: {:.1}\n\nObservation:\n{}",
-            observation.domain,
-            observation.source_event,
-            observation.importance,
-            observation.content
+    async fn extract_facts_batch(
+        &self,
+        observations: &[Observation],
+    ) -> common::Result<cognitive::BatchExtractionResult> {
+        if observations.is_empty() {
+            return Ok(cognitive::BatchExtractionResult {
+                extractions: Vec::new(),
+                fallback_indices: Vec::new(),
+            });
+        }
+
+        // Build numbered observation list for the prompt
+        let mut user_msg = String::new();
+        for (i, obs) in observations.iter().enumerate() {
+            use std::fmt::Write;
+            writeln!(
+                &mut user_msg,
+                "Observation {}:\nDomain: {}\nSource: {}\nImportance: {:.1}\nContent: {}\n",
+                i + 1,
+                obs.domain,
+                obs.source_event,
+                obs.importance,
+                obs.content
+            )
+            .unwrap();
+        }
+        user_msg.push_str(
+            "Extract facts from ALL observations. Return JSON:\n\
+             {\"results\": [{\"observation_index\": 1, \"facts\": [{\"domain\": \"...\", \"subject\": \"...\", \"predicate\": \"...\", \"object\": \"...\", \"confidence\": 0.0, \"source\": \"...\"}]}]}",
         );
 
         let messages = vec![
@@ -219,30 +300,46 @@ impl ExtractionHandler for LlmExtractionHandler {
         match self.provider.chat(&messages, None, &self.params).await {
             Ok(response) => {
                 let content = response.content.unwrap_or_default();
-                match serde_json::from_str::<ExtractionResult>(&content) {
-                    Ok(result) => Ok(result
-                        .facts
-                        .into_iter()
-                        .map(|f| ExtractedFact {
-                            domain: f.domain,
-                            subject: f.subject,
-                            predicate: f.predicate,
-                            object: f.object,
-                            confidence: f.confidence,
-                            source: f.source,
+                match serde_json::from_str::<BatchExtractionLlmResult>(&content) {
+                    Ok(result) => {
+                        let extractions = result
+                            .results
+                            .into_iter()
+                            .filter(|r| r.observation_index > 0) // skip invalid 0 indices (prompt is 1-based)
+                            .map(|r| cognitive::BatchExtraction {
+                                observation_index: r.observation_index - 1, // 1-based to 0-based
+                                facts: r
+                                    .facts
+                                    .into_iter()
+                                    .map(|f| ExtractedFact {
+                                        domain: f.domain,
+                                        subject: f.subject,
+                                        predicate: f.predicate,
+                                        object: f.object,
+                                        confidence: f.confidence,
+                                        source: f.source,
+                                    })
+                                    .collect(),
+                            })
+                            .collect();
+                        Ok(cognitive::BatchExtractionResult {
+                            extractions,
+                            fallback_indices: Vec::new(),
                         })
-                        .collect()),
+                    }
                     Err(e) => {
                         tracing::warn!(
-                            "LLM extraction JSON parse failed: {e}, falling back to heuristic"
+                            "LLM batch extraction JSON parse failed: {e}, falling back to heuristic for all"
                         );
-                        self.fallback.extract_facts(observation).await
+                        Ok(self.fallback_all(observations))
                     }
                 }
             }
             Err(e) => {
-                tracing::warn!("LLM extraction call failed: {e}, falling back to heuristic");
-                self.fallback.extract_facts(observation).await
+                tracing::warn!(
+                    "LLM batch extraction call failed: {e}, falling back to heuristic for all"
+                );
+                Ok(self.fallback_all(observations))
             }
         }
     }
@@ -251,16 +348,16 @@ impl ExtractionHandler for LlmExtractionHandler {
 // ── Consolidation ──
 
 const CONSOLIDATION_SYSTEM_PROMPT: &str = "\
-You are a semantic memory consolidation agent. Given a candidate fact and existing \
-similar facts, decide the correct operation:\n\n\
+You are a semantic memory consolidation agent. Given candidate facts and their existing \
+similar facts, decide the correct operation for each:\n\n\
 - add: The candidate is genuinely new information, no existing fact covers it.\n\
 - update: The candidate refines or corrects an existing fact. Provide the target_id of the fact to supersede.\n\
 - delete: The candidate contradicts an existing fact and the existing fact should be marked superseded. Provide the target_id to delete.\n\
 - noop: The candidate is already known.\n\n\
 Always prefer noop over add if the information is essentially the same.\n\
 Always prefer update over delete+add when the meaning is similar but the value changed.\n\n\
-Respond with JSON in this exact format:\n\
-{\"action\": \"add\", \"target_id\": null, \"reasoning\": \"New fact not covered by existing facts\", \"confidence\": 0.9}";
+Respond with JSON containing a decisions array, one entry per candidate:\n\
+{\"decisions\": [{\"index\": 1, \"action\": \"add|update|delete|noop\", \"target_id\": null}]}";
 
 /// LLM-backed consolidation with heuristic fallback.
 pub struct LlmConsolidationHandler {
@@ -280,40 +377,116 @@ impl LlmConsolidationHandler {
 }
 
 #[derive(serde::Deserialize)]
-struct ConsolidationDecisionJson {
+struct BatchConsolidationLlmResult {
+    decisions: Vec<ConsolidationDecisionIndexed>,
+}
+
+#[derive(serde::Deserialize)]
+struct ConsolidationDecisionIndexed {
+    index: usize,
     action: String,
     target_id: Option<String>,
-    #[allow(dead_code)]
-    reasoning: String,
-    #[allow(dead_code)]
-    confidence: f64,
+}
+
+impl LlmConsolidationHandler {
+    fn decision_to_op(
+        &self,
+        action: &str,
+        target_id: Option<&str>,
+        candidate: &cognitive::types::SemanticFact,
+        existing: &[cognitive::types::SemanticFact],
+    ) -> MemoryOp {
+        match action {
+            "add" => MemoryOp::Add {
+                id: candidate.id.clone(),
+            },
+            "update" => {
+                let old_id = target_id
+                    .map(String::from)
+                    .or_else(|| existing.first().map(|f| f.id.clone()))
+                    .unwrap_or_default();
+                MemoryOp::Update {
+                    id: candidate.id.clone(),
+                    old_id,
+                }
+            }
+            "delete" => {
+                let target = target_id
+                    .map(String::from)
+                    .or_else(|| existing.first().map(|f| f.id.clone()))
+                    .unwrap_or_default();
+                MemoryOp::Delete {
+                    id: target,
+                    superseded_by: candidate.id.clone(),
+                }
+            }
+            _ => MemoryOp::Noop,
+        }
+    }
 }
 
 #[async_trait]
 impl ConsolidationHandler for LlmConsolidationHandler {
-    async fn decide(
+    async fn decide_batch(
         &self,
-        candidate: &SemanticFact,
-        existing: &[SemanticFact],
-    ) -> common::Result<MemoryOp> {
-        let existing_json: Vec<serde_json::Value> = existing
-            .iter()
-            .map(|f| {
-                json!({
-                    "id": f.id,
-                    "subject": f.subject,
-                    "predicate": f.predicate,
-                    "object": f.object,
-                    "confidence": f.confidence,
-                    "source": f.source,
-                })
-            })
-            .collect();
+        candidates: &[cognitive::ConsolidationCandidate],
+    ) -> common::Result<Vec<MemoryOp>> {
+        if candidates.is_empty() {
+            return Ok(Vec::new());
+        }
 
-        let user_msg = format!(
-            "Candidate fact:\n  subject: {}\n  predicate: {}\n  object: {}\n  confidence: {}\n\nExisting facts:\n{}",
-            candidate.subject, candidate.predicate, candidate.object, candidate.confidence,
-            serde_json::to_string_pretty(&existing_json).unwrap_or_default()
+        // Candidates with no existing matches -> direct ADD (skip LLM)
+        let mut ops = vec![None; candidates.len()];
+        let mut llm_indices = Vec::new();
+
+        for (i, entry) in candidates.iter().enumerate() {
+            if entry.existing.is_empty() {
+                ops[i] = Some(MemoryOp::Add {
+                    id: entry.candidate.id.clone(),
+                });
+            } else {
+                llm_indices.push(i);
+            }
+        }
+
+        if llm_indices.is_empty() {
+            return Ok(ops.into_iter().map(|o| o.unwrap()).collect());
+        }
+
+        // Build prompt for candidates that need LLM decisions
+        let mut user_msg = String::new();
+        for (prompt_idx, &cand_idx) in llm_indices.iter().enumerate() {
+            let entry = &candidates[cand_idx];
+            let existing_json: Vec<serde_json::Value> = entry
+                .existing
+                .iter()
+                .map(|f| {
+                    json!({
+                        "id": f.id,
+                        "subject": f.subject,
+                        "predicate": f.predicate,
+                        "object": f.object,
+                        "confidence": f.confidence,
+                    })
+                })
+                .collect();
+
+            use std::fmt::Write;
+            writeln!(
+                &mut user_msg,
+                "Decision {}:\nCandidate: {}.{} = {} (confidence: {})\nExisting: {}\n",
+                prompt_idx + 1,
+                entry.candidate.subject,
+                entry.candidate.predicate,
+                entry.candidate.object,
+                entry.candidate.confidence,
+                serde_json::to_string(&existing_json).unwrap_or_default()
+            )
+            .unwrap();
+        }
+        user_msg.push_str(
+            "Decide for ALL candidates. Return JSON:\n\
+             {\"decisions\": [{\"index\": 1, \"action\": \"add|update|delete|noop\", \"target_id\": null}]}",
         );
 
         let messages = vec![
@@ -324,42 +497,53 @@ impl ConsolidationHandler for LlmConsolidationHandler {
         match self.provider.chat(&messages, None, &self.params).await {
             Ok(response) => {
                 let content = response.content.unwrap_or_default();
-                match serde_json::from_str::<ConsolidationDecisionJson>(&content) {
-                    Ok(decision) => match decision.action.as_str() {
-                        "add" => Ok(MemoryOp::Add {
-                            id: candidate.id.clone(),
-                        }),
-                        "update" => {
-                            let old_id = decision.target_id.unwrap_or_else(|| {
-                                existing.first().map(|f| f.id.clone()).unwrap_or_default()
-                            });
-                            Ok(MemoryOp::Update {
-                                id: candidate.id.clone(),
-                                old_id,
-                            })
+                match serde_json::from_str::<BatchConsolidationLlmResult>(&content) {
+                    Ok(result) => {
+                        for decision in result.decisions {
+                            let prompt_idx = decision.index.saturating_sub(1); // 1-based to 0-based
+                            if let Some(&cand_idx) = llm_indices.get(prompt_idx) {
+                                let candidate = &candidates[cand_idx].candidate;
+                                let existing = &candidates[cand_idx].existing;
+                                ops[cand_idx] = Some(self.decision_to_op(
+                                    &decision.action,
+                                    decision.target_id.as_deref(),
+                                    candidate,
+                                    existing,
+                                ));
+                            }
                         }
-                        "delete" => {
-                            let target = decision.target_id.unwrap_or_else(|| {
-                                existing.first().map(|f| f.id.clone()).unwrap_or_default()
-                            });
-                            Ok(MemoryOp::Delete {
-                                id: target,
-                                superseded_by: candidate.id.clone(),
-                            })
-                        }
-                        _ => Ok(MemoryOp::Noop),
-                    },
+                    }
                     Err(e) => {
-                        tracing::warn!("LLM consolidation JSON parse failed: {e}, falling back");
-                        self.fallback.decide(candidate, existing).await
+                        tracing::warn!(
+                            "LLM batch consolidation JSON parse failed: {e}, falling back"
+                        );
+                        for &cand_idx in &llm_indices {
+                            let entry = &candidates[cand_idx];
+                            ops[cand_idx] = Some(
+                                self.fallback
+                                    .decide_single(&entry.candidate, &entry.existing),
+                            );
+                        }
                     }
                 }
             }
             Err(e) => {
-                tracing::warn!("LLM consolidation call failed: {e}, falling back");
-                self.fallback.decide(candidate, existing).await
+                tracing::warn!("LLM batch consolidation call failed: {e}, falling back");
+                for &cand_idx in &llm_indices {
+                    let entry = &candidates[cand_idx];
+                    ops[cand_idx] = Some(
+                        self.fallback
+                            .decide_single(&entry.candidate, &entry.existing),
+                    );
+                }
             }
         }
+
+        // Fill any remaining None entries with Noop (missing from LLM response)
+        Ok(ops
+            .into_iter()
+            .map(|o| o.unwrap_or(MemoryOp::Noop))
+            .collect())
     }
 }
 
@@ -780,7 +964,12 @@ mod tests {
     async fn test_extraction_user_stated_fact() {
         let handler = HeuristicExtractionHandler;
         let obs = test_observation("UserStatedFact", "I prefer dark mode", 1.0);
-        let facts = handler.extract_facts(&obs).await.unwrap();
+        let result = handler.extract_facts_batch(&[obs]).await.unwrap();
+        let facts: Vec<_> = result
+            .extractions
+            .into_iter()
+            .flat_map(|e| e.facts)
+            .collect();
         assert_eq!(facts.len(), 1);
         assert_eq!(facts[0].source, "user_stated");
         assert_eq!(facts[0].confidence, 1.0);
@@ -790,7 +979,12 @@ mod tests {
     async fn test_extraction_low_importance_skipped() {
         let handler = HeuristicExtractionHandler;
         let obs = test_observation("ProductivityScoreComputed", "Score: 72", 0.5);
-        let facts = handler.extract_facts(&obs).await.unwrap();
+        let result = handler.extract_facts_batch(&[obs]).await.unwrap();
+        let facts: Vec<_> = result
+            .extractions
+            .into_iter()
+            .flat_map(|e| e.facts)
+            .collect();
         assert!(facts.is_empty());
     }
 
@@ -798,7 +992,12 @@ mod tests {
     async fn test_extraction_high_importance_extracted() {
         let handler = HeuristicExtractionHandler;
         let obs = test_observation("TransactionRecorded", "Over budget!", 0.8);
-        let facts = handler.extract_facts(&obs).await.unwrap();
+        let result = handler.extract_facts_batch(&[obs]).await.unwrap();
+        let facts: Vec<_> = result
+            .extractions
+            .into_iter()
+            .flat_map(|e| e.facts)
+            .collect();
         assert_eq!(facts.len(), 1);
     }
 
@@ -808,7 +1007,14 @@ mod tests {
     async fn test_consolidation_add_when_empty() {
         let handler = HeuristicConsolidationHandler;
         let candidate = test_fact("c1", "peak_hours", "10am-12pm");
-        let result = handler.decide(&candidate, &[]).await.unwrap();
+        let ops = handler
+            .decide_batch(&[cognitive::ConsolidationCandidate {
+                candidate,
+                existing: vec![],
+            }])
+            .await
+            .unwrap();
+        let result = ops.into_iter().next().unwrap();
         assert!(matches!(result, MemoryOp::Add { .. }));
     }
 
@@ -817,7 +1023,14 @@ mod tests {
         let handler = HeuristicConsolidationHandler;
         let candidate = test_fact("c1", "peak_hours", "10am-12pm");
         let existing = vec![test_fact("e1", "peak_hours", "10am-12pm")];
-        let result = handler.decide(&candidate, &existing).await.unwrap();
+        let ops = handler
+            .decide_batch(&[cognitive::ConsolidationCandidate {
+                candidate,
+                existing,
+            }])
+            .await
+            .unwrap();
+        let result = ops.into_iter().next().unwrap();
         assert!(matches!(result, MemoryOp::Noop));
     }
 
@@ -826,7 +1039,14 @@ mod tests {
         let handler = HeuristicConsolidationHandler;
         let candidate = test_fact("c1", "peak_hours", "2pm-4pm");
         let existing = vec![test_fact("e1", "peak_hours", "10am-12pm")];
-        let result = handler.decide(&candidate, &existing).await.unwrap();
+        let ops = handler
+            .decide_batch(&[cognitive::ConsolidationCandidate {
+                candidate,
+                existing,
+            }])
+            .await
+            .unwrap();
+        let result = ops.into_iter().next().unwrap();
         assert!(matches!(result, MemoryOp::Update { .. }));
     }
 
@@ -835,7 +1055,14 @@ mod tests {
         let handler = HeuristicConsolidationHandler;
         let candidate = test_fact("c1", "work_style", "deep focus");
         let existing = vec![test_fact("e1", "peak_hours", "10am-12pm")];
-        let result = handler.decide(&candidate, &existing).await.unwrap();
+        let ops = handler
+            .decide_batch(&[cognitive::ConsolidationCandidate {
+                candidate,
+                existing,
+            }])
+            .await
+            .unwrap();
+        let result = ops.into_iter().next().unwrap();
         assert!(matches!(result, MemoryOp::Add { .. }));
     }
 
@@ -875,7 +1102,7 @@ mod tests {
     #[tokio::test]
     async fn test_llm_extraction_parses_json_response() {
         let mock = Arc::new(MockProvider::new(mock_response(
-            r#"{"facts":[{"domain":"energy","subject":"user","predicate":"peak_hours","object":"10am-12pm","confidence":0.85,"source":"observed"}]}"#,
+            r#"{"results":[{"observation_index":1,"facts":[{"domain":"energy","subject":"user","predicate":"peak_hours","object":"10am-12pm","confidence":0.85,"source":"observed"}]}]}"#,
         )));
         let params = ChatParams::new("test-model")
             .with_temperature(0.2)
@@ -889,7 +1116,12 @@ mod tests {
             source_event: "ProductivityScoreComputed".into(),
             timestamp: Utc::now(),
         };
-        let facts = handler.extract_facts(&obs).await.unwrap();
+        let result = handler.extract_facts_batch(&[obs]).await.unwrap();
+        let facts: Vec<_> = result
+            .extractions
+            .into_iter()
+            .flat_map(|e| e.facts)
+            .collect();
         assert_eq!(facts.len(), 1);
         assert_eq!(facts[0].domain, "energy");
         assert_eq!(facts[0].predicate, "peak_hours");
@@ -909,7 +1141,12 @@ mod tests {
             source_event: "UserStatedFact".into(),
             timestamp: Utc::now(),
         };
-        let facts = handler.extract_facts(&obs).await.unwrap();
+        let result = handler.extract_facts_batch(&[obs]).await.unwrap();
+        let facts: Vec<_> = result
+            .extractions
+            .into_iter()
+            .flat_map(|e| e.facts)
+            .collect();
         assert!(!facts.is_empty());
     }
 
@@ -918,14 +1155,21 @@ mod tests {
     #[tokio::test]
     async fn test_llm_consolidation_parses_update() {
         let mock = Arc::new(MockProvider::new(mock_response(
-            r#"{"action":"update","target_id":"old-1","reasoning":"More specific time range","confidence":0.9}"#,
+            r#"{"decisions":[{"index":1,"action":"update","target_id":"old-1"}]}"#,
         )));
         let params = ChatParams::new("test-model");
         let handler = LlmConsolidationHandler::new(mock, params);
 
         let candidate = test_fact("new-1", "peak_hours", "9am-11am");
         let existing = vec![test_fact("old-1", "peak_hours", "10am-12pm")];
-        let op = handler.decide(&candidate, &existing).await.unwrap();
+        let ops = handler
+            .decide_batch(&[cognitive::ConsolidationCandidate {
+                candidate,
+                existing,
+            }])
+            .await
+            .unwrap();
+        let op = ops.into_iter().next().unwrap();
         assert!(
             matches!(op, MemoryOp::Update { ref id, ref old_id } if id == "new-1" && old_id == "old-1")
         );
@@ -934,14 +1178,21 @@ mod tests {
     #[tokio::test]
     async fn test_llm_consolidation_parses_noop() {
         let mock = Arc::new(MockProvider::new(mock_response(
-            r#"{"action":"noop","target_id":null,"reasoning":"Already known","confidence":1.0}"#,
+            r#"{"decisions":[{"index":1,"action":"noop","target_id":null}]}"#,
         )));
         let params = ChatParams::new("test-model");
         let handler = LlmConsolidationHandler::new(mock, params);
 
         let candidate = test_fact("new-1", "peak_hours", "10am-12pm");
         let existing = vec![test_fact("old-1", "peak_hours", "10am-12pm")];
-        let op = handler.decide(&candidate, &existing).await.unwrap();
+        let ops = handler
+            .decide_batch(&[cognitive::ConsolidationCandidate {
+                candidate,
+                existing,
+            }])
+            .await
+            .unwrap();
+        let op = ops.into_iter().next().unwrap();
         assert_eq!(op, MemoryOp::Noop);
     }
 

@@ -9,7 +9,7 @@ use chrono::Utc;
 use storage::StorageError;
 use tracing::{debug, info, warn};
 
-use crate::consolidation::{consolidate_batch, ConsolidationHandler};
+use crate::consolidation::{execute_memory_ops, ConsolidationCandidate, ConsolidationHandler};
 use crate::embedder::SemanticFactEmbedder;
 use crate::repos::{
     load_user_model, EpisodicMemoryRepo, ProceduralRuleRepo, SemanticFactRepo, RULE_DOMAINS,
@@ -111,8 +111,38 @@ pub async fn run_weekly_reflection(
             .collect();
 
         if !validated.is_empty() {
-            consolidate_batch(&validated, fact_repo, consolidation, embedder).await;
-            debug!("Reflection: consolidated {} fact updates", validated.len());
+            // Concurrent prefetch of existing facts (avoid sequential N+1)
+            let futs: Vec<_> = validated
+                .iter()
+                .map(|fact| {
+                    let repo = fact_repo.clone();
+                    let subject = fact.subject.clone();
+                    let predicate = fact.predicate.clone();
+                    async move {
+                        repo.find_similar(&subject, &predicate)
+                            .await
+                            .unwrap_or_default()
+                    }
+                })
+                .collect();
+            let existing_results = futures_util::future::join_all(futs).await;
+            let candidates: Vec<_> = validated
+                .iter()
+                .zip(existing_results)
+                .map(|(fact, existing)| ConsolidationCandidate {
+                    candidate: fact.clone(),
+                    existing,
+                })
+                .collect();
+            match consolidation.decide_batch(&candidates).await {
+                Ok(ops) => {
+                    execute_memory_ops(&ops, &candidates, fact_repo, embedder).await;
+                    debug!("Reflection: consolidated {} fact updates", validated.len());
+                }
+                Err(e) => {
+                    warn!("Reflection: consolidation failed: {e}");
+                }
+            }
         }
     }
 
@@ -174,12 +204,11 @@ mod tests {
 
     #[async_trait]
     impl ConsolidationHandler for MockConsolidationHandler {
-        async fn decide(
+        async fn decide_batch(
             &self,
-            _candidate: &SemanticFact,
-            _existing: &[SemanticFact],
-        ) -> common::Result<crate::types::MemoryOp> {
-            Ok(crate::types::MemoryOp::Noop)
+            candidates: &[ConsolidationCandidate],
+        ) -> common::Result<Vec<crate::types::MemoryOp>> {
+            Ok(vec![crate::types::MemoryOp::Noop; candidates.len()])
         }
     }
 

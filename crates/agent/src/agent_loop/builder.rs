@@ -328,6 +328,7 @@ impl AgentLoopBuilder {
                     };
                     let episodic_repo = cognitive::EpisodicMemoryRepo::new(pool.clone());
                     let accum_repo = cognitive::AccumulatedObservationRepo::new(pool.clone());
+                    let failed_obs_repo = cognitive::FailedObservationRepo::new(pool.clone());
                     let cancel = CancellationToken::new();
                     let bg_service = cognitive::background::BackgroundConsolidationService::start(
                         event_rx,
@@ -339,6 +340,7 @@ impl AgentLoopBuilder {
                         cancel.clone(),
                         self.pipeline_tx.take(),
                         Some(accum_repo),
+                        Some(failed_obs_repo),
                         config.cognitive.accumulate_promote_threshold,
                         config.cognitive.accumulate_min_days,
                     );
@@ -958,12 +960,10 @@ impl AgentLoopBuilder {
             )
             .with_event_bus(event_bus);
             if let Some(ref domain_bus) = self.domain_event_bus {
-                service = service.with_pattern_analyzer(
-                    crate::learning::PatternAnalyzer::new(
-                        repos.interaction_log.clone(),
-                        Arc::clone(domain_bus),
-                    ),
-                );
+                service = service.with_pattern_analyzer(crate::learning::PatternAnalyzer::new(
+                    repos.interaction_log.clone(),
+                    Arc::clone(domain_bus),
+                ));
             }
             service.start();
             Some(Arc::new(RwLock::new(service)))

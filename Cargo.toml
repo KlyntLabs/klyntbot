@@ -171,6 +171,7 @@ sqlx.workspace = true
 serde_json.workspace = true
 chrono.workspace = true
 tokio.workspace = true
+tokio-util.workspace = true
 uuid.workspace = true
 feature-todo.workspace = true
 feature-finance.workspace = true

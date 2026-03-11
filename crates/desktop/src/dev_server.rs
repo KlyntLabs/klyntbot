@@ -417,6 +417,7 @@ async fn cognitive_sse_handler(
                                 let event_name = match &pe {
                                     cognitive::PipelineEvent::Extraction { .. } => "cognitive:extraction",
                                     cognitive::PipelineEvent::Consolidation { .. } => "cognitive:consolidation",
+                                    _ => "cognitive:other",
                                 };
                                 let data = serde_json::to_string(&pe).unwrap_or_default();
                                 let event = Event::default().event(event_name).data(data);

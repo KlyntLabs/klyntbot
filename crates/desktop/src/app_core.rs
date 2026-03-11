@@ -237,6 +237,7 @@ fn wire_event_channels(core: &AppCore, channels: EventChannels, app_handle: &tau
                             cognitive::PipelineEvent::Consolidation { .. } => {
                                 "cognitive:consolidation"
                             }
+                            _ => continue, // BatchStarted, DeadLetterQueued, DeadLetterReprocessed — no desktop handling needed
                         };
                         let _ = app_handle_clone.emit(event_name, &pe);
                     }

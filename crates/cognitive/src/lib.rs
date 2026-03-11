@@ -20,19 +20,19 @@ pub mod types;
 
 pub use background::PipelineEvent;
 pub use compaction::CompactionResult;
-pub use consolidation::ConsolidationHandler;
+pub use consolidation::{execute_memory_ops, ConsolidationCandidate, ConsolidationHandler};
 pub use context_source::{CognitiveContextSource, CognitiveRetrievalConfig};
 pub use conversation_recall::{
     ConversationRecallService, RecallConfig, RecallMetadata, RecallResult,
 };
 pub use embedder::{SemanticFactEmbedder, TextEmbedder};
-pub use extraction::{ExtractedFact, ExtractionHandler};
+pub use extraction::{BatchExtraction, BatchExtractionResult, ExtractedFact, ExtractionHandler};
 pub use memory_retriever::UnifiedMemoryService;
 pub use reflection::ReflectionHandler;
 pub use repos::event_log::{DomainEventRow, PipelineEventRow};
 pub use repos::{
     cognitive_migrations, AccumulatedObservationRepo, AnnotationRepo, EpisodicMemoryRepo,
-    EventLogRepo, ProceduralRuleRepo, SemanticFactRepo,
+    EventLogRepo, FailedObservationRepo, ProceduralRuleRepo, SemanticFactRepo,
 };
 pub use situation::{compute_situation, SituationInputs, UserSituation};
 pub use types::*;

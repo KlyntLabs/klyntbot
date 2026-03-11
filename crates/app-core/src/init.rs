@@ -1089,6 +1089,10 @@ fn spawn_event_log_persistence(
                                         )
                                         .await
                                     }
+                                    _ => {
+                                        // BatchStarted, DeadLetterQueued, DeadLetterReprocessed — log but don't persist
+                                        continue;
+                                    }
                                 };
 
                                 if let Err(e) = result {
