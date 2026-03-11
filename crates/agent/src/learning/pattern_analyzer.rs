@@ -6,9 +6,9 @@
 //! - Agent usage frequency
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use chrono::{Datelike, Timelike};
-use tracing::warn;
 
 /// Minimum interactions before patterns can be detected.
 const MIN_INTERACTIONS_FOR_ANALYSIS: usize = 10;
@@ -17,19 +17,21 @@ const MIN_INTERACTIONS_FOR_ANALYSIS: usize = 10;
 const MIN_PATTERN_OCCURRENCES: i32 = 5;
 
 /// Analyzes interaction logs to detect behavioral patterns.
+///
+/// Emits `DomainEvent::BehavioralPatternDetected` events instead of writing
+/// to the (now-removed) `behavioral_patterns` table. The cognitive pipeline
+/// processes these events into procedural rules via salience → extraction →
+/// consolidation.
 pub struct PatternAnalyzer {
     log_repo: storage::InteractionLogRepo,
-    pattern_repo: storage::BehavioralPatternRepo,
+    event_bus: Arc<bus::DomainEventBus>,
 }
 
 impl PatternAnalyzer {
-    pub fn new(
-        log_repo: storage::InteractionLogRepo,
-        pattern_repo: storage::BehavioralPatternRepo,
-    ) -> Self {
+    pub fn new(log_repo: storage::InteractionLogRepo, event_bus: Arc<bus::DomainEventBus>) -> Self {
         Self {
             log_repo,
-            pattern_repo,
+            event_bus,
         }
     }
 
@@ -74,49 +76,53 @@ impl PatternAnalyzer {
             }
         }
 
-        // Flush day-of-week patterns
+        // Emit day-of-week patterns
         for ((day, agent), count) in &day_agent_counts {
             if *count >= MIN_PATTERN_OCCURRENCES {
-                let key = format!("{}_{}", day, agent);
-                let value = serde_json::json!({ "day": day, "agent": agent });
-                if let Err(e) = self
-                    .pattern_repo
-                    .upsert("day_of_week", &key, &value, *count)
-                    .await
-                {
-                    warn!("Failed to upsert day_of_week pattern: {}", e);
-                }
+                self.event_bus
+                    .publish(bus::DomainEvent::BehavioralPatternDetected {
+                        pattern_type: "day_of_week".into(),
+                        pattern_key: format!("{}_{}", day, agent),
+                        sample_count: *count,
+                        detail: format!(
+                            "User uses {} agent frequently on {}s ({} interactions)",
+                            agent, day, count
+                        ),
+                    });
             }
         }
 
-        // Flush time-of-day patterns
+        // Emit time-of-day patterns
         for (period, count) in &time_counts {
             if *count >= MIN_PATTERN_OCCURRENCES {
-                let value = serde_json::json!({ "period": period, "count": count });
-                if let Err(e) = self
-                    .pattern_repo
-                    .upsert("time_of_day", period, &value, *count)
-                    .await
-                {
-                    warn!("Failed to upsert time_of_day pattern: {}", e);
-                }
+                self.event_bus
+                    .publish(bus::DomainEvent::BehavioralPatternDetected {
+                        pattern_type: "time_of_day".into(),
+                        pattern_key: period.clone(),
+                        sample_count: *count,
+                        detail: format!(
+                            "User is most active in the {} ({} interactions)",
+                            period, count
+                        ),
+                    });
             }
         }
 
-        // Agent usage: use the repo's SQL GROUP BY instead of in-memory counting
-        // (correct across full table, not limited to the last 1000 rows)
+        // Agent usage: use the repo's SQL GROUP BY
         let agent_counts = self.log_repo.count_by_agent().await?;
         for (agent, count) in &agent_counts {
             let count_i32 = *count as i32;
             if count_i32 >= MIN_PATTERN_OCCURRENCES {
-                let value = serde_json::json!({ "agent": agent, "total_uses": count });
-                if let Err(e) = self
-                    .pattern_repo
-                    .upsert("agent_usage", agent, &value, count_i32)
-                    .await
-                {
-                    warn!("Failed to upsert agent_usage pattern: {}", e);
-                }
+                self.event_bus
+                    .publish(bus::DomainEvent::BehavioralPatternDetected {
+                        pattern_type: "agent_usage".into(),
+                        pattern_key: agent.clone(),
+                        sample_count: count_i32,
+                        detail: format!(
+                            "{} agent is used frequently ({} total uses)",
+                            agent, count
+                        ),
+                    });
             }
         }
 
@@ -129,11 +135,11 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_record_and_analyze_interactions() {
+    async fn test_pattern_analyzer_emits_domain_events() {
         let pool = storage::StoragePool::connect_in_memory().await.unwrap();
         let repos = storage::Repos::from_pool(&pool);
 
-        // Insert 15 interactions on a Monday with agent="task"
+        // Insert 15 interactions on a Monday morning with agent="task"
         for _ in 0..15 {
             repos
                 .interaction_log
@@ -142,48 +148,58 @@ mod tests {
                     &["task"],
                     "telegram",
                     Some(100),
-                    "2026-03-02 10:00:00", // Monday
+                    "2026-03-02 10:00:00", // Monday morning
                 )
                 .await
                 .unwrap();
         }
 
-        let analyzer = PatternAnalyzer::new(
-            repos.interaction_log.clone(),
-            repos.behavioral_patterns.clone(),
-        );
+        let event_bus = Arc::new(bus::DomainEventBus::new(64));
+        let mut rx = event_bus.subscribe();
+
+        let analyzer = PatternAnalyzer::new(repos.interaction_log.clone(), Arc::clone(&event_bus));
         analyzer.analyze().await.unwrap();
 
-        let patterns = repos
-            .behavioral_patterns
-            .list_by_type("day_of_week")
-            .await
-            .unwrap();
-        assert!(!patterns.is_empty(), "Should detect day_of_week pattern");
+        // Collect all published events
+        let mut events = Vec::new();
+        while let Ok(event) = rx.try_recv() {
+            events.push(event);
+        }
 
-        let agent_patterns = repos
-            .behavioral_patterns
-            .list_by_type("agent_usage")
-            .await
-            .unwrap();
+        // Should have: day_of_week + time_of_day + agent_usage = at least 3 events
         assert!(
-            !agent_patterns.is_empty(),
-            "Should detect agent_usage pattern"
+            events.len() >= 3,
+            "Expected at least 3 events, got {}",
+            events.len()
         );
 
-        let time_patterns = repos
-            .behavioral_patterns
-            .list_by_type("time_of_day")
-            .await
-            .unwrap();
-        assert!(
-            !time_patterns.is_empty(),
-            "Should detect time_of_day pattern"
-        );
+        let has_day = events.iter().any(|e| {
+            matches!(
+                e, bus::DomainEvent::BehavioralPatternDetected { pattern_type, .. }
+                if pattern_type == "day_of_week"
+            )
+        });
+        assert!(has_day, "Expected a day_of_week pattern event");
+
+        let has_time = events.iter().any(|e| {
+            matches!(
+                e, bus::DomainEvent::BehavioralPatternDetected { pattern_type, .. }
+                if pattern_type == "time_of_day"
+            )
+        });
+        assert!(has_time, "Expected a time_of_day pattern event");
+
+        let has_agent = events.iter().any(|e| {
+            matches!(
+                e, bus::DomainEvent::BehavioralPatternDetected { pattern_type, .. }
+                if pattern_type == "agent_usage"
+            )
+        });
+        assert!(has_agent, "Expected an agent_usage pattern event");
     }
 
     #[tokio::test]
-    async fn test_insufficient_data_skips_analysis() {
+    async fn test_insufficient_data_emits_no_events() {
         let pool = storage::StoragePool::connect_in_memory().await.unwrap();
         let repos = storage::Repos::from_pool(&pool);
 
@@ -196,16 +212,15 @@ mod tests {
                 .unwrap();
         }
 
-        let analyzer = PatternAnalyzer::new(
-            repos.interaction_log.clone(),
-            repos.behavioral_patterns.clone(),
-        );
+        let event_bus = Arc::new(bus::DomainEventBus::new(64));
+        let mut rx = event_bus.subscribe();
+
+        let analyzer = PatternAnalyzer::new(repos.interaction_log.clone(), Arc::clone(&event_bus));
         analyzer.analyze().await.unwrap();
 
-        let patterns = repos.behavioral_patterns.list_all().await.unwrap();
         assert!(
-            patterns.is_empty(),
-            "Should not detect patterns with insufficient data"
+            rx.try_recv().is_err(),
+            "Should not emit events with insufficient data"
         );
     }
 }

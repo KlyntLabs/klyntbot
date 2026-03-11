@@ -98,6 +98,15 @@ impl ProceduralRuleRepo {
             .await
     }
 
+    /// List all active rules across all domains.
+    pub async fn list_all_active(&self) -> Result<Vec<ProceduralRule>, sqlx::Error> {
+        sqlx::query_as::<_, ProceduralRule>(
+            "SELECT * FROM procedural_rules WHERE active = 1 ORDER BY confidence DESC",
+        )
+        .fetch_all(&self.pool)
+        .await
+    }
+
     /// Deactivate a rule.
     pub async fn deactivate(&self, id: &str) -> Result<(), sqlx::Error> {
         sqlx::query(
@@ -160,6 +169,25 @@ mod tests {
 
         let active = repo.list_active("productivity").await.unwrap();
         assert_eq!(active[0].signal_count, 3); // started at 1, +2
+    }
+
+    #[tokio::test]
+    async fn test_list_all_active_across_domains() {
+        let pool = setup().await;
+        let repo = ProceduralRuleRepo::new(pool);
+
+        let r1 = test_rule("r1", "productivity", "Morning is peak time");
+        let r2 = test_rule("r2", "finance", "Track daily expenses");
+        let r3 = test_rule("r3", "productivity", "Break every 90 minutes");
+        repo.upsert(&r1).await.unwrap();
+        repo.upsert(&r2).await.unwrap();
+        repo.upsert(&r3).await.unwrap();
+
+        // Deactivate one to verify filtering
+        repo.deactivate("r3").await.unwrap();
+
+        let all_active = repo.list_all_active().await.unwrap();
+        assert_eq!(all_active.len(), 2);
     }
 
     #[tokio::test]

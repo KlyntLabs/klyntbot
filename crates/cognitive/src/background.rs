@@ -521,6 +521,7 @@ fn event_type_key(event: &DomainEvent) -> String {
         DomainEvent::RuleEvolved { .. } => "RuleEvolved".into(),
         DomainEvent::VoiceJournalProcessed { .. } => "VoiceJournalProcessed".into(),
         DomainEvent::ToolCallExecuted { .. } => "ToolCallExecuted".into(),
+        DomainEvent::BehavioralPatternDetected { .. } => "BehavioralPatternDetected".into(),
     }
 }
 

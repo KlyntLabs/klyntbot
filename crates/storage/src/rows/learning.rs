@@ -77,46 +77,6 @@ pub struct StrategySummaryRow {
     pub avg_escalations: f32,
 }
 
-/// Row struct for the `user_profile` table.
-#[derive(Debug, Clone, FromRow, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct UserProfileRow {
-    pub id: i32,
-    pub category: String,
-    pub key: String,
-    pub value: String,
-    pub source: String,
-    pub confidence: f64,
-    pub agent_name: Option<String>,
-    pub last_confirmed: String,
-    pub created_at: String,
-}
-
-/// Row struct for the `behavioral_patterns` table.
-#[derive(Debug, Clone, FromRow, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BehavioralPatternRow {
-    pub id: i32,
-    pub pattern_type: String,
-    pub pattern_key: String,
-    pub pattern_value: String,
-    pub sample_count: i32,
-    pub last_updated: String,
-}
-
-/// Row struct for the `agent_adaptations` table.
-#[derive(Debug, Clone, FromRow, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AgentAdaptationRow {
-    pub id: i32,
-    pub agent_name: String,
-    pub preference_key: String,
-    pub preference_value: String,
-    pub source: String,
-    pub confidence: f64,
-    pub last_updated: String,
-}
-
 /// Row struct for the `interaction_log` table.
 #[derive(Debug, Clone, FromRow, Serialize)]
 #[serde(rename_all = "camelCase")]

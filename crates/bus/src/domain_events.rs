@@ -155,6 +155,14 @@ pub enum DomainEvent {
         intervention_id: String,
         response: FeedbackResponse,
     },
+
+    // -- Behavioral learning --
+    BehavioralPatternDetected {
+        pattern_type: String,
+        pattern_key: String,
+        sample_count: i32,
+        detail: String,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -228,6 +236,25 @@ mod tests {
 
         assert!(rx1.recv().await.is_ok());
         assert!(rx2.recv().await.is_ok());
+    }
+
+    #[test]
+    fn test_behavioral_pattern_detected_serialization() {
+        let event = DomainEvent::BehavioralPatternDetected {
+            pattern_type: "day_of_week".into(),
+            pattern_key: "monday_task".into(),
+            sample_count: 15,
+            detail: "User uses task agent frequently on Mondays (15 interactions)".into(),
+        };
+        let json = serde_json::to_string(&event).unwrap();
+        let deserialized: DomainEvent = serde_json::from_str(&json).unwrap();
+        assert!(matches!(
+            deserialized,
+            DomainEvent::BehavioralPatternDetected {
+                sample_count: 15,
+                ..
+            }
+        ));
     }
 
     #[test]

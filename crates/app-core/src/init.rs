@@ -1312,6 +1312,7 @@ fn domain_for_event(event: &bus::DomainEvent) -> &'static str {
         bus::DomainEvent::SessionCreated { .. }
         | bus::DomainEvent::SessionEnded { .. }
         | bus::DomainEvent::QualityScored { .. } => "energy",
+        bus::DomainEvent::BehavioralPatternDetected { .. } => "learning",
         bus::DomainEvent::PredictiveAlert { .. } | bus::DomainEvent::NarrativeGenerated { .. } => {
             "general"
         }

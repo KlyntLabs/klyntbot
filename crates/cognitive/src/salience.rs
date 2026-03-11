@@ -63,6 +63,7 @@ pub fn evaluate_salience(event: &DomainEvent) -> SalienceVerdict {
         DomainEvent::NoteCreated { .. } => SalienceVerdict::Accumulate,
         DomainEvent::NoteUpdated { .. } => SalienceVerdict::Accumulate,
         DomainEvent::ToolCallExecuted { .. } => SalienceVerdict::Accumulate,
+        DomainEvent::BehavioralPatternDetected { .. } => SalienceVerdict::Accumulate,
     }
 }
 
@@ -163,5 +164,16 @@ mod tests {
             response: bus::FeedbackResponse::Helpful,
         });
         assert_eq!(verdict, SalienceVerdict::Extract);
+    }
+
+    #[test]
+    fn test_behavioral_pattern_detected_is_accumulate() {
+        let verdict = evaluate_salience(&DomainEvent::BehavioralPatternDetected {
+            pattern_type: "day_of_week".into(),
+            pattern_key: "monday_task".into(),
+            sample_count: 15,
+            detail: "User uses task agent frequently on Mondays".into(),
+        });
+        assert_eq!(verdict, SalienceVerdict::Accumulate);
     }
 }

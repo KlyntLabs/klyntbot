@@ -1,10 +1,8 @@
 //! Repository modules and aggregate struct.
 
 pub mod action_repo;
-pub mod agent_adaptation;
 pub mod agent_task;
 pub mod area;
-pub mod behavioral_pattern;
 pub mod coaching_strategy;
 pub mod cron;
 pub mod custom_column;
@@ -29,17 +27,13 @@ pub mod session_context;
 pub mod status_workflow;
 pub mod strategy;
 pub mod task_group;
-pub mod usage;
-pub mod user_profile;
-
 #[cfg(test)]
 pub mod tests;
+pub mod usage;
 
 pub use action_repo::{ActionFilter, ActionPatch, ActionRepo, ActionSummary};
-pub use agent_adaptation::AgentAdaptationRepo;
 pub use agent_task::AgentTaskRepo;
 pub use area::AreaRepo;
-pub use behavioral_pattern::BehavioralPatternRepo;
 pub use coaching_strategy::{CoachingStrategyRepo, CoachingStrategyRow, UpsertCoachingStrategy};
 pub use cron::CronRepo;
 pub use custom_column::CustomColumnRepo;
@@ -64,7 +58,6 @@ pub use status_workflow::StatusWorkflowRepo;
 pub use strategy::{OverallStats, StrategyRepo, ToolStatsRow};
 pub use task_group::TaskGroupRepo;
 pub use usage::UsageRepo;
-pub use user_profile::UserProfileRepo;
 
 /// Aggregate of all repository handles, constructed from a single `SqlitePool`.
 ///
@@ -87,9 +80,6 @@ pub struct Repos {
     pub decision_log: DecisionLogRepo,
     pub session_context: SessionContextRepo,
     pub finance: crate::FinanceStorage,
-    pub user_profile: UserProfileRepo,
-    pub behavioral_patterns: BehavioralPatternRepo,
-    pub agent_adaptations: AgentAdaptationRepo,
     pub interaction_log: InteractionLogRepo,
     pub status_workflows: StatusWorkflowRepo,
     pub task_groups: TaskGroupRepo,
@@ -118,9 +108,6 @@ impl Repos {
             decision_log: DecisionLogRepo::new(db.clone()),
             session_context: SessionContextRepo::new(db.clone()),
             finance: crate::FinanceStorage::from_pool(&db),
-            user_profile: UserProfileRepo::new(db.clone()),
-            behavioral_patterns: BehavioralPatternRepo::new(db.clone()),
-            agent_adaptations: AgentAdaptationRepo::new(db.clone()),
             interaction_log: InteractionLogRepo::new(db.clone()),
             status_workflows: StatusWorkflowRepo::new(db.clone()),
             task_groups: TaskGroupRepo::new(db.clone()),

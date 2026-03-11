@@ -818,36 +818,7 @@ The system excels at memory architecture and personalization (where it arguably 
 - Add a retry mechanism with exponential backoff
 - Dashboard alert for persistent failures
 
-#### 6. Clean Up Legacy Learning System
-
-**Problem:** L2 learning tables coexist with L5 cognitive system, creating dual authority for user understanding. Investigation reveals a nuanced picture:
-
-| L2 Component | Status | Overlap with L5 |
-|---|---|---|
-| `interaction_log` | **Active** — written every message by `InteractionRecorder`, read by `PatternAnalyzer` | **None** — only raw interaction audit trail in the system |
-| `behavioral_patterns` | **Active** — computed every ~60s by `PatternAnalyzer` (day-of-week, time-of-day, agent usage) | **High** — overlaps with L5 procedural rules from weekly reflection |
-| `user_profile` | **Zombie** — never written in production, read-only for transparency events | **Full** — completely superseded by L5 semantic facts |
-| `agent_adaptations` | **Zombie** — never written in production, read-only for transparency events | **Partial** — per-agent preference concept is unique (L5 facts are global) |
-
-**Solution (phased):**
-
-**Phase 1 — Remove zombie tables:**
-- Delete `user_profile` table, repo, and transparency reads — it's dead code with no production writes
-- Delete `agent_adaptations` table and repo — also dead code. If per-agent preferences are needed later, implement as agent-scoped semantic facts in L5
-
-**Phase 2 — Migrate `behavioral_patterns` to L5:**
-- Route `PatternAnalyzer` output into the cognitive consolidation pipeline instead of `behavioral_patterns` table
-- Temporal patterns (day-of-week, time-of-day productivity) become procedural rules via the reflection cycle
-- Remove `behavioral_patterns` table after migration
-
-**Phase 3 — Keep `interaction_log` (no L5 equivalent):**
-- `interaction_log` stays — it's the raw audit trail for `(timestamp, agent, tools, channel, latency)`
-- L5 has no equivalent raw interaction logging; episodic memories are higher-level summaries
-- Consider adding a retention policy (e.g., 90-day compaction) to match L5 compaction patterns
-
-**Files involved:** `storage/migrations/003_learning_system.sql`, `storage/src/repos/{user_profile,behavioral_pattern,agent_adaptation,interaction_log}.rs`, `agent/src/learning/{interaction_recorder,pattern_analyzer,service}.rs`, `agent/src/agent_runtime/runtime.rs:505-587` (transparency events)
-
-#### 7. Add Per-User FSRS Calibration
+#### 6. Add Per-User FSRS Calibration
 
 **Problem:** FSRS parameters (`maxStability`, relevance weights) are configurable via `CognitiveConfig` but not automatically tuned per-user.
 
@@ -858,19 +829,19 @@ The system excels at memory architecture and personalization (where it arguably 
 
 ### 9.3 Lower Priority / Future Vision
 
-#### 8. Multi-Model Memory Pipeline
+#### 7. Multi-Model Memory Pipeline
 
 Use smaller/cheaper models for extraction and consolidation, reserving expensive models for user-facing responses.
 
-#### 9. Graph-Based Fact Relations
+#### 8. Graph-Based Fact Relations
 
 Add edges between semantic facts to represent relationships (e.g., "peak_hours CAUSES higher_productivity"). This would enable reasoning chains.
 
-#### 10. Proactive Memory Verification
+#### 9. Proactive Memory Verification
 
 Periodically verify high-importance facts with the user ("I believe your peak hours are 10am-12pm — is this still accurate?"). Prevents stale facts.
 
-#### 11. Memory Export & Portability
+#### 10. Memory Export & Portability
 
 Allow users to export their complete memory state (UserModel + episodic + procedural rules) as a portable format, enabling migration between AI systems.
 

@@ -17,11 +17,6 @@ use tracing::{debug, warn};
 use crate::agent_profile::{AgentManager, AgentProfile};
 use crate::events::AgentEvent;
 
-/// Minimum confidence for user profile entries to appear in context.
-const PROFILE_MIN_CONFIDENCE: f64 = 0.5;
-
-/// Minimum sample count for behavioral patterns to appear in context.
-const PATTERN_MIN_SAMPLES: i32 = 5;
 use crate::execution::ExecutionParams;
 use crate::intent_pipeline::analysis::IntentAnalyzer;
 use crate::intent_pipeline::router::{ExecutionRouter, RouterResult};
@@ -73,10 +68,8 @@ pub struct AgentRuntime {
     active_profile: Arc<RwLock<Option<Arc<AgentProfile>>>>,
     /// Records interactions for behavioral pattern analysis.
     interaction_recorder: Option<crate::learning::InteractionRecorder>,
-    /// Learning repos for transparency event summaries (subset of storage::Repos).
-    learning_user_profile: Option<storage::UserProfileRepo>,
-    learning_patterns: Option<storage::BehavioralPatternRepo>,
-    learning_adaptations: Option<storage::AgentAdaptationRepo>,
+    /// Procedural rules repo for transparency (L5 cognitive rules).
+    procedural_rule_repo: Option<cognitive::ProceduralRuleRepo>,
     /// Tool registry for looking up tool definitions during delegation.
     tool_registry: Option<Arc<RwLock<tools::registry::ToolRegistry>>>,
     /// Self-reference for delegation handler (set after Arc construction via OnceLock).
@@ -107,9 +100,7 @@ impl AgentRuntime {
             confidence_evaluator: None,
             active_profile,
             interaction_recorder: None,
-            learning_user_profile: None,
-            learning_patterns: None,
-            learning_adaptations: None,
+            procedural_rule_repo: None,
             tool_registry: None,
             delegation_self_ref: std::sync::OnceLock::new(),
             current_event_tx: RwLock::new(None),
@@ -137,10 +128,8 @@ impl AgentRuntime {
         self
     }
 
-    pub fn with_learning_repos(mut self, repos: &storage::Repos) -> Self {
-        self.learning_user_profile = Some(repos.user_profile.clone());
-        self.learning_patterns = Some(repos.behavioral_patterns.clone());
-        self.learning_adaptations = Some(repos.agent_adaptations.clone());
+    pub fn with_procedural_rule_repo(mut self, repo: cognitive::ProceduralRuleRepo) -> Self {
+        self.procedural_rule_repo = Some(repo);
         self
     }
 
@@ -357,7 +346,7 @@ impl AgentRuntime {
 
         // Emit learning context summaries for transparency
         if let Some(ref tx) = event_tx {
-            self.emit_learning_summary(tx, &agent_name).await;
+            self.emit_learning_summary(tx).await;
         }
 
         // Step 7: Filter tools based on agent profile (replaces ToolGroup filtering)
@@ -505,72 +494,24 @@ impl AgentRuntime {
     async fn emit_learning_summary(
         &self,
         tx: &tokio::sync::mpsc::Sender<AgentEvent>,
-        agent_name: &str,
     ) {
-        let (Some(ref profile_repo), Some(ref pattern_repo), Some(ref adapt_repo)) = (
-            &self.learning_user_profile,
-            &self.learning_patterns,
-            &self.learning_adaptations,
-        ) else {
-            return;
-        };
-
-        // Run independent DB queries concurrently
-        let (profile_result, patterns_result, adaptations_result) = tokio::join!(
-            profile_repo.list_above_confidence(PROFILE_MIN_CONFIDENCE),
-            pattern_repo.list_reliable(PATTERN_MIN_SAMPLES),
-            adapt_repo.list_by_agent(agent_name),
-        );
-
-        // User profile facts
-        if let Ok(entries) = profile_result {
-            if !entries.is_empty() {
-                let mut categories: Vec<String> = entries
-                    .iter()
-                    .map(|e| e.category.clone())
-                    .collect::<std::collections::HashSet<_>>()
-                    .into_iter()
-                    .collect();
-                categories.sort();
-                let _ = tx
-                    .send(AgentEvent::LearningEvent {
-                        event_type: "user_profile".into(),
-                        detail: format!("{} facts ({})", entries.len(), categories.join(", ")),
-                    })
-                    .await;
-            }
-        }
-
-        // Behavioral patterns
-        if let Ok(patterns) = patterns_result {
-            if !patterns.is_empty() {
-                let keys: Vec<&str> = patterns
-                    .iter()
-                    .take(3)
-                    .map(|p| p.pattern_key.as_str())
-                    .collect();
-                let _ = tx
-                    .send(AgentEvent::LearningEvent {
-                        event_type: "patterns".into(),
-                        detail: format!("{} patterns ({})", patterns.len(), keys.join(", ")),
-                    })
-                    .await;
-            }
-        }
-
-        // Agent-specific adaptations
-        if let Ok(adaptations) = adaptations_result {
-            if !adaptations.is_empty() {
-                let _ = tx
-                    .send(AgentEvent::LearningEvent {
-                        event_type: "adaptations".into(),
-                        detail: format!(
-                            "{} preferences for {} agent",
-                            adaptations.len(),
-                            agent_name
-                        ),
-                    })
-                    .await;
+        // Learned procedural rules (from L5 cognitive pipeline)
+        if let Some(ref rule_repo) = self.procedural_rule_repo {
+            if let Ok(rules) = rule_repo.list_all_active().await {
+                if !rules.is_empty() {
+                    let previews: Vec<&str> =
+                        rules.iter().take(3).map(|r| r.rule_text.as_str()).collect();
+                    let _ = tx
+                        .send(AgentEvent::LearningEvent {
+                            event_type: "patterns".into(),
+                            detail: format!(
+                                "{} learned rules ({})",
+                                rules.len(),
+                                previews.join(", ")
+                            ),
+                        })
+                        .await;
+                }
             }
         }
 

@@ -950,18 +950,21 @@ impl AgentLoopBuilder {
             });
 
             let threshold_handle = confidence_evaluator.as_ref().map(|e| e.threshold_handle());
-            let pattern_analyzer = crate::learning::PatternAnalyzer::new(
-                repos.interaction_log.clone(),
-                repos.behavioral_patterns.clone(),
-            );
             let mut service = crate::learning::LearningService::new(
                 Arc::clone(store),
                 adaptive,
                 threshold_handle,
                 Duration::from_secs(config.learning.analysis_interval_secs),
             )
-            .with_event_bus(event_bus)
-            .with_pattern_analyzer(pattern_analyzer);
+            .with_event_bus(event_bus);
+            if let Some(ref domain_bus) = self.domain_event_bus {
+                service = service.with_pattern_analyzer(
+                    crate::learning::PatternAnalyzer::new(
+                        repos.interaction_log.clone(),
+                        Arc::clone(domain_bus),
+                    ),
+                );
+            }
             service.start();
             Some(Arc::new(RwLock::new(service)))
         } else {
@@ -1053,8 +1056,9 @@ impl AgentLoopBuilder {
             runtime = runtime.with_interaction_recorder(recorder);
         }
 
-        // Inject learning repos for transparency event summaries
-        runtime = runtime.with_learning_repos(&repos);
+        // Inject procedural rule repo for transparency (L5 cognitive rules)
+        let rule_repo = cognitive::ProceduralRuleRepo::new(storage_pool.inner().clone());
+        runtime = runtime.with_procedural_rule_repo(rule_repo);
 
         // Inject tool registry for delegation support
         runtime = runtime.with_tool_registry(Arc::clone(&tool_registry));
