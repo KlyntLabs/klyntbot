@@ -95,8 +95,13 @@ pub struct McpServerRunner;
 
 impl McpServerRunner {
     /// Start the MCP server on stdio. Blocks until the server is stopped.
+    ///
+    /// Configures tracing to write to stderr so stdout stays clean for
+    /// JSON-RPC messages over the stdio transport.
     pub async fn run() -> anyhow::Result<()> {
         use rmcp::service::ServiceExt;
+
+        Self::configure_stdio_tracing();
 
         let handler = KlyntbotServerHandler::new();
         tracing::info!("Starting MCP server (stdio)");
@@ -105,6 +110,19 @@ impl McpServerRunner {
         let service = handler.serve(transport).await?;
         service.waiting().await?;
         Ok(())
+    }
+
+    /// Redirect tracing output to stderr for stdio transport.
+    ///
+    /// When running as an MCP server over stdio, stdout is reserved for
+    /// JSON-RPC messages. All log/trace output must go to stderr.
+    fn configure_stdio_tracing() {
+        use tracing_subscriber::EnvFilter;
+
+        let _ = tracing_subscriber::fmt()
+            .with_writer(std::io::stderr)
+            .with_env_filter(EnvFilter::from_default_env())
+            .try_init();
     }
 }
 
