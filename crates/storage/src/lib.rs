@@ -71,6 +71,9 @@ pub use rows::task::{
 pub use rows::task_group::TaskGroupRow;
 pub use rows::usage::UsageRecordRow;
 
+// Re-export task repo types.
+pub use repos::task_repo::{TaskFilter, TaskPatch, TaskRepo, TaskSummary};
+
 // Re-export task group repo.
 pub use repos::task_group::TaskGroupRepo;
 

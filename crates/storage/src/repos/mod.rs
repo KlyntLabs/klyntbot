@@ -27,6 +27,7 @@ pub mod session_context;
 pub mod status_workflow;
 pub mod strategy;
 pub mod task_group;
+pub mod task_repo;
 #[cfg(test)]
 pub mod tests;
 pub mod usage;
@@ -57,6 +58,7 @@ pub use session_context::SessionContextRepo;
 pub use status_workflow::StatusWorkflowRepo;
 pub use strategy::{OverallStats, StrategyRepo, ToolStatsRow};
 pub use task_group::TaskGroupRepo;
+pub use task_repo::{TaskFilter, TaskPatch, TaskRepo, TaskSummary};
 pub use usage::UsageRepo;
 
 /// Aggregate of all repository handles, constructed from a single `SqlitePool`.
@@ -86,6 +88,7 @@ pub struct Repos {
     pub custom_columns: CustomColumnRepo,
     pub entity_links: EntityLinkRepo,
     pub project_sources: ProjectSourceRepo,
+    pub tasks: TaskRepo,
 }
 
 impl Repos {
@@ -114,6 +117,7 @@ impl Repos {
             custom_columns: CustomColumnRepo::new(db.clone()),
             entity_links: EntityLinkRepo::new(db.clone()),
             project_sources: ProjectSourceRepo::new(db.clone()),
+            tasks: TaskRepo::new(db.clone()),
             pool: db,
         }
     }
