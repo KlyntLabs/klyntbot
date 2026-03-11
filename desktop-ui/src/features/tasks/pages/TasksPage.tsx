@@ -22,6 +22,7 @@ import { TaskDetailPanel } from "../components/TaskDetailPanel";
 import { TaskTable } from "../components/TaskTable";
 import { TaskTableSkeleton } from "../components/TaskTableSkeleton";
 import { Toolbar } from "../components/Toolbar";
+import { useColumnVisibility } from "../hooks/useColumnVisibility";
 
 export function TasksPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -75,6 +76,7 @@ export function TasksPage() {
   const { data: areas, refetch: refetchAreas } = useQuery<Area[]>("area_list", undefined, []);
   const { data: statusLabels } = useEffectiveLabels(null);
   const { data: groups } = useGroups(null);
+  const { visibleColumns, toggleColumn, resetToDefaults } = useColumnVisibility();
 
   const areaMap = useMemo(() => new Map(areas.map((a) => [a.id, a])), [areas]);
   const projectMap = useMemo(() => new Map(projects.map((p) => [p.id, p])), [projects]);
@@ -128,10 +130,7 @@ export function TasksPage() {
   const handleAddTask = useCallback(async () => {
     if (!newTaskTitle.trim()) return;
     // Resolve area from active tab, or fall back to the first area.
-    const area =
-      activeTab !== "All"
-        ? areas.find((a) => a.name === activeTab)
-        : areas[0];
+    const area = activeTab !== "All" ? areas.find((a) => a.name === activeTab) : areas[0];
     if (!area) return;
     await createTask.mutate({ title: newTaskTitle.trim(), areaId: area.id });
     setNewTaskTitle("");
@@ -205,6 +204,9 @@ export function TasksPage() {
             viewMode={viewMode}
             onViewModeChange={setViewMode}
             onAddTask={() => setAddingTask(true)}
+            visibleColumns={visibleColumns}
+            onToggleColumn={toggleColumn}
+            onResetColumns={resetToDefaults}
           />
 
           {/* Inline Add Task Row */}
@@ -277,6 +279,7 @@ export function TasksPage() {
               groups={groups}
               collapsedGroups={collapsedGroups}
               onToggleGroup={toggleGroup}
+              visibleColumns={visibleColumns}
             />
           )}
           {filteredTasks.length === 0 && !addingTask && (

@@ -1,5 +1,6 @@
 import type { Area, Project, StatusLabel, Task, TaskGroup, TaskUpdateParams } from "@shared/types";
 import { createContext, use } from "react";
+import type { ColumnId } from "../hooks/useColumnVisibility";
 
 export interface TaskTableCtx {
   completedTasks: Set<string>;
@@ -11,6 +12,7 @@ export interface TaskTableCtx {
   groups: TaskGroup[];
   collapsedGroups: Set<string>;
   showArea: boolean;
+  visibleColumns: Set<ColumnId>;
   onToggleTask: (id: string) => void;
   onToggleExpandTask: (id: string) => void;
   onToggleGroup: (groupId: string) => void;

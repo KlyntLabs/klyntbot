@@ -10,6 +10,7 @@ import type {
 } from "@shared/types";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useMemo } from "react";
+import type { ColumnId } from "../hooks/useColumnVisibility";
 import { AddSubtaskRow } from "./AddSubtaskRow";
 import { ProjectHeader } from "./ProjectHeader";
 import { RootTaskRow, SubtaskRow } from "./TaskRow";
@@ -35,10 +36,45 @@ interface TaskTableProps {
   groups?: TaskGroup[];
   collapsedGroups?: Set<string>;
   onToggleGroup?: (groupId: string) => void;
+  visibleColumns: Set<ColumnId>;
 }
 
 const UNASSIGNED = "_unassigned";
 const UNGROUPED = "_ungrouped";
+
+const COLUMN_HEADERS: Record<ColumnId, string> = {
+  project: "Project",
+  area: "Area",
+  priority: "Priority",
+  status: "Status",
+  dueDate: "Due Date",
+  tags: "Tags",
+  taskType: "Type",
+  energyLevel: "Energy",
+  estimatedMinutes: "Est.",
+  actualMinutes: "Actual",
+  executionState: "Exec State",
+  complexityScore: "Complexity",
+  totalTrackedSecs: "Tracked",
+  focusedAt: "Focused",
+};
+
+const COLUMN_ORDER: ColumnId[] = [
+  "project",
+  "area",
+  "priority",
+  "status",
+  "dueDate",
+  "tags",
+  "taskType",
+  "energyLevel",
+  "estimatedMinutes",
+  "actualMinutes",
+  "executionState",
+  "complexityScore",
+  "totalTrackedSecs",
+  "focusedAt",
+];
 
 export function TaskTable({
   tasks,
@@ -60,6 +96,7 @@ export function TaskTable({
   groups = [],
   collapsedGroups = new Set(),
   onToggleGroup = () => {},
+  visibleColumns,
 }: TaskTableProps) {
   const showArea = activeTab === "All";
 
@@ -116,6 +153,7 @@ export function TaskTable({
       groups,
       collapsedGroups,
       showArea,
+      visibleColumns,
       onToggleTask,
       onToggleExpandTask,
       onToggleGroup,
@@ -133,6 +171,7 @@ export function TaskTable({
       groups,
       collapsedGroups,
       showArea,
+      visibleColumns,
       onToggleTask,
       onToggleExpandTask,
       onToggleGroup,
@@ -150,12 +189,13 @@ export function TaskTable({
             <tr className="border-b border-white/[0.06] text-[11px] text-muted font-light text-left bg-white/[0.03]">
               <th className="px-5 py-2.5 w-9 font-light" />
               <th className="px-5 py-2.5 font-light tracking-wide uppercase">Task</th>
-              <th className="px-5 py-2.5 font-light tracking-wide uppercase">Project</th>
-              {showArea && <th className="px-5 py-2.5 font-light tracking-wide uppercase">Area</th>}
-              <th className="px-5 py-2.5 font-light tracking-wide uppercase">Priority</th>
-              <th className="px-5 py-2.5 font-light tracking-wide uppercase">Status</th>
-              <th className="px-5 py-2.5 font-light tracking-wide uppercase">Due Date</th>
-              <th className="px-5 py-2.5 font-light tracking-wide uppercase">Tags</th>
+              {COLUMN_ORDER.filter((col) =>
+                col === "area" ? showArea : visibleColumns.has(col),
+              ).map((col) => (
+                <th key={col} className="px-5 py-2.5 font-light tracking-wide uppercase">
+                  {COLUMN_HEADERS[col]}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
@@ -236,13 +276,21 @@ export function TaskTable({
   );
 }
 
+function useColCount() {
+  const { showArea, visibleColumns } = useTaskTable();
+  // 2 = checkbox + task title, plus dynamic columns
+  return (
+    2 + COLUMN_ORDER.filter((col) => (col === "area" ? showArea : visibleColumns.has(col))).length
+  );
+}
+
 /** Renders a task row plus its lazily-loaded subtasks if expanded. */
 function TaskWithSubtasks({ task }: { task: Task }) {
-  const { expandedTasks, childrenCache, showArea, completedTasks, onToggleTask, onUpdate } =
-    useTaskTable();
+  const { expandedTasks, childrenCache, completedTasks, onToggleTask, onUpdate } = useTaskTable();
   const isExpanded = expandedTasks.has(task.id);
   const subtasks = childrenCache.get(task.id);
   const isLoading = isExpanded && !subtasks;
+  const colCount = useColCount();
 
   return (
     <>
@@ -256,7 +304,7 @@ function TaskWithSubtasks({ task }: { task: Task }) {
       {isLoading && (
         <tr className="border-b border-white/[0.04]">
           <td className="px-5 py-2 w-9" />
-          <td colSpan={showArea ? 7 : 6} className="px-5 py-2">
+          <td colSpan={colCount - 1} className="px-5 py-2">
             <span className="text-[12px] text-dim font-light pl-6">Loading\u2026</span>
           </td>
         </tr>
@@ -289,8 +337,8 @@ function ProjectTaskGroup({
   groups: TaskGroup[];
   isCollapsed: boolean;
 }) {
-  const { showArea, collapsedGroups, onToggleGroup } = useTaskTable();
-  const colCount = showArea ? 8 : 7;
+  const { collapsedGroups, onToggleGroup } = useTaskTable();
+  const colCount = useColCount();
 
   // If no groups defined, render flat like before
   if (groups.length === 0) {
@@ -369,8 +417,7 @@ function GroupSection({
   isCollapsed: boolean;
   onToggle: () => void;
 }) {
-  const { showArea } = useTaskTable();
-  const colCount = showArea ? 8 : 7;
+  const colCount = useColCount();
   const name = group?.name ?? "Ungrouped";
   const color = group?.color;
 
