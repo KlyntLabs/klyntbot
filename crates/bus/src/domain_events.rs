@@ -88,15 +88,84 @@ pub enum DomainEvent {
         task_id: String,
         project: Option<String>,
         estimate_mins: Option<i64>,
+        task_type: String,
     },
     TaskCompleted {
         task_id: String,
         actual_duration_mins: Option<i64>,
         estimated_duration_mins: Option<i64>,
+        deviation_pct: Option<f64>,
     },
     TaskDeferred {
         task_id: String,
         times_deferred: i32,
+    },
+
+    // -- Tasks (agentic) --
+    TaskDecomposed {
+        source_task_id: String,
+        subtask_ids: Vec<String>,
+        total_estimated_mins: Option<i64>,
+    },
+    TaskExecutionStarted {
+        task_id: String,
+        execution_id: String,
+        agent_profile: String,
+    },
+    TaskExecutionCompleted {
+        task_id: String,
+        execution_id: String,
+        tokens_used: u64,
+        cost_usd: Option<f64>,
+        artifacts_count: u32,
+    },
+    TaskExecutionFailed {
+        task_id: String,
+        execution_id: String,
+        error: String,
+        retry_count: u32,
+    },
+    TaskBlocked {
+        task_id: String,
+        blocker_id: String,
+    },
+    TaskUnblocked {
+        task_id: String,
+        was_blocked_by: String,
+    },
+    DayPlanGenerated {
+        task_count: u32,
+        total_estimated_mins: u32,
+    },
+    ProactiveSuggestionCreated {
+        suggestion_id: String,
+        suggestion_type: String,
+        task_id: Option<String>,
+        confidence: f64,
+    },
+    TaskFocusStarted {
+        task_id: String,
+        energy_level: String,
+    },
+    TaskFocusEnded {
+        task_id: String,
+        duration_secs: u64,
+    },
+    EstimationRecorded {
+        task_id: String,
+        estimated_mins: u32,
+        actual_mins: u32,
+        deviation_pct: f64,
+    },
+    TaskExecutionProgress {
+        task_id: String,
+        execution_id: String,
+        current_step: String,
+        percentage: Option<u8>,
+        latest_tool: Option<String>,
+        reasoning_snippet: Option<String>,
+        cost_so_far_usd: f64,
+        elapsed_secs: u64,
     },
     GoalProgress {
         objective_id: String,
@@ -232,6 +301,7 @@ mod tests {
             task_id: "t1".into(),
             actual_duration_mins: Some(30),
             estimated_duration_mins: Some(45),
+            deviation_pct: None,
         });
 
         assert!(rx1.recv().await.is_ok());

@@ -166,6 +166,7 @@ impl TaskTool {
                         task_id: action.id.clone(),
                         actual_duration_mins: actual_mins,
                         estimated_duration_mins: estimated_mins,
+                        deviation_pct: None,
                     });
                 }
 

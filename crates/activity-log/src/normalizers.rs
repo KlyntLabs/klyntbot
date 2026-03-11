@@ -485,6 +485,7 @@ mod tests {
             task_id: "t-123".into(),
             project: Some("klyntbot".into()),
             estimate_mins: Some(30),
+            task_type: "manual".into(),
         };
         let entry = normalizer.normalize(&event).unwrap();
         assert_eq!(entry.source, ActivitySource::Task);

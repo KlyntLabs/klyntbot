@@ -143,6 +143,7 @@ impl TaskTool {
                 task_id: created.id.clone(),
                 project: created.project_id.clone(),
                 estimate_mins: created.estimated_minutes.map(|m| m as i64),
+                task_type: "manual".to_string(),
             });
         }
 

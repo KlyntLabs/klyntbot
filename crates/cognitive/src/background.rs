@@ -304,8 +304,7 @@ impl BackgroundConsolidationService {
                                 let _ = tx.send(PipelineEvent::Extraction {
                                     observation: obs.content.clone(),
                                     facts_extracted: ext.facts.len(),
-                                    used_fallback: fallback_set
-                                        .contains(&ext.observation_index),
+                                    used_fallback: fallback_set.contains(&ext.observation_index),
                                 });
                             }
                         }
@@ -533,6 +532,7 @@ fn event_to_observation(event: &DomainEvent) -> Option<Observation> {
             task_id,
             actual_duration_mins,
             estimated_duration_mins,
+            deviation_pct,
         } => {
             let detail = match (actual_duration_mins, estimated_duration_mins) {
                 (Some(actual), Some(est)) => {
@@ -540,9 +540,12 @@ fn event_to_observation(event: &DomainEvent) -> Option<Observation> {
                 }
                 _ => String::new(),
             };
+            let dev_detail = deviation_pct
+                .map(|d| format!(", deviation: {d:.1}%"))
+                .unwrap_or_default();
             Some(Observation {
                 domain: "tasks".into(),
-                content: format!("Task {task_id} completed{detail}"),
+                content: format!("Task {task_id} completed{detail}{dev_detail}"),
                 importance: 0.5,
                 source_event: "TaskCompleted".into(),
                 timestamp: now,
@@ -725,6 +728,18 @@ fn event_type_key(event: &DomainEvent) -> String {
         DomainEvent::VoiceJournalProcessed { .. } => "VoiceJournalProcessed".into(),
         DomainEvent::ToolCallExecuted { .. } => "ToolCallExecuted".into(),
         DomainEvent::BehavioralPatternDetected { .. } => "BehavioralPatternDetected".into(),
+        DomainEvent::TaskDecomposed { .. } => "TaskDecomposed".into(),
+        DomainEvent::TaskExecutionStarted { .. } => "TaskExecutionStarted".into(),
+        DomainEvent::TaskExecutionCompleted { .. } => "TaskExecutionCompleted".into(),
+        DomainEvent::TaskExecutionFailed { .. } => "TaskExecutionFailed".into(),
+        DomainEvent::TaskBlocked { .. } => "TaskBlocked".into(),
+        DomainEvent::TaskUnblocked { .. } => "TaskUnblocked".into(),
+        DomainEvent::DayPlanGenerated { .. } => "DayPlanGenerated".into(),
+        DomainEvent::ProactiveSuggestionCreated { .. } => "ProactiveSuggestionCreated".into(),
+        DomainEvent::TaskFocusStarted { .. } => "TaskFocusStarted".into(),
+        DomainEvent::TaskFocusEnded { .. } => "TaskFocusEnded".into(),
+        DomainEvent::EstimationRecorded { .. } => "EstimationRecorded".into(),
+        DomainEvent::TaskExecutionProgress { .. } => "TaskExecutionProgress".into(),
     }
 }
 
@@ -892,6 +907,7 @@ mod tests {
                 task_id: "t1".into(),
                 actual_duration_mins: None,
                 estimated_duration_mins: None,
+                deviation_pct: None,
             }),
             "TaskCompleted"
         );

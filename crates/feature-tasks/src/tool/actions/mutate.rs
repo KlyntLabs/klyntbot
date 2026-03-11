@@ -60,19 +60,13 @@ impl TaskTool {
             acceptance_criteria: p
                 .optional_str("acceptance_criteria")?
                 .map(|s| Some(s.to_string())),
-            agent_config: p
-                .optional_str("agent_config")?
-                .map(|s| Some(s.to_string())),
+            agent_config: p.optional_str("agent_config")?.map(|s| Some(s.to_string())),
             execution_state: None,
-            energy_level: p
-                .optional_str("energy_level")?
-                .map(|s| Some(s.to_string())),
+            energy_level: p.optional_str("energy_level")?.map(|s| Some(s.to_string())),
             complexity_score: None,
             completed: None,
             actual_minutes: None,
-            objective_id: p
-                .optional_str("objective_id")?
-                .map(|s| Some(s.to_string())),
+            objective_id: p.optional_str("objective_id")?.map(|s| Some(s.to_string())),
         };
 
         match self.repo.update(&patch).await {
@@ -89,10 +83,7 @@ impl TaskTool {
                 // Auto-embed updated task (best-effort)
                 if let Some(ref emb) = self.embedding_handler {
                     if let Err(e) = emb.embed_task(&task).await {
-                        warn!(
-                            "Failed to regenerate embedding for task {}: {}",
-                            task.id, e
-                        );
+                        warn!("Failed to regenerate embedding for task {}: {}", task.id, e);
                     }
                 }
 
@@ -236,8 +227,7 @@ impl TaskTool {
                 // Emit domain event for task completion
                 if let Some(ref bus) = self.domain_bus {
                     let actual_mins = {
-                        let total_secs: i64 =
-                            te_rows.iter().filter_map(|e| e.duration_secs).sum();
+                        let total_secs: i64 = te_rows.iter().filter_map(|e| e.duration_secs).sum();
                         if total_secs > 0 {
                             Some(total_secs / 60)
                         } else {
@@ -249,6 +239,7 @@ impl TaskTool {
                         task_id: task.id.clone(),
                         actual_duration_mins: actual_mins,
                         estimated_duration_mins: estimated_mins,
+                        deviation_pct: None,
                     });
                 }
 
@@ -284,12 +275,7 @@ impl TaskTool {
 
     // ─── Activity logging helper ────────────────────────────────────
 
-    async fn log_field_changes(
-        &self,
-        task_id: &str,
-        old: &storage::TaskRow,
-        new: &Task,
-    ) {
+    async fn log_field_changes(&self, task_id: &str, old: &storage::TaskRow, new: &Task) {
         let changes: Vec<(&str, String, String)> = {
             let mut v = Vec::new();
             if old.title != new.title {

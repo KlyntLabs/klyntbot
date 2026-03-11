@@ -172,7 +172,19 @@ fn wire_event_channels(core: &AppCore, channels: EventChannels, app_handle: &tau
                             bus::DomainEvent::TaskCreated { .. }
                             | bus::DomainEvent::TaskCompleted { .. }
                             | bus::DomainEvent::TaskDeferred { .. }
-                            | bus::DomainEvent::GoalProgress { .. } => "work",
+                            | bus::DomainEvent::GoalProgress { .. }
+                            | bus::DomainEvent::TaskDecomposed { .. }
+                            | bus::DomainEvent::TaskExecutionStarted { .. }
+                            | bus::DomainEvent::TaskExecutionCompleted { .. }
+                            | bus::DomainEvent::TaskExecutionFailed { .. }
+                            | bus::DomainEvent::TaskBlocked { .. }
+                            | bus::DomainEvent::TaskUnblocked { .. }
+                            | bus::DomainEvent::DayPlanGenerated { .. }
+                            | bus::DomainEvent::ProactiveSuggestionCreated { .. }
+                            | bus::DomainEvent::TaskFocusStarted { .. }
+                            | bus::DomainEvent::TaskFocusEnded { .. }
+                            | bus::DomainEvent::EstimationRecorded { .. }
+                            | bus::DomainEvent::TaskExecutionProgress { .. } => "work",
                             bus::DomainEvent::ActivitySessionCompleted { .. }
                             | bus::DomainEvent::FocusSessionStarted { .. }
                             | bus::DomainEvent::FocusSessionEnded { .. }

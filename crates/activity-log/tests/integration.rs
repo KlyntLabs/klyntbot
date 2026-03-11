@@ -40,6 +40,7 @@ async fn test_domain_event_full_flow() {
         task_id: "integration-t1".into(),
         project: Some("test-project".into()),
         estimate_mins: Some(60),
+        task_type: "manual".into(),
     });
 
     // Give the subscriber time to process
@@ -192,11 +193,13 @@ async fn test_count_by_source() {
         task_id: "t1".into(),
         project: None,
         estimate_mins: None,
+        task_type: "manual".into(),
     });
     domain_bus.publish(bus::DomainEvent::TaskCompleted {
         task_id: "t1".into(),
         actual_duration_mins: Some(30),
         estimated_duration_mins: Some(45),
+        deviation_pct: None,
     });
     domain_bus.publish(bus::DomainEvent::NoteCreated {
         note_id: "n1".into(),
@@ -229,6 +232,7 @@ async fn test_dedup_across_ingestion() {
         task_id: "dedup-test".into(),
         project: None,
         estimate_mins: None,
+        task_type: "manual".into(),
     };
 
     // Normalize twice — same event produces same content_hash

@@ -329,6 +329,7 @@ impl AppCore {
                 task_id: id.clone(),
                 project: created.project_id.clone(),
                 estimate_mins: None,
+                task_type: "manual".to_string(),
             });
         }
 
@@ -425,6 +426,7 @@ impl AppCore {
                     task_id: id.clone(),
                     actual_duration_mins: None,
                     estimated_duration_mins: row.estimated_minutes.map(|m| m as i64),
+                    deviation_pct: None,
                 });
             }
         }

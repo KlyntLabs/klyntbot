@@ -64,6 +64,18 @@ pub fn evaluate_salience(event: &DomainEvent) -> SalienceVerdict {
         DomainEvent::NoteUpdated { .. } => SalienceVerdict::Accumulate,
         DomainEvent::ToolCallExecuted { .. } => SalienceVerdict::Accumulate,
         DomainEvent::BehavioralPatternDetected { .. } => SalienceVerdict::Accumulate,
+        DomainEvent::TaskFocusStarted { .. } => SalienceVerdict::Accumulate,
+        DomainEvent::TaskFocusEnded { .. } => SalienceVerdict::Accumulate,
+        DomainEvent::EstimationRecorded { .. } => SalienceVerdict::Accumulate,
+        DomainEvent::TaskExecutionStarted { .. } => SalienceVerdict::Accumulate,
+        DomainEvent::TaskExecutionCompleted { .. } => SalienceVerdict::Extract,
+        DomainEvent::TaskExecutionFailed { .. } => SalienceVerdict::Extract,
+        DomainEvent::TaskExecutionProgress { .. } => SalienceVerdict::Accumulate,
+        DomainEvent::TaskDecomposed { .. } => SalienceVerdict::Accumulate,
+        DomainEvent::TaskBlocked { .. } => SalienceVerdict::Accumulate,
+        DomainEvent::TaskUnblocked { .. } => SalienceVerdict::Accumulate,
+        DomainEvent::DayPlanGenerated { .. } => SalienceVerdict::Accumulate,
+        DomainEvent::ProactiveSuggestionCreated { .. } => SalienceVerdict::Accumulate,
     }
 }
 
@@ -134,6 +146,7 @@ mod tests {
             task_id: "t1".into(),
             actual_duration_mins: Some(30),
             estimated_duration_mins: Some(45),
+            deviation_pct: None,
         });
         assert_eq!(verdict, SalienceVerdict::Accumulate);
     }
