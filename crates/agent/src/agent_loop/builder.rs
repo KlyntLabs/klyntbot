@@ -39,7 +39,7 @@ use super::{AgentLoop, LastActiveChannel};
 /// Builder for constructing an [`AgentLoop`] with all its dependencies.
 ///
 /// Required fields (`bus`, `provider`, `config`) are constructor params.
-/// Optional: `pool` (enables feature-todo, finance), `cron_service`, `notification_handle`.
+/// Optional: `pool` (enables feature-tasks, finance), `cron_service`, `notification_handle`.
 ///
 /// # Example
 /// ```ignore

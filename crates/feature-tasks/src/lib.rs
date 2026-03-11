@@ -70,7 +70,7 @@ impl FeaturePackage for TasksFeature {
     }
 
     fn tools(&self) -> Vec<DynTool> {
-        vec![] // Tools added in Chunk 3
+        vec![] // TaskTool is wired directly in agent builder, not via FeaturePackage
     }
 
     fn migrations(&self) -> Vec<FeatureMigration> {

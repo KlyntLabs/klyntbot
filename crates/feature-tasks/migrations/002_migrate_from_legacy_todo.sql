@@ -39,31 +39,28 @@ SELECT
     NULL,           -- complexity_score
     CASE WHEN status = 'done' THEN 1 ELSE 0 END,  -- completed
     key_result_id   -- objective_id (same as key_result_id for legacy tasks)
-FROM actions
-WHERE EXISTS (SELECT 1 FROM actions LIMIT 1);
+FROM actions;
 
 -- 2. Migrate action_attachments → task_attachments
 INSERT OR IGNORE INTO task_attachments (id, task_id, attachment_type, value, title, tags, created_at, source)
 SELECT id, action_id, attachment_type, value, title, tags, created_at, 'user'
-FROM action_attachments
-WHERE EXISTS (SELECT 1 FROM action_attachments LIMIT 1);
+FROM action_attachments;
 
 -- 3. Migrate action_time_entries → task_time_entries
 INSERT OR IGNORE INTO task_time_entries (id, task_id, source, started_at, ended_at, duration_secs, note, energy_level)
 SELECT id, action_id, source, started_at, ended_at, duration_secs, note, NULL
-FROM action_time_entries
-WHERE EXISTS (SELECT 1 FROM action_time_entries LIMIT 1);
+FROM action_time_entries;
 
 -- 4. Migrate action_dependencies → task_dependencies
 INSERT OR IGNORE INTO task_dependencies (task_id, blocker_id, dep_type)
 SELECT task_id, blocker_id, 'blocks'
-FROM action_dependencies
-WHERE EXISTS (SELECT 1 FROM action_dependencies LIMIT 1);
+FROM action_dependencies;
 
 -- 5. Generate initial activity log entries for migrated tasks
+-- Use deterministic ID (task id + suffix) so INSERT OR IGNORE is truly idempotent.
 INSERT OR IGNORE INTO task_activity (id, task_id, activity_type, field_changed, old_value, new_value, actor_type, actor_id, summary, created_at)
 SELECT
-    lower(hex(randomblob(16))),
+    id || '_migrated_v2',
     id,
     'migrated',
     NULL,
