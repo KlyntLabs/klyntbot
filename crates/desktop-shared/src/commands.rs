@@ -25,6 +25,15 @@ pub struct TaskResponse {
     pub status_label_id: Option<String>,
     pub status_label: Option<StatusLabelResponse>,
     pub group_id: Option<String>,
+    pub task_type: Option<String>,
+    pub execution_state: Option<String>,
+    pub energy_level: Option<String>,
+    pub acceptance_criteria: Option<String>,
+    pub estimated_minutes: Option<i32>,
+    pub actual_minutes: Option<i32>,
+    pub complexity_score: Option<i32>,
+    pub total_tracked_secs: Option<i64>,
+    pub focused_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -39,6 +48,10 @@ pub struct TaskCreateParams {
     pub parent_id: Option<String>,
     pub status_label_id: Option<String>,
     pub group_id: Option<String>,
+    pub task_type: Option<String>,
+    pub acceptance_criteria: Option<String>,
+    pub energy_level: Option<String>,
+    pub estimated_minutes: Option<i32>,
 }
 
 // ── Today Task (tray view) ──────────────────────────────────────────────
@@ -515,6 +528,11 @@ pub struct TaskUpdateParams {
     pub status_label_id: Option<Option<String>>,
     pub position: Option<i32>,
     pub group_id: Option<Option<String>>,
+    pub task_type: Option<String>,
+    pub acceptance_criteria: Option<Option<String>>,
+    pub energy_level: Option<String>,
+    pub execution_state: Option<String>,
+    pub estimated_minutes: Option<Option<i32>>,
 }
 
 // ── Area Params ────────────────────────────────────────────────────────
