@@ -50,7 +50,6 @@ impl TasksFeature {
     pub fn migration_sql() -> &'static str {
         include_str!("../migrations/001_create_tasks.sql")
     }
-
 }
 
 impl Default for TasksFeature {
