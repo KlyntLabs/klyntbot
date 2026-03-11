@@ -68,6 +68,11 @@ impl BudgetAllocator {
         }
     }
 
+    /// Total context window size from config.
+    pub fn config_total_window(&self) -> usize {
+        self.config.total_context_window
+    }
+
     /// Total tokens allocated across all priorities.
     pub fn total_allocated(&self) -> usize {
         self.allocations.values().sum()

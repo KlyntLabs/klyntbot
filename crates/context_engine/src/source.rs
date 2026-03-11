@@ -40,4 +40,11 @@ pub trait ContextSource: Send + Sync {
 
     /// Produce a context section, or `None` to skip.
     async fn provide(&self, ctx: &SourceContext) -> Option<String>;
+
+    /// Estimated token count for this source's output.
+    /// Used for budget planning before actually loading.
+    /// Default: 500 tokens (conservative estimate).
+    fn estimated_tokens(&self) -> usize {
+        500
+    }
 }

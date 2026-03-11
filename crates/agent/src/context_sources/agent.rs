@@ -65,6 +65,10 @@ impl ContextSource for AgentContextSource {
             Some(sections.join("\n\n---\n\n"))
         }
     }
+
+    fn estimated_tokens(&self) -> usize {
+        500
+    }
 }
 
 #[cfg(test)]

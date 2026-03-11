@@ -50,6 +50,10 @@ impl ContextSource for PageContextSource {
 
         details.map(|d| format!("# Page Context\n\n{d}"))
     }
+
+    fn estimated_tokens(&self) -> usize {
+        300
+    }
 }
 
 impl PageContextSource {

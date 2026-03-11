@@ -21,6 +21,7 @@ pub mod agent_task_tool;
 pub mod annotate;
 pub mod ask_user;
 pub mod browser;
+pub mod context_request;
 pub mod cron_tool;
 pub mod delegation;
 pub mod filesystem;
@@ -99,3 +100,6 @@ pub use search_utils::{rrf_merge, SearchResult};
 // Browser
 pub use browser::BrowserTool;
 pub use config::TrustLevel;
+
+// Context request
+pub use context_request::{ContextExpansionHandler, ContextRequestTool};

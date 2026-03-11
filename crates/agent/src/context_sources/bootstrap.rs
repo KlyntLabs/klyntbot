@@ -80,4 +80,8 @@ impl ContextSource for BootstrapSource {
             Some(content.clone())
         }
     }
+
+    fn estimated_tokens(&self) -> usize {
+        200
+    }
 }

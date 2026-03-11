@@ -66,4 +66,8 @@ impl ContextSource for WorkContextSource {
 
         Some(output)
     }
+
+    fn estimated_tokens(&self) -> usize {
+        300
+    }
 }

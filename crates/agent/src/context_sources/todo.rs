@@ -80,4 +80,8 @@ impl ContextSource for TodoSource {
 
         result
     }
+
+    fn estimated_tokens(&self) -> usize {
+        600
+    }
 }

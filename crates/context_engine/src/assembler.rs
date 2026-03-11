@@ -7,6 +7,7 @@ use sha2::{Digest, Sha256};
 use providers::Message;
 use tokio::sync::Mutex;
 
+use crate::inventory::{ContextInventory, ContextInventoryItem, ContextItemStatus};
 use crate::memory_retriever::MemoryRetriever;
 use crate::source::{ContextSource, SourceContext};
 use crate::summary_provider::SummaryProvider;
@@ -55,6 +56,12 @@ pub struct AssembledContext {
     pub token_count: usize,
     /// Budget allocation report.
     pub budget_report: BudgetReport,
+    /// Inventory of loaded vs. deferred context sources.
+    pub inventory: ContextInventory,
+    /// Remaining token budget available for expansion.
+    pub budget_remaining: usize,
+    /// Context version — incremented on each expand() call.
+    pub version: u32,
 }
 
 /// Default number of memory entries to retrieve.
@@ -375,13 +382,42 @@ impl ContextEngine {
         // Recent messages verbatim
         messages.extend(recent_messages);
 
-        let token_count = allocator.total_allocated();
+        let mut token_count = allocator.total_allocated();
+        let mut budget_remaining = allocator.remaining();
         let budget_report = allocator.report();
+
+        // Build inventory from registered sources.
+        let mut inventory = ContextInventory::new();
+        for source in &self.sources {
+            inventory.upsert(ContextInventoryItem {
+                source_name: source.name().to_string(),
+                priority: source.priority(),
+                status: ContextItemStatus::Loaded {
+                    tokens_used: source.estimated_tokens(),
+                },
+                token_estimate: source.estimated_tokens(),
+                summary: None,
+            });
+        }
+
+        // Inject inventory summary into the prompt if there are any
+        // deferred or available sources the agent could request.
+        if inventory.has_deferred() {
+            let total_budget = allocator.config_total_window();
+            let inventory_text = inventory.format_for_prompt(total_budget, budget_remaining);
+            let inv_tokens = self.estimate_text(&inventory_text);
+            messages.push(Message::system(&inventory_text));
+            token_count += inv_tokens;
+            budget_remaining = budget_remaining.saturating_sub(inv_tokens);
+        }
 
         AssembledContext {
             messages,
             token_count,
             budget_report,
+            inventory,
+            budget_remaining,
+            version: 0,
         }
     }
 
@@ -434,12 +470,65 @@ impl ContextEngine {
             .map(|t| self.estimate_text(&t.to_string()))
             .sum()
     }
+
+    /// Expand context by loading a deferred source.
+    ///
+    /// Finds the named source, calls `provide()`, and inserts the result
+    /// as a system message if it fits within the remaining budget.
+    /// Increments the context version on success.
+    pub async fn expand(
+        &self,
+        current: &AssembledContext,
+        source_name: &str,
+        source_ctx: &SourceContext,
+    ) -> common::Result<AssembledContext> {
+        let source = self
+            .sources
+            .iter()
+            .find(|s| s.name() == source_name)
+            .ok_or_else(|| {
+                common::ToolError::ExecutionFailed(format!(
+                    "Context source '{}' not found",
+                    source_name
+                ))
+            })?;
+
+        let content = source.provide(source_ctx).await;
+
+        // Check budget before cloning the full context.
+        if let Some(ref text) = content {
+            let tokens = self.estimate_text(text);
+            if tokens > current.budget_remaining {
+                return Err(common::ToolError::ExecutionFailed(format!(
+                    "Insufficient budget for '{}': needs {} tokens, {} remaining",
+                    source_name, tokens, current.budget_remaining
+                ))
+                .into());
+            }
+        }
+
+        let mut result = current.clone();
+        result.version += 1;
+
+        if let Some(text) = content {
+            let tokens = self.estimate_text(&text);
+            result.messages.push(Message::system(&text));
+            result.token_count += tokens;
+            result.budget_remaining -= tokens;
+            result.budget_report.remaining = result.budget_remaining;
+            result.inventory.mark_loaded(source_name, tokens);
+        }
+
+        Ok(result)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::inventory::{ContextInventory, ContextInventoryItem, ContextItemStatus};
     use crate::memory_retriever::{MemoryEntry, MemoryRetriever};
+    use crate::source::{ContextSource, SourceContext};
     use async_trait::async_trait;
 
     fn make_request(
@@ -922,5 +1011,118 @@ mod tests {
             called.load(std::sync::atomic::Ordering::SeqCst),
             "SummaryProvider should have been called via compress_async"
         );
+    }
+
+    // ── Expand tests ──
+
+    struct DeferredSource;
+
+    #[async_trait]
+    impl ContextSource for DeferredSource {
+        fn name(&self) -> &str {
+            "deferred_test"
+        }
+        fn priority(&self) -> u8 {
+            40
+        }
+        async fn provide(&self, _ctx: &SourceContext) -> Option<String> {
+            Some("[Deferred Content]\nProject details here.".into())
+        }
+        fn estimated_tokens(&self) -> usize {
+            200
+        }
+    }
+
+    fn test_source_context() -> SourceContext {
+        SourceContext {
+            channel: "cli".into(),
+            chat_id: "test".into(),
+            message: None,
+            intent_summary: None,
+            project_id: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_expand_loads_deferred_source() {
+        let engine = ContextEngine::new().with_sources(vec![Box::new(DeferredSource)]);
+
+        let mut initial = AssembledContext {
+            messages: vec![Message::system("System prompt.")],
+            token_count: 100,
+            budget_report: BudgetReport {
+                total_window: 12000,
+                total_allocated: 100,
+                remaining: 5000,
+                per_priority: vec![],
+            },
+            inventory: ContextInventory::new(),
+            budget_remaining: 5000,
+            version: 0,
+        };
+        initial.inventory.upsert(ContextInventoryItem {
+            source_name: "deferred_test".into(),
+            priority: 40,
+            status: ContextItemStatus::Deferred {
+                reason: "budget".into(),
+            },
+            token_estimate: 200,
+            summary: None,
+        });
+
+        let ctx = test_source_context();
+        let expanded = engine
+            .expand(&initial, "deferred_test", &ctx)
+            .await
+            .unwrap();
+        assert!(expanded.version > initial.version);
+        assert!(expanded.messages.len() > initial.messages.len());
+        assert!(!expanded.inventory.has_deferred());
+        assert_eq!(expanded.budget_report.remaining, expanded.budget_remaining);
+    }
+
+    #[tokio::test]
+    async fn test_expand_rejects_unknown_source() {
+        let engine = ContextEngine::new();
+        let initial = AssembledContext {
+            messages: vec![],
+            token_count: 0,
+            budget_report: BudgetReport {
+                total_window: 12000,
+                total_allocated: 0,
+                remaining: 5000,
+                per_priority: vec![],
+            },
+            inventory: ContextInventory::new(),
+            budget_remaining: 5000,
+            version: 0,
+        };
+
+        let ctx = test_source_context();
+        let result = engine.expand(&initial, "nonexistent", &ctx).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_expand_rejects_insufficient_budget() {
+        let engine = ContextEngine::new().with_sources(vec![Box::new(DeferredSource)]);
+
+        let initial = AssembledContext {
+            messages: vec![Message::system("System prompt.")],
+            token_count: 100,
+            budget_report: BudgetReport {
+                total_window: 200,
+                total_allocated: 195,
+                remaining: 5,
+                per_priority: vec![],
+            },
+            inventory: ContextInventory::new(),
+            budget_remaining: 5,
+            version: 0,
+        };
+
+        let ctx = test_source_context();
+        let result = engine.expand(&initial, "deferred_test", &ctx).await;
+        assert!(result.is_err());
     }
 }

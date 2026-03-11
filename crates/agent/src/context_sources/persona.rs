@@ -61,4 +61,8 @@ impl ContextSource for PersonaContextSource {
 
         Some(output)
     }
+
+    fn estimated_tokens(&self) -> usize {
+        200
+    }
 }

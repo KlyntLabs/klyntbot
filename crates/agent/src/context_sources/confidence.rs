@@ -55,4 +55,8 @@ impl ContextSource for ConfidenceSource {
         let threshold = self.threshold();
         Some(crate::confidence::prompt::confidence_prompt(threshold))
     }
+
+    fn estimated_tokens(&self) -> usize {
+        100
+    }
 }

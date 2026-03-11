@@ -105,4 +105,8 @@ impl ContextSource for ProjectContextSource {
             ))
         }
     }
+
+    fn estimated_tokens(&self) -> usize {
+        1500
+    }
 }

@@ -81,6 +81,10 @@ impl ContextSource for ProductivityContextSource {
 
         result
     }
+
+    fn estimated_tokens(&self) -> usize {
+        800
+    }
 }
 
 impl ProductivityContextSource {

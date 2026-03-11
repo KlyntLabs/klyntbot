@@ -320,6 +320,10 @@ impl ContextSource for CognitiveContextSource {
             Some(output)
         }
     }
+
+    fn estimated_tokens(&self) -> usize {
+        1000
+    }
 }
 
 #[cfg(test)]

@@ -90,4 +90,8 @@ impl ContextSource for AreaSource {
 
         result
     }
+
+    fn estimated_tokens(&self) -> usize {
+        400
+    }
 }

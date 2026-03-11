@@ -109,4 +109,8 @@ You are klyntbot, a personal AI assistant powered by advanced language models.
             messaging_instruction
         ))
     }
+
+    fn estimated_tokens(&self) -> usize {
+        300
+    }
 }

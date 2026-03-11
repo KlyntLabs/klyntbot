@@ -51,4 +51,8 @@ impl ContextSource for AnnotationContextSource {
 
         Some(text)
     }
+
+    fn estimated_tokens(&self) -> usize {
+        400
+    }
 }
