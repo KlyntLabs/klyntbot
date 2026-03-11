@@ -24,6 +24,7 @@ pub mod browser;
 pub mod context_request;
 pub mod cron_tool;
 pub mod delegation;
+pub mod docs;
 pub mod filesystem;
 pub mod glob_tool;
 pub mod grep;
@@ -103,3 +104,6 @@ pub use config::TrustLevel;
 
 // Context request
 pub use context_request::{ContextExpansionHandler, ContextRequestTool};
+
+// Docs (content registry)
+pub use docs::{ContentRegistryHandler, DocsTool};
