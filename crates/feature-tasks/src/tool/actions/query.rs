@@ -223,12 +223,7 @@ impl TaskTool {
             return Ok("No tasks found.".to_string());
         }
 
-        fn render_tree(
-            task: &Task,
-            all_tasks: &[Task],
-            prefix: &str,
-            is_last: bool,
-        ) -> String {
+        fn render_tree(task: &Task, all_tasks: &[Task], prefix: &str, is_last: bool) -> String {
             let mut output = String::new();
             let connector = if is_last { "└─ " } else { "├─ " };
             let priority_str = task

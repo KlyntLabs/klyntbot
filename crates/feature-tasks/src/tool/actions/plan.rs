@@ -24,9 +24,7 @@ impl TaskTool {
         let candidates: Vec<_> = all_tasks
             .into_iter()
             .filter(|t| {
-                t.status == TaskStatus::Todo.as_str()
-                    && !t.is_template
-                    && t.focused_at.is_none()
+                t.status == TaskStatus::Todo.as_str() && !t.is_template && t.focused_at.is_none()
             })
             .collect();
 
@@ -75,10 +73,7 @@ impl TaskTool {
             return Ok("No eligible tasks for planning. All clear!".to_string());
         }
 
-        let total_est_mins: i32 = plan
-            .iter()
-            .filter_map(|(t, _)| t.estimated_minutes)
-            .sum();
+        let total_est_mins: i32 = plan.iter().filter_map(|(t, _)| t.estimated_minutes).sum();
 
         let mut output = format!("Daily plan ({} tasks):\n\n", plan.len());
         for (i, (task, score)) in plan.iter().enumerate() {

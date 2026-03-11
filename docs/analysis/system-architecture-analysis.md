@@ -125,38 +125,48 @@ All vectors use **384-dimensional** embeddings via FastEmbed (`paraphrase-multil
 ### 2.3 Memory Lifecycle
 
 ```
-  User Message
+  User Messages (multiple)
        │
        ▼
   DomainEventBus ──publish──▶ BackgroundConsolidationService
        │                              │
-       │                    ┌─────────┴──────────┐
-       │                    ▼                    ▼
-       │           Salience Filter        Salience Filter
-       │           ┌───┬──────┬───┐      (Accumulate path)
-       │           │   │      │   │              │
-       │        Extract │  Discard│          Buffer events
-       │           │   │      │   │       ≥5 events + ≥3 days
-       │           ▼   │      │   │              │
-       │     Observation│      │   │         Promote to
-       │           │   │      │   │         Extraction
-       │           ▼   │      │   │              │
-       │     ExtractionHandler (LLM)             │
-       │           │                             │
-       │           ▼                             │
-       │    ExtractedFact[]                      │
-       │           │                             │
-       │           ▼                             │
-       │  ConsolidationHandler (LLM)◄────────────┘
-       │     ┌─────┼─────┬─────┐
-       │     ▼     ▼     ▼     ▼
-       │    ADD  UPDATE DELETE NOOP
-       │     │     │     │
-       │     ▼     ▼     ▼
-       │  SemanticFactRepo (SQLite)
-       │     │
-       │     ▼
-       │  SemanticFactEmbedder (LanceDB)
+       │                    collect_batch (3s window, max 10)
+       │                              │
+       │                    classify_batch (salience)
+       │                    ┌─────────┼──────────┐
+       │                    ▼         │          ▼
+       │                 Extract    Discard   Accumulate
+       │                    │                    │
+       │                    │              Buffer events
+       │                    │              ≥5 + ≥3 days
+       │                    │                    │
+       │                    │◄── DLQ retries ◄───┤ Promote
+       │                    │                    │
+       │                    ▼                    │
+       │           Batch ExtractionHandler       │
+       │              (1 LLM call)               │
+       │              ┌────┴────┐                │
+       │              │         │                │
+       │           Success   Fallback            │
+       │              │      (heuristic)         │
+       │              │         │                │
+       │              │    Dead-Letter Queue     │
+       │              │    (retry w/ backoff)    │
+       │              │         │                │
+       │              ▼         ▼                │
+       │         ExtractedFact[]                 │
+       │              │                          │
+       │         prefetch_existing (join_all)    │
+       │              │                          │
+       │              ▼                          │
+       │     Batch ConsolidationHandler ◄────────┘
+       │        (1 LLM call)
+       │        ┌─────┼─────┬─────┐
+       │        ▼     ▼     ▼     ▼
+       │       ADD  UPDATE DELETE NOOP
+       │        │     │     │
+       │        ▼     ▼     ▼
+       │  execute_memory_ops (SQLite + LanceDB)
        │
        ▼
   Context Assembly (retrieval on next request)
@@ -189,21 +199,22 @@ Events are classified into three tiers:
 
 | Verdict | Trigger Examples | Processing |
 |---------|-----------------|------------|
-| **Extract** | User stated facts, corrections, chat turns, budget alerts, coaching feedback | Immediate LLM extraction → consolidation |
+| **Extract** | User stated facts, corrections, chat turns, budget alerts, coaching feedback | Micro-batched (3s window) → batch LLM extraction → consolidation |
 | **Accumulate** | Productivity scores, task completions, focus sessions, normal transactions | Buffered; promoted after ≥5 events across ≥3 days |
 | **Discard** | (None currently — all events are either Extract or Accumulate) | Dropped |
 
-### 2.6 Consolidation (Mem0-Style)
+### 2.6 Consolidation (Mem0-Style, Batch)
 
-When a new fact candidate is extracted, consolidation checks existing facts:
+Fact candidates are processed in batches via `decide_batch`:
 
-1. Find similar facts by `(subject, predicate)` match
-2. If no similar facts → **ADD** directly
-3. If similar exist → ask LLM to decide:
+1. Concurrent `prefetch_existing` lookups via `join_all` for `(subject, predicate)` matches
+2. Candidates with no similar facts → **ADD** directly (skip LLM)
+3. Candidates with existing matches → single batch LLM call to decide:
    - **ADD** — new, non-conflicting fact
    - **UPDATE** — supersedes old fact (bi-temporal: `superseded_at`, `superseded_by`)
    - **DELETE** — old fact no longer valid
    - **NOOP** — duplicate, no action needed
+4. `execute_memory_ops` applies all decisions to SQLite + LanceDB
 
 ### 2.7 Weekly Reflection Cycle
 
@@ -599,39 +610,46 @@ Channel (sends response)    DomainEventBus
                         (async memory processing)
 ```
 
-### 5.2 Memory Processing Flow (Async, Event-Driven)
+### 5.2 Memory Processing Flow (Async, Micro-Batch)
 
 ```
 Feature Crate ──emit──▶ DomainEventBus
                               │
                     BackgroundConsolidationService
                               │
-                     Salience Evaluation
+                     collect_batch (3s / max 10)
+                              │
+                     classify_batch (salience)
                     ┌─────┬───┴───┬──────┐
                     │     │       │      │
                  Extract  Accumulate  Discard
                     │     │              │
                     │     Buffer         (drop)
-                    │     ≥5 + ≥3d
+                    │     ≥5 + ≥3d → Promote
                     │     │
-                    ▼     ▼
-             event_to_observation()
+                    │◄────┘ + DLQ retries (self-healing)
                     │
                     ▼
-             ExtractionHandler (LLM)
+             Batch ExtractionHandler (1 LLM call)
+                    │
+               ┌────┴────┐
+            Success    Fallback → Dead-Letter Queue
+               │       (heuristic)   (linear backoff,
+               │                      max 3 retries)
+               ▼
+        ExtractedFact[] → to_semantic_fact()
+                    │
+             prefetch_existing (concurrent join_all)
                     │
                     ▼
-             ExtractedFact[] → to_semantic_fact()
-                    │
-                    ▼
-             ConsolidationHandler (LLM)
+        Batch ConsolidationHandler (1 LLM call)
+             (no-existing → direct ADD, skip LLM)
                     │
                ┌────┼────┬────┐
                ADD UPDATE DEL  NOOP
                │    │    │
                ▼    ▼    ▼
-           SemanticFactRepo ──▶ SQLite
-           SemanticFactEmbedder ──▶ LanceDB
+         execute_memory_ops ──▶ SQLite + LanceDB
 ```
 
 ---
@@ -650,10 +668,11 @@ Feature Crate ──emit──▶ DomainEventBus
 - **Three-tier memory** (semantic/episodic/procedural) mirrors neuroscience models and provides a rich foundation for personalization
 - **FSRS decay** is mathematically grounded — based on peer-reviewed spaced repetition research
 - **Bi-temporal semantic facts** (valid_from/valid_until + recorded_at/superseded_at) enable time-travel queries and fact versioning
-- **Mem0-style consolidation** with LLM-driven ADD/UPDATE/DELETE/NOOP prevents memory bloat and handles contradictions
+- **Mem0-style batch consolidation** with LLM-driven ADD/UPDATE/DELETE/NOOP prevents memory bloat and handles contradictions. Micro-batch pipeline (3s window) reduces N+N LLM calls to 1+1 per batch
 - **Two-tier context injection** (static identity + dynamic query-relevant) balances always-on personalization with query-specific relevance
 - **Compaction system** with configurable retention policies prevents unbounded growth
 - **Accumulated observation promotion** (≥5 events across ≥3 days) filters noise while surfacing genuine patterns
+- **Dead-letter queue** with self-healing retry ensures no observations are lost on LLM failure (linear backoff, max 3 retries, piggyback drain on healthy batches)
 
 **Engineering:**
 - **456 Rust source files, ~115K LoC** — substantial but well-organized
@@ -666,7 +685,6 @@ Feature Crate ──emit──▶ DomainEventBus
 
 **Memory System:**
 - **No vector index until enough rows** — IVF-PQ indexing requires a minimum row count, meaning early queries do brute-force scans (acceptable for personal use, not scalable)
-- **Sequential consolidation** — `consolidate_batch` processes facts one-by-one; could batch LLM calls
 - **No per-user FSRS calibration** — FSRS parameters are configurable globally but not automatically tuned per-user based on retrieval outcomes
 - **Text-only embeddings** — no support for image/audio memory
 - **Conversation recall is separate from cognitive facts** — two parallel vector search paths that don't share a unified relevance model *(design spec written, implementation planned — see `docs/superpowers/specs/2026-03-11-unified-memory-retrieval-design.md`)*
@@ -676,12 +694,10 @@ Feature Crate ──emit──▶ DomainEventBus
 - **Single-binary monolith** — while well-layered, all 26 crates compile into one binary. No microservice boundaries for independent scaling.
 - **SQLite single-writer limitation** — concurrent writes are serialized; fine for personal use but a scalability ceiling
 - **No distributed event processing** — `tokio::broadcast` is in-process only
-- **No retry/dead-letter for failed extractions** — if the LLM extraction fails, the observation is lost
-- **LLM-dependent consolidation** — every memory write requires an LLM call when similar facts exist, adding latency and cost
+- **LLM-dependent consolidation** — every memory write requires an LLM call when similar facts exist, adding latency and cost (mitigated: candidates with no existing matches now bypass LLM with direct ADD)
 
 **Observability:**
-- **No structured metrics export** — no Prometheus/OpenTelemetry integration
-- **No A/B testing framework** for memory retrieval strategies
+- Existing `tracing` + `PipelineEvent` SSE stream is sufficient for a personal local app. No need for Prometheus/OpenTelemetry.
 
 **Evaluation & Intelligence:**
 - **No explicit intelligence scoring** — there is no mechanism to evaluate the AI's intelligence level
@@ -703,7 +719,7 @@ Feature Crate ──emit──▶ DomainEventBus
 | **Personalization** | Structured UserModel injected into every prompt | Usually no persistent user model |
 | **Temporal awareness** | Bi-temporal facts, time-decayed recall | Typically timestamp metadata only |
 | **Retrieval scoring** | 5-factor composite (similarity + decay + importance + frequency + situation) | Single-factor (cosine similarity) |
-| **Cost** | More LLM calls (extraction + consolidation per event) | Fewer LLM calls (embed + retrieve only) |
+| **Cost** | Batched LLM calls (1+1 per micro-batch window instead of N+N per event) | Fewer LLM calls (embed + retrieve only) |
 
 **Verdict:** Klyntbot's memory system is significantly more sophisticated than standard RAG. The tradeoff is higher LLM cost per memory operation.
 
@@ -725,7 +741,7 @@ Feature Crate ──emit──▶ DomainEventBus
 | Dimension | Klyntbot | Mem0 | MemGPT |
 |-----------|----------|------|--------|
 | **Memory types** | Semantic + Episodic + Procedural | Key-value facts | Hierarchical (core/archival/recall) |
-| **Consolidation** | LLM-driven ADD/UPDATE/DELETE/NOOP (Mem0-inspired) | Graph-based | Edit-based |
+| **Consolidation** | Batch LLM-driven ADD/UPDATE/DELETE/NOOP (Mem0-inspired), smart ADD bypass | Graph-based | Edit-based |
 | **Decay model** | FSRS (spaced repetition) | None | Context-based eviction |
 | **Observation filtering** | Salience-based (Extract/Accumulate/Discard) | All messages processed | All messages processed |
 | **User model** | Structured `UserModel` with domain-organized facts | Flat memory store | Persona blocks |
@@ -753,9 +769,9 @@ Feature Crate ──emit──▶ DomainEventBus
 | Dimension | Score | Rationale |
 |-----------|-------|-----------|
 | **Architecture Design** | **8/10** | Strict 9-layer hierarchy with dependency inversion is excellent. Single-binary monolith limits scalability but is appropriate for a personal AI. Feature packages are well-isolated. Loses points for SQLite single-writer limitation and lack of distributed event processing. |
-| **Memory System Quality** | **9/10** | Best-in-class for a personal AI agent. Three-tier cognitive model, FSRS decay, Mem0-style consolidation, bi-temporal facts, salience filtering, weekly reflection — this is more sophisticated than most commercial memory systems. Loses a point for sequential consolidation and separate conversation recall paths. |
+| **Memory System Quality** | **9/10** | Best-in-class for a personal AI agent. Three-tier cognitive model, FSRS decay, Mem0-style batch consolidation, bi-temporal facts, micro-batch pipeline (1+1 LLM calls per window), dead-letter queue with self-healing retry, salience filtering, weekly reflection. Loses a point for separate conversation recall paths. |
 | **Scalability** | **5/10** | Designed for single-user personal AI — SQLite, in-process event bus, single binary. Would need fundamental changes for multi-user. LanceDB vector search is brute-force until enough rows for indexing. Adequate for intended use case, but limited beyond it. |
-| **Observability** | **4/10** | Tracing via `tracing` crate exists but no structured metrics export. No dashboarding or A/B testing infrastructure. This is the weakest dimension. |
+| **Observability** | **N/A** | Not scored — `tracing` + `PipelineEvent` SSE is sufficient for a single-user local app. Structured metrics export is unnecessary overhead. |
 | **Intelligence & Reasoning** | **7/10** | Multi-agent routing, intent analysis, ReAct execution with tool calling, abstractive history compression, and context-window-aware budget allocation. No chain-of-thought or multi-step planning beyond ReAct. No self-reflection on response quality. |
 | **User Understanding & Personalization** | **8/10** | Structured UserModel with 10 domains, dynamic + static context injection, procedural rules from reflection, situation-aware coaching. Confidence calibration exists but isn't dynamically tuned. No explicit measurement of how well the system understands the user. |
 | **Maintainability** | **8/10** | Clean crate boundaries, zero-clippy-warning policy, comprehensive tests, derive macros for tools, conventional commit format. 26 crates is a lot to navigate but well-organized. Legacy L2 learning tables alongside L5 cognitive system adds some confusion. |
@@ -779,33 +795,23 @@ The system excels at memory architecture and personalization (where it arguably 
 - Add **Response Quality Signals**: implicit (user corrections, topic re-asks, session length) and explicit (thumbs up/down in desktop UI)
 - Track **Confidence Calibration**: compare the AI's confidence predictions with actual outcomes
 
-#### 2. Implement Structured Observability
+#### ~~2. Implement Structured Observability~~ — Skipped
 
-**Problem:** No metrics export, no dashboard.
-
-**Solution:**
-- Add OpenTelemetry integration with spans for: agent routing, context assembly, LLM calls, memory retrieval, consolidation
-- Build a desktop dashboard showing: memory growth, fact domains, retrieval hit rates, cost per interaction
+Not needed for a single-user local app. Existing `tracing` logs, `/api/cognitive/stream` SSE, and `PipelineEvent` broadcast provide sufficient observability.
 
 ### 9.2 Medium Priority
 
-#### 3. Batch LLM Operations
+#### ~~3. Batch LLM Operations~~ ✅ Implemented
 
-**Problem:** `consolidate_batch` makes individual LLM calls per fact. Extraction and consolidation are sequential.
+~~**Problem:** `consolidate_batch` makes individual LLM calls per fact. Extraction and consolidation are sequential.~~
 
-**Solution:**
-- Batch multiple fact consolidation decisions into a single LLM call with structured output
-- Pipeline extraction → consolidation to overlap API latency
-- Consider local models (Ollama) for extraction to reduce API costs
+**Implemented:** Micro-batch pipeline collects events in 3s windows (max 10), processes via single batch LLM calls for both extraction and consolidation (1+1 per window instead of N+N). Smart ADD bypass skips LLM for candidates with no existing matches. Concurrent `prefetch_existing` via `join_all`. See `crates/cognitive/src/background.rs`.
 
-#### 4. Add Dead-Letter Queue for Failed Memory Operations
+#### ~~4. Add Dead-Letter Queue for Failed Memory Operations~~ ✅ Implemented
 
-**Problem:** If LLM extraction or consolidation fails, the observation is lost.
+~~**Problem:** If LLM extraction or consolidation fails, the observation is lost.~~
 
-**Solution:**
-- Persist failed observations to a `failed_observations` table
-- Add a retry mechanism with exponential backoff
-- Dashboard alert for persistent failures
+**Implemented:** `failed_observations` table with linear backoff (`(retry_count + 1) * 5 minutes`, max 3 retries). Self-healing drain piggybacks on next successful LLM batch — pulls up to 5 eligible items per healthy cycle. See `crates/cognitive/src/repos/failed_observation.rs` and migration `007_failed_observations.sql`.
 
 #### 5. Add Per-User FSRS Calibration
 

@@ -1,6 +1,6 @@
 # Batch Pipeline & Dead-Letter Queue Implementation Plan
 
-> **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Restructure the cognitive memory pipeline to batch LLM calls (1+1 per window instead of N+N) and add a dead-letter queue with self-healing retry for failed observations.
 
@@ -38,7 +38,7 @@ These tasks build the new types, traits, dead-letter repo, and migration — all
 - Modify: `crates/cognitive/src/extraction.rs`
 - Modify: `crates/cognitive/src/lib.rs`
 
-- [ ] **Step 1: Add `BatchExtraction` and `BatchExtractionResult` types**
+- [x] **Step 1: Add `BatchExtraction` and `BatchExtractionResult` types**
 
 In `crates/cognitive/src/extraction.rs`, add after the `ExtractedFact` struct (after line 21):
 
@@ -60,7 +60,7 @@ pub struct BatchExtractionResult {
 }
 ```
 
-- [ ] **Step 2: Change `ExtractionHandler` trait to batch-native**
+- [x] **Step 2: Change `ExtractionHandler` trait to batch-native**
 
 Replace the existing `ExtractionHandler` trait (lines 28-33) with:
 
@@ -82,11 +82,11 @@ pub trait ExtractionHandler: Send + Sync {
 }
 ```
 
-- [ ] **Step 3: Remove `extract_from_observation` free function**
+- [x] **Step 3: Remove `extract_from_observation` free function**
 
 Delete the `extract_from_observation` function (lines 100-123). This logic moves into the batch handler implementations. Keep `to_semantic_fact` and `classify_memory_type` — they're still used.
 
-- [ ] **Step 4: Update re-exports in `lib.rs`**
+- [x] **Step 4: Update re-exports in `lib.rs`**
 
 In `crates/cognitive/src/lib.rs`, update the extraction re-export (line 29) to include new types:
 
@@ -96,13 +96,13 @@ pub use extraction::{
 };
 ```
 
-- [ ] **Step 5: Verify compilation fails expectedly**
+- [x] **Step 5: Verify compilation fails expectedly**
 
 Run: `cargo build -p cognitive 2>&1 | head -30`
 
 Expected: Compilation errors in `background.rs` (calls to removed `extract_from_observation`) and in `agent` crate (handlers implement old trait signature). This is expected — we'll fix these in later tasks.
 
-- [ ] **Step 6: Add unit test for `BatchExtractionResult`**
+- [x] **Step 6: Add unit test for `BatchExtractionResult`**
 
 Add to the existing `#[cfg(test)] mod tests` in `extraction.rs`:
 
@@ -143,7 +143,7 @@ fn test_batch_extraction_result_structure() {
 - Modify: `crates/cognitive/src/consolidation.rs`
 - Modify: `crates/cognitive/src/lib.rs`
 
-- [ ] **Step 1: Add `ConsolidationCandidate` type**
+- [x] **Step 1: Add `ConsolidationCandidate` type**
 
 In `crates/cognitive/src/consolidation.rs`, add after the imports (after line 13):
 
@@ -156,7 +156,7 @@ pub struct ConsolidationCandidate {
 }
 ```
 
-- [ ] **Step 2: Change `ConsolidationHandler` trait to batch-native**
+- [x] **Step 2: Change `ConsolidationHandler` trait to batch-native**
 
 Replace the existing `ConsolidationHandler` trait (lines 37-45) with:
 
@@ -176,7 +176,7 @@ pub trait ConsolidationHandler: Send + Sync {
 }
 ```
 
-- [ ] **Step 3: Replace `consolidate_fact` and `consolidate_batch` with `execute_memory_ops`**
+- [x] **Step 3: Replace `consolidate_fact` and `consolidate_batch` with `execute_memory_ops`**
 
 Remove `consolidate_fact` (lines 53-108) and `consolidate_batch` (lines 110-128). Replace with:
 
@@ -240,7 +240,7 @@ pub async fn execute_memory_ops(
 }
 ```
 
-- [ ] **Step 4: Update re-exports in `lib.rs`**
+- [x] **Step 4: Update re-exports in `lib.rs`**
 
 In `crates/cognitive/src/lib.rs`, update the consolidation re-export (line 23) to:
 
@@ -248,7 +248,7 @@ In `crates/cognitive/src/lib.rs`, update the consolidation re-export (line 23) t
 pub use consolidation::{ConsolidationCandidate, ConsolidationHandler, execute_memory_ops};
 ```
 
-- [ ] **Step 5: Update consolidation tests**
+- [x] **Step 5: Update consolidation tests**
 
 Replace the existing `consolidate_batch` test (lines 253-271) with a test for `execute_memory_ops`:
 
@@ -322,7 +322,7 @@ async fn test_execute_memory_ops_noop() {
 
 Also update the remaining `consolidate_fact` tests to work with `execute_memory_ops`, or remove them if fully covered by the new tests. The `consolidate_adds_when_no_existing`, `consolidate_updates_existing`, and `consolidate_noop_on_duplicate` tests test the old `consolidate_fact` function which no longer exists — remove them.
 
-- [ ] **Step 6: Verify cognitive crate tests pass (extraction + consolidation only)**
+- [x] **Step 6: Verify cognitive crate tests pass (extraction + consolidation only)**
 
 Run: `cargo nextest run -p cognitive -E 'test(test_execute_memory_ops) | test(test_batch_extraction) | test(test_classify) | test(test_to_semantic)'`
 
@@ -338,7 +338,7 @@ Expected: All new and retained tests PASS. Build errors still expected in `backg
 - Modify: `crates/cognitive/src/repos/mod.rs`
 - Modify: `crates/cognitive/src/lib.rs`
 
-- [ ] **Step 1: Write the failing test for `FailedObservationRepo`**
+- [x] **Step 1: Write the failing test for `FailedObservationRepo`**
 
 Create `crates/cognitive/src/repos/failed_observation.rs`:
 
@@ -493,13 +493,13 @@ mod tests {
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `cargo nextest run -p cognitive -E 'test(test_insert_and_list_eligible)'`
 
 Expected: FAIL — `insert` method doesn't exist yet, and migration table doesn't exist.
 
-- [ ] **Step 3: Create migration file**
+- [x] **Step 3: Create migration file**
 
 Create `crates/cognitive/migrations/007_failed_observations.sql`:
 
@@ -521,7 +521,7 @@ CREATE INDEX IF NOT EXISTS idx_failed_observations_eligible
     ON failed_observations(retry_count, next_retry_at);
 ```
 
-- [ ] **Step 4: Register migration in `repos/mod.rs`**
+- [x] **Step 4: Register migration in `repos/mod.rs`**
 
 In `crates/cognitive/src/repos/mod.rs`, add after the v6 migration entry (after line 76, before the closing `]`):
 
@@ -546,7 +546,7 @@ And add to the re-exports:
 pub use failed_observation::FailedObservationRepo;
 ```
 
-- [ ] **Step 5: Implement `FailedObservationRepo` methods**
+- [x] **Step 5: Implement `FailedObservationRepo` methods**
 
 In `crates/cognitive/src/repos/failed_observation.rs`, add the implementation methods inside the `impl FailedObservationRepo` block:
 
@@ -639,7 +639,7 @@ impl FailedObservationRepo {
 }
 ```
 
-- [ ] **Step 6: Update `lib.rs` re-exports**
+- [x] **Step 6: Update `lib.rs` re-exports**
 
 In `crates/cognitive/src/lib.rs`, add to the repos re-export block:
 
@@ -647,7 +647,7 @@ In `crates/cognitive/src/lib.rs`, add to the repos re-export block:
 pub use repos::FailedObservationRepo;
 ```
 
-- [ ] **Step 7: Run tests**
+- [x] **Step 7: Run tests**
 
 Run: `cargo nextest run -p cognitive -E 'test(failed_observation)'`
 
@@ -660,7 +660,7 @@ Expected: All 6 `FailedObservationRepo` tests PASS.
 **Files:**
 - Modify: `crates/cognitive/src/background.rs` (only the enum and `op_to_string`, NOT the event loop yet)
 
-- [ ] **Step 1: Update `PipelineEvent` enum**
+- [x] **Step 1: Update `PipelineEvent` enum**
 
 In `crates/cognitive/src/background.rs`, replace the `PipelineEvent` enum (lines 28-39) with:
 
@@ -702,7 +702,7 @@ pub enum PipelineEvent {
 }
 ```
 
-- [ ] **Step 2: Fix exhaustive `PipelineEvent` match sites**
+- [x] **Step 2: Fix exhaustive `PipelineEvent` match sites**
 
 Three files have exhaustive matches on `PipelineEvent` that will break with new variants. Add a wildcard arm to each:
 
@@ -717,7 +717,7 @@ _ => {} // BatchStarted, DeadLetterQueued, DeadLetterReprocessed — no desktop 
 
 Also update the existing `PipelineEvent::Extraction` emission in `background.rs` (the current event loop emits this variant — add `used_fallback: false` to the existing emission sites so the code compiles in the interim before the full rewrite in Task 7).
 
-- [ ] **Step 3: Verify with grep (full build deferred to Task 8)**
+- [x] **Step 3: Verify with grep (full build deferred to Task 8)**
 
 Note: `background.rs` will not compile at this point due to removed functions from Tasks 1-2. Full workspace build verification is deferred to Task 8. Verify the downstream fixes with:
 
@@ -736,7 +736,7 @@ Rewrite the LLM and heuristic handlers to implement the new batch traits. After 
 **Files:**
 - Modify: `crates/agent/src/cognitive_handlers.rs`
 
-- [ ] **Step 1: Extract `extract_single` as `pub(crate)` on `HeuristicExtractionHandler`**
+- [x] **Step 1: Extract `extract_single` as `pub(crate)` on `HeuristicExtractionHandler`**
 
 Move the body of the current `extract_facts` method (lines 27-73 of `cognitive_handlers.rs`) into a new `pub(crate)` method. This must be `pub(crate)` because `LlmExtractionHandler` calls it on `self.fallback`:
 
@@ -752,7 +752,7 @@ impl HeuristicExtractionHandler {
 }
 ```
 
-- [ ] **Step 2: Implement batch `ExtractionHandler` trait for `HeuristicExtractionHandler`**
+- [x] **Step 2: Implement batch `ExtractionHandler` trait for `HeuristicExtractionHandler`**
 
 Replace the old `ExtractionHandler` impl with:
 
@@ -779,7 +779,7 @@ impl ExtractionHandler for HeuristicExtractionHandler {
 }
 ```
 
-- [ ] **Step 3: Extract `decide_single` as `pub(crate)` on `HeuristicConsolidationHandler`**
+- [x] **Step 3: Extract `decide_single` as `pub(crate)` on `HeuristicConsolidationHandler`**
 
 Same pattern — move the body of `decide` (lines 83-111) into a `pub(crate)` method:
 
@@ -797,7 +797,7 @@ impl HeuristicConsolidationHandler {
 }
 ```
 
-- [ ] **Step 4: Implement batch `ConsolidationHandler` trait for `HeuristicConsolidationHandler`**
+- [x] **Step 4: Implement batch `ConsolidationHandler` trait for `HeuristicConsolidationHandler`**
 
 ```rust
 #[async_trait]
@@ -816,7 +816,7 @@ impl ConsolidationHandler for HeuristicConsolidationHandler {
 }
 ```
 
-- [ ] **Step 5: Update existing tests to use batch API**
+- [x] **Step 5: Update existing tests to use batch API**
 
 The existing tests in `cognitive_handlers.rs` call old trait methods (`extract_facts`, `decide`). Update them to use the batch API:
 
@@ -832,7 +832,7 @@ let ops = handler.decide_batch(&[cognitive::ConsolidationCandidate { candidate, 
 let op = ops.into_iter().next().unwrap();
 ```
 
-- [ ] **Step 6: Verify heuristic handler tests pass**
+- [x] **Step 6: Verify heuristic handler tests pass**
 
 Run: `cargo nextest run -p agent -E 'test(heuristic) | test(test_extraction)'`
 
@@ -845,7 +845,7 @@ Expected: All updated tests PASS.
 **Files:**
 - Modify: `crates/agent/src/cognitive_handlers.rs`
 
-- [ ] **Step 1: Rewrite `LlmExtractionHandler` for batch trait**
+- [x] **Step 1: Rewrite `LlmExtractionHandler` for batch trait**
 
 Replace the `ExtractionHandler` impl for `LlmExtractionHandler` (lines 203-248) with:
 
@@ -997,7 +997,7 @@ impl LlmExtractionHandler {
 }
 ```
 
-- [ ] **Step 2: Rewrite `LlmConsolidationHandler` for batch trait**
+- [x] **Step 2: Rewrite `LlmConsolidationHandler` for batch trait**
 
 **Note:** This code uses the `json!()` macro. Ensure `use serde_json::json;` is in the imports at the top of the file.
 
@@ -1178,11 +1178,11 @@ impl LlmConsolidationHandler {
 }
 ```
 
-- [ ] **Step 3: Remove old single-item deserialization structs if unused**
+- [x] **Step 3: Remove old single-item deserialization structs if unused**
 
 Remove `ExtractionResult` and `ConsolidationDecisionJson` if they're no longer referenced.
 
-- [ ] **Step 4: Verify agent crate builds**
+- [x] **Step 4: Verify agent crate builds**
 
 Run: `cargo build -p agent 2>&1 | head -30`
 
@@ -1201,7 +1201,7 @@ The big rewrite — replace the event-at-a-time loop with the micro-batch pipeli
 
 This is the largest task. The entire event loop changes. Keep all unchanged functions (`event_to_observation`, `event_type_key`, `summarize_accumulated`, `op_to_string`, `AccumulatedEntry`) and rewrite `BackgroundConsolidationService::start`.
 
-- [ ] **Step 1: Add `collect_batch` function**
+- [x] **Step 1: Add `collect_batch` function**
 
 Add before the `BackgroundConsolidationService` impl:
 
@@ -1249,7 +1249,7 @@ async fn collect_batch(
 }
 ```
 
-- [ ] **Step 2: Add `classify_batch` function**
+- [x] **Step 2: Add `classify_batch` function**
 
 ```rust
 /// Classify a batch of events by salience, returning observations split by verdict.
@@ -1276,7 +1276,7 @@ fn classify_batch(
 }
 ```
 
-- [ ] **Step 3: Add `prefetch_existing` function**
+- [x] **Step 3: Add `prefetch_existing` function**
 
 ```rust
 use futures_util::future::join_all;
@@ -1320,7 +1320,7 @@ async fn prefetch_existing(
 }
 ```
 
-- [ ] **Step 4: Rewrite `BackgroundConsolidationService::start`**
+- [x] **Step 4: Rewrite `BackgroundConsolidationService::start`**
 
 Update the `start` method signature to accept `FailedObservationRepo`:
 
@@ -1568,7 +1568,7 @@ let handle = tokio::spawn(async move {
 
 **Important:** You'll need to add `use futures_util::future::join_all;` to the imports and add `futures-util` as a dependency of the cognitive crate if it isn't already. Check `crates/cognitive/Cargo.toml`. Note: use `futures-util` (not `futures`) — it's lighter and provides `join_all` and `BoxFuture` directly.
 
-- [ ] **Step 5: Verify build**
+- [x] **Step 5: Verify build**
 
 Run: `cargo build -p cognitive 2>&1 | head -30`
 
@@ -1586,7 +1586,7 @@ use crate::consolidation as consolidation_mod;
 **Files:**
 - Modify: `crates/agent/src/agent_loop/builder.rs`
 
-- [ ] **Step 1: Add `FailedObservationRepo` to `BackgroundConsolidationService::start` call**
+- [x] **Step 1: Add `FailedObservationRepo` to `BackgroundConsolidationService::start` call**
 
 In the builder's cognitive wiring section (around line 329-341), update the `BackgroundConsolidationService::start` call to pass the new `failed_obs_repo` parameter:
 
@@ -1609,13 +1609,13 @@ let bg_service = cognitive::background::BackgroundConsolidationService::start(
 );
 ```
 
-- [ ] **Step 2: Verify full workspace builds**
+- [x] **Step 2: Verify full workspace builds**
 
 Run: `cargo build --workspace 2>&1 | tail -10`
 
 Expected: Clean build (maybe pre-existing desktop warnings).
 
-- [ ] **Step 3: Run full test suite**
+- [x] **Step 3: Run full test suite**
 
 Run: `cargo nextest run --workspace`
 
@@ -1623,13 +1623,13 @@ Expected: All tests pass. Pay special attention to:
 - `cargo nextest run -p cognitive` — new repo tests + updated extraction/consolidation tests
 - `cargo nextest run -p agent` — handler tests
 
-- [ ] **Step 4: Run clippy**
+- [x] **Step 4: Run clippy**
 
 Run: `cargo clippy --workspace --all-targets --all-features 2>&1 | grep "warning" | head -20`
 
 Expected: No new clippy warnings from our changes.
 
-- [ ] **Step 5: Run fmt**
+- [x] **Step 5: Run fmt**
 
 Run: `cargo fmt --all --check`
 
@@ -1641,7 +1641,7 @@ If failures: `cargo fmt --all`
 
 ### Task 9: Final verification and cleanup
 
-- [ ] **Step 1: Verify no references to old API remain**
+- [x] **Step 1: Verify no references to old API remain**
 
 Search for removed function names:
 
@@ -1657,13 +1657,13 @@ Run these greps and confirm zero hits outside of docs:
 - `fn extract_facts(` — old single-item trait method, should not appear
 - `fn decide(` on ConsolidationHandler — old single-item trait method
 
-- [ ] **Step 2: Run full workspace test suite**
+- [x] **Step 2: Run full workspace test suite**
 
 Run: `cargo nextest run --workspace`
 
 Expected: All tests pass (2243+ tests, 0 failures).
 
-- [ ] **Step 3: Verify dead-letter integration manually**
+- [x] **Step 3: Verify dead-letter integration manually**
 
 Check that the `FailedObservationRepo` is wired correctly by examining the builder code path:
 1. `FailedObservationRepo::new(pool.clone())` is called
@@ -1671,7 +1671,7 @@ Check that the `FailedObservationRepo` is wired correctly by examining the build
 3. Inside the event loop, fallback observations are inserted
 4. On successful batches, eligible items are drained
 
-- [ ] **Step 4: Check `futures-util` dependency**
+- [x] **Step 4: Check `futures-util` dependency**
 
 Verify `futures-util` is in `crates/cognitive/Cargo.toml`. If not, add it:
 

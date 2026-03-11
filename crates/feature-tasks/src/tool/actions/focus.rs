@@ -9,8 +9,7 @@ use super::super::TaskTool;
 impl TaskTool {
     pub(crate) async fn handle_focus(&self, p: &ParamExtractor<'_>) -> Result<String> {
         let id = p.required_str("id")?;
-        let deadline =
-            Some(Utc::now() + chrono::Duration::hours(self.focus_deadline_hours as i64));
+        let deadline = Some(Utc::now() + chrono::Duration::hours(self.focus_deadline_hours as i64));
 
         // Accept optional energy_level for the focus session
         let energy_level = p.optional_str("energy_level")?;
@@ -81,7 +80,14 @@ impl TaskTool {
         let energy_level = p.optional_str("energy_level")?;
 
         self.repo
-            .add_time_entry(id, "manual", started_at, Some(duration_secs), note, energy_level)
+            .add_time_entry(
+                id,
+                "manual",
+                started_at,
+                Some(duration_secs),
+                note,
+                energy_level,
+            )
             .await?;
 
         Ok(format!(

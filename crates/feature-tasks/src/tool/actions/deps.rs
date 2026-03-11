@@ -29,7 +29,10 @@ impl TaskTool {
                     None,
                     Some(&format!("blocked by {} ({})", blocker.id, dep_type)),
                     "user",
-                    Some(&format!("Added {} dependency on {}", dep_type, blocker.title)),
+                    Some(&format!(
+                        "Added {} dependency on {}",
+                        dep_type, blocker.title
+                    )),
                 )
                 .await;
         }

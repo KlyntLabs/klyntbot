@@ -450,9 +450,7 @@ impl AppCore {
                 });
                 let estimated_mins = updated.estimated_minutes.map(|m| m as i64);
                 let deviation_pct = match (actual_mins, estimated_mins) {
-                    (Some(a), Some(e)) if e > 0 => {
-                        Some(((a as f64) / (e as f64) - 1.0) * 100.0)
-                    }
+                    (Some(a), Some(e)) if e > 0 => Some(((a as f64) / (e as f64) - 1.0) * 100.0),
                     _ => None,
                 };
                 bus.publish(bus::DomainEvent::TaskCompleted {

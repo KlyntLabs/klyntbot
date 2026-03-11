@@ -22,9 +22,7 @@ impl TaskTool {
 
         // If we have embedding support, do hybrid search
         if let (Some(emb), Some(vs)) = (&self.embedding_handler, &self.embedding_store) {
-            return self
-                .search_hybrid(query, limit, emb.as_ref(), vs)
-                .await;
+            return self.search_hybrid(query, limit, emb.as_ref(), vs).await;
         }
 
         // Otherwise, keyword-only search
@@ -68,7 +66,10 @@ impl TaskTool {
         let keyword_count = keyword_results.len();
 
         // Run semantic search
-        debug!(query = query, "Generating query embedding for hybrid search");
+        debug!(
+            query = query,
+            "Generating query embedding for hybrid search"
+        );
         let query_vec = emb.embed_query(query).await?;
 
         let semantic_results = vs
@@ -79,7 +80,10 @@ impl TaskTool {
         let merged = crate::search::hybrid_merge(&keyword_results, &semantic_results, self.rrf_k);
 
         if merged.is_empty() {
-            return Ok(format!("No tasks found matching '{}' (hybrid search).", query));
+            return Ok(format!(
+                "No tasks found matching '{}' (hybrid search).",
+                query
+            ));
         }
 
         let results: Vec<_> = merged.into_iter().take(limit).collect();

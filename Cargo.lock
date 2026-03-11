@@ -60,6 +60,7 @@ dependencies = [
  "feature-finance",
  "feature-notes",
  "feature-productivity",
+ "feature-tasks",
  "feature-todo",
  "futures-util",
  "mcp",

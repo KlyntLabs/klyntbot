@@ -9,9 +9,9 @@ use storage::TaskPatch;
 impl TaskTool {
     /// Handle batch operations: complete, delete, tag, reorder.
     pub(crate) async fn handle_batch(&self, p: &ParamExtractor<'_>) -> Result<String> {
-        let ops = p
-            .optional_array("operations")?
-            .ok_or_else(|| ToolError::InvalidParams("'operations' array is required".to_string()))?;
+        let ops = p.optional_array("operations")?.ok_or_else(|| {
+            ToolError::InvalidParams("'operations' array is required".to_string())
+        })?;
 
         if ops.is_empty() {
             return Err(
@@ -86,9 +86,12 @@ impl TaskTool {
                                 ..Default::default()
                             };
                             match self.repo.update(&patch).await {
-                                Ok(row) => {
-                                    results.push(format!("Tagged: [{}] {} +{}", row.id, row.title, tags.join(",")))
-                                }
+                                Ok(row) => results.push(format!(
+                                    "Tagged: [{}] {} +{}",
+                                    row.id,
+                                    row.title,
+                                    tags.join(",")
+                                )),
                                 Err(e) => errors.push(format!("Tag {}: {}", id, e)),
                             }
                         }
@@ -110,9 +113,10 @@ impl TaskTool {
                                 ..Default::default()
                             };
                             match self.repo.update(&patch).await {
-                                Ok(row) => {
-                                    results.push(format!("Reordered: [{}] {} -> pos {}", row.id, row.title, pos))
-                                }
+                                Ok(row) => results.push(format!(
+                                    "Reordered: [{}] {} -> pos {}",
+                                    row.id, row.title, pos
+                                )),
                                 Err(e) => errors.push(format!("Reorder {}: {}", id, e)),
                             }
                         }

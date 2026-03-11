@@ -489,10 +489,7 @@ mod tests {
     }
 
     fn test_ctx() -> RoutingContext {
-        RoutingContext::new(
-            common::ChannelName::new("cli"),
-            common::ChatId::new("test"),
-        )
+        RoutingContext::new(common::ChannelName::new("cli"), common::ChatId::new("test"))
     }
 
     #[tokio::test]
@@ -619,13 +616,27 @@ mod tests {
             "action": "create", "title": "Blocker", "area_id": "test-area"
         });
         let r1 = tool.execute(args1, &ctx).await.unwrap();
-        let id1 = r1.split("ID: ").nth(1).unwrap().split(',').next().unwrap().trim_end_matches(')');
+        let id1 = r1
+            .split("ID: ")
+            .nth(1)
+            .unwrap()
+            .split(',')
+            .next()
+            .unwrap()
+            .trim_end_matches(')');
 
         let args2 = serde_json::json!({
             "action": "create", "title": "Blocked", "area_id": "test-area"
         });
         let r2 = tool.execute(args2, &ctx).await.unwrap();
-        let id2 = r2.split("ID: ").nth(1).unwrap().split(',').next().unwrap().trim_end_matches(')');
+        let id2 = r2
+            .split("ID: ")
+            .nth(1)
+            .unwrap()
+            .split(',')
+            .next()
+            .unwrap()
+            .trim_end_matches(')');
 
         // Add dependency: id2 blocked by id1
         let dep_args = serde_json::json!({
@@ -652,7 +663,14 @@ mod tests {
             "action": "create", "title": "To delete", "area_id": "test-area"
         });
         let r = tool.execute(create_args, &ctx).await.unwrap();
-        let id = r.split("ID: ").nth(1).unwrap().split(',').next().unwrap().trim_end_matches(')');
+        let id = r
+            .split("ID: ")
+            .nth(1)
+            .unwrap()
+            .split(',')
+            .next()
+            .unwrap()
+            .trim_end_matches(')');
 
         let delete_args = serde_json::json!({ "action": "delete", "id": id });
         let result = tool.execute(delete_args, &ctx).await.unwrap();
@@ -687,9 +705,14 @@ mod tests {
         tool.execute(
             serde_json::json!({ "action": "create", "title": "Task 1", "area_id": "test-area" }),
             &ctx,
-        ).await.unwrap();
+        )
+        .await
+        .unwrap();
 
-        let result = tool.execute(serde_json::json!({ "action": "summary" }), &ctx).await.unwrap();
+        let result = tool
+            .execute(serde_json::json!({ "action": "summary" }), &ctx)
+            .await
+            .unwrap();
         assert!(result.contains("Total tasks: 1"));
     }
 
@@ -702,13 +725,27 @@ mod tests {
             serde_json::json!({ "action": "create", "title": "Batch task 1", "area_id": "test-area" }),
             &ctx,
         ).await.unwrap();
-        let id1 = r1.split("ID: ").nth(1).unwrap().split(',').next().unwrap().trim_end_matches(')');
+        let id1 = r1
+            .split("ID: ")
+            .nth(1)
+            .unwrap()
+            .split(',')
+            .next()
+            .unwrap()
+            .trim_end_matches(')');
 
         let r2 = tool.execute(
             serde_json::json!({ "action": "create", "title": "Batch task 2", "area_id": "test-area" }),
             &ctx,
         ).await.unwrap();
-        let id2 = r2.split("ID: ").nth(1).unwrap().split(',').next().unwrap().trim_end_matches(')');
+        let id2 = r2
+            .split("ID: ")
+            .nth(1)
+            .unwrap()
+            .split(',')
+            .next()
+            .unwrap()
+            .trim_end_matches(')');
 
         let batch_args = serde_json::json!({
             "action": "batch",
@@ -731,18 +768,25 @@ mod tests {
             serde_json::json!({ "action": "create", "title": "Focus me", "area_id": "test-area" }),
             &ctx,
         ).await.unwrap();
-        let id = r.split("ID: ").nth(1).unwrap().split(',').next().unwrap().trim_end_matches(')');
+        let id = r
+            .split("ID: ")
+            .nth(1)
+            .unwrap()
+            .split(',')
+            .next()
+            .unwrap()
+            .trim_end_matches(')');
 
-        let focus_result = tool.execute(
-            serde_json::json!({ "action": "focus", "id": id }),
-            &ctx,
-        ).await.unwrap();
+        let focus_result = tool
+            .execute(serde_json::json!({ "action": "focus", "id": id }), &ctx)
+            .await
+            .unwrap();
         assert!(focus_result.contains("Focused on task"));
 
-        let unfocus_result = tool.execute(
-            serde_json::json!({ "action": "unfocus", "id": id }),
-            &ctx,
-        ).await.unwrap();
+        let unfocus_result = tool
+            .execute(serde_json::json!({ "action": "unfocus", "id": id }), &ctx)
+            .await
+            .unwrap();
         assert!(unfocus_result.contains("Unfocused task"));
     }
 
@@ -760,10 +804,13 @@ mod tests {
             &ctx,
         ).await.unwrap();
 
-        let result = tool.execute(
-            serde_json::json!({ "action": "plan_day", "count": 2 }),
-            &ctx,
-        ).await.unwrap();
+        let result = tool
+            .execute(
+                serde_json::json!({ "action": "plan_day", "count": 2 }),
+                &ctx,
+            )
+            .await
+            .unwrap();
         assert!(result.contains("Daily plan"));
         assert!(result.contains("Plan task 1"));
     }

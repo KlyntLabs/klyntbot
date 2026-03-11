@@ -1,24 +1,14 @@
 import { useQuery } from "@shared/hooks/useQuery";
 import { formatHumanDuration } from "@shared/lib/dates";
 import type { Project, Task } from "@shared/types";
-import {
-  CalendarDays,
-  CheckCircle2,
-  Circle,
-  ListTodo,
-  Target,
-} from "lucide-react";
+import { CalendarDays, CheckCircle2, Circle, ListTodo, Target } from "lucide-react";
 
 interface ProjectSummaryPanelProps {
   project: Project;
 }
 
 export function ProjectSummaryPanel({ project }: ProjectSummaryPanelProps) {
-  const { data: tasks } = useQuery<Task[]>(
-    "task_list",
-    { projectId: project.id },
-    [],
-  );
+  const { data: tasks } = useQuery<Task[]>("task_list", { projectId: project.id }, []);
 
   const total = tasks.length;
   const completed = tasks.filter((t) => t.status === "done").length;
@@ -26,9 +16,7 @@ export function ProjectSummaryPanel({ project }: ProjectSummaryPanelProps) {
   const pending = total - completed - inProgress;
   const progressPct = total > 0 ? Math.round((completed / total) * 100) : 0;
 
-  const hasInstructions =
-    project.instructions &&
-    Object.values(project.instructions).some(Boolean);
+  const hasInstructions = project.instructions && Object.values(project.instructions).some(Boolean);
 
   return (
     <div className="w-72 px-4 py-3 flex flex-col gap-3 overflow-y-auto shrink-0">
@@ -56,9 +44,7 @@ export function ProjectSummaryPanel({ project }: ProjectSummaryPanelProps) {
             />
           </svg>
           <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-sm font-semibold text-primary tabular-nums">
-              {progressPct}%
-            </span>
+            <span className="text-sm font-semibold text-primary tabular-nums">{progressPct}%</span>
           </div>
         </div>
         <div className="flex-1 min-w-0 flex flex-col gap-1 pt-0.5">
@@ -94,9 +80,7 @@ export function ProjectSummaryPanel({ project }: ProjectSummaryPanelProps) {
 
       {/* Task breakdown */}
       <section className="flex flex-col gap-1.5">
-        <h4 className="text-[10px] font-medium text-dim uppercase tracking-wider">
-          Tasks
-        </h4>
+        <h4 className="text-[10px] font-medium text-dim uppercase tracking-wider">Tasks</h4>
         <StatRow
           icon={<CheckCircle2 className="w-3 h-3 text-success" />}
           label="Completed"
@@ -107,22 +91,14 @@ export function ProjectSummaryPanel({ project }: ProjectSummaryPanelProps) {
           label="In Progress"
           value={inProgress}
         />
-        <StatRow
-          icon={<Circle className="w-3 h-3 text-muted" />}
-          label="Pending"
-          value={pending}
-        />
+        <StatRow icon={<Circle className="w-3 h-3 text-muted" />} label="Pending" value={pending} />
       </section>
 
       {/* Project info */}
       <section className="flex flex-col gap-1.5">
-        <h4 className="text-[10px] font-medium text-dim uppercase tracking-wider">
-          Details
-        </h4>
+        <h4 className="text-[10px] font-medium text-dim uppercase tracking-wider">Details</h4>
         {project.description && (
-          <p className="text-[11px] text-secondary leading-relaxed">
-            {project.description}
-          </p>
+          <p className="text-[11px] text-secondary leading-relaxed">{project.description}</p>
         )}
         {project.startDate && (
           <DetailRow
@@ -160,10 +136,7 @@ export function ProjectSummaryPanel({ project }: ProjectSummaryPanelProps) {
             .filter((t) => t.status === "done")
             .slice(0, 5)
             .map((t) => (
-              <div
-                key={t.id}
-                className="flex items-center gap-2 text-[11px] text-secondary"
-              >
+              <div key={t.id} className="flex items-center gap-2 text-[11px] text-secondary">
                 <CheckCircle2 className="w-3 h-3 text-success shrink-0" />
                 <span className="truncate">{t.title}</span>
               </div>
@@ -174,15 +147,7 @@ export function ProjectSummaryPanel({ project }: ProjectSummaryPanelProps) {
   );
 }
 
-function StatRow({
-  icon,
-  label,
-  value,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: number;
-}) {
+function StatRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
   return (
     <div className="flex items-center gap-2 text-[11px]">
       {icon}
@@ -205,9 +170,7 @@ function DetailRow({
     <div className="flex items-center gap-2 text-[11px]">
       {icon}
       <span className="text-muted">{label}</span>
-      <span className="text-secondary ml-auto truncate max-w-[140px]">
-        {value}
-      </span>
+      <span className="text-secondary ml-auto truncate max-w-[140px]">{value}</span>
     </div>
   );
 }
