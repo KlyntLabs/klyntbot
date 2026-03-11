@@ -18,6 +18,7 @@ import type {
 import { useCallback, useEffect, useMemo, useOptimistic, useState, useTransition } from "react";
 import { useSearchParams } from "react-router";
 import { KanbanBoard } from "../components/KanbanBoard";
+import { TaskDetailPanel } from "../components/TaskDetailPanel";
 import { TaskTable } from "../components/TaskTable";
 import { TaskTableSkeleton } from "../components/TaskTableSkeleton";
 import { Toolbar } from "../components/Toolbar";
@@ -103,6 +104,11 @@ export function TasksPage() {
   const [addingTask, setAddingTask] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState("");
 
+  // Side panel state
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const handleSelectTask = useCallback((id: string) => setSelectedTaskId(id), []);
+  const handleClosePanel = useCallback(() => setSelectedTaskId(null), []);
+
   const handleToggleTask = useCallback(
     async (taskId: string) => {
       addOptimistic(taskId);
@@ -161,114 +167,122 @@ export function TasksPage() {
   }, [activeTab, tasks, areaMap]);
 
   return (
-    <div className="flex-1 flex flex-col gap-2 overflow-hidden">
-      {/* Header Tabs — glass toolbar */}
-      <div className="h-12 flex items-center px-2 shrink-0">
-        <div className="flex-1 flex items-center gap-1.5">
-          {["All" as Tab, ...areas.map((a) => a.name as Tab)].map((tab) => (
-            <button
-              type="button"
-              key={tab}
-              onClick={() => startTransition(() => setActiveTab(tab))}
-              className={`flex-1 py-2 rounded-xl text-[13px] font-light transition-all duration-200 ${
-                activeTab === tab
-                  ? "glass-button-active text-primary"
-                  : "text-muted hover:text-secondary hover:bg-white/[0.04]"
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
+    <div className="flex-1 flex gap-2 overflow-hidden">
+      {/* Main task list */}
+      <div className="flex-1 flex flex-col gap-2 overflow-hidden min-w-0">
+        {/* Header Tabs — glass toolbar */}
+        <div className="h-12 flex items-center px-2 shrink-0">
+          <div className="flex-1 flex items-center gap-1.5">
+            {["All" as Tab, ...areas.map((a) => a.name as Tab)].map((tab) => (
+              <button
+                type="button"
+                key={tab}
+                onClick={() => startTransition(() => setActiveTab(tab))}
+                className={`flex-1 py-2 rounded-xl text-[13px] font-light transition-all duration-200 ${
+                  activeTab === tab
+                    ? "glass-button-active text-primary"
+                    : "text-muted hover:text-secondary hover:bg-white/[0.04]"
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Scrollable Content — glass panel */}
+        <div
+          className={`flex-1 overflow-y-auto p-3${isPending ? " opacity-70 transition-opacity" : ""}`}
+        >
+          <Toolbar
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            onAddTask={() => setAddingTask(true)}
+          />
+
+          {/* Inline Add Task Row */}
+          {addingTask && (
+            <div className="mb-2 glass-card px-5 py-3">
+              <input
+                value={newTaskTitle}
+                onChange={(e) => setNewTaskTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleAddTask();
+                  if (e.key === "Escape") {
+                    setAddingTask(false);
+                    setNewTaskTitle("");
+                  }
+                }}
+                onBlur={() => {
+                  if (!newTaskTitle.trim()) {
+                    setAddingTask(false);
+                    setNewTaskTitle("");
+                  }
+                }}
+                placeholder="Task title... (Enter to save, Esc to cancel)"
+                className="w-full bg-transparent text-[13px] font-light text-primary outline-none placeholder:text-dim"
+              />
+            </div>
+          )}
+
+          {tasksLoading ? (
+            <TaskTableSkeleton showArea={activeTab === "All"} />
+          ) : tasksError ? (
+            <div className="flex flex-col items-center py-10 gap-2">
+              <p className="text-muted text-sm font-light">Failed to load tasks</p>
+              <button
+                type="button"
+                onClick={refetchTasks}
+                className="text-brand text-xs font-light hover:underline"
+              >
+                Retry
+              </button>
+            </div>
+          ) : viewMode === "board" ? (
+            <KanbanBoard
+              tasks={filteredTasks}
+              projectMap={projectMap}
+              areaMap={areaMap}
+              completedTasks={completedTasks}
+              statusLabels={statusLabels}
+              onUpdateTask={handleUpdateTask}
+              onRefetch={refetchTasks}
+              onSelectTask={handleSelectTask}
+            />
+          ) : (
+            <TaskTable
+              tasks={filteredTasks}
+              projectMap={projectMap}
+              objectives={objectives}
+              areaMap={areaMap}
+              activeTab={activeTab}
+              completedTasks={completedTasks}
+              collapsedProjects={collapsedProjects}
+              expandedTasks={expandedTasks}
+              childrenCache={childrenCache}
+              onToggleTask={handleToggleTask}
+              onToggleProject={toggleProject}
+              onToggleExpandTask={toggleExpandTask}
+              onUpdate={handleUpdateTask}
+              onCreateSubtask={handleCreateSubtask}
+              onSelectTask={handleSelectTask}
+              statusLabels={statusLabels}
+              groups={groups}
+              collapsedGroups={collapsedGroups}
+              onToggleGroup={toggleGroup}
+            />
+          )}
+          {filteredTasks.length === 0 && !addingTask && (
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <p className="text-muted text-sm font-light">No tasks yet</p>
+              <p className="text-dim text-xs font-light mt-1">Create a task to get started</p>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Scrollable Content — glass panel */}
-      <div
-        className={`flex-1 overflow-y-auto p-3${isPending ? " opacity-70 transition-opacity" : ""}`}
-      >
-        <Toolbar
-          viewMode={viewMode}
-          onViewModeChange={setViewMode}
-          onAddTask={() => setAddingTask(true)}
-        />
-
-        {/* Inline Add Task Row */}
-        {addingTask && (
-          <div className="mb-2 glass-card px-5 py-3">
-            <input
-              value={newTaskTitle}
-              onChange={(e) => setNewTaskTitle(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleAddTask();
-                if (e.key === "Escape") {
-                  setAddingTask(false);
-                  setNewTaskTitle("");
-                }
-              }}
-              onBlur={() => {
-                if (!newTaskTitle.trim()) {
-                  setAddingTask(false);
-                  setNewTaskTitle("");
-                }
-              }}
-              placeholder="Task title... (Enter to save, Esc to cancel)"
-              className="w-full bg-transparent text-[13px] font-light text-primary outline-none placeholder:text-dim"
-            />
-          </div>
-        )}
-
-        {tasksLoading ? (
-          <TaskTableSkeleton showArea={activeTab === "All"} />
-        ) : tasksError ? (
-          <div className="flex flex-col items-center py-10 gap-2">
-            <p className="text-muted text-sm font-light">Failed to load tasks</p>
-            <button
-              type="button"
-              onClick={refetchTasks}
-              className="text-brand text-xs font-light hover:underline"
-            >
-              Retry
-            </button>
-          </div>
-        ) : viewMode === "board" ? (
-          <KanbanBoard
-            tasks={filteredTasks}
-            projectMap={projectMap}
-            areaMap={areaMap}
-            completedTasks={completedTasks}
-            statusLabels={statusLabels}
-            onUpdateTask={handleUpdateTask}
-            onRefetch={refetchTasks}
-          />
-        ) : (
-          <TaskTable
-            tasks={filteredTasks}
-            projectMap={projectMap}
-            objectives={objectives}
-            areaMap={areaMap}
-            activeTab={activeTab}
-            completedTasks={completedTasks}
-            collapsedProjects={collapsedProjects}
-            expandedTasks={expandedTasks}
-            childrenCache={childrenCache}
-            onToggleTask={handleToggleTask}
-            onToggleProject={toggleProject}
-            onToggleExpandTask={toggleExpandTask}
-            onUpdate={handleUpdateTask}
-            onCreateSubtask={handleCreateSubtask}
-            statusLabels={statusLabels}
-            groups={groups}
-            collapsedGroups={collapsedGroups}
-            onToggleGroup={toggleGroup}
-          />
-        )}
-        {filteredTasks.length === 0 && !addingTask && (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <p className="text-muted text-sm font-light">No tasks yet</p>
-            <p className="text-dim text-xs font-light mt-1">Create a task to get started</p>
-          </div>
-        )}
-      </div>
+      {/* Task Detail Side Panel */}
+      {selectedTaskId && <TaskDetailPanel taskId={selectedTaskId} onClose={handleClosePanel} />}
     </div>
   );
 }

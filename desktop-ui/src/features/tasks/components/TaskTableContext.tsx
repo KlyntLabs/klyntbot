@@ -16,6 +16,7 @@ export interface TaskTableCtx {
   onToggleGroup: (groupId: string) => void;
   onUpdate: (params: TaskUpdateParams) => void;
   onCreateSubtask: (parentId: string, title: string) => void;
+  onSelectTask: (id: string) => void;
 }
 
 export const TaskTableContext = createContext<TaskTableCtx | null>(null);

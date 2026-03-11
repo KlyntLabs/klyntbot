@@ -30,6 +30,7 @@ interface TaskTableProps {
   onToggleExpandTask: (taskId: string) => void;
   onUpdate: (params: TaskUpdateParams) => void;
   onCreateSubtask: (parentId: string, title: string) => void;
+  onSelectTask: (id: string) => void;
   statusLabels: StatusLabel[];
   groups?: TaskGroup[];
   collapsedGroups?: Set<string>;
@@ -54,6 +55,7 @@ export function TaskTable({
   onToggleExpandTask,
   onUpdate,
   onCreateSubtask,
+  onSelectTask,
   statusLabels,
   groups = [],
   collapsedGroups = new Set(),
@@ -119,6 +121,7 @@ export function TaskTable({
       onToggleGroup,
       onUpdate,
       onCreateSubtask,
+      onSelectTask,
     }),
     [
       completedTasks,
@@ -135,6 +138,7 @@ export function TaskTable({
       onToggleGroup,
       onUpdate,
       onCreateSubtask,
+      onSelectTask,
     ],
   );
 

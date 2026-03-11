@@ -1,7 +1,6 @@
 import type { Task, TaskUpdateParams } from "@shared/types";
 import { Badge, Checkbox } from "@shared/ui";
 import { ChevronDown, ChevronRight, Target } from "lucide-react";
-import { useNavigate } from "react-router";
 import { InlineDatePicker } from "./editors/InlineDatePicker";
 import { InlineSelect } from "./editors/InlineSelect";
 import { InlineTagsEditor } from "./editors/InlineTagsEditor";
@@ -33,13 +32,13 @@ export function RootTaskRow({
   onToggle,
   onUpdate,
 }: RootTaskRowProps) {
-  const { projects, areas, showArea, onToggleExpandTask, statusLabels } = useTaskTable();
+  const { projects, areas, showArea, onToggleExpandTask, statusLabels, onSelectTask } =
+    useTaskTable();
 
   const statusOptions = statusLabels.map((sl) => ({
     value: sl.id,
     label: sl.name,
   }));
-  const navigate = useNavigate();
   const hasSubtasks = task.subtaskCount > 0;
 
   return (
@@ -48,22 +47,23 @@ export function RootTaskRow({
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
-          navigate(`/task/${task.id}`);
+          onSelectTask(task.id);
         }
       }}
-      onClick={() => navigate(`/task/${task.id}`)}
+      onClick={() => onSelectTask(task.id)}
       className="hover:bg-white/[0.04] transition-colors border-b border-white/[0.04] last:border-b-0 cursor-pointer whitespace-nowrap"
     >
-      <td
-        className="px-5 py-2.5 w-9"
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center gap-1">
+      <td className="px-5 py-2.5 w-9">
+        {/* biome-ignore lint/a11y/useKeyWithClickEvents: stopPropagation only, not interactive */}
+        {/* biome-ignore lint/a11y/noStaticElementInteractions: stopPropagation only, not interactive */}
+        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
           {hasSubtasks && (
             <button
               type="button"
-              onClick={() => onToggleExpandTask(task.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleExpandTask(task.id);
+              }}
               aria-expanded={isExpanded}
               aria-label="Toggle subtasks"
               className="text-muted hover:text-secondary -ml-5 mr-0.5"
@@ -79,11 +79,7 @@ export function RootTaskRow({
         </div>
       </td>
 
-      <td
-        className="px-5 py-2.5"
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}
-      >
+      <td className="px-5 py-2.5">
         <div className="flex items-center gap-1.5 min-w-0">
           {task.objectiveId && (
             <Target className="w-[10px] h-[10px] text-brand flex-shrink-0" strokeWidth={1.5} />
@@ -99,11 +95,7 @@ export function RootTaskRow({
         </div>
       </td>
 
-      <td
-        className="px-5 py-2.5"
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}
-      >
+      <td className="px-5 py-2.5">
         <InlineSelect
           value={task.projectId}
           options={[
@@ -128,11 +120,7 @@ export function RootTaskRow({
       </td>
 
       {showArea && (
-        <td
-          className="px-5 py-2.5"
-          onClick={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.stopPropagation()}
-        >
+        <td className="px-5 py-2.5">
           <InlineSelect
             value={task.areaId}
             options={areas.map((a) => ({ value: a.id, label: a.name }))}
@@ -151,11 +139,7 @@ export function RootTaskRow({
         </td>
       )}
 
-      <td
-        className="px-5 py-2.5"
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}
-      >
+      <td className="px-5 py-2.5">
         <InlineSelect
           value={task.priority}
           options={PRIORITY_OPTIONS}
@@ -172,11 +156,7 @@ export function RootTaskRow({
         />
       </td>
 
-      <td
-        className="px-5 py-2.5"
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}
-      >
+      <td className="px-5 py-2.5">
         <InlineSelect
           value={task.statusLabelId}
           options={statusOptions}
@@ -191,22 +171,14 @@ export function RootTaskRow({
         />
       </td>
 
-      <td
-        className="px-5 py-2.5"
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}
-      >
+      <td className="px-5 py-2.5">
         <InlineDatePicker
           value={task.dueDate}
           onSave={(val) => onUpdate({ id: task.id, dueDate: val })}
         />
       </td>
 
-      <td
-        className="px-5 py-2.5"
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}
-      >
+      <td className="px-5 py-2.5">
         <InlineTagsEditor tags={task.tags} onSave={(tags) => onUpdate({ id: task.id, tags })} />
       </td>
     </tr>
@@ -221,13 +193,12 @@ interface SubtaskRowProps {
 }
 
 export function SubtaskRow({ task, isCompleted, onToggle, onUpdate }: SubtaskRowProps) {
-  const { showArea, statusLabels } = useTaskTable();
+  const { showArea, statusLabels, onSelectTask } = useTaskTable();
 
   const statusOptions = statusLabels.map((sl) => ({
     value: sl.id,
     label: sl.name,
   }));
-  const navigate = useNavigate();
 
   return (
     <tr
@@ -235,28 +206,22 @@ export function SubtaskRow({ task, isCompleted, onToggle, onUpdate }: SubtaskRow
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
-          navigate(`/task/${task.id}`);
+          onSelectTask(task.id);
         }
       }}
-      onClick={() => navigate(`/task/${task.id}`)}
+      onClick={() => onSelectTask(task.id)}
       className="hover:bg-white/[0.06] transition-colors border-b border-white/[0.04] last:border-b-0 cursor-pointer whitespace-nowrap bg-white/[0.02] relative"
       style={{ boxShadow: "inset 3px 0 0 var(--brand)" }}
     >
-      <td
-        className="px-5 py-1.5 w-9"
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center gap-1">
+      <td className="px-5 py-1.5 w-9">
+        {/* biome-ignore lint/a11y/useKeyWithClickEvents: stopPropagation only, not interactive */}
+        {/* biome-ignore lint/a11y/noStaticElementInteractions: stopPropagation only, not interactive */}
+        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
           <Checkbox checked={isCompleted} onCheckedChange={onToggle} />
         </div>
       </td>
 
-      <td
-        className="px-5 py-1.5"
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}
-      >
+      <td className="px-5 py-1.5">
         <div className="flex items-center gap-1.5 pl-6 min-w-0">
           {task.objectiveId && (
             <Target className="w-[10px] h-[10px] text-brand flex-shrink-0" strokeWidth={1.5} />
@@ -275,11 +240,7 @@ export function SubtaskRow({ task, isCompleted, onToggle, onUpdate }: SubtaskRow
       {/* Area cell — empty for subtasks */}
       {showArea && <td className="px-5 py-1.5" />}
 
-      <td
-        className="px-5 py-1.5"
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}
-      >
+      <td className="px-5 py-1.5">
         <InlineSelect
           value={task.priority}
           options={PRIORITY_OPTIONS}
@@ -296,11 +257,7 @@ export function SubtaskRow({ task, isCompleted, onToggle, onUpdate }: SubtaskRow
         />
       </td>
 
-      <td
-        className="px-5 py-1.5"
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}
-      >
+      <td className="px-5 py-1.5">
         <InlineSelect
           value={task.statusLabelId}
           options={statusOptions}
@@ -315,22 +272,14 @@ export function SubtaskRow({ task, isCompleted, onToggle, onUpdate }: SubtaskRow
         />
       </td>
 
-      <td
-        className="px-5 py-1.5"
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}
-      >
+      <td className="px-5 py-1.5">
         <InlineDatePicker
           value={task.dueDate}
           onSave={(val) => onUpdate({ id: task.id, dueDate: val })}
         />
       </td>
 
-      <td
-        className="px-5 py-1.5"
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}
-      >
+      <td className="px-5 py-1.5">
         <InlineTagsEditor tags={task.tags} onSave={(tags) => onUpdate({ id: task.id, tags })} />
       </td>
     </tr>
