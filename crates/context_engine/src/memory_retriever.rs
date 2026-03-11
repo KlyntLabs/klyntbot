@@ -1,6 +1,16 @@
 use async_trait::async_trait;
 
+/// Where a memory result originated.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MemorySource {
+    /// Extracted/consolidated semantic fact (FSRS-scored).
+    CognitiveFact,
+    /// Past conversation message (time-decay scored).
+    ConversationRecall,
+}
+
 /// A single retrieved memory entry.
+#[derive(Debug)]
 pub struct MemoryEntry {
     /// Unique identifier (e.g., todo ID or memory key).
     pub id: String,
@@ -8,6 +18,10 @@ pub struct MemoryEntry {
     pub content: String,
     /// Similarity score (0.0–1.0; higher = more relevant).
     pub score: f64,
+    /// Where this memory originated.
+    pub source: MemorySource,
+    /// The raw score before any normalization or blending.
+    pub raw_score: f64,
 }
 
 /// Trait for embedding-based memory retrieval during context assembly.
@@ -45,6 +59,8 @@ mod tests {
                     id: e.id.clone(),
                     content: e.content.clone(),
                     score: e.score,
+                    source: e.source.clone(),
+                    raw_score: e.raw_score,
                 })
                 .collect()
         }
@@ -57,16 +73,22 @@ mod tests {
                 id: "1".into(),
                 content: "First memory".into(),
                 score: 0.9,
+                source: MemorySource::CognitiveFact,
+                raw_score: 0.9,
             },
             MemoryEntry {
                 id: "2".into(),
                 content: "Second memory".into(),
                 score: 0.8,
+                source: MemorySource::CognitiveFact,
+                raw_score: 0.8,
             },
             MemoryEntry {
                 id: "3".into(),
                 content: "Third memory".into(),
                 score: 0.7,
+                source: MemorySource::CognitiveFact,
+                raw_score: 0.7,
             },
         ]);
 

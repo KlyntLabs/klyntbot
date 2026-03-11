@@ -27,7 +27,7 @@ pub use conversation_recall::{
 };
 pub use embedder::{SemanticFactEmbedder, TextEmbedder};
 pub use extraction::{ExtractedFact, ExtractionHandler};
-pub use memory_retriever::CognitiveMemoryRetriever;
+pub use memory_retriever::UnifiedMemoryService;
 pub use reflection::ReflectionHandler;
 pub use repos::event_log::{DomainEventRow, PipelineEventRow};
 pub use repos::{

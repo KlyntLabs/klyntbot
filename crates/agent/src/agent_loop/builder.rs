@@ -226,6 +226,11 @@ impl AgentLoopBuilder {
         ];
 
         // Cognitive context source (optional — requires real pool).
+        // These are hoisted so UnifiedMemoryService can use them outside the block.
+        let mut cognitive_fact_repo: Option<cognitive::SemanticFactRepo> = None;
+        let mut cognitive_embedder: Option<Arc<dyn cognitive::SemanticFactEmbedder>> = None;
+        let mut cognitive_retrieval_config: Option<cognitive::CognitiveRetrievalConfig> = None;
+
         let cognitive_bg_service: Option<cognitive::background::BackgroundConsolidationService> =
             if let Some(ref pool) = self.pool {
                 // Run cognitive feature migrations (idempotent)
@@ -245,7 +250,7 @@ impl AgentLoopBuilder {
                 let rule_repo = cognitive::ProceduralRuleRepo::new(pool.clone());
 
                 // Create SemanticFactEmbedder if embedding engine + vector store available
-                let cognitive_embedder: Option<Arc<dyn cognitive::SemanticFactEmbedder>> =
+                let cognitive_embedder_local: Option<Arc<dyn cognitive::SemanticFactEmbedder>> =
                     if let Some(ref vs) = self.vector_store {
                         Some(Arc::new(
                             crate::cognitive_embedder::SemanticFactEmbedderImpl::new(
@@ -274,14 +279,15 @@ impl AgentLoopBuilder {
                     relevance_weight_situation: config.cognitive.relevance_weight_situation,
                 };
 
-                let mut cog_source =
+                // Hoist for UnifiedMemoryService wiring below
+                cognitive_fact_repo = Some(fact_repo.clone());
+                cognitive_embedder = cognitive_embedder_local.clone();
+                cognitive_retrieval_config = Some(retrieval_config);
+
+                let cog_source =
                     cognitive::CognitiveContextSource::new(fact_repo.clone(), rule_repo)
-                        .with_embedder_opt(cognitive_embedder.clone())
-                        .with_config(retrieval_config)
+                        .with_static_fact_limit(config.cognitive.static_fact_limit)
                         .with_confidence_threshold(Arc::clone(&confidence_bits));
-                if let Some(ref sit) = self.user_situation {
-                    cog_source = cog_source.with_situation(Arc::clone(sit));
-                }
                 sources.push(Box::new(cog_source));
 
                 // Project context source — injects project instructions, role, and memories.
@@ -329,7 +335,7 @@ impl AgentLoopBuilder {
                         consolidation,
                         fact_repo,
                         Some(episodic_repo),
-                        cognitive_embedder,
+                        cognitive_embedder_local,
                         cancel.clone(),
                         self.pipeline_tx.take(),
                         Some(accum_repo),
@@ -541,10 +547,18 @@ impl AgentLoopBuilder {
                 None
             };
 
-        // ── Wire automatic memory retrieval (CognitiveMemoryRetriever) ───
-        let context_engine = if let Some(ref recall) = recall_service {
-            let retriever = Arc::new(cognitive::CognitiveMemoryRetriever::new(Arc::clone(recall)));
-            context_engine.with_memory_retriever(retriever)
+        // ── Wire automatic memory retrieval (UnifiedMemoryService) ───
+        let context_engine = if let Some(fact_repo) = cognitive_fact_repo {
+            let mut retriever = cognitive::UnifiedMemoryService::new(fact_repo)
+                .with_recall_opt(recall_service.clone())
+                .with_embedder_opt(cognitive_embedder);
+            if let Some(cfg) = cognitive_retrieval_config {
+                retriever = retriever.with_config(cfg);
+            }
+            if let Some(ref sit) = self.user_situation {
+                retriever = retriever.with_situation(Arc::clone(sit));
+            }
+            context_engine.with_memory_retriever(Arc::new(retriever))
         } else {
             context_engine
         };

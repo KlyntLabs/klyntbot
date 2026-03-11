@@ -8,7 +8,7 @@ use providers::Message;
 use tokio::sync::Mutex;
 
 use crate::inventory::{ContextInventory, ContextInventoryItem, ContextItemStatus};
-use crate::memory_retriever::MemoryRetriever;
+use crate::memory_retriever::{MemoryRetriever, MemorySource};
 use crate::source::{ContextSource, SourceContext};
 use crate::summary_provider::SummaryProvider;
 use crate::token_counter::{default_token_counter, TokenCounter};
@@ -431,23 +431,41 @@ impl ContextEngine {
 
     /// Retrieve relevant memories for the request via embedding-based retrieval.
     async fn retrieve_memory(&self, request: &ContextRequest) -> Option<String> {
-        if let Some(retriever) = &self.memory_retriever {
-            let entries = retriever
-                .retrieve(&request.message_text, self.memory_retrieval_limit)
-                .await;
-            if !entries.is_empty() {
-                let mut text = "[Relevant Context]\n".to_string();
-                for entry in entries {
-                    text.push_str(&format!(
-                        "- {} (relevance: {:.2})\n",
-                        entry.content, entry.score
-                    ));
-                }
-                return Some(text);
+        let retriever = self.memory_retriever.as_ref()?;
+        let entries = retriever
+            .retrieve(&request.message_text, self.memory_retrieval_limit)
+            .await;
+        if entries.is_empty() {
+            return None;
+        }
+
+        let (facts, recalls): (Vec<_>, Vec<_>) = entries
+            .into_iter()
+            .partition(|e| e.source == MemorySource::CognitiveFact);
+
+        let mut text = "[Relevant Context]\n".to_string();
+
+        if !facts.is_empty() {
+            text.push_str("\n## Relevant Facts\n");
+            for entry in &facts {
+                text.push_str(&format!(
+                    "- {} (relevance: {:.2})\n",
+                    entry.content, entry.score
+                ));
             }
         }
 
-        None
+        if !recalls.is_empty() {
+            text.push_str("\n## Related Conversations\n");
+            for entry in &recalls {
+                text.push_str(&format!(
+                    "- {} (relevance: {:.2})\n",
+                    entry.content, entry.score
+                ));
+            }
+        }
+
+        Some(text)
     }
 
     fn estimate_text(&self, text: &str) -> usize {
@@ -534,7 +552,7 @@ impl ContextEngine {
 mod tests {
     use super::*;
     use crate::inventory::{ContextInventory, ContextInventoryItem, ContextItemStatus};
-    use crate::memory_retriever::{MemoryEntry, MemoryRetriever};
+    use crate::memory_retriever::{MemoryEntry, MemoryRetriever, MemorySource};
     use crate::source::{ContextSource, SourceContext};
     use async_trait::async_trait;
 
@@ -749,7 +767,7 @@ mod tests {
     // ── G-08: Memory retrieval tests ──
 
     struct MockRetriever {
-        entries: Vec<(String, f64)>,
+        entries: Vec<(String, f64, MemorySource)>,
     }
 
     #[async_trait]
@@ -758,10 +776,12 @@ mod tests {
             self.entries
                 .iter()
                 .take(limit)
-                .map(|(content, score)| MemoryEntry {
+                .map(|(content, score, source)| MemoryEntry {
                     id: "test".into(),
                     content: content.clone(),
                     score: *score,
+                    source: source.clone(),
+                    raw_score: *score,
                 })
                 .collect()
         }
@@ -771,8 +791,12 @@ mod tests {
     async fn test_memory_retriever_injects_context() {
         let retriever = Arc::new(MockRetriever {
             entries: vec![
-                ("User likes Rust".into(), 0.95),
-                ("User works on klyntbot".into(), 0.80),
+                ("User likes Rust".into(), 0.95, MemorySource::CognitiveFact),
+                (
+                    "User works on klyntbot".into(),
+                    0.80,
+                    MemorySource::CognitiveFact,
+                ),
             ],
         });
 
@@ -817,8 +841,12 @@ mod tests {
     async fn test_direct_mode_includes_memory_retrieval() {
         let retriever = Arc::new(MockRetriever {
             entries: vec![
-                ("User likes Rust".into(), 0.95),
-                ("User works on klyntbot".into(), 0.80),
+                ("User likes Rust".into(), 0.95, MemorySource::CognitiveFact),
+                (
+                    "User works on klyntbot".into(),
+                    0.80,
+                    MemorySource::CognitiveFact,
+                ),
             ],
         });
 
@@ -847,7 +875,7 @@ mod tests {
     #[tokio::test]
     async fn test_clarification_mode_skips_memory_retrieval() {
         let retriever = Arc::new(MockRetriever {
-            entries: vec![("Some memory".into(), 0.90)],
+            entries: vec![("Some memory".into(), 0.90, MemorySource::CognitiveFact)],
         });
 
         let engine = ContextEngine::new().with_memory_retriever(retriever);
@@ -1108,6 +1136,52 @@ mod tests {
         let ctx = test_source_context();
         let result = engine.expand(&initial, "nonexistent", &ctx).await;
         assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_memory_retriever_groups_by_source() {
+        let retriever = Arc::new(MockRetriever {
+            entries: vec![
+                (
+                    "user: editor = neovim".into(),
+                    0.90,
+                    MemorySource::CognitiveFact,
+                ),
+                (
+                    "I mentioned I use neovim yesterday".into(),
+                    0.75,
+                    MemorySource::ConversationRecall,
+                ),
+            ],
+        });
+
+        let engine = ContextEngine::new().with_memory_retriever(retriever);
+        let request = ContextRequest {
+            message_text: "what editor do I use?".into(),
+            history: vec![],
+            system_prompt: "You are helpful.".into(),
+            strategy: ExecutionStrategy::ToolAssisted { max_iterations: 5 },
+            tool_definitions: vec![],
+            context_window: 128_000,
+        };
+
+        let result = engine.assemble(request).await;
+        if let Message::System { content } = &result.messages[1] {
+            assert!(
+                content.contains("## Relevant Facts"),
+                "Should have facts section"
+            );
+            assert!(
+                content.contains("## Related Conversations"),
+                "Should have recalls section"
+            );
+            // Facts should appear before conversations
+            let facts_pos = content.find("## Relevant Facts").unwrap();
+            let recalls_pos = content.find("## Related Conversations").unwrap();
+            assert!(facts_pos < recalls_pos);
+        } else {
+            panic!("Second message should be System (memory)");
+        }
     }
 
     #[tokio::test]

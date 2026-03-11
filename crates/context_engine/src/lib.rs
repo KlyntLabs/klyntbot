@@ -16,7 +16,7 @@ pub use history_compressor::{
     CompressedHistory, CompressorConfig, CompressorMode, HistoryCompressor, HistorySummary,
 };
 pub use inventory::{ContextInventory, ContextInventoryItem, ContextItemStatus};
-pub use memory_retriever::{MemoryEntry, MemoryRetriever};
+pub use memory_retriever::{MemoryEntry, MemoryRetriever, MemorySource};
 pub use source::{ContextSource, SourceContext};
 pub use summary_provider::SummaryProvider;
 pub use token_counter::{

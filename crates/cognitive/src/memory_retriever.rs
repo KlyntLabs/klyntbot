@@ -1,55 +1,405 @@
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use context_engine::memory_retriever::{MemoryEntry, MemoryRetriever};
+use context_engine::memory_retriever::{MemoryEntry, MemoryRetriever, MemorySource};
+use tokio::sync::Mutex;
+use tracing::warn;
 
+use crate::context_source::CognitiveRetrievalConfig;
 use crate::conversation_recall::ConversationRecallService;
+use crate::embedder::SemanticFactEmbedder;
+use crate::repos::{SemanticFactRepo, USER_MODEL_DOMAINS};
+use crate::retrieval::{retrieve_relevant_facts, RetrievalParams};
+use crate::situation::UserSituation;
 
-/// Implements `MemoryRetriever` by delegating to `ConversationRecallService`.
+/// RRF constant — same as used in retrieval.rs BM25 merge.
+const RRF_K: f64 = 60.0;
+
+/// Unified memory service that merges conversation recall and cognitive facts.
 ///
-/// Plugs into `ContextEngine::with_memory_retriever()` to inject conversation
-/// recall into the message list during context assembly.
-pub struct CognitiveMemoryRetriever {
-    recall: Arc<ConversationRecallService>,
+/// Replaces `CognitiveMemoryRetriever`. Fetches from both sources concurrently,
+/// merges via RRF, deduplicates (facts win), and returns a single ranked list.
+pub struct UnifiedMemoryService {
+    recall: Option<Arc<ConversationRecallService>>,
+    fact_repo: SemanticFactRepo,
+    embedder: Option<Arc<dyn SemanticFactEmbedder>>,
+    config: CognitiveRetrievalConfig,
+    situation: Option<Arc<Mutex<UserSituation>>>,
 }
 
-impl CognitiveMemoryRetriever {
-    pub fn new(recall: Arc<ConversationRecallService>) -> Self {
-        Self { recall }
+impl UnifiedMemoryService {
+    pub fn new(fact_repo: SemanticFactRepo) -> Self {
+        Self {
+            recall: None,
+            fact_repo,
+            embedder: None,
+            config: CognitiveRetrievalConfig::default(),
+            situation: None,
+        }
     }
-}
 
-#[async_trait]
-impl MemoryRetriever for CognitiveMemoryRetriever {
-    async fn retrieve(&self, query: &str, limit: usize) -> Vec<MemoryEntry> {
-        match self
-            .recall
-            .search(query, limit, self.recall.config().default_threshold)
+    pub fn with_recall_opt(mut self, recall: Option<Arc<ConversationRecallService>>) -> Self {
+        self.recall = recall;
+        self
+    }
+
+    pub fn with_embedder_opt(mut self, embedder: Option<Arc<dyn SemanticFactEmbedder>>) -> Self {
+        self.embedder = embedder;
+        self
+    }
+
+    pub fn with_config(mut self, config: CognitiveRetrievalConfig) -> Self {
+        self.config = config;
+        self
+    }
+
+    pub fn with_situation(mut self, situation: Arc<Mutex<UserSituation>>) -> Self {
+        self.situation = Some(situation);
+        self
+    }
+
+    async fn current_situational_boost(&self) -> f64 {
+        let Some(ref s) = self.situation else {
+            return 0.0;
+        };
+        let guard = s.lock().await;
+        (guard.energy_level * 0.25
+            + guard.focus_state * 0.30
+            + guard.deadline_pressure * 0.25
+            + (1.0 - guard.distraction_risk) * 0.20)
+            .clamp(0.0, 1.0)
+    }
+
+    /// Fetch cognitive facts, returning (id, score, content, predicate) tuples.
+    async fn fetch_facts(&self, query: &str, limit: usize) -> Vec<(String, f64, String, String)> {
+        if !self.config.dynamic_facts_enabled || query.is_empty() {
+            return Vec::new();
+        }
+
+        let situational_boost = self.current_situational_boost().await;
+        let params = RetrievalParams {
+            limit,
+            vector_top_k: self.config.vector_top_k,
+            min_similarity: self.config.min_similarity,
+            situational_boost,
+            max_stability: self.config.max_stability,
+            relevance_weight_semantic: self.config.relevance_weight_semantic,
+            relevance_weight_retrievability: self.config.relevance_weight_retrievability,
+            relevance_weight_importance: self.config.relevance_weight_importance,
+            relevance_weight_frequency: self.config.relevance_weight_frequency,
+            relevance_weight_situation: self.config.relevance_weight_situation,
+        };
+
+        match retrieve_relevant_facts(
+            &self.fact_repo,
+            self.embedder.as_deref(),
+            query,
+            USER_MODEL_DOMAINS,
+            &params,
+        )
+        .await
+        {
+            Ok(facts) => facts
+                .into_iter()
+                .filter(|f| f.score > 0.3)
+                .map(|f| {
+                    let content = format!(
+                        "{}: {} = {}",
+                        f.fact.subject, f.fact.predicate, f.fact.object
+                    );
+                    let predicate = f.fact.predicate;
+                    (f.fact.id, f.score, content, predicate)
+                })
+                .collect(),
+            Err(e) => {
+                warn!("Cognitive fact retrieval failed: {e}");
+                Vec::new()
+            }
+        }
+    }
+
+    async fn fetch_recalls(&self, query: &str, limit: usize) -> Vec<(String, f64, String)> {
+        let Some(ref recall) = self.recall else {
+            return Vec::new();
+        };
+
+        match recall
+            .search(query, limit, recall.config().default_threshold)
             .await
         {
             Ok(results) => results
                 .into_iter()
-                .map(|r| MemoryEntry {
-                    id: r.id,
-                    content: r.content,
-                    score: r.score,
-                })
+                .map(|r| (r.id, r.score, r.content))
                 .collect(),
             Err(e) => {
-                tracing::warn!("Conversation recall search failed: {e}");
+                warn!("Conversation recall search failed: {e}");
                 Vec::new()
             }
         }
     }
 }
 
+#[async_trait]
+impl MemoryRetriever for UnifiedMemoryService {
+    async fn retrieve(&self, query: &str, limit: usize) -> Vec<MemoryEntry> {
+        // 1. Fetch concurrently
+        let (facts_raw, recalls_raw) = tokio::join!(
+            self.fetch_facts(query, limit),
+            self.fetch_recalls(query, limit)
+        );
+
+        if facts_raw.is_empty() && recalls_raw.is_empty() {
+            return Vec::new();
+        }
+
+        // 2. Build predicate set for deduplication (facts win)
+        let fact_predicates: HashSet<String> = facts_raw
+            .iter()
+            .map(|(_, _, _, predicate)| predicate.to_lowercase())
+            .collect();
+
+        // 3. Filter recalls that overlap with facts (word-split match)
+        let recalls_deduped: Vec<&(String, f64, String)> = if fact_predicates.is_empty() {
+            recalls_raw.iter().collect()
+        } else {
+            recalls_raw
+                .iter()
+                .filter(|(_, _, content)| !content_overlaps(content, &fact_predicates))
+                .collect()
+        };
+
+        // 4. RRF merge — rank-based scoring, no pre-normalization needed
+        let capacity = facts_raw.len() + recalls_deduped.len();
+        let mut rrf_scores: HashMap<String, (f64, String, MemorySource, f64)> =
+            HashMap::with_capacity(capacity);
+
+        for (rank, (id, raw_score, content, _)) in facts_raw.iter().enumerate() {
+            let rrf = 1.0 / (RRF_K + rank as f64 + 1.0);
+            let entry = rrf_scores.entry(id.clone()).or_insert((
+                0.0,
+                content.clone(),
+                MemorySource::CognitiveFact,
+                *raw_score,
+            ));
+            entry.0 += rrf;
+        }
+
+        for (rank, (id, raw_score, content)) in recalls_deduped.iter().enumerate() {
+            let rrf = 1.0 / (RRF_K + rank as f64 + 1.0);
+            let entry = rrf_scores.entry(id.clone()).or_insert((
+                0.0,
+                content.clone(),
+                MemorySource::ConversationRecall,
+                *raw_score,
+            ));
+            entry.0 += rrf;
+        }
+
+        // 5. Sort and truncate
+        let mut results: Vec<MemoryEntry> = rrf_scores
+            .into_iter()
+            .map(|(id, (score, content, source, raw_score))| MemoryEntry {
+                id,
+                content,
+                score,
+                source,
+                raw_score,
+            })
+            .collect();
+
+        results.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        results.truncate(limit);
+
+        // 6. Re-normalize RRF scores to 0.0–1.0 for display
+        let rrf_scores_vec: Vec<f64> = results.iter().map(|r| r.score).collect();
+        let normalized = normalize_scores(&rrf_scores_vec);
+        for (entry, norm_score) in results.iter_mut().zip(normalized) {
+            entry.score = norm_score;
+        }
+
+        results
+    }
+}
+
+/// Min-max normalize a list of scores to 0.0–1.0.
+///
+/// Single-element or all-equal lists return 1.0 for every entry.
+fn normalize_scores(scores: &[f64]) -> Vec<f64> {
+    if scores.is_empty() {
+        return Vec::new();
+    }
+    let (min, max) = scores
+        .iter()
+        .fold((f64::INFINITY, f64::NEG_INFINITY), |(mn, mx), &s| {
+            (mn.min(s), mx.max(s))
+        });
+    let range = max - min;
+    if range < f64::EPSILON {
+        return vec![1.0; scores.len()];
+    }
+    scores.iter().map(|s| (s - min) / range).collect()
+}
+
+/// Check if a recall's content overlaps with any fact predicate.
+///
+/// Splits each predicate on underscores into individual words
+/// (e.g., "peak_hours" → ["peak", "hours"]) and checks if ALL words
+/// appear in the recall content.
+fn content_overlaps(recall_content: &str, fact_predicates: &HashSet<String>) -> bool {
+    let recall_lower = recall_content.to_lowercase();
+    fact_predicates.iter().any(|pred| {
+        pred.split('_')
+            .all(|word| !word.is_empty() && recall_lower.contains(word))
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use context_engine::memory_retriever::MemorySource;
 
     #[test]
-    fn test_retriever_is_send_sync() {
+    fn test_service_is_send_sync() {
         fn assert_send_sync<T: Send + Sync>() {}
-        assert_send_sync::<CognitiveMemoryRetriever>();
+        assert_send_sync::<UnifiedMemoryService>();
+    }
+
+    #[test]
+    fn test_normalize_scores_min_max() {
+        let scores = vec![0.3, 0.6, 0.9];
+        let normalized = normalize_scores(&scores);
+        assert!((normalized[0] - 0.0).abs() < f64::EPSILON);
+        assert!((normalized[1] - 0.5).abs() < f64::EPSILON);
+        assert!((normalized[2] - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_normalize_scores_single_element() {
+        let scores = vec![0.5];
+        let normalized = normalize_scores(&scores);
+        assert!((normalized[0] - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_normalize_scores_empty() {
+        let scores: Vec<f64> = vec![];
+        let normalized = normalize_scores(&scores);
+        assert!(normalized.is_empty());
+    }
+
+    #[test]
+    fn test_normalize_scores_all_equal() {
+        let scores = vec![0.5, 0.5, 0.5];
+        let normalized = normalize_scores(&scores);
+        // All equal -> all get 1.0
+        assert!(normalized.iter().all(|&s| (s - 1.0).abs() < f64::EPSILON));
+    }
+
+    #[test]
+    fn test_rrf_score_math() {
+        // Verify RRF formula: 1/(k + rank + 1)
+        let k = RRF_K;
+        let rank_0 = 1.0 / (k + 0.0 + 1.0); // ~0.01639
+        let rank_1 = 1.0 / (k + 1.0 + 1.0); // ~0.01613
+
+        // Item at rank 0 in both lists gets 2 * rank_0
+        let dual_score = rank_0 + rank_0;
+        // Item at rank 0 in one list only
+        let single_score = rank_0;
+
+        assert!(
+            dual_score > single_score,
+            "Item in both lists should score higher than item in one"
+        );
+        assert!((rank_0 - 1.0 / 61.0).abs() < 1e-10);
+        assert!((rank_1 - 1.0 / 62.0).abs() < 1e-10);
+    }
+
+    #[tokio::test]
+    async fn test_retrieve_facts_only_no_recall() {
+        let pool = crate::repos::cognitive_test_pool().await;
+        let fact_repo = crate::repos::SemanticFactRepo::new(pool);
+
+        // Insert a fact so fallback path returns something
+        let fact = crate::types::SemanticFact {
+            id: "f1".into(),
+            domain: "preferences".into(),
+            subject: "user".into(),
+            predicate: "editor".into(),
+            object: "neovim".into(),
+            confidence: 0.8,
+            source: "observed".into(),
+            valid_from: "2026-03-01".into(),
+            valid_until: None,
+            recorded_at: "2026-03-06T10:00:00".into(),
+            superseded_at: None,
+            superseded_by: None,
+            stability: 1.0,
+            last_accessed: None,
+            access_count: 0,
+            project_id: None,
+            memory_type: crate::types::DEFAULT_MEMORY_TYPE.to_string(),
+        };
+        fact_repo.upsert(&fact).await.unwrap();
+
+        let service = UnifiedMemoryService::new(fact_repo);
+        // No recall wired — should still return facts
+        let results = service.retrieve("what editor", 10).await;
+        assert!(
+            !results.is_empty(),
+            "Should return facts even without recall"
+        );
+        assert!(results
+            .iter()
+            .all(|r| r.source == MemorySource::CognitiveFact));
+    }
+
+    #[tokio::test]
+    async fn test_retrieve_empty_when_both_sources_empty() {
+        let pool = crate::repos::cognitive_test_pool().await;
+        let fact_repo = crate::repos::SemanticFactRepo::new(pool);
+
+        let service = UnifiedMemoryService::new(fact_repo);
+        let results = service.retrieve("anything", 10).await;
+        assert!(results.is_empty(), "Should return empty when no data");
+    }
+
+    #[test]
+    fn test_dedup_detects_overlap_with_underscore_split() {
+        let predicates: HashSet<String> = ["peak_hours".to_string()].into();
+        let recall_content = "I mentioned my peak hours are around 10am-12pm yesterday";
+
+        assert!(
+            content_overlaps(recall_content, &predicates),
+            "Should detect overlap by splitting peak_hours into [peak, hours]"
+        );
+    }
+
+    #[test]
+    fn test_dedup_no_false_positive() {
+        let predicates: HashSet<String> = ["peak_hours".to_string()].into();
+        let recall_content = "Let's schedule a meeting tomorrow";
+
+        assert!(
+            !content_overlaps(recall_content, &predicates),
+            "Should not detect overlap when predicate words absent from recall"
+        );
+    }
+
+    #[test]
+    fn test_dedup_requires_all_words() {
+        let predicates: HashSet<String> = ["peak_hours".to_string()].into();
+        // "peak" appears but "hours" doesn't — should NOT match
+        let recall_content = "I hit peak performance today";
+
+        assert!(
+            !content_overlaps(recall_content, &predicates),
+            "Should require ALL predicate words to match, not just one"
+        );
     }
 }
