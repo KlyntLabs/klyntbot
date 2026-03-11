@@ -62,6 +62,7 @@ impl TaskTool {
                 .map(|s| Some(s.to_string())),
             agent_config: p.optional_str("agent_config")?.map(|s| Some(s.to_string())),
             execution_state: None,
+            spawned_execution_id: None,
             energy_level: p.optional_str("energy_level")?.map(|s| Some(s.to_string())),
             complexity_score: None,
             completed: None,

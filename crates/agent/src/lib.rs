@@ -16,6 +16,7 @@ pub mod context_sources;
 pub mod conversation_recall_handler;
 pub mod cron_handler_adapter;
 pub mod enrichment;
+pub mod handlers;
 pub mod events;
 #[cfg(test)]
 mod events_tests;

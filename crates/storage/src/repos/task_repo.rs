@@ -62,6 +62,7 @@ pub struct TaskPatch {
     pub acceptance_criteria: Option<Option<String>>,
     pub agent_config: Option<Option<String>>,
     pub execution_state: Option<String>,
+    pub spawned_execution_id: Option<Option<String>>,
     pub energy_level: Option<Option<String>>,
     pub complexity_score: Option<Option<i32>>,
     pub completed: Option<bool>,
@@ -235,11 +236,12 @@ impl TaskRepo {
                 acceptance_criteria = CASE WHEN ?32 THEN ?33 ELSE acceptance_criteria END,
                 agent_config       = CASE WHEN ?34 THEN ?35 ELSE agent_config END,
                 execution_state    = COALESCE(?36, execution_state),
-                energy_level       = CASE WHEN ?37 THEN ?38 ELSE energy_level END,
-                complexity_score   = CASE WHEN ?39 THEN ?40 ELSE complexity_score END,
-                completed          = COALESCE(?41, completed),
-                actual_minutes     = CASE WHEN ?42 THEN ?43 ELSE actual_minutes END,
-                objective_id       = CASE WHEN ?44 THEN ?45 ELSE objective_id END,
+                spawned_execution_id = CASE WHEN ?37 THEN ?38 ELSE spawned_execution_id END,
+                energy_level       = CASE WHEN ?39 THEN ?40 ELSE energy_level END,
+                complexity_score   = CASE WHEN ?41 THEN ?42 ELSE complexity_score END,
+                completed          = COALESCE(?43, completed),
+                actual_minutes     = CASE WHEN ?44 THEN ?45 ELSE actual_minutes END,
+                objective_id       = CASE WHEN ?46 THEN ?47 ELSE objective_id END,
                 updated_at         = datetime('now')
             WHERE id = ?1
             RETURNING *
@@ -286,15 +288,17 @@ impl TaskRepo {
         .bind(patch.agent_config.is_some()) // ?34
         .bind(patch.agent_config.as_ref().and_then(|v| v.as_deref())) // ?35
         .bind(&patch.execution_state) // ?36
-        .bind(patch.energy_level.is_some()) // ?37
-        .bind(patch.energy_level.as_ref().and_then(|v| v.as_deref())) // ?38
-        .bind(patch.complexity_score.is_some()) // ?39
-        .bind(patch.complexity_score.unwrap_or_default()) // ?40
-        .bind(patch.completed.map(|b| b as i32)) // ?41
-        .bind(patch.actual_minutes.is_some()) // ?42
-        .bind(patch.actual_minutes.unwrap_or_default()) // ?43
-        .bind(patch.objective_id.is_some()) // ?44
-        .bind(patch.objective_id.as_ref().and_then(|v| v.as_deref())) // ?45
+        .bind(patch.spawned_execution_id.is_some()) // ?37
+        .bind(patch.spawned_execution_id.as_ref().and_then(|v| v.as_deref())) // ?38
+        .bind(patch.energy_level.is_some()) // ?39
+        .bind(patch.energy_level.as_ref().and_then(|v| v.as_deref())) // ?40
+        .bind(patch.complexity_score.is_some()) // ?41
+        .bind(patch.complexity_score.unwrap_or_default()) // ?42
+        .bind(patch.completed.map(|b| b as i32)) // ?43
+        .bind(patch.actual_minutes.is_some()) // ?44
+        .bind(patch.actual_minutes.unwrap_or_default()) // ?45
+        .bind(patch.objective_id.is_some()) // ?46
+        .bind(patch.objective_id.as_ref().and_then(|v| v.as_deref())) // ?47
         .fetch_optional(&self.pool)
         .await?
         .ok_or_not_found(&format!("task {}", patch.id))?;
