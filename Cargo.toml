@@ -28,6 +28,7 @@ members = [
     "crates/feature-coaching",
     "crates/app-core",
     "crates/activity-log",
+    "crates/feature-tasks",
 ]
 
 [workspace.package]
@@ -63,6 +64,7 @@ desktop-shared = { path = "crates/desktop-shared" }
 desktop = { path = "crates/desktop" }
 app-core = { path = "crates/app-core" }
 activity-log = { path = "crates/activity-log" }
+feature-tasks = { path = "crates/feature-tasks" }
 extism = "1"
 mcp = { path = "crates/mcp" }
 rmcp = { version = "0.17", default-features = false }

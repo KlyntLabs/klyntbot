@@ -1,0 +1,24 @@
+[package]
+name = "feature-tasks"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+bus.workspace = true
+common.workspace = true
+tools-core.workspace = true
+tools-core-macros.workspace = true
+storage.workspace = true
+async-trait.workspace = true
+serde = { workspace = true }
+serde_json.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+chrono = { workspace = true }
+uuid = { workspace = true }
+rrule.workspace = true
+sqlx.workspace = true
+futures-util.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "test-util"] }

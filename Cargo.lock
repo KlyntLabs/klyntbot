@@ -3574,6 +3574,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "feature-tasks"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "bus",
+ "chrono",
+ "common",
+ "futures-util",
+ "rrule",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "storage",
+ "tokio",
+ "tools-core",
+ "tools-core-macros",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "feature-todo"
 version = "0.1.0"
 dependencies = [
