@@ -235,24 +235,35 @@ mod tests {
     }
 
     #[test]
-    fn test_dedup_facts_win_over_recalls() {
+    fn test_dedup_detects_overlap_with_underscore_split() {
         let fact_content = "user: peak_hours = 10am-12pm";
+        // Free-form text uses spaces, not underscores — split handles this
         let recall_content = "I mentioned my peak hours are around 10am-12pm yesterday";
 
         assert!(
             content_overlaps(fact_content, recall_content, "peak_hours"),
-            "Should detect overlap via predicate substring"
+            "Should detect overlap by splitting peak_hours into [peak, hours]"
         );
     }
 
     #[test]
     fn test_dedup_no_false_positive() {
-        let fact_content = "user: peak_hours = 10am-12pm";
         let recall_content = "Let's schedule a meeting tomorrow";
 
         assert!(
-            !content_overlaps(fact_content, recall_content, "peak_hours"),
-            "Should not detect overlap when predicate absent from recall"
+            !content_overlaps("", recall_content, "peak_hours"),
+            "Should not detect overlap when predicate words absent from recall"
+        );
+    }
+
+    #[test]
+    fn test_dedup_requires_all_words() {
+        // "peak" appears but "hours" doesn't — should NOT match
+        let recall_content = "I hit peak performance today";
+
+        assert!(
+            !content_overlaps("", recall_content, "peak_hours"),
+            "Should require ALL predicate words to match, not just one"
         );
     }
 }
@@ -451,13 +462,15 @@ impl MemoryRetriever for UnifiedMemoryService {
             })
             .collect();
 
-        // 3. Filter recalls that overlap with facts
+        // 3. Filter recalls that overlap with facts (word-split match)
         let recalls_deduped: Vec<(String, f64, String)> = recalls_raw
             .into_iter()
             .filter(|(_, _, content)| {
-                !fact_predicates
-                    .iter()
-                    .any(|pred| content.to_lowercase().contains(pred))
+                let content_lower = content.to_lowercase();
+                !fact_predicates.iter().any(|pred| {
+                    pred.split('_')
+                        .all(|word| !word.is_empty() && content_lower.contains(word))
+                })
             })
             .collect();
 
@@ -514,6 +527,15 @@ impl MemoryRetriever for UnifiedMemoryService {
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
         results.truncate(limit);
+
+        // 7. Re-normalize RRF scores to 0.0–1.0 for display
+        // Raw RRF scores are ~0.016–0.033 which would be confusing in the prompt
+        let rrf_scores_vec: Vec<f64> = results.iter().map(|r| r.score).collect();
+        let normalized = normalize_scores(&rrf_scores_vec);
+        for (entry, norm_score) in results.iter_mut().zip(normalized) {
+            entry.score = norm_score;
+        }
+
         results
     }
 }
@@ -535,12 +557,20 @@ fn normalize_scores(scores: &[f64]) -> Vec<f64> {
 }
 
 /// Check if a recall's content overlaps with a fact based on the fact's predicate.
+///
+/// Splits predicate on underscores into individual words (e.g., "peak_hours" → ["peak", "hours"])
+/// and checks if ALL words appear in the recall content. This handles the mismatch between
+/// structured predicates ("peak_hours") and free-form text ("my peak hours are...").
 fn content_overlaps(
     _fact_content: &str,
     recall_content: &str,
     predicate: &str,
 ) -> bool {
-    recall_content.to_lowercase().contains(&predicate.to_lowercase())
+    let recall_lower = recall_content.to_lowercase();
+    predicate
+        .to_lowercase()
+        .split('_')
+        .all(|word| !word.is_empty() && recall_lower.contains(word))
 }
 ```
 
