@@ -11,6 +11,7 @@ pub mod skill_loader;
 pub mod cognitive_embedder;
 pub mod cognitive_handlers;
 pub mod confidence;
+pub mod content_registry;
 pub mod context_sources;
 pub mod conversation_recall_handler;
 pub mod cron_handler_adapter;
