@@ -7,6 +7,7 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Duration, Utc};
 use context_engine::source::{ContextSource, SourceContext};
+use context_engine::TtlCache;
 use feature_productivity::repos::ProductivityRepos;
 use feature_productivity::{DailyAggregator, ProductivityPatternAnalyzer, ProductivityPatterns};
 use tokio::sync::Mutex;
@@ -15,16 +16,11 @@ use tracing::debug;
 const PRODUCTIVITY_CACHE_TTL_SECS: i64 = 60;
 const PATTERN_CACHE_TTL_SECS: i64 = 600;
 
-struct CachedValue {
-    content: String,
-    expires_at: DateTime<Utc>,
-}
-
 pub struct ProductivityContextSource {
     repos: ProductivityRepos,
     aggregator: DailyAggregator,
     pattern_analyzer: ProductivityPatternAnalyzer,
-    cache: Mutex<Option<CachedValue>>,
+    cache: TtlCache,
     pattern_cache: Mutex<Option<(ProductivityPatterns, DateTime<Utc>)>>,
 }
 
@@ -36,7 +32,7 @@ impl ProductivityContextSource {
             repos,
             aggregator,
             pattern_analyzer,
-            cache: Mutex::new(None),
+            cache: TtlCache::new(PRODUCTIVITY_CACHE_TTL_SECS),
             pattern_cache: Mutex::new(None),
         }
     }
@@ -53,18 +49,12 @@ impl ContextSource for ProductivityContextSource {
     }
 
     async fn provide(&self, _ctx: &SourceContext) -> Option<String> {
-        // Check cache without holding the lock across the async build
-        {
-            let cache = self.cache.lock().await;
-            if let Some(ref cached) = *cache {
-                if Utc::now() < cached.expires_at {
-                    return if cached.content.is_empty() {
-                        None
-                    } else {
-                        Some(cached.content.clone())
-                    };
-                }
-            }
+        if let Some(cached) = self.cache.get() {
+            return if cached.is_empty() {
+                None
+            } else {
+                Some(cached)
+            };
         }
 
         let content = self.build_context().await;
@@ -74,11 +64,7 @@ impl ContextSource for ProductivityContextSource {
             Some(format!("# Productivity Context\n\n{}", content))
         };
 
-        *self.cache.lock().await = Some(CachedValue {
-            content: result.clone().unwrap_or_default(),
-            expires_at: Utc::now() + Duration::seconds(PRODUCTIVITY_CACHE_TTL_SECS),
-        });
-
+        self.cache.set(result.clone().unwrap_or_default());
         result
     }
 

@@ -67,15 +67,14 @@ mod tests {
         let base = std::path::PathBuf::from("/tmp/klyntbot_test_security_trav");
         std::fs::create_dir_all(&base).ok();
 
-        let result = validate_path(
-            &format!("{}/../../../etc/hosts", base.display()),
-            &base,
-        );
+        let result = validate_path(&format!("{}/../../../etc/hosts", base.display()), &base);
         // Should fail — either path doesn't exist or is outside base
-        assert!(result.is_err() || {
-            let p = result.unwrap();
-            !p.starts_with(base.canonicalize().unwrap())
-        });
+        assert!(
+            result.is_err() || {
+                let p = result.unwrap();
+                !p.starts_with(base.canonicalize().unwrap())
+            }
+        );
 
         std::fs::remove_dir_all(&base).ok();
     }

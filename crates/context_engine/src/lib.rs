@@ -6,6 +6,9 @@ pub mod memory_retriever;
 pub mod source;
 pub mod summary_provider;
 pub mod token_counter;
+pub mod ttl_cache;
+
+pub use ttl_cache::TtlCache;
 
 pub use assembler::{AssembledContext, ContextEngine, ContextRequest, ExecutionStrategy};
 pub use budget::{BudgetAllocator, BudgetConfig, BudgetReport, Priority};

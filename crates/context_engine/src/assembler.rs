@@ -78,7 +78,7 @@ const DEFAULT_CACHE_CAPACITY: usize = 8;
 /// changing the cache key.
 struct ContextCache {
     entries: HashMap<String, AssembledContext>,
-    /// Insertion order for eviction (oldest first). VecDeque for O(1) pop_front.
+    /// Insertion order for eviction (oldest first). O(1) eviction, O(n) promotion.
     order: VecDeque<String>,
     capacity: usize,
 }
@@ -97,15 +97,18 @@ impl ContextCache {
     }
 
     fn insert(&mut self, key: String, value: AssembledContext) {
-        if self.entries.len() >= self.capacity && !self.entries.contains_key(&key) {
-            // Evict oldest — O(1) with VecDeque
+        let is_update = self.entries.contains_key(&key);
+        if !is_update && self.entries.len() >= self.capacity {
+            // Evict oldest
             if let Some(oldest_key) = self.order.pop_front() {
                 self.entries.remove(&oldest_key);
             }
         }
-        if !self.order.contains(&key) {
-            self.order.push_back(key.clone());
+        if is_update {
+            // Promote to back: remove from old position, push to back.
+            self.order.retain(|k| k != &key);
         }
+        self.order.push_back(key.clone());
         self.entries.insert(key, value);
     }
 }
@@ -338,10 +341,14 @@ impl ContextEngine {
             .iter()
             .map(|m| self.estimate_message_tokens(m))
             .sum();
-        while recent_tokens > history_budget && recent_messages.len() > 1 {
-            let removed_tokens = self.estimate_message_tokens(&recent_messages[0]);
-            recent_messages.remove(0);
+        let mut drop_count = 0;
+        while recent_tokens > history_budget && (drop_count + 1) < recent_messages.len() {
+            let removed_tokens = self.estimate_message_tokens(&recent_messages[drop_count]);
             recent_tokens = recent_tokens.saturating_sub(removed_tokens);
+            drop_count += 1;
+        }
+        if drop_count > 0 {
+            recent_messages.drain(..drop_count);
         }
 
         // Track actual allocations
@@ -384,7 +391,7 @@ impl ContextEngine {
 
         let mut token_count = allocator.total_allocated();
         let mut budget_remaining = allocator.remaining();
-        let budget_report = allocator.report();
+        let mut budget_report = allocator.report();
 
         // Build inventory from registered sources.
         let mut inventory = ContextInventory::new();
@@ -409,6 +416,7 @@ impl ContextEngine {
             messages.push(Message::system(&inventory_text));
             token_count += inv_tokens;
             budget_remaining = budget_remaining.saturating_sub(inv_tokens);
+            budget_report.remaining = budget_remaining;
         }
 
         AssembledContext {
@@ -495,9 +503,9 @@ impl ContextEngine {
 
         let content = source.provide(source_ctx).await;
 
-        // Check budget before cloning the full context.
-        if let Some(ref text) = content {
-            let tokens = self.estimate_text(text);
+        // Pre-compute token cost and check budget before cloning the full context.
+        let content_tokens = content.as_ref().map(|text| self.estimate_text(text));
+        if let Some(tokens) = content_tokens {
             if tokens > current.budget_remaining {
                 return Err(common::ToolError::ExecutionFailed(format!(
                     "Insufficient budget for '{}': needs {} tokens, {} remaining",
@@ -510,8 +518,7 @@ impl ContextEngine {
         let mut result = current.clone();
         result.version += 1;
 
-        if let Some(text) = content {
-            let tokens = self.estimate_text(&text);
+        if let (Some(text), Some(tokens)) = (content, content_tokens) {
             result.messages.push(Message::system(&text));
             result.token_count += tokens;
             result.budget_remaining -= tokens;

@@ -6534,6 +6534,7 @@ dependencies = [
  "tokio",
  "tools-core",
  "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

@@ -1,9 +1,8 @@
 //! Todo context source — active tasks summary.
 
 use async_trait::async_trait;
-use chrono::{DateTime, Duration, Utc};
 use context_engine::source::{ContextSource, SourceContext};
-use tokio::sync::Mutex;
+use context_engine::TtlCache;
 use tracing::warn;
 
 /// Default TTL for cached todo context (seconds).
@@ -12,19 +11,14 @@ const TODO_CACHE_TTL_SECS: i64 = 60;
 /// Provides active tasks summary with TTL caching.
 pub struct TodoSource {
     repo: storage::ActionRepo,
-    cache: Mutex<Option<CachedValue>>,
-}
-
-struct CachedValue {
-    content: String,
-    expires_at: DateTime<Utc>,
+    cache: TtlCache,
 }
 
 impl TodoSource {
     pub fn new(repo: storage::ActionRepo) -> Self {
         Self {
             repo,
-            cache: Mutex::new(None),
+            cache: TtlCache::new(TODO_CACHE_TTL_SECS),
         }
     }
 }
@@ -40,18 +34,12 @@ impl ContextSource for TodoSource {
     }
 
     async fn provide(&self, _ctx: &SourceContext) -> Option<String> {
-        // Check TTL cache
-        {
-            let cache = self.cache.lock().await;
-            if let Some(ref cached) = *cache {
-                if Utc::now() < cached.expires_at {
-                    return if cached.content.trim().is_empty() {
-                        None
-                    } else {
-                        Some(cached.content.clone())
-                    };
-                }
-            }
+        if let Some(cached) = self.cache.get() {
+            return if cached.trim().is_empty() {
+                None
+            } else {
+                Some(cached)
+            };
         }
 
         // Cache miss — fetch fresh
@@ -69,15 +57,7 @@ impl ContextSource for TodoSource {
             Some(content.clone())
         };
 
-        // Store in cache
-        {
-            let mut cache = self.cache.lock().await;
-            *cache = Some(CachedValue {
-                content,
-                expires_at: Utc::now() + Duration::seconds(TODO_CACHE_TTL_SECS),
-            });
-        }
-
+        self.cache.set(content);
         result
     }
 
