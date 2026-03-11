@@ -441,11 +441,25 @@ impl AppCore {
         // Emit domain event when completing
         if updated.completed {
             if let Ok(bus) = self.domain_event_bus() {
+                let actual_mins = updated.actual_minutes.map(|m| m as i64).or_else(|| {
+                    if updated.total_tracked_secs > 0 {
+                        Some(updated.total_tracked_secs / 60)
+                    } else {
+                        None
+                    }
+                });
+                let estimated_mins = updated.estimated_minutes.map(|m| m as i64);
+                let deviation_pct = match (actual_mins, estimated_mins) {
+                    (Some(a), Some(e)) if e > 0 => {
+                        Some(((a as f64) / (e as f64) - 1.0) * 100.0)
+                    }
+                    _ => None,
+                };
                 bus.publish(bus::DomainEvent::TaskCompleted {
                     task_id: id.clone(),
-                    actual_duration_mins: None,
-                    estimated_duration_mins: row.estimated_minutes.map(|m| m as i64),
-                    deviation_pct: None,
+                    actual_duration_mins: actual_mins,
+                    estimated_duration_mins: estimated_mins,
+                    deviation_pct,
                 });
             }
         }

@@ -141,10 +141,10 @@ export interface TaskUpdateParams {
   statusLabelId?: string | null;
   position?: number;
   groupId?: string | null;
-  taskType?: string;
+  taskType?: "manual" | "agentic" | "hybrid";
   acceptanceCriteria?: string | null;
-  energyLevel?: string;
-  executionState?: string;
+  energyLevel?: "low" | "medium" | "high" | "deep";
+  executionState?: "idle" | "queued" | "running" | "paused" | "completed" | "failed";
   estimatedMinutes?: number | null;
 }
 
