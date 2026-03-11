@@ -9,7 +9,10 @@ use std::sync::Arc;
 use bus::DomainEventBus;
 
 use crate::config::TasksConfig;
-use crate::handlers::{EmbeddingHandler, EnrichmentHandler};
+use crate::handlers::{
+    DayPlanningHandler, DecompositionHandler, EmbeddingHandler, EnrichmentHandler,
+    TaskExecutionHandler,
+};
 use crate::types::{Attachment, Task, TimeEntry};
 use common::{Result, ToolError};
 use storage::TaskRepo;
@@ -35,6 +38,12 @@ pub struct TaskTool {
     pub(crate) domain_bus: Option<Arc<DomainEventBus>>,
     /// Feature configuration.
     pub(crate) config: TasksConfig,
+    /// Optional decomposition handler (LLM-powered subtask generation).
+    pub(crate) decomposition_handler: Option<Arc<dyn DecompositionHandler>>,
+    /// Optional execution handler (agentic task execution).
+    pub(crate) execution_handler: Option<Arc<dyn TaskExecutionHandler>>,
+    /// Optional day planning handler (LLM-powered daily planning).
+    pub(crate) planning_handler: Option<Arc<dyn DayPlanningHandler>>,
 }
 
 impl TaskTool {
@@ -59,6 +68,9 @@ impl TaskTool {
             progress_handler: None,
             domain_bus: None,
             config: TasksConfig::default(),
+            decomposition_handler: None,
+            execution_handler: None,
+            planning_handler: None,
         }
     }
 
@@ -114,6 +126,24 @@ impl TaskTool {
         self.semantic_threshold = config.search.semantic_threshold;
         self.rrf_k = config.search.rrf_k;
         self.config = config;
+        self
+    }
+
+    /// Attach a decomposition handler for AI-powered subtask generation.
+    pub fn with_decomposition_handler(mut self, handler: Arc<dyn DecompositionHandler>) -> Self {
+        self.decomposition_handler = Some(handler);
+        self
+    }
+
+    /// Attach an execution handler for agentic task execution.
+    pub fn with_execution_handler(mut self, handler: Arc<dyn TaskExecutionHandler>) -> Self {
+        self.execution_handler = Some(handler);
+        self
+    }
+
+    /// Attach a day planning handler for LLM-powered daily planning.
+    pub fn with_planning_handler(mut self, handler: Arc<dyn DayPlanningHandler>) -> Self {
+        self.planning_handler = Some(handler);
         self
     }
 
@@ -473,6 +503,13 @@ mod tests {
                 deviation_pct REAL NOT NULL DEFAULT 0.0, complexity_score INTEGER,
                 energy_level TEXT, tags TEXT NOT NULL DEFAULT '[]',
                 completed_at TEXT NOT NULL
+            )"#,
+            r#"CREATE TABLE IF NOT EXISTS task_decompositions (
+                id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+                plan TEXT NOT NULL, confidence REAL NOT NULL DEFAULT 0.0,
+                status TEXT NOT NULL DEFAULT 'pending', reasoning TEXT,
+                created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
+                applied_at TEXT
             )"#,
             "INSERT OR IGNORE INTO areas (id, name, color, status) VALUES ('test-area', 'Test Area', '#000', 'active')",
         ] {

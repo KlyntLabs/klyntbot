@@ -10,8 +10,8 @@ use sqlx::SqlitePool;
 
 use crate::error::{OptionExt, StorageError};
 use crate::rows::task::{
-    TaskActivityRow, TaskAttachmentRow, TaskEstimationRow, TaskExecutionRow, TaskRow,
-    TaskSuggestionRow, TaskTimeEntryRow,
+    TaskActivityRow, TaskAttachmentRow, TaskDecompositionRow, TaskEstimationRow, TaskExecutionRow,
+    TaskRow, TaskSuggestionRow, TaskTimeEntryRow,
 };
 
 /// Filter criteria for listing tasks.
@@ -1189,6 +1189,17 @@ impl TaskRepo {
         Ok(row)
     }
 
+    /// Get a single execution by ID.
+    pub async fn get_execution(&self, id: &str) -> Result<Option<TaskExecutionRow>, StorageError> {
+        let row = sqlx::query_as::<_, TaskExecutionRow>(
+            "SELECT * FROM task_executions WHERE id = ?1",
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row)
+    }
+
     /// List executions for a task.
     pub async fn list_executions(
         &self,
@@ -1271,6 +1282,83 @@ impl TaskRepo {
             .await?;
             Ok(rows)
         }
+    }
+
+    /// Expire all pending suggestions for a task.
+    pub async fn expire_suggestions_for_task(&self, task_id: &str) -> Result<u64, StorageError> {
+        let result = sqlx::query(
+            "UPDATE task_suggestions SET status = 'expired', resolved_at = datetime('now') WHERE task_id = ?1 AND status = 'pending'",
+        )
+        .bind(task_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected())
+    }
+
+    // -----------------------------------------------------------------------
+    // Decomposition Management
+    // -----------------------------------------------------------------------
+
+    /// Create a decomposition plan record.
+    pub async fn create_decomposition(
+        &self,
+        row: &TaskDecompositionRow,
+    ) -> Result<TaskDecompositionRow, StorageError> {
+        let inserted = sqlx::query_as::<_, TaskDecompositionRow>(
+            r#"
+            INSERT INTO task_decompositions (id, task_id, plan, confidence, status, reasoning)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+            RETURNING *
+            "#,
+        )
+        .bind(&row.id)
+        .bind(&row.task_id)
+        .bind(&row.plan)
+        .bind(row.confidence)
+        .bind(&row.status)
+        .bind(&row.reasoning)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(inserted)
+    }
+
+    /// Get a decomposition by ID.
+    pub async fn get_decomposition(
+        &self,
+        id: &str,
+    ) -> Result<Option<TaskDecompositionRow>, StorageError> {
+        let row = sqlx::query_as::<_, TaskDecompositionRow>(
+            "SELECT * FROM task_decompositions WHERE id = ?1",
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row)
+    }
+
+    /// List pending decompositions for a task.
+    pub async fn list_pending_decompositions(
+        &self,
+        task_id: &str,
+    ) -> Result<Vec<TaskDecompositionRow>, StorageError> {
+        let rows = sqlx::query_as::<_, TaskDecompositionRow>(
+            "SELECT * FROM task_decompositions WHERE task_id = ?1 AND status = 'pending' ORDER BY created_at DESC",
+        )
+        .bind(task_id)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
+    }
+
+    /// Mark a decomposition as applied.
+    pub async fn apply_decomposition(&self, id: &str) -> Result<bool, StorageError> {
+        let result = sqlx::query(
+            "UPDATE task_decompositions SET status = 'applied', applied_at = datetime('now') WHERE id = ?1",
+        )
+        .bind(id)
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected() > 0)
     }
 
     // -----------------------------------------------------------------------
@@ -1546,6 +1634,24 @@ mod tests {
         .await
         .unwrap();
 
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS task_decompositions (
+                id         TEXT PRIMARY KEY,
+                task_id    TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+                plan       TEXT NOT NULL,
+                confidence REAL NOT NULL DEFAULT 0.0,
+                status     TEXT NOT NULL DEFAULT 'pending',
+                reasoning  TEXT,
+                created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+                applied_at TEXT
+            )
+            "#,
+        )
+        .execute(db)
+        .await
+        .unwrap();
+
         // Insert a test area for FK references.
         sqlx::query(
             "INSERT OR IGNORE INTO areas (id, name, color, status) VALUES ('test-area', 'Test Area', '#000', 'active')",
@@ -1553,6 +1659,14 @@ mod tests {
         .execute(db)
         .await
         .unwrap();
+    }
+
+    /// Helper to create a ready-to-use TaskRepo backed by an in-memory DB.
+    async fn setup_repo() -> TaskRepo {
+        let pool = crate::StoragePool::connect_in_memory().await.unwrap();
+        let db = pool.inner().clone();
+        create_test_tables(&db).await;
+        TaskRepo::new(db)
     }
 
     /// Helper to create a minimal TaskRow for tests.
@@ -2197,5 +2311,103 @@ mod tests {
         let overdue = repo.overdue().await.unwrap();
         assert_eq!(overdue.len(), 1);
         assert_eq!(overdue[0].id, "sum4");
+    }
+
+    #[tokio::test]
+    async fn test_get_execution() {
+        let repo = setup_repo().await;
+
+        let task = make_task("exec-get-t", "Exec test");
+        repo.add(&task).await.unwrap();
+
+        let exec_row = TaskExecutionRow {
+            id: "exec-1".to_string(),
+            task_id: task.id.clone(),
+            status: "pending".to_string(),
+            agent_profile: Some("task".to_string()),
+            started_at: None,
+            completed_at: None,
+            duration_secs: None,
+            tokens_used: None,
+            cost_usd: None,
+            input_context: None,
+            output_summary: None,
+            error_message: None,
+            artifacts: None,
+            metrics: None,
+            retry_count: 0,
+            created_at: Utc::now(),
+        };
+        repo.create_execution(&exec_row).await.unwrap();
+
+        let fetched = repo.get_execution("exec-1").await.unwrap();
+        assert!(fetched.is_some());
+        assert_eq!(fetched.unwrap().status, "pending");
+
+        let missing = repo.get_execution("nonexistent").await.unwrap();
+        assert!(missing.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_decomposition_crud() {
+        let repo = setup_repo().await;
+
+        let task = make_task("decomp-t", "Decomp test");
+        repo.add(&task).await.unwrap();
+
+        let row = TaskDecompositionRow {
+            id: "decomp-1".to_string(),
+            task_id: task.id.clone(),
+            plan: r#"{"subtasks":[]}"#.to_string(),
+            confidence: 0.85,
+            status: "pending".to_string(),
+            reasoning: Some("test".to_string()),
+            created_at: Utc::now(),
+            applied_at: None,
+        };
+        let created = repo.create_decomposition(&row).await.unwrap();
+        assert_eq!(created.id, "decomp-1");
+
+        let fetched = repo.get_decomposition("decomp-1").await.unwrap();
+        assert!(fetched.is_some());
+
+        let pending = repo.list_pending_decompositions(&task.id).await.unwrap();
+        assert_eq!(pending.len(), 1);
+
+        repo.apply_decomposition("decomp-1").await.unwrap();
+        let applied = repo.get_decomposition("decomp-1").await.unwrap().unwrap();
+        assert_eq!(applied.status, "applied");
+
+        let pending_after = repo.list_pending_decompositions(&task.id).await.unwrap();
+        assert!(pending_after.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_expire_suggestions() {
+        let repo = setup_repo().await;
+
+        let task = make_task("expire-t", "Expire test");
+        repo.add(&task).await.unwrap();
+
+        let sugg = TaskSuggestionRow {
+            id: "sugg-1".to_string(),
+            task_id: Some(task.id.clone()),
+            suggestion_type: "Decompose".to_string(),
+            title: "Break down".to_string(),
+            description: None,
+            confidence: 0.8,
+            action_payload: None,
+            status: "pending".to_string(),
+            trigger: None,
+            created_at: Utc::now(),
+            resolved_at: None,
+        };
+        repo.create_suggestion(&sugg).await.unwrap();
+
+        let expired = repo.expire_suggestions_for_task(&task.id).await.unwrap();
+        assert_eq!(expired, 1);
+
+        let pending = repo.list_pending_suggestions(Some(&task.id)).await.unwrap();
+        assert!(pending.is_empty());
     }
 }
