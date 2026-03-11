@@ -115,60 +115,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
         quote! {}
     };
 
-    // Generate metadata() impl if any metadata attributes are provided
-    let has_metadata = category.is_some() || tags.is_some() || cost.is_some();
-    let metadata_impl = if has_metadata {
-        let category_expr = match category.as_deref() {
-            Some("General") | None => quote! { ::tools_core::ToolCategory::General },
-            Some("FileSystem") => quote! { ::tools_core::ToolCategory::FileSystem },
-            Some("Search") => quote! { ::tools_core::ToolCategory::Search },
-            Some("Web") => quote! { ::tools_core::ToolCategory::Web },
-            Some("Communication") => quote! { ::tools_core::ToolCategory::Communication },
-            Some("TaskManagement") => quote! { ::tools_core::ToolCategory::TaskManagement },
-            Some("Memory") => quote! { ::tools_core::ToolCategory::Memory },
-            Some("Finance") => quote! { ::tools_core::ToolCategory::Finance },
-            Some("Productivity") => quote! { ::tools_core::ToolCategory::Productivity },
-            Some("System") => quote! { ::tools_core::ToolCategory::System },
-            Some("Mcp") => quote! { ::tools_core::ToolCategory::Mcp },
-            Some("Plugin") => quote! { ::tools_core::ToolCategory::Plugin },
-            Some(other) => panic!(
-                "#[tool(category = \"{}\")] is invalid. Use General, FileSystem, Search, Web, Communication, TaskManagement, Memory, Finance, Productivity, System, Mcp, or Plugin",
-                other
-            ),
-        };
-
-        let tags_expr = if let Some(ref tags_str) = tags {
-            let tag_list: Vec<&str> = tags_str.split(',').map(|s| s.trim()).collect();
-            quote! { vec![#(#tag_list.to_string()),*] }
-        } else {
-            quote! { vec![] }
-        };
-
-        let cost_expr = match cost.as_deref() {
-            Some("Free") | None => quote! { ::tools_core::CostHint::Free },
-            Some("Low") => quote! { ::tools_core::CostHint::Low },
-            Some("Medium") => quote! { ::tools_core::CostHint::Medium },
-            Some("High") => quote! { ::tools_core::CostHint::High },
-            Some("Variable") => quote! { ::tools_core::CostHint::Variable },
-            Some(other) => panic!(
-                "#[tool(cost = \"{}\")] is invalid. Use Free, Low, Medium, High, or Variable",
-                other
-            ),
-        };
-
-        quote! {
-            fn metadata(&self) -> ::tools_core::ToolMetadata {
-                ::tools_core::ToolMetadata {
-                    category: #category_expr,
-                    tags: #tags_expr,
-                    cost_hint: #cost_expr,
-                    ..::std::default::Default::default()
-                }
-            }
-        }
-    } else {
-        quote! {}
-    };
+    let metadata_impl = crate::helpers::gen_metadata_impl(&category, &tags, &cost);
 
     let expanded = quote! {
         #[::async_trait::async_trait]

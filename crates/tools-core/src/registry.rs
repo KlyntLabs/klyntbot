@@ -6,14 +6,29 @@ use std::sync::{Arc, Mutex};
 use tracing::{debug, warn};
 
 use crate::metadata::{ToolCategory, ToolMetadata};
+use crate::search::{rrf_merge_triple, Searchable};
 use crate::{DynTool, RoutingContext, Tool, ToolPermissions};
 use common::{Result, ToolError};
+
+/// A tool entry for search result output.
+#[derive(Debug, Clone)]
+pub struct ToolSearchEntry {
+    pub name: String,
+    pub description: String,
+    pub category: ToolCategory,
+}
+
+impl Searchable for ToolSearchEntry {
+    fn search_id(&self) -> &str {
+        &self.name
+    }
+}
 
 /// Registry for agent tools
 pub struct ToolRegistry {
     tools: HashMap<String, DynTool>,
     metadata: HashMap<String, ToolMetadata>,
-    usage_counts: HashMap<String, u64>,
+    usage_counts: Mutex<HashMap<String, u64>>,
     cached_definitions: Mutex<Option<Arc<Vec<Value>>>>,
     permissions: Option<ToolPermissions>,
 }
@@ -24,7 +39,7 @@ impl ToolRegistry {
         Self {
             tools: HashMap::new(),
             metadata: HashMap::new(),
-            usage_counts: HashMap::new(),
+            usage_counts: Mutex::new(HashMap::new()),
             cached_definitions: Mutex::new(None),
             permissions: None,
         }
@@ -59,7 +74,10 @@ impl ToolRegistry {
     pub fn unregister(&mut self, name: &str) {
         self.tools.remove(name);
         self.metadata.remove(name);
-        self.usage_counts.remove(name);
+        self.usage_counts
+            .lock()
+            .expect("usage lock poisoned")
+            .remove(name);
         self.invalidate_cache();
     }
 
@@ -72,6 +90,8 @@ impl ToolRegistry {
         self.tools.retain(|name, _| !name.starts_with(prefix));
         self.metadata.retain(|name, _| !name.starts_with(prefix));
         self.usage_counts
+            .lock()
+            .expect("usage lock poisoned")
             .retain(|name, _| !name.starts_with(prefix));
         let removed = before - self.tools.len();
         if removed > 0 {
@@ -171,60 +191,113 @@ impl ToolRegistry {
     }
 
     /// Record a tool usage for tracking.
-    pub fn record_usage(&mut self, name: &str) {
-        *self.usage_counts.entry(name.to_string()).or_insert(0) += 1;
+    /// Uses interior mutability so only a shared reference is needed.
+    pub fn record_usage(&self, name: &str) {
+        *self
+            .usage_counts
+            .lock()
+            .expect("usage lock poisoned")
+            .entry(name.to_string())
+            .or_insert(0) += 1;
     }
 
     /// Get the top N most-used tools, sorted by usage count descending.
-    pub fn top_used(&self, n: usize) -> Vec<(&str, u64)> {
-        let mut counts: Vec<_> = self
-            .usage_counts
-            .iter()
-            .map(|(k, v)| (k.as_str(), *v))
-            .collect();
-        counts.sort_by(|a, b| b.1.cmp(&a.1));
-        counts.truncate(n);
-        counts
+    pub fn top_used(&self, n: usize) -> Vec<(String, u64)> {
+        let counts = self.usage_counts.lock().expect("usage lock poisoned");
+        let mut entries: Vec<_> = counts.iter().map(|(k, v)| (k.clone(), *v)).collect();
+        entries.sort_by(|a, b| b.1.cmp(&a.1));
+        entries.truncate(n);
+        entries
     }
 
-    /// Simple keyword search across tool names, descriptions, and tags.
+    /// Keyword search across tool names, descriptions, and tags using RRF.
+    ///
+    /// Produces three ranked lists (name matches, description matches, tag matches)
+    /// and merges them via Reciprocal Rank Fusion for consistent scoring with the
+    /// rest of the search infrastructure.
     pub fn search_tools(&self, query: &str, limit: usize) -> Vec<(String, f64)> {
         let query_lower = query.to_lowercase();
         let terms: Vec<&str> = query_lower.split_whitespace().collect();
 
-        let mut scores: Vec<(String, f64)> = self
+        // Build lookup map of all tool entries
+        let entries: HashMap<String, ToolSearchEntry> = self
             .tools
             .iter()
             .map(|(name, tool)| {
-                let desc = tool.description().to_lowercase();
-                let name_lower = name.to_lowercase();
-                let meta = self.metadata.get(name);
-
-                let mut score = 0.0;
-                for term in &terms {
-                    if name_lower.contains(term) {
-                        score += 3.0;
-                    }
-                    if desc.contains(term) {
-                        score += 1.0;
-                    }
-                    if let Some(m) = meta {
-                        if m.tags
-                            .iter()
-                            .any(|tag| tag.to_lowercase().contains(term))
-                        {
-                            score += 2.0;
-                        }
-                    }
-                }
-                (name.clone(), score)
+                let category = self
+                    .metadata
+                    .get(name)
+                    .map(|m| m.category.clone())
+                    .unwrap_or_default();
+                (
+                    name.clone(),
+                    ToolSearchEntry {
+                        name: name.clone(),
+                        description: tool.description().to_string(),
+                        category,
+                    },
+                )
             })
-            .filter(|(_, score)| *score > 0.0)
             .collect();
 
-        scores.sort_by(|a, b| b.1.total_cmp(&a.1));
-        scores.truncate(limit);
-        scores
+        // Score each tool per signal, then sort by score descending to produce ranked lists
+        let mut name_scored: Vec<(String, f64)> = Vec::new();
+        let mut desc_scored: Vec<(String, f64)> = Vec::new();
+        let mut tag_scored: Vec<(String, f64)> = Vec::new();
+
+        for (name, tool) in &self.tools {
+            let name_lower = name.to_lowercase();
+            let desc_lower = tool.description().to_lowercase();
+            let meta = self.metadata.get(name);
+
+            let mut name_score = 0.0;
+            let mut desc_score = 0.0;
+            let mut tag_score = 0.0;
+
+            for term in &terms {
+                if name_lower.contains(term) {
+                    name_score += 1.0;
+                }
+                if desc_lower.contains(term) {
+                    desc_score += 1.0;
+                }
+                if let Some(m) = meta {
+                    if m.tags.iter().any(|tag| tag.to_lowercase().contains(term)) {
+                        tag_score += 1.0;
+                    }
+                }
+            }
+
+            if name_score > 0.0 {
+                name_scored.push((name.clone(), name_score));
+            }
+            if desc_score > 0.0 {
+                desc_scored.push((name.clone(), desc_score));
+            }
+            if tag_score > 0.0 {
+                tag_scored.push((name.clone(), tag_score));
+            }
+        }
+
+        // Sort each list by score descending (highest-scoring = rank 0)
+        name_scored.sort_by(|a, b| b.1.total_cmp(&a.1));
+        desc_scored.sort_by(|a, b| b.1.total_cmp(&a.1));
+        tag_scored.sort_by(|a, b| b.1.total_cmp(&a.1));
+
+        // Convert name matches to Searchable entries for RRF (keyword signal)
+        let name_entries: Vec<ToolSearchEntry> = name_scored
+            .iter()
+            .filter_map(|(id, _)| entries.get(id).cloned())
+            .collect();
+
+        // Merge via RRF: name = keyword, description = semantic, tags = BM25
+        let rrf_results = rrf_merge_triple(&name_entries, &desc_scored, &tag_scored, 60, &entries);
+
+        rrf_results
+            .into_iter()
+            .take(limit)
+            .map(|(entry, score, _source)| (entry.name, score))
+            .collect()
     }
 
     /// Get list of registered tool names
@@ -338,6 +411,7 @@ mod tests {
         let mut reg = ToolRegistry::new();
         reg.register(FakeSearchTool);
 
+        // record_usage only needs &self thanks to interior mutability
         reg.record_usage("search");
         reg.record_usage("search");
         reg.record_usage("search");

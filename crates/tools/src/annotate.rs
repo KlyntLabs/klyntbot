@@ -71,7 +71,10 @@ impl AnnotateTool {
 
 #[tool_actions(
     name = "annotate",
-    description = "Create, retrieve, list, delete, or search persistent annotations on any entity (tool, fact, rule, skill, project)."
+    description = "Create, retrieve, list, delete, or search persistent annotations on any entity (tool, fact, rule, skill, project).",
+    category = "Memory",
+    tags = "annotation,note,gotcha",
+    cost = "Free"
 )]
 impl AnnotateTool {
     #[action(name = "create")]

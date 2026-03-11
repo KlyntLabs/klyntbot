@@ -370,6 +370,87 @@ pub fn collect_field_tokens(
     (schema_properties, required_fields, from_value_fields)
 }
 
+/// Extract a string value from a `Meta::NameValue` attribute.
+pub fn extract_str_attr(nv: &syn::MetaList, key: &str) -> Option<String> {
+    let tokens = nv.tokens.clone();
+    let parser = syn::punctuated::Punctuated::<Meta, syn::Token![,]>::parse_terminated;
+    let parsed = syn::parse::Parser::parse2(parser, tokens).ok()?;
+    for meta in parsed {
+        if let Meta::NameValue(nv) = &meta {
+            if nv.path.is_ident(key) {
+                if let syn::Expr::Lit(lit) = &nv.value {
+                    if let Lit::Str(s) = &lit.lit {
+                        return Some(s.value());
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Generate the `metadata()` method TokenStream from optional category, tags, cost strings.
+/// Returns empty TokenStream if no metadata attributes are provided.
+pub fn gen_metadata_impl(
+    category: &Option<String>,
+    tags: &Option<String>,
+    cost: &Option<String>,
+) -> proc_macro2::TokenStream {
+    let has_metadata = category.is_some() || tags.is_some() || cost.is_some();
+    if !has_metadata {
+        return quote! {};
+    }
+
+    let category_expr = match category.as_deref() {
+        Some("General") | None => quote! { ::tools_core::ToolCategory::General },
+        Some("FileSystem") => quote! { ::tools_core::ToolCategory::FileSystem },
+        Some("Search") => quote! { ::tools_core::ToolCategory::Search },
+        Some("Web") => quote! { ::tools_core::ToolCategory::Web },
+        Some("Communication") => quote! { ::tools_core::ToolCategory::Communication },
+        Some("TaskManagement") => quote! { ::tools_core::ToolCategory::TaskManagement },
+        Some("Memory") => quote! { ::tools_core::ToolCategory::Memory },
+        Some("Finance") => quote! { ::tools_core::ToolCategory::Finance },
+        Some("Productivity") => quote! { ::tools_core::ToolCategory::Productivity },
+        Some("System") => quote! { ::tools_core::ToolCategory::System },
+        Some("Mcp") => quote! { ::tools_core::ToolCategory::Mcp },
+        Some("Plugin") => quote! { ::tools_core::ToolCategory::Plugin },
+        Some(other) => panic!(
+            "category = \"{}\" is invalid. Use General, FileSystem, Search, Web, Communication, TaskManagement, Memory, Finance, Productivity, System, Mcp, or Plugin",
+            other
+        ),
+    };
+
+    let tags_expr = if let Some(ref tags_str) = tags {
+        let tag_list: Vec<&str> = tags_str.split(',').map(|s| s.trim()).collect();
+        quote! { vec![#(#tag_list.to_string()),*] }
+    } else {
+        quote! { vec![] }
+    };
+
+    let cost_expr = match cost.as_deref() {
+        Some("Free") | None => quote! { ::tools_core::CostHint::Free },
+        Some("Low") => quote! { ::tools_core::CostHint::Low },
+        Some("Medium") => quote! { ::tools_core::CostHint::Medium },
+        Some("High") => quote! { ::tools_core::CostHint::High },
+        Some("Variable") => quote! { ::tools_core::CostHint::Variable },
+        Some(other) => panic!(
+            "cost = \"{}\" is invalid. Use Free, Low, Medium, High, or Variable",
+            other
+        ),
+    };
+
+    quote! {
+        fn metadata(&self) -> ::tools_core::ToolMetadata {
+            ::tools_core::ToolMetadata {
+                category: #category_expr,
+                tags: #tags_expr,
+                cost_hint: #cost_expr,
+                ..::std::default::Default::default()
+            }
+        }
+    }
+}
+
 /// Generate schema property insertion code for a field.
 pub fn gen_schema_property(
     field_name_str: &str,

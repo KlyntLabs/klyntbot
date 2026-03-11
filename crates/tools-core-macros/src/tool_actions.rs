@@ -10,6 +10,9 @@ pub fn expand(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let mut tool_name = String::new();
     let mut tool_description = String::new();
+    let mut category: Option<String> = None;
+    let mut tags: Option<String> = None;
+    let mut cost: Option<String> = None;
 
     for meta in &attr_args {
         if let Meta::NameValue(nv) = meta {
@@ -23,6 +26,24 @@ pub fn expand(attr: TokenStream, item: TokenStream) -> TokenStream {
                 if let Expr::Lit(lit) = &nv.value {
                     if let Lit::Str(s) = &lit.lit {
                         tool_description = s.value();
+                    }
+                }
+            } else if nv.path.is_ident("category") {
+                if let Expr::Lit(lit) = &nv.value {
+                    if let Lit::Str(s) = &lit.lit {
+                        category = Some(s.value());
+                    }
+                }
+            } else if nv.path.is_ident("tags") {
+                if let Expr::Lit(lit) = &nv.value {
+                    if let Lit::Str(s) = &lit.lit {
+                        tags = Some(s.value());
+                    }
+                }
+            } else if nv.path.is_ident("cost") {
+                if let Expr::Lit(lit) = &nv.value {
+                    if let Lit::Str(s) = &lit.lit {
+                        cost = Some(s.value());
                     }
                 }
             }
@@ -131,6 +152,8 @@ pub fn expand(attr: TokenStream, item: TokenStream) -> TokenStream {
         })
         .collect();
 
+    let metadata_impl = crate::helpers::gen_metadata_impl(&category, &tags, &cost);
+
     let expanded = quote! {
         impl #self_ty {
             #(#other_items)*
@@ -145,6 +168,8 @@ pub fn expand(attr: TokenStream, item: TokenStream) -> TokenStream {
             fn description(&self) -> &str {
                 #tool_description
             }
+
+            #metadata_impl
 
             fn parameters(&self) -> ::serde_json::Value {
                 let mut merged_properties = ::serde_json::Map::new();

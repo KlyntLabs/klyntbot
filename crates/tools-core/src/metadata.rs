@@ -22,7 +22,20 @@ pub enum ToolCategory {
 
 impl std::fmt::Display for ToolCategory {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        match self {
+            Self::General => write!(f, "General"),
+            Self::FileSystem => write!(f, "File System"),
+            Self::Search => write!(f, "Search"),
+            Self::Web => write!(f, "Web"),
+            Self::Communication => write!(f, "Communication"),
+            Self::TaskManagement => write!(f, "Task Management"),
+            Self::Memory => write!(f, "Memory"),
+            Self::Finance => write!(f, "Finance"),
+            Self::Productivity => write!(f, "Productivity"),
+            Self::System => write!(f, "System"),
+            Self::Mcp => write!(f, "MCP"),
+            Self::Plugin => write!(f, "Plugin"),
+        }
     }
 }
 
