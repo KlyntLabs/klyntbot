@@ -684,9 +684,44 @@ fn event_to_observation(event: &DomainEvent) -> Option<Observation> {
             source_event: "PredictiveAlert".into(),
             timestamp: now,
         }),
+        // Agentic task events — Extract-priority need good observations
+        DomainEvent::TaskExecutionCompleted {
+            task_id,
+            execution_id,
+            tokens_used,
+            cost_usd,
+            artifacts_count,
+        } => {
+            let cost_str = cost_usd
+                .map(|c| format!(", cost ${c:.4}"))
+                .unwrap_or_default();
+            Some(Observation {
+                domain: "tasks".into(),
+                content: format!(
+                    "Task {task_id} execution {execution_id} completed: {tokens_used} tokens{cost_str}, {artifacts_count} artifacts"
+                ),
+                importance: 0.8,
+                source_event: "TaskExecutionCompleted".into(),
+                timestamp: now,
+            })
+        }
+        DomainEvent::TaskExecutionFailed {
+            task_id,
+            execution_id,
+            error,
+            retry_count,
+        } => Some(Observation {
+            domain: "tasks".into(),
+            content: format!(
+                "Task {task_id} execution {execution_id} failed (retry {retry_count}): {error}"
+            ),
+            importance: 0.9,
+            source_event: "TaskExecutionFailed".into(),
+            timestamp: now,
+        }),
         _ => {
-            // TaskCreated, TaskDeferred, GoalProgress, ActivitySessionCompleted
-            // Lower priority — convert generically
+            // TaskCreated, TaskDeferred, GoalProgress, ActivitySessionCompleted,
+            // and lower-priority agentic events (Accumulate-level)
             let content = format!("{event:?}");
             Some(Observation {
                 domain: "general".into(),
