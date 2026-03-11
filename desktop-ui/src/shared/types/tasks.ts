@@ -20,6 +20,15 @@ export interface Task {
   statusLabelId: string | null;
   statusLabel: StatusLabel | null;
   groupId: string | null;
+  taskType?: "manual" | "agentic" | "hybrid";
+  executionState?: "idle" | "queued" | "running" | "paused" | "completed" | "failed";
+  energyLevel?: "low" | "medium" | "high" | "deep";
+  acceptanceCriteria?: string;
+  estimatedMinutes?: number;
+  actualMinutes?: number;
+  complexityScore?: number;
+  totalTrackedSecs?: number;
+  focusedAt?: string;
 }
 
 export interface TodayTask {
@@ -132,6 +141,11 @@ export interface TaskUpdateParams {
   statusLabelId?: string | null;
   position?: number;
   groupId?: string | null;
+  taskType?: string;
+  acceptanceCriteria?: string | null;
+  energyLevel?: string;
+  executionState?: string;
+  estimatedMinutes?: number | null;
 }
 
 export interface TaskCreateParams {
@@ -143,6 +157,10 @@ export interface TaskCreateParams {
   tags?: string[];
   parentId?: string;
   groupId?: string;
+  taskType?: "manual" | "agentic" | "hybrid";
+  acceptanceCriteria?: string;
+  energyLevel?: "low" | "medium" | "high" | "deep";
+  estimatedMinutes?: number;
 }
 
 // ── Area Mutation Parameters ────────────────────────────────
