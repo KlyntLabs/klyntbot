@@ -569,22 +569,22 @@ impl AgentLoopBuilder {
         // Outputs for MemoryTool — populated inside the pool block if embedding is enabled
         let todo_embedding_handler: Option<Arc<dyn tools::EmbeddingHandler>>;
 
-        // ── Feature-todo tool (requires real pool) ────────────────────────
+        // ── Feature-tasks tool (requires real pool) ───────────────────────
         if self.pool.is_some() {
             let pool_ref = storage_pool.inner();
-            let feature_todo_repo = feature_todo::ActionRepo::new(pool_ref.clone());
-            let mut todo_tool = feature_todo::TaskTool::new(
-                feature_todo_repo,
+            let task_repo = storage::TaskRepo::new(pool_ref.clone());
+            let mut task_tool = feature_tasks::TaskTool::new(
+                task_repo,
                 config.todo.focus.max_slots,
                 config.todo.focus.deadline_hours,
                 config.timezone.clone(),
             );
 
             // Set enrichment threshold from config
-            todo_tool =
-                todo_tool.with_enrichment_threshold(config.todo.enrichment.auto_apply_threshold);
+            task_tool =
+                task_tool.with_enrichment_threshold(config.todo.enrichment.auto_apply_threshold);
 
-            // Enrichment engine
+            // Enrichment engine — wrapped via adapter to implement feature_tasks::EnrichmentHandler
             if config.todo.enrichment.enabled {
                 let mut enrichment_engine =
                     super::super::enrichment::EnrichmentEngine::new(config.todo.enrichment.clone());
@@ -593,29 +593,30 @@ impl AgentLoopBuilder {
                         .with_provider(provider.clone(), config.agents.defaults.model.clone());
                 }
                 let enrichment_engine = Arc::new(enrichment_engine);
-                todo_tool =
-                    todo_tool
-                        .with_enrichment_handler(Arc::clone(&enrichment_engine)
-                            as Arc<dyn feature_todo::EnrichmentHandler>);
+                let task_enrichment_adapter =
+                    Arc::new(crate::task_enrichment_adapter::TaskEnrichmentAdapter::new(
+                        Arc::clone(&enrichment_engine),
+                    ));
+                task_tool = task_tool.with_enrichment_handler(Arc::clone(&task_enrichment_adapter)
+                    as Arc<dyn feature_tasks::EnrichmentHandler>);
             }
 
-            // Todo embedding (semantic search)
+            // Task embedding (semantic search)
             if let (true, Some(vs)) = (config.todo.search.enabled, self.vector_store.clone()) {
-                let todo_embed_impl = Arc::new(
-                    crate::todo_embedding_handler::TodoEmbeddingHandlerImpl::new(
+                let task_embed_impl =
+                    Arc::new(crate::task_embedding_adapter::TaskEmbeddingAdapter::new(
                         Arc::clone(&embedding_engine),
                         vs.clone(),
-                    ),
-                );
+                    ));
 
                 let memory_embed_impl = Arc::new(tools::EmbeddingEngineImpl::new(
                     Arc::clone(&embedding_engine),
                     vs.clone(),
                 ));
 
-                todo_tool = todo_tool
+                task_tool = task_tool
                     .with_embedding_handler(
-                        Arc::clone(&todo_embed_impl) as Arc<dyn feature_todo::EmbeddingHandler>
+                        Arc::clone(&task_embed_impl) as Arc<dyn feature_tasks::EmbeddingHandler>
                     )
                     .with_embedding_store(vs)
                     .with_search_config(
@@ -636,14 +637,14 @@ impl AgentLoopBuilder {
                     repos.objectives.clone(),
                     repos.actions.clone(),
                 ));
-            todo_tool = todo_tool.with_progress_handler(Arc::clone(&progress_handler));
+            task_tool = task_tool.with_progress_handler(Arc::clone(&progress_handler));
 
             // Wire DomainEventBus for task lifecycle events
             if let Some(ref domain_bus) = self.domain_event_bus {
-                todo_tool = todo_tool.with_domain_bus(Arc::clone(domain_bus));
+                task_tool = task_tool.with_domain_bus(Arc::clone(domain_bus));
             }
 
-            tool_registry.register(todo_tool);
+            tool_registry.register(task_tool);
 
             // ── OKR tool (needs same progress handler) ────────────────────
             tool_registry.register(

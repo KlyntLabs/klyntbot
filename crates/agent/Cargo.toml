@@ -16,6 +16,7 @@ session.workspace = true
 tools.workspace = true
 tools-core.workspace = true
 feature-todo.workspace = true
+feature-tasks.workspace = true
 feature-finance.workspace = true
 feature-productivity.workspace = true
 feature-coaching.workspace = true

@@ -119,6 +119,7 @@ fn test_salience_task_completed_is_accumulate() {
         task_id: "t1".into(),
         actual_duration_mins: Some(30),
         estimated_duration_mins: Some(45),
+        deviation_pct: None,
     });
     assert_eq!(verdict, SalienceVerdict::Accumulate);
 }

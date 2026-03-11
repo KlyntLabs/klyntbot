@@ -37,6 +37,8 @@ pub mod recurring_tasks;
 pub mod reminders;
 pub mod session_cleanup_service;
 pub mod subagent;
+pub mod task_embedding_adapter;
+pub mod task_enrichment_adapter;
 pub mod todo_embedding_handler;
 
 pub use agent_loop::{AgentLoop, StreamingHandle};
