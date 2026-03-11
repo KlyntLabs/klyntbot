@@ -10,23 +10,121 @@ use super::super::TaskTool;
 use crate::types::{EnergyLevel, Task, TaskStatus};
 use storage::TaskFilter;
 
+/// Filter for plannable tasks: todo, not a template, not currently focused.
+fn is_plannable(t: &Task) -> bool {
+    t.status == TaskStatus::Todo.as_str() && !t.is_template && t.focused_at.is_none()
+}
+
+/// Build a TaskFilter that pre-filters at the DB level for plannable candidates.
+fn plannable_filter() -> TaskFilter {
+    TaskFilter {
+        status: Some("todo".into()),
+        templates_only: false,
+        ..TaskFilter::default()
+    }
+}
+
 impl TaskTool {
     pub(crate) async fn handle_plan_day(&self, p: &ParamExtractor<'_>) -> Result<String> {
         let count = p.optional_u64("count")?.unwrap_or(3).min(10) as usize;
         let energy_preference = p.optional_str("energy_level")?;
-        info!("Generating daily plan (top {} tasks)", count);
 
-        let rows = self.repo.list(&TaskFilter::default()).await?;
+        // If LLM planning handler is available, use it
+        if let Some(ref handler) = self.planning_handler {
+            return self.handle_plan_day_llm(handler.as_ref(), count).await;
+        }
+
+        // Fallback: scoring-only plan (Phase 1 behavior)
+        self.handle_plan_day_scoring(count, energy_preference).await
+    }
+
+    /// LLM-powered daily planning path.
+    async fn handle_plan_day_llm(
+        &self,
+        handler: &dyn crate::handlers::DayPlanningHandler,
+        count: usize,
+    ) -> Result<String> {
+        use crate::types::PlanningContext;
+
+        let rows = self.repo.list(&plannable_filter()).await?;
+        let tasks: Vec<Task> = rows
+            .into_iter()
+            .map(Task::from)
+            .filter(|t| is_plannable(t))
+            .collect();
+        // Give LLM a broader candidate set (sorted by created_at from DB)
+        let tasks: Vec<Task> = tasks.into_iter().take(count * 3).collect();
+
+        let ctx = PlanningContext {
+            tasks,
+            working_hours: self.config.working_hours.clone(),
+            calendar_blocks: vec![],
+            energy_profile: None,
+            max_tasks: Some(count as u32),
+            locked_task_ids: vec![],
+            target_date: None,
+        };
+
+        let plan = handler.plan_day(&ctx).await?;
+
+        // Format output
+        let mut output = format!("Daily plan ({} slots):\n\n", plan.slots.len());
+        for (i, slot) in plan.slots.iter().enumerate() {
+            let time = slot.start_time.as_deref().unwrap_or("--:--");
+            let energy = slot
+                .energy_level
+                .as_ref()
+                .map(|e| format!(" · energy: {e}"))
+                .unwrap_or_default();
+            output.push_str(&format!(
+                "{}. [{}] {} (ID: {}) · {}min{}\n",
+                i + 1,
+                time,
+                slot.title,
+                slot.task_id,
+                slot.estimated_minutes,
+                energy,
+            ));
+        }
+
+        if !plan.deferred.is_empty() {
+            output.push_str(&format!("\nDeferred ({}):\n", plan.deferred.len()));
+            for d in &plan.deferred {
+                output.push_str(&format!("  - {} ({})\n", d.title, d.reason));
+            }
+        }
+
+        output.push_str(&format!(
+            "\nTotal: {}min ({:.1}h) · Utilization: {:.0}%\n",
+            plan.total_work_mins,
+            plan.total_work_mins as f64 / 60.0,
+            plan.utilization * 100.0,
+        ));
+
+        if !plan.reasoning.is_empty() {
+            output.push_str(&format!("\n{}\n", plan.reasoning));
+        }
+
+        Ok(output)
+    }
+
+    /// Scoring-only daily plan (Phase 1 fallback).
+    async fn handle_plan_day_scoring(
+        &self,
+        count: usize,
+        energy_preference: Option<&str>,
+    ) -> Result<String> {
+        info!(
+            "Generating daily plan (top {} tasks, scoring fallback)",
+            count
+        );
+
+        let rows = self.repo.list(&plannable_filter()).await?;
         let all_tasks: Vec<Task> = rows.into_iter().map(Task::from).collect();
         debug!("Total tasks in store: {}", all_tasks.len());
 
         let now = Utc::now();
-        let candidates: Vec<_> = all_tasks
-            .into_iter()
-            .filter(|t| {
-                t.status == TaskStatus::Todo.as_str() && !t.is_template && t.focused_at.is_none()
-            })
-            .collect();
+        let candidates: Vec<_> = all_tasks.into_iter().filter(|t| is_plannable(t)).collect();
 
         // Batch-check blockers concurrently instead of N sequential queries
         let blocker_results: Vec<Vec<_>> = try_join_all(

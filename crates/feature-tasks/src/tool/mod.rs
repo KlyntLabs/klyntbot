@@ -180,6 +180,13 @@ impl TaskTool {
             None => Ok(None),
         }
     }
+
+    /// Load a task by ID or return a not-found error.
+    pub(crate) async fn require_task(&self, id: &str) -> Result<Task> {
+        self.get_full_task(id)
+            .await?
+            .ok_or_else(|| ToolError::ExecutionFailed(format!("Task {id} not found")).into())
+    }
 }
 
 #[async_trait]
@@ -189,7 +196,7 @@ impl Tool for TaskTool {
     }
 
     fn description(&self) -> &str {
-        "Manage tasks with agentic execution support. Actions: create, update, complete, delete, show, list, summary, tree, search, focus, unfocus, log_time, add_dep, remove_dep, batch, recur, list_recurring, delete_recurring, plan_day."
+        "Manage tasks with agentic execution support. Actions: create, update, complete, delete, show, list, summary, tree, search, focus, unfocus, log_time, add_dep, remove_dep, batch, recur, list_recurring, delete_recurring, plan_day, decompose, execute, cancel_execution."
     }
 
     fn parameters(&self) -> Value {
@@ -206,7 +213,8 @@ impl Tool for TaskTool {
                         "add_dep", "remove_dep",
                         "batch",
                         "recur", "list_recurring", "delete_recurring",
-                        "plan_day"
+                        "plan_day",
+                        "decompose", "execute", "cancel_execution"
                     ],
                     "description": "Action to perform"
                 },
@@ -289,6 +297,12 @@ impl Tool for TaskTool {
                     "type": "integer",
                     "description": "Number of tasks to include in plan (default: 3)"
                 },
+                "execution_id": { "type": "string", "description": "Execution ID (for cancel_execution)" },
+                "agent_profile": { "type": "string", "description": "Agent profile for execution" },
+                "max_cost": { "type": "number", "description": "Max cost in USD for execution" },
+                "max_iterations": { "type": "integer", "description": "Max LLM iterations for execution" },
+                "timeout_secs": { "type": "integer", "description": "Timeout in seconds for execution" },
+                "require_approval": { "type": "boolean", "description": "Require approval before execution" },
                 "unassigned": {
                     "type": "boolean",
                     "description": "Filter for tasks not assigned to any project or area (list)"
@@ -346,6 +360,9 @@ impl Tool for TaskTool {
             "list_recurring" => self.handle_list_recurring().await,
             "delete_recurring" => self.handle_delete_recurring(&p).await,
             "plan_day" => self.handle_plan_day(&p).await,
+            "decompose" => self.handle_decompose(&p).await,
+            "execute" => self.handle_execute(&p).await,
+            "cancel_execution" => self.handle_cancel_execution(&p).await,
             _ => Err(ToolError::InvalidParams(format!("Unknown action: {action}")).into()),
         }
     }

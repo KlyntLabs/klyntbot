@@ -393,8 +393,7 @@ mod tests {
             .any(|w| matches!(w.kind, ValidationWarningKind::CircularDependency)));
         // Verify the circular dep was actually removed from the tree
         assert!(
-            tree.subtasks[0].dependencies.is_empty()
-                || tree.subtasks[1].dependencies.is_empty()
+            tree.subtasks[0].dependencies.is_empty() || tree.subtasks[1].dependencies.is_empty()
         );
     }
 

@@ -16,12 +16,12 @@ pub mod context_sources;
 pub mod conversation_recall_handler;
 pub mod cron_handler_adapter;
 pub mod enrichment;
-pub mod handlers;
 pub mod events;
 #[cfg(test)]
 mod events_tests;
 pub mod execution;
 pub mod finance_adapter;
+pub mod handlers;
 pub mod intent_pipeline;
 pub mod learning;
 pub mod learning_handler;

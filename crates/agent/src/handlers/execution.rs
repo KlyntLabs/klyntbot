@@ -36,10 +36,7 @@ impl LlmTaskExecutionHandler {
         Self { repo, domain_bus }
     }
 
-    async fn fetch_execution(
-        &self,
-        execution_id: &str,
-    ) -> Result<storage::TaskExecutionRow> {
+    async fn fetch_execution(&self, execution_id: &str) -> Result<storage::TaskExecutionRow> {
         self.repo
             .get_execution(execution_id)
             .await?
@@ -89,9 +86,7 @@ impl TaskExecutionHandler for LlmTaskExecutionHandler {
                 task_id: Some(task.id.clone()),
                 suggestion_type: "Execute".to_string(),
                 title: format!("Approve execution of: {}", task.title),
-                description: Some(
-                    "This task requires approval before agent execution.".into(),
-                ),
+                description: Some("This task requires approval before agent execution.".into()),
                 confidence: 1.0,
                 action_payload: Some(serde_json::to_string(config).unwrap_or_else(|e| {
                     warn!("Failed to serialize ExecutionConfig: {e}");

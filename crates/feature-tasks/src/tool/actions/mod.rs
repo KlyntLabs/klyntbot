@@ -1,6 +1,8 @@
 pub mod batch;
 pub mod create;
+pub mod decompose;
 pub mod deps;
+pub mod execute;
 pub mod focus;
 pub mod mutate;
 pub mod plan;

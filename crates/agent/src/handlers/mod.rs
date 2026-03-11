@@ -2,8 +2,8 @@
 
 mod decomposition;
 mod execution;
-// mod planning;
+mod planning;
 
 pub use decomposition::LlmDecompositionHandler;
 pub use execution::LlmTaskExecutionHandler;
-// pub use planning::LlmDayPlanningHandler;
+pub use planning::LlmDayPlanningHandler;

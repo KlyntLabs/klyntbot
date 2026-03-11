@@ -289,7 +289,12 @@ impl TaskRepo {
         .bind(patch.agent_config.as_ref().and_then(|v| v.as_deref())) // ?35
         .bind(&patch.execution_state) // ?36
         .bind(patch.spawned_execution_id.is_some()) // ?37
-        .bind(patch.spawned_execution_id.as_ref().and_then(|v| v.as_deref())) // ?38
+        .bind(
+            patch
+                .spawned_execution_id
+                .as_ref()
+                .and_then(|v| v.as_deref()),
+        ) // ?38
         .bind(patch.energy_level.is_some()) // ?39
         .bind(patch.energy_level.as_ref().and_then(|v| v.as_deref())) // ?40
         .bind(patch.complexity_score.is_some()) // ?41
@@ -1195,12 +1200,11 @@ impl TaskRepo {
 
     /// Get a single execution by ID.
     pub async fn get_execution(&self, id: &str) -> Result<Option<TaskExecutionRow>, StorageError> {
-        let row = sqlx::query_as::<_, TaskExecutionRow>(
-            "SELECT * FROM task_executions WHERE id = ?1",
-        )
-        .bind(id)
-        .fetch_optional(&self.pool)
-        .await?;
+        let row =
+            sqlx::query_as::<_, TaskExecutionRow>("SELECT * FROM task_executions WHERE id = ?1")
+                .bind(id)
+                .fetch_optional(&self.pool)
+                .await?;
         Ok(row)
     }
 

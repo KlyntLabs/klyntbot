@@ -573,6 +573,7 @@ impl AgentLoopBuilder {
         if self.pool.is_some() {
             let pool_ref = storage_pool.inner();
             let task_repo = storage::TaskRepo::new(pool_ref.clone());
+            let task_repo_for_handlers = task_repo.clone();
             let mut task_tool = feature_tasks::TaskTool::new(
                 task_repo,
                 config.todo.focus.max_slots,
@@ -643,6 +644,33 @@ impl AgentLoopBuilder {
             if let Some(ref domain_bus) = self.domain_event_bus {
                 task_tool = task_tool.with_domain_bus(Arc::clone(domain_bus));
             }
+
+            // ── Phase 2: Agentic Intelligence handlers ────────────────────
+            let decomp_handler = Arc::new(crate::handlers::LlmDecompositionHandler::new(
+                provider.clone(),
+                config.agents.defaults.model.clone(),
+                task_repo_for_handlers.clone(),
+                self.domain_event_bus.clone(),
+            ));
+            task_tool = task_tool.with_decomposition_handler(
+                decomp_handler as Arc<dyn feature_tasks::DecompositionHandler>,
+            );
+
+            let exec_handler = Arc::new(crate::handlers::LlmTaskExecutionHandler::new(
+                task_repo_for_handlers,
+                self.domain_event_bus.clone(),
+            ));
+            task_tool = task_tool.with_execution_handler(
+                exec_handler as Arc<dyn feature_tasks::TaskExecutionHandler>,
+            );
+
+            let plan_handler = Arc::new(crate::handlers::LlmDayPlanningHandler::new(
+                provider.clone(),
+                config.agents.defaults.model.clone(),
+                self.domain_event_bus.clone(),
+            ));
+            task_tool = task_tool
+                .with_planning_handler(plan_handler as Arc<dyn feature_tasks::DayPlanningHandler>);
 
             tool_registry.register(task_tool);
 
