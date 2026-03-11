@@ -63,6 +63,14 @@ pub struct Task {
     pub subtask_count: i64,
     #[serde(default)]
     pub subtask_completed_count: i64,
+    #[serde(default)]
+    pub attachments: Vec<Attachment>,
+    #[serde(default)]
+    pub time_entries: Vec<TimeEntry>,
+    #[serde(default)]
+    pub blocked_by: Vec<String>,
+    #[serde(default)]
+    pub blocks: Vec<String>,
 }
 
 impl Task {
@@ -117,6 +125,10 @@ impl Task {
             completed: false,
             subtask_count: 0,
             subtask_completed_count: 0,
+            attachments: Vec::new(),
+            time_entries: Vec::new(),
+            blocked_by: Vec::new(),
+            blocks: Vec::new(),
         }
     }
 }
@@ -187,6 +199,10 @@ impl From<TaskRow> for Task {
             completed: row.completed,
             subtask_count: 0,
             subtask_completed_count: 0,
+            attachments: Vec::new(),
+            time_entries: Vec::new(),
+            blocked_by: Vec::new(),
+            blocks: Vec::new(),
         }
     }
 }
