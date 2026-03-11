@@ -41,7 +41,12 @@ export const ALL_COLUMNS: ColumnDef[] = [
 const STORAGE_KEY = "klyntbot:tasks:visibleColumns";
 const DEFAULT_VISIBLE: ColumnId[] = ["project", "priority", "status", "dueDate", "tags"];
 
-function getStored(): ColumnId[] {
+// Module-level listener set so useSyncExternalStore can notify on same-tab writes.
+const listeners = new Set<() => void>();
+
+let snapshot: ColumnId[] = readFromStorage();
+
+function readFromStorage(): ColumnId[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_VISIBLE;
@@ -51,30 +56,34 @@ function getStored(): ColumnId[] {
   }
 }
 
-function setStored(cols: ColumnId[]) {
+function write(cols: ColumnId[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(cols));
-  window.dispatchEvent(new StorageEvent("storage", { key: STORAGE_KEY }));
+  snapshot = cols;
+  for (const cb of listeners) cb();
 }
 
 function subscribe(cb: () => void) {
-  const handler = (e: StorageEvent) => {
-    if (e.key === STORAGE_KEY) cb();
+  listeners.add(cb);
+  return () => {
+    listeners.delete(cb);
   };
-  window.addEventListener("storage", handler);
-  return () => window.removeEventListener("storage", handler);
+}
+
+function getSnapshot() {
+  return snapshot;
 }
 
 export function useColumnVisibility() {
-  const stored = useSyncExternalStore(subscribe, getStored, () => DEFAULT_VISIBLE);
+  const stored = useSyncExternalStore(subscribe, getSnapshot, () => DEFAULT_VISIBLE);
   const visibleSet = useMemo(() => new Set(stored), [stored]);
 
   const toggleColumn = useCallback((id: ColumnId) => {
-    const current = getStored();
+    const current = getSnapshot();
     const next = current.includes(id) ? current.filter((c) => c !== id) : [...current, id];
-    setStored(next);
+    write(next);
   }, []);
 
-  const resetToDefaults = useCallback(() => setStored(DEFAULT_VISIBLE), []);
+  const resetToDefaults = useCallback(() => write(DEFAULT_VISIBLE), []);
   const isVisible = useCallback((id: ColumnId) => visibleSet.has(id), [visibleSet]);
 
   return { visibleColumns: visibleSet, toggleColumn, resetToDefaults, isVisible };
