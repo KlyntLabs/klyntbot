@@ -50,6 +50,11 @@ impl TasksFeature {
     pub fn migration_sql() -> &'static str {
         include_str!("../migrations/001_create_tasks.sql")
     }
+
+    /// Migration SQL for this feature (version 2: data migration from legacy todo).
+    pub fn migration_sql_v2() -> &'static str {
+        include_str!("../migrations/002_migrate_from_legacy_todo.sql")
+    }
 }
 
 impl Default for TasksFeature {
@@ -69,12 +74,20 @@ impl FeaturePackage for TasksFeature {
     }
 
     fn migrations(&self) -> Vec<FeatureMigration> {
-        vec![FeatureMigration {
-            feature_name: "tasks".to_string(),
-            version: 1,
-            description: "Create agentic task tables".to_string(),
-            sql: Self::migration_sql().to_string(),
-        }]
+        vec![
+            FeatureMigration {
+                feature_name: "tasks".to_string(),
+                version: 1,
+                description: "Create agentic task tables".to_string(),
+                sql: Self::migration_sql().to_string(),
+            },
+            FeatureMigration {
+                feature_name: "tasks".to_string(),
+                version: 2,
+                description: "Migrate data from legacy todo system".to_string(),
+                sql: Self::migration_sql_v2().to_string(),
+            },
+        ]
     }
 
     fn config_key(&self) -> &str {
@@ -124,9 +137,11 @@ mod tests {
     fn test_feature_package_migrations() {
         let feature = TasksFeature::new();
         let migrations = feature.migrations();
-        assert_eq!(migrations.len(), 1);
+        assert_eq!(migrations.len(), 2);
         assert_eq!(migrations[0].feature_name, "tasks");
         assert_eq!(migrations[0].version, 1);
+        assert_eq!(migrations[1].feature_name, "tasks");
+        assert_eq!(migrations[1].version, 2);
     }
 
     #[test]
