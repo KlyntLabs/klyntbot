@@ -25,6 +25,7 @@ cd desktop-ui && bun install            # Install deps (always bun, never npm)
 cd desktop-ui && bun run dev            # Vite dev server (port 1420)
 cd desktop-ui && bun run build          # Production build
 cd desktop-ui && bun run lint:fix       # Biome 2.0 auto-fix (lint + format + imports)
+cd desktop-ui && bun run test           # Vitest (run once)
 ```
 
 **Tailwind v4 + CSS tokens:** All theming in `src/styles/theme.css` via CSS variables + `@theme inline`. No `tailwind.config.js`. Never hardcode hex/rgba — use token utilities (`bg-surface-base`, `text-muted`, `border-border`). For new visual patterns, add a CSS variable to `:root` first, register in `@theme inline`, then use via Tailwind.
@@ -39,20 +40,20 @@ cd desktop-ui && bun run lint:fix       # Biome 2.0 auto-fix (lint + format + im
 cargo tauri dev                    # Full desktop app (auto-starts Vite + dev HTTP server on :3456)
 ```
 
-Browser-only dev: run `cargo run -p dev-api` + `cd desktop-ui && bun run dev` in two terminals, open `localhost:1420`. In debug builds, `cargo tauri dev` also starts an embedded HTTP server on `:3456`. Business logic lives in the `app-core` crate; `desktop` is a thin Tauri adapter. Tauri config: `crates/desktop/tauri.conf.json`. Shared IPC types: `desktop-shared` crate.
+Browser-only dev: run `cargo tauri dev` (starts Vite + embedded HTTP server on `:3456`) then open `localhost:1420`. The dev HTTP server lives in `crates/desktop/src/dev_server.rs` — no separate `dev-api` crate. Business logic lives in the `app-core` crate; `desktop` is a thin Tauri adapter. Tauri config: `crates/desktop/tauri.conf.json`. Shared IPC types: `desktop-shared` crate.
 
 ## Architecture
 
 Rust personal AI agent — single binary connecting 6+ chat platforms to LLMs with task/project management and persistent memory. All state in SQLite + LanceDB.
 
-### Workspace (26 crates, 9 layers)
+### Workspace (27 crates, 9 layers)
 
 ```
 L0: common                — KlyntbotError, MessageRole, ChannelName, ChatId, SessionKey
 L1: config, bus, tools-core, tools-core-macros — Config (camelCase JSON), message bus, Tool/FeaturePackage traits, derive macros
 L2: storage, domain       — SqlitePool, migrations, *Repo structs, OKR+PARA domain types
 L3: providers, session, scheduling, context_engine — LLM clients, session persistence, cron, token budgets
-L4: tools, feature-todo, feature-finance, feature-notes, feature-productivity, feature-coaching, plugin-runtime — 20+ tools, feature packages, WASM plugins
+L4: tools, feature-tasks, feature-todo, feature-finance, feature-notes, feature-productivity, feature-coaching, activity-log, plugin-runtime — 20+ tools, feature packages, WASM plugins
 L5: channels, agent, cognitive — Platform integrations (Telegram/Discord/Slack/Email), agent runtime, cognitive memory system
 L6: mcp                   — MCP server/client
 L7: app-core, desktop-shared, desktop — Application core (shared handlers), Tauri desktop app
@@ -102,5 +103,5 @@ Five built-in agents in `agents/`: general, task, finance, automation, communica
 - **Dependency inversion** — new tools needing agent context must inject via `Arc<dyn Trait>` to avoid circular deps.
 - **`email` feature** (on by default) gates IMAP/SMTP deps in `channels` crate.
 - **`tauri.conf.json` uses `npm` in `beforeDevCommand`** but project requires `bun`. `cargo tauri dev` may fail with ENOENT. Workaround: start Vite manually (`cd desktop-ui && bun run dev`) then run `cargo tauri dev`, or use browser-only dev mode.
-- **Timestamps are UTC** — Rust emits `chrono::Utc::now().to_rfc3339()`. Never `.slice()` ISO strings for display — always parse via `new Date(iso)` and use `toLocaleTimeString()`. Shared helper: `formatTime()` in `desktop-ui/src/lib/dates.ts`.
+- **Timestamps are UTC** — Rust emits `chrono::Utc::now().to_rfc3339()`. Never `.slice()` ISO strings for display — always parse via `new Date(iso)` and use `toLocaleTimeString()`. Shared helper: `formatTime()` in `desktop-ui/src/shared/lib/dates.ts`.
 - **Legacy `feature-todo` → `feature-tasks` migration pending** — Pre-release, no user data to migrate. Before first release, write `002_migrate_from_legacy_todo.sql` to copy `actions` → `tasks`, `action_attachments` → `task_attachments`, `action_time_entries` → `task_time_entries`, `action_dependencies` → `task_dependencies`. Register as `FeatureMigration` version 2 in `TasksFeature::migrations()`. Use `INSERT OR IGNORE` for idempotency. After migration is confirmed working, `feature-todo` crate can be removed.
