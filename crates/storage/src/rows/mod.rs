@@ -15,6 +15,7 @@ pub mod project_source;
 pub mod session;
 pub mod session_context;
 pub mod status;
+pub mod task;
 pub mod task_group;
 pub mod usage;
 
