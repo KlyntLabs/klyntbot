@@ -249,7 +249,12 @@ impl AppCore {
                     .map_err(map_storage_err)?;
                 parent.area_id
             }
-            (None, None) => "default".to_string(),
+            (None, None) => {
+                return Err(ApiError {
+                    code: "VALIDATION".to_string(),
+                    message: "area_id is required when creating a top-level task".to_string(),
+                });
+            }
         };
 
         // Auto-assign status_label_id if not provided

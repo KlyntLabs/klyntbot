@@ -94,6 +94,19 @@ impl AppCore {
         .map_err(|e| format!("notes migration failed: {e}"))?;
         let note_repo = NoteRepo::new(notes_pool);
 
+        // Run tasks feature migrations.
+        StoragePool::run_feature_migrations(
+            storage_pool.inner(),
+            &[tools_core::FeatureMigration {
+                feature_name: "tasks".to_string(),
+                version: 1,
+                description: "Create agentic task tables".to_string(),
+                sql: feature_tasks::TasksFeature::migration_sql().to_string(),
+            }],
+        )
+        .await
+        .map_err(|e| format!("tasks migration failed: {e}"))?;
+
         // 3. Create LLM provider (graceful — falls back to noop for setup wizard)
         let (provider, resolved_model) = match providers::create_provider(&config) {
             Ok((p, m)) => {

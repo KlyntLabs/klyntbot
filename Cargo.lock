@@ -187,6 +187,7 @@ dependencies = [
  "feature-coaching",
  "feature-notes",
  "feature-productivity",
+ "feature-tasks",
  "futures-util",
  "notify",
  "notify-debouncer-mini",

@@ -127,10 +127,17 @@ export function TasksPage() {
 
   const handleAddTask = useCallback(async () => {
     if (!newTaskTitle.trim()) return;
-    await createTask.mutate({ title: newTaskTitle.trim() });
+    // Resolve area from active tab, or fall back to the first area.
+    const area =
+      activeTab !== "All"
+        ? areas.find((a) => a.name === activeTab)
+        : areas[0];
+    if (!area) return;
+    await createTask.mutate({ title: newTaskTitle.trim(), areaId: area.id });
     setNewTaskTitle("");
     setAddingTask(false);
-  }, [newTaskTitle, createTask]);
+    refetchTasks();
+  }, [newTaskTitle, createTask, activeTab, areas, refetchTasks]);
 
   const handleCreateSubtask = useCallback(
     async (parentId: string, title: string) => {
