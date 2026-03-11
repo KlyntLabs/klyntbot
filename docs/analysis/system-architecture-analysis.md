@@ -669,8 +669,8 @@ Feature Crate ──emit──▶ DomainEventBus
 - **Sequential consolidation** — `consolidate_batch` processes facts one-by-one; could batch LLM calls
 - **No per-user FSRS calibration** — FSRS parameters are configurable globally but not automatically tuned per-user based on retrieval outcomes
 - **Text-only embeddings** — no support for image/audio memory
-- **Conversation recall is separate from cognitive facts** — two parallel vector search paths that don't share a unified relevance model
-- **Legacy L2 learning tables** (`user_profile`, `behavioral_patterns`, `agent_adaptations`) coexist with the L5 cognitive system — potential confusion about which system is authoritative
+- **Conversation recall is separate from cognitive facts** — two parallel vector search paths that don't share a unified relevance model *(design spec written, implementation planned — see `docs/superpowers/specs/2026-03-11-unified-memory-retrieval-design.md`)*
+- **Legacy L2 learning tables coexist with L5 cognitive system** — `user_profile` and `agent_adaptations` are zombie tables (never written in production, only read for transparency events). `behavioral_patterns` is actively computed by `PatternAnalyzer` but overlaps with L5 procedural rules. `interaction_log` is actively used and has no L5 equivalent. Dual authority creates confusion about source of truth for user understanding.
 
 **Architecture:**
 - **Single-binary monolith** — while well-layered, all 26 crates compile into one binary. No microservice boundaries for independent scaling.
@@ -787,14 +787,16 @@ The system excels at memory architecture and personalization (where it arguably 
 - Add OpenTelemetry integration with spans for: agent routing, context assembly, LLM calls, memory retrieval, consolidation
 - Build a desktop dashboard showing: memory growth, fact domains, retrieval hit rates, cost per interaction
 
-#### 3. Unify Memory Retrieval Paths
+#### 3. Unify Memory Retrieval Paths *(In Progress — Design Complete)*
 
 **Problem:** Conversation recall (`conv_embeddings`) and cognitive facts (`cognitive_fact_embeddings`) use separate search paths with different scoring models.
 
 **Solution:**
-- Create a unified `MemoryRetriever` that merges results from both paths
-- Apply a single composite relevance score across all memory types
-- Deduplicate overlapping information between conversation recall and extracted facts
+- Create `UnifiedMemoryService` that fetches from both sources concurrently, normalizes scores via min-max, merges via RRF (k=60), and deduplicates (facts win over overlapping recalls)
+- Enrich `MemoryRetriever` trait with `MemorySource` enum for grouped prompt formatting (facts section + recalls section)
+- Strip `CognitiveContextSource` to static identity context only; dynamic retrieval moves to `UnifiedMemoryService`
+
+**Status:** Design spec at `docs/superpowers/specs/2026-03-11-unified-memory-retrieval-design.md`, implementation plan at `docs/superpowers/plans/2026-03-11-unified-memory-retrieval.md`. Infrastructure exists (`MemoryRetriever` trait, `CognitiveMemoryRetriever`), but paths are not yet unified. ~40% complete.
 
 ### 9.2 Medium Priority
 
@@ -818,12 +820,32 @@ The system excels at memory architecture and personalization (where it arguably 
 
 #### 6. Clean Up Legacy Learning System
 
-**Problem:** L2 `user_profile`, `behavioral_patterns`, `agent_adaptations` tables overlap with L5 cognitive system.
+**Problem:** L2 learning tables coexist with L5 cognitive system, creating dual authority for user understanding. Investigation reveals a nuanced picture:
 
-**Solution:**
-- Migrate existing data from L2 tables into cognitive semantic facts
-- Deprecate and eventually remove the L2 learning system
-- Ensure a single source of truth for user understanding
+| L2 Component | Status | Overlap with L5 |
+|---|---|---|
+| `interaction_log` | **Active** — written every message by `InteractionRecorder`, read by `PatternAnalyzer` | **None** — only raw interaction audit trail in the system |
+| `behavioral_patterns` | **Active** — computed every ~60s by `PatternAnalyzer` (day-of-week, time-of-day, agent usage) | **High** — overlaps with L5 procedural rules from weekly reflection |
+| `user_profile` | **Zombie** — never written in production, read-only for transparency events | **Full** — completely superseded by L5 semantic facts |
+| `agent_adaptations` | **Zombie** — never written in production, read-only for transparency events | **Partial** — per-agent preference concept is unique (L5 facts are global) |
+
+**Solution (phased):**
+
+**Phase 1 — Remove zombie tables:**
+- Delete `user_profile` table, repo, and transparency reads — it's dead code with no production writes
+- Delete `agent_adaptations` table and repo — also dead code. If per-agent preferences are needed later, implement as agent-scoped semantic facts in L5
+
+**Phase 2 — Migrate `behavioral_patterns` to L5:**
+- Route `PatternAnalyzer` output into the cognitive consolidation pipeline instead of `behavioral_patterns` table
+- Temporal patterns (day-of-week, time-of-day productivity) become procedural rules via the reflection cycle
+- Remove `behavioral_patterns` table after migration
+
+**Phase 3 — Keep `interaction_log` (no L5 equivalent):**
+- `interaction_log` stays — it's the raw audit trail for `(timestamp, agent, tools, channel, latency)`
+- L5 has no equivalent raw interaction logging; episodic memories are higher-level summaries
+- Consider adding a retention policy (e.g., 90-day compaction) to match L5 compaction patterns
+
+**Files involved:** `storage/migrations/003_learning_system.sql`, `storage/src/repos/{user_profile,behavioral_pattern,agent_adaptation,interaction_log}.rs`, `agent/src/learning/{interaction_recorder,pattern_analyzer,service}.rs`, `agent/src/agent_runtime/runtime.rs:505-587` (transparency events)
 
 #### 7. Add Per-User FSRS Calibration
 
