@@ -90,6 +90,10 @@ Five built-in agents in `agents/`: general, task, finance, automation, communica
 - Commits: Conventional format — `feat(scope): description`, `fix(scope): description`.
 - Zero clippy warnings policy. `desktop` crate has pre-existing exceptions.
 
+## Non-goals
+
+- **Structured observability (OpenTelemetry, Prometheus, metrics dashboards)** — this is a single-user local app. Existing `tracing` logs and `PipelineEvent` SSE stream are sufficient. Don't add observability infrastructure.
+
 ## Gotchas
 
 - **`StoragePool::from_existing()` skips migrations** — only for already-migrated pools. Tests must use `connect_in_memory()`.
@@ -99,3 +103,4 @@ Five built-in agents in `agents/`: general, task, finance, automation, communica
 - **`email` feature** (on by default) gates IMAP/SMTP deps in `channels` crate.
 - **`tauri.conf.json` uses `npm` in `beforeDevCommand`** but project requires `bun`. `cargo tauri dev` may fail with ENOENT. Workaround: start Vite manually (`cd desktop-ui && bun run dev`) then run `cargo tauri dev`, or use browser-only dev mode.
 - **Timestamps are UTC** — Rust emits `chrono::Utc::now().to_rfc3339()`. Never `.slice()` ISO strings for display — always parse via `new Date(iso)` and use `toLocaleTimeString()`. Shared helper: `formatTime()` in `desktop-ui/src/lib/dates.ts`.
+- **Legacy `feature-todo` → `feature-tasks` migration pending** — Pre-release, no user data to migrate. Before first release, write `002_migrate_from_legacy_todo.sql` to copy `actions` → `tasks`, `action_attachments` → `task_attachments`, `action_time_entries` → `task_time_entries`, `action_dependencies` → `task_dependencies`. Register as `FeatureMigration` version 2 in `TasksFeature::migrations()`. Use `INSERT OR IGNORE` for idempotency. After migration is confirmed working, `feature-todo` crate can be removed.
