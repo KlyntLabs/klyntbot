@@ -10,17 +10,12 @@ impl AppCore {
     pub async fn agent_status(&self) -> Result<AgentStatusResponse, ApiError> {
         let focused = self
             .repos
-            .actions
+            .tasks
             .list_focused()
             .await
             .map_err(map_storage_err)?;
 
-        let summary = self
-            .repos
-            .actions
-            .summary()
-            .await
-            .map_err(map_storage_err)?;
+        let summary = self.repos.tasks.summary().await.map_err(map_storage_err)?;
 
         let focus_task = match focused.first() {
             Some(row) => Some(super::tasks::row_to_task(&self.repos, row).await?),

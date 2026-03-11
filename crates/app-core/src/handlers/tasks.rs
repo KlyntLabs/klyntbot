@@ -5,7 +5,7 @@ use desktop_shared::commands::{
 };
 use desktop_shared::errors::ApiError;
 use desktop_shared::types::EntityKind;
-use storage::{ActionFilter, ActionPatch, ActionRow, KeyResultRow, ObjectiveRow, ProjectFilter};
+use storage::{KeyResultRow, ObjectiveRow, ProjectFilter, TaskFilter, TaskPatch, TaskRow};
 use tracing::warn;
 
 use crate::errors::{map_storage_err, parse_date};
@@ -17,22 +17,22 @@ pub fn priority_label(p: Option<i16>) -> Option<String> {
     p.map(|v| format!("P{v}"))
 }
 
-pub fn action_to_task(
-    row: &ActionRow,
+pub fn row_to_task_response(
+    row: &TaskRow,
     subtask_count: u32,
     subtask_completed_count: u32,
 ) -> TaskResponse {
     TaskResponse {
         id: row.id.clone(),
         title: row.title.clone(),
-        completed: row.status == "done",
+        completed: row.completed,
         priority: priority_label(row.priority),
         status: row.status.clone(),
         due_date: row.due_date.map(|d| d.format("%Y-%m-%d").to_string()),
         tags: row.tags.clone(),
         project_id: row.project_id.clone(),
         area_id: row.area_id.clone(),
-        objective_id: row.key_result_id.clone(),
+        objective_id: row.objective_id.clone(),
         description: row.description.clone(),
         parent_id: row.parent_id.clone(),
         subtask_count,
@@ -40,11 +40,20 @@ pub fn action_to_task(
         status_label_id: row.status_label_id.clone(),
         status_label: None,
         group_id: row.group_id.clone(),
+        task_type: Some(row.task_type.clone()),
+        execution_state: Some(row.execution_state.clone()),
+        energy_level: row.energy_level.clone(),
+        acceptance_criteria: row.acceptance_criteria.clone(),
+        estimated_minutes: row.estimated_minutes,
+        actual_minutes: row.actual_minutes,
+        complexity_score: row.complexity_score,
+        total_tracked_secs: Some(row.total_tracked_secs),
+        focused_at: row.focused_at.map(|dt| dt.to_rfc3339()),
     }
 }
 
-pub fn action_to_today_task(row: &ActionRow, now: DateTime<Utc>) -> TodayTaskResponse {
-    let is_overdue = row.due_date.is_some_and(|d| d < now) && row.status != "done";
+pub fn action_to_today_task(row: &TaskRow, now: DateTime<Utc>) -> TodayTaskResponse {
+    let is_overdue = row.due_date.is_some_and(|d| d < now) && !row.completed;
     let is_due_today = !is_overdue
         && row
             .due_date
@@ -73,7 +82,7 @@ pub fn action_to_today_task(row: &ActionRow, now: DateTime<Utc>) -> TodayTaskRes
         title: row.title.clone(),
         priority: priority_label(row.priority),
         status: row.status.clone(),
-        completed: row.status == "done",
+        completed: row.completed,
         is_overdue,
         is_due_today,
         due_display,
@@ -107,14 +116,14 @@ pub fn kr_to_response(row: &KeyResultRow) -> KeyResultResponse {
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 
-/// Convert a list of ActionRows to TaskResponses, bulk-fetching subtask counts and status labels.
+/// Convert a list of TaskRows to TaskResponses, bulk-fetching subtask counts and status labels.
 pub async fn rows_to_tasks(
     repos: &storage::Repos,
-    rows: &[ActionRow],
+    rows: &[TaskRow],
 ) -> Result<Vec<TaskResponse>, ApiError> {
     let ids: Vec<String> = rows.iter().map(|r| r.id.clone()).collect();
     let counts = repos
-        .actions
+        .tasks
         .count_children_bulk(&ids)
         .await
         .map_err(map_storage_err)?;
@@ -137,7 +146,7 @@ pub async fn rows_to_tasks(
     let mut tasks = Vec::with_capacity(rows.len());
     for row in rows {
         let (total, completed) = counts.get(&row.id).copied().unwrap_or((0, 0));
-        let mut task = action_to_task(row, total as u32, completed as u32);
+        let mut task = row_to_task_response(row, total as u32, completed as u32);
         task.status_label = row
             .status_label_id
             .as_deref()
@@ -155,10 +164,10 @@ pub async fn rows_to_tasks(
     Ok(tasks)
 }
 
-/// Look up the status label for an action row, if it has one.
+/// Look up the status label for a task row, if it has one.
 async fn resolve_status_label(
     repos: &storage::Repos,
-    row: &ActionRow,
+    row: &TaskRow,
 ) -> Result<Option<StatusLabelResponse>, ApiError> {
     match &row.status_label_id {
         Some(label_id) => {
@@ -181,16 +190,13 @@ async fn resolve_status_label(
 }
 
 /// Fetch subtask counts for a single row and convert to TaskResponse.
-pub async fn row_to_task(
-    repos: &storage::Repos,
-    row: &ActionRow,
-) -> Result<TaskResponse, ApiError> {
+pub async fn row_to_task(repos: &storage::Repos, row: &TaskRow) -> Result<TaskResponse, ApiError> {
     let (total, completed) = repos
-        .actions
+        .tasks
         .count_children(&row.id)
         .await
         .map_err(map_storage_err)?;
-    let mut task = action_to_task(row, total as u32, completed as u32);
+    let mut task = row_to_task_response(row, total as u32, completed as u32);
     task.status_label = resolve_status_label(repos, row).await?;
     Ok(task)
 }
@@ -199,7 +205,7 @@ pub async fn row_to_task(
 
 impl AppCore {
     pub async fn task_get(&self, id: String) -> Result<Option<TaskResponse>, ApiError> {
-        match self.repos.actions.get(&id).await.map_err(map_storage_err)? {
+        match self.repos.tasks.get(&id).await.map_err(map_storage_err)? {
             Some(row) => Ok(Some(row_to_task(&self.repos, &row).await?)),
             None => Ok(None),
         }
@@ -211,7 +217,7 @@ impl AppCore {
         project_id: Option<String>,
         status: Option<String>,
     ) -> Result<Vec<TaskResponse>, ApiError> {
-        let filter = ActionFilter {
+        let filter = TaskFilter {
             area_id,
             project_id,
             status,
@@ -220,7 +226,7 @@ impl AppCore {
         };
         let rows = self
             .repos
-            .actions
+            .tasks
             .list(&filter)
             .await
             .map_err(map_storage_err)?;
@@ -237,7 +243,7 @@ impl AppCore {
             (None, Some(pid)) => {
                 let parent = self
                     .repos
-                    .actions
+                    .tasks
                     .get_or_err(pid)
                     .await
                     .map_err(map_storage_err)?;
@@ -280,7 +286,7 @@ impl AppCore {
             }
         };
 
-        let row = ActionRow {
+        let row = TaskRow {
             id: id.clone(),
             title: params.title,
             description: None,
@@ -299,7 +305,7 @@ impl AppCore {
             updated_at: now,
             completed_at: None,
             total_tracked_secs: 0,
-            estimated_minutes: None,
+            estimated_minutes: params.estimated_minutes,
             calendar_event_uid: None,
             last_reminded_at: None,
             recurrence_rule: None,
@@ -309,14 +315,21 @@ impl AppCore {
             status_label_id,
             position: 0,
             group_id: params.group_id,
+            task_type: params.task_type.unwrap_or_else(|| "manual".to_string()),
+            acceptance_criteria: params.acceptance_criteria,
+            agent_config: None,
+            execution_state: "idle".to_string(),
+            spawned_execution_id: None,
+            context_snapshot: None,
+            energy_level: params.energy_level,
+            estimated_focus_blocks: None,
+            actual_minutes: None,
+            complexity_score: None,
+            completed: false,
+            objective_id: None,
         };
 
-        let created = self
-            .repos
-            .actions
-            .add(&row)
-            .await
-            .map_err(map_storage_err)?;
+        let created = self.repos.tasks.add(&row).await.map_err(map_storage_err)?;
 
         let updates = vec![EntityUpdate {
             kind: EntityKind::Task,
@@ -328,19 +341,19 @@ impl AppCore {
             bus.publish(bus::DomainEvent::TaskCreated {
                 task_id: id.clone(),
                 project: created.project_id.clone(),
-                estimate_mins: None,
-                task_type: "manual".to_string(),
+                estimate_mins: created.estimated_minutes.map(|m| m as i64),
+                task_type: created.task_type.clone(),
             });
         }
 
         // Newly created task has no subtasks yet; resolve status label for the response
-        let mut task = action_to_task(&created, 0, 0);
+        let mut task = row_to_task_response(&created, 0, 0);
         task.status_label = resolve_status_label(&self.repos, &created).await?;
         Ok((task, updates))
     }
 
     pub async fn task_update(&self, params: TaskUpdateParams) -> HandlerResult<TaskResponse> {
-        let patch = ActionPatch {
+        let patch = TaskPatch {
             id: params.id.clone(),
             title: params.title,
             description: params.description,
@@ -353,12 +366,17 @@ impl AppCore {
             key_result_id: params.key_result_id,
             status_label_id: params.status_label_id,
             group_id: params.group_id,
+            task_type: params.task_type,
+            acceptance_criteria: params.acceptance_criteria,
+            energy_level: params.energy_level.map(Some),
+            execution_state: params.execution_state,
+            estimated_minutes: params.estimated_minutes,
             ..Default::default()
         };
 
         let updated = self
             .repos
-            .actions
+            .tasks
             .update(&patch)
             .await
             .map_err(map_storage_err)?;
@@ -375,7 +393,7 @@ impl AppCore {
     pub async fn task_delete(&self, id: String) -> HandlerResult<bool> {
         let deleted = self
             .repos
-            .actions
+            .tasks
             .delete(&id)
             .await
             .map_err(map_storage_err)?;
@@ -395,32 +413,33 @@ impl AppCore {
     pub async fn task_toggle_complete(&self, id: String) -> HandlerResult<TaskResponse> {
         let row = self
             .repos
-            .actions
+            .tasks
             .get_or_err(&id)
             .await
             .map_err(map_storage_err)?;
 
-        let new_status = if row.status == "done" {
+        let new_status = if row.completed {
             "todo".to_string()
         } else {
             "done".to_string()
         };
 
-        let patch = ActionPatch {
+        let patch = TaskPatch {
             id: id.clone(),
             status: Some(new_status),
+            completed: Some(!row.completed),
             ..Default::default()
         };
 
         let updated = self
             .repos
-            .actions
+            .tasks
             .update(&patch)
             .await
             .map_err(map_storage_err)?;
 
         // Emit domain event when completing
-        if updated.status == "done" {
+        if updated.completed {
             if let Ok(bus) = self.domain_event_bus() {
                 bus.publish(bus::DomainEvent::TaskCompleted {
                     task_id: id.clone(),
@@ -446,7 +465,7 @@ impl AppCore {
     ) -> Result<Vec<TaskResponse>, ApiError> {
         let rows = self
             .repos
-            .actions
+            .tasks
             .get_children(&parent_id)
             .await
             .map_err(map_storage_err)?;
@@ -460,27 +479,27 @@ impl AppCore {
         let start_of_tomorrow = start_of_today + chrono::Duration::days(1);
 
         // Run all three queries concurrently — SqlitePool is safe for parallel reads
-        let doing_filter = ActionFilter {
+        let doing_filter = TaskFilter {
             status: Some("doing".to_string()),
             ..Default::default()
         };
-        let due_today_filter = ActionFilter {
+        let due_today_filter = TaskFilter {
             due_after: Some(start_of_today),
             due_before: Some(start_of_tomorrow),
             ..Default::default()
         };
         let (doing, due_today, overdue) = tokio::try_join!(
-            self.repos.actions.list(&doing_filter),
-            self.repos.actions.list(&due_today_filter),
-            self.repos.actions.overdue(),
+            self.repos.tasks.list(&doing_filter),
+            self.repos.tasks.list(&due_today_filter),
+            self.repos.tasks.overdue(),
         )
         .map_err(map_storage_err)?;
 
         // Merge + deduplicate by ID
         let mut seen = std::collections::HashSet::new();
-        let mut all_rows: Vec<ActionRow> = Vec::new();
+        let mut all_rows: Vec<TaskRow> = Vec::new();
         for row in overdue.into_iter().chain(doing).chain(due_today) {
-            if row.status != "done" && row.status != "archived" && seen.insert(row.id.clone()) {
+            if !row.completed && row.status != "archived" && seen.insert(row.id.clone()) {
                 all_rows.push(row);
             }
         }
