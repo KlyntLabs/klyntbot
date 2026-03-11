@@ -787,20 +787,9 @@ The system excels at memory architecture and personalization (where it arguably 
 - Add OpenTelemetry integration with spans for: agent routing, context assembly, LLM calls, memory retrieval, consolidation
 - Build a desktop dashboard showing: memory growth, fact domains, retrieval hit rates, cost per interaction
 
-#### 3. Unify Memory Retrieval Paths *(In Progress — Design Complete)*
-
-**Problem:** Conversation recall (`conv_embeddings`) and cognitive facts (`cognitive_fact_embeddings`) use separate search paths with different scoring models.
-
-**Solution:**
-- Create `UnifiedMemoryService` that fetches from both sources concurrently, normalizes scores via min-max, merges via RRF (k=60), and deduplicates (facts win over overlapping recalls)
-- Enrich `MemoryRetriever` trait with `MemorySource` enum for grouped prompt formatting (facts section + recalls section)
-- Strip `CognitiveContextSource` to static identity context only; dynamic retrieval moves to `UnifiedMemoryService`
-
-**Status:** Design spec at `docs/superpowers/specs/2026-03-11-unified-memory-retrieval-design.md`, implementation plan at `docs/superpowers/plans/2026-03-11-unified-memory-retrieval.md`. Infrastructure exists (`MemoryRetriever` trait, `CognitiveMemoryRetriever`), but paths are not yet unified. ~40% complete.
-
 ### 9.2 Medium Priority
 
-#### 4. Batch LLM Operations
+#### 3. Batch LLM Operations
 
 **Problem:** `consolidate_batch` makes individual LLM calls per fact. Extraction and consolidation are sequential.
 
@@ -809,7 +798,7 @@ The system excels at memory architecture and personalization (where it arguably 
 - Pipeline extraction → consolidation to overlap API latency
 - Consider local models (Ollama) for extraction to reduce API costs
 
-#### 5. Add Dead-Letter Queue for Failed Memory Operations
+#### 4. Add Dead-Letter Queue for Failed Memory Operations
 
 **Problem:** If LLM extraction or consolidation fails, the observation is lost.
 
@@ -818,7 +807,7 @@ The system excels at memory architecture and personalization (where it arguably 
 - Add a retry mechanism with exponential backoff
 - Dashboard alert for persistent failures
 
-#### 6. Add Per-User FSRS Calibration
+#### 5. Add Per-User FSRS Calibration
 
 **Problem:** FSRS parameters (`maxStability`, relevance weights) are configurable via `CognitiveConfig` but not automatically tuned per-user.
 
@@ -829,19 +818,19 @@ The system excels at memory architecture and personalization (where it arguably 
 
 ### 9.3 Lower Priority / Future Vision
 
-#### 7. Multi-Model Memory Pipeline
+#### 6. Multi-Model Memory Pipeline
 
 Use smaller/cheaper models for extraction and consolidation, reserving expensive models for user-facing responses.
 
-#### 8. Graph-Based Fact Relations
+#### 7. Graph-Based Fact Relations
 
 Add edges between semantic facts to represent relationships (e.g., "peak_hours CAUSES higher_productivity"). This would enable reasoning chains.
 
-#### 9. Proactive Memory Verification
+#### 8. Proactive Memory Verification
 
 Periodically verify high-importance facts with the user ("I believe your peak hours are 10am-12pm — is this still accurate?"). Prevents stale facts.
 
-#### 10. Memory Export & Portability
+#### 9. Memory Export & Portability
 
 Allow users to export their complete memory state (UserModel + episodic + procedural rules) as a portable format, enabling migration between AI systems.
 
