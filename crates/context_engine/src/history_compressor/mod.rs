@@ -1,3 +1,8 @@
+mod snippet;
+mod types;
+
+pub use types::{CompressedHistory, CompressorConfig, CompressorMode, HistorySummary};
+
 use std::sync::Arc;
 
 use providers::{Message, UserContent};
@@ -5,61 +10,8 @@ use providers::{Message, UserContent};
 use crate::summary_provider::SummaryProvider;
 use crate::token_counter::{default_token_counter, TokenCounter};
 
-/// Default snippet length for extractive summaries (characters).
-const DEFAULT_SNIPPET_LENGTH: usize = 200;
-
-/// Summary of a range of compressed messages.
-pub struct HistorySummary {
-    /// The summarized content text.
-    pub content: String,
-    /// Indices (start, end) of the original messages this summary covers.
-    pub message_range: (usize, usize),
-    /// Estimated token count for this summary.
-    pub token_count: usize,
-}
-
-/// Result of compressing conversation history.
-pub struct CompressedHistory {
-    /// Summaries of older messages that were compressed.
-    pub summaries: Vec<HistorySummary>,
-    /// Recent messages kept verbatim.
-    pub recent_messages: Vec<Message>,
-    /// Estimated total token count across summaries + recent messages.
-    pub total_tokens: usize,
-}
-
-/// Configuration for the history compressor.
-#[derive(Debug, Clone)]
-pub struct CompressorConfig {
-    /// Maximum snippet length in characters for extractive summaries.
-    pub snippet_length: usize,
-    /// Compression mode.
-    pub mode: CompressorMode,
-    /// Number of messages per summary chunk when compressing older history.
-    pub chunk_size: usize,
-    /// Minimum number of recent messages to always keep verbatim.
-    pub min_recent_messages: usize,
-}
-
-impl Default for CompressorConfig {
-    fn default() -> Self {
-        Self {
-            snippet_length: DEFAULT_SNIPPET_LENGTH,
-            mode: CompressorMode::Extractive,
-            chunk_size: 5,
-            min_recent_messages: 4,
-        }
-    }
-}
-
-/// Compression mode for history summarization.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CompressorMode {
-    /// Extractive: takes a snippet from each message (no LLM call).
-    Extractive,
-    /// Abstractive: future mode, currently falls back to Extractive.
-    Abstractive,
-}
+use snippet::first_snippet;
+use types::DEFAULT_SNIPPET_LENGTH;
 
 /// Compresses conversation history to fit within a token budget.
 ///
@@ -299,15 +251,15 @@ impl HistoryCompressor {
                         UserContent::Text(t) => t.clone(),
                         UserContent::MultiPart(_) => "[multipart message]".to_string(),
                     };
-                    let snippet = first_snippet(&text, snippet_length);
-                    lines.push(format!("- User: {}", snippet));
+                    let snip = first_snippet(&text, snippet_length);
+                    lines.push(format!("- User: {}", snip));
                 }
                 Message::Assistant {
                     content: Some(text),
                     ..
                 } => {
-                    let snippet = first_snippet(text, snippet_length);
-                    lines.push(format!("- Assistant: {}", snippet));
+                    let snip = first_snippet(text, snippet_length);
+                    lines.push(format!("- Assistant: {}", snip));
                 }
                 _ => {}
             }
@@ -332,67 +284,6 @@ impl HistoryCompressor {
             Message::Tool { content, .. } => self.token_counter.estimate_text(content) + 10,
         }
     }
-}
-
-/// Extract the first sentence or up to `max_chars` characters,
-/// preferring to cut at the last complete sentence boundary within the limit.
-///
-/// Strategy:
-/// 1. If the text fits within `max_chars`, return it as-is.
-/// 2. Look for sentence-ending punctuation (`. `, `! `, `? `, or newline) within the limit.
-///    Prefer the *last* such boundary to capture as much content as possible.
-/// 3. If no sentence boundary is found, fall back to the last word boundary (space).
-/// 4. If no word boundary either, hard-cut at `max_chars`.
-fn first_snippet(text: &str, max_chars: usize) -> String {
-    let trimmed = text.trim();
-    if trimmed.len() <= max_chars {
-        return trimmed.to_string();
-    }
-
-    let window = &trimmed[..max_chars];
-
-    // Look for sentence-ending punctuation followed by a space or end-of-window,
-    // to avoid cutting mid-abbreviation (e.g., "Dr.Smith").
-    let sentence_end = window
-        .rmatch_indices(['.', '!', '?'])
-        .find(|&(pos, _)| {
-            // Accept if it's the last char in window, or followed by whitespace
-            pos + 1 >= window.len()
-                || window
-                    .as_bytes()
-                    .get(pos + 1)
-                    .is_some_and(|b| b.is_ascii_whitespace())
-        })
-        .map(|(pos, _)| pos + 1); // include the punctuation
-
-    // Also check for newline boundaries
-    let newline_end = window.rfind('\n');
-
-    // Pick the best sentence boundary (whichever is later/longer)
-    let best_sentence = match (sentence_end, newline_end) {
-        (Some(a), Some(b)) => Some(a.max(b)),
-        (Some(a), None) => Some(a),
-        (None, Some(b)) => Some(b),
-        (None, None) => None,
-    };
-
-    // Require a minimum cut position to avoid degenerate snippets (e.g., "I.")
-    let min_cut = max_chars / 4;
-    if let Some(cut) = best_sentence {
-        if cut >= min_cut {
-            return format!("{}…", trimmed[..cut].trim_end());
-        }
-    }
-
-    // Fall back to word boundary
-    if let Some(space_pos) = window.rfind(' ') {
-        if space_pos >= min_cut {
-            return format!("{}…", &trimmed[..space_pos]);
-        }
-    }
-
-    // Hard cut
-    format!("{}…", window)
 }
 
 #[cfg(test)]
