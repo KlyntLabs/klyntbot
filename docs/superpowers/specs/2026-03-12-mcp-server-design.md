@@ -36,7 +36,7 @@ MCP Server layer (in klyntbot-server crate):
 ### Key Decisions
 
 - **`klyntbot-server`** is a new crate — both a library (for desktop embedding) and a binary (`klyntbot-mcp`). No business logic lives here; it's pure MCP wiring.
-- **`mcp` crate stays lean** — no `app-core` dependency added. The bridge lives in `klyntbot-server`. The existing `mcp` crate continues to handle the client side (connecting to external MCP servers).
+- **`mcp` crate stays lean** — no `app-core` dependency added. The bridge lives in `klyntbot-server`. The existing `mcp` crate continues to handle the client side (connecting to external MCP servers). The existing `mcp/src/server/handlers.rs` (static `MCP_EXPOSED_TOOLS` list and `validate_tool_call`) will be removed — it's dead code superseded by the runtime-configurable `exposed_tools` in config and the whitelist logic in `ToolRegistryBridge`.
 - **Two bridge paths**: `ToolRegistryBridge` for all standard tools (reuses `ToolRegistry`), `AgentBridge` for the `agent` chat tool (calls `AppCore::chat_send()` directly).
 - **Tool whitelist** in config (`mcp.server.exposedTools`) controls which internal tools are visible via MCP. Dangerous tools (filesystem, shell) excluded by default.
 
@@ -103,13 +103,16 @@ KlyntbotServerHandler::call_tool()
 
 ```rust
 fn build_mcp_routing_context(session_id: &str) -> RoutingContext {
+    // Uses RoutingContext::new() which sets all optional fields to None.
+    // Equivalent to:
     RoutingContext {
         channel: ChannelName::new("mcp"),
         chat_id: ChatId::new(session_id),
-        interaction_channel: None,  // MCP has no interactive prompts (see Elicitation)
-        entity_tx: None,            // no UI entity cards
-        is_direct_mode: true,       // always direct (no group chat)
+        interaction_tx: None,           // ask_user tool sends InteractionBundles here (None = unavailable)
+        is_direct_mode: true,           // responses go directly to event stream, not via bus
         delegation_depth: 0,
+        entity_tx: None,                // no UI entity cards in MCP mode
+        interaction_channel: None,      // platform-native UI (Telegram buttons, etc.) — N/A for MCP
     }
 }
 ```
@@ -128,15 +131,17 @@ fn build_mcp_routing_context(session_id: &str) -> RoutingContext {
 
 For headless tools (ToolRegistryBridge): not a problem — standard tools don't use `ask_user`.
 
-For agent delegation (AgentBridge): the agent CAN call `ask_user` during its ReAct loop. Solution is capability-aware hybrid:
+For agent delegation (AgentBridge): the agent CAN call `ask_user` during its ReAct loop. Each `InteractionBundle` contains a `response_tx: oneshot::Sender<FormResponse>` that must be consumed — if dropped without sending, the agent loop blocks forever.
+
+Solution is capability-aware hybrid:
 
 ```
 Client connects → ClientCapabilities.elicitation?
-  ├─ yes → interaction_rx fires → elicitation/create → relay response back to agent
-  └─ no  → interaction_rx fires → auto-respond "User interaction not available via MCP"
+  ├─ yes → interaction_rx fires → elicitation/create → relay FormResponse back via response_tx
+  └─ no  → interaction_rx fires → send FormResponse::Cancelled on response_tx (auto-decline)
 ```
 
-The agent already handles `ask_user` failures gracefully — it continues with best-effort reasoning. When clients add elicitation support, it automatically upgrades with no code changes.
+The auto-decline MUST send `FormResponse::Cancelled` on `response_tx`, not just drop it. This unblocks the agent's `ask_user` tool, which handles cancellation gracefully and continues with best-effort reasoning. When clients add elicitation support, it automatically upgrades with no code changes.
 
 ## Agent Delegation Bridge
 
@@ -167,17 +172,40 @@ AgentBridge::execute()
   │
   ├─ Handle interaction_rx (capability-aware):
   │   select! on both event_rx and interaction_rx
-  │   → elicitation supported? relay to client
-  │   → not supported? auto-decline
+  │   → elicitation supported? relay to client, send FormResponse via response_tx
+  │   → not supported? send FormResponse::Cancelled on response_tx (unblocks agent)
   │
   └─ Build CallToolResult:
       Content::text(response)  // agent's synthesized answer
       + optional Content::text(tool_log)  // transparency: which tools were called
 ```
 
+### Agent Tool Schema
+
+The `agent` tool's MCP schema includes `session_key` as an optional argument:
+
+```json
+{
+  "name": "agent",
+  "description": "Send a natural language request to klyntbot's agent pipeline.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "action": { "type": "string", "enum": ["chat", "status"] },
+      "message": { "type": "string", "description": "Natural language request" },
+      "session_key": {
+        "type": "string",
+        "description": "Optional session key for conversation continuity. Omit for one-shot requests."
+      }
+    },
+    "required": ["action", "message"]
+  }
+}
+```
+
 ### Session Continuity
 
-The `session_key` allows multi-turn conversations. If the MCP client passes `session_key: "my-session"`, subsequent calls continue the conversation with full history.
+The `session_key` is a tool argument in the `agent` tool's input schema. If the MCP client passes `session_key: "my-session"`, subsequent calls continue the conversation with full history. If omitted, a unique session key is generated per call (`mcp:{uuid}`).
 
 ### Timeout
 
@@ -209,10 +237,39 @@ pub enum AppMode {
 }
 ```
 
+### Signature Changes
+
+The existing `AppCore::init()` signature is:
+
+```rust
+pub async fn init(config_override: Option<Config>) -> Result<(Self, EventChannels), String>
+pub async fn init_with_sender(
+    config_override: Option<Config>,
+    notification_sender: Option<Arc<dyn NotificationSender>>,
+) -> Result<(Self, EventChannels), String>
+```
+
+Add `AppMode` as the first parameter to both:
+
+```rust
+pub async fn init(mode: AppMode, config_override: Option<Config>) -> Result<(Self, EventChannels), String>
+pub async fn init_with_sender(
+    mode: AppMode,
+    config_override: Option<Config>,
+    notification_sender: Option<Arc<dyn NotificationSender>>,
+) -> Result<(Self, EventChannels), String>
+```
+
+All existing callers must be updated:
+- Tauri desktop: `AppCore::init(AppMode::Desktop, None)` or `AppCore::init_with_sender(AppMode::Desktop, None, Some(sender))`
+- Dev server: `AppCore::init(AppMode::Desktop, None)`
+- Tests: `AppCore::init(AppMode::Server, Some(test_config))` (or `AppMode::Desktop` if testing desktop features)
+- klyntbot-mcp: `AppCore::init(AppMode::Server, None)`
+
 ### Modified Init Phases
 
 ```
-AppCore::init(mode: AppMode)
+AppCore::init_with_sender(mode, config_override, notification_sender)
   │
   ├─ Phase 1 (ALWAYS):
   │   config → storage → repos → vector_store → provider → bus
@@ -221,7 +278,7 @@ AppCore::init(mode: AppMode)
   ├─ Phase 2 (Desktop + Server):
   │   cron_service → register_cron_callbacks → ensure_cron_jobs
   │
-  ├─ Phase 3 (Desktop ONLY — skipped for Server):
+  ├─ Phase 3 (Desktop ONLY — gated by `if mode == AppMode::Desktop`):
   │   channel_manager.start_all()      ← Telegram/Discord/Slack/Email
   │   productivity_engine              ← focus tracking, session timing
   │   focus_manager                    ← Pomodoro, deep work
@@ -236,11 +293,13 @@ AppCore::init(mode: AppMode)
 
 The optional fields (`productivity_engine`, `focus_manager`, etc.) are already `Option<Arc<...>>`. In Server mode, they're `None`. Handlers that access them already return `Err(ApiError { code: "FEATURE_DISABLED" })`.
 
-`AppMode` is a runtime property of the entry point, not user configuration:
+`AppMode` is stored on the `AppCore` struct for runtime checks:
 
 ```rust
-AppCore::init(AppMode::Server).await   // klyntbot-mcp
-AppCore::init(AppMode::Desktop).await  // Tauri
+pub struct AppCore {
+    pub mode: AppMode,
+    // ... existing fields
+}
 ```
 
 ## Crate Structure
@@ -261,20 +320,33 @@ crates/klyntbot-server/
 │       └── schema.rs        # OpenAI JSON Schema → rmcp Tool translation
 ```
 
+### Layer Assignment
+
+`klyntbot-server` sits at **L7** alongside `app-core`, `desktop-shared`, and `desktop`. The dependency DAG is:
+
+```
+desktop → klyntbot-server → app-core → L0-L6 (no cycles)
+```
+
+`desktop` already depends on `app-core`. Adding `klyntbot-server` (which also depends on `app-core`) creates no circular path — both are L7 crates with strictly upward deps.
+
 ### Dependencies
 
 ```
-klyntbot-server
-  ├── app-core     (AppCore, handlers, AppMode)
-  ├── mcp          (re-use security module)
-  ├── tools-core   (Tool trait, ToolRegistry, RoutingContext)
-  ├── common       (types, errors)
-  ├── config       (Config, McpServerSettings)
-  ├── rmcp         (server handler, transport, protocol types)
-  ├── clap         (CLI)
-  ├── tokio        (async runtime)
-  └── tracing      (logging)
+klyntbot-server (L7)
+  ├── app-core       (L7 — AppCore, handlers)
+  ├── desktop-shared (L7 — SessionContextInput, ChatMessageResponse, ApiError)
+  ├── mcp            (L6 — re-use security module)
+  ├── tools-core     (L1 — Tool trait, ToolRegistry, RoutingContext)
+  ├── common         (L0 — types, errors, AppMode)
+  ├── config         (L1 — Config, McpServerSettings)
+  ├── rmcp           (external — server handler, transport, protocol types)
+  ├── clap           (external — CLI)
+  ├── tokio          (external — async runtime)
+  └── tracing        (external — logging)
 ```
+
+Note: `desktop-shared` is required because `AppCore::chat_send()` returns `ChatMessageResponse` (defined in `desktop-shared`). The `AgentBridge` imports this type to destructure the return value.
 
 ### CLI Interface
 
@@ -307,22 +379,31 @@ klyntbot-mcp --version
 
 ### McpServerSettings
 
+Both new fields use `#[serde(default)]` so existing `config.json` files without these fields deserialize correctly (project convention).
+
 ```rust
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct McpServerSettings {
-    pub enabled: bool,               // default false
-    pub port: u16,                   // default 3100
-    pub host: String,                // default "127.0.0.1"
-    pub exposed_tools: Vec<String>,  // NEW — whitelist, default: safe tools
-    pub auth: McpAuthConfig,         // NEW — HTTP auth
+    #[serde(default)]
+    pub enabled: bool,                   // default false
+    #[serde(default = "default_port")]
+    pub port: u16,                       // default 3100
+    #[serde(default = "default_host")]
+    pub host: String,                    // default "127.0.0.1"
+    #[serde(default = "default_exposed_tools")]
+    pub exposed_tools: Vec<String>,      // NEW — whitelist, default: safe tools
+    #[serde(default)]
+    pub auth: McpAuthConfig,             // NEW — HTTP auth
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct McpAuthConfig {
-    pub enabled: bool,                 // default false
-    pub token: Option<Secret<String>>, // Bearer token for HTTP transport
+    #[serde(default)]
+    pub enabled: bool,                   // default false
+    #[serde(default)]
+    pub token: Option<Secret<String>>,   // Bearer token for HTTP transport
 }
 ```
 
@@ -469,6 +550,10 @@ New files:
 Modified files:
 - `crates/klyntbot-server/src/handler.rs` — wire bridge
 - `crates/config/src/schema/mcp.rs` — add `exposed_tools`, `McpAuthConfig`
+
+Removed files:
+- `crates/mcp/src/server/handlers.rs` — dead code (static `MCP_EXPOSED_TOOLS`, `validate_tool_call`), superseded by runtime config whitelist in `ToolRegistryBridge`
+- Update `crates/mcp/src/server/mod.rs` — remove `handlers` module export
 
 ### Phase 3: Agent Delegation
 
