@@ -38,7 +38,7 @@ MCP Server layer (in klyntbot-server crate):
 - **`klyntbot-server`** is a new crate — both a library (for desktop embedding) and a binary (`klyntbot-mcp`). No business logic lives here; it's pure MCP wiring.
 - **`mcp` crate stays lean** — no `app-core` dependency added. The bridge lives in `klyntbot-server`. The existing `mcp` crate continues to handle the client side (connecting to external MCP servers). The existing `mcp/src/server/handlers.rs` (static `MCP_EXPOSED_TOOLS` list and `validate_tool_call`) will be removed — it's dead code superseded by the runtime-configurable `exposed_tools` in config and the whitelist logic in `ToolRegistryBridge`.
 - **Two bridge paths**: `ToolRegistryBridge` for all standard tools (reuses `ToolRegistry`), `AgentBridge` for the `agent` chat tool (calls `AppCore::chat_send()` directly).
-- **ToolRegistry access**: `AgentLoop.tool_registry` is currently `pub(crate)`. A new public accessor `AgentLoop::tool_registry() -> Arc<RwLock<ToolRegistry>>` must be added so `klyntbot-server` can access it via `app.agent.tool_registry()`.
+- **ToolRegistry access**: `AgentLoop.tool_registry` is currently `pub(crate)`. A new public accessor `AgentLoop::tool_registry() -> Arc<RwLock<ToolRegistry>>` must be added so `klyntbot-server` can access it via `app.agent.tool_registry()`. Note: the field type `tools::registry::ToolRegistry` is a re-export of `tools_core::ToolRegistry`, so `klyntbot-server` only needs `tools-core` (L1) as a dependency, not `tools` (L4).
 - **Tool whitelist** in config (`mcp.server.exposedTools`) controls which internal tools are visible via MCP. Dangerous tools (filesystem, shell) excluded by default.
 
 ### Two Runtime Modes
@@ -93,7 +93,7 @@ KlyntbotServerHandler::call_tool()
   │
   └─ otherwise → ToolRegistryBridge::execute()
                   ├─ Whitelist check (is tool in exposedTools?)
-                  ├─ Input sanitization (existing security::sanitize_input)
+                  ├─ Input sanitization (mcp::server::security::sanitize_input — needs pub re-export)
                   ├─ Construct RoutingContext { channel: "mcp", chat_id: session_id }
                   ├─ ToolRegistry::prepare(name, args, &routing_ctx)
                   ├─ Tool::execute(args, &routing_ctx)
@@ -298,30 +298,37 @@ AppCore::init_with_sender(mode, config_override, notification_sender)
   │   intervention_router              ← currently always Some(...)
   │   feedback_tracker                 ← currently always Some(...)
   │   coaching_service.start()         ← subscribes to domain_event_bus
+  │   BUT: always create the intervention_tx/intervention_rx channel pair
+  │        (even in Server mode) to satisfy EventChannels struct
   │
   └─ Return (AppCore, EventChannels)
       For Server mode: spawn a drain task for EventChannels receivers
       that have no consumer — prevents back-pressure on mpsc channels.
 ```
 
-**Implementation note — coaching init refactor:** Currently, `init.rs:L358-400` unconditionally initializes `SignalAccumulator`, `PatternDetector`, `InterventionRouter`, `FeedbackTracker`, and `CoachingService`. These MUST be gated behind `if mode == AppMode::Desktop` because:
-- They subscribe to `domain_event_bus` and spawn background tasks
-- `intervention_tx`/`intervention_rx` channel is created unconditionally — in Server mode, the tx side has no sender but the `EventChannels.intervention_rx` has no consumer, causing silent back-pressure
+**Implementation note — coaching init refactor:** Currently, `init.rs:L358-400` unconditionally initializes `SignalAccumulator`, `PatternDetector`, `InterventionRouter`, `FeedbackTracker`, and `CoachingService`. The refactor:
+- Always create `let (intervention_tx, intervention_rx) = mpsc::channel(64)` — needed because `EventChannels.intervention_rx` is non-optional
+- Gate the actual coaching service startup behind `if mode == AppMode::Desktop`:
+  - `SignalAccumulator`, `PatternDetector`, `InterventionRouter`, `FeedbackTracker` — only init in Desktop
+  - `CoachingService::start(...)` — only start in Desktop mode
+  - `intervention_tx` is passed to `CoachingService::start()` — in Server mode, `intervention_tx` is dropped, so `intervention_rx.recv()` returns `None` immediately
 - The coaching fields are already `Option<Arc<...>>` on `AppCore`, so setting them to `None` in Server mode is safe
 
-**EventChannels drain:** `EventChannels` contains non-optional fields (`intervention_rx`, `pipeline_rx`). In Server mode, the sender side still exists (from `domain_event_bus`). To prevent back-pressure:
+**EventChannels drain:** `EventChannels` contains non-optional fields (`intervention_rx`, `pipeline_rx`). In Server mode, `intervention_tx` is dropped (coaching service not started), so `intervention_rx.recv()` returns `None` immediately. But `pipeline_rx` (`broadcast::Receiver`) may still receive events from `domain_event_bus`. The drain task must handle both:
 ```rust
 // In klyntbot-server main.rs, after init:
-let (_app, events) = AppCore::init(AppMode::Server, None).await?;
-// Spawn drain task — consumes events nobody listens to
+let (app, events) = AppCore::init(AppMode::Server, None).await?;
+// Spawn drain task — consumes events nobody listens to.
+// Runs until all senders are dropped (app shutdown).
 tokio::spawn(async move {
     let mut intervention_rx = events.intervention_rx;
     let mut pipeline_rx = events.pipeline_rx;
     loop {
         tokio::select! {
-            _ = intervention_rx.recv() => {}
-            _ = pipeline_rx.recv() => {}
-            else => break,
+            msg = intervention_rx.recv() => {
+                if msg.is_none() { break; }  // sender dropped, channel closed
+            }
+            _ = pipeline_rx.recv() => {}     // broadcast: recv returns Err when all senders drop
         }
     }
 });
@@ -372,7 +379,7 @@ desktop → klyntbot-server → app-core → L0-L6 (no cycles)
 klyntbot-server (L7)
   ├── app-core       (L7 — AppCore, handlers)
   ├── desktop-shared (L7 — SessionContextInput, ChatMessageResponse, ApiError)
-  ├── mcp            (L6 — re-use security module)
+  ├── mcp            (L6 — re-use security::sanitize_input, needs pub re-export from mcp crate)
   ├── tools-core     (L1 — Tool trait, ToolRegistry, RoutingContext)
   ├── common         (L0 — types, errors, AppMode)
   ├── config         (L1 — Config, McpServerSettings)
@@ -557,7 +564,7 @@ Desktop embedded:
 
 ### Test Utilities
 
-- `create_test_app()` — `AppCore::init(AppMode::Server)` with in-memory storage
+- `create_test_app()` — `AppCore::init(AppMode::Server, Some(test_config))` with in-memory storage
 - `mcp_routing_ctx()` — RoutingContext with channel "mcp"
 - `extract_text(result: &CallToolResult)` — pulls text from Content vec
 
@@ -577,6 +584,7 @@ Modified files:
 - `crates/app-core/src/init.rs` — accept `AppMode`, gate Phase 3+4 (channels, productivity, coaching)
 - `crates/app-core/src/state.rs` — store `AppMode`
 - `crates/agent/src/agent_loop/mod.rs` — add `pub fn tool_registry()` accessor (currently `pub(crate)`)
+- `crates/mcp/src/lib.rs` — add `pub use server::security` re-export (currently not exported)
 
 ### Phase 2: Tool Bridge
 
@@ -588,6 +596,7 @@ New files:
 Modified files:
 - `crates/klyntbot-server/src/handler.rs` — wire bridge
 - `crates/config/src/schema/mcp.rs` — add `exposed_tools`, `McpAuthConfig`
+- `crates/config/src/lib.rs` — add `McpAuthConfig` to pub re-exports
 
 Removed files:
 - `crates/mcp/src/server/handlers.rs` — dead code (static `MCP_EXPOSED_TOOLS`, `validate_tool_call`), superseded by runtime config whitelist in `ToolRegistryBridge`. The 4 unit tests in this file are replaced by whitelist tests in `klyntbot-server/src/bridge/registry.rs`.
