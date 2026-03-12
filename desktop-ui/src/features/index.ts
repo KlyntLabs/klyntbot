@@ -9,4 +9,5 @@ export * from "./productivity";
 export * from "./settings";
 export * from "./setup";
 export * from "./tasks";
+export * from "./tasks2";
 export * from "./tray";
