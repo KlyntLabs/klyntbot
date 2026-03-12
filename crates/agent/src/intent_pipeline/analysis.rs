@@ -192,8 +192,6 @@ fn is_task_management(msg: &str) -> bool {
         "create a todo",
         "new task",
         "new todo",
-        "add task",
-        "create todo",
         // Query patterns
         "what task",
         "my task",
@@ -213,8 +211,28 @@ fn is_task_management(msg: &str) -> bool {
         "decompose this",
         "break down task",
         "execute task",
+        // Forecast & suggestion patterns
+        "forecast",
+        "accuracy report",
+        "estimation accuracy",
+        "suggest",
+        "suggestion",
     ];
-    TASK_MGMT.iter().any(|k| msg.contains(k))
+
+    if TASK_MGMT.iter().any(|k| msg.contains(k)) {
+        return true;
+    }
+
+    // Combinatorial check: action verb + task noun anywhere in message.
+    // Catches "create 3 tasks", "add more todos", "delete the task", etc.
+    const TASK_VERBS: &[&str] = &[
+        "create", "add", "make", "update", "edit", "modify", "complete", "finish", "done",
+        "delete", "remove", "list", "show", "check", "get",
+    ];
+    const TASK_NOUNS: &[&str] = &["task", "tasks", "todo", "todos"];
+    let has_verb = TASK_VERBS.iter().any(|v| msg.contains(v));
+    let has_noun = TASK_NOUNS.iter().any(|n| msg.contains(n));
+    has_verb && has_noun
 }
 
 fn is_direct_question(msg: &str) -> bool {
