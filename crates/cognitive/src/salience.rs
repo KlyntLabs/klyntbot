@@ -4,6 +4,10 @@ use bus::DomainEvent;
 
 use crate::types::SalienceVerdict;
 
+/// Deviation percentage threshold above which estimation events are promoted to Extract.
+/// Shared with `background::event_to_observation` for consistent importance scaling.
+pub const HIGH_DEVIATION_THRESHOLD: f64 = 50.0;
+
 /// Evaluate the salience of a domain event.
 ///
 /// - `Extract`: high-value events processed immediately (user-explicit, threshold-crossing)
@@ -53,7 +57,13 @@ pub fn evaluate_salience(event: &DomainEvent) -> SalienceVerdict {
         DomainEvent::FocusSessionEnded { .. } => SalienceVerdict::Accumulate,
         DomainEvent::DistractionDetected { .. } => SalienceVerdict::Accumulate,
         DomainEvent::TaskCreated { .. } => SalienceVerdict::Accumulate,
-        DomainEvent::TaskCompleted { .. } => SalienceVerdict::Accumulate,
+        DomainEvent::TaskCompleted { deviation_pct, .. } => {
+            if deviation_pct.map_or(false, |d| d.abs() > HIGH_DEVIATION_THRESHOLD) {
+                SalienceVerdict::Extract
+            } else {
+                SalienceVerdict::Accumulate
+            }
+        }
         DomainEvent::TaskDeferred { .. } => SalienceVerdict::Accumulate,
         DomainEvent::GoalProgress { .. } => SalienceVerdict::Accumulate,
         DomainEvent::TransactionRecorded {
@@ -66,7 +76,13 @@ pub fn evaluate_salience(event: &DomainEvent) -> SalienceVerdict {
         DomainEvent::BehavioralPatternDetected { .. } => SalienceVerdict::Accumulate,
         DomainEvent::TaskFocusStarted { .. } => SalienceVerdict::Accumulate,
         DomainEvent::TaskFocusEnded { .. } => SalienceVerdict::Accumulate,
-        DomainEvent::EstimationRecorded { .. } => SalienceVerdict::Accumulate,
+        DomainEvent::EstimationRecorded { deviation_pct, .. } => {
+            if deviation_pct.abs() > HIGH_DEVIATION_THRESHOLD {
+                SalienceVerdict::Extract
+            } else {
+                SalienceVerdict::Accumulate
+            }
+        }
         DomainEvent::TaskExecutionStarted { .. } => SalienceVerdict::Accumulate,
         DomainEvent::TaskExecutionCompleted { .. } => SalienceVerdict::Extract,
         DomainEvent::TaskExecutionFailed { .. } => SalienceVerdict::Extract,
@@ -175,6 +191,62 @@ mod tests {
         let verdict = evaluate_salience(&DomainEvent::CoachingFeedback {
             intervention_id: "i1".into(),
             response: bus::FeedbackResponse::Helpful,
+        });
+        assert_eq!(verdict, SalienceVerdict::Extract);
+    }
+
+    #[test]
+    fn test_task_completed_large_deviation_is_extract() {
+        let verdict = evaluate_salience(&DomainEvent::TaskCompleted {
+            task_id: "t1".into(),
+            actual_duration_mins: Some(90),
+            estimated_duration_mins: Some(30),
+            deviation_pct: Some(200.0),
+        });
+        assert_eq!(verdict, SalienceVerdict::Extract);
+    }
+
+    #[test]
+    fn test_task_completed_small_deviation_is_accumulate() {
+        let verdict = evaluate_salience(&DomainEvent::TaskCompleted {
+            task_id: "t1".into(),
+            actual_duration_mins: Some(35),
+            estimated_duration_mins: Some(30),
+            deviation_pct: Some(16.7),
+        });
+        assert_eq!(verdict, SalienceVerdict::Accumulate);
+    }
+
+    #[test]
+    fn test_estimation_recorded_large_deviation_is_extract() {
+        let verdict = evaluate_salience(&DomainEvent::EstimationRecorded {
+            task_id: "t1".into(),
+            estimated_mins: 30,
+            actual_mins: 90,
+            deviation_pct: 200.0,
+        });
+        assert_eq!(verdict, SalienceVerdict::Extract);
+    }
+
+    #[test]
+    fn test_estimation_recorded_small_deviation_is_accumulate() {
+        let verdict = evaluate_salience(&DomainEvent::EstimationRecorded {
+            task_id: "t1".into(),
+            estimated_mins: 30,
+            actual_mins: 35,
+            deviation_pct: 16.7,
+        });
+        assert_eq!(verdict, SalienceVerdict::Accumulate);
+    }
+
+    #[test]
+    fn test_task_execution_completed_is_extract() {
+        let verdict = evaluate_salience(&DomainEvent::TaskExecutionCompleted {
+            task_id: "t1".into(),
+            execution_id: "e1".into(),
+            tokens_used: 1000,
+            cost_usd: Some(0.05),
+            artifacts_count: 2,
         });
         assert_eq!(verdict, SalienceVerdict::Extract);
     }

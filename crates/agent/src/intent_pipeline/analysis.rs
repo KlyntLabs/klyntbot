@@ -48,14 +48,9 @@ pub fn analyze_heuristic(message: &str) -> Option<IntentAnalysis> {
         return None;
     }
 
-    // 2. Very short non-keyword messages → Direct
-    if msg.len() < 20 && word_count <= 4 && !has_any_action_keyword(&msg) {
-        return Some(direct_analysis("Short message, no action keywords", 0.85));
-    }
-
-    // 3. Task management patterns → Reactive (CRUD, low iteration budget)
-    //    Must be checked BEFORE plan/code keywords because task descriptions
-    //    often contain code-like words that are just the task *description*.
+    // 2. Task management patterns → Reactive (CRUD, low iteration budget)
+    //    Must be checked BEFORE short-message heuristic because short phrases
+    //    like "plan my day" or "list tasks" are actionable and need tools.
     if is_task_management(&msg) {
         let signals = ComplexitySignals {
             estimated_tool_calls: count_tool_indicators(&msg).max(1),
@@ -71,6 +66,11 @@ pub fn analyze_heuristic(message: &str) -> Option<IntentAnalysis> {
             0.90,
             signals,
         ));
+    }
+
+    // 3. Very short non-keyword messages → Direct
+    if msg.len() < 20 && word_count <= 4 && !has_any_action_keyword(&msg) {
+        return Some(direct_analysis("Short message, no action keywords", 0.85));
     }
 
     // 4. Direct response patterns (questions, explanations)
@@ -192,8 +192,6 @@ fn is_task_management(msg: &str) -> bool {
         "create a todo",
         "new task",
         "new todo",
-        "add task",
-        "create todo",
         // Query patterns
         "what task",
         "my task",
@@ -205,8 +203,36 @@ fn is_task_management(msg: &str) -> bool {
         "todo list",
         "how many task",
         "pending task",
+        // Planning & agentic patterns
+        "plan my day",
+        "plan day",
+        "daily plan",
+        "decompose task",
+        "decompose this",
+        "break down task",
+        "execute task",
+        // Forecast & suggestion patterns
+        "forecast",
+        "accuracy report",
+        "estimation accuracy",
+        "suggest",
+        "suggestion",
     ];
-    TASK_MGMT.iter().any(|k| msg.contains(k))
+
+    if TASK_MGMT.iter().any(|k| msg.contains(k)) {
+        return true;
+    }
+
+    // Combinatorial check: action verb + task noun anywhere in message.
+    // Catches "create 3 tasks", "add more todos", "delete the task", etc.
+    const TASK_VERBS: &[&str] = &[
+        "create", "add", "make", "update", "edit", "modify", "complete", "finish", "done",
+        "delete", "remove", "list", "show", "check", "get",
+    ];
+    const TASK_NOUNS: &[&str] = &["task", "tasks", "todo", "todos"];
+    let has_verb = TASK_VERBS.iter().any(|v| msg.contains(v));
+    let has_noun = TASK_NOUNS.iter().any(|n| msg.contains(n));
+    has_verb && has_noun
 }
 
 fn is_direct_question(msg: &str) -> bool {

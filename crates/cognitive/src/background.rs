@@ -24,7 +24,7 @@ use crate::extraction::ExtractionHandler;
 use crate::repos::accumulated_observation::AccumulatedObservationRepo;
 use crate::repos::failed_observation::FailedObservationRepo;
 use crate::repos::{EpisodicMemoryRepo, SemanticFactRepo};
-use crate::salience::evaluate_salience;
+use crate::salience::{evaluate_salience, HIGH_DEVIATION_THRESHOLD};
 use crate::types::{EpisodicMemory, Observation, SalienceVerdict};
 
 /// Debug events emitted by the pipeline for the debug dashboard.
@@ -719,6 +719,113 @@ fn event_to_observation(event: &DomainEvent) -> Option<Observation> {
             source_event: "TaskExecutionFailed".into(),
             timestamp: now,
         }),
+        DomainEvent::TaskFocusStarted {
+            task_id,
+            energy_level,
+        } => Some(Observation {
+            domain: "tasks".into(),
+            content: format!("Focus started on task {task_id} at energy level {energy_level}"),
+            importance: 0.3,
+            source_event: "TaskFocusStarted".into(),
+            timestamp: now,
+        }),
+        DomainEvent::TaskFocusEnded {
+            task_id,
+            duration_secs,
+        } => Some(Observation {
+            domain: "tasks".into(),
+            content: format!(
+                "Focus ended on task {task_id} after {}min",
+                duration_secs / 60
+            ),
+            importance: 0.3,
+            source_event: "TaskFocusEnded".into(),
+            timestamp: now,
+        }),
+        DomainEvent::EstimationRecorded {
+            task_id,
+            estimated_mins,
+            actual_mins,
+            deviation_pct,
+        } => {
+            let importance = if deviation_pct.abs() > HIGH_DEVIATION_THRESHOLD {
+                0.6
+            } else {
+                0.3
+            };
+            Some(Observation {
+                domain: "tasks".into(),
+                content: format!(
+                    "Estimation recorded for task {task_id}: estimated {estimated_mins}min, actual {actual_mins}min, deviation {deviation_pct:.1}%"
+                ),
+                importance,
+                source_event: "EstimationRecorded".into(),
+                timestamp: now,
+            })
+        }
+        DomainEvent::TaskDecomposed {
+            source_task_id,
+            subtask_ids,
+            total_estimated_mins,
+        } => {
+            let est = total_estimated_mins
+                .map(|m| format!(", total {m}min"))
+                .unwrap_or_default();
+            Some(Observation {
+                domain: "tasks".into(),
+                content: format!(
+                    "Task {source_task_id} decomposed into {} subtasks{est}",
+                    subtask_ids.len()
+                ),
+                importance: 0.4,
+                source_event: "TaskDecomposed".into(),
+                timestamp: now,
+            })
+        }
+        DomainEvent::DayPlanGenerated {
+            task_count,
+            total_estimated_mins,
+        } => Some(Observation {
+            domain: "tasks".into(),
+            content: format!(
+                "Day plan generated: {task_count} tasks, {total_estimated_mins}min scheduled"
+            ),
+            importance: 0.4,
+            source_event: "DayPlanGenerated".into(),
+            timestamp: now,
+        }),
+        DomainEvent::ProactiveSuggestionCreated {
+            suggestion_id: _,
+            suggestion_type,
+            task_id,
+            confidence,
+        } => {
+            let target = task_id
+                .as_deref()
+                .map(|id| format!(" for task {id}"))
+                .unwrap_or_default();
+            Some(Observation {
+                domain: "tasks".into(),
+                content: format!(
+                    "Proactive suggestion: {suggestion_type}{target} (confidence {:.0}%)",
+                    confidence * 100.0
+                ),
+                importance: 0.3,
+                source_event: "ProactiveSuggestionCreated".into(),
+                timestamp: now,
+            })
+        }
+        DomainEvent::TaskExecutionStarted {
+            task_id,
+            execution_id,
+            agent_profile: _,
+        } => Some(Observation {
+            domain: "tasks".into(),
+            content: format!("Agentic execution {execution_id} started for task {task_id}"),
+            importance: 0.4,
+            source_event: "TaskExecutionStarted".into(),
+            timestamp: now,
+        }),
         _ => {
             // TaskCreated, TaskDeferred, GoalProgress, ActivitySessionCompleted,
             // and lower-priority agentic events (Accumulate-level)
@@ -926,6 +1033,118 @@ mod tests {
         assert!(summary.content.contains("Score: 72"));
         assert!(summary.content.contains("Score: 78"));
         assert!(summary.content.contains("2 accumulated"));
+    }
+
+    #[test]
+    fn test_event_to_observation_task_focus_started() {
+        let event = DomainEvent::TaskFocusStarted {
+            task_id: "t1".into(),
+            energy_level: "high".into(),
+        };
+        let obs = event_to_observation(&event).unwrap();
+        assert_eq!(obs.domain, "tasks");
+        assert!(obs.content.contains("t1"));
+        assert!(obs.content.contains("high"));
+        assert_eq!(obs.source_event, "TaskFocusStarted");
+    }
+
+    #[test]
+    fn test_event_to_observation_task_focus_ended() {
+        let event = DomainEvent::TaskFocusEnded {
+            task_id: "t1".into(),
+            duration_secs: 2700,
+        };
+        let obs = event_to_observation(&event).unwrap();
+        assert_eq!(obs.domain, "tasks");
+        assert!(obs.content.contains("45min")); // 2700 / 60
+        assert_eq!(obs.source_event, "TaskFocusEnded");
+    }
+
+    #[test]
+    fn test_event_to_observation_estimation_recorded() {
+        let event = DomainEvent::EstimationRecorded {
+            task_id: "t1".into(),
+            estimated_mins: 30,
+            actual_mins: 75,
+            deviation_pct: 150.0,
+        };
+        let obs = event_to_observation(&event).unwrap();
+        assert_eq!(obs.domain, "tasks");
+        assert!(obs.content.contains("estimated 30min"));
+        assert!(obs.content.contains("actual 75min"));
+        assert!(obs.content.contains("150.0%"));
+        assert_eq!(obs.source_event, "EstimationRecorded");
+    }
+
+    #[test]
+    fn test_event_to_observation_estimation_recorded_importance() {
+        let large_dev = DomainEvent::EstimationRecorded {
+            task_id: "t1".into(),
+            estimated_mins: 30,
+            actual_mins: 75,
+            deviation_pct: 150.0,
+        };
+        let obs = event_to_observation(&large_dev).unwrap();
+        assert!(
+            obs.importance >= 0.6,
+            "Large deviation should have high importance, got {}",
+            obs.importance
+        );
+
+        let small_dev = DomainEvent::EstimationRecorded {
+            task_id: "t2".into(),
+            estimated_mins: 30,
+            actual_mins: 35,
+            deviation_pct: 16.7,
+        };
+        let obs2 = event_to_observation(&small_dev).unwrap();
+        assert!(
+            obs2.importance <= 0.4,
+            "Small deviation should have low importance, got {}",
+            obs2.importance
+        );
+    }
+
+    #[test]
+    fn test_event_to_observation_task_decomposed() {
+        let event = DomainEvent::TaskDecomposed {
+            source_task_id: "t1".into(),
+            subtask_ids: vec!["s1".into(), "s2".into(), "s3".into()],
+            total_estimated_mins: Some(120),
+        };
+        let obs = event_to_observation(&event).unwrap();
+        assert_eq!(obs.domain, "tasks");
+        assert!(obs.content.contains("3 subtasks"));
+        assert!(obs.content.contains("120min"));
+        assert_eq!(obs.source_event, "TaskDecomposed");
+    }
+
+    #[test]
+    fn test_event_to_observation_day_plan_generated() {
+        let event = DomainEvent::DayPlanGenerated {
+            task_count: 5,
+            total_estimated_mins: 360,
+        };
+        let obs = event_to_observation(&event).unwrap();
+        assert_eq!(obs.domain, "tasks");
+        assert!(obs.content.contains("5 tasks"));
+        assert!(obs.content.contains("360min"));
+        assert_eq!(obs.source_event, "DayPlanGenerated");
+    }
+
+    #[test]
+    fn test_event_to_observation_proactive_suggestion() {
+        let event = DomainEvent::ProactiveSuggestionCreated {
+            suggestion_id: "sug-1".into(),
+            suggestion_type: "Decompose".into(),
+            task_id: Some("t1".into()),
+            confidence: 0.85,
+        };
+        let obs = event_to_observation(&event).unwrap();
+        assert_eq!(obs.domain, "tasks");
+        assert!(obs.content.contains("Decompose"));
+        assert!(obs.content.contains("85%"));
+        assert_eq!(obs.source_event, "ProactiveSuggestionCreated");
     }
 
     #[test]

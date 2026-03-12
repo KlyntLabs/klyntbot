@@ -10,8 +10,8 @@ use bus::DomainEventBus;
 
 use crate::config::TasksConfig;
 use crate::handlers::{
-    DayPlanningHandler, DecompositionHandler, EmbeddingHandler, EnrichmentHandler,
-    TaskExecutionHandler,
+    DayPlanningHandler, DecompositionHandler, EmbeddingHandler, EnrichmentHandler, ForecastHandler,
+    ProactiveHandler, SuggestionApplier, TaskExecutionHandler,
 };
 use crate::types::{Attachment, Task, TimeEntry};
 use common::{Result, ToolError};
@@ -44,6 +44,12 @@ pub struct TaskTool {
     pub(crate) execution_handler: Option<Arc<dyn TaskExecutionHandler>>,
     /// Optional day planning handler (LLM-powered daily planning).
     pub(crate) planning_handler: Option<Arc<dyn DayPlanningHandler>>,
+    /// Optional proactive suggestion handler.
+    pub(crate) proactive_handler: Option<Arc<dyn ProactiveHandler>>,
+    /// Optional suggestion applier for executing accepted suggestions.
+    pub(crate) suggestion_applier: Option<Arc<dyn SuggestionApplier>>,
+    /// Optional forecast handler for estimation accuracy and project forecasting.
+    pub(crate) forecast_handler: Option<Arc<dyn ForecastHandler>>,
 }
 
 impl TaskTool {
@@ -71,6 +77,9 @@ impl TaskTool {
             decomposition_handler: None,
             execution_handler: None,
             planning_handler: None,
+            proactive_handler: None,
+            suggestion_applier: None,
+            forecast_handler: None,
         }
     }
 
@@ -147,6 +156,24 @@ impl TaskTool {
         self
     }
 
+    /// Attach a proactive suggestion handler.
+    pub fn with_proactive_handler(mut self, handler: Arc<dyn ProactiveHandler>) -> Self {
+        self.proactive_handler = Some(handler);
+        self
+    }
+
+    /// Attach a suggestion applier for executing accepted suggestions.
+    pub fn with_suggestion_applier(mut self, applier: Arc<dyn SuggestionApplier>) -> Self {
+        self.suggestion_applier = Some(applier);
+        self
+    }
+
+    /// Attach a forecast handler for estimation accuracy and project forecasting.
+    pub fn with_forecast_handler(mut self, handler: Arc<dyn ForecastHandler>) -> Self {
+        self.forecast_handler = Some(handler);
+        self
+    }
+
     // ─── Scoring helpers ───────────────────────────────────────────
 
     pub(crate) fn calculate_score(task: &Task, now: chrono::DateTime<chrono::Utc>) -> f64 {
@@ -196,7 +223,7 @@ impl Tool for TaskTool {
     }
 
     fn description(&self) -> &str {
-        "Manage tasks with agentic execution support. Actions: create, update, complete, delete, show, list, summary, tree, search, focus, unfocus, log_time, add_dep, remove_dep, batch, recur, list_recurring, delete_recurring, plan_day, decompose, execute, cancel_execution."
+        "Manage tasks with agentic execution support. Actions: create, update, complete, delete, show, list, summary, tree, search, focus, unfocus, log_time, add_dep, remove_dep, batch, recur, list_recurring, delete_recurring, plan_day, decompose, execute, cancel_execution, suggest, apply_suggestion, dismiss_suggestion, list_suggestions, forecast_task, forecast_project, accuracy_report."
     }
 
     fn parameters(&self) -> Value {
@@ -214,7 +241,9 @@ impl Tool for TaskTool {
                         "batch",
                         "recur", "list_recurring", "delete_recurring",
                         "plan_day",
-                        "decompose", "execute", "cancel_execution"
+                        "decompose", "execute", "cancel_execution",
+                        "suggest", "apply_suggestion", "dismiss_suggestion", "list_suggestions",
+                        "forecast_task", "forecast_project", "accuracy_report"
                     ],
                     "description": "Action to perform"
                 },
@@ -298,6 +327,7 @@ impl Tool for TaskTool {
                     "description": "Number of tasks to include in plan (default: 3)"
                 },
                 "execution_id": { "type": "string", "description": "Execution ID (for cancel_execution)" },
+                "suggestion_id": { "type": "string", "description": "Suggestion ID (for apply_suggestion/dismiss_suggestion)" },
                 "agent_profile": { "type": "string", "description": "Agent profile for execution" },
                 "max_cost": { "type": "number", "description": "Max cost in USD for execution" },
                 "max_iterations": { "type": "integer", "description": "Max LLM iterations for execution" },
@@ -363,6 +393,13 @@ impl Tool for TaskTool {
             "decompose" => self.handle_decompose(&p).await,
             "execute" => self.handle_execute(&p).await,
             "cancel_execution" => self.handle_cancel_execution(&p).await,
+            "suggest" => self.handle_suggest(&p).await,
+            "apply_suggestion" => self.handle_apply_suggestion(&p).await,
+            "dismiss_suggestion" => self.handle_dismiss_suggestion(&p).await,
+            "list_suggestions" => self.handle_list_suggestions(&p).await,
+            "forecast_task" => self.handle_forecast_task(&p).await,
+            "forecast_project" => self.handle_forecast_project(&p).await,
+            "accuracy_report" => self.handle_accuracy_report(&p).await,
             _ => Err(ToolError::InvalidParams(format!("Unknown action: {action}")).into()),
         }
     }

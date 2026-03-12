@@ -1269,6 +1269,20 @@ impl TaskRepo {
         Ok(result.rows_affected() > 0)
     }
 
+    /// Get a single pending suggestion by ID.
+    pub async fn get_pending_suggestion(
+        &self,
+        id: &str,
+    ) -> Result<Option<TaskSuggestionRow>, StorageError> {
+        let row = sqlx::query_as::<_, TaskSuggestionRow>(
+            "SELECT * FROM task_suggestions WHERE id = ?1 AND status = 'pending'",
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row)
+    }
+
     /// List pending suggestions, optionally filtered by task_id.
     pub async fn list_pending_suggestions(
         &self,
@@ -1441,6 +1455,21 @@ impl TaskRepo {
             .await?;
             Ok(row)
         }
+    }
+
+    /// List raw estimation history records within a lookback window.
+    pub async fn list_estimation_history(
+        &self,
+        lookback_days: u32,
+    ) -> Result<Vec<TaskEstimationRow>, StorageError> {
+        let cutoff = chrono::Utc::now() - chrono::Duration::days(lookback_days as i64);
+        let rows = sqlx::query_as::<_, TaskEstimationRow>(
+            "SELECT * FROM task_estimation_history WHERE completed_at >= ?1 ORDER BY completed_at DESC",
+        )
+        .bind(cutoff)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
     }
 }
 

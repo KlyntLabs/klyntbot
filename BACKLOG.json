@@ -1,0 +1,34 @@
+[
+  {
+    "id": "BACK-001",
+    "title": "Intent classification: short-message heuristic preempts domain-specific patterns",
+    "priority": "high",
+    "area": "agent/intent-pipeline",
+    "description": "The heuristic classifier in `analyze_heuristic()` checks message length before domain-specific patterns. Messages under 20 chars / 4 words that lack generic action keywords (fix, build, create, etc.) are routed to Direct mode — even when they match domain-specific tool patterns like 'plan my day', 'list tasks', 'my todos'. This affects ALL features, not just task management.",
+    "impact": "Short actionable commands across all features (tasks, finance, notes, automations) get Direct mode (no tools) instead of Reactive mode. The agent responds with text describing what it would do, but never actually executes tool calls.",
+    "root_cause": "In `crates/agent/src/intent_pipeline/analysis.rs`, the short-message check (rule 2, line ~52) runs before `is_task_management()` (rule 3, line ~59). The `has_any_action_keyword()` guard only checks generic code/dev keywords (fix, build, implement) — not domain-specific verbs (plan, decompose, execute, list, track, log).",
+    "proposed_fix": "Restructure `analyze_heuristic()` priority order: (1) Greetings, (2) Multi-agent, (3) ALL domain-specific pattern matchers (task management, finance, notes, etc.), (4) Short-message fallback, (5) Direct questions, (6) Complex workflows. This ensures domain patterns always take precedence over the length heuristic. Additionally, expand `has_any_action_keyword()` or replace the short-message heuristic entirely with a negative-match approach (only go Direct if no domain pattern matches AND it's short).",
+    "files": [
+      "crates/agent/src/intent_pipeline/analysis.rs"
+    ],
+    "discovered": "2026-03-12",
+    "context": "Found while testing Phase 2 features (plan_day, decompose, execute) through the chat UI. DeepSeek model in Direct mode outputs tool calls as text/code blocks instead of executing them."
+  },
+  {
+    "id": "BACK-002",
+    "title": "Due dates underutilized: enrichment doesn't aggressively suggest them, UI doesn't surface urgency",
+    "priority": "medium",
+    "area": "feature-tasks/ux",
+    "description": "The due_date field exists in schema, scoring (urgency calculation), and plan_day — but tasks are routinely created without due dates. The enrichment handler doesn't aggressively infer deadlines from natural language ('by Friday', 'end of week', 'before the meeting'). The UI task list and planning views don't prominently display due dates or color-code urgency. The todo skill's ask-first workflow doesn't include 'when is this due?' as a follow-up.",
+    "impact": "Without due dates, the scoring system assigns urgency=1 (minimum) to most tasks, reducing the effectiveness of plan_day prioritization. Users lose deadline awareness — the system can't remind them what's overdue or due soon.",
+    "proposed_fix": "Three improvements: (1) Enrichment: make LLM enrichment handler more aggressively suggest due_date when tasks contain time-sensitive language. (2) UI: show due dates in task list and planning views with color coding (red=overdue, yellow=today/tomorrow, grey=future). (3) Skill: add 'when is this due?' to the todo skill's ask-first workflow as a follow-up question after title/area.",
+    "files": [
+      "crates/feature-tasks/src/handlers/enrichment.rs",
+      "crates/feature-tasks/src/tool/actions/create.rs",
+      "agents/task/skills/todo.md",
+      "desktop-ui/src/features/tasks/"
+    ],
+    "discovered": "2026-03-12",
+    "context": "Found during Phase 2 E2E testing — all test tasks were created without due dates, making plan_day scoring less effective. The plumbing (schema, urgency calc, scoring weight) is complete; the gap is in data capture and display."
+  }
+]
