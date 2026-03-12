@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use serde_json::Value;
 use tracing::warn;
 
-use super::{InteractionBundle, RoutingContext, Tool};
+use crate::{InteractionBundle, RoutingContext, Tool};
 use common::{
     Answer, AnswerOption, AnswerType, AnswerValue, FormResponse, InteractionRequest, Question,
     Result, ToolError,

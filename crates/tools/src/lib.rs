@@ -1,8 +1,8 @@
 //! Klyntbot Tools - Core tool implementations and domain tool interfaces.
 //!
 //! This crate provides:
-//! - Core tool implementations: filesystem (x4), web (x2), message, spawn, cron
-//! - Domain tool interfaces: learning, memory, project, area, okr
+//! - System tools: filesystem (x4), web (x2), browser, message, ask_user
+//! - Domain tools: learning, memory, project, area, okr, delegation, cron, etc.
 //! - Embedding infrastructure: engine (fastembed), store (LanceDB)
 //! - Tool registry and permissions
 //!
@@ -16,46 +16,32 @@ pub use tools_core::{
     FeaturePackage, HealthStatus, InteractionBundle, Page, RoutingContext, Searchable, Tool,
 };
 
-// ── Core tool implementations ────────────────────────────────────────────────
-pub mod agent_task_tool;
-pub mod annotate;
-pub mod ask_user;
-pub mod browser;
-pub mod context_request;
-pub mod cron_tool;
-pub mod delegation;
-pub mod docs;
-pub mod filesystem;
-pub mod glob_tool;
-pub mod grep;
-pub mod message;
-pub mod spawn;
-pub mod web;
+// ── Grouped modules ─────────────────────────────────────────────────────────
+pub mod domain;
+pub mod embedding;
+pub mod system;
 
-// ── Domain tool interfaces (handler traits + tool impls) ─────────────────────
-pub mod area_tool;
-pub mod learning_tool;
-pub mod memory_tool;
-pub mod okr_tool;
-pub mod progress_handler;
-pub mod project_tool;
+// ── Module re-exports (backward-compatible paths) ───────────────────────────
+pub use domain::{
+    agent_task_tool, annotate, area_tool, context_request, cron_tool, delegation, docs,
+    learning_tool, memory_tool, okr_tool, project_tool, spawn,
+};
+pub use embedding::{embedding_engine, embedding_store};
+pub use system::{ask_user, browser, filesystem, glob_tool, grep, message, web};
 
-// ── Embedding infrastructure ─────────────────────────────────────────────────
+// ── Shared modules (root-level) ─────────────────────────────────────────────
 pub mod conversation_recall;
-pub mod embedding_engine;
-pub mod embedding_store;
-
-// ── Shared types still consumed by tools-internal modules ────────────────────
+pub mod progress_handler;
 pub mod search_utils;
 pub mod todo_types;
 
-// ── Tool framework ───────────────────────────────────────────────────────────
+// ── Tool framework ──────────────────────────────────────────────────────────
 pub mod params;
 pub mod permissions;
 pub mod registry;
 pub use params::ParamExtractor;
 
-// ── Re-exports for convenient access by consumers ────────────────────────────
+// ── Re-exports for convenient access by consumers ───────────────────────────
 
 // Agent task
 pub use agent_task_tool::{AgentTaskHandler, AgentTaskTool};

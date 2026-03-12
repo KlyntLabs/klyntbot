@@ -639,7 +639,7 @@ Use this to track refactor progress:
 - [x] Phase 4 — `providers` port/adapter split
 - [x] Phase 5 — `channels` platform split into `adapters/`
 - [x] Phase 6 — `cognitive` service layer split into `services/`
-- [ ] Phase 7 — `tools` domain grouping
+- [x] Phase 7 — `tools` domain grouping into `system/`, `domain/`, `embedding/`
 - [ ] Phase 8 — `agent` internal reorganization (8a–8f)
 - [ ] Phase 9 — `context_engine` restructure
 - [ ] Phase 10 — feature crates restructure

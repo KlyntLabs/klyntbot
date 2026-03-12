@@ -5,7 +5,7 @@ use config::TrustLevel;
 use serde_json::Value;
 use tracing::{debug, warn};
 
-use super::{PermissionLevel, RoutingContext, Tool};
+use crate::{PermissionLevel, RoutingContext, Tool};
 use crate::params::ParamExtractor;
 use common::{Result, ToolError};
 

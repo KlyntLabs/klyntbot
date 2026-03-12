@@ -9,7 +9,7 @@ use serde_json::Value;
 use std::sync::Arc;
 use tracing::debug;
 
-use super::{PermissionLevel, RoutingContext, Tool};
+use crate::{PermissionLevel, RoutingContext, Tool};
 use crate::params::ParamExtractor;
 use common::ToolError;
 
