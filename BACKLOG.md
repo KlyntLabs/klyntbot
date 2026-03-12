@@ -555,6 +555,41 @@ Currently:
 
 **References:** `crates/domain/src/area.rs`, `crates/domain/src/key_result.rs`, `crates/domain/src/objective.rs`, `crates/domain/src/project.rs`
 
+### A-042 🟡 Medium | `agents/communication` — No Skills Defined
+
+**Summary:** The communication agent has zero skills and is the only agent without a `skills/` directory. It can route messages but has no specialized workflows for message templates, broadcast coordination, or cross-channel formatting.
+
+**Impact:** Communication agent is the thinnest agent — delegates everything to raw tool calls with no workflow guidance.
+
+**Proposed Fix:**
+- Add a `messaging` skill with workflows for single/broadcast messaging, confirmation patterns, and channel-specific formatting
+- Add a `notification` skill for alert routing preferences and batching
+
+**References:** `agents/communication/AGENT.md`
+
+---
+
+### A-043 🟡 Medium | `agents/general/skills/summarize.md` — References External CLI Binary
+
+**Summary:** The `summarize` skill references an external CLI tool (`summarize` binary) with flags like `--model`, `--youtube`, `--extract-only`. This binary is not part of the klyntbot workspace, not tracked as a dependency, and has no fallback if missing.
+
+**Impact:** Skill silently fails if the CLI is not installed. No error guidance for users.
+
+**Proposed Fix:**
+- Either (a) replace with `web_fetch`-based summarization using the agent's LLM, or (b) add a check step in the skill instructions ("verify `summarize` is installed, if not, use `web_fetch` to get the content and summarize with the LLM directly")
+
+**References:** `agents/general/skills/summarize.md`
+
+---
+
+### A-044 🟢 Low | `agents` — Skill Metadata Contains Redundant `agent` Field
+
+**Summary:** Every skill's YAML frontmatter includes `metadata.agent: <agent_name>`, but the agent is already determined by directory path (`agents/{agent}/skills/{skill}.md`). This creates a maintenance burden — if a skill is moved between agents, the metadata must be manually updated.
+
+**Proposed Fix:** Remove the `agent` field from skill metadata. Update `AgentSkill::parse()` if it reads this field (currently it doesn't — the field is informational only).
+
+**References:** All `agents/*/skills/*.md` files
+
 ---
 
 ## Section B — Pre-Existing Backlog Items

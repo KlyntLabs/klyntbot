@@ -144,7 +144,7 @@ Skills are activated in two ways:
 
 | Agent | Skills |
 |-------|--------|
-| general | memory, search, browser, summarize, weather, skill-creator |
+| general | memory, search, browser, summarize, skill-creator |
 | task | todo, daily-planner, task-decompose, project-management, weekly-review, retrospective |
 | finance | budgeting, spending-analysis |
 | automation | cron |

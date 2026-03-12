@@ -136,7 +136,7 @@ println!("{}", cron_skill.content);
 **Built-in skills** (embedded in binary):
 - `cron` — Natural language scheduling
 - `github` — Repository operations
-- `weather` — Weather forecasts
+
 - `summarize` — Document summarization
 - `tmux` — Terminal multiplexer integration
 - `skill-creator` — Create new skills

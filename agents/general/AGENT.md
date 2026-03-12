@@ -1,25 +1,10 @@
 ---
 name: general
 description: General-purpose assistant and orchestrator
-tools:
-- ask_user
-- memory
-- web_search
-- web_fetch
-- grep
-- glob
-- read_file
-- list_dir
-- spawn
-- learning
-mcp_tools:
-- '*'
+tools: [ask_user, memory, web_search, web_fetch, grep, glob, read_file, list_dir, spawn, learning]
+mcp_tools: ["*"]
 max_iterations: 15
-can_delegate_to:
-- task
-- finance
-- automation
-- communication
+can_delegate_to: [task, finance, automation, communication]
 always_skills: []
 ---
 
