@@ -81,6 +81,35 @@ Dependencies flow strictly upward. `plugin-sdk` and `tests/fixtures/hello_plugin
 
 Five built-in agents in `agents/`: general, task, finance, automation, communication. Each has `AGENT.md` (YAML frontmatter) + `skills/` folder. Compiled via `include_str!`. MCP tool names: `mcp_{server}_{tool}` (see `mcp::sanitize`). MCP access controlled per-agent via `mcp_tools` field (`["*"]` = all, `[]` = none). Task agent has `mcp_tools: ["google-calendar"]` for calendar operations via Google Calendar MCP.
 
+### MCP server — exposing tools to Claude Code
+
+Klyntbot exposes tools to external AI clients (Claude Code, Cursor, etc.) via MCP stdio transport (`klyntbot-mcp serve --stdio`). The desktop app also embeds the MCP server (config: `mcp.server` in `config.json`).
+
+**Architecture:** `ToolRegistryBridge` translates MCP calls → internal `Tool::execute()`. The `agent` tool delegates natural language to the full AI pipeline via `AgentBridge`. Tool names must match the `ToolRegistry` key exactly (e.g. `tasks` not `task`, `notes` not `note`).
+
+**Currently exposed tools:** `tasks`, `project`, `area`, `notes`, `memory`, `okr`, `finance`, `productivity`, `work_context`, `agent` — configured in `default_exposed_tools()` at `crates/config/src/schema/mcp.rs`.
+
+**To expose a new feature tool via MCP:**
+
+1. **Implement the tool** — `#[derive(Tool)]` in a `feature-*` crate, register in `ToolRegistry` via `FeaturePackage::tools()`. The tool's `name()` return value is the registry key.
+2. **Add to default whitelist** — append the tool's registry name to `default_exposed_tools()` in `crates/config/src/schema/mcp.rs`. This controls which tools MCP clients can discover and call.
+3. **Verify the name matches** — run `cargo nextest run -p klyntbot-server` to confirm the tool appears in `list_tools` and passes the whitelist. Common mistake: the tool registers as plural (`tasks`) but you added singular (`task`).
+4. **Test via Claude Code** — rebuild the MCP binary (`cargo build -p klyntbot-mcp`), then in Claude Code call the tool: `mcp__klyntbot__<tool_name>`. No Claude Code config changes needed — it auto-discovers tools via `tools/list`.
+5. **Override per-user** — users can customize the whitelist in `config.json` → `mcp.server.exposedTools`. If a user has overridden this array, new defaults won't take effect until they add the tool manually.
+
+**Claude Code MCP config** (`~/.claude.json`):
+```json
+{
+  "mcpServers": {
+    "klyntbot": {
+      "command": "<path>/target/debug/klyntbot-mcp",
+      "args": ["serve", "--stdio"],
+      "env": { "KLYNTBOT_HOME": "~/.klyntbot-dev" }
+    }
+  }
+}
+```
+
 ### Agent runtime
 
 `AgentRuntime` → `AgentManager` → `IntentAnalyzer` → `ContextEngine` → `ExecutionRouter` → `CostTracker`. Two execution modes: **Direct** (single LLM call, no tools) and **Reactive** (ReAct loop with tool calls, synthesizes at max_iterations). Code in `crates/agent/src/agent_runtime/` and `crates/agent/src/intent_pipeline/`.
