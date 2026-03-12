@@ -443,6 +443,120 @@ Currently:
 
 ---
 
+### A-031 🔴 High | `domain` — Domain Types Dead at Runtime (No Row Bridge)
+
+**Summary:** The `domain` crate defines rich typed entities (`Area`, `Objective`, `KeyResult`, `Project`) with status enums and progress logic. However, **no runtime code path uses them**. All callers (tools, app-core, agent) work directly with `*Row` types from `storage`. No `From<AreaRow> for Area` or inverse bridge exists anywhere in the workspace.
+
+**Impact:** The domain crate is effectively dead code at the application level. Domain invariants (e.g., `KeyResult::recalculate_metric_progress()`) are never called in production.
+
+**Proposed Fix:** Either (a) add `From<XxxRow> for Xxx` bridges + use domain types in tool handlers and app-core, or (b) acknowledge the crate is only a conceptual model and annotate it clearly; strip the unneeded methods.
+
+**References:** `crates/domain/src/`, all `*Row` types in `crates/storage/src/rows/`
+
+---
+
+### A-032 🔴 High | `domain` — `generate_id()` Produces 8-Char Truncated UUIDs
+
+**Summary:** `Area::generate_id()`, `Objective::generate_id()`, `KeyResult::generate_id()`, and `Project::generate_id()` all call `uuid::Uuid::new_v4().to_string()[..8]`, producing 8-character IDs. App-core and tool handlers produce full 36-character UUIDs. Mixed ID lengths exist in the database.
+
+**Impact:** IDs in the `areas`, `objectives`, `key_results`, `projects` tables are 8 chars; IDs in `tasks`, `actions`, `sessions` are 36 chars. Cross-table FK lookups and LLM context injection are more error-prone with inconsistent formats.
+
+**Proposed Fix:** Remove `generate_id()` from domain types. All ID generation should use `uuid::Uuid::new_v4().to_string()` (full UUID) from a single utility in `common`.
+
+**References:** `crates/domain/src/area.rs:22`, `crates/domain/src/key_result.rs:25`, `crates/domain/src/objective.rs:22`, `crates/domain/src/project.rs:19`
+
+---
+
+### A-033 🟡 Medium | `storage` — `resources` and `archive_items` Tables Schema-Only
+
+**Summary:** Two tables in `migrations/001_initial.sql` have explicit "schema-only, no tool support yet" comments: `resources` (L558) and `archive_items` (L574). Neither has a row struct, repo, or any tool implementation. They consume schema space and create false impressions of implemented features.
+
+**Proposed Fix:** Either implement `ResourceRepo` + `ArchiveItemRepo` with associated tools, or drop the tables (pre-release — no migration script needed per CLAUDE.md).
+
+**References:** `crates/storage/migrations/001_initial.sql:558,574`
+
+---
+
+### A-034 🟡 Medium | `storage` — `calendar_sync_state` / `calendar_event_cache` Have No Repo
+
+**Summary:** Both tables are defined in `001_initial.sql:285-309` with full schemas but have no repo struct or row type in the `storage` crate. They are accessed via raw SQL in the `channels` crate, bypassing the storage abstraction layer.
+
+**Proposed Fix:** Add `CalendarSyncStateRepo` and `CalendarEventCacheRepo` with row types to the `storage` crate. Update `channels` to use them.
+
+**References:** `crates/storage/migrations/001_initial.sql:285-309`
+
+---
+
+### A-035 🟡 Medium | `storage` — `tool_usage` Table Has No Dedicated Repo
+
+**Summary:** The `tool_usage` table tracks per-tool call statistics but has no `ToolUsageRepo`. Cleanup is done via raw SQL directly inside `Repos::cleanup_analytics()` with the comment "tool_usage has no dedicated repo — use direct SQL." This bypasses the established repo pattern.
+
+**Proposed Fix:** Create `ToolUsageRepo` with at minimum: `insert()`, `delete_older_than()`, and `aggregate_by_tool()` (for the analytics dashboard).
+
+**References:** `crates/storage/src/repos/mod.rs:146-152`
+
+---
+
+### A-036 🟡 Medium | `storage` — `FinancePortfolioRow` Defined Without `FinancePortfolioRepo`
+
+**Summary:** `rows/finance.rs` defines `FinancePortfolioRow` and `PortfolioSummaryRow`, but there is no `FinancePortfolioRepo`. Finance investments reference portfolios via FK (`finance_investments.portfolio_id`) but portfolios cannot be created or managed through the storage API.
+
+**Proposed Fix:** Add `FinancePortfolioRepo` to the `finance_storage` module alongside the other 6 finance repos. Add to `FinanceStorage` aggregate.
+
+**References:** `crates/storage/src/rows/finance.rs`, `crates/storage/src/finance_storage.rs`
+
+---
+
+### A-037 🟡 Medium | `storage` — `custom_column_values.task_id` FK Points to `actions`, Not `tasks`
+
+**Summary:** In `migrations/006_custom_columns.sql:17`, the column is named `task_id` but the FK is `REFERENCES actions(id)`. This is inconsistent: the field name implies `tasks` (the newer `feature-tasks` entity) but points to `actions` (the legacy `feature-todo` entity). When the `feature-todo` → `feature-tasks` migration happens (see A-009), this FK needs updating.
+
+**Proposed Fix:** When deprecating `feature-todo`, migrate `custom_column_values.task_id` FK from `actions(id)` to `tasks(id)`.
+
+**References:** `crates/storage/migrations/006_custom_columns.sql:17`
+
+---
+
+### A-038 🟢 Low | `storage` — `FinanceInvestmentTxRow` Not Re-Exported from `lib.rs`
+
+**Summary:** `rows::finance::FinanceInvestmentTxRow` is defined in `rows/finance.rs` but is the only row type not re-exported from `lib.rs`. It is accessible only via `storage::rows::finance::FinanceInvestmentTxRow` — breaking the flat public API convention.
+
+**Proposed Fix:** Add `pub use rows::finance::FinanceInvestmentTxRow;` to `crates/storage/src/lib.rs`.
+
+**References:** `crates/storage/src/lib.rs`, `crates/storage/src/rows/finance.rs`
+
+---
+
+### A-039 🟢 Low | `storage` — `session_context.rs` Tests Use File-Based Pool + `dir.keep()`
+
+**Summary:** `repos/session_context.rs:175-183` is the only repo test file that uses `StoragePool::connect(dir.path())` (file-based) instead of `connect_in_memory()`. It also calls `dir.keep()` to prevent cleanup, which leaves orphaned temp directories on the filesystem after each test run.
+
+**Proposed Fix:** Migrate to `connect_in_memory()`. The only reason file-based was needed is if the tests relied on `session_context` requiring a prior `sessions` FK — which `connect_in_memory()` handles via migrations. *(Note: `session_context` has a FK to `sessions` — ensure `sessions` is seeded first.)*
+
+**References:** `crates/storage/src/repos/session_context.rs:174-183`
+
+---
+
+### A-040 🟢 Low | `storage` — `session_context.rs` Manual Timestamp Formatting
+
+**Summary:** Four places in `repos/session_context.rs` (L31, L81, L145, L157) manually format timestamps with `.format("%Y-%m-%dT%H:%M:%SZ").to_string()` and then bind them as strings. All other repos bind `chrono::DateTime<Utc>` directly via sqlx, which handles the format correctly. This inconsistency can cause subtle timestamp comparison bugs if formats diverge.
+
+**Proposed Fix:** Replace manual format strings with direct `Utc::now()` chrono binding.
+
+**References:** `crates/storage/src/repos/session_context.rs:31,81,145,157`
+
+---
+
+### A-041 🟢 Low | `domain` — `from_str_loose()` / `as_str()` / `is_terminal()` Are Dead Code
+
+**Summary:** All status and color enums in the `domain` crate implement `from_str_loose()`, `as_str()`, and (for terminal-state enums) `is_terminal()`. None of these methods have callers outside `#[cfg(test)]` blocks in the same file. They exist in anticipation of the domain-bridge work (A-031) but are currently dead.
+
+**Proposed Fix:** Either (a) implement A-031 and these methods become live, or (b) remove them and replace with standard `Display`/`FromStr` derives via `strum` to reduce boilerplate.
+
+**References:** `crates/domain/src/area.rs`, `crates/domain/src/key_result.rs`, `crates/domain/src/objective.rs`, `crates/domain/src/project.rs`
+
+---
+
 ## Section B — Pre-Existing Backlog Items
 
 These items were in `BACKLOG.json` at time of refactor analysis.

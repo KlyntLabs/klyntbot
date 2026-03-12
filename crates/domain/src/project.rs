@@ -97,3 +97,60 @@ impl ProjectColor {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_project_status_roundtrip() {
+        for (s, expected) in [
+            ("active", ProjectStatus::Active),
+            ("paused", ProjectStatus::Paused),
+            ("completed", ProjectStatus::Completed),
+            ("archived", ProjectStatus::Archived),
+        ] {
+            let parsed = ProjectStatus::from_str_loose(s).unwrap();
+            assert_eq!(parsed, expected);
+            assert_eq!(parsed.as_str(), s);
+        }
+    }
+
+    #[test]
+    fn test_project_color_roundtrip() {
+        for (s, expected) in [
+            ("red", ProjectColor::Red),
+            ("orange", ProjectColor::Orange),
+            ("yellow", ProjectColor::Yellow),
+            ("green", ProjectColor::Green),
+            ("blue", ProjectColor::Blue),
+            ("purple", ProjectColor::Purple),
+            ("gray", ProjectColor::Gray),
+        ] {
+            let parsed = ProjectColor::from_str_loose(s).unwrap();
+            assert_eq!(parsed, expected);
+            assert_eq!(parsed.as_str(), s);
+        }
+    }
+
+    #[test]
+    fn test_project_color_grey_alias() {
+        // "grey" (UK spelling) should resolve to Gray
+        assert_eq!(
+            ProjectColor::from_str_loose("grey"),
+            Some(ProjectColor::Gray)
+        );
+        assert_eq!(
+            ProjectColor::from_str_loose("GREY"),
+            Some(ProjectColor::Gray)
+        );
+    }
+
+    #[test]
+    fn test_project_id_generation() {
+        let id = Project::generate_id();
+        assert_eq!(id.len(), 8);
+        // Two generated IDs must differ (with overwhelming probability)
+        assert_ne!(id, Project::generate_id());
+    }
+}
