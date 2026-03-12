@@ -93,7 +93,7 @@ pub trait WsHandler: Send + Sync {
 
 /// Manages a single WebSocket session: connect → heartbeat → read loop → cleanup.
 ///
-/// Callers wrap [`WebSocketManager::run`] in [`super::reconnect_loop`] for automatic reconnection.
+/// Callers wrap [`WebSocketManager::run`] in [`crate::reconnect_loop`] for automatic reconnection.
 pub struct WebSocketManager {
     running: Arc<AtomicBool>,
 }

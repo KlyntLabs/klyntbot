@@ -683,7 +683,7 @@ impl Channel for DiscordChannel {
 
         let manager = WebSocketManager::new(self.running.clone());
 
-        super::reconnect_loop("Discord", &self.running, || manager.run(&config, self)).await;
+        crate::reconnect_loop("Discord", &self.running, || manager.run(&config, self)).await;
 
         Ok(())
     }

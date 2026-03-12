@@ -574,7 +574,7 @@ impl Channel for SlackChannel {
         // Get a fresh socket URL for each connection attempt
         let get_socket_url = || self.get_socket_url();
 
-        super::reconnect_loop("Slack", &self.running, || async {
+        crate::reconnect_loop("Slack", &self.running, || async {
             let socket_url = get_socket_url().await?;
 
             let config = WsConfig {

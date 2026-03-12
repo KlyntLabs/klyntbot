@@ -1,6 +1,8 @@
-//! Klyntbot Channels - Chat platform integrations
+//! Klyntbot Channels — Chat platform integrations.
 //!
-//! This crate provides channel implementations for various chat platforms.
+//! This crate defines the [`Channel`] trait (the port) and concrete adapters
+//! for various messaging platforms. The [`manager`] module orchestrates
+//! channel lifecycle and outbound message dispatch.
 
 use async_trait::async_trait;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -12,25 +14,22 @@ use tracing::{error, info};
 use bus::{MessageBus, OutboundMessage};
 use common::{FormResponse, InteractionRequest, Result};
 
-pub mod discord;
-#[cfg(feature = "email")]
-pub mod email;
+pub mod adapters;
 pub mod formatter;
 pub mod manager;
 pub mod shared;
-pub mod slack;
-pub mod telegram;
 pub mod utils;
 pub mod ws_manager;
 
-pub use discord::DiscordChannel;
+// ── Adapters ──────────────────────────────────────────────
+pub use adapters::{DiscordChannel, SlackChannel, TelegramChannel};
 #[cfg(feature = "email")]
-pub use email::EmailChannel;
-pub use manager::ChannelManager;
-pub use slack::SlackChannel;
-pub use telegram::TelegramChannel;
+pub use adapters::EmailChannel;
 
-/// Channel trait - implemented by all chat platforms
+// ── Manager ───────────────────────────────────────────────
+pub use manager::ChannelManager;
+
+/// Channel trait — implemented by all chat platform adapters.
 #[async_trait]
 pub trait Channel: Send + Sync {
     /// Channel name (e.g., "telegram", "discord")

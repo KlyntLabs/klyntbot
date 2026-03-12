@@ -632,12 +632,12 @@ These items were in `BACKLOG.json` at time of refactor analysis.
 
 Use this to track refactor progress:
 
-- [ ] Phase 0 — Baseline established (tests pass, clippy clean)
-- [ ] Phase 1 — `common` restructured
-- [ ] Phase 2 — `config` loader split
-- [ ] Phase 3 — `storage` vertical-slice grouping
-- [ ] Phase 4 — `providers` port/adapter split
-- [ ] Phase 5 — `channels` platform split + stubs
+- [x] Phase 0 — Baseline established (tests pass, clippy clean)
+- [x] Phase 1 — `common` restructured
+- [x] Phase 2 — `config` loader split
+- [x] Phase 3 — `storage` vertical-slice grouping
+- [x] Phase 4 — `providers` port/adapter split
+- [x] Phase 5 — `channels` platform split into `adapters/`
 - [ ] Phase 6 — `cognitive` clean architecture layout
 - [ ] Phase 7 — `tools` domain grouping
 - [ ] Phase 8 — `agent` internal reorganization (8a–8f)
