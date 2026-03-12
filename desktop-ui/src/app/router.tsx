@@ -9,6 +9,11 @@ const AppShell = lazy(() => import("./layouts/AppShell").then((m) => ({ default:
 
 // ── Tasks Feature ─────────────────────────────────────────────────
 const TasksPage = lazy(() => import("../features/tasks").then((m) => ({ default: m.TasksPage })));
+
+// ── Tasks2 Feature ────────────────────────────────────────────────
+const Tasks2Page = lazy(() =>
+  import("../features/tasks2").then((m) => ({ default: m.Tasks2Page })),
+);
 const ProjectDetailPage = lazy(() =>
   import("../features/tasks").then((m) => ({ default: m.ProjectDetailPage })),
 );
@@ -197,6 +202,7 @@ export const router = createHashRouter([
       { path: "/system", element: <SystemPage /> },
       { path: "/system/:tab", element: <SystemPage /> },
       { path: "/tasks", element: <TasksPage /> },
+      { path: "/tasks2", element: <Tasks2Page /> },
       { path: "/chat", element: <ChatPage /> },
       { path: "/notes", element: <NotesPage /> },
       { path: "/project/:id", element: <ProjectDetailPage /> },
