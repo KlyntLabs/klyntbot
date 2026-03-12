@@ -19,7 +19,8 @@ pub async fn init(app_handle: tauri::AppHandle) -> Result<AppCore, String> {
     let sender = Arc::new(crate::notify::TauriNotificationSender::new(
         app_handle.clone(),
     ));
-    let (core, channels) = AppCore::init_with_sender(None, Some(sender)).await?;
+    let (core, channels) =
+        AppCore::init_with_sender(common::AppMode::Desktop, None, Some(sender)).await?;
     wire_event_channels(&core, channels, &app_handle);
     Ok(core)
 }

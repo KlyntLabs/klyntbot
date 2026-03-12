@@ -11,6 +11,7 @@ use crate::KlyntbotError;
 // ── Well-known channel / sender constants ─────────────────────────────────
 pub const SYSTEM_CHANNEL: &str = "system";
 pub const CLI_CHANNEL: &str = "cli";
+pub const MCP_CHANNEL: &str = "mcp";
 pub const TELEGRAM_RESET_SENDER: &str = "telegram_reset";
 
 /// Channel name (e.g., "telegram", "discord")
@@ -121,6 +122,17 @@ impl From<&str> for SessionKey {
     fn from(s: &str) -> Self {
         Self(s.to_string())
     }
+}
+
+/// Runtime mode for the application entry point.
+/// Controls which subsystems are initialized during `AppCore::init()`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum AppMode {
+    /// Full desktop app: channels, productivity, coaching, everything.
+    #[default]
+    Desktop,
+    /// Headless MCP server: storage, agent, cron only.
+    Server,
 }
 
 /// Message role in conversations

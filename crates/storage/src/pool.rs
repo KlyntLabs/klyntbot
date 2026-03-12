@@ -25,6 +25,9 @@ impl StoragePool {
         sqlx::query("PRAGMA foreign_keys=ON;")
             .execute(&pool)
             .await?;
+        sqlx::query("PRAGMA busy_timeout = 5000;")
+            .execute(&pool)
+            .await?;
         sqlx::migrate!("./migrations").run(&pool).await?;
         Ok(Self(pool))
     }
@@ -40,6 +43,9 @@ impl StoragePool {
     pub async fn connect_in_memory() -> Result<Self, StorageError> {
         let pool = sqlx::SqlitePool::connect("sqlite::memory:").await?;
         sqlx::query("PRAGMA foreign_keys=ON;")
+            .execute(&pool)
+            .await?;
+        sqlx::query("PRAGMA busy_timeout = 5000;")
             .execute(&pool)
             .await?;
         sqlx::migrate!("./migrations").run(&pool).await?;

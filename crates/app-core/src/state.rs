@@ -32,6 +32,7 @@ pub type HandlerResult<T> = Result<(T, Vec<EntityUpdate>), ApiError>;
 /// This struct is transport-agnostic: no Tauri, no Axum references.
 /// Desktop and dev-server each wrap it with their own event wiring.
 pub struct AppCore {
+    pub mode: common::AppMode,
     pub repos: Repos,
     pub storage_pool: StoragePool,
     pub agent: Arc<AgentLoop>,

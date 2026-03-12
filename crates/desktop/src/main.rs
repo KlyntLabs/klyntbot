@@ -80,6 +80,32 @@ fn main() {
                 });
             }
 
+            // Start embedded MCP HTTP server if enabled in config.
+            // Must clone before app.manage(core) moves the Arc.
+            {
+                let mcp_core = Arc::clone(&core);
+                let enabled = tauri::async_runtime::block_on(async {
+                    mcp_core.config.read().await.mcp.server.enabled
+                });
+                if enabled {
+                    tauri::async_runtime::spawn(async move {
+                        let config = mcp_core.config.read().await;
+                        let host = config.mcp.server.host.clone();
+                        let port = config.mcp.server.port;
+                        let whitelist = config.mcp.server.exposed_tools.clone();
+                        drop(config);
+                        tracing::info!("Starting embedded MCP HTTP server on {host}:{port}");
+                        let handler =
+                            klyntbot_server::KlyntbotServerHandler::new(mcp_core, whitelist);
+                        // TODO: Wire rmcp streamable HTTP server transport
+                        tracing::warn!(
+                            "HTTP transport not yet implemented — MCP server not started"
+                        );
+                        let _ = handler;
+                    });
+                }
+            }
+
             app.manage(core);
             app.manage(Arc::new(focus_timer::FocusTimer::new()));
 

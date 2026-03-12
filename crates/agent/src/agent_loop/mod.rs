@@ -82,6 +82,12 @@ pub struct AgentLoop {
 }
 
 impl AgentLoop {
+    /// Public accessor for the tool registry.
+    /// Used by `klyntbot-server` to bridge internal tools to MCP.
+    pub fn tool_registry(&self) -> Arc<RwLock<tools::registry::ToolRegistry>> {
+        Arc::clone(&self.tool_registry)
+    }
+
     /// Handle emoji reactions by mapping to satisfaction scores.
     /// Updates the most recent strategy_record for this chat. No response sent.
     async fn handle_reaction(&self, msg: &bus::InboundMessage) -> common::Result<()> {

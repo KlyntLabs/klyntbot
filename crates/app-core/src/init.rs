@@ -40,9 +40,10 @@ impl AppCore {
     /// Returns `(AppCore, EventChannels)`. The caller wires `EventChannels`
     /// receivers to their transport layer (Tauri events, SSE, etc.).
     pub async fn init(
+        mode: common::AppMode,
         config_override: Option<config::Config>,
     ) -> Result<(Self, EventChannels), String> {
-        Self::init_with_sender(config_override, None).await
+        Self::init_with_sender(mode, config_override, None).await
     }
 
     /// Initialize with an optional custom notification sender.
@@ -51,6 +52,7 @@ impl AppCore {
     /// (e.g. Tauri's notification plugin, which shows the app icon). When
     /// `None`, the default platform command (`osascript` / `notify-send`) is used.
     pub async fn init_with_sender(
+        mode: common::AppMode,
         config_override: Option<config::Config>,
         notification_sender: Option<Arc<dyn common::NotificationSender>>,
     ) -> Result<(Self, EventChannels), String> {
@@ -355,53 +357,77 @@ impl AppCore {
             (None, None, None, None, None, None, None, None, None)
         };
 
-        // Initialize coaching engine state.
-        let signal_accumulator = Arc::new(Mutex::new(SignalAccumulator::new()));
-        let pattern_detector = Arc::new(Mutex::new(PatternDetector::new()));
-        let intervention_router = Arc::new(Mutex::new(InterventionRouter::new(Default::default())));
-        let coaching_repo = storage::CoachingStrategyRepo::new(storage_pool.inner().clone());
-        let mut tracker = FeedbackTracker::new().with_repo(coaching_repo);
-        tracker.load_from_db().await;
-        let feedback_tracker = Arc::new(Mutex::new(tracker));
-
-        // Compute real user situation now that productivity_repos is available.
-        {
-            let real_situation = build_situation_inputs(
-                productivity_repos.as_ref(),
-                &repos,
-                None, // router just created, no dismissals yet
-            )
-            .await;
-            *user_situation.lock().await = real_situation;
-        }
-
-        // Start CoachingService — processes domain events through coaching pipeline.
-        let coaching_reasoner: Arc<dyn feature_coaching::CoachingReasonerHandler> =
-            if let Some(ref cp) = cognitive_provider {
-                let params = providers::cognitive_chat_params(&config, 1024);
-                Arc::new(agent::cognitive_handlers::LlmCoachingReasonerHandler::new(
-                    cp.clone(),
-                    params,
-                ))
-            } else {
-                Arc::new(agent::cognitive_handlers::HeuristicCoachingReasonerHandler)
-            };
-
-        let coaching_cancel = shutdown_token.child_token();
+        // Always create the intervention channel pair (EventChannels requires it).
         let (intervention_tx, intervention_rx) =
             mpsc::channel::<feature_coaching::router::DeliveredIntervention>(64);
-        let coaching_service = feature_coaching::CoachingService::start(
-            domain_event_bus.subscribe(),
-            signal_accumulator.clone(),
-            pattern_detector.clone(),
-            intervention_router.clone(),
-            feedback_tracker.clone(),
-            user_situation.clone(),
-            coaching_reasoner,
-            intervention_tx,
-            coaching_cancel,
-        );
-        info!("coaching service started");
+
+        let (
+            signal_accumulator,
+            pattern_detector,
+            intervention_router,
+            feedback_tracker,
+            coaching_service,
+        ) = if mode == common::AppMode::Desktop {
+            // Initialize coaching engine state.
+            let signal_accumulator = Arc::new(Mutex::new(SignalAccumulator::new()));
+            let pattern_detector = Arc::new(Mutex::new(PatternDetector::new()));
+            let intervention_router =
+                Arc::new(Mutex::new(InterventionRouter::new(Default::default())));
+            let coaching_repo = storage::CoachingStrategyRepo::new(storage_pool.inner().clone());
+            let mut tracker = FeedbackTracker::new().with_repo(coaching_repo);
+            tracker.load_from_db().await;
+            let feedback_tracker = Arc::new(Mutex::new(tracker));
+
+            // Compute real user situation now that productivity_repos is available.
+            {
+                let real_situation = build_situation_inputs(
+                    productivity_repos.as_ref(),
+                    &repos,
+                    None, // router just created, no dismissals yet
+                )
+                .await;
+                *user_situation.lock().await = real_situation;
+            }
+
+            // Start CoachingService — processes domain events through coaching pipeline.
+            let coaching_reasoner: Arc<dyn feature_coaching::CoachingReasonerHandler> =
+                if let Some(ref cp) = cognitive_provider {
+                    let params = providers::cognitive_chat_params(&config, 1024);
+                    Arc::new(agent::cognitive_handlers::LlmCoachingReasonerHandler::new(
+                        cp.clone(),
+                        params,
+                    ))
+                } else {
+                    Arc::new(agent::cognitive_handlers::HeuristicCoachingReasonerHandler)
+                };
+
+            let coaching_cancel = shutdown_token.child_token();
+            let coaching_service = feature_coaching::CoachingService::start(
+                domain_event_bus.subscribe(),
+                signal_accumulator.clone(),
+                pattern_detector.clone(),
+                intervention_router.clone(),
+                feedback_tracker.clone(),
+                user_situation.clone(),
+                coaching_reasoner,
+                intervention_tx.clone(),
+                coaching_cancel,
+            );
+            info!("coaching service started");
+
+            (
+                Some(signal_accumulator),
+                Some(pattern_detector),
+                Some(intervention_router),
+                Some(feedback_tracker),
+                Some(coaching_service),
+            )
+        } else {
+            // Server mode: drop intervention_tx so intervention_rx.recv() returns None immediately.
+            drop(intervention_tx);
+            info!("coaching service skipped (server mode)");
+            (None, None, None, None, None)
+        };
 
         // Phase 3: Auto-generate ingestion token on first startup if missing.
         if config.capture.ingestion_api.enabled && config.capture.ingestion_api.token.is_none() {
@@ -460,6 +486,7 @@ impl AppCore {
         }
 
         let core = AppCore {
+            mode,
             repos,
             storage_pool: storage_pool.clone(),
             agent: Arc::clone(&agent),
@@ -479,12 +506,12 @@ impl AppCore {
             nudge_service,
             distraction_interceptor,
             domain_event_bus: Some(Arc::clone(&domain_event_bus)),
-            signal_accumulator: Some(signal_accumulator),
-            pattern_detector: Some(pattern_detector),
-            intervention_router: Some(intervention_router),
-            feedback_tracker: Some(feedback_tracker),
+            signal_accumulator,
+            pattern_detector,
+            intervention_router,
+            feedback_tracker,
             user_situation: Some(user_situation),
-            coaching_service: Some(Arc::new(Mutex::new(coaching_service))),
+            coaching_service: coaching_service.map(|cs| Arc::new(Mutex::new(cs))),
             cognitive_provider,
             pipeline_broadcast: Some(pipeline_broadcast_tx),
             event_log_repo: Some(cognitive::EventLogRepo::new(storage_pool.inner().clone())),

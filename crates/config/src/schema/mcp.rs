@@ -130,6 +130,16 @@ pub enum McpTransport {
     },
 }
 
+/// Authentication configuration for the MCP server.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct McpAuthConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub token: Option<Secret<String>>,
+}
+
 /// Server-side MCP settings (expose klyntbot as an MCP server).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -140,6 +150,10 @@ pub struct McpServerSettings {
     pub port: u16,
     #[serde(default = "default_localhost")]
     pub host: String,
+    #[serde(default = "default_exposed_tools")]
+    pub exposed_tools: Vec<String>,
+    #[serde(default)]
+    pub auth: McpAuthConfig,
 }
 
 impl Default for McpServerSettings {
@@ -148,6 +162,8 @@ impl Default for McpServerSettings {
             enabled: false,
             port: default_mcp_port(),
             host: default_localhost(),
+            exposed_tools: default_exposed_tools(),
+            auth: McpAuthConfig::default(),
         }
     }
 }
@@ -157,6 +173,23 @@ fn default_mcp_port() -> u16 {
 }
 fn default_localhost() -> String {
     "127.0.0.1".to_string()
+}
+fn default_exposed_tools() -> Vec<String> {
+    [
+        "task",
+        "project",
+        "area",
+        "note",
+        "memory",
+        "objective",
+        "key_result",
+        "finance",
+        "productivity",
+        "work_context",
+        "agent",
+    ]
+    .map(String::from)
+    .to_vec()
 }
 
 #[cfg(test)]

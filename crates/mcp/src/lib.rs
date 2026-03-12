@@ -14,4 +14,5 @@ pub use config::McpConfig;
 pub use client::events::McpStartupEvent;
 pub use client::manager::McpManager;
 pub use client::sanitize;
+pub use server::security;
 pub use server::McpServerRunner;
