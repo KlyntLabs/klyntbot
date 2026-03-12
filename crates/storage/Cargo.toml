@@ -8,7 +8,6 @@ common.workspace = true
 tools-core.workspace = true
 sqlx.workspace = true
 lancedb.workspace = true
-arrow.workspace = true
 arrow-array.workspace = true
 arrow-schema.workspace = true
 uuid.workspace = true
