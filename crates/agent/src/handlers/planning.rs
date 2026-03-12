@@ -63,7 +63,7 @@ impl LlmDayPlanningHandler {
 
     fn emit(&self, event: DomainEvent) {
         if let Some(bus) = &self.domain_bus {
-            let _ = bus.publish(event);
+            bus.publish(event);
         }
     }
 }

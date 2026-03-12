@@ -45,12 +45,13 @@ impl LlmTaskExecutionHandler {
                     "Execution {execution_id} not found"
                 ))
             })
-            .map_err(Into::into)
+
+
     }
 
     fn emit(&self, event: DomainEvent) {
         if let Some(bus) = &self.domain_bus {
-            let _ = bus.publish(event);
+            bus.publish(event);
         }
     }
 }
