@@ -14,46 +14,46 @@ pub mod repos;
 pub mod rows;
 pub mod vector_store;
 
+// ── Core infrastructure ─────────────────────────────────────────────
 pub use error::{OptionExt, StorageError};
 pub use pool::StoragePool;
 pub use repos::Repos;
 pub use vector_store::{sanitize_predicate_value, VectorStore};
 
-// Re-export repo types for consumer convenience.
-pub use repos::action_repo::{
-    ActionFilter, ActionPatch, ActionRepo, ActionSummary, TimeEntryWithTask,
-};
-pub use repos::area::AreaRepo;
-pub use repos::key_result::KeyResultRepo;
-pub use repos::objective::ObjectiveRepo;
-pub use repos::project_repo::{ProjectFilter, ProjectPatch, ProjectRepo, ProjectWithStats};
-pub use repos::AgentTaskRepo;
-pub use repos::CronRepo;
-pub use repos::DecisionLogRepo;
-pub use repos::EntityLinkRepo;
-pub use repos::InteractionLogRepo;
-pub use repos::LearningStateRepo;
-pub use repos::OutcomeRepo;
-pub use repos::ProjectSourceRepo;
-pub use repos::SessionRepo;
-pub use repos::UsageRepo;
+// ── Actions / Tasks / Projects ──────────────────────────────────────
+pub use repos::action_repo::TimeEntryWithTask;
+pub use repos::{ActionFilter, ActionPatch, ActionRepo, ActionSummary};
+pub use repos::{CustomColumnRepo, TaskGroupRepo};
+pub use repos::{EntityLinkRepo, ProjectSourceRepo};
+pub use repos::{ProjectFilter, ProjectPatch, ProjectRepo, ProjectWithStats};
+pub use repos::{TaskFilter, TaskPatch, TaskRepo, TaskSummary};
+
+// ── OKR ─────────────────────────────────────────────────────────────
+pub use repos::{AreaRepo, KeyResultRepo, ObjectiveRepo};
+
+// ── Sessions / Context ──────────────────────────────────────────────
+pub use repos::{SessionContextRepo, SessionRepo};
+
+// ── Agent / Learning ────────────────────────────────────────────────
+pub use repos::StatusWorkflowRepo;
+pub use repos::{AgentTaskRepo, CronRepo, UsageRepo};
 pub use repos::{CoachingStrategyRepo, CoachingStrategyRow, UpsertCoachingStrategy};
+pub use repos::{DecisionLogRepo, InteractionLogRepo, LearningStateRepo, OutcomeRepo};
 pub use repos::{OverallStats, StrategyRepo, ToolStatsRow};
 
-// Re-export finance types.
+// ── Finance ─────────────────────────────────────────────────────────
 pub use finance_storage::FinanceStorage;
-pub use repos::FinanceAccountRepo;
-pub use repos::FinanceBudgetRepo;
-pub use repos::FinanceGoalRepo;
-pub use repos::FinanceInvestmentRepo;
-pub use repos::FinanceLiabilityRepo;
-pub use repos::FinanceTransactionRepo;
+pub use repos::{
+    FinanceAccountRepo, FinanceBudgetRepo, FinanceGoalRepo, FinanceInvestmentRepo,
+    FinanceLiabilityRepo, FinanceTransactionRepo,
+};
 
-// Re-export row structs for consumer convenience.
+// ── Row structs ─────────────────────────────────────────────────────
 pub use rows::action::{ActionAttachmentRow, ActionDependencyRow, ActionRow, ActionTimeEntryRow};
 pub use rows::agent_task::AgentTaskRow;
 pub use rows::area::AreaRow;
 pub use rows::cron::CronJobRow;
+pub use rows::custom_column::{CustomColumnRow, CustomColumnValueRow};
 pub use rows::entity_link::EntityLinkRow;
 pub use rows::key_result::KeyResultRow;
 pub use rows::learning::{
@@ -70,13 +70,3 @@ pub use rows::task::{
 };
 pub use rows::task_group::TaskGroupRow;
 pub use rows::usage::UsageRecordRow;
-
-// Re-export task repo types.
-pub use repos::task_repo::{TaskFilter, TaskPatch, TaskRepo, TaskSummary};
-
-// Re-export task group repo.
-pub use repos::task_group::TaskGroupRepo;
-
-// Re-export custom column types.
-pub use repos::custom_column::CustomColumnRepo;
-pub use rows::custom_column::{CustomColumnRow, CustomColumnValueRow};
