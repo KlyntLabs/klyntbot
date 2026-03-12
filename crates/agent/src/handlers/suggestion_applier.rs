@@ -49,12 +49,8 @@ impl SuggestionApplier for TaskSuggestionApplier {
                 let dt = chrono::DateTime::parse_from_rfc3339(due_date)
                     .or_else(|_| {
                         // Try YYYY-MM-DD format
-                        chrono::NaiveDate::parse_from_str(due_date, "%Y-%m-%d").map(|d| {
-                            d.and_hms_opt(0, 0, 0)
-                                .unwrap()
-                                .and_utc()
-                                .fixed_offset()
-                        })
+                        chrono::NaiveDate::parse_from_str(due_date, "%Y-%m-%d")
+                            .map(|d| d.and_hms_opt(0, 0, 0).unwrap().and_utc().fixed_offset())
                     })
                     .map_err(|e| {
                         common::ToolError::ExecutionFailed(format!("Invalid date: {e}"))
@@ -133,9 +129,7 @@ impl SuggestionApplier for TaskSuggestionApplier {
                     .await?;
                 format!("Set energy level to {level}")
             }
-            SuggestionAction::Informational => {
-                "Informational suggestion — no action taken".into()
-            }
+            SuggestionAction::Informational => "Informational suggestion — no action taken".into(),
         };
 
         // Mark suggestion as applied

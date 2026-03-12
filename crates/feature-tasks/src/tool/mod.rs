@@ -10,8 +10,8 @@ use bus::DomainEventBus;
 
 use crate::config::TasksConfig;
 use crate::handlers::{
-    DayPlanningHandler, DecompositionHandler, EmbeddingHandler, EnrichmentHandler,
-    ForecastHandler, ProactiveHandler, SuggestionApplier, TaskExecutionHandler,
+    DayPlanningHandler, DecompositionHandler, EmbeddingHandler, EnrichmentHandler, ForecastHandler,
+    ProactiveHandler, SuggestionApplier, TaskExecutionHandler,
 };
 use crate::types::{Attachment, Task, TimeEntry};
 use common::{Result, ToolError};
@@ -223,7 +223,7 @@ impl Tool for TaskTool {
     }
 
     fn description(&self) -> &str {
-        "Manage tasks with agentic execution support. Actions: create, update, complete, delete, show, list, summary, tree, search, focus, unfocus, log_time, add_dep, remove_dep, batch, recur, list_recurring, delete_recurring, plan_day, decompose, execute, cancel_execution, suggest, apply_suggestion, dismiss_suggestion, list_suggestions."
+        "Manage tasks with agentic execution support. Actions: create, update, complete, delete, show, list, summary, tree, search, focus, unfocus, log_time, add_dep, remove_dep, batch, recur, list_recurring, delete_recurring, plan_day, decompose, execute, cancel_execution, suggest, apply_suggestion, dismiss_suggestion, list_suggestions, forecast_task, forecast_project, accuracy_report."
     }
 
     fn parameters(&self) -> Value {

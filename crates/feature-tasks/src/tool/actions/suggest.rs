@@ -60,10 +60,7 @@ impl TaskTool {
         Ok(output)
     }
 
-    pub(crate) async fn handle_apply_suggestion(
-        &self,
-        p: &ParamExtractor<'_>,
-    ) -> Result<String> {
+    pub(crate) async fn handle_apply_suggestion(&self, p: &ParamExtractor<'_>) -> Result<String> {
         let applier = self.suggestion_applier.as_ref().ok_or_else(|| {
             common::ToolError::ExecutionFailed("Suggestion applier not available".into())
         })?;
@@ -87,9 +84,7 @@ impl TaskTool {
             .map(serde_json::from_str)
             .transpose()
             .map_err(|e| common::ToolError::ExecutionFailed(format!("Invalid action: {e}")))?
-            .ok_or_else(|| {
-                common::ToolError::ExecutionFailed("No action payload".into())
-            })?;
+            .ok_or_else(|| common::ToolError::ExecutionFailed("No action payload".into()))?;
 
         let summary = applier
             .apply(suggestion_id, suggestion.task_id.as_deref(), &action)
@@ -98,10 +93,7 @@ impl TaskTool {
         Ok(format!("Applied suggestion: {summary}"))
     }
 
-    pub(crate) async fn handle_dismiss_suggestion(
-        &self,
-        p: &ParamExtractor<'_>,
-    ) -> Result<String> {
+    pub(crate) async fn handle_dismiss_suggestion(&self, p: &ParamExtractor<'_>) -> Result<String> {
         let suggestion_id = p.required_str("suggestion_id")?;
         self.repo
             .resolve_suggestion(suggestion_id, "dismissed")
@@ -109,10 +101,7 @@ impl TaskTool {
         Ok(format!("Dismissed suggestion {suggestion_id}"))
     }
 
-    pub(crate) async fn handle_list_suggestions(
-        &self,
-        _p: &ParamExtractor<'_>,
-    ) -> Result<String> {
+    pub(crate) async fn handle_list_suggestions(&self, _p: &ParamExtractor<'_>) -> Result<String> {
         let suggestions = self.repo.list_pending_suggestions(None).await?;
         if suggestions.is_empty() {
             return Ok("No pending suggestions.".into());

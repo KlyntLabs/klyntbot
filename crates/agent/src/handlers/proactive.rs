@@ -12,8 +12,7 @@ use providers::{ChatParams, DynProvider, Message, ResponseFormat};
 use tracing::{debug, warn};
 
 use feature_tasks::types::{
-    SuggestionAction, SuggestionCandidate, SuggestionScope, SuggestionTrigger, SuggestionType,
-    Task,
+    SuggestionAction, SuggestionCandidate, SuggestionScope, SuggestionTrigger, SuggestionType, Task,
 };
 use feature_tasks::ProactiveHandler;
 use storage::TaskRepo;
@@ -105,10 +104,9 @@ fn parse_suggestions(
         .into_iter()
         .filter_map(|s| {
             let suggestion_type_str = s.get("suggestion_type")?.as_str()?;
-            let suggestion_type: SuggestionType = serde_json::from_value(
-                serde_json::Value::String(suggestion_type_str.to_string()),
-            )
-            .ok()?;
+            let suggestion_type: SuggestionType =
+                serde_json::from_value(serde_json::Value::String(suggestion_type_str.to_string()))
+                    .ok()?;
             let action: Option<SuggestionAction> = s
                 .get("action")
                 .and_then(|a| serde_json::from_value(a.clone()).ok());
@@ -236,8 +234,7 @@ mod tests {
     fn test_parse_suggestions_valid_json() {
         let response = r#"{"suggestions": [{"suggestion_type": "reprioritize", "title": "Increase priority", "description": "Task is overdue", "confidence": 0.85, "action": {"type": "setpriority", "priority": 1}}]}"#;
 
-        let candidates =
-            parse_suggestions(response, "t1", &SuggestionTrigger::TaskOverdue);
+        let candidates = parse_suggestions(response, "t1", &SuggestionTrigger::TaskOverdue);
 
         assert_eq!(candidates.len(), 1);
         assert_eq!(candidates[0].title, "Increase priority");
@@ -248,24 +245,21 @@ mod tests {
     #[test]
     fn test_parse_suggestions_empty() {
         let response = r#"{"suggestions": []}"#;
-        let candidates =
-            parse_suggestions(response, "t1", &SuggestionTrigger::TaskOverdue);
+        let candidates = parse_suggestions(response, "t1", &SuggestionTrigger::TaskOverdue);
         assert!(candidates.is_empty());
     }
 
     #[test]
     fn test_parse_suggestions_invalid_json() {
         let response = "I'm sorry, I can't help with that.";
-        let candidates =
-            parse_suggestions(response, "t1", &SuggestionTrigger::TaskOverdue);
+        let candidates = parse_suggestions(response, "t1", &SuggestionTrigger::TaskOverdue);
         assert!(candidates.is_empty());
     }
 
     #[test]
     fn test_parse_suggestions_with_markdown_fences() {
         let response = "```json\n{\"suggestions\": [{\"suggestion_type\": \"decompose\", \"title\": \"Break down\", \"description\": \"Too complex\", \"confidence\": 0.9, \"action\": {\"type\": \"triggerdecomposition\"}}]}\n```";
-        let candidates =
-            parse_suggestions(response, "t1", &SuggestionTrigger::PeriodicScan);
+        let candidates = parse_suggestions(response, "t1", &SuggestionTrigger::PeriodicScan);
 
         assert_eq!(candidates.len(), 1);
         assert_eq!(candidates[0].title, "Break down");

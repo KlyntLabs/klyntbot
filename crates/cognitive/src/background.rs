@@ -815,6 +815,17 @@ fn event_to_observation(event: &DomainEvent) -> Option<Observation> {
                 timestamp: now,
             })
         }
+        DomainEvent::TaskExecutionStarted {
+            task_id,
+            execution_id,
+            agent_profile: _,
+        } => Some(Observation {
+            domain: "tasks".into(),
+            content: format!("Agentic execution {execution_id} started for task {task_id}"),
+            importance: 0.4,
+            source_event: "TaskExecutionStarted".into(),
+            timestamp: now,
+        }),
         _ => {
             // TaskCreated, TaskDeferred, GoalProgress, ActivitySessionCompleted,
             // and lower-priority agentic events (Accumulate-level)

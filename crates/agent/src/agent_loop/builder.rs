@@ -695,9 +695,8 @@ impl AgentLoopBuilder {
                 config.agents.defaults.model.clone(),
                 task_repo_for_handlers,
             ));
-            task_tool = task_tool.with_forecast_handler(
-                forecast_handler as Arc<dyn feature_tasks::ForecastHandler>,
-            );
+            task_tool = task_tool
+                .with_forecast_handler(forecast_handler as Arc<dyn feature_tasks::ForecastHandler>);
 
             tool_registry.register(task_tool);
 

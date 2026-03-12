@@ -123,11 +123,16 @@ pub fn extract_agentic_success_rate(facts: &[CognitiveFact]) -> Option<f64> {
         .and_then(|f| parse_percentage_value(&f.object))
 }
 
-/// Parse a bias string like "+38% underestimation" or "-10%" into a fraction.
+/// Parse a bias string like "+38% underestimation" or "-10%" or "0.38" into a fraction.
 fn parse_bias_value(s: &str) -> Option<f64> {
-    // Strip everything after '%' (if present), then parse the leading number
-    let stripped = s.split('%').next().unwrap_or(s);
-    parse_numeric_value(stripped).map(|v| v / 100.0)
+    if s.contains('%') {
+        // "+38% underestimation" → 38.0 → 0.38
+        let before_pct = s.split('%').next()?;
+        parse_numeric_value(before_pct).map(|v| v / 100.0)
+    } else {
+        // "0.38" → 0.38 (already a fraction)
+        parse_numeric_value(s)
+    }
 }
 
 /// Parse a numeric value from strings like "12.5 average" or "3.2 tasks/week".
@@ -229,8 +234,16 @@ mod tests {
     #[test]
     fn test_extract_deferral_patterns() {
         let facts = vec![
-            fact("user", "deferral_pattern", "defers planning tasks to someday"),
-            fact("user", "deferral_pattern", "defers research tasks when busy"),
+            fact(
+                "user",
+                "deferral_pattern",
+                "defers planning tasks to someday",
+            ),
+            fact(
+                "user",
+                "deferral_pattern",
+                "defers research tasks when busy",
+            ),
         ];
         let patterns = extract_deferral_patterns(&facts);
         assert_eq!(patterns.len(), 2);
@@ -246,6 +259,12 @@ mod tests {
     #[test]
     fn test_parse_bias_negative() {
         assert!((parse_bias_value("-10%").unwrap() - (-0.10)).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_parse_bias_raw_fraction() {
+        // Raw fraction without % should not be double-divided
+        assert!((parse_bias_value("0.38").unwrap() - 0.38).abs() < 0.01);
     }
 
     #[test]

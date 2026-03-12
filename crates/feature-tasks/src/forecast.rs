@@ -40,12 +40,12 @@ pub fn similarity(
     let tags_sim = jaccard_similarity(target_tags, &record.tags);
     let energy_sim = energy_similarity(target_energy, record.energy_level.as_deref());
     let complexity_sim = complexity_similarity(target_complexity, record.complexity_score);
-    let project_sim =
-        if target_project == record.project_id.as_deref() && target_project.is_some() {
-            1.0
-        } else {
-            0.0
-        };
+    let project_sim = if target_project == record.project_id.as_deref() && target_project.is_some()
+    {
+        1.0
+    } else {
+        0.0
+    };
     let recency = recency_score(record.completed_at, now);
 
     tags_sim * 0.35
@@ -129,6 +129,7 @@ pub fn deviation_correction(
     let eligible: Vec<f64> = records
         .iter()
         .filter(|(sim, _)| *sim >= threshold)
+        .filter(|(_, r)| r.estimated_minutes > 0)
         .map(|(_, r)| {
             (r.actual_minutes as f64 - r.estimated_minutes as f64) / r.estimated_minutes as f64
         })
@@ -212,11 +213,16 @@ pub fn accuracy_stats(records: &[EstimationRecord]) -> Option<AccuracyStats> {
 
     let mut deviations: Vec<f64> = records
         .iter()
+        .filter(|r| r.estimated_minutes > 0)
         .map(|r| {
             ((r.actual_minutes as f64 - r.estimated_minutes as f64) / r.estimated_minutes as f64)
                 * 100.0
         })
         .collect();
+
+    if deviations.is_empty() {
+        return None;
+    }
     deviations.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
     let n = deviations.len();
@@ -313,7 +319,7 @@ mod tests {
     #[test]
     fn test_deviation_correction_underestimate() {
         let records = [
-            record(&["rust"], "high", 5, "p1", 30, 60, 5),  // +100% deviation
+            record(&["rust"], "high", 5, "p1", 30, 60, 5), // +100% deviation
             record(&["rust"], "high", 5, "p1", 45, 60, 10), // +33% deviation
         ];
         let scored: Vec<(f64, &EstimationRecord)> = records.iter().map(|r| (0.8, r)).collect();
@@ -336,7 +342,10 @@ mod tests {
 
     #[test]
     fn test_data_quality_tiers() {
-        assert_eq!(DataQualityTier::from_sample_size(25), DataQualityTier::Strong);
+        assert_eq!(
+            DataQualityTier::from_sample_size(25),
+            DataQualityTier::Strong
+        );
         assert_eq!(
             DataQualityTier::from_sample_size(15),
             DataQualityTier::Moderate

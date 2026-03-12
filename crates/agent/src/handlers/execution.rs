@@ -246,7 +246,7 @@ impl TaskExecutionHandler for LlmTaskExecutionHandler {
 
         let config = ExecutionConfig {
             agent_profile: row.agent_profile.clone(),
-            max_cost_usd: row.cost_usd,
+            max_cost_usd: None, // Fresh budget — don't reuse prior spend as cap
             require_approval: false,
             ..Default::default()
         };

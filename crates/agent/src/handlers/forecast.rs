@@ -14,8 +14,8 @@ use tracing::debug;
 
 use feature_tasks::forecast::{self as fc, DataQualityTier};
 use feature_tasks::types::{
-    AccuracyReport, AccuracyScope, AccuracyTrend, DataQuality, ForecastContext, ForecastMethodology,
-    ForecastRisk, ProjectForecast, RiskKind, Task, TaskForecast,
+    AccuracyReport, AccuracyScope, AccuracyTrend, DataQuality, ForecastContext,
+    ForecastMethodology, ForecastRisk, ProjectForecast, RiskKind, Task, TaskForecast,
 };
 use feature_tasks::ForecastHandler;
 use storage::TaskRepo;
@@ -113,9 +113,9 @@ fn parse_risks(response: &str) -> Vec<ForecastRisk> {
         .map(|arr| {
             arr.iter()
                 .filter_map(|r| {
-                    let kind: RiskKind = serde_json::from_value(
-                        serde_json::Value::String(r.get("kind")?.as_str()?.into()),
-                    )
+                    let kind: RiskKind = serde_json::from_value(serde_json::Value::String(
+                        r.get("kind")?.as_str()?.into(),
+                    ))
                     .ok()?;
                     Some(ForecastRisk {
                         kind,
@@ -210,7 +210,7 @@ impl ForecastHandler for LlmForecastHandler {
         };
 
         let adjustments = if correction.is_some() {
-            vec![format!("deviation correction ({mean_dev:+.0}%)")]
+            vec![format!("deviation correction ({:+.0}%)", mean_dev * 100.0)]
         } else {
             vec![]
         };
@@ -250,22 +250,21 @@ impl ForecastHandler for LlmForecastHandler {
             .map(|t| t.estimated_minutes.unwrap_or(60))
             .sum();
 
-        // Count completed tasks for this project
-        let completed_count = records
-            .iter()
-            .filter(|_| {
-                // project_id not on estimation rows, so we count all as approximate
-                // TODO: enrich estimation rows with project_id for precise counts
-                true
-            })
-            .count();
+        // Count completed tasks for this project via task list (not estimation rows,
+        // which lack project_id). This gives an accurate per-project count.
+        let completed_filter = storage::TaskFilter {
+            project_id: Some(project_id.into()),
+            status: Some("done".into()),
+            ..Default::default()
+        };
+        let completed_count = self.repo.list(&completed_filter).await?.len();
 
         let quality_tier = DataQualityTier::from_sample_size(completed_count);
 
         // Confidence interval: ±30%/50% of remaining estimate.
         // Velocity is checked only to confirm we have recent data.
-        let has_velocity = fc::project_velocity(&records, chrono::Utc::now(), 4)
-            .is_some_and(|v| v > 0.0);
+        let has_velocity =
+            fc::project_velocity(&records, chrono::Utc::now(), 4).is_some_and(|v| v > 0.0);
         let (confidence_low, confidence_high) = if has_velocity {
             (
                 (remaining_mins as f64 * 0.7) as i32,
@@ -330,6 +329,9 @@ fn compute_breakdown(
 ) -> HashMap<String, f64> {
     let mut groups: HashMap<String, Vec<f64>> = HashMap::new();
     for r in records {
+        if r.estimated_minutes == 0 {
+            continue;
+        }
         if let Some(key) = key_fn(r) {
             let dev = (r.actual_minutes as f64 - r.estimated_minutes as f64)
                 / r.estimated_minutes as f64
