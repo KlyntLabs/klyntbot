@@ -1,7 +1,7 @@
 ---
 name: task
 description: Task and project management specialist with planning, reviews, and goal tracking
-tools: [task, area, project, okr, notes, ask_user, memory, grep, glob, read_file, list_dir]
+tools: [task, tasks, area, project, okr, notes, ask_user, memory, grep, glob, read_file, list_dir]
 mcp_tools: ["google-calendar"]
 triggers: [todo, task, tasks, create a task, add a task, my tasks, task list, what tasks, check tasks, list tasks, todo list, focus, project, area, objective, key result, okr, plan my day, morning plan, daily plan, weekly review, review my week, break down, decompose, retrospective, monthly review, quarter review, wrap up, end of day, how are my projects, project status, calendar, schedule, event, meeting, appointment, free time, busy, availability, note, notes, notebook, create a note, my notes, write a note, list notes, search notes, link notes, tag note]
 max_iterations: 12
