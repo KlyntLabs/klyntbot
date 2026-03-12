@@ -370,25 +370,6 @@ pub fn collect_field_tokens(
     (schema_properties, required_fields, from_value_fields)
 }
 
-/// Extract a string value from a `Meta::NameValue` attribute.
-pub fn extract_str_attr(nv: &syn::MetaList, key: &str) -> Option<String> {
-    let tokens = nv.tokens.clone();
-    let parser = syn::punctuated::Punctuated::<Meta, syn::Token![,]>::parse_terminated;
-    let parsed = syn::parse::Parser::parse2(parser, tokens).ok()?;
-    for meta in parsed {
-        if let Meta::NameValue(nv) = &meta {
-            if nv.path.is_ident(key) {
-                if let syn::Expr::Lit(lit) = &nv.value {
-                    if let Lit::Str(s) = &lit.lit {
-                        return Some(s.value());
-                    }
-                }
-            }
-        }
-    }
-    None
-}
-
 /// Generate the `metadata()` method TokenStream from optional category, tags, cost strings.
 /// Returns empty TokenStream if no metadata attributes are provided.
 pub fn gen_metadata_impl(

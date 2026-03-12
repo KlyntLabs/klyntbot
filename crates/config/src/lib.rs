@@ -2,12 +2,12 @@
 //!
 //! This crate handles configuration schema definition and file I/O.
 
+pub mod env;
 pub mod loader;
 pub mod schema;
 
-pub use loader::{
-    config_dir, config_path, init, load, load_sync, load_with_env_overrides, save, save_sync,
-};
+pub use env::load_with_env_overrides;
+pub use loader::{config_dir, config_path, init, load, load_sync, save, save_sync};
 pub use schema::{
     default_finance_categories, Config, ContentConfig, ContentSourceConfig, DiscordConfig,
     EmailConfig, ExtendedThinkingConfig, FinanceBudgetingConfig, FinanceCategoryConfig,

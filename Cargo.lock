@@ -1096,7 +1096,6 @@ dependencies = [
  "serde_json",
  "tokio",
  "tracing",
- "uuid",
 ]
 
 [[package]]
@@ -1550,7 +1549,6 @@ dependencies = [
  "iana-time-zone",
  "serde",
  "serde_json",
- "shellexpand",
  "tempfile",
  "tokio",
 ]
