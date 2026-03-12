@@ -30,3 +30,6 @@ tests/fixtures/hello_plugin/plugin.wasm
 *.swp
 *.swo
 .worktrees
+
+.qwen/
+gha-creds-*.json

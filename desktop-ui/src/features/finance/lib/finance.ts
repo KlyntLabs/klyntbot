@@ -15,8 +15,27 @@ import {
 
 // ── Formatting ──────────────────────────────────────────────────────────
 
+// Zero-decimal currencies — stored amount IS the major unit (no subunits).
+const ZERO_DECIMAL: ReadonlySet<string> = new Set([
+  "VND",
+  "JPY",
+  "KRW",
+  "CLP",
+  "HUF",
+  "ISK",
+  "UGX",
+  "RWF",
+  "PYG",
+  "BIF",
+]);
+
+/** Convert stored integer (smallest unit) to display value. */
+function toMajor(amount: number, currency: string): number {
+  return ZERO_DECIMAL.has(currency) ? amount : amount / 100;
+}
+
 export function fmtMoney(amount: number, currency: string): string {
-  const value = amount / 100;
+  const value = toMajor(amount, currency);
   if (currency === "VND") return `${new Intl.NumberFormat("vi-VN").format(Math.round(value))}đ`;
   if (currency === "USDT")
     return (
@@ -38,11 +57,11 @@ export function toVnd(amount: number, currency: string, rates: Record<string, nu
 }
 
 export function fmtVnd(amount: number): string {
-  return `${new Intl.NumberFormat("vi-VN").format(Math.round(amount / 100))}đ`;
+  return `${new Intl.NumberFormat("vi-VN").format(Math.round(amount))}đ`;
 }
 
-export function fmtCompact(amount: number): string {
-  const v = amount / 100;
+export function fmtCompact(amount: number, currency = "VND"): string {
+  const v = toMajor(amount, currency);
   if (Math.abs(v) >= 1e9) return `${(v / 1e9).toFixed(1)}B`;
   if (Math.abs(v) >= 1e6) return `${(v / 1e6).toFixed(1)}M`;
   if (Math.abs(v) >= 1e3) return `${(v / 1e3).toFixed(0)}K`;
