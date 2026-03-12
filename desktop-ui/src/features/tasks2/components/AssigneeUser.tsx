@@ -11,13 +11,13 @@ export function AssigneeUser({ user }: AssigneeUserProps) {
     return (
       <Avatar className="size-6 shrink-0">
         <AvatarImage src={user.avatarUrl} alt={user.name} />
-        <AvatarFallback>{user.name[0]}</AvatarFallback>
+        <AvatarFallback>{user.name[0] ?? "?"}</AvatarFallback>
       </Avatar>
     );
   }
   return (
     <div className="size-6 flex items-center justify-center">
-      <CircleUserRound className="size-5 text-zinc-600" />
+      <CircleUserRound className="size-5 text-muted" />
     </div>
   );
 }

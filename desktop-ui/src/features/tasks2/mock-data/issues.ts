@@ -26,11 +26,27 @@ export interface Issue {
   dueDate?: string;
 }
 
-const s = (id: string): Status => status.find((s) => s.id === id)!;
-const p = (id: string): Priority => priorities.find((p) => p.id === id)!;
-const u = (id: string): User => users.find((u) => u.id === id)!;
+function s(id: string): Status {
+  const found = status.find((s) => s.id === id);
+  if (!found) throw new Error(`Unknown status id: "${id}"`);
+  return found;
+}
+function p(id: string): Priority {
+  const found = priorities.find((p) => p.id === id);
+  if (!found) throw new Error(`Unknown priority id: "${id}"`);
+  return found;
+}
+function u(id: string): User {
+  const found = users.find((u) => u.id === id);
+  if (!found) throw new Error(`Unknown user id: "${id}"`);
+  return found;
+}
 const l = (...ids: string[]): LabelInterface[] => labels.filter((l) => ids.includes(l.id));
-const pr = (id: string): Project => projects.find((p) => p.id === id)!;
+function pr(id: string): Project {
+  const found = projects.find((p) => p.id === id);
+  if (!found) throw new Error(`Unknown project id: "${id}"`);
+  return found;
+}
 
 export const issues: Issue[] = [
   {

@@ -19,7 +19,16 @@ export function TabContent() {
     );
   }
 
-  const currentView = activeTab.navStack[activeTab.navStack.length - 1];
+  const currentView =
+    activeTab.navStack.length > 0 ? activeTab.navStack[activeTab.navStack.length - 1] : null;
+
+  if (!currentView) {
+    return (
+      <div className="flex-1 flex items-center justify-center text-sm text-[hsl(var(--muted-foreground))]">
+        Click + to open a tab
+      </div>
+    );
+  }
 
   const renderContent = () => {
     switch (currentView.type) {

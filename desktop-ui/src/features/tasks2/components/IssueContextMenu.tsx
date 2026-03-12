@@ -43,7 +43,9 @@ export function IssueContextMenu({ issue, children }: IssueContextMenuProps) {
         <ContextMenuGroup>
           <ContextMenuItem
             onSelect={() => {
-              navigator.clipboard.writeText(issue.identifier);
+              navigator.clipboard.writeText(issue.identifier).catch(() => {
+                console.warn("Failed to copy issue ID to clipboard");
+              });
             }}
           >
             Copy ID

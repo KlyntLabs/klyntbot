@@ -18,17 +18,17 @@ export function CreateIssueModal() {
   const addIssue = useIssuesStore((s) => s.addIssue);
 
   const [title, setTitle] = useState("");
-  const [selectedStatus, setSelectedStatus] = useState<Status>(allStatus[0]);
-  const [selectedPriority, setSelectedPriority] = useState<Priority>(priorities[0]);
+  const [selectedStatus, setSelectedStatus] = useState<Status | null>(allStatus[0] ?? null);
+  const [selectedPriority, setSelectedPriority] = useState<Priority | null>(priorities[0] ?? null);
   const [selectedAssignee, setSelectedAssignee] = useState<User | null>(null);
   const [selectedLabels, setSelectedLabels] = useState<LabelInterface[]>([]);
 
   const handleOpenChange = (open: boolean) => {
     if (open) {
       // Sync form status from store when opening
-      setSelectedStatus(defaultStatus ?? allStatus[0]);
+      setSelectedStatus(defaultStatus ?? allStatus[0] ?? null);
       setTitle("");
-      setSelectedPriority(priorities[0]);
+      setSelectedPriority(priorities[0] ?? null);
       setSelectedAssignee(null);
       setSelectedLabels([]);
     } else {
@@ -37,7 +37,7 @@ export function CreateIssueModal() {
   };
 
   const handleSubmit = () => {
-    if (!title.trim()) return;
+    if (!title.trim() || !selectedStatus || !selectedPriority) return;
 
     const newIssue = {
       id: `new-${Date.now()}`,
@@ -102,7 +102,7 @@ export function CreateIssueModal() {
                   type="button"
                   onClick={() => setSelectedStatus(s)}
                   className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs border transition-colors ${
-                    selectedStatus.id === s.id
+                    selectedStatus?.id === s.id
                       ? "border-[hsl(var(--primary))] bg-[hsl(var(--primary))]/10 text-[hsl(var(--foreground))]"
                       : "border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))]"
                   }`}
@@ -126,7 +126,7 @@ export function CreateIssueModal() {
                     type="button"
                     onClick={() => setSelectedPriority(p)}
                     className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs border transition-colors ${
-                      selectedPriority.id === p.id
+                      selectedPriority?.id === p.id
                         ? "border-[hsl(var(--primary))] bg-[hsl(var(--primary))]/10 text-[hsl(var(--foreground))]"
                         : "border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))]"
                     }`}
@@ -204,7 +204,11 @@ export function CreateIssueModal() {
           <Button variant="ghost" size="sm" onClick={() => handleOpenChange(false)}>
             Cancel
           </Button>
-          <Button size="sm" onClick={handleSubmit} disabled={!title.trim()}>
+          <Button
+            size="sm"
+            onClick={handleSubmit}
+            disabled={!title.trim() || !selectedStatus || !selectedPriority}
+          >
             Create Issue
           </Button>
         </DialogFooter>

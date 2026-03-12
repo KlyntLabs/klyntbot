@@ -8,6 +8,8 @@ interface ViewState {
   setViewType: (viewType: ViewType) => void;
 }
 
+const VALID_VIEW_TYPES: ViewType[] = ["list", "grid"];
+
 export const useViewStore = create<ViewState>()(
   persist(
     (set) => ({
@@ -16,6 +18,11 @@ export const useViewStore = create<ViewState>()(
     }),
     {
       name: "tasks2-view-storage",
+      onRehydrateStorage: () => (state) => {
+        if (state && !VALID_VIEW_TYPES.includes(state.viewType)) {
+          state.viewType = "list";
+        }
+      },
     },
   ),
 );

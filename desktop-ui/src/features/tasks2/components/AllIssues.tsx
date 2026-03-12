@@ -12,7 +12,12 @@ export default function AllIssues() {
   const filters = useFilterStore((s) => s.filters);
   const isFiltered = useFilterStore((s) => Object.values(s.filters).some((a) => a.length > 0));
 
-  // Search mode
+  // All hooks must be called before any conditional returns
+  const displayIssues = useMemo(
+    () => (isFiltered ? filterIssues(filters) : issues),
+    [isFiltered, filters, issues, filterIssues],
+  );
+
   if (isSearchOpen) {
     if (searchQuery.trim()) {
       return <SearchIssues />;
@@ -23,11 +28,6 @@ export default function AllIssues() {
       </div>
     );
   }
-
-  const displayIssues = useMemo(
-    () => (isFiltered ? filterIssues(filters) : issues),
-    [isFiltered, filters, issues, filterIssues],
-  );
 
   return <IssueBoard issues={displayIssues} />;
 }

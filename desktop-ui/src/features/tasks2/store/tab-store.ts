@@ -57,7 +57,8 @@ export const useTabStore = create<TabState>((set, get) => ({
 
     // Deduplicate: if tab with same root type+targetId exists, switch to it
     const existing = tabs.find(
-      (t) => t.navStack[0].type === type && t.navStack[0].targetId === targetId,
+      (t) =>
+        t.navStack.length > 0 && t.navStack[0].type === type && t.navStack[0].targetId === targetId,
     );
     if (existing) {
       set({ activeTabId: existing.id });
@@ -109,6 +110,10 @@ export const useTabStore = create<TabState>((set, get) => ({
     const index = tabs.findIndex((t) => t.id === tabId);
     if (index === -1) return;
     const newTabs = tabs.slice(0, index + 1);
+    if (newTabs.length === 0) {
+      set({ tabs: [], activeTabId: "" });
+      return;
+    }
     const newActive = newTabs.find((t) => t.id === activeTabId)
       ? activeTabId
       : newTabs[newTabs.length - 1].id;
@@ -132,6 +137,7 @@ export const useTabStore = create<TabState>((set, get) => ({
     const { tabs, activeTabId } = get();
     const idx = tabs.findIndex((t) => t.id === activeTabId);
     if (idx === -1) return;
+    if (index < 0 || index >= tabs[idx].navStack.length) return;
     const updated = [...tabs];
     updated[idx] = { ...tabs[idx], navStack: tabs[idx].navStack.slice(0, index + 1) };
     set({ tabs: updated });
@@ -139,6 +145,7 @@ export const useTabStore = create<TabState>((set, get) => ({
 
   reorderTabs: (fromIndex, toIndex) => {
     const { tabs } = get();
+    if (fromIndex < 0 || fromIndex >= tabs.length || toIndex < 0 || toIndex >= tabs.length) return;
     set({ tabs: arrayMove(tabs, fromIndex, toIndex) });
   },
 }));
