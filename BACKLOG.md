@@ -638,7 +638,7 @@ Use this to track refactor progress:
 - [x] Phase 3 — `storage` vertical-slice grouping
 - [x] Phase 4 — `providers` port/adapter split
 - [x] Phase 5 — `channels` platform split into `adapters/`
-- [ ] Phase 6 — `cognitive` clean architecture layout
+- [x] Phase 6 — `cognitive` service layer split into `services/`
 - [ ] Phase 7 — `tools` domain grouping
 - [ ] Phase 8 — `agent` internal reorganization (8a–8f)
 - [ ] Phase 9 — `context_engine` restructure
