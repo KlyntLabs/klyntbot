@@ -1,64 +1,66 @@
 //! Klyntbot Agent - Core agent orchestration
 //!
 //! This crate provides the AgentLoop and related agent functionality.
+//!
+//! - `adapters/` — trait implementations bridging lower-layer contracts
+//! - Core modules: agent_loop, agent_runtime, intent_pipeline, execution, etc.
 
+// ── Grouped modules ─────────────────────────────────────────────────────────
+pub mod adapters;
+pub mod services;
+
+// ── Core modules ─────────────────────────────────────────────────────────────
 pub mod agent_loop;
 pub mod agent_profile;
 pub mod agent_runtime;
-pub mod agent_task_handler;
-pub mod skill_loader;
-
-pub mod cognitive_embedder;
-pub mod cognitive_handlers;
 pub mod confidence;
 pub mod content_registry;
 pub mod context_sources;
-pub mod conversation_recall_handler;
-pub mod cron_handler_adapter;
 pub mod enrichment;
 pub mod events;
 #[cfg(test)]
 mod events_tests;
 pub mod execution;
-pub mod finance_adapter;
 pub mod handlers;
 pub mod intent_pipeline;
 pub mod learning;
-pub mod learning_handler;
-pub mod llm_summary_provider;
-pub mod memory_maintenance_service;
 #[cfg(test)]
 mod notes_integration_tests;
-pub mod notifications;
 pub mod output;
 pub mod persona;
-pub mod productivity_handler;
-pub mod progress_handler;
-pub mod recurring_tasks;
-pub mod reminders;
-pub mod session_cleanup_service;
 pub mod subagent;
-pub mod task_embedding_adapter;
-pub mod task_enrichment_adapter;
-pub mod todo_embedding_handler;
 
+// ── Skill loader re-export (moved into agent_profile/) ──────────────────────
+pub use agent_profile::skill_loader;
+
+// ── Module re-exports (backward-compatible paths) ────────────────────────────
+pub use adapters::{
+    agent_task, cognitive_embedder, cognitive_handlers, conversation_recall, cron, finance,
+    learning as learning_handler, llm_summary, productivity, progress, task_embedding,
+    task_enrichment, todo_embedding,
+};
+pub use services::{
+    memory_maintenance, notifications, recurring_tasks, reminders, session_cleanup,
+};
+
+// ── Type re-exports ──────────────────────────────────────────────────────────
 pub use agent_loop::{AgentLoop, StreamingHandle};
 pub use agent_runtime::{AgentRuntime, RuntimeResult};
 pub use cognitive_embedder::TextEmbedderImpl;
 pub use confidence::{ConfidenceAssessment, ConfidenceEvaluator, DecisionAction, DecisionLogger};
 pub use context_sources::ConfidenceSource;
-pub use conversation_recall_handler::ConversationRecallHandlerImpl;
-pub use cron_handler_adapter::CronHandlerAdapter;
+pub use conversation_recall::ConversationRecallHandlerImpl;
+pub use cron::CronHandlerAdapter;
 pub use enrichment::EnrichmentEngine;
 pub use events::AgentEvent;
 pub use execution::{CycleOutcome, ExecutionCore, ExecutionParams, ToolExecutionResult};
-pub use finance_adapter::FinanceHandlerImpl;
+pub use finance::FinanceHandlerImpl;
 pub use learning::LearningService;
 pub use learning_handler::LearningHandlerImpl;
 pub use notifications::NotificationDispatcher;
 pub use persona::{PersonaChain, PersonaManager, PersonaScope};
-pub use productivity_handler::ProductivityHandlerImpl;
-pub use progress_handler::ProgressHandlerImpl;
+pub use productivity::ProductivityHandlerImpl;
+pub use progress::ProgressHandlerImpl;
 pub use recurring_tasks::RecurringTaskSpawner;
 pub use reminders::ReminderEngine;
 pub use subagent::{SubagentManager, SubagentProfile};

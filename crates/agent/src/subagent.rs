@@ -453,7 +453,7 @@ async fn run_subagent_task(
     }
 
     // All profiles get the agent task tool for task board coordination
-    let task_handler = Arc::new(crate::agent_task_handler::AgentTaskHandlerImpl::new(
+    let task_handler = Arc::new(crate::adapters::agent_task::AgentTaskHandlerImpl::new(
         config.agent_task_repo,
     ));
     tools.register(AgentTaskTool::new(

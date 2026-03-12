@@ -250,7 +250,7 @@ impl AgentLoopBuilder {
                 let cognitive_embedder_local: Option<Arc<dyn cognitive::SemanticFactEmbedder>> =
                     if let Some(ref vs) = self.vector_store {
                         Some(Arc::new(
-                            crate::cognitive_embedder::SemanticFactEmbedderImpl::new(
+                            crate::adapters::cognitive_embedder::SemanticFactEmbedderImpl::new(
                                 Arc::clone(&embedding_engine),
                                 vs.clone(),
                             ),
@@ -308,19 +308,19 @@ impl AgentLoopBuilder {
                     ) = if let Some(ref cp) = self.cognitive_provider {
                         let params = providers::cognitive_chat_params(&config, 1024);
                         (
-                            Arc::new(crate::cognitive_handlers::LlmExtractionHandler::new(
+                            Arc::new(crate::adapters::cognitive_handlers::LlmExtractionHandler::new(
                                 cp.clone(),
                                 params.clone(),
                             )),
-                            Arc::new(crate::cognitive_handlers::LlmConsolidationHandler::new(
+                            Arc::new(crate::adapters::cognitive_handlers::LlmConsolidationHandler::new(
                                 cp.clone(),
                                 params,
                             )),
                         )
                     } else {
                         (
-                            Arc::new(crate::cognitive_handlers::HeuristicExtractionHandler),
-                            Arc::new(crate::cognitive_handlers::HeuristicConsolidationHandler),
+                            Arc::new(crate::adapters::cognitive_handlers::HeuristicExtractionHandler),
+                            Arc::new(crate::adapters::cognitive_handlers::HeuristicConsolidationHandler),
                         )
                     };
                     let episodic_repo = cognitive::EpisodicMemoryRepo::new(pool.clone());
@@ -371,7 +371,7 @@ impl AgentLoopBuilder {
                 )));
 
                 // Start inference engine + background loop
-                let text_embedder = Arc::new(crate::cognitive_embedder::TextEmbedderImpl::new(
+                let text_embedder = Arc::new(crate::adapters::cognitive_embedder::TextEmbedderImpl::new(
                     Arc::clone(&embedding_engine),
                 ));
                 let inference_config =
@@ -407,7 +407,7 @@ impl AgentLoopBuilder {
         // Sort by priority (descending) — ensures correct ordering in prompt
         sources.sort_by_key(|s| std::cmp::Reverse(s.priority()));
 
-        let summary_provider = Arc::new(crate::llm_summary_provider::LlmSummaryProvider::new(
+        let summary_provider = Arc::new(crate::adapters::llm_summary::LlmSummaryProvider::new(
             provider.clone(),
             config.agents.defaults.model.clone(),
         ));
@@ -529,7 +529,7 @@ impl AgentLoopBuilder {
                 config.conversation.embedding.enabled,
                 self.vector_store.clone(),
             ) {
-                let text_embedder = Arc::new(crate::cognitive_embedder::TextEmbedderImpl::new(
+                let text_embedder = Arc::new(crate::adapters::cognitive_embedder::TextEmbedderImpl::new(
                     Arc::clone(&embedding_engine),
                 ));
                 Some(Arc::new(cognitive::ConversationRecallService::new(
@@ -592,7 +592,7 @@ impl AgentLoopBuilder {
                 }
                 let enrichment_engine = Arc::new(enrichment_engine);
                 let task_enrichment_adapter =
-                    Arc::new(crate::task_enrichment_adapter::TaskEnrichmentAdapter::new(
+                    Arc::new(crate::adapters::task_enrichment::TaskEnrichmentAdapter::new(
                         Arc::clone(&enrichment_engine),
                     ));
                 task_tool = task_tool.with_enrichment_handler(Arc::clone(&task_enrichment_adapter)
@@ -602,7 +602,7 @@ impl AgentLoopBuilder {
             // Task embedding (semantic search)
             if let (true, Some(vs)) = (config.todo.search.enabled, self.vector_store.clone()) {
                 let task_embed_impl =
-                    Arc::new(crate::task_embedding_adapter::TaskEmbeddingAdapter::new(
+                    Arc::new(crate::adapters::task_embedding::TaskEmbeddingAdapter::new(
                         Arc::clone(&embedding_engine),
                         vs.clone(),
                     ));
@@ -630,7 +630,7 @@ impl AgentLoopBuilder {
 
             // Inject progress handler for KR→Objective cascade
             let progress_handler: Arc<dyn tools_core::ProgressHandler> =
-                Arc::new(super::super::progress_handler::ProgressHandlerImpl::new(
+                Arc::new(crate::adapters::progress::ProgressHandlerImpl::new(
                     repos.key_results.clone(),
                     repos.objectives.clone(),
                     repos.actions.clone(),
@@ -730,7 +730,7 @@ impl AgentLoopBuilder {
         let conversation_recall_handler: Option<Arc<dyn tools::ConversationRecallHandler>> =
             recall_service.as_ref().map(|service| {
                 Arc::new(
-                    super::super::conversation_recall_handler::ConversationRecallHandlerImpl::new(
+                    crate::adapters::conversation_recall::ConversationRecallHandlerImpl::new(
                         Arc::clone(service),
                     ),
                 ) as Arc<dyn tools::ConversationRecallHandler>
@@ -763,7 +763,7 @@ impl AgentLoopBuilder {
                 );
 
                 let finance_handler_impl =
-                    Arc::new(crate::finance_adapter::FinanceHandlerImpl::new(
+                    Arc::new(crate::adapters::finance::FinanceHandlerImpl::new(
                         repos.clone(),
                         price_service.clone(),
                         config.finance.clone(),
@@ -823,7 +823,7 @@ impl AgentLoopBuilder {
                 prod_repos.clone(),
                 config.productivity.focus.clone(),
             ));
-            let prod_handler = Arc::new(crate::productivity_handler::ProductivityHandlerImpl::new(
+            let prod_handler = Arc::new(crate::adapters::productivity::ProductivityHandlerImpl::new(
                 provider.clone(),
                 config.agents.defaults.model.clone(),
             ));
@@ -1125,7 +1125,7 @@ impl AgentLoopBuilder {
         // ── Session cleanup service ───────────────────────────────────────
         let session_cleanup_token = if self.pool.is_some() {
             let token = CancellationToken::new();
-            let cleanup_service = crate::session_cleanup_service::SessionCleanupService::new(
+            let cleanup_service = crate::services::session_cleanup::SessionCleanupService::new(
                 storage::SessionRepo::new(storage_pool.inner().clone()),
                 config.conversation.session.ttl_days,
                 config.conversation.session.cleanup_interval_hours,
@@ -1142,7 +1142,7 @@ impl AgentLoopBuilder {
             if let (Some(_), Some(vs)) = (&self.pool, self.vector_store.clone()) {
                 let token = CancellationToken::new();
                 let maintenance_service =
-                    crate::memory_maintenance_service::MemoryMaintenanceService::new(
+                    crate::services::memory_maintenance::MemoryMaintenanceService::new(
                         vs,
                         config.conversation.memory.max_age_days,
                         config.conversation.memory.maintenance_interval_hours,

@@ -675,7 +675,7 @@ Use this to track refactor progress:
 - [x] Phase 5 — `channels` platform split into `adapters/`
 - [x] Phase 6 — `cognitive` service layer split into `services/`
 - [x] Phase 7 — `tools` domain grouping into `system/`, `domain/`, `embedding/`
-- [ ] Phase 8 — `agent` internal reorganization (8a–8f)
+- [x] Phase 8 — `agent` internal reorganization (8a–8c: adapters/, services/, skill_loader)
 - [ ] Phase 9 — `context_engine` restructure
 - [ ] Phase 10 — feature crates restructure
 - [ ] Phase 11 — `app-core` restructure

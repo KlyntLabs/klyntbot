@@ -10,7 +10,7 @@ use tracing::{debug, error};
 use common::Result;
 use tools::todo_types::Todo;
 
-use super::NotificationDispatcher;
+use super::notifications::NotificationDispatcher;
 
 /// ReminderEngine - checks for todos that need reminders
 pub struct ReminderEngine {
