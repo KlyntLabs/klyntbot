@@ -1,54 +1,20 @@
 //! Signal accumulator — subscribes to DomainEventBus, maintains a rolling
 //! event window, and evaluates heuristic trigger conditions against UserSituation.
 
+mod conversion;
+mod types;
+
+pub use types::{Signal, SignalMetadata, TriggerCondition, TriggerFired};
+
 use std::collections::VecDeque;
 
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
 
 use bus::DomainEvent;
 use cognitive::situation::UserSituation;
 
-/// A timestamped signal derived from a domain event.
-#[derive(Debug, Clone)]
-pub struct Signal {
-    pub event_type: String,
-    pub timestamp: DateTime<Utc>,
-    pub metadata: SignalMetadata,
-}
-
-/// Extra data attached to a signal for trigger evaluation.
-#[derive(Debug, Clone, Default)]
-pub struct SignalMetadata {
-    pub app: Option<String>,
-    pub task_id: Option<String>,
-    pub category: Option<String>,
-    pub amount: Option<f64>,
-}
-
-/// Named trigger conditions with cooldown tracking.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TriggerCondition {
-    pub name: String,
-    pub cooldown_secs: i64,
-}
-
-impl TriggerCondition {
-    pub fn new(name: &str, cooldown_secs: i64) -> Self {
-        Self {
-            name: name.to_string(),
-            cooldown_secs,
-        }
-    }
-}
-
-/// Result of evaluating triggers.
-#[derive(Debug, Clone)]
-pub struct TriggerFired {
-    pub condition_name: String,
-    pub confidence: f64,
-    pub context: String,
-}
+use conversion::event_to_signal;
+use types::default_conditions;
 
 /// Rolling window signal accumulator with heuristic trigger evaluation.
 pub struct SignalAccumulator {
@@ -60,19 +26,6 @@ pub struct SignalAccumulator {
     last_fired: std::collections::HashMap<String, DateTime<Utc>>,
     /// Registered trigger conditions.
     conditions: Vec<TriggerCondition>,
-}
-
-/// Default built-in trigger conditions.
-fn default_conditions() -> Vec<TriggerCondition> {
-    vec![
-        TriggerCondition::new("distraction_streak", 900), // 15min cooldown
-        TriggerCondition::new("low_productivity", 1800),  // 30min cooldown
-        TriggerCondition::new("deadline_approaching", 3600), // 1h cooldown
-        TriggerCondition::new("focus_quality_declining", 1800),
-        TriggerCondition::new("context_switch_overload", 900),
-        TriggerCondition::new("budget_warning", 3600),
-        TriggerCondition::new("task_avoidance", 1800),
-    ]
 }
 
 impl SignalAccumulator {
@@ -264,110 +217,6 @@ impl SignalAccumulator {
 impl Default for SignalAccumulator {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-/// Convert a domain event into a signal.
-fn event_to_signal(event: &DomainEvent, timestamp: DateTime<Utc>) -> Signal {
-    let (event_type, metadata) = match event {
-        DomainEvent::DistractionDetected { app, .. } => (
-            "DistractionDetected",
-            SignalMetadata {
-                app: Some(app.clone()),
-                ..Default::default()
-            },
-        ),
-        DomainEvent::FocusSessionEnded { .. } => ("FocusSessionEnded", SignalMetadata::default()),
-        DomainEvent::ProductivityScoreComputed { .. } => {
-            ("ProductivityScoreComputed", SignalMetadata::default())
-        }
-        DomainEvent::TaskCompleted { task_id, .. } => (
-            "TaskCompleted",
-            SignalMetadata {
-                task_id: Some(task_id.clone()),
-                ..Default::default()
-            },
-        ),
-        DomainEvent::TaskDeferred { task_id, .. } => (
-            "TaskDeferred",
-            SignalMetadata {
-                task_id: Some(task_id.clone()),
-                ..Default::default()
-            },
-        ),
-        DomainEvent::BudgetAlert { category, .. } => (
-            "BudgetAlert",
-            SignalMetadata {
-                category: Some(category.clone()),
-                ..Default::default()
-            },
-        ),
-        DomainEvent::TransactionRecorded {
-            category, amount, ..
-        } => (
-            "TransactionRecorded",
-            SignalMetadata {
-                category: Some(category.clone()),
-                amount: Some(*amount),
-                ..Default::default()
-            },
-        ),
-        // -- Intelligence layer events --
-        DomainEvent::SessionCreated {
-            session_type,
-            dominant_category,
-            ..
-        } => (
-            "SessionCreated",
-            SignalMetadata {
-                category: Some(format!("{session_type}:{dominant_category}")),
-                ..Default::default()
-            },
-        ),
-        DomainEvent::SessionEnded {
-            duration_secs,
-            quality_score,
-            session_type,
-            ..
-        } => (
-            "SessionEnded",
-            SignalMetadata {
-                category: Some(session_type.clone()),
-                amount: quality_score.or(Some(*duration_secs as f64)),
-                ..Default::default()
-            },
-        ),
-        DomainEvent::QualityScored {
-            overall_score,
-            score_date,
-            ..
-        } => (
-            "QualityScored",
-            SignalMetadata {
-                category: Some(score_date.clone()),
-                amount: Some(*overall_score),
-                ..Default::default()
-            },
-        ),
-        DomainEvent::PredictiveAlert {
-            forecast_type,
-            predicted_value,
-            ..
-        } => (
-            "PredictiveAlert",
-            SignalMetadata {
-                category: Some(forecast_type.clone()),
-                amount: Some(*predicted_value),
-                ..Default::default()
-            },
-        ),
-        _ => ("Other", SignalMetadata::default()),
-    };
-
-    Signal {
-        event_type: event_type.to_string(),
-        timestamp,
-        metadata,
     }
 }
 

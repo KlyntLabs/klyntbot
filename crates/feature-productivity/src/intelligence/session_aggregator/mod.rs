@@ -1,3 +1,9 @@
+mod types;
+
+pub use types::ClassifiedTick;
+
+use types::*;
+
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 
@@ -8,77 +14,6 @@ use bus::{DomainEvent, DomainEventBus};
 
 use crate::repos::IntelligenceSessionRepo;
 use crate::types::*;
-
-/// A classified tick ready for the session FSM.
-#[derive(Debug, Clone)]
-pub struct ClassifiedTick {
-    pub timestamp: DateTime<Utc>,
-    pub app_name: String,
-    pub category: String,
-    pub session_type: IntelligenceSessionType,
-    pub confidence: f64,
-    pub is_idle: bool,
-    pub is_context_switch: bool,
-}
-
-/// Maximum sliding window size (240 ticks × 5s = 20 minutes).
-const MAX_WINDOW: usize = 240;
-
-/// Number of ticks in the Building state before promoting to Active.
-/// 180 ticks × 5s = 15 minutes of sustained activity.
-const BUILDING_THRESHOLD: usize = 180;
-
-/// Minimum purity to promote from Building to Active.
-const BUILDING_PURITY_MIN: f64 = 0.75;
-
-/// If Building state exceeds this many ticks without meeting the threshold, reset to Idle.
-/// 240 ticks × 5s = 20 minutes.
-const BUILDING_TIMEOUT: usize = 240;
-
-/// Purity below this in Active state triggers Ending.
-const ACTIVE_PURITY_DROP: f64 = 0.50;
-
-/// Number of ticks in Ending state before actually ending.
-/// 24 ticks × 5s = 2 minutes grace period.
-const ENDING_GRACE_TICKS: usize = 24;
-
-#[derive(Debug, Clone)]
-enum SessionState {
-    Idle,
-    Building {
-        category: String,
-        session_type: IntelligenceSessionType,
-        since: DateTime<Utc>,
-        tick_count: usize,
-        matching_ticks: usize,
-    },
-    Active {
-        session_id: String,
-        session_type: IntelligenceSessionType,
-        category: String,
-        started_at: DateTime<Utc>,
-        tick_count: usize,
-        matching_ticks: usize,
-        context_switches: i64,
-        distraction_count: i64,
-        app_counts: HashMap<String, u32>,
-        last_app: String,
-    },
-    Ending {
-        session_id: String,
-        session_type: IntelligenceSessionType,
-        category: String,
-        started_at: DateTime<Utc>,
-        ending_since: DateTime<Utc>,
-        ending_ticks: usize,
-        tick_count: usize,
-        matching_ticks: usize,
-        context_switches: i64,
-        distraction_count: i64,
-        app_counts: HashMap<String, u32>,
-        last_app: String,
-    },
-}
 
 pub struct SessionAggregator {
     state: SessionState,
@@ -215,7 +150,7 @@ impl SessionAggregator {
                 app_counts,
                 last_app,
             } => {
-                // Idle tick in Active → transition to Ending
+                // Idle tick in Active -> transition to Ending
                 self.state = SessionState::Ending {
                     session_id,
                     session_type,
@@ -280,7 +215,7 @@ impl SessionAggregator {
                 }
             }
             SessionState::Building { .. } => {
-                // Idle during building → reset
+                // Idle during building -> reset
                 self.state = SessionState::Idle;
                 None
             }
@@ -300,7 +235,7 @@ impl SessionAggregator {
     ) -> Option<SessionEvent> {
         let new_tick_count = tick_count + 1;
 
-        // Category changed → reset to Building with new category
+        // Category changed -> reset to Building with new category
         if tick.category != category {
             self.state = SessionState::Building {
                 category: tick.category.clone(),
@@ -441,7 +376,7 @@ impl SessionAggregator {
 
         let purity = new_matching as f64 / new_tick_count as f64;
 
-        // Purity dropped too low → start ending
+        // Purity dropped too low -> start ending
         if purity < ACTIVE_PURITY_DROP {
             debug!(session_id = %session_id, purity = %purity, "purity dropped, entering Ending state");
             self.state = SessionState::Ending {
@@ -464,7 +399,7 @@ impl SessionAggregator {
             });
         }
 
-        // Periodically persist stats (every 60 ticks ≈ 5 min)
+        // Periodically persist stats (every 60 ticks ~ 5 min)
         if new_tick_count % 60 == 0 {
             let breakdown = serde_json::to_string(&app_counts).ok();
             let _ = self
@@ -525,7 +460,7 @@ impl SessionAggregator {
 
         *app_counts.entry(tick.app_name.clone()).or_insert(0) += 1;
 
-        // Recovery: matching tick during ending → back to Active
+        // Recovery: matching tick during ending -> back to Active
         if is_matching {
             let purity = new_matching as f64 / new_tick_count as f64;
             if purity >= ACTIVE_PURITY_DROP {
@@ -808,7 +743,7 @@ mod tests {
         let base = Utc::now();
         let mut created_event = None;
 
-        // Send BUILDING_THRESHOLD ticks (180 × 5s = 15 min)
+        // Send BUILDING_THRESHOLD ticks (180 x 5s = 15 min)
         for i in 0..BUILDING_THRESHOLD {
             let ts = base + Duration::seconds(i as i64 * 5);
             let event = agg.process_tick(focus_tick(ts, "Code")).await;
@@ -867,7 +802,7 @@ mod tests {
             let ts = base + Duration::seconds(i as i64 * 5);
             // Alternate between matching and non-matching, keeping purity just below 0.75
             let tick = if i % 4 == 3 {
-                // Every 4th tick is a different category → resets Building
+                // Every 4th tick is a different category -> resets Building
                 // But actually building resets on category change, so let's test timeout differently.
                 // To test timeout without purity issue, keep same category but low purity is N/A for same category.
                 // The timeout fires if tick_count >= BUILDING_TIMEOUT regardless.
@@ -909,7 +844,7 @@ mod tests {
         agg2.process_tick(focus_tick(ts, "Code")).await;
         assert_eq!(agg2.state_name(), "building");
 
-        // Change category → resets to new Building
+        // Change category -> resets to new Building
         let ts2 = base + Duration::seconds(5);
         agg2.process_tick(meeting_tick(ts2)).await;
         assert_eq!(agg2.state_name(), "building");
@@ -931,7 +866,7 @@ mod tests {
         }
         assert_eq!(agg.state_name(), "building");
 
-        // Category change → restarts Building with new category
+        // Category change -> restarts Building with new category
         let ts = base + Duration::seconds(50);
         agg.process_tick(meeting_tick(ts)).await;
         assert_eq!(agg.state_name(), "building");
@@ -956,7 +891,7 @@ mod tests {
         // Now send enough distraction ticks to drop purity below 0.50
         // Current: 180 matching out of 180 total (purity = 1.0)
         // Need: matching / total < 0.50
-        // After N distraction ticks: 180 / (180 + N) < 0.50 → N > 180
+        // After N distraction ticks: 180 / (180 + N) < 0.50 -> N > 180
         let offset = BUILDING_THRESHOLD as i64;
         for i in 0..181 {
             let ts = base + Duration::seconds((offset + i) * 5);
@@ -1039,7 +974,7 @@ mod tests {
         }
         assert_eq!(agg.state_name(), "active");
 
-        // Send enough distractions to enter Ending (purity < 0.50 → need >180 distractions)
+        // Send enough distractions to enter Ending (purity < 0.50 -> need >180 distractions)
         let offset = BUILDING_THRESHOLD as i64;
         for i in 0..181 {
             let ts = base + Duration::seconds((offset + i) * 5);
@@ -1050,7 +985,7 @@ mod tests {
         // Now send enough focus ticks during Ending to recover purity above 0.50
         // Current: 180 matching / 361 total = 0.498
         // Need: (180 + N) / (361 + N) >= 0.50
-        // 180 + N >= 180.5 + 0.5N → 0.5N >= 0.5 → N >= 1
+        // 180 + N >= 180.5 + 0.5N -> 0.5N >= 0.5 -> N >= 1
         // But purity needs to hit exactly 0.50 with N=1: 181/362 = 0.5 — that's >= 0.50.
         let offset2 = offset + 181;
         agg.process_tick(focus_tick(base + Duration::seconds(offset2 * 5), "Code"))

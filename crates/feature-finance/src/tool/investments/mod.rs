@@ -3,6 +3,9 @@
 //! Handles: portfolio_create, portfolio_list, investment_add, investment_update,
 //! investment_tx, investment_summary, price_fetch, price_refresh.
 
+mod pricing;
+mod summary;
+
 use chrono::{Local, Utc};
 use serde_json::json;
 use uuid::Uuid;
@@ -10,8 +13,7 @@ use uuid::Uuid;
 use crate::types::{AssetType, InvestmentTxType};
 use common::{Result, ToolError};
 use storage::rows::finance::{
-    FinanceInvestmentFilter, FinanceInvestmentPatch, FinanceInvestmentRow, FinanceInvestmentTxRow,
-    FinancePortfolioRow,
+    FinanceInvestmentPatch, FinanceInvestmentRow, FinanceInvestmentTxRow, FinancePortfolioRow,
 };
 use tools_core::ParamExtractor;
 use tools_core::RoutingContext;
@@ -416,225 +418,6 @@ impl FinanceTool {
             },
         };
         Ok(patch)
-    }
-
-    // ── Summary ────────────────────────────────────────────────────────────────
-
-    async fn investment_summary(&self, p: &ParamExtractor<'_>) -> Result<String> {
-        let portfolio_id = p.optional_str("portfolio_id")?;
-
-        // Verify portfolio exists if specified
-        if let Some(pid) = portfolio_id {
-            let portfolio_exists = self.storage.investments.get_portfolio(pid).await?;
-            if portfolio_exists.is_none() {
-                return Err(
-                    ToolError::ExecutionFailed(format!("Portfolio not found: {pid}")).into(),
-                );
-            }
-        }
-
-        let filter = FinanceInvestmentFilter {
-            portfolio_id: portfolio_id.map(|s| s.to_string()),
-            ..Default::default()
-        };
-        let investments = self.storage.investments.list_investments(&filter).await?;
-
-        let total_cost_basis: i64 = investments.iter().map(|i| i.cost_basis).sum();
-        // Use current_value if set; fall back to cost_basis so the summary is always populated
-        let total_value: i64 = investments
-            .iter()
-            .map(|i| i.current_value.unwrap_or(i.cost_basis))
-            .sum();
-        let total_return = total_value - total_cost_basis;
-        let return_pct = if total_cost_basis > 0 {
-            (total_return * 100) / total_cost_basis
-        } else {
-            0
-        };
-
-        // Asset allocation grouped by asset_type
-        let mut alloc_map: std::collections::HashMap<String, i64> =
-            std::collections::HashMap::new();
-        for inv in &investments {
-            let value = inv.current_value.unwrap_or(inv.cost_basis);
-            *alloc_map.entry(inv.asset_type.clone()).or_insert(0) += value;
-        }
-        let mut allocation: Vec<_> = alloc_map
-            .iter()
-            .map(|(asset_type, value)| {
-                let pct = if total_value > 0 {
-                    (value * 100) / total_value
-                } else {
-                    0
-                };
-                json!({"asset_type": asset_type, "value": value, "pct": pct})
-            })
-            .collect();
-        allocation.sort_by(|a, b| {
-            b["value"]
-                .as_i64()
-                .unwrap_or(0)
-                .cmp(&a["value"].as_i64().unwrap_or(0))
-        });
-
-        let holdings: Vec<_> = investments
-            .iter()
-            .map(|inv| {
-                let value = inv.current_value.unwrap_or(inv.cost_basis);
-                let ret = value - inv.cost_basis;
-                let ret_pct = if inv.cost_basis > 0 {
-                    (ret * 100) / inv.cost_basis
-                } else {
-                    0
-                };
-                json!({
-                    "id": inv.id,
-                    "name": inv.name,
-                    "symbol": inv.symbol,
-                    "asset_type": inv.asset_type,
-                    "quantity": inv.quantity,
-                    "cost_basis": inv.cost_basis,
-                    "current_value": value,
-                    "return": ret,
-                    "return_pct": ret_pct,
-                    "currency": inv.currency,
-                })
-            })
-            .collect();
-
-        let resp = json!({
-            "total_value": total_value,
-            "total_cost_basis": total_cost_basis,
-            "total_return": total_return,
-            "return_pct": return_pct,
-            "allocation": allocation,
-            "holdings": holdings,
-        });
-        Ok(serde_json::to_string_pretty(&resp).unwrap())
-    }
-
-    // ── Price fetching ─────────────────────────────────────────────────────────
-
-    async fn price_fetch(&self, p: &ParamExtractor<'_>) -> Result<String> {
-        let symbol = p.required_str("symbol")?;
-        let asset_type_str = p.required_str("asset_type")?;
-        let asset_type = AssetType::from_str_loose(asset_type_str).ok_or_else(|| {
-            ToolError::InvalidParams(format!("Invalid asset_type: {asset_type_str}"))
-        })?;
-
-        if asset_type == AssetType::RealEstate {
-            return Err(ToolError::ExecutionFailed(
-                "Price fetch is not available for real estate".to_string(),
-            )
-            .into());
-        }
-
-        let price_result = self
-            .price_service
-            .fetch_price(symbol, asset_type)
-            .await
-            .map_err(|e| ToolError::ExecutionFailed(format!("Price fetch failed: {e}")))?;
-
-        // Update all investments whose symbol matches (case-insensitive)
-        let all = self.storage.investments.list_with_symbols().await?;
-        let matching: Vec<_> = all
-            .iter()
-            .filter(|i| {
-                i.symbol
-                    .as_deref()
-                    .map(|s| s.to_lowercase() == symbol.to_lowercase())
-                    .unwrap_or(false)
-            })
-            .collect();
-
-        // Prices stored in smallest currency unit (×100 for 2-decimal currencies)
-        let price_int = (price_result.price * 100.0).round() as i64;
-        let mut updated_count = 0usize;
-        for inv in &matching {
-            let current_value = (price_result.price * inv.quantity * 100.0).round() as i64;
-            if self
-                .storage
-                .investments
-                .update_price(&inv.id, price_int, current_value)
-                .await
-                .is_ok()
-            {
-                updated_count += 1;
-            }
-        }
-
-        let resp = json!({
-            "symbol": price_result.symbol,
-            "price": price_result.price,
-            "currency": price_result.currency,
-            "source": price_result.source,
-            "updated_investments_count": updated_count,
-        });
-        Ok(serde_json::to_string_pretty(&resp).unwrap())
-    }
-
-    async fn price_refresh(&self, _p: &ParamExtractor<'_>) -> Result<String> {
-        let investments = self.storage.investments.list_with_symbols().await?;
-
-        let mut updated = 0usize;
-        let mut failed = 0usize;
-        let mut details = Vec::new();
-
-        for inv in &investments {
-            let symbol = match &inv.symbol {
-                Some(s) => s.clone(),
-                None => continue,
-            };
-
-            let asset_type = AssetType::from_str_loose(&inv.asset_type).unwrap_or_default();
-            match self.price_service.fetch_price(&symbol, asset_type).await {
-                Ok(price_result) => {
-                    let price_int = (price_result.price * 100.0).round() as i64;
-                    let current_value = (price_result.price * inv.quantity * 100.0).round() as i64;
-                    match self
-                        .storage
-                        .investments
-                        .update_price(&inv.id, price_int, current_value)
-                        .await
-                    {
-                        Ok(_) => {
-                            updated += 1;
-                            details.push(json!({
-                                "id": inv.id,
-                                "symbol": symbol,
-                                "price": price_result.price,
-                                "status": "updated",
-                            }));
-                        }
-                        Err(e) => {
-                            failed += 1;
-                            details.push(json!({
-                                "id": inv.id,
-                                "symbol": symbol,
-                                "status": "failed",
-                                "error": e.to_string(),
-                            }));
-                        }
-                    }
-                }
-                Err(e) => {
-                    failed += 1;
-                    details.push(json!({
-                        "id": inv.id,
-                        "symbol": symbol,
-                        "status": "failed",
-                        "error": e,
-                    }));
-                }
-            }
-        }
-
-        let resp = json!({
-            "updated": updated,
-            "failed": failed,
-            "details": details,
-        });
-        Ok(serde_json::to_string_pretty(&resp).unwrap())
     }
 }
 

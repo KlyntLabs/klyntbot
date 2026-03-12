@@ -1,0 +1,59 @@
+//! Signal types, trigger conditions, and default condition definitions.
+
+use chrono::DateTime;
+use chrono::Utc;
+use serde::{Deserialize, Serialize};
+
+/// A timestamped signal derived from a domain event.
+#[derive(Debug, Clone)]
+pub struct Signal {
+    pub event_type: String,
+    pub timestamp: DateTime<Utc>,
+    pub metadata: SignalMetadata,
+}
+
+/// Extra data attached to a signal for trigger evaluation.
+#[derive(Debug, Clone, Default)]
+pub struct SignalMetadata {
+    pub app: Option<String>,
+    pub task_id: Option<String>,
+    pub category: Option<String>,
+    pub amount: Option<f64>,
+}
+
+/// Named trigger conditions with cooldown tracking.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TriggerCondition {
+    pub name: String,
+    pub cooldown_secs: i64,
+}
+
+impl TriggerCondition {
+    pub fn new(name: &str, cooldown_secs: i64) -> Self {
+        Self {
+            name: name.to_string(),
+            cooldown_secs,
+        }
+    }
+}
+
+/// Result of evaluating triggers.
+#[derive(Debug, Clone)]
+pub struct TriggerFired {
+    pub condition_name: String,
+    pub confidence: f64,
+    pub context: String,
+}
+
+/// Default built-in trigger conditions.
+pub(super) fn default_conditions() -> Vec<TriggerCondition> {
+    vec![
+        TriggerCondition::new("distraction_streak", 900), // 15min cooldown
+        TriggerCondition::new("low_productivity", 1800),  // 30min cooldown
+        TriggerCondition::new("deadline_approaching", 3600), // 1h cooldown
+        TriggerCondition::new("focus_quality_declining", 1800),
+        TriggerCondition::new("context_switch_overload", 900),
+        TriggerCondition::new("budget_warning", 3600),
+        TriggerCondition::new("task_avoidance", 1800),
+    ]
+}
