@@ -1,10 +1,19 @@
 import { Search, X } from "lucide-react";
 import { useCallback } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { useSearchStore } from "../store/search-store";
+import { useTabStore } from "../store/tab-store";
 import { Button } from "./ui/button";
 
 export default function HeaderNav() {
   const { isSearchOpen, searchQuery, toggleSearch, closeSearch, setSearchQuery } = useSearchStore();
+  const navStack = useTabStore(
+    useShallow((s) => {
+      const active = s.tabs.find((t) => t.id === s.activeTabId);
+      return active?.navStack ?? [];
+    }),
+  );
+  const navigateToStackIndex = useTabStore((s) => s.navigateToStackIndex);
 
   const inputRef = useCallback((node: HTMLInputElement | null) => {
     node?.focus();
@@ -12,12 +21,37 @@ export default function HeaderNav() {
 
   return (
     <div className="flex items-center justify-between px-4 py-2 border-b border-[hsl(var(--border))]">
-      {/* Left */}
-      <div className="flex items-center gap-2">
-        <h1 className="text-sm font-medium text-[hsl(var(--foreground))]">My Issues</h1>
+      {/* Left — Breadcrumb */}
+      <div className="flex items-center gap-1 min-w-0">
+        {navStack.map((entry, index) => {
+          const isLast = index === navStack.length - 1;
+          return (
+            <div
+              key={`${entry.type}-${entry.targetId}`}
+              className="flex items-center gap-1 min-w-0"
+            >
+              {index > 0 && (
+                <span className="text-xs text-[hsl(var(--muted-foreground))] flex-shrink-0">›</span>
+              )}
+              {isLast ? (
+                <span className="text-sm font-medium text-[hsl(var(--foreground))] truncate">
+                  {entry.label}
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => navigateToStackIndex(index)}
+                  className="text-sm text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition-colors truncate"
+                >
+                  {entry.label}
+                </button>
+              )}
+            </div>
+          );
+        })}
       </div>
 
-      {/* Right */}
+      {/* Right — Search */}
       <div className="flex items-center gap-2">
         {isSearchOpen ? (
           <div className="flex items-center gap-2">

@@ -7,6 +7,7 @@ import { projects } from "../mock-data/projects";
 import { status as allStatus } from "../mock-data/status";
 import { users } from "../mock-data/users";
 import { useIssuesStore } from "../store/issues-store";
+import { useTabStore } from "../store/tab-store";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -49,6 +50,15 @@ export function IssueContextMenu({ issue, children }: IssueContextMenuProps) {
             <span className="ml-auto text-xs text-[hsl(var(--muted-foreground))]">
               {issue.identifier}
             </span>
+          </ContextMenuItem>
+          <ContextMenuItem
+            onSelect={() => {
+              useTabStore
+                .getState()
+                .openTab("issue", issue.id, `${issue.identifier} ${issue.title}`);
+            }}
+          >
+            Open in new tab
           </ContextMenuItem>
         </ContextMenuGroup>
 
