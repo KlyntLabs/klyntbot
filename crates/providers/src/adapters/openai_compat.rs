@@ -4,14 +4,13 @@
 //! using OpenAI chat completion format.
 
 use async_trait::async_trait;
-use futures_util::StreamExt;
 use reqwest::Client;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::time::Duration;
 use tracing::{debug, warn};
 
-use common::{build_http_client, KlyntbotError, ProviderError, Result};
+use common::{build_http_client, ProviderError, Result};
 
 use crate::registry::ProviderRegistry;
 use crate::types::{
@@ -317,7 +316,7 @@ impl LlmProvider for OpenAiCompatProvider {
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
 
-            return Err(super::types::map_http_error(
+            return Err(crate::types::map_http_error(
                 status.as_u16(),
                 error_text,
                 self.name(),
@@ -372,54 +371,17 @@ impl LlmProvider for OpenAiCompatProvider {
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
 
-            return Err(super::types::map_http_error(
+            return Err(crate::types::map_http_error(
                 status.as_u16(),
                 error_text,
                 self.name(),
             ));
         }
 
-        // Create SSE stream
-        let stream = response.bytes_stream();
-
-        // Create a stream that parses SSE chunks
-        let chunk_stream = stream.scan(String::new(), |line_buffer, result| {
-            // Process bytes synchronously to avoid borrow issues
-            let chunks_result = match result {
-                Ok(bytes) => {
-                    let text = String::from_utf8_lossy(&bytes);
-                    line_buffer.push_str(&text);
-
-                    // Process complete lines
-                    let mut chunks = Vec::new();
-                    while let Some(newline_pos) = line_buffer.find('\n') {
-                        let line = line_buffer.drain(..=newline_pos).collect::<String>();
-                        let line = line.trim();
-
-                        // Parse SSE format: "data: {...}"
-                        if let Some(data) = line.strip_prefix("data: ") {
-                            match Self::parse_sse_chunk(data) {
-                                Ok(Some(chunk)) => chunks.push(Ok(chunk)),
-                                Ok(None) => {} // [DONE] marker or empty chunk
-                                Err(e) => {
-                                    warn!("Failed to parse SSE chunk: {}", e);
-                                    // Continue processing other chunks
-                                }
-                            }
-                        }
-                    }
-                    chunks
-                }
-                Err(e) => vec![Err(KlyntbotError::Provider(ProviderError::Http(
-                    e.to_string(),
-                )))],
-            };
-
-            // Return async block with processed chunks
-            async move { Some(futures_util::stream::iter(chunks_result)) }
-        });
-
-        Ok(Box::pin(chunk_stream.flatten()))
+        // OpenAI SSE has no event: lines — ignore the event_type parameter
+        Ok(crate::streaming::sse_chunk_stream(response, |_event_type, data| {
+            Self::parse_sse_chunk(data)
+        }))
     }
 
     fn supports_streaming(&self) -> bool {
