@@ -103,17 +103,6 @@ impl std::fmt::Display for KeyResultStatus {
     }
 }
 
-pub struct KeyResultPatch {
-    pub title: Option<String>,
-    pub description: Option<Option<String>>,
-    pub status: Option<KeyResultStatus>,
-    pub tracking_mode: Option<TrackingMode>,
-    pub target_value: Option<Option<f64>>,
-    pub current_value: Option<f64>,
-    pub unit: Option<Option<String>>,
-    pub due_date: Option<Option<DateTime<Utc>>>,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

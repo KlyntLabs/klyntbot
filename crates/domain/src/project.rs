@@ -98,18 +98,3 @@ impl ProjectColor {
     }
 }
 
-pub struct ProjectPatch {
-    pub name: Option<String>,
-    pub area_id: Option<String>,
-    pub description: Option<Option<String>>,
-    pub color: Option<ProjectColor>,
-    pub tags: Option<Vec<String>>,
-    pub status: Option<ProjectStatus>,
-}
-
-pub struct ProjectFilter {
-    pub area_id: Option<String>,
-    pub status: Option<ProjectStatus>,
-    pub tag: Option<String>,
-    pub limit: Option<usize>,
-}

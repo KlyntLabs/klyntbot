@@ -64,14 +64,6 @@ impl std::fmt::Display for ObjectiveStatus {
     }
 }
 
-pub struct ObjectivePatch {
-    pub title: Option<String>,
-    pub description: Option<Option<String>>,
-    pub status: Option<ObjectiveStatus>,
-    pub priority: Option<Option<u8>>,
-    pub due_date: Option<Option<DateTime<Utc>>>,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

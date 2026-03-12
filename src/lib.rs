@@ -32,7 +32,7 @@ pub use common::{
     InteractionRequest, MessageRole, Question, Result, SessionKey,
 };
 pub use config::Config;
-pub use domain::{Area, AreaStatus, KeyResult, Objective, Project};
+pub use domain::{Area, KeyResult, Objective, Project};
 pub use providers::{
     create_provider, create_provider_with_failover, DynProvider, LlmProvider, LlmResponse, Message,
     ProviderRegistry,

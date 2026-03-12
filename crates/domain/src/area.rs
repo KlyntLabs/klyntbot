@@ -93,16 +93,6 @@ impl AreaColor {
     }
 }
 
-/// Partial update for an area.
-pub struct AreaPatch {
-    pub name: Option<String>,
-    pub description: Option<Option<String>>,
-    pub color: Option<AreaColor>,
-    pub icon: Option<Option<String>>,
-    pub position: Option<i32>,
-    pub status: Option<AreaStatus>,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
