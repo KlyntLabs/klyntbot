@@ -13,6 +13,7 @@
 pub mod cognitive_bridge;
 pub mod complexity;
 pub mod config;
+pub mod forecast;
 pub mod handlers;
 pub mod rrule_utils;
 pub mod scoring;

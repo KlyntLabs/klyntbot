@@ -132,8 +132,7 @@ fn parse_bias_value(s: &str) -> Option<f64> {
 
 /// Parse a numeric value from strings like "12.5 average" or "3.2 tasks/week".
 fn parse_numeric_value(s: &str) -> Option<f64> {
-    s.trim()
-        .split_whitespace()
+    s.split_whitespace()
         .next()
         .and_then(|v| v.parse::<f64>().ok())
 }
