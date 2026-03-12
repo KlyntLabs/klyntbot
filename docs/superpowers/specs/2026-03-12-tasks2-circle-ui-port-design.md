@@ -75,6 +75,12 @@ desktop-ui/src/features/tasks2/
 | `motion` | Layout animations (list↔board transitions, drag previews) | framer-motion v12+ (import from `motion/react`) |
 | `date-fns` | Date formatting (`format(date, 'MMM dd')`) | Used throughout issue display |
 | `cmdk` | Command palette for selectors and filters | Circle uses shadcn Command which wraps cmdk |
+| `@radix-ui/react-popover` | Popover primitive for filter and selector dropdowns | Required by shadcn-style Popover component |
+| `@radix-ui/react-dropdown-menu` | Dropdown primitive for display toggle | Required by shadcn-style DropdownMenu component |
+| `@radix-ui/react-dialog` | Dialog primitive for create issue modal | Required by shadcn-style Dialog component |
+| `@radix-ui/react-context-menu` | Context menu primitive for right-click actions | Required by shadcn-style ContextMenu component |
+| `@radix-ui/react-avatar` | Avatar primitive for assignee display | Required by shadcn-style Avatar component |
+| `@radix-ui/react-separator` | Separator primitive | Used in command lists and filter UI |
 
 **Already available:** `@dnd-kit/core`, `@dnd-kit/sortable`, `@dnd-kit/utilities` (use these instead of Circle's `react-dnd`), `lucide-react`, `clsx`, `tailwind-merge`.
 
@@ -102,7 +108,7 @@ Five Zustand stores, each self-contained:
 Circle uses shadcn/ui + Tailwind (light/dark). Our app uses custom CSS tokens + Tailwind v4. Strategy:
 
 - **Keep Circle's visual identity** — the `tasks2` page should look like Circle, not like the rest of the app. This is intentional since we're evaluating a redesign.
-- **Use Tailwind utilities directly** — `bg-sidebar/50`, `text-muted-foreground`, `border-border` etc. These map naturally to both Circle's shadcn theme and our CSS variables.
+- **Local CSS variables** — add a `tasks2.css` file in the feature folder that defines shadcn-compatible CSS variables (e.g., `--sidebar`, `--muted-foreground`, `--accent`, `--primary-foreground`, `--border`, `--container`) scoped under a `.tasks2-scope` class on the page root. This avoids polluting the global theme while letting Tailwind utilities like `bg-sidebar/50` and `text-muted-foreground` work correctly within the tasks2 page.
 - **SVG status/priority icons** — port directly from Circle (inline SVGs, no icon library dependency)
 - **No glass-panel** — Circle's design is flat/bordered, not glassmorphic
 - **Color values in mock data** — status colors (`#facc15`, `#22c55e`, etc.) are defined in mock data, not theme tokens. This is fine for the UI-only phase.
@@ -133,6 +139,35 @@ const Tasks2Page = lazy(() =>
 ```
 
 No sidebar navigation item needed — this is an experimental page accessed by URL.
+
+## Data Types
+
+### Issue Interface
+
+```typescript
+interface Issue {
+  id: string;
+  identifier: string;        // e.g., "LNUI-101"
+  title: string;
+  description: string;
+  status: Status;             // Embedded object (not ID)
+  assignee: User | null;      // Embedded object or null if unassigned
+  priority: Priority;         // Embedded object
+  labels: LabelInterface[];   // Array of embedded label objects
+  createdAt: string;          // ISO date string, displayed as "MMM dd"
+  cycleId: string;
+  project?: Project;          // Optional embedded project object
+  subissues?: string[];       // Issue IDs (not used in UI yet)
+  rank: string;               // LexoRank string for ordering
+  dueDate?: string;           // Optional ISO date string (not used in UI yet)
+}
+```
+
+All related types (`Status`, `Priority`, `LabelInterface`, `Project`, `User`) are embedded objects, not foreign keys. The stores operate on these objects directly — no ID lookups needed.
+
+### Create Issue Modal
+
+Fields: title (required), status (pre-selected from group header), priority (default: No Priority), assignee (optional), labels (optional). On submit, generates a new ID/identifier and pushes to the issues-store array.
 
 ## Mock Data
 
