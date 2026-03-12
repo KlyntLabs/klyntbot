@@ -13,6 +13,7 @@ dirs.workspace = true
 shellexpand.workspace = true
 tokio.workspace = true
 iana-time-zone = { workspace = true }
+dotenvy = { workspace = true }
 
 [dev-dependencies]
 tempfile.workspace = true

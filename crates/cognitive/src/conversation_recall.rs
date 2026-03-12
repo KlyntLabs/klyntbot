@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use common::utils::truncate_at_boundary;
+use common::truncate_at_boundary;
 use storage::{sanitize_predicate_value, VectorStore};
 
 use crate::embedder::TextEmbedder;

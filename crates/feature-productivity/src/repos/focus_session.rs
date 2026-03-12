@@ -39,7 +39,7 @@ impl From<SessionRow> for FocusSession {
                 }
             })
             .unwrap_or_default();
-        let started_at = common::utils::date::parse_datetime(&row.started_at, "UTC")
+        let started_at = common::parse_datetime(&row.started_at, "UTC")
             .unwrap_or_else(|| {
                 warn!(raw = %row.started_at, "unparseable started_at in productivity_sessions, using now()");
                 Utc::now()
@@ -47,7 +47,7 @@ impl From<SessionRow> for FocusSession {
         let ended_at = row
             .ended_at
             .as_deref()
-            .and_then(|s| common::utils::date::parse_datetime(s, "UTC"));
+            .and_then(|s| common::parse_datetime(s, "UTC"));
         let source = row.source.parse::<SessionSource>().unwrap_or_else(|_| {
             warn!(raw = %row.source, "unknown source in DB, defaulting to Manual");
             SessionSource::Manual

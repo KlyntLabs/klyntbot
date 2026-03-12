@@ -68,9 +68,9 @@ impl LlmSummaryProvider {
     }
 
     /// Try to extract a `Vec<String>` JSON array from LLM output,
-    /// delegating bracket-finding to `common::utils::extract_json_array`.
+    /// delegating bracket-finding to `common::helpers::extract_json_array`.
     fn extract_json(text: &str) -> Option<Vec<String>> {
-        let slice = common::utils::extract_json_array(text.trim());
+        let slice = common::helpers::extract_json_array(text.trim());
         serde_json::from_str::<Vec<String>>(slice).ok()
     }
 

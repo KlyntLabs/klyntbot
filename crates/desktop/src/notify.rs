@@ -3,7 +3,7 @@
 //! Routes OS notifications through `tauri-plugin-notification` so that
 //! macOS attributes them to the Klynt app and displays the correct app icon.
 
-use common::utils::notify::NotificationSender;
+use common::NotificationSender;
 use common::Result;
 use tauri_plugin_notification::NotificationExt;
 

@@ -12,7 +12,7 @@ use crate::memory_retriever::{MemoryRetriever, MemorySource};
 use crate::source::{ContextSource, SourceContext};
 use crate::summary_provider::SummaryProvider;
 use crate::token_counter::{default_token_counter, TokenCounter};
-use common::utils::tool_def_name;
+use common::helpers::tool_def_name;
 
 use crate::{
     BudgetAllocator, BudgetConfig, BudgetReport, CompressorConfig, HistoryCompressor, Priority,

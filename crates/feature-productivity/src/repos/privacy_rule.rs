@@ -18,8 +18,8 @@ impl From<PrivacyRuleRow> for PrivacyRule {
             warn!(raw = %row.match_mode, "unknown match_mode in privacy_rules, defaulting to Exact");
             MatchMode::Exact
         });
-        let created_at = common::utils::date::parse_datetime(&row.created_at, "UTC")
-            .unwrap_or_else(chrono::Utc::now);
+        let created_at =
+            common::parse_datetime(&row.created_at, "UTC").unwrap_or_else(chrono::Utc::now);
 
         Self {
             id: row.id,

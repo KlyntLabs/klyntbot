@@ -7,7 +7,7 @@
 use std::sync::Arc;
 use std::time::Instant;
 
-use common::{utils::tool_def_name, Result};
+use common::{helpers::tool_def_name, Result};
 use context_engine::{ContextEngine, ContextRequest, ExecutionStrategy};
 use providers::Message;
 use tokio::sync::RwLock;

@@ -100,7 +100,7 @@ fn build_risk_prompt(data: &RiskPromptData<'_>) -> String {
 
 /// Parse LLM risk analysis response into ForecastRisk structs.
 fn parse_risks(response: &str) -> Vec<ForecastRisk> {
-    let json_str = common::utils::strip_llm_fences(response);
+    let json_str = common::helpers::strip_llm_fences(response);
 
     let parsed: serde_json::Value = match serde_json::from_str(json_str) {
         Ok(v) => v,

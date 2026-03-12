@@ -5,7 +5,7 @@ use tokio::sync::{mpsc, RwLock};
 use tracing::warn;
 
 use bus::OutboundMessage;
-use common::utils::notify::{NotificationSender, OsNotificationSender};
+use common::notify::{NotificationSender, OsNotificationSender};
 use common::{ChannelName, ChatId, Result};
 use config::schema::TodoNotificationConfig;
 

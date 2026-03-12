@@ -22,11 +22,10 @@ impl From<ProjectRow> for ProductivityProject {
             .as_deref()
             .and_then(|s| serde_json::from_str(s).ok())
             .unwrap_or_default();
-        let created_at = common::utils::date::parse_datetime(&row.created_at, "UTC")
-            .unwrap_or_else(|| {
-                warn!(raw = %row.created_at, "unparseable created_at in productivity_projects");
-                Utc::now()
-            });
+        let created_at = common::parse_datetime(&row.created_at, "UTC").unwrap_or_else(|| {
+            warn!(raw = %row.created_at, "unparseable created_at in productivity_projects");
+            Utc::now()
+        });
         Self {
             id: row.id,
             display_name: row.display_name,

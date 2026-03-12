@@ -7,7 +7,7 @@ use std::time::Duration;
 use tracing::{debug, warn};
 use url::Url;
 
-use common::{utils::build_http_client_with_builder, Result, ToolError};
+use common::{build_http_client_with_builder, Result, ToolError};
 use tools_core::{RoutingContext, ToolParams};
 
 #[derive(Debug, ToolParams)]
@@ -265,7 +265,7 @@ fn truncate_output(text: &str, max_bytes: usize) -> String {
     if text.len() <= max_bytes {
         text.to_string()
     } else {
-        let truncated = common::utils::truncate_at_boundary(text, max_bytes);
+        let truncated = common::truncate_at_boundary(text, max_bytes);
         format!(
             "{}... (truncated, {} more bytes)",
             truncated,

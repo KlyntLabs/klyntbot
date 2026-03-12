@@ -84,7 +84,7 @@ fn parse_suggestions(
     task_id: &str,
     trigger: &SuggestionTrigger,
 ) -> Vec<SuggestionCandidate> {
-    let json_str = common::utils::strip_llm_fences(response);
+    let json_str = common::helpers::strip_llm_fences(response);
 
     let parsed: serde_json::Value = match serde_json::from_str(json_str) {
         Ok(v) => v,

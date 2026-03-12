@@ -43,7 +43,7 @@ impl ContextSource for IdentitySource {
 
         let date_str = if let Some(tz) = self.parsed_tz {
             let local = now.with_timezone(&tz);
-            let utc_offset = common::utils::date::timezone_utc_offset(&self.timezone);
+            let utc_offset = common::date::timezone_utc_offset(&self.timezone);
             format!(
                 "{} ({}, UTC{})",
                 local.format("%Y-%m-%d %H:%M (%A)"),

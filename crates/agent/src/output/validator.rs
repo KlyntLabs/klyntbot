@@ -5,7 +5,7 @@
 //! - Detects leaked system prompt patterns
 //! - Flags low-quality or empty responses
 
-use common::utils::truncate_at_boundary;
+use common::truncate_at_boundary;
 
 /// Validates LLM responses for safety and quality.
 pub struct ResponseValidator {

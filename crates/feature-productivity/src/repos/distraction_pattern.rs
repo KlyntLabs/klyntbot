@@ -21,8 +21,7 @@ struct PatternRow {
 
 impl From<PatternRow> for DistractionPattern {
     fn from(row: PatternRow) -> Self {
-        let created_at =
-            common::utils::date::parse_datetime(&row.created_at, "UTC").unwrap_or_else(Utc::now);
+        let created_at = common::parse_datetime(&row.created_at, "UTC").unwrap_or_else(Utc::now);
         Self {
             id: row.id,
             date: row.date,

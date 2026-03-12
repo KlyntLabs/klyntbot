@@ -20,11 +20,10 @@ impl From<NudgeRow> for NudgeRecord {
             warn!(raw = %row.nudge_type, "unknown nudge_type in DB, defaulting to BreakReminder");
             NudgeType::BreakReminder
         });
-        let created_at = common::utils::date::parse_datetime(&row.created_at, "UTC")
-            .unwrap_or_else(|| {
-                warn!(raw = %row.created_at, "unparseable created_at in nudge_history, using now()");
-                Utc::now()
-            });
+        let created_at = common::parse_datetime(&row.created_at, "UTC").unwrap_or_else(|| {
+            warn!(raw = %row.created_at, "unparseable created_at in nudge_history, using now()");
+            Utc::now()
+        });
         Self {
             id: row.id,
             nudge_type,

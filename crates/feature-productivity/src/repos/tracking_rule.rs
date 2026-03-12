@@ -46,11 +46,11 @@ impl From<TrackingRuleRow> for TrackingRule {
         let last_hit_at = row
             .last_hit_at
             .as_deref()
-            .and_then(|s| common::utils::date::parse_datetime(s, "UTC"));
-        let created_at = common::utils::date::parse_datetime(&row.created_at, "UTC")
-            .unwrap_or_else(chrono::Utc::now);
-        let updated_at = common::utils::date::parse_datetime(&row.updated_at, "UTC")
-            .unwrap_or_else(chrono::Utc::now);
+            .and_then(|s| common::parse_datetime(s, "UTC"));
+        let created_at =
+            common::parse_datetime(&row.created_at, "UTC").unwrap_or_else(chrono::Utc::now);
+        let updated_at =
+            common::parse_datetime(&row.updated_at, "UTC").unwrap_or_else(chrono::Utc::now);
 
         Self {
             id: row.id,

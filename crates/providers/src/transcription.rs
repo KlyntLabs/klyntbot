@@ -6,7 +6,7 @@ use std::path::Path;
 use std::time::Duration;
 use tracing::{debug, warn};
 
-use common::{utils::build_http_client, KlyntbotError, ProviderError, Result};
+use common::{build_http_client, KlyntbotError, ProviderError, Result};
 
 /// Default API base URL for Groq
 const DEFAULT_GROQ_API_BASE: &str = "https://api.groq.com/openai/v1";

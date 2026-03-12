@@ -47,7 +47,7 @@ fn format_interaction_summary(response: &common::FormResponse) -> String {
                         if *answer { "Yes" } else { "No" }.to_string()
                     }
                     common::AnswerValue::Text { content } => {
-                        common::utils::truncate_chars(content, 57, "...")
+                        common::truncate_chars(content, 57, "...")
                     }
                     common::AnswerValue::Skipped => "Skipped".to_string(),
                 })

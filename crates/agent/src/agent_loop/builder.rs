@@ -56,7 +56,7 @@ pub struct AgentLoopBuilder {
     vector_store: Option<storage::VectorStore>,
     cron_service: Option<Arc<scheduling::CronService>>,
     notification_handle: Option<LastActiveChannel>,
-    notification_sender: Option<Arc<dyn common::utils::notify::NotificationSender>>,
+    notification_sender: Option<Arc<dyn common::NotificationSender>>,
     domain_event_bus: Option<Arc<bus::DomainEventBus>>,
     cognitive_provider: Option<DynProvider>,
     pipeline_tx: Option<tokio::sync::broadcast::Sender<cognitive::PipelineEvent>>,
@@ -103,10 +103,7 @@ impl AgentLoopBuilder {
         self
     }
 
-    pub fn with_notification_sender(
-        mut self,
-        sender: Arc<dyn common::utils::notify::NotificationSender>,
-    ) -> Self {
+    pub fn with_notification_sender(mut self, sender: Arc<dyn common::NotificationSender>) -> Self {
         self.notification_sender = Some(sender);
         self
     }

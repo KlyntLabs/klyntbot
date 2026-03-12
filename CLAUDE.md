@@ -40,6 +40,8 @@ cd desktop-ui && bun run test           # Vitest (run once)
 cargo tauri dev                    # Full desktop app (auto-starts Vite + dev HTTP server on :3456)
 ```
 
+**Dev/prod isolation:** Set `KLYNTBOT_HOME=~/.klyntbot-dev` (via `.env` file or env var) to run a dev instance with separate config + data from production (`~/.klyntbot/`). Controls where `config.json`, `sessions/`, `workspace/`, `data.db`, `lance/`, `plugins/`, `personas/` all live. A `.env` file at the project root is auto-loaded.
+
 Browser-only dev: run `cargo tauri dev` (starts Vite + embedded HTTP server on `:3456`) then open `localhost:1420`. The dev HTTP server lives in `crates/desktop/src/dev_server.rs` — no separate `dev-api` crate. Business logic lives in the `app-core` crate; `desktop` is a thin Tauri adapter. Tauri config: `crates/desktop/tauri.conf.json`. Shared IPC types: `desktop-shared` crate.
 
 ## Architecture

@@ -12,7 +12,7 @@ use async_trait::async_trait;
 use chrono::Utc;
 use tracing::debug;
 
-use common::{utils::tool_def_name, Result};
+use common::{helpers::tool_def_name, Result};
 use providers::Message;
 use tools::RoutingContext;
 

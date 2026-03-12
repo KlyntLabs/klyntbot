@@ -8,6 +8,9 @@ tests/fixtures/hello_plugin/target/
 tests/fixtures/hello_plugin/Cargo.lock
 tests/fixtures/hello_plugin/plugin.wasm
 
+# Environment overrides (dev/prod isolation)
+.env
+
 # User data directories (runtime)
 .klyntbot/
 

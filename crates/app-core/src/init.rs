@@ -52,7 +52,7 @@ impl AppCore {
     /// `None`, the default platform command (`osascript` / `notify-send`) is used.
     pub async fn init_with_sender(
         config_override: Option<config::Config>,
-        notification_sender: Option<Arc<dyn common::utils::notify::NotificationSender>>,
+        notification_sender: Option<Arc<dyn common::NotificationSender>>,
     ) -> Result<(Self, EventChannels), String> {
         // 1. Load config
         let mut config = match config_override {

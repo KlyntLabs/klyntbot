@@ -143,7 +143,7 @@ async fn call_llm_for_plan(
 
     let response = provider.chat(&messages, None, &params).await?;
     let content = response.content.unwrap_or_default();
-    let json_str = common::utils::strip_llm_fences(&content);
+    let json_str = common::helpers::strip_llm_fences(&content);
 
     let parsed: LlmDayPlanResponse = serde_json::from_str(json_str).map_err(|e| {
         common::ToolError::ExecutionFailed(format!("Day plan JSON parse failed: {e}"))

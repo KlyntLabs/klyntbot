@@ -584,7 +584,7 @@ impl IntentClassifier {
     }
 
     fn parse_classification_json(content: &str) -> IntentAnalysis {
-        let json_str = match common::utils::extract_json_object(content) {
+        let json_str = match common::helpers::extract_json_object(content) {
             Some(s) => s,
             None => return IntentAnalysis::fallback(),
         };
@@ -1132,14 +1132,14 @@ mod tests {
     fn extract_json_finds_object() {
         let input = r#"text {"key":"value"} more"#;
         assert_eq!(
-            common::utils::extract_json_object(input),
+            common::helpers::extract_json_object(input),
             Some(r#"{"key":"value"}"#)
         );
     }
 
     #[test]
     fn extract_json_handles_no_json() {
-        assert_eq!(common::utils::extract_json_object("no json here"), None);
+        assert_eq!(common::helpers::extract_json_object("no json here"), None);
     }
 
     #[test]

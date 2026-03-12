@@ -174,12 +174,17 @@ impl Config {
         expand_tilde(&self.agents.defaults.workspace)
     }
 
-    /// Resolve the data directory path, expanding `~` and defaulting to `~/.klyntbot`.
+    /// Resolve the data directory path.
+    ///
+    /// Priority: `data_dir` config field → `KLYNTBOT_HOME` env var → `~/.klyntbot`.
     pub fn data_dir_path(&self) -> PathBuf {
-        match &self.data_dir {
-            Some(dir) => expand_tilde(dir),
-            None => expand_tilde("~/.klyntbot"),
+        if let Some(dir) = &self.data_dir {
+            return expand_tilde(dir);
         }
+        if let Ok(dir) = std::env::var("KLYNTBOT_HOME") {
+            return PathBuf::from(dir);
+        }
+        expand_tilde("~/.klyntbot")
     }
 
     /// Return all provider configs keyed by name (detection priority order).

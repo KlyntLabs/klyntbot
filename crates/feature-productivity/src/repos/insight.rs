@@ -31,7 +31,7 @@ impl From<InsightRow> for InsightCard {
             baseline_value: row.baseline_value,
             date: row.date,
             dismissed: row.dismissed,
-            generated_at: common::utils::date::parse_datetime(&row.generated_at, "UTC")
+            generated_at: common::parse_datetime(&row.generated_at, "UTC")
                 .unwrap_or_else(chrono::Utc::now),
         }
     }

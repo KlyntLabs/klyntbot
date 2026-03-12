@@ -25,11 +25,10 @@ impl From<GoalRow> for ProductivityGoal {
             warn!(raw = %row.metric, "unknown metric in DB, defaulting to ProductiveHours");
             GoalMetric::ProductiveHours
         });
-        let created_at = common::utils::date::parse_datetime(&row.created_at, "UTC")
-            .unwrap_or_else(|| {
-                warn!(raw = %row.created_at, "unparseable created_at in productivity_goals");
-                Utc::now()
-            });
+        let created_at = common::parse_datetime(&row.created_at, "UTC").unwrap_or_else(|| {
+            warn!(raw = %row.created_at, "unparseable created_at in productivity_goals");
+            Utc::now()
+        });
         Self {
             id: row.id,
             goal_type,

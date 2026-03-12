@@ -28,7 +28,7 @@ impl TaskTool {
         action.priority = p.optional_u64("priority")?.map(|v| v as u8);
         action.due_date = p
             .optional_str("due_date")?
-            .and_then(|s| common::utils::date::parse_datetime(s, &self.timezone));
+            .and_then(|s| common::parse_datetime(s, &self.timezone));
         action.tags = p.string_array_or_empty("tags")?;
         action.project_id = p.optional_str("project_id")?.map(String::from);
 
@@ -170,7 +170,7 @@ impl TaskTool {
         action.priority = p.optional_u64("priority")?.map(|v| v as u8);
         action.due_date = p
             .optional_str("due_date")?
-            .and_then(|s| common::utils::date::parse_datetime(s, &self.timezone));
+            .and_then(|s| common::parse_datetime(s, &self.timezone));
         action.tags = p.string_array_or_empty("tags")?;
         action.parent_id = Some(parent_id.to_string());
         action.project_id = p

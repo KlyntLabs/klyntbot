@@ -31,7 +31,7 @@ impl TaskTool {
                 if s.is_empty() || s == "null" {
                     None
                 } else {
-                    common::utils::date::parse_datetime(s, &self.timezone)
+                    common::parse_datetime(s, &self.timezone)
                 }
             }),
             tags: p.optional_array("tags")?.map(|arr| {

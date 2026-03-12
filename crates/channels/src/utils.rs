@@ -1,6 +1,6 @@
 //! Message splitting utilities for per-channel length limits.
 
-use common::utils::truncate_at_boundary;
+use common::truncate_at_boundary;
 
 /// Per-channel message length limits.
 pub fn max_length(channel: &str) -> usize {

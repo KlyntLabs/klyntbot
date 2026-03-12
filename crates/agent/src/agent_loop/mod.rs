@@ -14,7 +14,7 @@ use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, warn};
 
 use bus::{InboundMessage, MessageBus, OutboundMessage};
-use common::{utils::truncate_at_boundary, Result};
+use common::{truncate_at_boundary, Result};
 use config::Config;
 use providers::Message;
 use session::SessionManager;

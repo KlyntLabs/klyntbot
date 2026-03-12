@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use crate::types::AssetType;
-use common::utils::build_http_client_with_builder;
+use common::build_http_client_with_builder;
 
 /// A cached price entry.
 #[derive(Debug, Clone)]

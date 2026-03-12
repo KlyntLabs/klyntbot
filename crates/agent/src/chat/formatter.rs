@@ -5,7 +5,7 @@
 //! - Discord: code blocks supported, limit 2000 chars
 //! - Default/CLI: pass through unchanged
 
-use common::utils::truncate_at_boundary;
+use common::truncate_at_boundary;
 use common::ChannelName;
 
 /// Maximum message length per channel.
@@ -32,7 +32,7 @@ fn format_discord(content: &str) -> String {
 }
 
 /// Truncate content at a word boundary, appending "..." if truncated.
-/// Delegates UTF-8 boundary safety to `common::utils::truncate_at_boundary`.
+/// Delegates UTF-8 boundary safety to `common::truncate_at_boundary`.
 fn truncate_with_ellipsis(content: &str, max_bytes: usize) -> String {
     if content.len() <= max_bytes {
         return content.to_string();

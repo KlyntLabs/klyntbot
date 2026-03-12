@@ -106,7 +106,7 @@ Return only valid JSON, no markdown fences."#;
 /// Parse the LLM JSON response into an `EnrichmentResult`.
 /// Only fills fields that are not already set on the task.
 fn parse_llm_enrichment_response(content: &str, task: &Todo) -> Option<EnrichmentResult> {
-    let json_str = common::utils::strip_llm_fences(content);
+    let json_str = common::helpers::strip_llm_fences(content);
     let parsed: LlmEnrichmentResponse = match serde_json::from_str(json_str) {
         Ok(r) => r,
         Err(e) => {

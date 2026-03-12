@@ -10,7 +10,7 @@ use serde_json::{json, Value};
 use std::time::Duration;
 use tracing::{debug, warn};
 
-use common::{utils::build_http_client, KlyntbotError, ProviderError, Result};
+use common::{build_http_client, KlyntbotError, ProviderError, Result};
 use config::{ExtendedThinkingConfig, Secret};
 
 use crate::registry::ProviderRegistry;

@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use cognitive::conversation_recall::{ConversationRecallService, RecallMetadata};
-use common::utils::truncate_at_boundary;
+use common::truncate_at_boundary;
 use tools::conversation_recall::{
     ConversationRecallHandler, ConversationRecallStatus, PurgeFilter, RecallSearchResult,
 };

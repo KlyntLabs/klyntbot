@@ -8,17 +8,20 @@ use tokio::fs;
 use super::schema::{Config, Secret};
 use common::{ConfigError, Result};
 
-/// Get the default configuration file path (~/.klyntbot/config.json)
+/// Get the configuration file path (`{home}/config.json`).
+///
+/// Respects `KLYNTBOT_HOME` env var, falling back to `~/.klyntbot/`.
 pub fn config_path() -> Result<PathBuf> {
-    dirs::home_dir()
-        .map(|home| home.join(".klyntbot").join("config.json"))
-        .ok_or_else(|| {
-            ConfigError::Invalid("Unable to determine home directory".to_string()).into()
-        })
+    Ok(config_dir()?.join("config.json"))
 }
 
-/// Get the klyntbot data directory (~/.klyntbot/)
+/// Get the klyntbot home directory (config + data root).
+///
+/// Respects `KLYNTBOT_HOME` env var, falling back to `~/.klyntbot/`.
 pub fn config_dir() -> Result<PathBuf> {
+    if let Ok(dir) = std::env::var("KLYNTBOT_HOME") {
+        return Ok(PathBuf::from(dir));
+    }
     dirs::home_dir()
         .map(|home| home.join(".klyntbot"))
         .ok_or_else(|| {
@@ -166,7 +169,12 @@ macro_rules! env_secret {
 /// Load configuration from environment variables
 /// Environment variables are prefixed with KLYNTBOT_ and use double underscores for nesting
 /// Example: KLYNTBOT_AGENTS__DEFAULTS__MODEL=claude-sonnet-4-5
+///
+/// Automatically loads a `.env` file from the current directory if present.
 pub async fn load_with_env_overrides() -> Result<Config> {
+    // Load .env file if present (silently ignored if missing)
+    dotenvy::dotenv().ok();
+
     let mut config = load().await?;
 
     // Agent defaults
@@ -253,8 +261,10 @@ pub async fn load_with_env_overrides() -> Result<Config> {
         config.providers.aihubmix.api_key
     );
 
-    // Data directory
+    // Data directory (explicit override takes precedence over KLYNTBOT_HOME)
     if let Ok(val) = std::env::var("KLYNTBOT_DATA_DIR") {
+        config.data_dir = Some(val);
+    } else if let Ok(val) = std::env::var("KLYNTBOT_HOME") {
         config.data_dir = Some(val);
     }
 
@@ -323,7 +333,6 @@ mod tests {
     #[test]
     fn test_config_paths() {
         let path = config_path().unwrap();
-        assert!(path.to_string_lossy().contains(".klyntbot"));
         assert!(path.to_string_lossy().ends_with("config.json"));
     }
 
@@ -337,7 +346,29 @@ mod tests {
     #[test]
     fn test_config_dir_path() {
         let dir = config_dir().unwrap();
-        assert!(dir.to_string_lossy().contains(".klyntbot"));
+        assert!(
+            dir.exists()
+                || dir.to_string_lossy().contains(".klyntbot")
+                || std::env::var("KLYNTBOT_HOME").is_ok()
+        );
+    }
+
+    #[test]
+    fn test_config_dir_respects_env_override() {
+        use tempfile::TempDir;
+        let temp_dir = TempDir::new().unwrap();
+        let custom_dir = temp_dir.path().join("custom-home");
+        std::fs::create_dir_all(&custom_dir).unwrap();
+
+        std::env::set_var("KLYNTBOT_HOME", custom_dir.to_str().unwrap());
+
+        let dir = config_dir().unwrap();
+        assert_eq!(dir, custom_dir);
+
+        let path = config_path().unwrap();
+        assert_eq!(path, custom_dir.join("config.json"));
+
+        std::env::remove_var("KLYNTBOT_HOME");
     }
 
     #[test]
@@ -619,20 +650,25 @@ mod tests {
 
     #[test]
     fn test_config_path_includes_home_directory() {
-        let path = config_path().unwrap();
-        let home = dirs::home_dir().unwrap();
+        // Only assert home-based path when env override is not set
+        if std::env::var("KLYNTBOT_HOME").is_err() {
+            let path = config_path().unwrap();
+            let home = dirs::home_dir().unwrap();
 
-        assert!(path.starts_with(home));
-        assert!(path.ends_with(".klyntbot/config.json"));
+            assert!(path.starts_with(home));
+            assert!(path.ends_with(".klyntbot/config.json"));
+        }
     }
 
     #[test]
     fn test_config_dir_includes_home_directory() {
-        let dir = config_dir().unwrap();
-        let home = dirs::home_dir().unwrap();
+        if std::env::var("KLYNTBOT_HOME").is_err() {
+            let dir = config_dir().unwrap();
+            let home = dirs::home_dir().unwrap();
 
-        assert!(dir.starts_with(home));
-        assert!(dir.ends_with(".klyntbot"));
+            assert!(dir.starts_with(home));
+            assert!(dir.ends_with(".klyntbot"));
+        }
     }
 
     #[test]

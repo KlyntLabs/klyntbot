@@ -18,8 +18,8 @@ use crate::ws_manager::{HeartbeatStrategy, WebSocketManager, WsConfig, WsHandler
 use crate::{check_allowlist, Channel};
 use bus::{InboundMessage, MessageBus, MessageKind, OutboundMessage};
 use common::{
-    utils::{build_http_client, truncate_chars},
-    Answer, AnswerType, AnswerValue, ChannelError, FormResponse, InteractionRequest, Result,
+    build_http_client, truncate_chars, Answer, AnswerType, AnswerValue, ChannelError, FormResponse,
+    InteractionRequest, Result,
 };
 use config::SlackConfig;
 

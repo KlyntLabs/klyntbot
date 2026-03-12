@@ -21,7 +21,7 @@ use crate::Result;
 /// # Examples
 ///
 /// ```ignore
-/// use common::utils::build_http_client;
+/// use common::build_http_client;
 /// use std::time::Duration;
 ///
 /// let client = build_http_client(Duration::from_secs(30))?;
@@ -46,7 +46,7 @@ pub fn build_http_client(timeout: Duration) -> Result<Client> {
 /// # Examples
 ///
 /// ```ignore
-/// use common::utils::build_http_client_with_builder;
+/// use common::build_http_client_with_builder;
 /// use std::time::Duration;
 ///
 /// let client = build_http_client_with_builder(|builder| {

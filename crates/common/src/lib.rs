@@ -1,15 +1,22 @@
-//! Klyntbot Core - Foundation types, errors, and utilities
+//! Klyntbot Core — foundation types, errors, and utilities.
 //!
 //! This crate provides the foundational types and error handling used across
 //! the entire klyntbot workspace.
 
+// ── Modules ─────────────────────────────────────────────────────────────
+
+pub mod date;
 pub mod entity_card;
 pub mod error;
+pub mod helpers;
+pub mod http;
+pub mod notify;
+pub mod ports;
 pub mod prompts;
 pub mod types;
-pub mod utils;
 
-// Re-export commonly used types
+// ── Re-exports: domain types ────────────────────────────────────────────
+
 pub use entity_card::EntityCard;
 pub use error::{
     ChannelError, ConfigError, KlyntbotError, ProviderError, Result, SessionError, ToolError,
@@ -21,3 +28,10 @@ pub use types::{
     ChannelName, ChatId, MessageRole, SessionKey, CLI_CHANNEL, SYSTEM_CHANNEL,
     TELEGRAM_RESET_SENDER,
 };
+
+// ── Re-exports: commonly used utilities ─────────────────────────────────
+
+pub use date::parse_datetime;
+pub use helpers::{truncate_at_boundary, truncate_chars};
+pub use http::{build_http_client, build_http_client_with_builder};
+pub use ports::NotificationSender;
