@@ -196,6 +196,19 @@ impl AgentLoopBuilder {
         // ── Shared embedding engine ──
         let embedding_engine = Arc::new(tools::EmbeddingEngine::new());
 
+        // Inject text embedder into agent manager for semantic agent matching,
+        // then precompute one representative embedding per agent.
+        {
+            let embedder: Arc<dyn cognitive::TextEmbedder> = Arc::new(
+                crate::adapters::cognitive_embedder::TextEmbedderImpl::new(Arc::clone(
+                    &embedding_engine,
+                )),
+            );
+            let mut mgr = agent_manager.write().await;
+            mgr.set_embedder(embedder);
+            mgr.precompute_embeddings().await;
+        }
+
         // ── Context sources ───────────────────────────────────────────────
         let confidence_bits = Arc::new(std::sync::atomic::AtomicU32::new(
             config.confidence.threshold.to_bits(),

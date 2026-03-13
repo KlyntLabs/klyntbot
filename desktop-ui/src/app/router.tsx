@@ -123,28 +123,8 @@ const DistractionOverlay = lazy(() =>
 );
 
 // ── Setup Wizard ─────────────────────────────────────────────────
-const SetupLayout = lazy(() =>
-  import("../features/setup").then((m) => ({ default: m.SetupLayout })),
-);
-const WelcomeStep = lazy(() =>
-  import("../features/setup").then((m) => ({ default: m.WelcomeStep })),
-);
-const ProviderStep = lazy(() =>
-  import("../features/setup").then((m) => ({ default: m.ProviderStep })),
-);
-const ChannelsStep = lazy(() =>
-  import("../features/setup").then((m) => ({ default: m.ChannelsStep })),
-);
-const AreasStep = lazy(() => import("../features/setup").then((m) => ({ default: m.AreasStep })));
-const ProductivityStep = lazy(() =>
-  import("../features/setup").then((m) => ({ default: m.ProductivityStep })),
-);
-const FinanceStep = lazy(() =>
-  import("../features/setup").then((m) => ({ default: m.FinanceStep })),
-);
-const McpStep = lazy(() => import("../features/setup").then((m) => ({ default: m.McpStep })));
-const CompleteStep = lazy(() =>
-  import("../features/setup").then((m) => ({ default: m.CompleteStep })),
+const ConversationRunner = lazy(() =>
+  import("../features/setup").then((m) => ({ default: m.ConversationRunner })),
 );
 
 // ── Redirect Components ──────────────────────────────────────────
@@ -157,7 +137,7 @@ function SetupRedirect() {
 
   useEffect(() => {
     ipc<AppInfoResponse>("app_info")
-      .then((info) => setTarget(info.setupCompleted ? "/" : "/setup/welcome"))
+      .then((info) => setTarget(info.setupCompleted ? "/" : "/setup"))
       .catch(() => setTarget("/"));
   }, []);
 
@@ -296,21 +276,8 @@ export const router = createHashRouter([
       },
     ],
   },
-  {
-    path: "/setup",
-    element: <SetupLayout />,
-    children: [
-      { index: true, element: <Navigate to="/setup/welcome" replace /> },
-      { path: "welcome", element: <WelcomeStep /> },
-      { path: "provider", element: <ProviderStep /> },
-      { path: "channels", element: <ChannelsStep /> },
-      { path: "areas", element: <AreasStep /> },
-      { path: "productivity", element: <ProductivityStep /> },
-      { path: "finance", element: <FinanceStep /> },
-      { path: "mcp", element: <McpStep /> },
-      { path: "complete", element: <CompleteStep /> },
-    ],
-  },
+  { path: "/setup", element: <ConversationRunner /> },
+  { path: "/setup/*", element: <ConversationRunner /> },
   { path: "/launcher", element: <LauncherPage /> },
   { path: "/tray", element: <SystemTrayPage /> },
   { path: "/distraction-overlay", element: <DistractionOverlay /> },

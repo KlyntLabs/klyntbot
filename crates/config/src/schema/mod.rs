@@ -34,6 +34,7 @@ mod project;
 mod providers;
 mod todo;
 mod tools;
+mod user;
 mod work_context;
 
 pub use self::agents::*;
@@ -56,6 +57,7 @@ pub use self::project::*;
 pub use self::providers::*;
 pub use self::todo::*;
 pub use self::tools::*;
+pub use self::user::*;
 pub use self::work_context::*;
 
 #[cfg(test)]
@@ -496,6 +498,30 @@ mod tests {
         let config = Config::default();
         assert!(!config.finance.fire.enabled);
         assert_eq!(config.finance.fire.safe_withdrawal_rate, 4.0);
+    }
+
+    #[test]
+    fn test_user_config_default() {
+        let config = Config::default();
+        assert_eq!(config.user.name, "");
+    }
+
+    #[test]
+    fn test_user_config_serde_roundtrip() {
+        let json = r#"{"user": {"name": "Vu"}}"#;
+        let config: Config = serde_json::from_str(json).unwrap();
+        assert_eq!(config.user.name, "Vu");
+
+        let serialized = serde_json::to_string(&config).unwrap();
+        let loaded: Config = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(loaded.user.name, "Vu");
+    }
+
+    #[test]
+    fn test_config_without_user_deserializes() {
+        let json = r#"{"agents": {"defaults": {"workspace": "~/.klyntbot/workspace", "model": "anthropic/claude-opus-4-5", "maxTokens": 8192, "temperature": 0.7, "maxToolIterations": 20}}}"#;
+        let config: Config = serde_json::from_str(json).unwrap();
+        assert_eq!(config.user.name, "");
     }
 
     #[test]

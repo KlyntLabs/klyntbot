@@ -178,10 +178,26 @@ impl AgentRuntime {
     ) -> Result<RuntimeResult> {
         let pipeline_start = Instant::now();
 
-        // Step 1: Match message to agent
+        // Step 1: Match message to agent (two-phase to keep the lock brief across the await)
+        // Phase A — collect keyword scores and embedder clone without holding lock across await.
+        let (kw_scores, embedder) = {
+            let mgr = self.agent_manager.read().await;
+            (mgr.keyword_scores_owned(message), mgr.get_embedder())
+        };
+        // Phase B — embed query asynchronously (no lock held).
+        let query_vec: Option<Vec<f32>> = if let Some(ref emb) = embedder {
+            emb.embed(message).await.ok().filter(|v| !v.is_empty())
+        } else {
+            None
+        };
+        // Phase C — select profile using blended or keyword-only scoring.
         let mut profile = {
             let mgr = self.agent_manager.read().await;
-            Arc::clone(mgr.match_agent(message))
+            Arc::clone(if let Some(ref qv) = query_vec {
+                mgr.blend_scores(&kw_scores, qv)
+            } else {
+                mgr.match_agent(message)
+            })
         };
         let mut agent_name = profile.name.clone();
         debug!("AgentRuntime: matched agent '{}'", agent_name);

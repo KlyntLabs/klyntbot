@@ -46,19 +46,6 @@ These items were identified during the 2026-03-12 structural refactor analysis.
 
 ---
 
-### A-015 🟡 Medium | `providers` — Pricing Tables Not Up to Date
-
-**Summary:** `agent/src/output/cost_tracker.rs` contains hardcoded pricing tables for 12 providers. Provider pricing changes frequently.
-
-**Impact:** Monthly budget alerts may be inaccurate.
-
-**Proposed Fix:**
-- Add `updated_at` comment to each pricing table entry
-- Consider moving pricing to `config.json` so users can update without recompiling
-
-**References:** `crates/agent/src/output/cost_tracker.rs`
-
----
 
 ### A-016 🟢 Low | `channels` — WebSocket Channel Not Listed in `ChannelName` Enum
 
@@ -165,19 +152,6 @@ These items were identified during the 2026-03-12 structural refactor analysis.
 
 ---
 
-### A-028 🟡 Medium | `agent/agent_profile` — Keyword-Based Agent Selection Is Brittle
-
-**Summary:** `AgentManager::match_agent()` uses keyword matching. Natural variations may miss the right agent.
-
-**Impact:** Users typing natural variations may fall back to `general` agent.
-
-**Proposed Fix:**
-- Add semantic embedding similarity as a secondary scoring signal
-- Score: `final_score = keyword_match_score * 0.7 + semantic_similarity * 0.3`
-
-**References:** `crates/agent/src/agent_profile/manager.rs`
-
----
 
 ### A-029 🟢 Low | `activity-log` — No Deduplication for Rapid Context Switches
 

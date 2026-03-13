@@ -24,6 +24,7 @@ use super::project::ProjectConfig;
 use super::providers::{ProviderManagerConfig, ProvidersConfig};
 use super::todo::TodoConfig;
 use super::tools::ToolsConfig;
+use super::user::UserConfig;
 use super::work_context::WorkContextConfig;
 
 /// Expand a leading `~` in a path to the user's home directory.
@@ -146,6 +147,10 @@ pub struct Config {
     /// Cognitive memory & coaching configuration.
     #[serde(default)]
     pub cognitive: CognitiveConfig,
+
+    /// User profile settings (name, preferences).
+    #[serde(default)]
+    pub user: UserConfig,
 
     /// Work context inference engine configuration.
     #[serde(default)]

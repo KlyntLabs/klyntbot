@@ -62,22 +62,35 @@ struct ModelPricing {
 fn model_pricing(model: &str) -> ModelPricing {
     let m = model.to_lowercase();
 
-    // Exact match table (checked first)
+    // Exact match table (checked first).
+    // "Prices last verified" dates indicate when each section was last checked
+    // against provider pricing pages. Update on each pricing change.
     match m.as_str() {
-        // Claude 4.x
-        "claude-opus-4" | "claude-opus-4-20250514" => ModelPricing {
+        // ── Anthropic Claude 4.x ── prices last verified: 2026-03-13
+        "claude-opus-4-6"
+        | "claude-opus-4"
+        | "claude-opus-4-20250514" => ModelPricing {
             input: 15.0,
             output: 75.0,
             cache_read: 1.50,
             cache_write: 18.75,
         },
-        "claude-sonnet-4" | "claude-sonnet-4-20250514" => ModelPricing {
+        "claude-sonnet-4-6"
+        | "claude-sonnet-4-5"
+        | "claude-sonnet-4"
+        | "claude-sonnet-4-20250514" => ModelPricing {
             input: 3.0,
             output: 15.0,
             cache_read: 0.30,
             cache_write: 3.75,
         },
-        // Claude 3.5
+        "claude-haiku-4-5" | "claude-haiku-4-5-20251001" => ModelPricing {
+            input: 0.80,
+            output: 4.0,
+            cache_read: 0.08,
+            cache_write: 1.0,
+        },
+        // ── Anthropic Claude 3.5 ── prices last verified: 2026-03-13
         "claude-3-5-sonnet-20241022" | "claude-3-5-sonnet-latest" => ModelPricing {
             input: 3.0,
             output: 15.0,
@@ -90,14 +103,14 @@ fn model_pricing(model: &str) -> ModelPricing {
             cache_read: 0.08,
             cache_write: 1.0,
         },
-        // Claude 3
+        // ── Anthropic Claude 3 ── prices last verified: 2026-03-13
         "claude-3-haiku-20240307" => ModelPricing {
             input: 0.25,
             output: 1.25,
             cache_read: 0.03,
             cache_write: 0.30,
         },
-        // GPT-4o family
+        // ── OpenAI GPT-4o family ── prices last verified: 2026-03-13
         "gpt-4o" | "gpt-4o-2024-11-20" | "gpt-4o-2024-08-06" => ModelPricing {
             input: 2.50,
             output: 10.0,
@@ -110,7 +123,7 @@ fn model_pricing(model: &str) -> ModelPricing {
             cache_read: 0.075,
             cache_write: 0.0,
         },
-        // Gemini
+        // ── Google Gemini ── prices last verified: 2026-03-13
         "gemini-2.0-flash" | "gemini-2.0-flash-001" => ModelPricing {
             input: 0.10,
             output: 0.40,
@@ -129,7 +142,7 @@ fn model_pricing(model: &str) -> ModelPricing {
             cache_read: 0.01875,
             cache_write: 0.0,
         },
-        // DeepSeek
+        // ── DeepSeek ── prices last verified: 2026-03-13
         "deepseek-chat" | "deepseek-v3" => ModelPricing {
             input: 0.27,
             output: 1.10,
@@ -142,7 +155,7 @@ fn model_pricing(model: &str) -> ModelPricing {
             cache_read: 0.14,
             cache_write: 0.0,
         },
-        // Mistral
+        // ── Mistral ── prices last verified: 2026-03-13
         "mistral-large-latest" => ModelPricing {
             input: 2.0,
             output: 6.0,
@@ -176,11 +189,13 @@ fn substring_fallback(model: &str) -> ModelPricing {
             cache_write: 3.75,
         }
     } else if model.contains("haiku") {
+        // Default to 3.5/4.x Haiku pricing — more recent and commonly used.
+        // claude-3-haiku is matched exactly above; unknown haiku variants skew newer.
         ModelPricing {
-            input: 0.25,
-            output: 1.25,
-            cache_read: 0.03,
-            cache_write: 0.30,
+            input: 0.80,
+            output: 4.0,
+            cache_read: 0.08,
+            cache_write: 1.0,
         }
     } else if model.contains("gpt-4o-mini") {
         ModelPricing {
@@ -392,10 +407,35 @@ mod tests {
     }
 
     #[test]
-    fn test_model_pricing_haiku() {
-        let pricing = model_pricing("claude-haiku-3");
+    fn test_model_pricing_haiku_exact() {
+        // claude-3-haiku has its own exact-match entry at the lower legacy price
+        let pricing = model_pricing("claude-3-haiku-20240307");
         assert!((pricing.input - 0.25).abs() < 0.001);
         assert!((pricing.output - 1.25).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_model_pricing_haiku_fallback_uses_newer_price() {
+        // Unknown haiku variants should default to the newer 3.5/4.x rate
+        let pricing = model_pricing("claude-haiku-future-xyz");
+        assert!((pricing.input - 0.80).abs() < 0.001);
+        assert!((pricing.output - 4.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_model_pricing_claude4x_variants() {
+        // All Claude 4.x Sonnet aliases should have the same pricing
+        for id in &["claude-sonnet-4-6", "claude-sonnet-4-5", "claude-sonnet-4"] {
+            let pricing = model_pricing(id);
+            assert!((pricing.input - 3.0).abs() < 0.001, "{id}: unexpected input price");
+            assert!((pricing.output - 15.0).abs() < 0.001, "{id}: unexpected output price");
+        }
+        // Haiku 4.5
+        let h = model_pricing("claude-haiku-4-5-20251001");
+        assert!((h.input - 0.80).abs() < 0.001);
+        // Opus 4.6
+        let o = model_pricing("claude-opus-4-6");
+        assert!((o.input - 15.0).abs() < 0.001);
     }
 
     #[test]

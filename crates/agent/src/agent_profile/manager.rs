@@ -4,6 +4,21 @@ use std::sync::Arc;
 
 use super::{AgentProfile, AgentSkill};
 
+/// Cosine similarity between two equal-length vectors. Returns 0.0 on empty or mismatched input.
+fn cosine_similarity(a: &[f32], b: &[f32]) -> f64 {
+    if a.is_empty() || a.len() != b.len() {
+        return 0.0;
+    }
+    let dot: f32 = a.iter().zip(b).map(|(x, y)| x * y).sum();
+    let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
+    let norm_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
+    if norm_a == 0.0 || norm_b == 0.0 {
+        0.0
+    } else {
+        (dot / (norm_a * norm_b)) as f64
+    }
+}
+
 // Built-in agents compiled at build time
 macro_rules! include_agent {
     ($name:expr) => {
@@ -97,6 +112,11 @@ pub fn builtin_agents() -> Vec<BuiltinAgentInfo> {
 #[derive(Default)]
 pub struct AgentManager {
     agents: HashMap<String, Arc<AgentProfile>>,
+    /// One representative embedding per agent (description + triggers concatenated).
+    /// Stored inside `Arc` so it can be cheaply cloned out of an async lock.
+    agent_embeddings: Arc<HashMap<String, Vec<f32>>>,
+    /// Text embedder injected at startup. `None` = keyword-only fallback.
+    embedder: Option<Arc<dyn cognitive::TextEmbedder>>,
 }
 
 impl AgentManager {
@@ -197,9 +217,109 @@ impl AgentManager {
     /// Called after editing agent files from the UI.
     pub async fn reload(&mut self, workspace_path: &Path) -> common::Result<()> {
         self.agents.clear();
+        self.agent_embeddings = Arc::new(HashMap::new());
         self.load_builtin_agents()?;
         self.load_workspace_agents(workspace_path).await.ok(); // non-fatal
+        self.precompute_embeddings().await;
         Ok(())
+    }
+
+    /// Inject a text embedder for semantic matching. Called once at startup before
+    /// `precompute_embeddings`.
+    pub fn set_embedder(&mut self, embedder: Arc<dyn cognitive::TextEmbedder>) {
+        self.embedder = Some(embedder);
+    }
+
+    /// Cheap Arc clone of the embedder — for extracting outside an async lock.
+    pub fn get_embedder(&self) -> Option<Arc<dyn cognitive::TextEmbedder>> {
+        self.embedder.clone()
+    }
+
+    /// Precompute one embedding per agent from its description + trigger list.
+    /// No-ops if no embedder is set. Non-fatal: logs warnings on per-agent failures.
+    pub async fn precompute_embeddings(&mut self) {
+        let Some(ref embedder) = self.embedder else {
+            return;
+        };
+        let mut embeddings = HashMap::new();
+        for (name, profile) in &self.agents {
+            if profile.triggers.is_empty() {
+                continue;
+            }
+            let text = format!(
+                "{}. Triggers: {}",
+                profile.description,
+                profile.triggers.join(", ")
+            );
+            match embedder.embed(&text).await {
+                Ok(vec) => {
+                    embeddings.insert(name.clone(), vec);
+                }
+                Err(e) => {
+                    tracing::warn!(agent = %name, "Failed to precompute agent embedding: {e}");
+                }
+            }
+        }
+        tracing::debug!("Precomputed embeddings for {} agents", embeddings.len());
+        self.agent_embeddings = Arc::new(embeddings);
+    }
+
+    /// Normalized keyword scores for every agent with at least one trigger match.
+    /// Score is normalized to `[0, 1]` (raw word-count / 5, capped at 1.0).
+    pub fn keyword_scores_owned(&self, message: &str) -> HashMap<String, f64> {
+        let normalized = super::types::normalize_for_matching(message);
+        let mut result = HashMap::new();
+        for (name, profile) in &self.agents {
+            if profile.triggers.is_empty() {
+                continue;
+            }
+            let mut score: usize = 0;
+            let mut hits: usize = 0;
+            for t in &profile.triggers {
+                if normalized.contains(t.as_str()) {
+                    score += t.split_whitespace().count();
+                    hits += 1;
+                }
+            }
+            if hits > 0 {
+                result.insert(name.clone(), (score as f64 / 5.0).min(1.0));
+            }
+        }
+        result
+    }
+
+    /// Select the best agent by blending keyword and semantic scores.
+    ///
+    /// Formula: `kw * 0.7 + sem * 0.3`. An agent is only considered if it has a
+    /// keyword match OR its semantic similarity is ≥ 0.5. Falls back to `general`
+    /// when no agent clears the threshold.
+    pub fn blend_scores(&self, kw: &HashMap<String, f64>, query_vec: &[f32]) -> &Arc<AgentProfile> {
+        let mut best: Option<(&str, f64)> = None;
+        for (name, profile) in &self.agents {
+            if profile.triggers.is_empty() {
+                continue;
+            }
+            let kw_score = kw.get(name.as_str()).copied().unwrap_or(0.0);
+            let sem_score = self
+                .agent_embeddings
+                .get(name)
+                .map(|av| cosine_similarity(query_vec, av))
+                .unwrap_or(0.0);
+
+            // Require meaningful keyword hit or high semantic similarity
+            if kw_score == 0.0 && sem_score < 0.5 {
+                continue;
+            }
+            let blended = kw_score * 0.7 + sem_score * 0.3;
+            if best.is_none_or(|(_, s)| blended > s) {
+                best = Some((name.as_str(), blended));
+            }
+        }
+        if let Some((name, _)) = best {
+            &self.agents[name]
+        } else {
+            self.get_general()
+        }
     }
 
     /// Match a user message to an agent profile.
@@ -268,6 +388,13 @@ mod tests {
         let mut mgr = AgentManager::new();
         mgr.load_builtin_agents().unwrap();
         mgr
+    }
+
+    /// Directly inject a precomputed embedding for a named agent (test-only helper).
+    fn inject_embedding(mgr: &mut AgentManager, agent: &str, vec: Vec<f32>) {
+        let mut map = (*mgr.agent_embeddings).clone();
+        map.insert(agent.to_string(), vec);
+        mgr.agent_embeddings = Arc::new(map);
     }
 
     #[test]
@@ -339,5 +466,52 @@ mod tests {
             task_agent.skills.iter().any(|s| s.name == "todo"),
             "task agent should have the todo skill"
         );
+    }
+
+    #[test]
+    fn test_keyword_scores_owned_task() {
+        let mgr = make_test_manager();
+        let scores = mgr.keyword_scores_owned("create a task for me");
+        assert!(scores.contains_key("task"), "task agent should have a score");
+        assert!(*scores.get("task").unwrap() > 0.0);
+        assert!(!scores.contains_key("general"), "general has no triggers");
+    }
+
+    #[test]
+    fn test_keyword_scores_owned_no_match() {
+        let mgr = make_test_manager();
+        let scores = mgr.keyword_scores_owned("hello, how are you today?");
+        assert!(scores.is_empty(), "no agent should score for a generic greeting");
+    }
+
+    #[test]
+    fn test_blend_scores_semantic_rescues_keyword_miss() {
+        let mut mgr = make_test_manager();
+        // Inject a unit vector for "task" and orthogonal vectors for others
+        let task_vec = vec![1.0_f32, 0.0, 0.0];
+        inject_embedding(&mut mgr, "task", task_vec.clone());
+        inject_embedding(&mut mgr, "finance", vec![0.0, 1.0, 0.0]);
+        inject_embedding(&mut mgr, "automation", vec![0.0, 0.0, 1.0]);
+
+        // No keyword hit, but query points straight at task (cosine = 1.0 ≥ 0.5)
+        let kw: HashMap<String, f64> = HashMap::new();
+        let selected = mgr.blend_scores(&kw, &task_vec);
+        assert_eq!(selected.name, "task", "semantic should rescue when no keyword match");
+    }
+
+    #[test]
+    fn test_blend_scores_keyword_wins_over_weak_semantic() {
+        let mut mgr = make_test_manager();
+        // task has keyword hit (0.6), finance has higher semantic but below 0.5
+        inject_embedding(&mut mgr, "task", vec![0.6_f32, 0.0, 0.0]);
+        inject_embedding(&mut mgr, "finance", vec![0.0_f32, 1.0, 0.0]);
+
+        let mut kw: HashMap<String, f64> = HashMap::new();
+        kw.insert("task".to_string(), 0.6);
+
+        // Query is slightly tilted toward finance but not enough (sem < 0.5 with no kw)
+        let query = vec![0.3_f32, 0.4, 0.0]; // closer to finance but not by a lot
+        let selected = mgr.blend_scores(&kw, &query);
+        assert_eq!(selected.name, "task", "keyword match should dominate over weak semantic");
     }
 }
