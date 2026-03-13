@@ -142,6 +142,19 @@ pub fn exists() -> bool {
     config_path().map(|p| p.exists()).unwrap_or(false)
 }
 
+/// Embedded workspace template files — copied on first init if missing.
+const WORKSPACE_TEMPLATES: &[(&str, &str)] = &[
+    ("SOUL.md", include_str!("../../../workspace/SOUL.md")),
+    ("AGENTS.md", include_str!("../../../workspace/AGENTS.md")),
+    ("USER.md", include_str!("../../../workspace/USER.md")),
+    ("TOOLS.md", include_str!("../../../workspace/TOOLS.md")),
+    ("RESPONSE.md", include_str!("../../../workspace/RESPONSE.md")),
+    (
+        "HEARTBEAT.md",
+        include_str!("../../../workspace/HEARTBEAT.md"),
+    ),
+];
+
 /// Initialize configuration directory structure
 pub async fn init() -> Result<()> {
     let dir = config_dir()?;
@@ -154,6 +167,15 @@ pub async fn init() -> Result<()> {
     fs::create_dir_all(dir.join("workspace"))
         .await
         .map_err(ConfigError::Io)?;
+
+    // Copy workspace templates if they don't exist yet
+    let workspace = dir.join("workspace");
+    for &(name, content) in WORKSPACE_TEMPLATES {
+        let path = workspace.join(name);
+        if !path.exists() {
+            fs::write(&path, content).await.map_err(ConfigError::Io)?;
+        }
+    }
 
     // Save default config if it doesn't exist
     if !exists() {
