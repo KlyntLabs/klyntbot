@@ -644,5 +644,5 @@ Use this to track refactor progress:
 - [x] Phase 11 — `app-core` restructure
 - [x] Phase 12 — `desktop-shared` domain split
 - [x] Phase 13 — `desktop` dev server split
-- [ ] Phase 14 — `docs/ai-coding-rules.md` created
+- [x] Phase 14 — `docs/ai-coding-rules.md` created
 - [ ] Phase 15 — Final verification (all tests pass, zero warnings)
