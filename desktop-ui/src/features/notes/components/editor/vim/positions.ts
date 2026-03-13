@@ -1,4 +1,5 @@
 import type { EditorState } from "@tiptap/pm/state";
+import type { EditorView } from "@tiptap/pm/view";
 
 /** Flat text with bidirectional position mapping to ProseMirror positions. */
 export interface FlatTextMap {
@@ -53,71 +54,29 @@ export function cursorPos(state: EditorState): number {
   return state.selection.head;
 }
 
-export function verticalMove(state: EditorState, pos: number, direction: 1 | -1): number {
-  const $pos = state.doc.resolve(pos);
+/**
+ * Move the cursor up or down by one **visual line** using the view's
+ * coordinate system. This works correctly for:
+ * - Lines within code blocks (newlines in a single node)
+ * - Wrapped paragraphs (soft-wrapped visual lines)
+ * - Moving between different block types (heading → paragraph → code)
+ */
+export function verticalMove(view: EditorView, pos: number, direction: 1 | -1): number {
+  const coords = view.coordsAtPos(pos);
+  const lineHeight = coords.bottom - coords.top;
 
-  // Find the textblock containing the cursor
-  let blockDepth = $pos.depth;
-  while (blockDepth > 0 && !$pos.node(blockDepth).isTextblock) {
-    blockDepth--;
-  }
-  if (blockDepth === 0) {
-    // Cursor is outside any textblock (e.g. at doc end) — find nearest textblock
-    if (direction === -1 || pos >= state.doc.content.size) {
-      let lastStart = -1;
-      let lastEnd = -1;
-      state.doc.nodesBetween(0, Math.min(pos, state.doc.content.size), (node, npos) => {
-        if (node.isTextblock) {
-          lastStart = npos + 1;
-          lastEnd = npos + 1 + node.content.size;
-        }
-        return true;
-      });
-      if (lastStart >= 0) return Math.min(lastStart, lastEnd);
-    }
-    return pos;
-  }
+  // Jump to the vertical midpoint of the adjacent visual line.
+  // Using half a line-height past the edge ensures we land squarely on the
+  // next/previous line even when there's inter-line spacing or padding.
+  const targetY =
+    direction === 1
+      ? coords.bottom + Math.max(lineHeight * 0.5, 2)
+      : coords.top - Math.max(lineHeight * 0.5, 2);
 
-  const blockStart = $pos.start(blockDepth);
-  const column = pos - blockStart;
+  const result = view.posAtCoords({ left: coords.left, top: targetY });
+  if (!result) return pos;
 
-  if (direction === 1) {
-    // Down: find next textblock after current block
-    const afterBlock = $pos.after(blockDepth);
-    if (afterBlock >= state.doc.content.size) return pos;
-
-    let found = -1;
-    let foundEnd = -1;
-    state.doc.nodesBetween(afterBlock, state.doc.content.size, (node, npos) => {
-      if (found >= 0) return false;
-      if (node.isTextblock) {
-        found = npos + 1;
-        foundEnd = npos + 1 + node.content.size;
-        return false;
-      }
-      return true;
-    });
-
-    if (found < 0) return pos;
-    return Math.min(found + column, foundEnd);
-  }
-
-  // Up: find previous textblock before current block
-  const beforeBlock = $pos.before(blockDepth);
-  if (beforeBlock <= 0) return pos;
-
-  let found = -1;
-  let foundEnd = -1;
-  state.doc.nodesBetween(0, beforeBlock, (node, npos) => {
-    if (node.isTextblock) {
-      found = npos + 1;
-      foundEnd = npos + 1 + node.content.size;
-    }
-    return true;
-  });
-
-  if (found < 0) return pos;
-  return Math.min(found + column, foundEnd);
+  return result.pos;
 }
 
 export function clampPos(state: EditorState, pos: number): number {

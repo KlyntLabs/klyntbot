@@ -40,22 +40,22 @@ function motionL(_view: EditorView, state: EditorState, vim: VimState): MotionRe
 // j / k — vertical movement
 // ---------------------------------------------------------------------------
 
-function motionJ(_view: EditorView, state: EditorState, vim: VimState): MotionResult {
+function motionJ(view: EditorView, state: EditorState, vim: VimState): MotionResult {
   const head = cursorPos(state);
   const count = effectiveCount(vim);
   let pos = head;
   for (let i = 0; i < count; i++) {
-    pos = verticalMove(state, pos, 1);
+    pos = verticalMove(view, pos, 1);
   }
   return { pos: clampPos(state, pos), linewise: true };
 }
 
-function motionK(_view: EditorView, state: EditorState, vim: VimState): MotionResult {
+function motionK(view: EditorView, state: EditorState, vim: VimState): MotionResult {
   const head = cursorPos(state);
   const count = effectiveCount(vim);
   let pos = head;
   for (let i = 0; i < count; i++) {
-    pos = verticalMove(state, pos, -1);
+    pos = verticalMove(view, pos, -1);
   }
   return { pos: clampPos(state, pos), linewise: true };
 }
