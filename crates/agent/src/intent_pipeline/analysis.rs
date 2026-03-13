@@ -68,6 +68,55 @@ pub fn analyze_heuristic(message: &str) -> Option<IntentAnalysis> {
         ));
     }
 
+    // 2b. Finance domain patterns → Reactive (CRUD, queries)
+    if is_finance_operation(&msg) {
+        let signals = ComplexitySignals {
+            estimated_tool_calls: count_tool_indicators(&msg).max(1),
+            has_sequential_deps: false,
+            failure_risk: FailureRisk::Low,
+            requires_state_tracking: false,
+            requires_retries: false,
+        };
+        let budget = compute_iteration_budget(&signals);
+        return Some(reactive_analysis(
+            budget,
+            "Finance operation",
+            0.90,
+            signals,
+        ));
+    }
+
+    // 2c. Notes domain patterns → Reactive
+    if is_notes_operation(&msg) {
+        let signals = ComplexitySignals {
+            estimated_tool_calls: count_tool_indicators(&msg).max(1),
+            has_sequential_deps: false,
+            failure_risk: FailureRisk::Low,
+            requires_state_tracking: false,
+            requires_retries: false,
+        };
+        let budget = compute_iteration_budget(&signals);
+        return Some(reactive_analysis(budget, "Notes operation", 0.90, signals));
+    }
+
+    // 2d. Automation/scheduling domain patterns → Reactive
+    if is_automation_operation(&msg) {
+        let signals = ComplexitySignals {
+            estimated_tool_calls: count_tool_indicators(&msg).max(1),
+            has_sequential_deps: false,
+            failure_risk: FailureRisk::Low,
+            requires_state_tracking: false,
+            requires_retries: false,
+        };
+        let budget = compute_iteration_budget(&signals);
+        return Some(reactive_analysis(
+            budget,
+            "Automation/scheduling operation",
+            0.90,
+            signals,
+        ));
+    }
+
     // 3. Very short non-keyword messages → Direct
     if msg.len() < 20 && word_count <= 4 && !has_any_action_keyword(&msg) {
         return Some(direct_analysis("Short message, no action keywords", 0.85));
@@ -223,16 +272,127 @@ fn is_task_management(msg: &str) -> bool {
         return true;
     }
 
+    // Possessive check: "my tasks", "my todos" — ownership implies query intent
+    const TASK_NOUNS: &[&str] = &["task", "tasks", "todo", "todos"];
+    if msg.starts_with("my ") && TASK_NOUNS.iter().any(|n| msg.contains(n)) {
+        return true;
+    }
+
     // Combinatorial check: action verb + task noun anywhere in message.
     // Catches "create 3 tasks", "add more todos", "delete the task", etc.
     const TASK_VERBS: &[&str] = &[
         "create", "add", "make", "update", "edit", "modify", "complete", "finish", "done",
         "delete", "remove", "list", "show", "check", "get",
     ];
-    const TASK_NOUNS: &[&str] = &["task", "tasks", "todo", "todos"];
     let has_verb = TASK_VERBS.iter().any(|v| msg.contains(v));
     let has_noun = TASK_NOUNS.iter().any(|n| msg.contains(n));
     has_verb && has_noun
+}
+
+fn is_finance_operation(msg: &str) -> bool {
+    const FINANCE_PATTERNS: &[&str] = &[
+        "log expense",
+        "track expense",
+        "add expense",
+        "log income",
+        "track income",
+        "add income",
+        "log transaction",
+        "add transaction",
+        "show budget",
+        "my budget",
+        "check budget",
+        "show balance",
+        "my balance",
+        "check balance",
+        "track spending",
+        "my spending",
+        "show spending",
+        "budget report",
+        "finance report",
+        "expense report",
+    ];
+
+    if FINANCE_PATTERNS.iter().any(|k| msg.contains(k)) {
+        return true;
+    }
+
+    // Combinatorial: finance verb + finance noun
+    const FINANCE_VERBS: &[&str] = &[
+        "log", "track", "add", "show", "check", "list", "create", "delete", "remove", "get",
+    ];
+    const FINANCE_NOUNS: &[&str] = &[
+        "expense",
+        "expenses",
+        "income",
+        "transaction",
+        "transactions",
+        "budget",
+        "balance",
+        "spending",
+        "investment",
+        "investments",
+    ];
+    let has_verb = FINANCE_VERBS.iter().any(|v| msg.contains(v));
+    let has_noun = FINANCE_NOUNS.iter().any(|n| msg.contains(n));
+    if has_verb && has_noun {
+        return true;
+    }
+
+    // Possessive: "my budget", "my expenses"
+    if msg.starts_with("my ") && FINANCE_NOUNS.iter().any(|n| msg.contains(n)) {
+        return true;
+    }
+
+    false
+}
+
+fn is_notes_operation(msg: &str) -> bool {
+    const NOTES_PATTERNS: &[&str] = &[
+        "add note",
+        "create note",
+        "new note",
+        "take note",
+        "my notes",
+        "show notes",
+        "list notes",
+        "note this",
+        "note that",
+        "jot down",
+    ];
+
+    if NOTES_PATTERNS.iter().any(|k| msg.contains(k)) {
+        return true;
+    }
+
+    // Combinatorial: notes verb + notes noun
+    const NOTES_VERBS: &[&str] = &[
+        "add", "create", "take", "show", "list", "delete", "remove", "search", "find", "get",
+    ];
+    const NOTES_NOUNS: &[&str] = &["note", "notes", "memo", "memos"];
+    let has_verb = NOTES_VERBS.iter().any(|v| msg.contains(v));
+    let has_noun = NOTES_NOUNS.iter().any(|n| msg.contains(n));
+    if has_verb && has_noun {
+        return true;
+    }
+
+    false
+}
+
+fn is_automation_operation(msg: &str) -> bool {
+    const AUTOMATION_PATTERNS: &[&str] = &[
+        "remind me",
+        "set reminder",
+        "add reminder",
+        "create reminder",
+        "schedule task",
+        "schedule a",
+        "set up cron",
+        "automate this",
+        "automate that",
+        "recurring task",
+    ];
+    AUTOMATION_PATTERNS.iter().any(|k| msg.contains(k))
 }
 
 fn is_direct_question(msg: &str) -> bool {
@@ -278,7 +438,37 @@ fn has_action_keyword(msg: &str) -> bool {
 }
 
 fn has_any_action_keyword(msg: &str) -> bool {
-    has_tool_keyword(msg) || has_action_keyword(msg) || has_complex_workflow_keyword(msg)
+    has_tool_keyword(msg)
+        || has_action_keyword(msg)
+        || has_complex_workflow_keyword(msg)
+        || has_domain_verb(msg)
+}
+
+/// Domain-specific verbs not covered by tool/action/workflow keyword lists.
+/// Acts as a safety net: if a short message contains one of these, the
+/// short-message guard won't swallow it — it'll fall through to later
+/// classification steps or the LLM classifier.
+fn has_domain_verb(msg: &str) -> bool {
+    const DOMAIN_VERBS: &[&str] = &[
+        "log",
+        "track",
+        "plan",
+        "remind",
+        "schedule",
+        "budget",
+        "note",
+        "annotate",
+        "complete",
+        "decompose",
+        "execute",
+        "forecast",
+        "summarize",
+        "record",
+    ];
+    let words: Vec<&str> = msg.split_whitespace().collect();
+    words
+        .iter()
+        .any(|w| DOMAIN_VERBS.contains(&w.trim_matches(|c: char| !c.is_alphabetic())))
 }
 
 fn has_complex_workflow_keyword(msg: &str) -> bool {
@@ -1352,5 +1542,96 @@ mod tests {
             result.is_some(),
             "Single-domain finance message should not defer"
         );
+    }
+
+    // ── A-001: Short domain commands must route to Reactive ────
+
+    #[test]
+    fn short_task_commands_are_reactive() {
+        for cmd in &["my todos", "my todo", "plan my day", "list tasks"] {
+            let result = analyze_heuristic(cmd);
+            assert!(
+                result.is_some()
+                    && matches!(
+                        result.as_ref().unwrap().mode,
+                        ExecutionMode::Reactive { .. }
+                    ),
+                "Expected Reactive for '{}', got {:?}",
+                cmd,
+                result
+            );
+        }
+    }
+
+    #[test]
+    fn short_finance_commands_are_reactive() {
+        for cmd in &[
+            "log expense",
+            "track spending",
+            "show budget",
+            "my budget",
+            "log income",
+        ] {
+            let result = analyze_heuristic(cmd);
+            assert!(
+                result.is_some()
+                    && matches!(
+                        result.as_ref().unwrap().mode,
+                        ExecutionMode::Reactive { .. }
+                    ),
+                "Expected Reactive for '{}', got {:?}",
+                cmd,
+                result
+            );
+        }
+    }
+
+    #[test]
+    fn short_notes_commands_are_reactive() {
+        for cmd in &["my notes", "take notes", "note this"] {
+            let result = analyze_heuristic(cmd);
+            assert!(
+                result.is_some()
+                    && matches!(
+                        result.as_ref().unwrap().mode,
+                        ExecutionMode::Reactive { .. }
+                    ),
+                "Expected Reactive for '{}', got {:?}",
+                cmd,
+                result
+            );
+        }
+    }
+
+    #[test]
+    fn short_automation_commands_are_reactive() {
+        for cmd in &["remind me", "schedule task"] {
+            let result = analyze_heuristic(cmd);
+            assert!(
+                result.is_some()
+                    && matches!(
+                        result.as_ref().unwrap().mode,
+                        ExecutionMode::Reactive { .. }
+                    ),
+                "Expected Reactive for '{}', got {:?}",
+                cmd,
+                result
+            );
+        }
+    }
+
+    #[test]
+    fn short_inert_messages_still_direct() {
+        // These should NOT be affected — they're genuinely non-actionable
+        for cmd in &["ok cool", "thanks", "yes", "got it", "nice"] {
+            let result = analyze_heuristic(cmd);
+            assert!(
+                result.is_some()
+                    && matches!(result.as_ref().unwrap().mode, ExecutionMode::Direct),
+                "Expected Direct for '{}', got {:?}",
+                cmd,
+                result
+            );
+        }
     }
 }
