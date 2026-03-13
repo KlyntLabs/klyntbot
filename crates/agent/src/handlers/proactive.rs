@@ -3,11 +3,10 @@
 //! Evaluates tasks against triggers (overdue, stale, WIP exceeded, etc.)
 //! and generates suggestion candidates using LLM reasoning.
 
-use std::sync::Arc;
-
 use async_trait::async_trait;
-use chrono::Utc;
+use chrono::{Duration, Utc};
 use common::Result;
+use feature_tasks::TasksConfig;
 use providers::{ChatParams, DynProvider, Message, ResponseFormat};
 use tracing::{debug, warn};
 
@@ -23,7 +22,7 @@ pub struct LlmProactiveHandler {
     provider: DynProvider,
     model: String,
     repo: TaskRepo,
-    domain_bus: Option<Arc<bus::DomainEventBus>>,
+    tasks_config: TasksConfig,
 }
 
 impl LlmProactiveHandler {
@@ -31,13 +30,13 @@ impl LlmProactiveHandler {
         provider: DynProvider,
         model: String,
         repo: TaskRepo,
-        domain_bus: Option<Arc<bus::DomainEventBus>>,
+        tasks_config: TasksConfig,
     ) -> Self {
         Self {
             provider,
             model,
             repo,
-            domain_bus,
+            tasks_config,
         }
     }
 }
@@ -130,27 +129,93 @@ fn parse_suggestions(
 #[async_trait]
 impl ProactiveHandler for LlmProactiveHandler {
     async fn suggest(&self, scope: &SuggestionScope) -> Result<Vec<SuggestionCandidate>> {
-        let filter = storage::TaskFilter {
-            status: Some("todo".into()),
+        // Fetch both todo and doing tasks (two separate calls — TaskFilter supports one status)
+        let base_filter = storage::TaskFilter {
             project_id: scope.project_id.clone(),
             area_id: scope.area_id.clone(),
             ..Default::default()
         };
-        let tasks = self.repo.list(&filter).await?;
+        let mut tasks = self
+            .repo
+            .list(&storage::TaskFilter {
+                status: Some("todo".into()),
+                ..base_filter.clone()
+            })
+            .await?;
+        let mut doing_rows = self
+            .repo
+            .list(&storage::TaskFilter {
+                status: Some("doing".into()),
+                ..base_filter
+            })
+            .await?;
+        tasks.append(&mut doing_rows);
 
         let mut all_suggestions = Vec::new();
         let now = Utc::now();
+        let stale_cutoff =
+            now - Duration::days(self.tasks_config.stale_task_days as i64);
 
+        // --- TaskOverdue ---
         for row in &tasks {
             let task = Task::from(row.clone());
-
             if let Some(due) = &task.due_date {
                 if *due < now {
-                    let candidates = self
+                    let mut c = self
                         .evaluate_task(&task, &SuggestionTrigger::TaskOverdue)
                         .await?;
-                    all_suggestions.extend(candidates);
+                    all_suggestions.append(&mut c);
                 }
+            }
+        }
+
+        // --- TaskStale ---
+        for row in tasks.iter().filter(|r| r.updated_at < stale_cutoff) {
+            let task = Task::from(row.clone());
+            let mut c = self
+                .evaluate_task(&task, &SuggestionTrigger::TaskStale)
+                .await?;
+            all_suggestions.append(&mut c);
+        }
+
+        // --- WipLimitExceeded ---
+        let summary = self.repo.summary().await?;
+        if summary.doing > self.tasks_config.wip_limit as i64 {
+            let mut doing = self
+                .repo
+                .list(&storage::TaskFilter {
+                    status: Some("doing".into()),
+                    ..Default::default()
+                })
+                .await?;
+            // Oldest first — most likely stale
+            doing.sort_by_key(|r| r.updated_at);
+            for row in doing.iter().take(3) {
+                let task = Task::from(row.clone());
+                let mut c = self
+                    .evaluate_task(&task, &SuggestionTrigger::WipLimitExceeded)
+                    .await?;
+                all_suggestions.append(&mut c);
+            }
+        }
+
+        // --- BlockedChainStale ---
+        for row in &tasks {
+            let blocker_rows = self
+                .repo
+                .get_blockers(&row.id)
+                .await
+                .unwrap_or_default();
+            if blocker_rows.is_empty() {
+                continue;
+            }
+            let has_stale_blocker = blocker_rows.iter().any(|b| b.updated_at < stale_cutoff);
+            if has_stale_blocker {
+                let task = Task::from(row.clone());
+                let mut c = self
+                    .evaluate_task(&task, &SuggestionTrigger::BlockedChainStale)
+                    .await?;
+                all_suggestions.append(&mut c);
             }
         }
 
@@ -195,18 +260,8 @@ impl ProactiveHandler for LlmProactiveHandler {
         let text = response.content.unwrap_or_default();
         let candidates = parse_suggestions(&text, &task.id, trigger);
 
-        // Emit events for created suggestions
-        if let Some(ref bus) = self.domain_bus {
-            for c in &candidates {
-                let _ = bus.publish(bus::DomainEvent::ProactiveSuggestionCreated {
-                    suggestion_id: uuid::Uuid::new_v4().to_string(),
-                    suggestion_type: format!("{:?}", c.suggestion_type),
-                    task_id: c.task_id.clone(),
-                    confidence: c.confidence,
-                });
-            }
-        }
-
+        // Event emission is the caller's responsibility (run_proactive_scan emits
+        // ProactiveSuggestionCreated with the real DB row ID after persisting).
         Ok(candidates)
     }
 }

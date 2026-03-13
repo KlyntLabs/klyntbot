@@ -5,6 +5,7 @@ import {
   useCustomColumns,
 } from "@shared/hooks/useCustomColumns";
 import { useEvent } from "@shared/hooks/useEvent";
+import { ipc } from "@shared/hooks/useIpc";
 import { useMutation } from "@shared/hooks/useMutation";
 import { useQuery } from "@shared/hooks/useQuery";
 import { useEffectiveLabels } from "@shared/hooks/useWorkflows";
@@ -101,6 +102,15 @@ export function TaskDetailPanel({ taskId, onClose }: TaskDetailPanelProps) {
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06] shrink-0">
         <span className="text-[12px] text-muted font-light">Task Detail</span>
         <div className="flex items-center gap-1">
+          {!task.focusedAt && (
+            <button
+              type="button"
+              onClick={() => ipc("task_start_focus", { taskId })}
+              className="px-2 py-1 rounded text-[11px] text-muted hover:text-primary hover:bg-white/[0.06] transition-colors"
+            >
+              Focus
+            </button>
+          )}
           <button
             type="button"
             onClick={onClose}

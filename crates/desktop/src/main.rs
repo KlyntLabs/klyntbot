@@ -181,6 +181,8 @@ fn main() {
             commands::tasks::task_delete,
             commands::tasks::task_toggle_complete,
             commands::tasks::task_list_children,
+            commands::tasks::task_start_focus,
+            commands::tasks::task_end_focus,
             commands::tasks::project_list,
             commands::tasks::objective_list,
             // Notes

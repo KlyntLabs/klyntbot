@@ -65,7 +65,7 @@ impl AppCore {
             provider,
         } = storage::init_storage(config_override).await?;
 
-        // ── Shared: Bus + cognitive provider ─────────────────────────────
+        // ── Shared: Bus + cognitive provider + domain event bus ──────────
         // Created once here in the orchestrator. Both cron and agent receive
         // references to the same instances (matches the original single-fn flow).
         let bus = Arc::new(MessageBus::new(100));
@@ -77,6 +77,10 @@ impl AppCore {
             info!("no cognitive provider — using heuristic handlers");
         }
 
+        // DomainEventBus is created before cron so the proactive scan callback
+        // can capture it and emit ProactiveSuggestionCreated after persisting.
+        let domain_event_bus = Arc::new(bus::DomainEventBus::new(256));
+
         // ── Phase 2: Cron ────────────────────────────────────────────────
         let cron::CronResult {
             cron_service,
@@ -87,6 +91,9 @@ impl AppCore {
             &bus,
             &notification_sender,
             cognitive_provider.clone(),
+            provider.clone(),
+            &domain_event_bus,
+            feature_tasks::TasksConfig::default(),
         )
         .await?;
 
@@ -98,7 +105,6 @@ impl AppCore {
             inbound_rx,
             pipeline_broadcast_tx,
             user_situation,
-            domain_event_bus,
             activity_svc,
         } = agent::init_agent(
             &config,
@@ -108,6 +114,7 @@ impl AppCore {
             vector_store,
             &bus,
             cognitive_provider,
+            &domain_event_bus,
             &cron_service,
             &notification_dispatcher,
             &notification_sender,
@@ -198,6 +205,7 @@ impl AppCore {
             event_log_repo: Some(::cognitive::EventLogRepo::new(storage_pool.inner().clone())),
             consecutive_coaching_ignores: Arc::new(std::sync::atomic::AtomicI32::new(0)),
             activity_ingestion_service: Some(Arc::clone(&activity_svc)),
+            active_task_focus: Arc::new(std::sync::Mutex::new(None)),
         };
 
         // ── Post-core background services ────────────────────────────────

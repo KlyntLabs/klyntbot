@@ -697,7 +697,7 @@ impl AgentLoopBuilder {
                 provider.clone(),
                 config.agents.defaults.model.clone(),
                 task_repo_for_handlers.clone(),
-                self.domain_event_bus.clone(),
+                feature_tasks::TasksConfig::default(),
             ));
             task_tool = task_tool.with_proactive_handler(
                 proactive_handler as Arc<dyn feature_tasks::ProactiveHandler>,

@@ -4,11 +4,13 @@
 //! and all associated enums and supporting types. Includes conversions from/to
 //! storage row types.
 
+mod active_focus;
 mod entity;
 mod execution;
 mod planning;
 mod suggestion;
 
+pub use active_focus::ActiveTaskFocus;
 pub use entity::*;
 pub use execution::*;
 pub use planning::*;

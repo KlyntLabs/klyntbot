@@ -28,16 +28,6 @@ These items were identified during the 2026-03-12 structural refactor analysis.
 ---
 
 
-### A-010 🟡 Medium | `feature-tasks` — Phase 3 Implementation Pending
-
-**Summary:** Feature-tasks Phase 2 is complete. Phase 3 covers proactive task suggestions, workload forecasting improvements, cognitive integration, and recurring task generation with FSRS decay.
-
-**Impact:** Task management lacks proactivity. Agent doesn't suggest tasks based on calendar/context.
-
-**References:** `docs/superpowers/plans/2026-03-12-feature-tasks-phase3.md`
-
----
-
 ### A-012 🟢 Low | `agent/agent_loop/builder.rs` (1,210 LOC) — Monolithic Builder
 
 **Summary:** The `AgentLoopBuilder` has 50+ setter methods in a single file. Related concerns (channel setup, cognitive wiring, feature registration) are interleaved.

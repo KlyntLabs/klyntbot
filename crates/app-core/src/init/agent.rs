@@ -16,14 +16,13 @@ pub(super) struct AgentResult {
     pub inbound_rx: mpsc::Receiver<bus::InboundMessage>,
     pub pipeline_broadcast_tx: tokio::sync::broadcast::Sender<cognitive::PipelineEvent>,
     pub user_situation: Arc<Mutex<UserSituation>>,
-    pub domain_event_bus: Arc<DomainEventBus>,
     pub activity_svc: Arc<activity_log::ActivityIngestionService>,
 }
 
-/// Initialize persona manager, activity log, domain event bus, and agent loop.
+/// Initialize persona manager, activity log, and agent loop.
 ///
-/// The message bus and cognitive provider are created by the orchestrator and passed in,
-/// since they are shared with the cron phase.
+/// The message bus, cognitive provider, and domain event bus are created by the
+/// orchestrator and passed in, since they are shared with the cron phase.
 #[allow(clippy::too_many_arguments)]
 pub(super) async fn init_agent(
     config: &config::Config,
@@ -33,6 +32,7 @@ pub(super) async fn init_agent(
     vector_store: Option<VectorStore>,
     bus: &Arc<MessageBus>,
     cognitive_provider: Option<providers::DynProvider>,
+    domain_event_bus: &Arc<DomainEventBus>,
     cron_service: &Arc<CronService>,
     notification_dispatcher: &Arc<agent::NotificationDispatcher>,
     notification_sender: &Option<Arc<dyn common::NotificationSender>>,
@@ -57,9 +57,6 @@ pub(super) async fn init_agent(
         activity_log::PrivacyFilter::default(),
     ));
 
-    // 8. DomainEventBus for cross-feature communication (cognitive + coaching)
-    let domain_event_bus = Arc::new(DomainEventBus::new(256));
-
     // Pre-create user situation (defaults now, recomputed with real data below
     // and every 2 min afterwards). Shared with CognitiveContextSource for
     // situational_boost in memory retrieval.
@@ -80,7 +77,7 @@ pub(super) async fn init_agent(
     }
 
     let mut builder = builder
-        .with_domain_bus(Arc::clone(&domain_event_bus))
+        .with_domain_bus(Arc::clone(domain_event_bus))
         .with_cognitive_provider(cognitive_provider.clone())
         .with_pipeline_tx(pipeline_tx)
         .with_user_situation(user_situation.clone())
@@ -107,7 +104,6 @@ pub(super) async fn init_agent(
         inbound_rx,
         pipeline_broadcast_tx,
         user_situation,
-        domain_event_bus,
         activity_svc,
     })
 }

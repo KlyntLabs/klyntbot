@@ -1,3 +1,4 @@
+import { ipc } from "@shared/hooks/useIpc";
 import { formatHumanDuration, formatRelativeTime } from "@shared/lib/dates";
 import type { Task, TaskUpdateParams } from "@shared/types";
 import { Badge, Checkbox } from "@shared/ui";
@@ -322,6 +323,19 @@ export function RootTaskRow({
           />
           {hasSubtasks && (
             <SubtaskProgress total={task.subtaskCount} completed={task.subtaskCompletedCount} />
+          )}
+          {!task.focusedAt && !isCompleted && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                ipc("task_start_focus", { taskId: task.id });
+              }}
+              className="text-[10px] text-dim hover:text-primary transition-colors px-1.5 py-0.5 rounded hover:bg-white/[0.06] shrink-0"
+              title="Start Focus"
+            >
+              Focus
+            </button>
           )}
         </div>
       </td>

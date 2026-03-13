@@ -1,5 +1,7 @@
 mod converters;
 mod crud;
+pub mod focus;
+pub mod proactive;
 mod queries;
 
 // Re-exports required by sibling handler files

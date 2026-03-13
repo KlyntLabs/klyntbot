@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
-use bus::MessageBus;
+use bus::{DomainEventBus, MessageBus};
+use feature_tasks::handlers::suggestion_applier::SuggestionApplier;
+use feature_tasks::ProactiveHandler;
+use feature_tasks::TasksConfig;
 use scheduling::CronService;
 use storage::Repos;
 use tracing::{error, info, warn};
@@ -11,13 +14,19 @@ pub(super) struct CronResult {
     pub notification_dispatcher: Arc<agent::NotificationDispatcher>,
 }
 
+pub const JOB_PROACTIVE_SCAN: &str = "proactive_scan";
+
 /// Initialize cron service, register callbacks, and ensure default jobs.
+#[allow(clippy::too_many_arguments)]
 pub(super) async fn init_cron(
     config: &config::Config,
     repos: &Repos,
     bus: &Arc<MessageBus>,
     notification_sender: &Option<Arc<dyn common::NotificationSender>>,
     cognitive_provider: Option<providers::DynProvider>,
+    provider: providers::DynProvider,
+    domain_event_bus: &Arc<DomainEventBus>,
+    tasks_config: TasksConfig,
 ) -> Result<CronResult, String> {
     // 6. Cron service — set callbacks BEFORE wrapping in Arc
     let mut cron_service = CronService::new(repos.cron.clone());
@@ -38,6 +47,25 @@ pub(super) async fn init_cron(
         ),
     });
 
+    // Build the proactive handler and applier for the cron job.
+    // Uses its own LlmProactiveHandler instance (domain_bus=None — event emission
+    // happens in run_proactive_scan after persist, not inside the handler).
+    let proactive_handler: Arc<dyn ProactiveHandler> = {
+        let task_repo = repos.tasks.clone();
+        Arc::new(agent::handlers::LlmProactiveHandler::new(
+            provider,
+            config.agents.defaults.model.clone(),
+            task_repo,
+            tasks_config.clone(),
+        ))
+    };
+    let suggestion_applier: Option<Arc<dyn SuggestionApplier>> = {
+        let task_repo = repos.tasks.clone();
+        Some(Arc::new(agent::handlers::TaskSuggestionApplier::new(
+            task_repo,
+        )))
+    };
+
     register_cron_callbacks(
         &mut cron_service,
         repos,
@@ -45,10 +73,14 @@ pub(super) async fn init_cron(
         config,
         bus,
         cognitive_provider,
+        domain_event_bus,
+        tasks_config.clone(),
+        proactive_handler,
+        suggestion_applier,
     );
 
     let cron_service = Arc::new(cron_service);
-    ensure_cron_jobs(&cron_service, config)
+    ensure_cron_jobs(&cron_service, config, &tasks_config)
         .await
         .map_err(|e| format!("cron job registration failed: {e}"))?;
     info!("cron service started");
@@ -74,6 +106,7 @@ const JOB_FINANCE_PRICE_REFRESH: &str = "__klyntbot_finance_price_refresh";
 const JOB_FINANCE_HEALTH_CHECK: &str = "__klyntbot_finance_health_check";
 
 /// Register individual cron handlers (must be called before wrapping CronService in Arc).
+#[allow(clippy::too_many_arguments)]
 fn register_cron_callbacks(
     cron_service: &mut CronService,
     repos: &Repos,
@@ -81,6 +114,10 @@ fn register_cron_callbacks(
     config: &config::Config,
     bus: &Arc<MessageBus>,
     cognitive_provider: Option<providers::DynProvider>,
+    domain_event_bus: &Arc<DomainEventBus>,
+    tasks_config: TasksConfig,
+    proactive_handler: Arc<dyn ProactiveHandler>,
+    suggestion_applier: Option<Arc<dyn SuggestionApplier>>,
 ) {
     let rt = tokio::runtime::Handle::current();
 
@@ -309,12 +346,50 @@ fn register_cron_callbacks(
             })
         }));
     }
+
+    // ── proactive_scan ───────────────────────────────────────────────────
+    if tasks_config.proactive_suggestions {
+        let handler = proactive_handler.clone();
+        let repos_clone = repos.clone();
+        let bus_clone = Some(Arc::clone(domain_event_bus));
+        let cfg = tasks_config.clone();
+        let applier = suggestion_applier.clone();
+        let rt = rt.clone();
+        cron_service.register_handler(
+            JOB_PROACTIVE_SCAN,
+            Arc::new(move |_job: &scheduling::CronJob| {
+                let handler = handler.clone();
+                let repos = repos_clone.clone();
+                let bus = bus_clone.clone();
+                let cfg = cfg.clone();
+                let applier = applier.clone();
+                tokio::task::block_in_place(|| {
+                    rt.block_on(async move {
+                        match crate::handlers::tasks::proactive::run_proactive_scan(
+                            &handler, &repos, &bus, &cfg, &applier,
+                        )
+                        .await
+                        {
+                            Ok(n) => Ok(Some(format!(
+                                "Proactive scan complete: {n} suggestions generated"
+                            ))),
+                            Err(e) => {
+                                warn!("Proactive scan failed: {e}");
+                                Ok(None)
+                            }
+                        }
+                    })
+                })
+            }),
+        );
+    }
 }
 
 /// Register default cron jobs (idempotent — skips existing).
 async fn ensure_cron_jobs(
     cron_service: &Arc<CronService>,
     config: &config::Config,
+    tasks_config: &TasksConfig,
 ) -> Result<(), common::KlyntbotError> {
     let existing: std::collections::HashSet<String> = cron_service
         .list_jobs(true)
@@ -439,6 +514,18 @@ async fn ensure_cron_jobs(
                 tz: None,
             },
             "Finance data health check"
+        );
+    }
+
+    // Proactive suggestion scan (every 4 hours)
+    if tasks_config.proactive_suggestions {
+        ensure_job!(
+            JOB_PROACTIVE_SCAN,
+            scheduling::CronSchedule::Cron {
+                expr: "0 */4 * * *".to_string(),
+                tz: None,
+            },
+            "Proactive task suggestion scan"
         );
     }
 
