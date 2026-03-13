@@ -1,4 +1,5 @@
 import { useEvent } from "@shared/hooks/useEvent";
+import { ipc } from "@shared/hooks/useIpc";
 import { useMutation } from "@shared/hooks/useMutation";
 import { useQuery } from "@shared/hooks/useQuery";
 import type {
@@ -7,6 +8,7 @@ import type {
   NotebookCreateParams,
   NoteCreateParams,
   NoteUpdateParams,
+  WorkspaceFileContent,
 } from "@shared/types";
 import { FileText, GitGraph, PenLine } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -57,6 +59,8 @@ export default function NotesPage() {
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [viewMode, setNotesViewMode] = useState<NotesViewMode>("editor");
   const [searchResults, setSearchResults] = useState<Note[] | null>(null);
+  const [activeWorkspaceFile, setActiveWorkspaceFile] = useState<string | null>(null);
+  const [workspaceContent, setWorkspaceContent] = useState<string>("");
   const [searchParams, setSearchParams] = useSearchParams();
   const sidebarRef = useRef<HTMLDivElement>(null);
   const sidebarWidthRef = useRef(260);
@@ -195,6 +199,50 @@ export default function NotesPage() {
     [updateNotebook],
   );
 
+  // ── Workspace file handlers ────────────────────────────────────────────
+  const handleSelectNote = useCallback((id: string) => {
+    setActiveWorkspaceFile(null);
+    setSelectedNoteId(id);
+  }, []);
+
+  const handleSelectWorkspaceFile = useCallback(async (filename: string) => {
+    setSelectedNoteId(null);
+    setActiveWorkspaceFile(filename);
+    try {
+      const result = await ipc<WorkspaceFileContent>("workspace_read_file", { filename });
+      setWorkspaceContent(result.content);
+    } catch (e) {
+      console.error("Failed to load workspace file:", e);
+    }
+  }, []);
+
+  const handleWorkspaceSave = useCallback(
+    (params: NoteUpdateParams) => {
+      if (!activeWorkspaceFile || !params.body) return;
+      ipc("workspace_write_file", {
+        filename: activeWorkspaceFile,
+        content: params.body,
+      }).catch((e: unknown) => console.error("Failed to save workspace file:", e));
+    },
+    [activeWorkspaceFile],
+  );
+
+  const workspaceNote = useMemo((): Note | undefined => {
+    if (!activeWorkspaceFile) return undefined;
+    return {
+      id: `__workspace__${activeWorkspaceFile}`,
+      notebookId: null,
+      title: activeWorkspaceFile,
+      body: workspaceContent,
+      bodyHtml: null,
+      pinned: false,
+      archived: false,
+      tags: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+  }, [activeWorkspaceFile, workspaceContent]);
+
   const searchRef = useRef<NoteSearchBarHandle>(null);
 
   // ── Keyboard shortcuts ─────────────────────────────────────────────────
@@ -243,7 +291,7 @@ export default function NotesPage() {
           notebooks={searchResults ? [] : notebooks}
           notes={displayedNotes}
           selectedNoteId={selectedNoteId}
-          onSelectNote={setSelectedNoteId}
+          onSelectNote={handleSelectNote}
           onCreateNote={handleCreateNote}
           onCreateNotebook={handleCreateNotebook}
           onDeleteNote={handleDelete}
@@ -253,6 +301,8 @@ export default function NotesPage() {
           onRenameNote={handleRenameNote}
           onMoveNote={handleMoveNote}
           onMoveNotebook={handleMoveNotebook}
+          activeWorkspaceFile={activeWorkspaceFile}
+          onSelectWorkspaceFile={handleSelectWorkspaceFile}
         />
       </div>
 
@@ -280,11 +330,30 @@ export default function NotesPage() {
           </>
         ) : selectedNote ? (
           <NoteEditor
+            key={selectedNote.id}
             note={selectedNote}
             onSave={updateNote}
             viewMode={viewMode}
             onViewModeChange={setNotesViewMode}
           />
+        ) : workspaceNote ? (
+          <>
+            <div className="flex items-center justify-between shrink-0 px-3 pt-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-primary font-mono">{activeWorkspaceFile}</span>
+                <span className="text-[10px] text-dim bg-white/[0.06] px-1.5 py-0.5 rounded">system config</span>
+              </div>
+              <ViewModeToggle viewMode={viewMode} onChange={setNotesViewMode} />
+            </div>
+            <p className="text-[11px] text-dim px-3 mt-1">Restart agent to apply changes</p>
+            <NoteEditor
+              key={workspaceNote.id}
+              note={workspaceNote}
+              onSave={handleWorkspaceSave}
+              viewMode={viewMode}
+              onViewModeChange={setNotesViewMode}
+            />
+          </>
         ) : (
           <>
             {/* Minimal toggle bar for empty state */}

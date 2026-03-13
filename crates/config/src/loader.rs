@@ -148,7 +148,10 @@ const WORKSPACE_TEMPLATES: &[(&str, &str)] = &[
     ("AGENTS.md", include_str!("../../../workspace/AGENTS.md")),
     ("USER.md", include_str!("../../../workspace/USER.md")),
     ("TOOLS.md", include_str!("../../../workspace/TOOLS.md")),
-    ("RESPONSE.md", include_str!("../../../workspace/RESPONSE.md")),
+    (
+        "RESPONSE.md",
+        include_str!("../../../workspace/RESPONSE.md"),
+    ),
     (
         "HEARTBEAT.md",
         include_str!("../../../workspace/HEARTBEAT.md"),
