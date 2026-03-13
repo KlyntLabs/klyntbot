@@ -31,7 +31,8 @@ use tools_core::FeaturePackage;
 use super::super::confidence::ConfidenceEvaluator;
 use super::super::context_sources::{
     AgentContextSource, AreaSource, BootstrapSource, IdentitySource, PageContextSource,
-    PersonaContextSource, ProductivityContextSource, ProjectContextSource, TodoSource,
+    PersonaContextSource, ProductivityContextSource, ProjectContextSource,
+    SessionContextSource, TodoSource,
 };
 use super::super::{CronHandlerAdapter, SubagentManager};
 use super::{AgentLoop, LastActiveChannel};
@@ -212,6 +213,7 @@ impl AgentLoopBuilder {
                 config.timezone.clone(),
             )),
             Box::new(BootstrapSource::new(workspace.clone())),
+            Box::new(SessionContextSource::new(repos.clone())),
             Box::new(AreaSource::new(repos.areas.clone())),
             Box::new(TodoSource::new(repos.actions.clone())),
             Box::new(AgentContextSource::new(Arc::clone(&active_profile))),

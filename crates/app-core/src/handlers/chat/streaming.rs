@@ -60,7 +60,7 @@ fn format_interaction_summary(response: &common::FormResponse) -> String {
 /// Map a tool name to its domain category.
 fn tool_domain(tool_name: &str) -> Option<&'static str> {
     match tool_name {
-        "todo" => Some("task"),
+        "todo" | "tasks" => Some("task"),
         "project" => Some("project"),
         "area" => Some("area"),
         "okr" => Some("objective"),
@@ -103,11 +103,6 @@ async fn auto_detect_context(
     tool_names: &[String],
     entity_cards: &[EntityCard],
 ) -> Result<(), ApiError> {
-    // Skip if session already has context
-    if let Ok(Some(_)) = repos.session_context.get(session_key).await {
-        return Ok(());
-    }
-
     // Determine dominant domain from tool names
     let domains: HashSet<&str> = tool_names.iter().filter_map(|n| tool_domain(n)).collect();
     if domains.len() != 1 {
@@ -156,8 +151,10 @@ async fn resolve_ancestry(
 
     match domain {
         "task" => {
-            if let Ok(Some(task)) = repos.actions.get(id).await {
+            if let Ok(Some(task)) = repos.tasks.get(id).await {
                 (Some(task.area_id.clone()), task.project_id.clone())
+            } else if let Ok(Some(action)) = repos.actions.get(id).await {
+                (Some(action.area_id.clone()), action.project_id.clone())
             } else {
                 (None, None)
             }
