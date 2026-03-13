@@ -60,20 +60,40 @@ export function getVimPlugin(editor: Editor): VimPluginInstance | null {
 
 // ── Key handling ────────────────────────────────────────────────────────
 
-function vimKeyFromEvent(e: KeyboardEvent): string | null {
-  let key = e.key;
-  if (key === "Escape") key = "Esc";
+// Special keys that vim.js expects wrapped in angle brackets: <Esc>, <CR>, <BS>, etc.
+const SPECIAL_KEYS: Record<string, string> = {
+  Escape: "Esc",
+  Enter: "CR",
+  Backspace: "BS",
+  Delete: "Del",
+  Tab: "Tab",
+  ArrowUp: "Up",
+  ArrowDown: "Down",
+  ArrowLeft: "Left",
+  ArrowRight: "Right",
+  Home: "Home",
+  End: "End",
+  PageUp: "PageUp",
+  PageDown: "PageDown",
+  Insert: "Ins",
+  " ": "Space",
+};
 
+function vimKeyFromEvent(e: KeyboardEvent): string | null {
   // Skip pure modifier keys
-  if (key === "Control" || key === "Alt" || key === "Shift" || key === "Meta") return null;
+  if (e.key === "Control" || e.key === "Alt" || e.key === "Shift" || e.key === "Meta") return null;
+
+  const special = SPECIAL_KEYS[e.key];
+  const key = special ?? e.key;
 
   const parts: string[] = [];
   if (e.ctrlKey) parts.push("C");
   if (e.altKey) parts.push("A");
   if (e.shiftKey && key.length > 1) parts.push("S");
 
-  if (parts.length > 0) {
-    return `<${parts.join("-")}-${key}>`;
+  // Wrap in angle brackets if there are modifiers OR this is a special key
+  if (parts.length > 0 || special) {
+    return `<${[...parts, key].join("-")}>`;
   }
   return key;
 }
@@ -106,7 +126,7 @@ function createVimPlugins(opts: Required<VimModeOptions>) {
       adapter = new ProseMirrorAdapter(editorView);
 
       // Listen for vim events
-      adapter.on("vim-mode-change", (_cm: unknown, event: VimModeChangeEvent) => {
+      adapter.on("vim-mode-change", (event: VimModeChangeEvent) => {
         currentMode = mapVimMode(event);
         opts.onStateChange({ mode: currentMode });
       });
@@ -116,32 +136,22 @@ function createVimPlugins(opts: Required<VimModeOptions>) {
         editorView.dispatch(editorView.state.tr);
       });
 
-      adapter.on(
-        "dialog",
-        (
-          _cm: unknown,
-          data: {
-            template: unknown;
-            callback: Function;
-            options?: unknown;
-          },
-        ) => {
-          // Determine prefix from template
-          let prefix = ":";
-          if (data.template instanceof HTMLElement) {
-            const text = data.template.textContent || "";
-            if (text.includes("/")) prefix = "/";
-            else if (text.includes("?")) prefix = "?";
-          }
-          opts.onOpenCommandLine(prefix);
-        },
-      );
+      adapter.on("dialog", (data: { template: unknown; callback: Function; options?: unknown }) => {
+        // Determine prefix from template
+        let prefix = ":";
+        if (data.template instanceof HTMLElement) {
+          const text = data.template.textContent || "";
+          if (text.includes("/")) prefix = "/";
+          else if (text.includes("?")) prefix = "?";
+        }
+        opts.onOpenCommandLine(prefix);
+      });
 
       adapter.on("save", () => {
         document.dispatchEvent(new CustomEvent(VIM_SAVE_EVENT));
       });
 
-      adapter.on("searchOverlayChange", (_cm: unknown, overlay: { query: RegExp } | null) => {
+      adapter.on("searchOverlayChange", (overlay: { query: RegExp } | null) => {
         searchOverlayQuery = overlay?.query ?? null;
         // Force decoration recalculation
         editorView.dispatch(editorView.state.tr);

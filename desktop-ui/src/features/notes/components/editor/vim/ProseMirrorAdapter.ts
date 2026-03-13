@@ -136,6 +136,9 @@ export class ProseMirrorAdapter {
   view: EditorView;
   state: Record<string, unknown>; // vim.js reads/writes cm.state.vim, cm.state.overwrite, etc.
 
+  // biome-ignore lint/suspicious/noExplicitAny: vim.js reads/writes arbitrary properties on curOp
+  curOp: Record<string, any> | null = null;
+
   private _listeners: Map<string, Set<Function>> = new Map();
   private _lastChange: { from: Pos; to: Pos; text: string[] } | null = null;
   private _inOperation = false;
@@ -228,7 +231,7 @@ export class ProseMirrorAdapter {
   signal(type: string, ...args: unknown[]): void {
     const listeners = this._listeners.get(type);
     if (listeners) {
-      for (const fn of listeners) fn(this, ...args);
+      for (const fn of listeners) fn(...args);
     }
   }
 
@@ -683,9 +686,11 @@ export class ProseMirrorAdapter {
 
   operation<T>(fn: () => T): T {
     this._inOperation = true;
+    this.curOp = {};
     try {
       return fn();
     } finally {
+      this.curOp = null;
       this._inOperation = false;
       if (this._pendingCursorActivity) {
         this._pendingCursorActivity = false;
