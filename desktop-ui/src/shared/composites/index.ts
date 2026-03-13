@@ -8,6 +8,8 @@ export {
 } from "./Card";
 export type { DonutChartProps, DonutSegment, ProgressRingProps } from "./Chart";
 export { DonutChart, ProgressRing } from "./Chart";
+export type { DataTableColumn, DataTableProps } from "./DataTable";
+export { DataTable } from "./DataTable";
 export type { DateNavigatorProps } from "./DateNavigator";
 export { DateNavigator } from "./DateNavigator";
 export type { ConfirmDialogProps, DialogProps } from "./Dialog";

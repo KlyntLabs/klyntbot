@@ -1,4 +1,5 @@
 // Features barrel - re-exports all major feature modules
+export * from "./automations";
 export * from "./chat";
 export * from "./dashboard";
 export * from "./debug";

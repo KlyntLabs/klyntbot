@@ -7,6 +7,11 @@ import { createHashRouter, Navigate } from "react-router";
 // ── App Shell & Layouts ───────────────────────────────────────────
 const AppShell = lazy(() => import("./layouts/AppShell").then((m) => ({ default: m.AppShell })));
 
+// ── Automations Feature ──────────────────────────────────────────
+const AutomationsPage = lazy(() =>
+  import("../features/automations").then((m) => ({ default: m.AutomationsPage })),
+);
+
 // ── Tasks Feature ─────────────────────────────────────────────────
 const TasksPage = lazy(() => import("../features/tasks").then((m) => ({ default: m.TasksPage })));
 
@@ -205,6 +210,7 @@ export const router = createHashRouter([
       { path: "/tasks2", element: <Tasks2Page /> },
       { path: "/chat", element: <ChatPage /> },
       { path: "/notes", element: <NotesPage /> },
+      { path: "/automations", element: <AutomationsPage /> },
       { path: "/project/:id", element: <ProjectDetailPage /> },
       { path: "/task/:id", element: <TaskDetailPage /> },
       { path: "/objective/:id", element: <ObjectiveDetailPage /> },
