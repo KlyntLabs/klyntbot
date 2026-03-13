@@ -104,7 +104,7 @@ impl Tool for OkrTool {
             "objective.create" => {
                 let project_id = p.required_str("project_id")?;
                 let title = p.required_str("title")?;
-                let id = domain::Objective::generate_id();
+                let id = uuid::Uuid::new_v4().to_string();
                 let now = Utc::now();
 
                 let due_date = p
@@ -266,7 +266,7 @@ impl Tool for OkrTool {
             "kr.create" => {
                 let objective_id = p.required_str("objective_id")?;
                 let title = p.required_str("title")?;
-                let id = domain::KeyResult::generate_id();
+                let id = uuid::Uuid::new_v4().to_string();
                 let now = Utc::now();
 
                 let tracking_mode = p

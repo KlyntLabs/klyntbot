@@ -24,7 +24,6 @@ feature-notes.workspace = true
 plugin-runtime.workspace = true
 mcp.workspace = true
 scheduling.workspace = true
-domain.workspace = true
 context_engine.workspace = true
 storage.workspace = true
 sqlx.workspace = true

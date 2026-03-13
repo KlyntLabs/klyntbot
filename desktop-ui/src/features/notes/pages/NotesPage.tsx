@@ -20,6 +20,50 @@ import { NoteSearchBar, type NoteSearchBarHandle } from "../components/NoteSearc
 
 type NotesViewMode = "editor" | "graph";
 
+/** Minimal markdown-to-HTML for workspace config files. */
+function mdToHtml(md: string): string {
+  return md
+    .split("\n\n")
+    .map((block) => {
+      const trimmed = block.trim();
+      if (!trimmed) return "";
+      // Headings
+      const hMatch = trimmed.match(/^(#{1,6})\s+(.*)/);
+      if (hMatch) {
+        const level = hMatch[1].length;
+        return `<h${level}>${escapeHtml(hMatch[2])}</h${level}>`;
+      }
+      // Unordered list
+      if (/^[-*]\s/.test(trimmed)) {
+        const items = trimmed
+          .split("\n")
+          .filter((l) => /^[-*]\s/.test(l.trim()))
+          .map((l) => `<li><p>${inlinemd(l.replace(/^[-*]\s+/, "").trim())}</p></li>`)
+          .join("");
+        return `<ul>${items}</ul>`;
+      }
+      // Code block
+      if (trimmed.startsWith("```")) {
+        const lines = trimmed.split("\n");
+        const code = lines.slice(1, lines.length - 1).join("\n");
+        return `<pre><code>${escapeHtml(code)}</code></pre>`;
+      }
+      // Paragraph (may be multi-line)
+      return `<p>${inlinemd(trimmed.replace(/\n/g, " "))}</p>`;
+    })
+    .join("");
+}
+
+function inlinemd(s: string): string {
+  return escapeHtml(s)
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/`(.+?)`/g, "<code>$1</code>");
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
 function ViewModeToggle({
   viewMode,
   onChange,
@@ -61,6 +105,7 @@ export default function NotesPage() {
   const [searchResults, setSearchResults] = useState<Note[] | null>(null);
   const [activeWorkspaceFile, setActiveWorkspaceFile] = useState<string | null>(null);
   const [workspaceContent, setWorkspaceContent] = useState<string>("");
+  const [loadedWorkspaceFile, setLoadedWorkspaceFile] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const sidebarRef = useRef<HTMLDivElement>(null);
   const sidebarWidthRef = useRef(260);
@@ -208,9 +253,11 @@ export default function NotesPage() {
   const handleSelectWorkspaceFile = useCallback(async (filename: string) => {
     setSelectedNoteId(null);
     setActiveWorkspaceFile(filename);
+    setLoadedWorkspaceFile(null); // Clear until load completes
     try {
       const result = await ipc<WorkspaceFileContent>("workspace_read_file", { filename });
       setWorkspaceContent(result.content);
+      setLoadedWorkspaceFile(filename);
     } catch (e) {
       console.error("Failed to load workspace file:", e);
     }
@@ -228,20 +275,20 @@ export default function NotesPage() {
   );
 
   const workspaceNote = useMemo((): Note | undefined => {
-    if (!activeWorkspaceFile) return undefined;
+    if (!activeWorkspaceFile || loadedWorkspaceFile !== activeWorkspaceFile) return undefined;
     return {
       id: `__workspace__${activeWorkspaceFile}`,
       notebookId: null,
       title: activeWorkspaceFile,
       body: workspaceContent,
-      bodyHtml: null,
+      bodyHtml: mdToHtml(workspaceContent),
       pinned: false,
       archived: false,
       tags: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-  }, [activeWorkspaceFile, workspaceContent]);
+  }, [activeWorkspaceFile, loadedWorkspaceFile, workspaceContent]);
 
   const searchRef = useRef<NoteSearchBarHandle>(null);
 

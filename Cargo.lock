@@ -56,7 +56,6 @@ dependencies = [
  "config",
  "context_engine",
  "dirs",
- "domain",
  "feature-coaching",
  "feature-finance",
  "feature-notes",
@@ -3108,15 +3107,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "domain"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "serde",
- "uuid",
-]
-
-[[package]]
 name = "dotenvy"
 version = "0.15.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5515,7 +5505,6 @@ dependencies = [
  "common",
  "config",
  "context_engine",
- "domain",
  "extism",
  "feature-coaching",
  "feature-finance",
@@ -11298,7 +11287,6 @@ dependencies = [
  "cognitive",
  "common",
  "config",
- "domain",
  "fastembed",
  "globset",
  "html2text",

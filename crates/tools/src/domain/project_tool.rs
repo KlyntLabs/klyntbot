@@ -106,7 +106,7 @@ impl Tool for ProjectTool {
             "create" => {
                 let name = p.required_str("name")?;
                 let area_id = p.required_str("area_id")?;
-                let id = domain::Project::generate_id();
+                let id = uuid::Uuid::new_v4().to_string();
                 let now = Utc::now();
 
                 let row = storage::rows::project::ProjectRow {

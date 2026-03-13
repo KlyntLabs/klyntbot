@@ -10,7 +10,6 @@ pub use cognitive;
 pub use common;
 pub use config;
 pub use context_engine;
-pub use domain;
 pub use feature_coaching;
 pub use mcp;
 pub use providers;
@@ -32,7 +31,6 @@ pub use common::{
     InteractionRequest, MessageRole, Question, Result, SessionKey,
 };
 pub use config::Config;
-pub use domain::{Area, KeyResult, Objective, Project};
 pub use providers::{
     create_provider, create_provider_with_failover, DynProvider, LlmProvider, LlmResponse, Message,
     ProviderRegistry,

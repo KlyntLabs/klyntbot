@@ -48,12 +48,12 @@ Browser-only dev: run `cargo tauri dev` (starts Vite + embedded HTTP server on `
 
 Rust personal AI agent — single binary connecting 6+ chat platforms to LLMs with task/project management and persistent memory. All state in SQLite + LanceDB.
 
-### Workspace (27 crates, 9 layers)
+### Workspace (26 crates, 9 layers)
 
 ```
 L0: common                — KlyntbotError, MessageRole, ChannelName, ChatId, SessionKey
 L1: config, bus, tools-core, tools-core-macros — Config (camelCase JSON), message bus, Tool/FeaturePackage traits, derive macros
-L2: storage, domain       — SqlitePool, migrations, *Repo structs, OKR+PARA domain types
+L2: storage               — SqlitePool, migrations, *Repo structs, *Row types
 L3: providers, session, scheduling, context_engine — LLM clients, session persistence, cron, token budgets
 L4: tools, feature-tasks, feature-finance, feature-notes, feature-productivity, feature-coaching, activity-log, plugin-runtime — 20+ tools, feature packages, WASM plugins
 L5: channels, agent, cognitive — Platform integrations (Telegram/Discord/Slack/Email), agent runtime, cognitive memory system

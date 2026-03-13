@@ -278,18 +278,6 @@ These items were identified during the 2026-03-12 structural refactor analysis.
 
 ---
 
-### A-031 🔴 High | `domain` — Domain Types Dead at Runtime (No Row Bridge)
-
-**Summary:** The `domain` crate defines rich typed entities but no runtime code path uses them. All callers work directly with `*Row` types from `storage`.
-
-**Impact:** Domain crate is effectively dead code. Domain invariants are never called in production.
-
-**Proposed Fix:** Either (a) add `From<XxxRow> for Xxx` bridges + use domain types in handlers, or (b) strip the unneeded methods and annotate as conceptual model only.
-
-**References:** `crates/domain/src/`, `crates/storage/src/rows/`
-
----
-
 ### A-034 🟡 Medium | `storage` — `calendar_sync_state` / `calendar_event_cache` Have No Repo
 
 **Summary:** Both tables are accessed via raw SQL in the `channels` crate, bypassing the storage abstraction.

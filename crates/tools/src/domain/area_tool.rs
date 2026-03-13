@@ -92,7 +92,7 @@ impl Tool for AreaTool {
         match action {
             "create" => {
                 let name = p.required_str("name")?;
-                let id = domain::Area::generate_id();
+                let id = uuid::Uuid::new_v4().to_string();
                 let now = Utc::now();
 
                 let row = storage::rows::area::AreaRow {
