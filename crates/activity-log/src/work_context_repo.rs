@@ -196,7 +196,12 @@ impl WorkContextRepo {
         Ok(result.rows_affected())
     }
 
-    pub async fn merge(pool: &StoragePool, keep_id: &str, remove_id: &str) -> common::Result<()> {
+    pub async fn merge(
+        pool: &StoragePool,
+        keep_id: &str,
+        remove_id: &str,
+        reason: &str,
+    ) -> common::Result<()> {
         let mut tx = pool.inner().begin().await.map_err(StorageError::from)?;
 
         // Transfer resources
@@ -238,8 +243,56 @@ impl WorkContextRepo {
             .await
             .map_err(StorageError::from)?;
 
+        // Record merge event
+        sqlx::query(
+            "INSERT INTO context_merges (id, keep_id, remove_id, reason, merged_at) \
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+        )
+        .bind(crate::normalizers::new_ulid())
+        .bind(keep_id)
+        .bind(remove_id)
+        .bind(reason)
+        .bind(Utc::now().to_rfc3339())
+        .execute(&mut *tx)
+        .await
+        .map_err(StorageError::from)?;
+
         tx.commit().await.map_err(StorageError::from)?;
         Ok(())
+    }
+
+    pub async fn count_merges_since(
+        pool: &StoragePool,
+        since: DateTime<Utc>,
+    ) -> common::Result<i64> {
+        let row: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM context_merges WHERE merged_at >= ?1")
+                .bind(since.to_rfc3339())
+                .fetch_one(pool.inner())
+                .await
+                .map_err(StorageError::from)?;
+        Ok(row.0)
+    }
+
+    pub async fn record_inference_run(pool: &StoragePool) -> common::Result<()> {
+        sqlx::query(
+            "INSERT INTO inference_state (key, value) VALUES ('last_run_at', ?1) \
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        )
+        .bind(Utc::now().to_rfc3339())
+        .execute(pool.inner())
+        .await
+        .map_err(StorageError::from)?;
+        Ok(())
+    }
+
+    pub async fn get_last_inference_run(pool: &StoragePool) -> common::Result<Option<String>> {
+        let row: Option<(String,)> =
+            sqlx::query_as("SELECT value FROM inference_state WHERE key = 'last_run_at'")
+                .fetch_optional(pool.inner())
+                .await
+                .map_err(StorageError::from)?;
+        Ok(row.map(|r| r.0))
     }
 
     pub async fn count_by_status(
@@ -401,6 +454,29 @@ pub(crate) mod tests {
         assert_eq!(archived, 1);
         let loaded = WorkContextRepo::get(&pool, &ctx.id).await.unwrap().unwrap();
         assert_eq!(loaded.status, WorkContextStatus::Archived);
+    }
+
+    #[tokio::test]
+    async fn test_merge_records_event_and_counts() {
+        let pool = crate::test_pool().await;
+        let c1 = make_context("Keep Me");
+        let c2 = make_context("Remove Me");
+        WorkContextRepo::insert(&pool, &c1).await.unwrap();
+        WorkContextRepo::insert(&pool, &c2).await.unwrap();
+
+        WorkContextRepo::merge(&pool, &c1.id, &c2.id, "inferred")
+            .await
+            .unwrap();
+
+        // Removed context is gone
+        assert!(WorkContextRepo::get(&pool, &c2.id).await.unwrap().is_none());
+
+        // Merge event recorded
+        let since = Utc::now() - chrono::Duration::hours(1);
+        let count = WorkContextRepo::count_merges_since(&pool, since)
+            .await
+            .unwrap();
+        assert_eq!(count, 1);
     }
 
     #[tokio::test]

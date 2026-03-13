@@ -27,21 +27,6 @@ These items were identified during the 2026-03-12 structural refactor analysis.
 
 ---
 
-### A-006 🟡 Medium | `app-core/handlers/work_context` — Merge Tracking Not Implemented
-
-**Summary:** TODO comments exist for tracking context merges and exposing them from the inference loop. The work context inference loop can detect context merges but does not record them.
-
-**Impact:** Work context history may have gaps. Merge analytics are unavailable.
-
-**Proposed Fix:**
-- Add `context_merges` table to `activity-log` migrations
-- Record merge events in `work_context_repo.rs` when inference detects a merge
-- Expose merge count in `WorkContextSummary` response type
-
-**References:** `crates/app-core/src/handlers/work_context.rs`
-
----
-
 ### A-007 🟢 Low | `app-core/handlers/work_context` — "Compare With Yesterday" Not Implemented
 
 **Summary:** The daily work summary handler has placeholders for cross-day comparison (productivity trends) and pulling context from cognitive memory.
@@ -53,21 +38,6 @@ These items were identified during the 2026-03-12 structural refactor analysis.
 - Query `cognitive` semantic facts for work-related context before generating summary
 
 **References:** `crates/app-core/src/handlers/work_context.rs`
-
----
-
-### A-008 🟡 Medium | `agent/handlers/forecast.rs` — Trend Computation Not Implemented
-
-**Summary:** The forecast handler has a placeholder for computing accuracy trends (is the agent getting better at estimating task durations?). The raw data is available in `strategy_records` and `enrichment_feedback` tables.
-
-**Impact:** The confidence evaluator cannot improve over time based on forecast accuracy. The adaptive learning loop is incomplete.
-
-**Proposed Fix:**
-- Query last 30 days vs last 90 days of forecast accuracy records
-- Compute trend direction and magnitude
-- Feed into `ConfidenceEvaluator` threshold adjustment
-
-**References:** `crates/agent/src/handlers/forecast.rs`
 
 ---
 
@@ -254,7 +224,7 @@ These items were identified during the 2026-03-12 structural refactor analysis.
 ### C-001 🟡 Medium | Feature-Tasks Phase 3 — Proactive Suggestions + Forecasting + Cognitive Integration
 **Spec:** `docs/superpowers/plans/2026-03-12-feature-tasks-phase3.md`
 - Proactive daily task suggestions based on cognitive context
-- Workload forecasting with trend accuracy tracking (prerequisite: A-008)
+- Workload forecasting with trend accuracy tracking (A-008 resolved)
 - Cognitive integration: pull relevant facts before task creation/planning
 - Recurring task generation with FSRS-adjusted intervals
 

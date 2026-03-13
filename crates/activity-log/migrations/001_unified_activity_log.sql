@@ -114,3 +114,21 @@ CREATE TABLE IF NOT EXISTS work_context_actions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_wca_action ON work_context_actions(action_id);
+
+-- Context merge log: records every merge for analytics + history tracking
+CREATE TABLE IF NOT EXISTS context_merges (
+    id              TEXT PRIMARY KEY,         -- ULID
+    keep_id         TEXT NOT NULL,            -- Context that survived
+    remove_id       TEXT NOT NULL,            -- Context that was absorbed
+    reason          TEXT NOT NULL DEFAULT 'inferred'
+                    CHECK (reason IN ('inferred', 'manual', 'title_match')),
+    merged_at       TEXT NOT NULL             -- ISO-8601 UTC
+);
+
+CREATE INDEX IF NOT EXISTS idx_cm_merged_at ON context_merges(merged_at);
+
+-- Lightweight key-value store for inference loop state (e.g. last_run_at)
+CREATE TABLE IF NOT EXISTS inference_state (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);

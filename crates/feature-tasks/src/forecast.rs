@@ -195,6 +195,62 @@ pub fn project_velocity(
     Some(total_mins as f64 / weeks as f64)
 }
 
+/// Compute accuracy trend by comparing recent records (0-30 days) against older (31-90 days).
+///
+/// Returns `Insufficient` if either window has fewer than `min_sample` records.
+/// Otherwise compares mean **absolute** deviation:
+/// - `Improving` if recent |deviation| is >15% lower than older
+/// - `Degrading` if recent |deviation| is >15% higher
+/// - `Stable` otherwise
+pub fn compute_trend(
+    records: &[EstimationRecord],
+    now: DateTime<Utc>,
+    min_sample: usize,
+) -> crate::types::AccuracyTrend {
+    use crate::types::AccuracyTrend;
+
+    let cutoff_30 = now - chrono::Duration::days(30);
+    let cutoff_90 = now - chrono::Duration::days(90);
+
+    let (mut recent, mut older) = (Vec::new(), Vec::new());
+
+    for r in records {
+        if r.estimated_minutes == 0 {
+            continue;
+        }
+        let dev = ((r.actual_minutes as f64 - r.estimated_minutes as f64)
+            / r.estimated_minutes as f64)
+            .abs();
+        if r.completed_at >= cutoff_30 {
+            recent.push(dev);
+        } else if r.completed_at >= cutoff_90 {
+            older.push(dev);
+        }
+    }
+
+    if recent.len() < min_sample || older.len() < min_sample {
+        return AccuracyTrend::Insufficient;
+    }
+
+    let mean_recent = recent.iter().sum::<f64>() / recent.len() as f64;
+    let mean_older = older.iter().sum::<f64>() / older.len() as f64;
+
+    if mean_older < 0.01 {
+        // Older deviation near zero — can't meaningfully compare
+        return AccuracyTrend::Stable;
+    }
+
+    let change_ratio = (mean_recent - mean_older) / mean_older;
+
+    if change_ratio < -0.15 {
+        AccuracyTrend::Improving
+    } else if change_ratio > 0.15 {
+        AccuracyTrend::Degrading
+    } else {
+        AccuracyTrend::Stable
+    }
+}
+
 /// Accuracy statistics for a set of estimation records.
 #[derive(Debug, Clone)]
 pub struct AccuracyStats {
@@ -386,5 +442,67 @@ mod tests {
         assert_eq!(stats.count, 3);
         // mean: (50 + 50 + 0) / 3 = 33.3%
         assert!((stats.mean_deviation_pct - 33.33).abs() < 0.1);
+    }
+
+    #[test]
+    fn test_compute_trend_improving() {
+        use crate::types::AccuracyTrend;
+        let now = Utc::now();
+        let mut records = Vec::new();
+        // Recent (0-30 days): estimates are close to actuals (low deviation)
+        for i in 0..6 {
+            records.push(record(&[], "medium", 3, "p1", 60, 63, i + 1)); // ~5% deviation
+        }
+        // Older (31-90 days): estimates were way off (high deviation)
+        for i in 0..6 {
+            records.push(record(&[], "medium", 3, "p1", 60, 96, 35 + i)); // ~60% deviation
+        }
+        assert_eq!(compute_trend(&records, now, 5), AccuracyTrend::Improving);
+    }
+
+    #[test]
+    fn test_compute_trend_degrading() {
+        use crate::types::AccuracyTrend;
+        let now = Utc::now();
+        let mut records = Vec::new();
+        // Recent: estimates are way off
+        for i in 0..6 {
+            records.push(record(&[], "medium", 3, "p1", 60, 96, i + 1)); // ~60% deviation
+        }
+        // Older: estimates were accurate
+        for i in 0..6 {
+            records.push(record(&[], "medium", 3, "p1", 60, 63, 35 + i)); // ~5% deviation
+        }
+        assert_eq!(compute_trend(&records, now, 5), AccuracyTrend::Degrading);
+    }
+
+    #[test]
+    fn test_compute_trend_stable() {
+        use crate::types::AccuracyTrend;
+        let now = Utc::now();
+        let mut records = Vec::new();
+        // Both windows: similar deviation (~25-27%)
+        for i in 0..6 {
+            records.push(record(&[], "medium", 3, "p1", 60, 76, i + 1)); // ~26.7%
+        }
+        for i in 0..6 {
+            records.push(record(&[], "medium", 3, "p1", 60, 75, 35 + i)); // ~25%
+        }
+        assert_eq!(compute_trend(&records, now, 5), AccuracyTrend::Stable);
+    }
+
+    #[test]
+    fn test_compute_trend_insufficient_recent() {
+        use crate::types::AccuracyTrend;
+        let now = Utc::now();
+        let mut records = Vec::new();
+        // Only 2 recent records (below min_sample=5)
+        for i in 0..2 {
+            records.push(record(&[], "medium", 3, "p1", 60, 63, i + 1));
+        }
+        for i in 0..6 {
+            records.push(record(&[], "medium", 3, "p1", 60, 96, 35 + i));
+        }
+        assert_eq!(compute_trend(&records, now, 5), AccuracyTrend::Insufficient);
     }
 }

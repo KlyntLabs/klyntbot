@@ -473,7 +473,7 @@ impl ContextInferenceEngine {
                 continue;
             }
 
-            if let Err(e) = WorkContextRepo::merge(&self.pool, &keep, &remove).await {
+            if let Err(e) = WorkContextRepo::merge(&self.pool, &keep, &remove, "inferred").await {
                 warn!("Failed to merge contexts {keep} <- {remove}: {e}");
                 continue;
             }

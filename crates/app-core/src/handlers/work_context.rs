@@ -138,7 +138,7 @@ impl AppCore {
         keep_id: String,
         remove_id: String,
     ) -> Result<WorkContextResponse, ApiError> {
-        activity_log::WorkContextRepo::merge(&self.storage_pool, &keep_id, &remove_id)
+        activity_log::WorkContextRepo::merge(&self.storage_pool, &keep_id, &remove_id, "manual")
             .await
             .map_err(map_err)?;
 
@@ -288,7 +288,7 @@ impl AppCore {
         let one_hour_ago = now - Duration::hours(1);
         let one_day_ago = now - Duration::hours(24);
 
-        let (active_count, archived_count, events_1h, events_24h, assigned_24h, avg_confidence) = tokio::try_join!(
+        let (active_count, archived_count, events_1h, events_24h, assigned_24h, avg_confidence, merges_24h) = tokio::try_join!(
             async {
                 activity_log::WorkContextRepo::count_by_status(
                     &self.storage_pool,
@@ -325,6 +325,11 @@ impl AppCore {
                     .await
                     .map_err(map_err)
             },
+            async {
+                activity_log::WorkContextRepo::count_merges_since(&self.storage_pool, one_day_ago)
+                    .await
+                    .map_err(map_err)
+            },
         )?;
 
         let assignment_rate = if events_24h > 0 {
@@ -340,8 +345,12 @@ impl AppCore {
             events_last_24h: events_24h,
             assignment_rate,
             avg_confidence,
-            merges_last_24h: 0, // TODO: track merges when merge logging is added
-            last_run_at: None,  // TODO: expose from inference loop
+            merges_last_24h: merges_24h,
+            last_run_at: activity_log::WorkContextRepo::get_last_inference_run(
+                &self.storage_pool,
+            )
+            .await
+            .map_err(map_err)?,
         })
     }
 

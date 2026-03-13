@@ -65,6 +65,11 @@ impl ContextInferenceLoop {
                             }
                             _ => {}
                         }
+
+                        // Record last inference run timestamp
+                        if let Err(e) = WorkContextRepo::record_inference_run(&pool).await {
+                            warn!("Failed to record inference run: {e}");
+                        }
                     }
                     _ = archival_interval.tick() => {
                         match WorkContextRepo::archive_dormant(&pool, dormancy_days).await {

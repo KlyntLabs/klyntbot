@@ -291,6 +291,7 @@ impl ForecastHandler for LlmForecastHandler {
         let records = self.load_records(lookback).await?;
 
         let stats = fc::accuracy_stats(&records);
+        let trend = fc::compute_trend(&records, chrono::Utc::now(), 5);
 
         // Compute per-energy-level breakdowns
         let by_energy_level = compute_breakdown(&records, |r| r.energy_level.clone());
@@ -304,7 +305,7 @@ impl ForecastHandler for LlmForecastHandler {
                 mean_deviation_pct: s.mean_deviation_pct,
                 median_deviation_pct: s.median_deviation_pct,
                 p90_deviation_pct: s.p90_deviation_pct,
-                trend: AccuracyTrend::Insufficient, // TODO: compute trend from recent vs older
+                trend,
                 by_energy_level,
                 by_complexity,
             },
