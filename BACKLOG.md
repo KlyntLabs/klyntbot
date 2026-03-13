@@ -641,8 +641,8 @@ Use this to track refactor progress:
 - [x] Phase 8 — `agent` internal reorganization (8a–8c: adapters/, services/, skill_loader)
 - [x] Phase 9 — `context_engine` restructure (assembler/ + history_compressor/ splits)
 - [x] Phase 10 — feature crates restructure (types/, repo/, tool/ splits across 5 crates)
-- [ ] Phase 11 — `app-core` restructure
-- [ ] Phase 12 — `desktop-shared` domain split
+- [x] Phase 11 — `app-core` restructure
+- [x] Phase 12 — `desktop-shared` domain split
 - [ ] Phase 13 — `desktop` dev server split
 - [ ] Phase 14 — `docs/ai-coding-rules.md` created
 - [ ] Phase 15 — Final verification (all tests pass, zero warnings)
