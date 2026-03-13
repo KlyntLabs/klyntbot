@@ -46,6 +46,10 @@ pub trait ReflectionHandler: Send + Sync {
     async fn reflect(&self, input: &ReflectionInput) -> common::Result<ReflectionOutput>;
 }
 
+/// Minimum number of episodic memories required before reflection runs.
+/// Below this threshold, the LLM produces low-quality or hallucinated patterns.
+const MIN_EPISODE_COUNT: usize = 20;
+
 /// Run a weekly reflection cycle.
 ///
 /// 1. Load episodic memories from the past 7 days
@@ -54,6 +58,10 @@ pub trait ReflectionHandler: Send + Sync {
 /// 4. Consolidate fact updates
 /// 5. Apply rule updates
 /// 6. Store the reflection as an episodic memory
+///
+/// Returns early with an empty output if the total episodic memory count
+/// is below [`MIN_EPISODE_COUNT`] — new users with sparse data would
+/// get low-quality reflections.
 pub async fn run_weekly_reflection(
     handler: &dyn ReflectionHandler,
     consolidation: &dyn ConsolidationHandler,
@@ -66,6 +74,25 @@ pub async fn run_weekly_reflection(
     let week_ago = now - chrono::Duration::days(7);
     let period_start = week_ago.format("%Y-%m-%dT00:00:00").to_string();
     let period_end = now.format("%Y-%m-%dT23:59:59").to_string();
+
+    // Guard: skip reflection when user has too few episodic memories overall.
+    let total_episodes = episodic_repo
+        .count_all()
+        .await
+        .map_err(StorageError::from)?;
+    if (total_episodes as usize) < MIN_EPISODE_COUNT {
+        info!(
+            "Skipping weekly reflection: only {} episodic memories (need >= {})",
+            total_episodes, MIN_EPISODE_COUNT
+        );
+        return Ok(ReflectionOutput {
+            fact_updates: vec![],
+            rule_updates: vec![],
+            summary: format!(
+                "Skipped — not enough data yet ({total_episodes}/{MIN_EPISODE_COUNT} memories)."
+            ),
+        });
+    }
 
     // Load episodic memories from the past week
     let memories = episodic_repo
@@ -216,12 +243,82 @@ mod tests {
         crate::repos::cognitive_test_pool().await
     }
 
+    /// Seed enough episodic memories to pass the MIN_EPISODE_COUNT guard.
+    async fn seed_minimum_episodes(repo: &EpisodicMemoryRepo) {
+        for i in 0..MIN_EPISODE_COUNT {
+            let mem = EpisodicMemory {
+                id: format!("seed_{i}"),
+                domain: "general".into(),
+                content: format!("Seed episode {i}"),
+                summary: None,
+                importance: 0.5,
+                occurred_at: format!("2026-02-{:02}T10:00:00", (i % 28) + 1),
+                recorded_at: "2026-03-01T00:00:00".into(),
+                stability: 1.0,
+                last_accessed: None,
+                access_count: 0,
+                project_id: None,
+            };
+            repo.insert(&mem).await.unwrap();
+        }
+    }
+
+    #[tokio::test]
+    async fn test_weekly_reflection_skipped_when_too_few_episodes() {
+        let pool = setup().await;
+        let fact_repo = SemanticFactRepo::new(pool.clone());
+        let episodic_repo = EpisodicMemoryRepo::new(pool.clone());
+        let rule_repo = ProceduralRuleRepo::new(pool);
+
+        // Insert only 5 memories — well below MIN_EPISODE_COUNT (20)
+        for i in 0..5 {
+            let mem = EpisodicMemory {
+                id: format!("ep_{i}"),
+                domain: "productivity".into(),
+                content: format!("Session {i}"),
+                summary: None,
+                importance: 0.7,
+                occurred_at: format!("2026-03-0{i}T10:00:00"),
+                recorded_at: "2026-03-06T12:00:00".into(),
+                stability: 1.0,
+                last_accessed: None,
+                access_count: 0,
+                project_id: None,
+            };
+            episodic_repo.insert(&mem).await.unwrap();
+        }
+
+        let handler = MockReflectionHandler {
+            output: ReflectionOutput {
+                fact_updates: vec![],
+                rule_updates: vec![],
+                summary: "Should never reach this.".into(),
+            },
+        };
+
+        let output = run_weekly_reflection(
+            &handler,
+            &MockConsolidationHandler,
+            &fact_repo,
+            &episodic_repo,
+            &rule_repo,
+            None,
+        )
+        .await
+        .unwrap();
+
+        assert!(output.summary.contains("Skipped"));
+        assert!(output.fact_updates.is_empty());
+        assert!(output.rule_updates.is_empty());
+    }
+
     #[tokio::test]
     async fn test_weekly_reflection_stores_result() {
         let pool = setup().await;
         let fact_repo = SemanticFactRepo::new(pool.clone());
         let episodic_repo = EpisodicMemoryRepo::new(pool.clone());
         let rule_repo = ProceduralRuleRepo::new(pool);
+        seed_minimum_episodes(&episodic_repo).await;
 
         let handler = MockReflectionHandler {
             output: ReflectionOutput {
@@ -264,6 +361,7 @@ mod tests {
         let fact_repo = SemanticFactRepo::new(pool.clone());
         let episodic_repo = EpisodicMemoryRepo::new(pool.clone());
         let rule_repo = ProceduralRuleRepo::new(pool);
+        seed_minimum_episodes(&episodic_repo).await;
 
         let handler = MockReflectionHandler {
             output: ReflectionOutput {
@@ -306,6 +404,7 @@ mod tests {
         let fact_repo = SemanticFactRepo::new(pool.clone());
         let episodic_repo = EpisodicMemoryRepo::new(pool.clone());
         let rule_repo = ProceduralRuleRepo::new(pool);
+        seed_minimum_episodes(&episodic_repo).await;
 
         let handler = MockReflectionHandler {
             output: ReflectionOutput {

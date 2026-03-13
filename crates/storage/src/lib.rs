@@ -40,6 +40,7 @@ pub use repos::{AgentTaskRepo, CronRepo, UsageRepo};
 pub use repos::{CoachingStrategyRepo, CoachingStrategyRow, UpsertCoachingStrategy};
 pub use repos::{DecisionLogRepo, InteractionLogRepo, LearningStateRepo, OutcomeRepo};
 pub use repos::{OverallStats, StrategyRepo, ToolStatsRow};
+pub use repos::ToolUsageRepo;
 
 // ── Finance ─────────────────────────────────────────────────────────
 pub use finance_storage::FinanceStorage;
@@ -70,4 +71,5 @@ pub use rows::task::{
     TaskExecutionRow, TaskRow, TaskSuggestionRow, TaskTimeEntryRow,
 };
 pub use rows::task_group::TaskGroupRow;
+pub use rows::tool_usage::{ToolUsageRow, ToolUsageStatsRow};
 pub use rows::usage::UsageRecordRow;

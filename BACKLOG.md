@@ -89,21 +89,6 @@ These items were identified during the 2026-03-12 structural refactor analysis.
 
 ---
 
-### A-014 🟡 Medium | `cognitive` — No Semantic Fact Expiry/Pruning
-
-**Summary:** The cognitive memory system accumulates semantic facts over time but has no automatic pruning. Facts with very low salience are never deleted.
-
-**Impact:** Memory retrieval will slow down. Disk usage grows indefinitely.
-
-**Proposed Fix:**
-- Add `prune_expired_facts(threshold: f32)` to `SemanticFactRepo`
-- Schedule weekly prune in `cognitive/background/` pipeline
-- Default threshold: salience < 0.05 AND last_accessed > 180 days
-
-**References:** `crates/cognitive/src/repos/semantic_fact.rs`
-
----
-
 ### A-015 🟡 Medium | `providers` — Pricing Tables Not Up to Date
 
 **Summary:** `agent/src/output/cost_tracker.rs` contains hardcoded pricing tables for 12 providers. Provider pricing changes frequently.
@@ -212,20 +197,6 @@ These items were identified during the 2026-03-12 structural refactor analysis.
 
 ---
 
-### A-024 🟡 Medium | `cognitive` — Reflection Runs Without Minimum Data Guard
-
-**Summary:** The reflection handler runs weekly on episodic memory. New users with sparse data get low-quality or hallucinated "patterns".
-
-**Impact:** Early users may see spurious coaching suggestions.
-
-**Proposed Fix:**
-- Add `min_episode_count: u32` guard in `ReflectionHandler::should_run()`
-- Default: skip reflection if `episodic_memory` count < 20
-
-**References:** `crates/cognitive/src/reflection.rs`, `crates/cognitive/src/consolidation.rs`
-
----
-
 ### A-026 🟢 Low | `common/types.rs` — `ChatId` Lacks Typed Constructors
 
 **Summary:** `ChatId` is constructed via raw string literals everywhere, making it easy to construct invalid IDs.
@@ -275,48 +246,6 @@ These items were identified during the 2026-03-12 structural refactor analysis.
 - Add deduplication: skip if context is identical to last emitted
 
 **References:** `crates/activity-log/src/inference.rs`
-
----
-
-### A-034 🟡 Medium | `storage` — `calendar_sync_state` / `calendar_event_cache` Have No Repo
-
-**Summary:** Both tables are accessed via raw SQL in the `channels` crate, bypassing the storage abstraction.
-
-**Proposed Fix:** Add `CalendarSyncStateRepo` and `CalendarEventCacheRepo` to the `storage` crate.
-
-**References:** `crates/storage/migrations/001_initial.sql`
-
----
-
-### A-035 🟡 Medium | `storage` — `tool_usage` Table Has No Dedicated Repo
-
-**Summary:** Cleanup is done via raw SQL bypassing the repo pattern.
-
-**Proposed Fix:** Create `ToolUsageRepo` with `insert()`, `delete_older_than()`, `aggregate_by_tool()`.
-
-**References:** `crates/storage/src/repos/mod.rs`
-
----
-
-### A-036 🟡 Medium | `storage` — `FinancePortfolioRow` Defined Without `FinancePortfolioRepo`
-
-**Summary:** Portfolios cannot be created or managed through the storage API despite having a row type and FK references.
-
-**Proposed Fix:** Add `FinancePortfolioRepo` to the `finance_storage` module.
-
-**References:** `crates/storage/src/rows/finance.rs`, `crates/storage/src/finance_storage.rs`
-
----
-
-### A-042 🟡 Medium | `agents/communication` — No Skills Defined
-
-**Summary:** The communication agent has zero skills — the only agent without a `skills/` directory.
-
-**Proposed Fix:**
-- Add a `messaging` skill for single/broadcast messaging and channel-specific formatting
-- Add a `notification` skill for alert routing and batching
-
-**References:** `agents/communication/AGENT.md`
 
 ---
 

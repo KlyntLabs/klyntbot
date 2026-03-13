@@ -30,6 +30,7 @@ pub mod task_group;
 pub mod task_repo;
 #[cfg(test)]
 pub mod tests;
+pub mod tool_usage;
 pub mod usage;
 
 pub use action_repo::{ActionFilter, ActionPatch, ActionRepo, ActionSummary};
@@ -59,6 +60,7 @@ pub use status_workflow::StatusWorkflowRepo;
 pub use strategy::{OverallStats, StrategyRepo, ToolStatsRow};
 pub use task_group::TaskGroupRepo;
 pub use task_repo::{TaskFilter, TaskPatch, TaskRepo, TaskSummary};
+pub use tool_usage::ToolUsageRepo;
 pub use usage::UsageRepo;
 
 /// Aggregate of all repository handles, constructed from a single `SqlitePool`.
@@ -89,6 +91,7 @@ pub struct Repos {
     pub entity_links: EntityLinkRepo,
     pub project_sources: ProjectSourceRepo,
     pub tasks: TaskRepo,
+    pub tool_usage: ToolUsageRepo,
 }
 
 impl Repos {
@@ -118,6 +121,7 @@ impl Repos {
             entity_links: EntityLinkRepo::new(db.clone()),
             project_sources: ProjectSourceRepo::new(db.clone()),
             tasks: TaskRepo::new(db.clone()),
+            tool_usage: ToolUsageRepo::new(db.clone()),
             pool: db,
         }
     }
@@ -142,16 +146,10 @@ impl Repos {
         total += self.strategies.delete_older_than(90, now).await?;
         total += self.outcomes.delete_older_than(30, now).await?;
         total += self.interaction_log.delete_older_than(60, now).await?;
-
-        // tool_usage has no dedicated repo — use direct SQL.
-        let cutoff_90 = now - chrono::Duration::days(90);
-        let result = sqlx::query("DELETE FROM tool_usage WHERE created_at < ?1")
-            .bind(cutoff_90)
-            .execute(&self.pool)
-            .await?;
-        total += result.rows_affected();
+        total += self.tool_usage.delete_older_than(90, now).await?;
 
         // enrichment_feedback
+        let cutoff_90 = now - chrono::Duration::days(90);
         let result = sqlx::query("DELETE FROM enrichment_feedback WHERE timestamp < ?1")
             .bind(cutoff_90)
             .execute(&self.pool)

@@ -299,6 +299,30 @@ impl SemanticFactRepo {
         Ok(rows > 0)
     }
 
+    /// Prune low-salience facts: delete non-superseded facts where
+    /// confidence < threshold AND last_accessed is older than the given number of days
+    /// (or never accessed). Returns the number of facts deleted.
+    pub async fn prune_low_salience(
+        &self,
+        confidence_threshold: f64,
+        inactive_days: i64,
+    ) -> Result<u64, sqlx::Error> {
+        let result = sqlx::query(
+            r#"
+            DELETE FROM semantic_facts
+            WHERE superseded_at IS NULL
+              AND confidence < ?1
+              AND (last_accessed IS NULL
+                   OR julianday('now') - julianday(last_accessed) > ?2)
+            "#,
+        )
+        .bind(confidence_threshold)
+        .bind(inactive_days)
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected())
+    }
+
     /// Move superseded facts older than N days to the archive table.
     pub async fn archive_superseded(&self, older_than_days: i64) -> Result<u64, sqlx::Error> {
         let mut tx = self.pool.begin().await?;
@@ -589,6 +613,41 @@ mod tests {
             .unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].id, "f1");
+    }
+
+    #[tokio::test]
+    async fn test_prune_low_salience() {
+        let pool = setup().await;
+        let repo = SemanticFactRepo::new(pool);
+
+        // Low confidence, never accessed — should be pruned
+        let mut f1 = test_fact("f1", "productivity", "noise", "irrelevant");
+        f1.confidence = 0.02;
+
+        // High confidence — should survive
+        let f2 = test_fact("f2", "productivity", "peak_hours", "10am-12pm");
+
+        // Low confidence but recently accessed — should survive (inactive_days = 180)
+        let mut f3 = test_fact("f3", "productivity", "weak", "maybe");
+        f3.confidence = 0.01;
+
+        repo.upsert(&f1).await.unwrap();
+        repo.upsert(&f2).await.unwrap();
+        repo.upsert(&f3).await.unwrap();
+
+        // Mark f3 as recently accessed
+        repo.record_access("f3", 0.5).await.unwrap();
+
+        // Prune: confidence < 0.05 AND inactive > 0 days
+        // f1 has never been accessed (last_accessed IS NULL) → pruned
+        // f3 was just accessed → survives (0 < 180 days inactive)
+        let pruned = repo.prune_low_salience(0.05, 180).await.unwrap();
+        assert_eq!(pruned, 1);
+
+        // f1 gone, f2 and f3 remain
+        assert!(repo.get("f1").await.unwrap().is_none());
+        assert!(repo.get("f2").await.unwrap().is_some());
+        assert!(repo.get("f3").await.unwrap().is_some());
     }
 
     #[tokio::test]

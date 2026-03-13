@@ -53,6 +53,15 @@ export const EntityMentionMark = Mark.create<EntityMentionOptions>({
     ];
   },
 
+  addStorage() {
+    return {
+      markdown: {
+        serialize: { open: "", close: "" },
+        parse: {},
+      },
+    };
+  },
+
   addProseMirrorPlugins() {
     const onNavigate = this.options.onNavigate;
     return [

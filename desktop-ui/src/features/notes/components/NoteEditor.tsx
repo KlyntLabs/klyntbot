@@ -31,7 +31,7 @@ export function NoteEditor({ note, onSave, viewMode, onViewModeChange }: NoteEdi
   const tagsRef = useRef<NoteTagsHandle>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastNoteIdRef = useRef(note.id);
-  const pendingRef = useRef<{ html: string; text: string } | null>(null);
+  const pendingRef = useRef<{ html: string; markdown: string } | null>(null);
   const onSaveRef = useRef(onSave);
   onSaveRef.current = onSave;
   const noteContentRef = useRef(note.bodyHtml || note.body || "");
@@ -90,7 +90,7 @@ export function NoteEditor({ note, onSave, viewMode, onViewModeChange }: NoteEdi
       const noteId = lastNoteIdRef.current;
       onSaveRef.current({
         id: noteId,
-        body: pending.text,
+        body: pending.markdown,
         bodyHtml: pending.html,
       });
       maybeCreateVersion(noteId);
@@ -98,8 +98,8 @@ export function NoteEditor({ note, onSave, viewMode, onViewModeChange }: NoteEdi
   }, [maybeCreateVersion]);
 
   const handleUpdate = useCallback(
-    (html: string, text: string) => {
-      pendingRef.current = { html, text };
+    (html: string, markdown: string) => {
+      pendingRef.current = { html, markdown };
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       saveTimerRef.current = setTimeout(flushSave, 1000);
     },

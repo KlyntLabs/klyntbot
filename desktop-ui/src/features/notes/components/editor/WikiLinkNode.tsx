@@ -52,6 +52,15 @@ export const WikiLinkMark = Mark.create<WikiLinkOptions>({
     ];
   },
 
+  addStorage() {
+    return {
+      markdown: {
+        serialize: { open: "[[", close: "]]" },
+        parse: {},
+      },
+    };
+  },
+
   addProseMirrorPlugins() {
     const onNavigate = this.options.onNavigate;
     return [

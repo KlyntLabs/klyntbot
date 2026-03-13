@@ -21,6 +21,7 @@ import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { common, createLowlight } from "lowlight";
 import { useEffect } from "react";
+import { Markdown } from "tiptap-markdown";
 import { EntityMentionAutocomplete, EntityMentionMark } from "./EntityMention";
 import { MathBlock, MathInline } from "./MathNode";
 import { SlashCommandsExtension } from "./SlashCommandMenu";
@@ -185,13 +186,18 @@ export function getEditorExtensions(opts: EditorExtensionOptions = {}): Extensio
     MathInline,
     SlashCommandsExtension,
     VimModeExtension.configure(vimOptions ?? {}),
+    Markdown.configure({
+      html: true,
+      transformPastedText: true,
+      transformCopiedText: true,
+    }),
     ...extra,
   ];
 }
 
 interface UseNoteEditorOptions {
   content: string;
-  onUpdate: (html: string, text: string) => void;
+  onUpdate: (html: string, markdown: string) => void;
   extensions?: Extensions;
   onNavigateNote?: (noteId: string) => void;
   onNavigateEntity?: (entityType: string, entityId: string) => void;
@@ -229,7 +235,7 @@ export function useNoteEditor({
     }),
     content,
     onUpdate: ({ editor: ed }) => {
-      onUpdate(ed.getHTML(), ed.getText());
+      onUpdate(ed.getHTML(), ed.storage.markdown.getMarkdown());
     },
     editorProps: {
       attributes: { class: "editor-content" },

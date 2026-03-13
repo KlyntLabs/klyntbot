@@ -87,9 +87,10 @@ pub(super) fn spawn_post_core_services(
         shutdown_token.clone(),
     );
 
-    // Spawn daily analytics retention cleanup.
+    // Spawn daily analytics retention cleanup + semantic fact pruning.
     {
         let repos_bg = core.repos.clone();
+        let cog_pool = core.repos.pool().clone();
         let token = shutdown_token.clone();
         tokio::spawn(async move {
             let mut interval = tokio::time::interval(std::time::Duration::from_secs(24 * 60 * 60));
@@ -103,6 +104,14 @@ pub(super) fn spawn_post_core_services(
                             Ok(0) => {}
                             Ok(n) => info!(deleted = n, "analytics retention: cleaned up old records"),
                             Err(e) => warn!(error = %e, "analytics retention cleanup failed"),
+                        }
+
+                        // Prune low-salience semantic facts (confidence < 0.05, untouched for 180+ days).
+                        let fact_repo = cognitive::SemanticFactRepo::new(cog_pool.clone());
+                        match fact_repo.prune_low_salience(0.05, 180).await {
+                            Ok(0) => {}
+                            Ok(n) => info!(pruned = n, "cognitive: pruned low-salience facts"),
+                            Err(e) => warn!(error = %e, "cognitive: fact pruning failed"),
                         }
                     }
                     _ = token.cancelled() => break,
