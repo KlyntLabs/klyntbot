@@ -16,6 +16,7 @@ const BOOTSTRAP_FILES: &[&str] = &[
     "TOOLS.md",
     "IDENTITY.md",
     "RESPONSE.md",
+    "HEARTBEAT.md",
 ];
 
 /// Provides bootstrap file content (cached after first load).
