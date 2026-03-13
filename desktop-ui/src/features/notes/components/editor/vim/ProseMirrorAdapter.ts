@@ -336,6 +336,35 @@ export class ProseMirrorAdapter {
   replaceRange(text: string, s: Pos, e?: Pos): void {
     const from = this.model.toPMPos(s.line, s.ch);
     const to = e ? this.model.toPMPos(e.line, e.ch) : from;
+    const doc = this.view.state.doc;
+    const $from = doc.resolve(from);
+    const $to = doc.resolve(to);
+
+    // Linewise deletion: when range spans block boundaries and replacement is empty,
+    // expand to cover entire block nodes to avoid merging paragraphs.
+    // Two patterns from vim.js:
+    //   Non-last line dd: replaceRange("", {line:N, ch:0}, {line:N+1, ch:0}) — s.ch===0
+    //   Last line dd:     replaceRange("", {line:N-1, ch:end}, {line:N+1, ch:0}) — s.ch>0
+    if (text === "" && $from.parent !== $to.parent) {
+      let blockFrom: number;
+      let blockTo: number;
+
+      if (s.ch === 0) {
+        // Deleting from start of a line — remove the starting block(s)
+        blockFrom = $from.before($from.depth);
+        blockTo = e && e.ch === 0 ? $to.before($to.depth) : $to.after($to.depth);
+      } else {
+        // Deleting from end/middle of a line (last-line dd) — keep starting block,
+        // remove the ending block(s)
+        blockFrom = $from.after($from.depth);
+        blockTo = $to.after($to.depth);
+      }
+
+      const tr = this.view.state.tr.delete(blockFrom, blockTo);
+      this._dispatchChange(tr, s, e ?? s, text);
+      return;
+    }
+
     const tr = this.view.state.tr.insertText(text, from, to);
     this._dispatchChange(tr, s, e ?? s, text);
   }
