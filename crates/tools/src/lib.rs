@@ -6,8 +6,8 @@
 //! - Embedding infrastructure: engine (fastembed), store (LanceDB)
 //! - Tool registry and permissions
 //!
-//! Feature-specific tools (todo, finance) live in their own crates
-//! (`feature-todo`, `feature-finance`) and depend on `tools-core` directly.
+//! Feature-specific tools (tasks, finance) live in their own crates
+//! (`feature-tasks`, `feature-finance`) and depend on `tools-core` directly.
 
 // Re-export from tools-core for convenience.
 // Consumers can import from tools-core directly.

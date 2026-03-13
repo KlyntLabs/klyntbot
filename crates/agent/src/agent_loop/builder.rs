@@ -594,7 +594,7 @@ impl AgentLoopBuilder {
             task_tool =
                 task_tool.with_enrichment_threshold(config.todo.enrichment.auto_apply_threshold);
 
-            // Enrichment engine — wrapped via adapter to implement feature_tasks::EnrichmentHandler
+            // Enrichment engine — directly implements feature_tasks::EnrichmentHandler
             if config.todo.enrichment.enabled {
                 let mut enrichment_engine =
                     super::super::enrichment::EnrichmentEngine::new(config.todo.enrichment.clone());
@@ -603,12 +603,7 @@ impl AgentLoopBuilder {
                         .with_provider(provider.clone(), config.agents.defaults.model.clone());
                 }
                 let enrichment_engine = Arc::new(enrichment_engine);
-                let task_enrichment_adapter = Arc::new(
-                    crate::adapters::task_enrichment::TaskEnrichmentAdapter::new(Arc::clone(
-                        &enrichment_engine,
-                    )),
-                );
-                task_tool = task_tool.with_enrichment_handler(Arc::clone(&task_enrichment_adapter)
+                task_tool = task_tool.with_enrichment_handler(enrichment_engine
                     as Arc<dyn feature_tasks::EnrichmentHandler>);
             }
 

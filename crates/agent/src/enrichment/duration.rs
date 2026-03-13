@@ -1,6 +1,6 @@
 //! Duration prediction from task title, tags, and complexity heuristics.
 
-use feature_todo::{EnrichmentSuggestion, Todo};
+use feature_tasks::{EnrichmentSuggestion, Task};
 
 use super::priority::build_searchable_text;
 
@@ -27,7 +27,7 @@ const LARGE_KEYWORDS: &[&str] = &[
 ];
 
 /// Predict duration from task content.
-pub fn predict_duration(task: &Todo) -> Option<EnrichmentSuggestion<u32>> {
+pub fn predict_duration(task: &Task) -> Option<EnrichmentSuggestion<u32>> {
     let text = build_searchable_text(task).to_lowercase();
 
     if contains_any(&text, QUICK_KEYWORDS) {
@@ -77,7 +77,7 @@ fn contains_any(text: &str, keywords: &[&str]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use feature_todo::Todo;
+    use feature_tasks::Task;
 
     #[test]
     fn test_duration_prediction_from_keywords() {
@@ -89,7 +89,7 @@ mod tests {
             ("Review PR", 45),                       // default (no keywords)
         ];
         for (title, expected_minutes) in cases {
-            let mut task = Todo::default_instance();
+            let mut task = Task::default_instance();
             task.title = title.to_string();
             let result = predict_duration(&task).expect("should always return Some");
             assert_eq!(result.value, expected_minutes, "failed for: {title}");

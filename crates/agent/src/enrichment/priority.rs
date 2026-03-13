@@ -1,6 +1,6 @@
 //! Priority inference from task title, description, and tags.
 
-use feature_todo::{EnrichmentSuggestion, Todo};
+use feature_tasks::{EnrichmentSuggestion, Task};
 
 /// Keyword groups mapped to priority levels.
 /// Priority scale: 1 = highest, 4 = lowest.
@@ -54,7 +54,7 @@ const LOW_KEYWORDS: &[&str] = &[
 
 /// Infer priority from task content using keyword matching.
 /// When multiple keywords match, use the most specific (highest confidence) one.
-pub fn infer_priority(task: &Todo) -> Option<EnrichmentSuggestion<u8>> {
+pub fn infer_priority(task: &Task) -> Option<EnrichmentSuggestion<i16>> {
     let text = build_searchable_text(task);
     let lower = text.to_lowercase();
 
@@ -109,7 +109,7 @@ pub fn infer_priority(task: &Todo) -> Option<EnrichmentSuggestion<u8>> {
 
 /// Build lowercase-ready searchable text from a task's title, description, and tags.
 /// Shared across enrichment modules so keyword matching is consistent.
-pub fn build_searchable_text(task: &Todo) -> String {
+pub fn build_searchable_text(task: &Task) -> String {
     let mut text = task.title.clone();
     if let Some(ref desc) = task.description {
         text.push(' ');
@@ -129,7 +129,7 @@ fn find_keyword<'a>(text: &str, keywords: &[&'a str]) -> Option<&'a str> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use feature_todo::Todo;
+    use feature_tasks::Task;
 
     #[test]
     fn test_priority_inference_from_keywords() {
@@ -145,7 +145,7 @@ mod tests {
             ("   \t\n  ", 3),              // whitespace-only → default medium
         ];
         for (title, expected_priority) in cases {
-            let mut task = Todo::default_instance();
+            let mut task = Task::default_instance();
             task.title = title.to_string();
             let result = infer_priority(&task).expect("should always return Some");
             assert_eq!(result.value, expected_priority, "failed for: {title:?}");
@@ -155,7 +155,7 @@ mod tests {
     #[test]
     fn test_priority_inference_from_multiple_sources() {
         // Description keywords: "critical" in description → P1
-        let mut task = Todo::default_instance();
+        let mut task = Task::default_instance();
         task.title = "Handle edge case".to_string();
         task.description = Some("This is a critical security issue".to_string());
         assert_eq!(
@@ -165,7 +165,7 @@ mod tests {
         );
 
         // Tag keywords: "bug" in tags → P2
-        let mut task = Todo::default_instance();
+        let mut task = Task::default_instance();
         task.title = "Some task".to_string();
         task.tags = vec!["bug".to_string()];
         assert_eq!(
@@ -175,7 +175,7 @@ mod tests {
         );
 
         // Tags only (no title/description keywords): "urgent" in tags → P1
-        let mut task = Todo::default_instance();
+        let mut task = Task::default_instance();
         task.title = "Do something".to_string();
         task.tags = vec!["urgent".to_string(), "production".to_string()];
         let result = infer_priority(&task).unwrap();
@@ -190,7 +190,7 @@ mod tests {
     fn test_priority_conflict_resolution() {
         // "Fix typo" has "fix" (P2, conf 0.82) and "typo" (P4, conf 0.87)
         // Highest confidence wins → "typo" at P4
-        let mut task = Todo::default_instance();
+        let mut task = Task::default_instance();
         task.title = "Fix typo in header".to_string();
         let result = infer_priority(&task).unwrap();
         assert_eq!(
@@ -201,7 +201,7 @@ mod tests {
 
         // "URGENT minor bug fix" has "urgent" (P1, 0.90), "minor" (P4, 0.87), "bug" (P2, 0.82)
         // Highest confidence wins → "urgent" at P1
-        let mut task = Todo::default_instance();
+        let mut task = Task::default_instance();
         task.title = "URGENT minor bug fix".to_string();
         let result = infer_priority(&task).unwrap();
         assert_eq!(

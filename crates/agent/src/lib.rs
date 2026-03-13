@@ -37,7 +37,6 @@ pub use agent_profile::skill_loader;
 pub use adapters::{
     agent_task, cognitive_embedder, cognitive_handlers, conversation_recall, cron, finance,
     learning as learning_handler, llm_summary, productivity, progress, task_embedding,
-    task_enrichment, todo_embedding,
 };
 pub use services::{
     memory_maintenance, notifications, recurring_tasks, reminders, session_cleanup,

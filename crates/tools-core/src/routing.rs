@@ -20,7 +20,7 @@ pub struct InteractionBundle {
 
 /// Trait for cascading progress updates (KR → Objective).
 ///
-/// Defined in `tools-core` (Layer 1) so both `tools` (OkrTool) and `feature-todo`
+/// Defined in `tools-core` (Layer 1) so both `tools` (OkrTool) and `feature-tasks`
 /// (TaskTool) can consume it without circular deps. Implemented in `agent` (Layer 5).
 #[async_trait]
 pub trait ProgressHandler: Send + Sync {

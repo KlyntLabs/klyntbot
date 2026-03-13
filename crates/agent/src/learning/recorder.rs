@@ -269,10 +269,10 @@ fn fnv_hash(data: &[u8]) -> u32 {
 /// There is no separate "rate this tool call" mechanism — enrichment feedback is the
 /// sole explicit signal path. Additional explicit feedback channels are a post-v0.3 item.
 #[async_trait::async_trait]
-impl feature_todo::EnrichmentFeedbackHandler for OutcomeRecorder {
+impl crate::learning::EnrichmentFeedbackHandler for OutcomeRecorder {
     async fn record_feedback(
         &self,
-        feedback: feature_todo::EnrichmentFeedbackEntry,
+        feedback: EnrichmentFeedbackEntry,
     ) -> common::Result<()> {
         let store = self.store.write().await;
         store.record_feedback(feedback).await

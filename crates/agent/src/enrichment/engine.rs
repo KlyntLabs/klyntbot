@@ -3,7 +3,7 @@
 use async_trait::async_trait;
 use common::Result;
 use config::TodoEnrichmentConfig;
-use feature_todo::{EnrichmentHandler, EnrichmentResult, EnrichmentSuggestion, Todo};
+use feature_tasks::{EnrichmentHandler, EnrichmentResult, EnrichmentSuggestion, Task};
 use providers::{ChatParams, DynProvider, Message};
 use serde::Deserialize;
 use tracing::warn;
@@ -11,12 +11,9 @@ use tracing::warn;
 /// JSON structure returned by the LLM for task enrichment.
 #[derive(Deserialize)]
 struct LlmEnrichmentResponse {
-    priority: Option<u8>,
+    priority: Option<i16>,
     priority_confidence: Option<f64>,
     priority_reasoning: Option<String>,
-    estimated_minutes: Option<u32>,
-    duration_confidence: Option<f64>,
-    duration_reasoning: Option<String>,
     due_date: Option<String>,
     due_date_confidence: Option<f64>,
     due_date_reasoning: Option<String>,
@@ -47,7 +44,7 @@ impl EnrichmentEngine {
 
     /// Try to enrich a task using the LLM. Returns `None` on any error so callers
     /// can fall back to keyword enrichment.
-    async fn enrich_with_llm(&self, task: &Todo) -> Option<EnrichmentResult> {
+    async fn enrich_with_llm(&self, task: &Task) -> Option<EnrichmentResult> {
         let provider = self.provider.as_ref()?;
         let model = self.model.as_deref().unwrap_or("gpt-4o-mini");
 
@@ -105,7 +102,7 @@ Return only valid JSON, no markdown fences."#;
 
 /// Parse the LLM JSON response into an `EnrichmentResult`.
 /// Only fills fields that are not already set on the task.
-fn parse_llm_enrichment_response(content: &str, task: &Todo) -> Option<EnrichmentResult> {
+fn parse_llm_enrichment_response(content: &str, task: &Task) -> Option<EnrichmentResult> {
     let json_str = common::helpers::strip_llm_fences(content);
     let parsed: LlmEnrichmentResponse = match serde_json::from_str(json_str) {
         Ok(r) => r,
@@ -129,21 +126,11 @@ fn parse_llm_enrichment_response(content: &str, task: &Todo) -> Option<Enrichmen
         }
     }
 
-    if task.estimated_minutes.is_none() {
-        if let Some(minutes) = parsed.estimated_minutes {
-            result.estimated_minutes = Some(EnrichmentSuggestion {
-                value: minutes,
-                confidence: parsed.duration_confidence.unwrap_or(0.7),
-                reasoning: parsed.duration_reasoning.unwrap_or_default(),
-            });
-        }
-    }
-
     if task.due_date.is_none() {
         if let Some(ref date_str) = parsed.due_date {
-            if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(date_str) {
+            if chrono::DateTime::parse_from_rfc3339(date_str).is_ok() {
                 result.due_date = Some(EnrichmentSuggestion {
-                    value: dt.with_timezone(&chrono::Utc),
+                    value: date_str.clone(),
                     confidence: parsed.due_date_confidence.unwrap_or(0.6),
                     reasoning: parsed.due_date_reasoning.unwrap_or_default(),
                 });
@@ -156,7 +143,7 @@ fn parse_llm_enrichment_response(content: &str, task: &Todo) -> Option<Enrichmen
 
 #[async_trait]
 impl EnrichmentHandler for EnrichmentEngine {
-    async fn enrich_task(&self, task: &Todo) -> Result<Option<EnrichmentResult>> {
+    async fn enrich(&self, task: &Task) -> Result<Option<EnrichmentResult>> {
         if !self.config.enabled {
             return Ok(None);
         }
@@ -180,14 +167,15 @@ impl EnrichmentHandler for EnrichmentEngine {
             result.priority = super::priority::infer_priority(task);
         }
 
-        // Predict duration (only if not already set)
-        if task.estimated_minutes.is_none() {
-            result.estimated_minutes = super::duration::predict_duration(task);
-        }
-
         // Suggest due date (only if not already set)
         if task.due_date.is_none() {
-            result.due_date = super::scheduling::suggest_due_date(task);
+            if let Some(due) = super::scheduling::suggest_due_date(task) {
+                result.due_date = Some(EnrichmentSuggestion {
+                    value: due.value.to_rfc3339(),
+                    confidence: due.confidence,
+                    reasoning: due.reasoning,
+                });
+            }
         }
 
         if result.is_empty() {
@@ -201,7 +189,7 @@ impl EnrichmentHandler for EnrichmentEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use feature_todo::Todo;
+    use feature_tasks::Task;
     use serde_json::Value;
     use std::sync::Arc;
 
@@ -270,9 +258,9 @@ mod tests {
             ..Default::default()
         };
         let engine = EnrichmentEngine::new(config);
-        let task = Todo::default_instance();
+        let task = Task::default_instance();
 
-        let result = engine.enrich_task(&task).await.unwrap();
+        let result = engine.enrich(&task).await.unwrap();
         assert!(result.is_none());
     }
 
@@ -281,16 +269,14 @@ mod tests {
         let config = TodoEnrichmentConfig::default();
         let engine = EnrichmentEngine::new(config);
 
-        let mut task = Todo::default_instance();
+        let mut task = Task::default_instance();
         task.priority = Some(1);
-        task.estimated_minutes = Some(60);
         // due_date is still None — should still suggest
 
-        let result = engine.enrich_task(&task).await.unwrap();
-        // Priority and duration should be skipped (already set)
+        let result = engine.enrich(&task).await.unwrap();
+        // Priority should be skipped (already set)
         if let Some(ref enrichment) = result {
             assert!(enrichment.priority.is_none());
-            assert!(enrichment.estimated_minutes.is_none());
         }
     }
 
@@ -299,17 +285,15 @@ mod tests {
         let config = TodoEnrichmentConfig::default();
         let engine = EnrichmentEngine::new(config);
 
-        let mut task = Todo::default_instance();
+        let mut task = Task::default_instance();
         task.title = "Fix urgent production bug in auth".to_string();
 
-        let result = engine.enrich_task(&task).await.unwrap();
+        let result = engine.enrich(&task).await.unwrap();
         assert!(result.is_some());
 
         let enrichment = result.unwrap();
         // Priority should be inferred from "urgent" keyword
         assert!(enrichment.priority.is_some());
-        // Duration should have a default estimate
-        assert!(enrichment.estimated_minutes.is_some());
     }
 
     // ========================================================================
@@ -321,13 +305,12 @@ mod tests {
         let config = TodoEnrichmentConfig::default();
         let engine = EnrichmentEngine::new(config);
 
-        let mut task = Todo::default_instance();
+        let mut task = Task::default_instance();
         task.title = "URGENT: Fix bug".to_string();
         task.priority = Some(1);
-        task.estimated_minutes = Some(30);
         task.due_date = Some(chrono::Utc::now() + chrono::Duration::days(1));
 
-        let result = engine.enrich_task(&task).await.unwrap();
+        let result = engine.enrich(&task).await.unwrap();
         // All fields already set, should return None
         assert!(
             result.is_none(),
@@ -340,23 +323,19 @@ mod tests {
         let config = TodoEnrichmentConfig::default();
         let engine = EnrichmentEngine::new(config);
 
-        let mut task = Todo::default_instance();
+        let mut task = Task::default_instance();
         task.title = "Fix typo in docs".to_string();
         task.priority = Some(4); // Already set
-                                 // estimated_minutes and due_date are None
+                                 // due_date is None
 
-        let result = engine.enrich_task(&task).await.unwrap();
-        assert!(result.is_some(), "Should enrich missing fields");
-
-        let enrichment = result.unwrap();
-        assert!(
-            enrichment.priority.is_none(),
-            "Priority already set, should skip"
-        );
-        assert!(
-            enrichment.estimated_minutes.is_some(),
-            "Should suggest duration"
-        );
+        let result = engine.enrich(&task).await.unwrap();
+        // Priority already set, should skip; due_date may or may not be suggested
+        if let Some(ref enrichment) = result {
+            assert!(
+                enrichment.priority.is_none(),
+                "Priority already set, should skip"
+            );
+        }
     }
 
     #[tokio::test]
@@ -364,10 +343,10 @@ mod tests {
         let config = TodoEnrichmentConfig::default();
         let engine = EnrichmentEngine::new(config);
 
-        let mut task = Todo::default_instance();
+        let mut task = Task::default_instance();
         task.title = "修复紧急bug (fix urgent bug)".to_string();
 
-        let result = engine.enrich_task(&task).await.unwrap();
+        let result = engine.enrich(&task).await.unwrap();
         assert!(result.is_some());
 
         let enrichment = result.unwrap();
@@ -384,10 +363,10 @@ mod tests {
         let engine = EnrichmentEngine::new(config);
 
         // Test 1: Completely empty title
-        let mut task1 = Todo::default_instance();
+        let mut task1 = Task::default_instance();
         task1.title = "".to_string();
 
-        let result1 = engine.enrich_task(&task1).await.unwrap();
+        let result1 = engine.enrich(&task1).await.unwrap();
         assert!(result1.is_some());
         let enrich1 = result1.unwrap();
         assert!(enrich1.priority.is_some());
@@ -398,10 +377,10 @@ mod tests {
         );
 
         // Test 2: Whitespace-only title
-        let mut task2 = Todo::default_instance();
+        let mut task2 = Task::default_instance();
         task2.title = "   \t\n  ".to_string();
 
-        let result2 = engine.enrich_task(&task2).await.unwrap();
+        let result2 = engine.enrich(&task2).await.unwrap();
         assert!(result2.is_some());
         let enrich2 = result2.unwrap();
         assert_eq!(
@@ -416,10 +395,10 @@ mod tests {
         let config = TodoEnrichmentConfig::default();
         let engine = EnrichmentEngine::new(config);
 
-        let mut task = Todo::default_instance();
+        let mut task = Task::default_instance();
         task.title = "URGENT critical production issue".to_string();
 
-        let result = engine.enrich_task(&task).await.unwrap();
+        let result = engine.enrich(&task).await.unwrap();
         assert!(result.is_some());
 
         let enrichment = result.unwrap();
@@ -441,11 +420,11 @@ mod tests {
         let config = TodoEnrichmentConfig::default();
         let engine = EnrichmentEngine::new(config);
 
-        let mut task = Todo::default_instance();
+        let mut task = Task::default_instance();
         task.title = "Do something".to_string(); // Generic title
         task.tags = vec!["urgent".to_string(), "critical".to_string()];
 
-        let result = engine.enrich_task(&task).await.unwrap();
+        let result = engine.enrich(&task).await.unwrap();
         assert!(result.is_some());
 
         let enrichment = result.unwrap();
@@ -477,10 +456,10 @@ mod tests {
             "mock".to_string(),
         );
 
-        let mut task = Todo::default_instance();
+        let mut task = Task::default_instance();
         task.title = "Fix urgent auth bug".to_string();
 
-        let result = engine.enrich_task(&task).await.unwrap();
+        let result = engine.enrich(&task).await.unwrap();
         assert!(result.is_some(), "LLM enrichment should return a result");
 
         let enrichment = result.unwrap();
@@ -489,15 +468,6 @@ mod tests {
             enrichment.priority.as_ref().unwrap().value,
             1,
             "LLM-inferred priority should be 1"
-        );
-        assert!(
-            enrichment.estimated_minutes.is_some(),
-            "Duration should be set"
-        );
-        assert_eq!(
-            enrichment.estimated_minutes.as_ref().unwrap().value,
-            30,
-            "LLM-inferred duration should be 30 min"
         );
     }
 
@@ -510,11 +480,11 @@ mod tests {
         let engine = EnrichmentEngine::new(config)
             .with_provider(Arc::new(ErrorProvider), "error".to_string());
 
-        let mut task = Todo::default_instance();
+        let mut task = Task::default_instance();
         task.title = "Fix urgent auth bug".to_string();
 
         // LLM errors → keyword enrichment should still produce results
-        let result = engine.enrich_task(&task).await.unwrap();
+        let result = engine.enrich(&task).await.unwrap();
         assert!(
             result.is_some(),
             "Should fall back to keyword enrichment on LLM error"
@@ -547,12 +517,12 @@ mod tests {
             "mock".to_string(),
         );
 
-        let mut task = Todo::default_instance();
+        let mut task = Task::default_instance();
         task.title = "Fix bug in auth".to_string();
         task.priority = Some(1); // Already set
 
-        let result = engine.enrich_task(&task).await.unwrap();
-        // May be Some (with estimated_minutes set) or None — priority must be absent
+        let result = engine.enrich(&task).await.unwrap();
+        // May be Some (with due_date set) or None — priority must be absent
         if let Some(enrichment) = result {
             assert!(
                 enrichment.priority.is_none(),
@@ -578,14 +548,12 @@ mod tests {
             "mock".to_string(),
         );
 
-        let mut task = Todo::default_instance();
+        let mut task = Task::default_instance();
         task.title = "Rename variable".to_string(); // keyword → P3/quick
 
-        let result = engine.enrich_task(&task).await.unwrap();
+        let result = engine.enrich(&task).await.unwrap();
         assert!(result.is_some());
         // Keyword engine sees no high-priority keywords → medium priority (3)
-        // and detects "rename" → quick (15 min) … but "rename" isn't in keyword list
-        // so it will be a medium-duration default. The key assertion is:
         // If LLM had run it would return priority=1, keywords return priority=3.
         let enrichment = result.unwrap();
         if let Some(priority) = enrichment.priority {

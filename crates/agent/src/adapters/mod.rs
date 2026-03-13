@@ -14,5 +14,3 @@ pub mod llm_summary;
 pub mod productivity;
 pub mod progress;
 pub mod task_embedding;
-pub mod task_enrichment;
-pub mod todo_embedding;

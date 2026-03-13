@@ -6,7 +6,7 @@
 
 use super::common::*;
 use chrono::Utc;
-use feature_todo::EnrichmentFeedbackHandler;
+use klyntbot::agent::learning::EnrichmentFeedbackHandler;
 use klyntbot::agent::confidence::prompt::confidence_prompt;
 use klyntbot::agent::confidence::ConfidenceEvaluator;
 use klyntbot::agent::learning::adaptive::AdaptiveThresholds;
@@ -32,8 +32,8 @@ use tools::Tool;
 fn make_feedback(
     task_id: &str,
     accepted: bool,
-) -> feature_todo::enrichment::EnrichmentFeedbackEntry {
-    feature_todo::enrichment::EnrichmentFeedbackEntry {
+) -> klyntbot::agent::learning::EnrichmentFeedbackEntry {
+    klyntbot::agent::learning::EnrichmentFeedbackEntry {
         task_id: task_id.to_string(),
         field: "priority".to_string(),
         suggested_value: "1".to_string(),
@@ -52,8 +52,8 @@ fn make_feedback_with_field(
     task_id: &str,
     accepted: bool,
     field: &str,
-) -> feature_todo::enrichment::EnrichmentFeedbackEntry {
-    feature_todo::enrichment::EnrichmentFeedbackEntry {
+) -> klyntbot::agent::learning::EnrichmentFeedbackEntry {
+    klyntbot::agent::learning::EnrichmentFeedbackEntry {
         task_id: task_id.to_string(),
         field: field.to_string(),
         suggested_value: "1".to_string(),
@@ -379,7 +379,7 @@ async fn combined_outcomes_and_feedback_analysis() {
         .map(|i| make_outcome(&format!("o{}", i), "todo", i % 5 != 0, 0.7))
         .collect();
 
-    let feedback: Vec<feature_todo::enrichment::EnrichmentFeedbackEntry> = (0..10)
+    let feedback: Vec<klyntbot::agent::learning::EnrichmentFeedbackEntry> = (0..10)
         .map(|i| make_feedback_with_field(&format!("f{}", i), i < 8, "priority"))
         .collect();
 
@@ -573,7 +573,7 @@ async fn threshold_history_tracked_after_change() {
 
 #[tokio::test]
 async fn enrichment_feedback_records_override() {
-    use feature_todo::EnrichmentFeedbackEntry;
+    use klyntbot::agent::learning::EnrichmentFeedbackEntry;
 
     let store = Arc::new(RwLock::new(OutcomeStore::new_in_memory()));
     let recorder = Arc::new(OutcomeRecorder::new(Arc::clone(&store)));
@@ -602,7 +602,7 @@ async fn enrichment_feedback_records_override() {
 
 #[tokio::test]
 async fn enrichment_feedback_records_acceptance() {
-    use feature_todo::EnrichmentFeedbackEntry;
+    use klyntbot::agent::learning::EnrichmentFeedbackEntry;
 
     let store = Arc::new(RwLock::new(OutcomeStore::new_in_memory()));
     let recorder = Arc::new(OutcomeRecorder::new(Arc::clone(&store)));

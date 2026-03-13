@@ -71,22 +71,6 @@ These items were identified during the 2026-03-12 structural refactor analysis.
 
 ---
 
-### A-009 🔴 High | `feature-todo` / `feature-tasks` — Deprecation Not Marked, No Migration Path
-
-**Summary:** `feature-todo` is the legacy task crate. `feature-tasks` is the new agentic replacement. Currently no `#[deprecated]` markers, no migration tooling, both crates compiled into every build.
-
-**Impact:** New contributors may accidentally extend `feature-todo` instead of `feature-tasks`. Data migration will be more complex the longer it's deferred.
-
-**Proposed Fix:**
-1. Add `#[deprecated(note = "Use feature-tasks. Removal planned post-1.0.")]` to `feature-todo/src/lib.rs`
-2. Design a one-time migration script: `actions` → `tasks` table with status/priority mapping
-3. Update CLAUDE.md with explicit deprecation timeline
-4. After migration: remove `feature-todo` from `Cargo.toml` workspace members
-
-**References:** `crates/feature-todo/src/lib.rs`, CLAUDE.md
-
----
-
 ### A-010 🟡 Medium | `feature-tasks` — Phase 3 Implementation Pending
 
 **Summary:** Feature-tasks Phase 2 is complete. Phase 3 covers proactive task suggestions, workload forecasting improvements, cognitive integration, and recurring task generation with FSRS decay.
@@ -345,12 +329,6 @@ These items were identified during the 2026-03-12 structural refactor analysis.
 **References:** `crates/storage/src/rows/finance.rs`, `crates/storage/src/finance_storage.rs`
 
 ---
-
-### A-037 🟡 Medium | `storage` — `custom_column_values.task_id` FK Points to `actions`, Not `tasks`
-
-**Summary:** Field named `task_id` but FK references `actions(id)` (legacy). Needs updating when `feature-todo` is deprecated (see A-009).
-
-**References:** `crates/storage/migrations/001_initial.sql`
 
 ---
 

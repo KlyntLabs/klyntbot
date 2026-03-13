@@ -55,7 +55,7 @@ L0: common                — KlyntbotError, MessageRole, ChannelName, ChatId, S
 L1: config, bus, tools-core, tools-core-macros — Config (camelCase JSON), message bus, Tool/FeaturePackage traits, derive macros
 L2: storage, domain       — SqlitePool, migrations, *Repo structs, OKR+PARA domain types
 L3: providers, session, scheduling, context_engine — LLM clients, session persistence, cron, token budgets
-L4: tools, feature-tasks, feature-todo, feature-finance, feature-notes, feature-productivity, feature-coaching, activity-log, plugin-runtime — 20+ tools, feature packages, WASM plugins
+L4: tools, feature-tasks, feature-finance, feature-notes, feature-productivity, feature-coaching, activity-log, plugin-runtime — 20+ tools, feature packages, WASM plugins
 L5: channels, agent, cognitive — Platform integrations (Telegram/Discord/Slack/Email), agent runtime, cognitive memory system
 L6: mcp                   — MCP server/client
 L7: app-core, desktop-shared, desktop — Application core (shared handlers), Tauri desktop app
@@ -135,4 +135,4 @@ Klyntbot exposes tools to external AI clients (Claude Code, Cursor, etc.) via MC
 - **`email` feature** (on by default) gates IMAP/SMTP deps in `channels` crate.
 - **`tauri.conf.json` uses `bun`** in `beforeBuildCommand`. Ensure `bun` is installed globally.
 - **Timestamps are UTC** — Rust emits `chrono::Utc::now().to_rfc3339()`. Never `.slice()` ISO strings for display — always parse via `new Date(iso)` and use `toLocaleTimeString()`. Shared helper: `formatTime()` in `desktop-ui/src/shared/lib/dates.ts`.
-- **Pre-release — no user data to migrate.** All schema changes can be made directly (alter tables, drop and recreate) without writing migration scripts. No need for backwards-compatible migrations until first release. When a migration is consolidated, update the `FeatureMigration` version and SQL in-place rather than adding incremental migration files. After first release, all schema changes require proper versioned migrations with `INSERT OR IGNORE` for idempotency. Legacy `feature-todo` crate can be removed once `feature-tasks` fully replaces it.
+- **Pre-release — no user data to migrate.** All schema changes can be made directly (alter tables, drop and recreate) without writing migration scripts. No need for backwards-compatible migrations until first release. When a migration is consolidated, update the `FeatureMigration` version and SQL in-place rather than adding incremental migration files. After first release, all schema changes require proper versioned migrations with `INSERT OR IGNORE` for idempotency.

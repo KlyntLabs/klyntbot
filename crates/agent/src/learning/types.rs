@@ -89,8 +89,23 @@ pub struct FieldAcceptanceStats {
     pub acceptance_rate: f32,
 }
 
-// Re-export EnrichmentFeedbackEntry from feature-todo (canonical definition).
-pub use feature_todo::EnrichmentFeedbackEntry;
+/// Feedback entry for recording enrichment outcomes.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EnrichmentFeedbackEntry {
+    pub task_id: String,
+    pub field: String,
+    pub suggested_value: String,
+    pub actual_value: Option<String>,
+    pub accepted: bool,
+    pub confidence: f64,
+    pub timestamp: DateTime<Utc>,
+}
+
+/// Trait for recording enrichment feedback.
+#[async_trait::async_trait]
+pub trait EnrichmentFeedbackHandler: Send + Sync {
+    async fn record_feedback(&self, entry: EnrichmentFeedbackEntry) -> common::Result<()>;
+}
 
 /// Persistent state for adaptive threshold adjustment.
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -10,7 +10,7 @@ use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info};
 
-use feature_todo::rrule_utils;
+use feature_tasks::rrule_utils;
 use tools::todo_types::Todo;
 
 /// Background spawner for recurring task instances.

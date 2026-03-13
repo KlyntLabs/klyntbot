@@ -1,13 +1,13 @@
 //! Due-date suggestion based on priority and task keywords.
 
 use chrono::{Duration, Utc};
-use feature_todo::{EnrichmentSuggestion, Todo};
+use feature_tasks::{EnrichmentSuggestion, Task};
 
 use super::priority::{build_searchable_text, HIGH_PRIORITY_KEYWORDS};
 
 /// Suggest a due date based on task content and inferred urgency.
 pub fn suggest_due_date(
-    task: &Todo,
+    task: &Task,
 ) -> Option<EnrichmentSuggestion<chrono::DateTime<chrono::Utc>>> {
     let text = build_searchable_text(task).to_lowercase();
 
@@ -88,11 +88,11 @@ fn contains_urgency(text: &str) -> bool {
 mod tests {
     use super::*;
     use chrono::Utc;
-    use feature_todo::Todo;
+    use feature_tasks::Task;
 
     #[test]
     fn test_urgent_task_due_today() {
-        let mut task = Todo::default_instance();
+        let mut task = Task::default_instance();
         task.title = "Fix urgent production issue".to_string();
 
         let result = suggest_due_date(&task);
@@ -105,7 +105,7 @@ mod tests {
 
     #[test]
     fn test_tomorrow_keyword() {
-        let mut task = Todo::default_instance();
+        let mut task = Task::default_instance();
         task.title = "Submit report tomorrow".to_string();
 
         let result = suggest_due_date(&task).unwrap();
@@ -116,7 +116,7 @@ mod tests {
 
     #[test]
     fn test_this_week_keyword() {
-        let mut task = Todo::default_instance();
+        let mut task = Task::default_instance();
         task.title = "Finish this week".to_string();
 
         let result = suggest_due_date(&task).unwrap();
@@ -126,7 +126,7 @@ mod tests {
 
     #[test]
     fn test_priority_fallback() {
-        let mut task = Todo::default_instance();
+        let mut task = Task::default_instance();
         task.title = "Something generic".to_string();
         task.priority = Some(1);
 
@@ -137,7 +137,7 @@ mod tests {
 
     #[test]
     fn test_no_signal_returns_none() {
-        let mut task = Todo::default_instance();
+        let mut task = Task::default_instance();
         task.title = "Something generic".to_string();
         // No priority, no keywords
 

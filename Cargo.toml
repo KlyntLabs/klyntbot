@@ -17,7 +17,6 @@ members = [
     "crates/tools-core",
     "crates/tools-core-macros",
     "crates/feature-finance",
-    "crates/feature-todo",
     "crates/plugin-runtime",
     "crates/mcp",
     "crates/desktop-shared",
@@ -56,7 +55,6 @@ tools-core = { path = "crates/tools-core" }
 tools-core-macros = { path = "crates/tools-core-macros" }
 feature-finance = { path = "crates/feature-finance" }
 feature-notes = { path = "crates/feature-notes" }
-feature-todo = { path = "crates/feature-todo" }
 feature-productivity = { path = "crates/feature-productivity" }
 plugin-runtime = { path = "crates/plugin-runtime" }
 cognitive = { path = "crates/cognitive" }
@@ -179,7 +177,6 @@ chrono.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
 uuid.workspace = true
-feature-todo.workspace = true
 feature-finance.workspace = true
 plugin-runtime.workspace = true
 tools-core.workspace = true
