@@ -22,7 +22,7 @@ import {
   Underline as UnderlineIcon,
 } from "lucide-react";
 import { VimStatusLine } from "./VimStatusLine";
-import type { VimMode } from "./vim/VimState";
+import type { VimMode } from "./vim";
 
 interface EditorToolbarProps {
   editor: Editor | null;
