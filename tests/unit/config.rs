@@ -59,9 +59,6 @@ fn backward_compat_minimal_config_deserializes() {
     assert!(config.providers.anthropic.extra_headers.is_none());
     assert!(config.providers.zhipu.api_key.is_empty());
     assert!(config.providers.dashscope.api_key.is_empty());
-    assert!(!config.channels.feishu.enabled);
-    assert!(!config.channels.dingtalk.enabled);
-    assert!(!config.channels.mochat.enabled);
     assert_eq!(config.gateway.host, "127.0.0.1");
     assert_eq!(config.gateway.port, 18790);
 }

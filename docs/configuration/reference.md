@@ -17,9 +17,6 @@ Definitive reference for every configuration field in klyntbot. Generated from t
   - [channels.discord](#channelsdiscord)
   - [channels.slack](#channelsslack)
   - [channels.email](#channelsemail)
-  - [channels.feishu](#channelsfeishu)
-  - [channels.dingtalk](#channelsdingtalk)
-  - [channels.mochat](#channelsmochat)
 - [tools](#tools)
 - [gateway](#gateway)
 - [todo](#todo)
@@ -209,7 +206,7 @@ Routing configuration for primary/fallback/classifier provider selection.
 
 JSON path: `channels`
 
-Contains 7 channel sub-objects. All channels are disabled by default.
+Contains 4 channel sub-objects. All channels are disabled by default.
 
 ### channels.telegram
 
@@ -275,39 +272,6 @@ Contains 7 channel sub-objects. All channels are disabled by default.
 | `markSeen` | bool | `true` | Mark processed emails as seen in IMAP |
 | `pollIntervalSeconds` | u32 | `30` | How often to poll for new emails (seconds) |
 | `subjectPrefix` | String | `"Re: "` | Prefix for reply subject lines |
-
-### channels.feishu
-
-| JSON Field | Type | Default | Description |
-|---|---|---|---|
-| `enabled` | bool | `false` | Enable Feishu/Lark channel |
-| `appId` | String | `""` | Feishu app ID |
-| `appSecret` | Secret\<String\> | `""` | Feishu app secret |
-| `encryptKey` | Secret\<String\> | `""` | Message encryption key |
-| `verificationToken` | String | `""` | Webhook verification token |
-| `allowFrom` | String[] | `[]` | Allowed user IDs |
-
-### channels.dingtalk
-
-| JSON Field | Type | Default | Description |
-|---|---|---|---|
-| `enabled` | bool | `false` | Enable DingTalk channel |
-| `clientId` | String | `""` | DingTalk client ID |
-| `clientSecret` | Secret\<String\> | `""` | DingTalk client secret |
-| `allowFrom` | String[] | `[]` | Allowed user IDs |
-
-### channels.mochat
-
-| JSON Field | Type | Default | Description |
-|---|---|---|---|
-| `enabled` | bool | `false` | Enable Mochat channel |
-| `baseUrl` | String | `"https://mochat.io"` | Mochat API base URL |
-| `socketUrl` | String | `""` | WebSocket URL for real-time messaging |
-| `clawToken` | Secret\<String\> | `""` | Claw authentication token |
-| `agentUserId` | String | `""` | Agent's user ID in the Mochat system |
-| `sessions` | String[] | `[]` | Session IDs to monitor |
-| `panels` | String[] | `[]` | Panel IDs to monitor |
-| `allowFrom` | String[] | `[]` | Allowed user IDs |
 
 ---
 

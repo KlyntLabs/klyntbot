@@ -27,32 +27,6 @@ These items were identified during the 2026-03-12 structural refactor analysis.
 
 ---
 
-### A-003 🟡 Medium | `channels` — Feishu/Lark Channel: Implementation Missing
-
-**Summary:** `FeishuConfig` exists but no `Channel` trait implementation. `ChannelManager` now logs `tracing::error!` when `feishu.enabled = true` (short-term fix done). Long-term: implement `FeishuChannel` using Feishu Open Platform API.
-
-**References:** `crates/config/src/schema/channels.rs`, `crates/channels/src/manager.rs`
-
----
-
-### A-004 🟡 Medium | `channels` — DingTalk Channel: Implementation Missing
-
-**Summary:** Same as A-003 for DingTalk. `ChannelManager` now logs `tracing::error!` when `dingtalk.enabled = true` (short-term fix done). Long-term: implement using DingTalk Chatbot API.
-
-**References:** `crates/config/src/schema/channels.rs`, `crates/channels/src/manager.rs`
-
----
-
-### A-005 🟡 Medium | `channels` — Mochat Channel: Config Present, Implementation Missing
-
-**Summary:** `MochatConfig` (`base_url`, `socket_url`, `claw_token`, `agent_user_id`, `sessions`, `panels`) exists in config. Mochat is a WhatsApp-style business messaging platform. No implementation exists.
-
-**Proposed Fix:** Same pattern — add validation warning + stub.
-
-**References:** `crates/config/src/schema/channels.rs`
-
----
-
 ### A-006 🟡 Medium | `app-core/handlers/work_context` — Merge Tracking Not Implemented
 
 **Summary:** TODO comments exist for tracking context merges and exposing them from the inference loop. The work context inference loop can detect context merges but does not record them.
@@ -430,25 +404,6 @@ These items were identified during the 2026-03-12 structural refactor analysis.
 - Workload forecasting with trend accuracy tracking (prerequisite: A-008)
 - Cognitive integration: pull relevant facts before task creation/planning
 - Recurring task generation with FSRS-adjusted intervals
-
-### C-002 🟡 Medium | Feishu/Lark Channel Implementation
-**Prerequisites:** A-003 error logging in place (done)
-- OAuth App Token flow
-- Receive events via webhook (message, action card)
-- Send text, card, file messages
-- Interactive card with button/select support
-
-### C-003 🟡 Medium | DingTalk Channel Implementation
-**Prerequisites:** A-004 error logging in place (done)
-- Outgoing webhook message receive
-- `access_token` sign + send messages
-- Action card interactions
-
-### C-004 🟢 Low | Mochat Channel Implementation
-**Prerequisites:** A-005 stub in place
-- Socket.io connection to `socket_url`
-- `claw_token` auth
-- Multi-session support (personal vs business panels)
 
 ### C-005 🟢 Low | Web Dashboard (Browser UI)
 **Context:** `desktop/src/dev_server/` already serves HTTP on port 3456. A browser-accessible dashboard without Tauri is architecturally already supported.

@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-Klyntbot is a local-first AI agent that connects multiple chat platforms (Telegram, Discord, Slack, Email, Feishu, DingTalk) to LLM providers with tool execution capabilities. Its security model is designed around the principle that the agent runs on a single user's machine, with all data stored locally. The primary threat model covers:
+Klyntbot is a local-first AI agent that connects multiple chat platforms (Telegram, Discord, Slack, Email) to LLM providers with tool execution capabilities. Its security model is designed around the principle that the agent runs on a single user's machine, with all data stored locally. The primary threat model covers:
 
 - Preventing LLM-driven tool calls from escaping intended boundaries (path traversal, command injection)
 - Controlling which tools are available on which channels
@@ -27,7 +27,7 @@ Key properties:
 - **Debug and Display are redacted.** Both `fmt::Debug` and `fmt::Display` emit `[REDACTED]` instead of the inner value. This prevents accidental exposure in log output, error messages, and debug prints.
 - **Explicit access required.** The inner value is only accessible via `.expose()` (borrow) or `.into_inner()` (consume). This makes secret access grep-able in code review.
 - **Serde transparent.** Serialization/deserialization passes through to the inner type, so `Secret<String>` serializes as a plain string in JSON. This means the config file at `~/.klyntbot/config.json` contains API keys in plaintext.
-- **Used throughout config.** All channel tokens (`TelegramConfig.token`, `DiscordConfig.token`, `SlackConfig.bot_token`, `SlackConfig.app_token`), provider API keys (`ProviderConfig.api_key`), email passwords, and Feishu/DingTalk secrets use `Secret<String>`.
+- **Used throughout config.** All channel tokens (`TelegramConfig.token`, `DiscordConfig.token`, `SlackConfig.bot_token`, `SlackConfig.app_token`), provider API keys (`ProviderConfig.api_key`), and email passwords use `Secret<String>`.
 
 ### Plaintext at Rest
 
@@ -155,9 +155,6 @@ Every channel configuration includes an `allow_from` field that restricts which 
 - **Discord:** `channels.discord.allowFrom` -- list of Discord user IDs.
 - **Slack:** `channels.slack.allowFrom` -- list of Slack user IDs. Additionally, `channels.slack.dm.allowFrom` for DM-specific access, and `channels.slack.groupAllowFrom` for group channel access.
 - **Email:** `channels.email.allowFrom` -- list of allowed sender email addresses.
-- **Feishu:** `channels.feishu.allowFrom` -- list of allowed user IDs.
-- **DingTalk:** `channels.dingtalk.allowFrom` -- list of allowed user IDs.
-- **Mochat:** `channels.mochat.allowFrom` -- list of allowed user IDs.
 
 When `allow_from` is empty, behavior depends on the channel implementation (typically allows all users).
 

@@ -227,30 +227,6 @@ Each receiver (`inbound_rx`, `outbound_rx`) is wrapped in `Mutex<Option<...>>`. 
 | **Auto-reply** | Controlled by `auto_reply_enabled`. When `false`, outbound messages are silently dropped. |
 | **SMTP** | Uses `lettre` with `SmtpTransport`. Send runs via `spawn_blocking` to avoid blocking the async runtime. |
 
-### Feishu/Lark (Config only)
-
-| Aspect | Detail |
-|---|---|
-| **Config struct** | `FeishuConfig` |
-| **Config fields** | `enabled`, `app_id`, `app_secret`, `encrypt_key`, `verification_token`, `allow_from` |
-| **Status** | Configuration defined but no channel implementation yet. |
-
-### DingTalk (Config only)
-
-| Aspect | Detail |
-|---|---|
-| **Config struct** | `DingTalkConfig` |
-| **Config fields** | `enabled`, `client_id`, `client_secret`, `allow_from` |
-| **Status** | Configuration defined but no channel implementation yet. |
-
-### Mochat (Config only)
-
-| Aspect | Detail |
-|---|---|
-| **Config struct** | `MochatConfig` |
-| **Config fields** | `enabled`, `base_url` (default: `"https://mochat.io"`), `socket_url`, `claw_token`, `agent_user_id`, `sessions`, `panels`, `allow_from` |
-| **Status** | Configuration defined but no channel implementation yet. |
-
 ## Access Control
 
 Every channel has an `allow_from: Vec<String>` config field. Access checking uses `check_allowlist()` from `crates/channels/src/lib.rs`:

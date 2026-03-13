@@ -20,14 +20,6 @@ pub struct ChannelsConfig {
     #[serde(default)]
     pub email: EmailConfig,
 
-    #[serde(default)]
-    pub feishu: FeishuConfig,
-
-    #[serde(default)]
-    pub dingtalk: DingTalkConfig,
-
-    #[serde(default)]
-    pub mochat: MochatConfig,
 }
 
 /// Telegram channel configuration
@@ -287,94 +279,6 @@ fn default_poll_interval_seconds() -> u32 {
 
 fn default_subject_prefix() -> String {
     "Re: ".to_string()
-}
-
-/// Feishu/Lark channel configuration
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct FeishuConfig {
-    #[serde(default)]
-    pub enabled: bool,
-
-    #[serde(default)]
-    pub app_id: String,
-
-    #[serde(default)]
-    pub app_secret: Secret<String>,
-
-    #[serde(default)]
-    pub encrypt_key: Secret<String>,
-
-    #[serde(default)]
-    pub verification_token: String,
-
-    #[serde(default)]
-    pub allow_from: Vec<String>,
-}
-
-/// DingTalk channel configuration
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct DingTalkConfig {
-    #[serde(default)]
-    pub enabled: bool,
-
-    #[serde(default)]
-    pub client_id: String,
-
-    #[serde(default)]
-    pub client_secret: Secret<String>,
-
-    #[serde(default)]
-    pub allow_from: Vec<String>,
-}
-
-/// Mochat channel configuration (pragmatic subset)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MochatConfig {
-    #[serde(default)]
-    pub enabled: bool,
-
-    #[serde(default = "default_mochat_base_url")]
-    pub base_url: String,
-
-    #[serde(default)]
-    pub socket_url: String,
-
-    #[serde(default)]
-    pub claw_token: Secret<String>,
-
-    #[serde(default)]
-    pub agent_user_id: String,
-
-    #[serde(default)]
-    pub sessions: Vec<String>,
-
-    #[serde(default)]
-    pub panels: Vec<String>,
-
-    #[serde(default)]
-    pub allow_from: Vec<String>,
-}
-
-impl Default for MochatConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            base_url: default_mochat_base_url(),
-            socket_url: String::new(),
-            claw_token: Secret::default(),
-            agent_user_id: String::new(),
-            sessions: Vec::new(),
-            panels: Vec::new(),
-            allow_from: Vec::new(),
-        }
-    }
-}
-
-fn default_mochat_base_url() -> String {
-    "https://mochat.io".to_string()
 }
 
 #[cfg(test)]

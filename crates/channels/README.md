@@ -6,7 +6,7 @@
 
 `channels` provides chat platform integrations for klyntbot:
 - `Channel` trait for platform implementations
-- 6 ready channels + 3 planned
+- 4 ready channels
 - Async WebSocket and HTTP transports
 - Automatic reconnection and rate limiting
 - Attachment handling (images, documents, voice)
@@ -35,9 +35,6 @@ pub trait Channel: Send + Sync {
 | **Discord** | WebSocket Gateway v10 | ✅ Ready | Auto-reconnect, rate limits, attachments |
 | **Slack** | Socket Mode | ✅ Ready | DM/group policy, thread replies |
 | **Email** | IMAP + SMTP | ✅ Ready | HTML parsing, threading, consent gate |
-| **Feishu** | WebSocket | 🔧 Planned | Lark long connection |
-| **DingTalk** | Stream Mode | 🔧 Planned | OAuth2, batch send |
-| **Mochat** | Socket.IO | 🔧 Planned | Reply delay, cursor tracking |
 
 ### Channel Manager
 
