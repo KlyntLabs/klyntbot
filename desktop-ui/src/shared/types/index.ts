@@ -156,6 +156,9 @@ export type {
 // ── Notes Types ───────────────────────────────────────────
 
 export type {
+  AgentFileContent,
+  AgentFileSummary,
+  AgentProfileSummary,
   Note,
   Notebook,
   NotebookCreateParams,

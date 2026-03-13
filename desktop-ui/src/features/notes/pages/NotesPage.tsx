@@ -3,6 +3,7 @@ import { ipc } from "@shared/hooks/useIpc";
 import { useMutation } from "@shared/hooks/useMutation";
 import { useQuery } from "@shared/hooks/useQuery";
 import type {
+  AgentFileContent,
   Note,
   Notebook,
   NotebookCreateParams,
@@ -13,6 +14,7 @@ import type {
 import { FileText, GitGraph, PenLine } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
+import { AgentFrontmatterForm } from "../components/AgentFrontmatterForm";
 import { FileTree } from "../components/FileTree";
 import { GraphView } from "../components/GraphView";
 import { NoteEditor } from "../components/NoteEditor";
@@ -64,6 +66,13 @@ function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+/** Split YAML frontmatter from markdown body. */
+function parseFrontmatter(content: string): { frontmatter: string; body: string } {
+  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
+  if (!match) return { frontmatter: "", body: content };
+  return { frontmatter: match[1], body: match[2] };
+}
+
 function ViewModeToggle({
   viewMode,
   onChange,
@@ -106,6 +115,12 @@ export default function NotesPage() {
   const [activeWorkspaceFile, setActiveWorkspaceFile] = useState<string | null>(null);
   const [workspaceContent, setWorkspaceContent] = useState<string>("");
   const [loadedWorkspaceFile, setLoadedWorkspaceFile] = useState<string | null>(null);
+  const [activeAgentName, setActiveAgentName] = useState<string | null>(null);
+  const [activeAgentFilename, setActiveAgentFilename] = useState<string | null>(null);
+  const [agentFrontmatter, setAgentFrontmatter] = useState<string>("");
+  const [agentBody, setAgentBody] = useState<string>("");
+  const [agentFileIsBuiltin, setAgentFileIsBuiltin] = useState(false);
+  const [loadedAgentKey, setLoadedAgentKey] = useState<string | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const sidebarRef = useRef<HTMLDivElement>(null);
   const sidebarWidthRef = useRef(260);
@@ -247,19 +262,41 @@ export default function NotesPage() {
   // ── Workspace file handlers ────────────────────────────────────────────
   const handleSelectNote = useCallback((id: string) => {
     setActiveWorkspaceFile(null);
+    setActiveAgentName(null);
+    setActiveAgentFilename(null);
     setSelectedNoteId(id);
   }, []);
 
   const handleSelectWorkspaceFile = useCallback(async (filename: string) => {
     setSelectedNoteId(null);
+    setActiveAgentName(null);
+    setActiveAgentFilename(null);
     setActiveWorkspaceFile(filename);
-    setLoadedWorkspaceFile(null); // Clear until load completes
+    setLoadedWorkspaceFile(null);
     try {
       const result = await ipc<WorkspaceFileContent>("workspace_read_file", { filename });
       setWorkspaceContent(result.content);
       setLoadedWorkspaceFile(filename);
     } catch (e) {
       console.error("Failed to load workspace file:", e);
+    }
+  }, []);
+
+  const handleSelectAgentFile = useCallback(async (agentName: string, filename: string) => {
+    setSelectedNoteId(null);
+    setActiveWorkspaceFile(null);
+    setActiveAgentName(agentName);
+    setActiveAgentFilename(filename);
+    setLoadedAgentKey(null);
+    try {
+      const result = await ipc<AgentFileContent>("agent_read_file", { agentName, filename });
+      const { frontmatter, body } = parseFrontmatter(result.content);
+      setAgentFrontmatter(frontmatter);
+      setAgentBody(body);
+      setAgentFileIsBuiltin(result.isBuiltin);
+      setLoadedAgentKey(`${agentName}/${filename}`);
+    } catch (e) {
+      console.error("Failed to load agent file:", e);
     }
   }, []);
 
@@ -272,6 +309,22 @@ export default function NotesPage() {
       }).catch((e: unknown) => console.error("Failed to save workspace file:", e));
     },
     [activeWorkspaceFile],
+  );
+
+  const handleAgentFileSave = useCallback(
+    (params: NoteUpdateParams) => {
+      if (!activeAgentName || !activeAgentFilename || !params.body) return;
+      // Reassemble frontmatter + edited body
+      const content = agentFrontmatter
+        ? `---\n${agentFrontmatter}\n---\n${params.body}`
+        : params.body;
+      ipc("agent_write_file", {
+        agentName: activeAgentName,
+        filename: activeAgentFilename,
+        content,
+      }).catch((e: unknown) => console.error("Failed to save agent file:", e));
+    },
+    [activeAgentName, activeAgentFilename, agentFrontmatter],
   );
 
   const workspaceNote = useMemo((): Note | undefined => {
@@ -289,6 +342,23 @@ export default function NotesPage() {
       updatedAt: new Date().toISOString(),
     };
   }, [activeWorkspaceFile, loadedWorkspaceFile, workspaceContent]);
+
+  const agentNote = useMemo((): Note | undefined => {
+    const key = `${activeAgentName}/${activeAgentFilename}`;
+    if (!activeAgentName || !activeAgentFilename || loadedAgentKey !== key) return undefined;
+    return {
+      id: `__agent__${key}`,
+      notebookId: null,
+      title: activeAgentFilename,
+      body: agentBody,
+      bodyHtml: mdToHtml(agentBody),
+      pinned: false,
+      archived: false,
+      tags: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+  }, [activeAgentName, activeAgentFilename, loadedAgentKey, agentBody]);
 
   const searchRef = useRef<NoteSearchBarHandle>(null);
 
@@ -350,6 +420,9 @@ export default function NotesPage() {
           onMoveNotebook={handleMoveNotebook}
           activeWorkspaceFile={activeWorkspaceFile}
           onSelectWorkspaceFile={handleSelectWorkspaceFile}
+          activeAgentName={activeAgentName}
+          activeAgentFilename={activeAgentFilename}
+          onSelectAgentFile={handleSelectAgentFile}
         />
       </div>
 
@@ -401,6 +474,35 @@ export default function NotesPage() {
               key={workspaceNote.id}
               note={workspaceNote}
               onSave={handleWorkspaceSave}
+              viewMode={viewMode}
+              onViewModeChange={setNotesViewMode}
+            />
+          </>
+        ) : agentNote ? (
+          <>
+            <div className="flex items-center justify-between shrink-0 px-3 pt-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-primary font-mono">
+                  {activeAgentName}/{activeAgentFilename}
+                </span>
+                <span className="text-[10px] text-dim bg-white/[0.06] px-1.5 py-0.5 rounded">
+                  {agentFileIsBuiltin ? "built-in" : "custom"}
+                </span>
+              </div>
+              <ViewModeToggle viewMode={viewMode} onChange={setNotesViewMode} />
+            </div>
+            {agentFileIsBuiltin && (
+              <p className="text-[11px] text-dim px-3 mt-1">
+                Editing creates an override — original built-in preserved
+              </p>
+            )}
+            {agentFrontmatter && (
+              <AgentFrontmatterForm frontmatter={agentFrontmatter} onChange={setAgentFrontmatter} />
+            )}
+            <NoteEditor
+              key={agentNote.id}
+              note={agentNote}
+              onSave={handleAgentFileSave}
               viewMode={viewMode}
               onViewModeChange={setNotesViewMode}
             />

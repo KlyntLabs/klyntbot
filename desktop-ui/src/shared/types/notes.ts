@@ -79,3 +79,28 @@ export interface WorkspaceFileContent {
   name: string;
   content: string;
 }
+
+// ── Agent Profiles ──────────────────────────────────────────
+
+export interface AgentProfileSummary {
+  name: string;
+  description: string;
+  isBuiltin: boolean;
+  hasOverride: boolean;
+  files: AgentFileSummary[];
+}
+
+export interface AgentFileSummary {
+  filename: string;
+  displayName: string;
+  description: string;
+  isBuiltin: boolean;
+  hasOverride: boolean;
+}
+
+export interface AgentFileContent {
+  agentName: string;
+  filename: string;
+  content: string;
+  isBuiltin: boolean;
+}

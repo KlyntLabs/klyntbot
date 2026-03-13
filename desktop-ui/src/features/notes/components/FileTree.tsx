@@ -16,6 +16,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { type DragEvent, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AgentFileTree } from "./AgentFileTree";
 import { WorkspaceFileTree } from "./WorkspaceFileTree";
 
 // ── Types ────────────────────────────────────────────────────────────────
@@ -36,6 +37,9 @@ interface FileTreeProps {
   onMoveNotebook: (id: string, parentId: string | null) => void;
   activeWorkspaceFile: string | null;
   onSelectWorkspaceFile: (filename: string) => void;
+  activeAgentName: string | null;
+  activeAgentFilename: string | null;
+  onSelectAgentFile: (agentName: string, filename: string) => void;
 }
 
 type ContextTarget =
@@ -80,6 +84,9 @@ export function FileTree({
   onMoveNotebook,
   activeWorkspaceFile,
   onSelectWorkspaceFile,
+  activeAgentName,
+  activeAgentFilename,
+  onSelectAgentFile,
 }: FileTreeProps) {
   const [contextMenu, setContextMenu] = useState<ContextTarget>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -232,6 +239,11 @@ export function FileTree({
       </div>
 
       <WorkspaceFileTree activeFile={activeWorkspaceFile} onSelectFile={onSelectWorkspaceFile} />
+      <AgentFileTree
+        activeAgent={activeAgentName}
+        activeFilename={activeAgentFilename}
+        onSelectFile={onSelectAgentFile}
+      />
 
       {/* Context Menu */}
       {contextMenu && (

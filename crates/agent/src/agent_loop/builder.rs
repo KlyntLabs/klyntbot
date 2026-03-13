@@ -185,7 +185,7 @@ impl AgentLoopBuilder {
                 .await
                 .ok(); // non-fatal
         }
-        let agent_manager = Arc::new(agent_manager);
+        let agent_manager = Arc::new(tokio::sync::RwLock::new(agent_manager));
 
         // Shared active profile — written by AgentRuntime, read by AgentContextSource
         let active_profile: Arc<
@@ -1189,6 +1189,7 @@ impl AgentLoopBuilder {
             cognitive_bg_service: tokio::sync::Mutex::new(cognitive_bg_service),
             _inference_loop_token,
             activity_svc: self.activity_svc,
+            agent_manager,
         })
     }
 }

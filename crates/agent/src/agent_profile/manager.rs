@@ -58,6 +58,42 @@ const BUILTIN_AGENT_SKILLS: &[(&str, &str, &str)] = &[
 
 const GENERAL_AGENT_NAME: &str = "general";
 
+/// Metadata about a built-in agent (for UI listing without full parse).
+pub struct BuiltinAgentInfo {
+    pub name: &'static str,
+    pub content: &'static str,
+    pub skills: Vec<BuiltinSkillInfo>,
+}
+
+/// Metadata about a built-in skill.
+pub struct BuiltinSkillInfo {
+    pub name: &'static str,
+    pub content: &'static str,
+}
+
+/// Returns raw built-in agent content for the UI layer.
+/// This is a static view — no workspace overrides applied.
+pub fn builtin_agents() -> Vec<BuiltinAgentInfo> {
+    BUILTIN_AGENTS
+        .iter()
+        .map(|(name, content)| {
+            let skills = BUILTIN_AGENT_SKILLS
+                .iter()
+                .filter(|(agent, _, _)| *agent == *name)
+                .map(|(_, skill_name, skill_content)| BuiltinSkillInfo {
+                    name: skill_name,
+                    content: skill_content,
+                })
+                .collect();
+            BuiltinAgentInfo {
+                name,
+                content,
+                skills,
+            }
+        })
+        .collect()
+}
+
 #[derive(Default)]
 pub struct AgentManager {
     agents: HashMap<String, Arc<AgentProfile>>,
@@ -154,6 +190,15 @@ impl AgentManager {
 
             self.agents.insert(name, Arc::new(profile));
         }
+        Ok(())
+    }
+
+    /// Reload: reset to built-in agents then re-apply workspace overrides.
+    /// Called after editing agent files from the UI.
+    pub async fn reload(&mut self, workspace_path: &Path) -> common::Result<()> {
+        self.agents.clear();
+        self.load_builtin_agents()?;
+        self.load_workspace_agents(workspace_path).await.ok(); // non-fatal
         Ok(())
     }
 

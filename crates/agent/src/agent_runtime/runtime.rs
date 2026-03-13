@@ -55,7 +55,7 @@ pub struct RuntimeResult {
 /// The key difference: agent selection happens first, and the agent profile
 /// shapes everything downstream (system prompt, tool filtering, iteration budget).
 pub struct AgentRuntime {
-    agent_manager: Arc<AgentManager>,
+    agent_manager: Arc<RwLock<AgentManager>>,
     analyzer: IntentAnalyzer,
     context_engine: Arc<ContextEngine>,
     router: ExecutionRouter,
@@ -80,7 +80,7 @@ pub struct AgentRuntime {
 
 impl AgentRuntime {
     pub fn new(
-        agent_manager: Arc<AgentManager>,
+        agent_manager: Arc<RwLock<AgentManager>>,
         analyzer: IntentAnalyzer,
         context_engine: Arc<ContextEngine>,
         router: ExecutionRouter,
@@ -179,7 +179,10 @@ impl AgentRuntime {
         let pipeline_start = Instant::now();
 
         // Step 1: Match message to agent
-        let mut profile = self.agent_manager.match_agent(message);
+        let mut profile = {
+            let mgr = self.agent_manager.read().await;
+            Arc::clone(mgr.match_agent(message))
+        };
         let mut agent_name = profile.name.clone();
         debug!("AgentRuntime: matched agent '{}'", agent_name);
 
@@ -219,7 +222,7 @@ impl AgentRuntime {
         // Step 2: Set active profile for AgentContextSource
         {
             let mut guard = self.active_profile.write().await;
-            *guard = Some(Arc::clone(profile));
+            *guard = Some(Arc::clone(&profile));
         }
 
         // Step 3: Filter MCP tool names to those the matched agent can access
@@ -256,7 +259,11 @@ impl AgentRuntime {
 
         // Step 3b: Orchestration override — route multi-agent intents to orchestrator
         if analysis.needs_orchestration {
-            if let Some(general) = self.agent_manager.get(ORCHESTRATOR_AGENT) {
+            let general = {
+                let mgr = self.agent_manager.read().await;
+                mgr.get(ORCHESTRATOR_AGENT).cloned()
+            };
+            if let Some(general) = general {
                 debug!(
                     "Orchestration override: routing '{}' → {} agent",
                     agent_name, ORCHESTRATOR_AGENT
@@ -267,7 +274,7 @@ impl AgentRuntime {
                 // Update active profile
                 {
                     let mut guard = self.active_profile.write().await;
-                    *guard = Some(Arc::clone(profile));
+                    *guard = Some(Arc::clone(&profile));
                 }
 
                 // Emit updated agent selection so the UI reflects the orchestrator
@@ -362,12 +369,12 @@ impl AgentRuntime {
                 .cloned()
                 .collect()
         } else {
-            filter_tools_for_profile(tool_definitions, profile)
+            filter_tools_for_profile(tool_definitions, &profile)
         };
 
         // Step 7b: Add DelegationTool if agent can delegate and depth allows
         inject_delegation_tool(
-            profile,
+            &profile,
             ctx.delegation_depth,
             &self.delegation_self_ref,
             &self.tool_registry,
@@ -739,7 +746,11 @@ impl tools::DelegationHandler for AgentRuntime {
         let start = Instant::now();
 
         // 1. Look up the delegated agent profile
-        let profile = self.agent_manager.get(agent_name).ok_or_else(|| {
+        let profile = {
+            let mgr = self.agent_manager.read().await;
+            mgr.get(agent_name).cloned()
+        }
+        .ok_or_else(|| {
             common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(format!(
                 "Unknown agent for delegation: '{agent_name}'"
             )))
@@ -790,7 +801,7 @@ impl tools::DelegationHandler for AgentRuntime {
         // 2. Set the delegated agent as active profile (for AgentContextSource)
         {
             let mut guard = self.active_profile.write().await;
-            *guard = Some(Arc::clone(profile));
+            *guard = Some(Arc::clone(&profile));
         }
 
         // 3. Build context with the delegated agent's instructions
@@ -816,11 +827,11 @@ impl tools::DelegationHandler for AgentRuntime {
             vec![]
         };
 
-        let mut filtered_tools = filter_tools_for_profile(&tool_defs, profile);
+        let mut filtered_tools = filter_tools_for_profile(&tool_defs, &profile);
 
         // 5. Optionally add DelegationTool for chained delegation
         inject_delegation_tool(
-            profile,
+            &profile,
             depth,
             &self.delegation_self_ref,
             &self.tool_registry,
@@ -976,10 +987,10 @@ mod tests {
         RoutingContext::new("test".into(), "test".into())
     }
 
-    fn make_agent_manager() -> Arc<AgentManager> {
+    fn make_agent_manager() -> Arc<RwLock<AgentManager>> {
         let mut mgr = AgentManager::new();
         mgr.load_builtin_agents().unwrap();
-        Arc::new(mgr)
+        Arc::new(RwLock::new(mgr))
     }
 
     async fn make_runtime(provider: Arc<dyn LlmProvider>) -> AgentRuntime {
@@ -1024,7 +1035,8 @@ mod tests {
     #[tokio::test]
     async fn test_agent_runtime_selects_correct_agent() {
         let agent_manager = make_agent_manager();
-        let selected = agent_manager.match_agent("create a task to review budget");
+        let mgr = agent_manager.read().await;
+        let selected = mgr.match_agent("create a task to review budget");
         assert_eq!(selected.name, "task");
     }
 
@@ -1230,7 +1242,8 @@ mod tests {
         // Set up event channel and active profile for the delegation
         *runtime.current_event_tx.write().await = Some(tx);
         {
-            let general = runtime.agent_manager.get("general").unwrap();
+            let mgr = runtime.agent_manager.read().await;
+            let general = mgr.get("general").unwrap();
             let mut guard = runtime.active_profile.write().await;
             *guard = Some(Arc::clone(general));
         }

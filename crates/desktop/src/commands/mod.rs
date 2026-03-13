@@ -1,3 +1,4 @@
+pub mod agents;
 pub mod areas;
 pub mod capture;
 pub mod chat;

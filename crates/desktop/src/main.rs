@@ -433,6 +433,13 @@ fn main() {
             commands::workspace::workspace_list_files,
             commands::workspace::workspace_read_file,
             commands::workspace::workspace_write_file,
+            // Agent Profiles
+            commands::agents::agent_list_profiles,
+            commands::agents::agent_read_file,
+            commands::agents::agent_write_file,
+            commands::agents::agent_create_profile,
+            commands::agents::agent_create_skill,
+            commands::agents::agent_delete_file,
             commands::window::resize_window,
             commands::window::open_url,
             commands::window::show_dashboard,

@@ -253,6 +253,11 @@ export default function NotesView() {
           onRenameNote={handleRenameNote}
           onMoveNote={handleMoveNote}
           onMoveNotebook={handleMoveNotebook}
+          activeWorkspaceFile={null}
+          onSelectWorkspaceFile={() => {}}
+          activeAgentName={null}
+          activeAgentFilename={null}
+          onSelectAgentFile={() => {}}
         />
       </div>
 

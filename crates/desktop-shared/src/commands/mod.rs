@@ -1,3 +1,4 @@
+mod agents;
 mod areas;
 mod calendar;
 mod capture;
@@ -13,6 +14,7 @@ mod timeline;
 mod work_context;
 mod workspace;
 
+pub use agents::*;
 pub use areas::*;
 pub use calendar::*;
 pub use capture::*;

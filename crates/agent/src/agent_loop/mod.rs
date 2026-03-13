@@ -79,6 +79,8 @@ pub struct AgentLoop {
     pub(crate) _inference_loop_token: Option<CancellationToken>,
     /// Activity ingestion service for chat message logging.
     pub(crate) activity_svc: Option<Arc<activity_log::ActivityIngestionService>>,
+    /// Shared agent manager — used for hot-reload of agent profiles.
+    pub(crate) agent_manager: Arc<RwLock<crate::agent_profile::AgentManager>>,
 }
 
 impl AgentLoop {
@@ -86,6 +88,13 @@ impl AgentLoop {
     /// Used by `klyntbot-server` to bridge internal tools to MCP.
     pub fn tool_registry(&self) -> Arc<RwLock<tools::registry::ToolRegistry>> {
         Arc::clone(&self.tool_registry)
+    }
+
+    /// Reload agent profiles from workspace (hot-reload after UI edits).
+    pub async fn reload_agents(&self) -> common::Result<()> {
+        let workspace_path = self.config.workspace_path();
+        let mut mgr = self.agent_manager.write().await;
+        mgr.reload(&workspace_path).await
     }
 
     /// Handle emoji reactions by mapping to satisfaction scores.
