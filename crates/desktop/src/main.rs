@@ -429,6 +429,10 @@ fn main() {
             commands::capture::capture_uninstall_shell_hook,
             commands::capture::capture_get_ingestion_token,
             commands::capture::capture_regenerate_ingestion_token,
+            // Workspace Config
+            commands::workspace::workspace_list_files,
+            commands::workspace::workspace_read_file,
+            commands::workspace::workspace_write_file,
             commands::window::resize_window,
             commands::window::open_url,
             commands::window::show_dashboard,

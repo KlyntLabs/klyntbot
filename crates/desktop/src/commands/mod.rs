@@ -24,6 +24,7 @@ pub mod timeline;
 pub mod window;
 pub mod work_context;
 pub mod workflows;
+pub mod workspace;
 
 #[cfg(debug_assertions)]
 pub(crate) mod dev_helpers;
