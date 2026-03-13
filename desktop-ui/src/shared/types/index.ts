@@ -163,6 +163,8 @@ export type {
   NoteLink,
   NoteUpdateParams,
   NoteVersion,
+  WorkspaceFile,
+  WorkspaceFileContent,
 } from "./notes";
 
 // ── Dashboard Types ───────────────────────────────────────

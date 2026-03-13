@@ -66,3 +66,16 @@ export interface NotebookCreateParams {
   parentId?: string;
   icon?: string;
 }
+
+// ── Workspace Config ──────────────────────────────────────
+
+export interface WorkspaceFile {
+  name: string;
+  description: string;
+  exists: boolean;
+}
+
+export interface WorkspaceFileContent {
+  name: string;
+  content: string;
+}
