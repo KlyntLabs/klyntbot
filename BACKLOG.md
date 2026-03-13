@@ -1,5 +1,5 @@
 # Klyntbot — Engineering Backlog
-> Last updated: 2026-03-12
+> Last updated: 2026-03-13
 > Format: `[ID] Priority | Crate(s) | Short description`
 > Priorities: 🔴 High | 🟡 Medium | 🟢 Low
 
@@ -300,21 +300,6 @@ Currently:
 
 ---
 
-### A-021 🟡 Medium | `feature-productivity` — macOS-Only Activity Tracker
-
-**Summary:** `crates/feature-productivity/src/tracker/` contains macOS-specific code for capturing active application windows and titles. No Linux or Windows implementation exists. The crate is not feature-gated for macOS.
-
-**Impact:** The crate compiles on all platforms but the tracker silently produces no data on non-macOS systems. No warning or error is surfaced.
-
-**Proposed Fix:**
-- Add `#[cfg(target_os = "macos")]` to macOS tracker code
-- Add `#[cfg(not(target_os = "macos"))]` stub that logs a single `tracing::warn!("Activity tracking is only supported on macOS")` on startup
-- Consider adding `linux` tracker as a future enhancement (using `xdotool` or `wnck`)
-
-**References:** `crates/feature-productivity/src/tracker/`
-
----
-
 ### A-022 🟢 Low | `mcp` — MCP Server Does Not Support Tool Discovery by External Agents
 
 **Summary:** `McpServerRunner` exposes klyntbot tools to external MCP clients. The current implementation exposes all registered tools unconditionally. There is no filtering by calling agent identity or capability scope.
@@ -431,18 +416,6 @@ Currently:
 
 ---
 
-### A-030 🟢 Low | All Feature Crates — `FeatureMigration` Version Comments Missing
-
-**Summary:** Each feature crate defines `FeatureMigration` with a `version` integer and SQL. There are no inline comments explaining what each migration version changed. After many versions, it's impossible to audit the schema history.
-
-**Impact:** Debugging migration issues is difficult. Rollback planning is impossible without history.
-
-**Proposed Fix:**
-- Add `-- Migration N: [description]` comment to the top of each migration SQL block
-- Example: `-- Migration 7: Add productivity_distraction_count to focus_sessions`
-
----
-
 ### A-031 🔴 High | `domain` — Domain Types Dead at Runtime (No Row Bridge)
 
 **Summary:** The `domain` crate defines rich typed entities (`Area`, `Objective`, `KeyResult`, `Project`) with status enums and progress logic. However, **no runtime code path uses them**. All callers (tools, app-core, agent) work directly with `*Row` types from `storage`. No `From<AreaRow> for Area` or inverse bridge exists anywhere in the workspace.
@@ -513,17 +486,7 @@ Currently:
 
 **Proposed Fix:** When deprecating `feature-todo`, migrate `custom_column_values.task_id` FK from `actions(id)` to `tasks(id)`.
 
-**References:** `crates/storage/migrations/006_custom_columns.sql:17`
-
----
-
-### A-038 🟢 Low | `storage` — `FinanceInvestmentTxRow` Not Re-Exported from `lib.rs`
-
-**Summary:** `rows::finance::FinanceInvestmentTxRow` is defined in `rows/finance.rs` but is the only row type not re-exported from `lib.rs`. It is accessible only via `storage::rows::finance::FinanceInvestmentTxRow` — breaking the flat public API convention.
-
-**Proposed Fix:** Add `pub use rows::finance::FinanceInvestmentTxRow;` to `crates/storage/src/lib.rs`.
-
-**References:** `crates/storage/src/lib.rs`, `crates/storage/src/rows/finance.rs`
+**References:** `crates/storage/migrations/001_initial.sql` (custom_column_values table)
 
 ---
 

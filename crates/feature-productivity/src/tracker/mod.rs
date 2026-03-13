@@ -99,6 +99,12 @@ impl ActivityTracker {
     }
 
     pub fn start(&mut self) {
+        #[cfg(not(target_os = "macos"))]
+        {
+            warn!("Activity tracking is only supported on macOS — tracker disabled");
+            return;
+        }
+
         if self.task_handle.is_some() {
             warn!("ActivityTracker already running — ignoring duplicate start");
             return;

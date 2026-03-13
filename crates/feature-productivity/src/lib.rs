@@ -55,78 +55,13 @@ impl ProductivityFeature {
         include_str!("../migrations/001_productivity_tables.sql")
     }
 
-    fn migration_v2_sql() -> &'static str {
-        include_str!("../migrations/002_productivity_v2.sql")
-    }
-
-    fn migration_v3_sql() -> &'static str {
-        include_str!("../migrations/003_projects.sql")
-    }
-
-    fn migration_v4_sql() -> &'static str {
-        include_str!("../migrations/004_intelligence_layer.sql")
-    }
-
-    fn migration_v5_sql() -> &'static str {
-        include_str!("../migrations/005_focus_activity_link.sql")
-    }
-
-    fn migration_v6_sql() -> &'static str {
-        include_str!("../migrations/006_calendar_events.sql")
-    }
-
-    fn migration_v7_sql() -> &'static str {
-        include_str!("../migrations/007_score_components.sql")
-    }
-
     pub fn migrations_static() -> Vec<FeatureMigration> {
-        vec![
-            FeatureMigration {
-                feature_name: "productivity".to_string(),
-                version: 1,
-                description: "Create productivity tracking tables".to_string(),
-                sql: Self::migration_sql().to_string(),
-            },
-            FeatureMigration {
-                feature_name: "productivity".to_string(),
-                version: 2,
-                description: "Add buckets, distraction patterns, insights, focus source"
-                    .to_string(),
-                sql: Self::migration_v2_sql().to_string(),
-            },
-            FeatureMigration {
-                feature_name: "productivity".to_string(),
-                version: 3,
-                description: "Add project tracking tables".to_string(),
-                sql: Self::migration_v3_sql().to_string(),
-            },
-            FeatureMigration {
-                feature_name: "productivity".to_string(),
-                version: 4,
-                description: "Add intelligence layer tables".to_string(),
-                sql: Self::migration_v4_sql().to_string(),
-            },
-            FeatureMigration {
-                feature_name: "productivity".to_string(),
-                version: 5,
-                description: "Link activity events to focus sessions".to_string(),
-                sql: Self::migration_v5_sql().to_string(),
-            },
-            FeatureMigration {
-                feature_name: "productivity".to_string(),
-                version: 6,
-                description: "Add calendar events table".to_string(),
-                sql: Self::migration_v6_sql().to_string(),
-            },
-            FeatureMigration {
-                feature_name: "productivity".to_string(),
-                version: 7,
-                description:
-                    "Add deep_work_ratio, avg_session_length, meeting_focus_ratio to quality scores"
-                        .to_string(),
-                sql: Self::migration_v7_sql().to_string(),
-            },
-        ]
+        vec![FeatureMigration {
+            feature_name: "productivity".to_string(),
+            version: 1,
+            description: "Create productivity tracking tables".to_string(),
+            sql: Self::migration_sql().to_string(),
+        }]
     }
 
     pub fn default_config_static() -> Value {

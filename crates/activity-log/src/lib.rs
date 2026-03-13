@@ -40,25 +40,13 @@ use tools_core::FeatureMigration;
 pub struct ActivityLog;
 
 impl ActivityLog {
-    fn migration_sql() -> &'static str {
-        include_str!("../migrations/001_unified_activity_log.sql")
-    }
-
     pub fn migrations_static() -> Vec<FeatureMigration> {
-        vec![
-            FeatureMigration {
-                feature_name: "activity_log".to_string(),
-                version: 1,
-                description: "Create unified activity log table".to_string(),
-                sql: Self::migration_sql().to_string(),
-            },
-            FeatureMigration {
-                feature_name: "activity_log".to_string(),
-                version: 2,
-                description: "Create work context tables".to_string(),
-                sql: include_str!("../migrations/002_work_contexts.sql").to_string(),
-            },
-        ]
+        vec![FeatureMigration {
+            feature_name: "activity_log".to_string(),
+            version: 1,
+            description: "Activity log tables".to_string(),
+            sql: include_str!("../migrations/001_unified_activity_log.sql").to_string(),
+        }]
     }
 }
 

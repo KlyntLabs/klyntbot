@@ -17,6 +17,32 @@ CREATE TABLE areas (
 );
 
 -- ============================================================
+-- Status Workflows
+-- ============================================================
+CREATE TABLE IF NOT EXISTS status_workflows (
+    id                TEXT PRIMARY KEY,
+    name              TEXT NOT NULL,
+    is_template       INTEGER NOT NULL DEFAULT 0,
+    is_global_default INTEGER NOT NULL DEFAULT 0,
+    created_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    updated_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+);
+
+-- ============================================================
+-- Status Labels (belong to workflows)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS status_labels (
+    id           TEXT PRIMARY KEY,
+    workflow_id  TEXT NOT NULL REFERENCES status_workflows(id) ON DELETE CASCADE,
+    name         TEXT NOT NULL,
+    color        TEXT NOT NULL DEFAULT '#6b7280',
+    status_group TEXT NOT NULL CHECK(status_group IN ('not_started', 'active', 'done', 'stuck')),
+    position     INTEGER NOT NULL DEFAULT 0,
+    created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+);
+CREATE INDEX idx_status_labels_workflow_id ON status_labels(workflow_id);
+
+-- ============================================================
 -- Projects (belong to areas)
 -- ============================================================
 CREATE TABLE projects (
@@ -34,7 +60,8 @@ CREATE TABLE projects (
     user_role       TEXT,
     start_date      TEXT,
     target_end_date TEXT,
-    settings        TEXT
+    settings        TEXT,
+    workflow_id TEXT REFERENCES status_workflows(id) ON DELETE SET NULL
 );
 CREATE INDEX idx_projects_area_id ON projects(area_id);
 CREATE INDEX idx_projects_status ON projects(status);
@@ -81,6 +108,19 @@ CREATE INDEX idx_key_results_objective_id ON key_results(objective_id);
 CREATE INDEX idx_key_results_status ON key_results(status);
 
 -- ============================================================
+-- Task Groups
+-- ============================================================
+CREATE TABLE IF NOT EXISTS task_groups (
+    id          TEXT PRIMARY KEY,
+    project_id  TEXT REFERENCES projects(id) ON DELETE CASCADE,
+    name        TEXT NOT NULL,
+    color       TEXT,
+    position    INTEGER NOT NULL DEFAULT 0,
+    created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+);
+CREATE INDEX idx_task_groups_project_id ON task_groups(project_id);
+
+-- ============================================================
 -- Actions (replaces todos)
 -- ============================================================
 CREATE TABLE actions (
@@ -108,7 +148,10 @@ CREATE TABLE actions (
     recurrence_rule      TEXT,
     recurrence_parent_id TEXT,
     is_template          INTEGER NOT NULL DEFAULT 0,
-    next_instance_date   TEXT
+    next_instance_date   TEXT,
+    status_label_id      TEXT REFERENCES status_labels(id) ON DELETE SET NULL,
+    position             INTEGER NOT NULL DEFAULT 0,
+    group_id             TEXT REFERENCES task_groups(id) ON DELETE SET NULL
 );
 CREATE INDEX idx_actions_area_id ON actions(area_id);
 CREATE INDEX idx_actions_project_id ON actions(project_id);
@@ -118,6 +161,9 @@ CREATE INDEX idx_actions_status ON actions(status);
 CREATE INDEX idx_actions_due_date ON actions(due_date);
 CREATE INDEX idx_actions_focused_at ON actions(focused_at) WHERE focused_at IS NOT NULL;
 CREATE INDEX idx_actions_is_template ON actions(is_template) WHERE is_template = 1;
+CREATE INDEX idx_actions_status_label_id ON actions(status_label_id);
+CREATE INDEX idx_actions_position ON actions(position);
+CREATE INDEX idx_actions_group_id ON actions(group_id);
 
 -- ============================================================
 -- Action Attachments
@@ -307,16 +353,6 @@ CREATE TABLE calendar_event_cache (
 CREATE INDEX idx_calendar_event_cache_provider ON calendar_event_cache(provider_id);
 CREATE INDEX idx_calendar_event_cache_start ON calendar_event_cache(start_at);
 CREATE INDEX idx_calendar_event_cache_uid ON calendar_event_cache(uid);
-
--- ============================================================
--- Memory Notes
--- ============================================================
-CREATE TABLE memory_notes (
-    note_key   TEXT PRIMARY KEY,
-    content    TEXT NOT NULL DEFAULT '',
-    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
-);
 
 -- ============================================================
 -- Learning State (key-value store)
@@ -619,3 +655,101 @@ CREATE TABLE project_sources (
 );
 
 CREATE INDEX idx_project_sources_project ON project_sources(project_id);
+
+-- ── Session context ──────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS session_context (
+    session_key  TEXT PRIMARY KEY REFERENCES sessions(key) ON DELETE CASCADE,
+    context_type TEXT NOT NULL DEFAULT 'general',
+    entity_kind  TEXT,
+    entity_id    TEXT,
+    area_id      TEXT,
+    project_id   TEXT,
+    is_ephemeral INTEGER NOT NULL DEFAULT 0,
+    is_pinned    INTEGER NOT NULL DEFAULT 0,
+    created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_session_context_area ON session_context(area_id);
+CREATE INDEX IF NOT EXISTS idx_session_context_entity ON session_context(entity_kind, entity_id);
+CREATE INDEX IF NOT EXISTS idx_session_context_ephemeral ON session_context(is_ephemeral, is_pinned);
+
+-- ── Interaction log ──────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS interaction_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp TEXT NOT NULL DEFAULT (datetime('now')),
+    agent_name TEXT NOT NULL,
+    tool_names TEXT NOT NULL DEFAULT '[]',
+    channel TEXT NOT NULL,
+    duration_ms INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_interaction_log_timestamp
+    ON interaction_log(timestamp DESC);
+
+-- ── Status workflows: seed data ──────────────────────────────
+
+-- Global default workflow
+INSERT INTO status_workflows (id, name, is_template, is_global_default)
+VALUES ('wf_default', 'Default', 0, 1);
+
+INSERT INTO status_labels (id, workflow_id, name, color, status_group, position) VALUES
+    ('sl_backlog',     'wf_default', 'Backlog',     '#6b7280', 'not_started', 0),
+    ('sl_todo',        'wf_default', 'Todo',        '#3b82f6', 'not_started', 1),
+    ('sl_in_progress', 'wf_default', 'In Progress', '#eab308', 'active',      2),
+    ('sl_in_review',   'wf_default', 'In Review',   '#f97316', 'active',      3),
+    ('sl_done',        'wf_default', 'Done',        '#22c55e', 'done',        4),
+    ('sl_blocked',     'wf_default', 'Blocked',     '#ef4444', 'stuck',       5);
+
+-- Template: Simple
+INSERT INTO status_workflows (id, name, is_template, is_global_default)
+VALUES ('wf_simple', 'Simple', 1, 0);
+
+INSERT INTO status_labels (id, workflow_id, name, color, status_group, position) VALUES
+    ('sl_simple_todo',        'wf_simple', 'Todo',        '#3b82f6', 'not_started', 0),
+    ('sl_simple_in_progress', 'wf_simple', 'In Progress', '#eab308', 'active',      1),
+    ('sl_simple_done',        'wf_simple', 'Done',        '#22c55e', 'done',        2);
+
+-- Template: Software Dev
+INSERT INTO status_workflows (id, name, is_template, is_global_default)
+VALUES ('wf_swdev', 'Software Dev', 1, 0);
+
+INSERT INTO status_labels (id, workflow_id, name, color, status_group, position) VALUES
+    ('sl_swdev_backlog',     'wf_swdev', 'Backlog',     '#6b7280', 'not_started', 0),
+    ('sl_swdev_todo',        'wf_swdev', 'Todo',        '#3b82f6', 'not_started', 1),
+    ('sl_swdev_in_progress', 'wf_swdev', 'In Progress', '#eab308', 'active',      2),
+    ('sl_swdev_in_review',   'wf_swdev', 'In Review',   '#f97316', 'active',      3),
+    ('sl_swdev_done',        'wf_swdev', 'Done',        '#22c55e', 'done',        4),
+    ('sl_swdev_blocked',     'wf_swdev', 'Blocked',     '#ef4444', 'stuck',       5);
+
+-- Template: Content Creation
+INSERT INTO status_workflows (id, name, is_template, is_global_default)
+VALUES ('wf_content', 'Content Creation', 1, 0);
+
+INSERT INTO status_labels (id, workflow_id, name, color, status_group, position) VALUES
+    ('sl_content_idea',      'wf_content', 'Idea',      '#a855f7', 'not_started', 0),
+    ('sl_content_drafting',  'wf_content', 'Drafting',  '#eab308', 'active',      1),
+    ('sl_content_editing',   'wf_content', 'Editing',   '#f97316', 'active',      2),
+    ('sl_content_published', 'wf_content', 'Published', '#22c55e', 'done',        3);
+
+-- ── Custom columns ───────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS custom_columns (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    column_type TEXT NOT NULL CHECK(column_type IN (
+        'text','number','date','dropdown','multi_select','checkbox',
+        'tags','link','rating','progress','duration','currency'
+    )),
+    options_json TEXT,
+    position INTEGER NOT NULL DEFAULT 0,
+    width INTEGER DEFAULT 150,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS custom_column_values (
+    task_id TEXT NOT NULL REFERENCES actions(id) ON DELETE CASCADE,
+    column_id TEXT NOT NULL REFERENCES custom_columns(id) ON DELETE CASCADE,
+    value_json TEXT NOT NULL,
+    PRIMARY KEY (task_id, column_id)
+);

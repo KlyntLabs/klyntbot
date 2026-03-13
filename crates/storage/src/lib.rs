@@ -69,4 +69,5 @@ pub use rows::task::{
     TaskExecutionRow, TaskRow, TaskSuggestionRow, TaskTimeEntryRow,
 };
 pub use rows::task_group::TaskGroupRow;
+pub use rows::finance::FinanceInvestmentTxRow;
 pub use rows::usage::UsageRecordRow;

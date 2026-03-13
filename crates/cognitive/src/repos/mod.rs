@@ -38,51 +38,12 @@ pub const RULE_DOMAINS: &[&str] = &["productivity", "tasks", "finance", "coachin
 
 /// Return cognitive feature migrations for use with `StoragePool::run_feature_migrations`.
 pub fn cognitive_migrations() -> Vec<FeatureMigration> {
-    vec![
-        FeatureMigration {
-            feature_name: "cognitive".to_string(),
-            version: 1,
-            description: "Create cognitive memory tables".to_string(),
-            sql: include_str!("../../migrations/001_cognitive_tables.sql").to_string(),
-        },
-        FeatureMigration {
-            feature_name: "cognitive".to_string(),
-            version: 2,
-            description: "Add unique index on coaching_strategies(strategy_type, domain)"
-                .to_string(),
-            sql: include_str!("../../migrations/002_coaching_strategy_unique.sql").to_string(),
-        },
-        FeatureMigration {
-            feature_name: "cognitive".to_string(),
-            version: 3,
-            description: "Create domain_event_log and pipeline_event_log tables".to_string(),
-            sql: include_str!("../../migrations/003_event_log_tables.sql").to_string(),
-        },
-        FeatureMigration {
-            feature_name: "cognitive".to_string(),
-            version: 4,
-            description: "Persist accumulated observations across restarts".to_string(),
-            sql: include_str!("../../migrations/004_accumulated_observations.sql").to_string(),
-        },
-        FeatureMigration {
-            feature_name: "cognitive".to_string(),
-            version: 5,
-            description: "Add FTS5 virtual tables for BM25 full-text search".to_string(),
-            sql: include_str!("../../migrations/005_fts5_tables.sql").to_string(),
-        },
-        FeatureMigration {
-            feature_name: "cognitive".to_string(),
-            version: 6,
-            description: "Add annotations table with FTS5 search".to_string(),
-            sql: include_str!("../../migrations/006_annotations.sql").to_string(),
-        },
-        FeatureMigration {
-            feature_name: "cognitive".to_string(),
-            version: 7,
-            description: "Add dead-letter queue for failed observations".to_string(),
-            sql: include_str!("../../migrations/007_failed_observations.sql").to_string(),
-        },
-    ]
+    vec![FeatureMigration {
+        feature_name: "cognitive".to_string(),
+        version: 1,
+        description: "Cognitive memory system tables".to_string(),
+        sql: include_str!("../../migrations/001_cognitive_tables.sql").to_string(),
+    }]
 }
 
 /// Load the full `UserModel` from a `SemanticFactRepo`.
