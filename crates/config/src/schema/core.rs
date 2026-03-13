@@ -27,7 +27,7 @@ use super::tools::ToolsConfig;
 use super::work_context::WorkContextConfig;
 
 /// Expand a leading `~` in a path to the user's home directory.
-fn expand_tilde(path: &str) -> PathBuf {
+pub(crate) fn expand_tilde(path: &str) -> PathBuf {
     if path.starts_with('~') {
         if let Some(home) = dirs::home_dir() {
             return home.join(path.trim_start_matches("~/"));
@@ -182,7 +182,7 @@ impl Config {
             return expand_tilde(dir);
         }
         if let Ok(dir) = std::env::var("KLYNTBOT_HOME") {
-            return PathBuf::from(dir);
+            return expand_tilde(&dir);
         }
         expand_tilde("~/.klyntbot")
     }

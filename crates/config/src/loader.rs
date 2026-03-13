@@ -20,7 +20,7 @@ pub fn config_path() -> Result<PathBuf> {
 /// Respects `KLYNTBOT_HOME` env var, falling back to `~/.klyntbot/`.
 pub fn config_dir() -> Result<PathBuf> {
     if let Ok(dir) = std::env::var("KLYNTBOT_HOME") {
-        return Ok(PathBuf::from(dir));
+        return Ok(super::schema::core::expand_tilde(&dir));
     }
     dirs::home_dir()
         .map(|home| home.join(".klyntbot"))

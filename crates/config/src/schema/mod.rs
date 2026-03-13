@@ -21,7 +21,7 @@ mod cognitive;
 mod confidence;
 mod content;
 mod conversation;
-mod core;
+pub(crate) mod core;
 mod finance;
 mod gateway;
 mod learning;
