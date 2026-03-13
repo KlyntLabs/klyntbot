@@ -290,16 +290,6 @@ These items were identified during the 2026-03-12 structural refactor analysis.
 
 ---
 
-### A-033 🟡 Medium | `storage` — `resources` and `archive_items` Tables Schema-Only
-
-**Summary:** Two tables have no row struct, repo, or tool implementation. They create false impressions of implemented features.
-
-**Proposed Fix:** Either implement repos + tools, or drop the tables (pre-release).
-
-**References:** `crates/storage/migrations/001_initial.sql`
-
----
-
 ### A-034 🟡 Medium | `storage` — `calendar_sync_state` / `calendar_event_cache` Have No Repo
 
 **Summary:** Both tables are accessed via raw SQL in the `channels` crate, bypassing the storage abstraction.
@@ -330,18 +320,6 @@ These items were identified during the 2026-03-12 structural refactor analysis.
 
 ---
 
----
-
-### A-041 🟢 Low | `domain` — Dead Code: `from_str_loose()` / `as_str()` / `is_terminal()`
-
-**Summary:** Status/color enum methods have no callers outside `#[cfg(test)]`. Exist in anticipation of A-031.
-
-**Proposed Fix:** Either implement A-031 (methods become live), or replace with `strum` derives.
-
-**References:** `crates/domain/src/`
-
----
-
 ### A-042 🟡 Medium | `agents/communication` — No Skills Defined
 
 **Summary:** The communication agent has zero skills — the only agent without a `skills/` directory.
@@ -351,26 +329,6 @@ These items were identified during the 2026-03-12 structural refactor analysis.
 - Add a `notification` skill for alert routing and batching
 
 **References:** `agents/communication/AGENT.md`
-
----
-
-### A-043 🟡 Medium | `agents/general/skills/summarize.md` — References External CLI Binary
-
-**Summary:** The `summarize` skill references an external CLI tool not tracked as a dependency. No fallback if missing.
-
-**Proposed Fix:** Add a check step or replace with `web_fetch`-based summarization using the agent's LLM.
-
-**References:** `agents/general/skills/summarize.md`
-
----
-
-### A-044 🟢 Low | `agents` — Skill Metadata Contains Redundant `agent` Field
-
-**Summary:** Every skill's YAML frontmatter includes `metadata.agent` but the agent is already determined by directory path.
-
-**Proposed Fix:** Remove the `agent` field from skill metadata.
-
-**References:** All `agents/*/skills/*.md` files
 
 ---
 

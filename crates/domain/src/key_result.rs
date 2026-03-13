@@ -49,23 +49,6 @@ pub enum TrackingMode {
     Action,
 }
 
-impl TrackingMode {
-    pub fn from_str_loose(s: &str) -> Option<Self> {
-        match s.to_lowercase().as_str() {
-            "metric" => Some(Self::Metric),
-            "action" => Some(Self::Action),
-            _ => None,
-        }
-    }
-
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Metric => "metric",
-            Self::Action => "action",
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum KeyResultStatus {
@@ -75,31 +58,8 @@ pub enum KeyResultStatus {
 }
 
 impl KeyResultStatus {
-    pub fn from_str_loose(s: &str) -> Option<Self> {
-        match s.to_lowercase().as_str() {
-            "active" => Some(Self::Active),
-            "completed" => Some(Self::Completed),
-            "abandoned" => Some(Self::Abandoned),
-            _ => None,
-        }
-    }
-
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Active => "active",
-            Self::Completed => "completed",
-            Self::Abandoned => "abandoned",
-        }
-    }
-
     pub fn is_terminal(self) -> bool {
         matches!(self, Self::Completed | Self::Abandoned)
-    }
-}
-
-impl std::fmt::Display for KeyResultStatus {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.as_str())
     }
 }
 
@@ -149,18 +109,5 @@ mod tests {
         };
         kr.recalculate_metric_progress();
         assert!((kr.progress - 100.0).abs() < f64::EPSILON);
-    }
-
-    #[test]
-    fn test_tracking_mode_roundtrip() {
-        assert_eq!(
-            TrackingMode::from_str_loose("metric"),
-            Some(TrackingMode::Metric)
-        );
-        assert_eq!(
-            TrackingMode::from_str_loose("action"),
-            Some(TrackingMode::Action)
-        );
-        assert_eq!(TrackingMode::from_str_loose("unknown"), None);
     }
 }

@@ -4,8 +4,8 @@ description: Summarize or extract text/transcripts from URLs, podcasts, and loca
 license: MIT
 metadata:
   author: klyntbot
-  version: "1.0.0"
-  updated-on: "2026-03-10"
+  version: "2.0.0"
+  updated-on: "2026-03-13"
   source: official
   tags: "summarize,summary,digest,tldr"
   always: false
@@ -13,32 +13,29 @@ metadata:
   agent: general
 ---
 
-Fast CLI to summarize URLs, local files, and YouTube links.
+Summarize web pages, articles, and YouTube content using built-in tools.
 
 ## When to use
 
 - "what's this link/video about?"
 - "summarize this URL/article"
-- "transcribe this YouTube/video"
+- "give me a TLDR of this page"
 
-## Quick start
+## How to summarize
 
-```bash
-summarize "https://example.com" --model google/gemini-3-flash-preview
-summarize "/path/to/file.pdf" --model google/gemini-3-flash-preview
-summarize "https://youtu.be/dQw4w9WgXcQ" --youtube auto
-```
+1. Use the `web_fetch` tool to retrieve the page content
+2. Summarize the returned text at the requested length
+3. If the content is very long, produce a tight summary first, then ask which section to expand
 
-## YouTube transcript
+## Length guidelines
 
-```bash
-summarize "https://youtu.be/dQw4w9WgXcQ" --youtube auto --extract-only
-```
+- **short**: 2-3 sentences, key takeaway only
+- **medium** (default): 1-2 paragraphs covering main points
+- **long**: Detailed summary with section headings
+- **extract-only**: Return the raw fetched text without summarizing
 
-If transcript is huge, return a tight summary first, then ask which section to expand.
+## Tips
 
-## Useful flags
-
-- `--length short|medium|long|xl|xxl|<chars>`
-- `--extract-only` (URLs only)
-- `--youtube auto` (Apify fallback if `APIFY_API_TOKEN` set)
+- For YouTube links, `web_fetch` retrieves the page content including available transcript/description
+- If the URL returns an error or paywall, inform the user and suggest alternatives
+- When summarizing technical content, preserve code snippets and key terminology

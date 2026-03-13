@@ -34,52 +34,14 @@ pub enum ObjectiveStatus {
 }
 
 impl ObjectiveStatus {
-    pub fn from_str_loose(s: &str) -> Option<Self> {
-        match s.to_lowercase().as_str() {
-            "active" => Some(Self::Active),
-            "paused" => Some(Self::Paused),
-            "completed" => Some(Self::Completed),
-            "abandoned" => Some(Self::Abandoned),
-            _ => None,
-        }
-    }
-
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Active => "active",
-            Self::Paused => "paused",
-            Self::Completed => "completed",
-            Self::Abandoned => "abandoned",
-        }
-    }
-
     pub fn is_terminal(self) -> bool {
         matches!(self, Self::Completed | Self::Abandoned)
-    }
-}
-
-impl std::fmt::Display for ObjectiveStatus {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.as_str())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_objective_status_roundtrip() {
-        for status in [
-            ObjectiveStatus::Active,
-            ObjectiveStatus::Paused,
-            ObjectiveStatus::Completed,
-            ObjectiveStatus::Abandoned,
-        ] {
-            let s = status.as_str();
-            assert_eq!(ObjectiveStatus::from_str_loose(s), Some(status));
-        }
-    }
 
     #[test]
     fn test_terminal_states() {

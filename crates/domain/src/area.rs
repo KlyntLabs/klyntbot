@@ -30,29 +30,6 @@ pub enum AreaStatus {
     Archived,
 }
 
-impl AreaStatus {
-    pub fn from_str_loose(s: &str) -> Option<Self> {
-        match s.to_lowercase().as_str() {
-            "active" => Some(Self::Active),
-            "archived" => Some(Self::Archived),
-            _ => None,
-        }
-    }
-
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Active => "active",
-            Self::Archived => "archived",
-        }
-    }
-}
-
-impl std::fmt::Display for AreaStatus {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.as_str())
-    }
-}
-
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum AreaColor {
@@ -66,33 +43,6 @@ pub enum AreaColor {
     Gray,
 }
 
-impl AreaColor {
-    pub fn from_str_loose(s: &str) -> Option<Self> {
-        match s.to_lowercase().as_str() {
-            "blue" => Some(Self::Blue),
-            "green" => Some(Self::Green),
-            "purple" => Some(Self::Purple),
-            "orange" => Some(Self::Orange),
-            "red" => Some(Self::Red),
-            "yellow" => Some(Self::Yellow),
-            "gray" | "grey" => Some(Self::Gray),
-            _ => None,
-        }
-    }
-
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Blue => "blue",
-            Self::Green => "green",
-            Self::Purple => "purple",
-            Self::Orange => "orange",
-            Self::Red => "red",
-            Self::Yellow => "yellow",
-            Self::Gray => "gray",
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -102,34 +52,5 @@ mod tests {
         let id = Area::generate_id();
         assert_eq!(id.len(), 36); // full UUID
         assert_ne!(id, Area::generate_id());
-    }
-
-    #[test]
-    fn test_area_status_roundtrip() {
-        assert_eq!(
-            AreaStatus::from_str_loose("active"),
-            Some(AreaStatus::Active)
-        );
-        assert_eq!(
-            AreaStatus::from_str_loose("ARCHIVED"),
-            Some(AreaStatus::Archived)
-        );
-        assert_eq!(AreaStatus::from_str_loose("unknown"), None);
-    }
-
-    #[test]
-    fn test_area_color_roundtrip() {
-        for color in [
-            AreaColor::Blue,
-            AreaColor::Green,
-            AreaColor::Purple,
-            AreaColor::Orange,
-            AreaColor::Red,
-            AreaColor::Yellow,
-            AreaColor::Gray,
-        ] {
-            let s = color.as_str();
-            assert_eq!(AreaColor::from_str_loose(s), Some(color));
-        }
     }
 }

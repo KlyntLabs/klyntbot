@@ -21,11 +21,7 @@ export const WorkspaceFileTree = memo(function WorkspaceFileTree({
   activeFile,
   onSelectFile,
 }: WorkspaceFileTreeProps) {
-  const { data: files } = useQuery<WorkspaceFile[]>(
-    "workspace_list_files",
-    undefined,
-    [],
-  );
+  const { data: files } = useQuery<WorkspaceFile[]>("workspace_list_files", undefined, []);
 
   const [collapsed, setCollapsed] = useState(() => {
     try {
@@ -75,9 +71,7 @@ export const WorkspaceFileTree = memo(function WorkspaceFileTree({
                   : "text-muted hover:text-secondary hover:bg-white/[0.03]"
               }`}
             >
-              <span className="text-[11px]">
-                {FILE_ICONS[file.name] ?? "\u{1F4C4}"}
-              </span>
+              <span className="text-[11px]">{FILE_ICONS[file.name] ?? "\u{1F4C4}"}</span>
               <span className="font-mono truncate">{file.name}</span>
             </button>
           ))}

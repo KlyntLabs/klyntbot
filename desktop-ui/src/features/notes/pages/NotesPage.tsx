@@ -340,8 +340,12 @@ export default function NotesPage() {
           <>
             <div className="flex items-center justify-between shrink-0 px-3 pt-3">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-primary font-mono">{activeWorkspaceFile}</span>
-                <span className="text-[10px] text-dim bg-white/[0.06] px-1.5 py-0.5 rounded">system config</span>
+                <span className="text-sm font-medium text-primary font-mono">
+                  {activeWorkspaceFile}
+                </span>
+                <span className="text-[10px] text-dim bg-white/[0.06] px-1.5 py-0.5 rounded">
+                  system config
+                </span>
               </div>
               <ViewModeToggle viewMode={viewMode} onChange={setNotesViewMode} />
             </div>

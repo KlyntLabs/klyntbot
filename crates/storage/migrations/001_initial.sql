@@ -589,36 +589,6 @@ CREATE INDEX idx_tool_usage_tool ON tool_usage(tool_name);
 CREATE INDEX idx_tool_usage_created ON tool_usage(created_at);
 
 -- ============================================================
--- PARA: Resources (schema-only, no tool support yet)
--- ============================================================
-CREATE TABLE resources (
-    id            TEXT PRIMARY KEY,
-    area_id       TEXT REFERENCES areas(id) ON DELETE SET NULL,
-    title         TEXT NOT NULL,
-    description   TEXT,
-    resource_type TEXT NOT NULL DEFAULT 'note',
-    content       TEXT,
-    url           TEXT,
-    tags          TEXT NOT NULL DEFAULT '[]',
-    created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
-);
-
--- ============================================================
--- PARA: Archive Items (schema-only, no tool support yet)
--- ============================================================
-CREATE TABLE archive_items (
-    id              TEXT PRIMARY KEY,
-    source_type     TEXT NOT NULL,
-    source_id       TEXT NOT NULL,
-    title           TEXT NOT NULL,
-    snapshot        TEXT NOT NULL,
-    archived_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    archived_reason TEXT
-);
-CREATE INDEX idx_archive_items_source ON archive_items(source_type, source_id);
-
--- ============================================================
 -- Entity Links (cross-feature linking)
 -- ============================================================
 CREATE TABLE entity_links (

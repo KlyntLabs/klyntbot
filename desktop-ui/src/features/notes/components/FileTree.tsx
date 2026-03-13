@@ -2,7 +2,6 @@ import { useClickOutside } from "@shared/hooks/useClickOutside";
 import { formatDate } from "@shared/lib/dates";
 import type { Note, Notebook } from "@shared/types";
 import { ContextMenu, ContextMenuItem, ContextMenuSeparator, ContextMenuSubmenu } from "@shared/ui";
-import { WorkspaceFileTree } from "./WorkspaceFileTree";
 import {
   ChevronRight,
   FileText,
@@ -17,6 +16,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { type DragEvent, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { WorkspaceFileTree } from "./WorkspaceFileTree";
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -231,10 +231,7 @@ export function FileTree({
         )}
       </div>
 
-      <WorkspaceFileTree
-        activeFile={activeWorkspaceFile}
-        onSelectFile={onSelectWorkspaceFile}
-      />
+      <WorkspaceFileTree activeFile={activeWorkspaceFile} onSelectFile={onSelectWorkspaceFile} />
 
       {/* Context Menu */}
       {contextMenu && (
