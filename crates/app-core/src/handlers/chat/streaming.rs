@@ -1,14 +1,14 @@
-//! Chat handlers — wired to AgentLoop with streaming events.
+//! Streaming relay, chat send/cancel, and interaction response handlers.
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 
 use agent::AgentEvent;
 use common::EntityCard;
-use desktop_shared::commands::{ChatMessageResponse, ChatThreadResponse, SessionContextInput};
+use desktop_shared::commands::{ChatMessageResponse, SessionContextInput};
 use desktop_shared::errors::ApiError;
 use desktop_shared::events::{self, *};
-use storage::{ProjectFilter, Repos};
+use storage::Repos;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
@@ -16,8 +16,8 @@ use crate::errors::map_storage_err;
 use crate::state::AppCore;
 
 /// Type aliases for the DashMap types used across both AppCore variants.
-type ActiveStreams = dashmap::DashMap<String, CancellationToken>;
-type PendingInteractions =
+pub(super) type ActiveStreams = dashmap::DashMap<String, CancellationToken>;
+pub(super) type PendingInteractions =
     dashmap::DashMap<String, (String, tokio::sync::oneshot::Sender<common::FormResponse>)>;
 
 // ── ChatStreamInfo ──────────────────────────────────────────────────────
@@ -191,229 +191,6 @@ async fn resolve_ancestry(
 }
 
 // ── Public free functions ────────────────────────────────────────────────
-//
-// These take explicit references so they can be called from either the
-// app-core `AppCore` or the desktop's own `AppCore` (which has the same
-// fields but is a different type during the migration period).
-
-pub async fn chat_threads(repos: &Repos) -> Result<Vec<ChatThreadResponse>, ApiError> {
-    let default_filter = ProjectFilter::default();
-    let (sessions, visible_contexts, all_areas, all_projects) = tokio::join!(
-        repos.sessions.list_sessions(),
-        repos.session_context.list_visible(),
-        repos.areas.list(None),
-        repos.projects.list(&default_filter),
-    );
-    let sessions = sessions.map_err(map_storage_err)?;
-    let visible_contexts = visible_contexts.map_err(map_storage_err)?;
-    let all_areas = all_areas.map_err(map_storage_err)?;
-    let all_projects = all_projects.map_err(map_storage_err)?;
-
-    let ctx_map: HashMap<&str, _> = visible_contexts
-        .iter()
-        .map(|c| (c.session_key.as_str(), c))
-        .collect();
-
-    let area_names: HashMap<&str, &str> = all_areas
-        .iter()
-        .map(|a| (a.id.as_str(), a.name.as_str()))
-        .collect();
-    let project_names: HashMap<&str, &str> = all_projects
-        .iter()
-        .map(|p| (p.id.as_str(), p.name.as_str()))
-        .collect();
-
-    Ok(sessions
-        .iter()
-        .map(|s| {
-            let title = s
-                .metadata
-                .get("title")
-                .and_then(|v| v.as_str())
-                .unwrap_or(&s.key)
-                .to_string();
-            let ctx = ctx_map.get(s.key.as_str());
-
-            ChatThreadResponse {
-                session_key: s.key.clone(),
-                title,
-                message_count: s.message_count,
-                updated_at: s.updated_at,
-                context_type: ctx.map(|c| c.context_type.clone()),
-                entity_kind: ctx.and_then(|c| c.entity_kind.clone()),
-                entity_id: ctx.and_then(|c| c.entity_id.clone()),
-                area_id: ctx.and_then(|c| c.area_id.clone()),
-                area_name: ctx.and_then(|c| {
-                    c.area_id
-                        .as_deref()
-                        .and_then(|id| area_names.get(id).map(|s| s.to_string()))
-                }),
-                project_id: ctx.and_then(|c| c.project_id.clone()).or_else(|| {
-                    s.metadata
-                        .get("projectId")
-                        .and_then(|v| v.as_str())
-                        .map(String::from)
-                }),
-                project_name: ctx.and_then(|c| {
-                    c.project_id
-                        .as_deref()
-                        .and_then(|id| project_names.get(id).map(|s| s.to_string()))
-                }),
-            }
-        })
-        .collect())
-}
-
-pub async fn chat_messages(
-    repos: &Repos,
-    session_key: String,
-    limit: Option<i64>,
-) -> Result<Vec<ChatMessageResponse>, ApiError> {
-    let rows = if let Some(lim) = limit {
-        repos.sessions.get_recent_messages(&session_key, lim).await
-    } else {
-        repos.sessions.get_messages(&session_key).await
-    }
-    .map_err(map_storage_err)?;
-
-    Ok(rows
-        .iter()
-        .filter(|m| m.role == "user" || m.role == "assistant" || m.role == "interaction")
-        .map(|m| {
-            let segments: Option<Vec<events::MessageSegment>> = m
-                .metadata
-                .as_ref()
-                .and_then(|meta| meta.get("segments"))
-                .and_then(|v| serde_json::from_value(v.clone()).ok());
-            let transparency: Option<events::TransparencyData> = m
-                .metadata
-                .as_ref()
-                .and_then(|meta| meta.get("transparency"))
-                .and_then(|v| serde_json::from_value(v.clone()).ok());
-            ChatMessageResponse {
-                id: m.id.to_string(),
-                role: m.role.clone(),
-                content: m.content.clone(),
-                timestamp: m.timestamp,
-                segments,
-                transparency,
-            }
-        })
-        .collect())
-}
-
-pub async fn chat_pin_thread(repos: &Repos, session_key: String) -> Result<(), ApiError> {
-    repos
-        .session_context
-        .pin(&session_key)
-        .await
-        .map_err(map_storage_err)?;
-    Ok(())
-}
-
-pub async fn chat_rename_thread(
-    repos: &Repos,
-    session_key: String,
-    title: String,
-) -> Result<(), ApiError> {
-    let title = title.trim().to_string();
-    if title.is_empty() {
-        return Err(ApiError::new("INVALID_PARAMS", "title cannot be empty"));
-    }
-    repos
-        .sessions
-        .rename_session(&session_key, &title)
-        .await
-        .map_err(map_storage_err)?;
-    Ok(())
-}
-
-pub async fn chat_delete_thread(
-    repos: &Repos,
-    active_streams: &ActiveStreams,
-    pending_interactions: &PendingInteractions,
-    session_key: String,
-) -> Result<(), ApiError> {
-    // Cancel any in-flight stream before deleting to avoid dangling writes
-    if let Some((_, token)) = active_streams.remove(&session_key) {
-        token.cancel();
-    }
-    // Cancel any pending interaction to avoid leaking the oneshot
-    if let Some((_, (_, tx))) = pending_interactions.remove(&session_key) {
-        let _ = tx.send(common::FormResponse::Cancelled);
-    }
-    repos
-        .sessions
-        .delete_session(&session_key)
-        .await
-        .map_err(map_storage_err)?;
-    Ok(())
-}
-
-pub async fn chat_cancel(
-    active_streams: &ActiveStreams,
-    pending_interactions: &PendingInteractions,
-    session_key: String,
-) -> Result<(), ApiError> {
-    // Cancel stream
-    if let Some((_, token)) = active_streams.remove(&session_key) {
-        token.cancel();
-    }
-    // Cancel any pending interaction
-    if let Some((_, (_, tx))) = pending_interactions.remove(&session_key) {
-        let _ = tx.send(common::FormResponse::Cancelled);
-    }
-    Ok(())
-}
-
-pub async fn chat_respond_interaction(
-    repos: &Repos,
-    pending_interactions: &PendingInteractions,
-    session_key: String,
-    request_id: String,
-    response: common::FormResponse,
-) -> Result<(), ApiError> {
-    // 1. Find and remove the pending oneshot sender, validating request_id
-    let (_, (stored_id, sender)) = pending_interactions
-        .remove(&session_key)
-        .ok_or_else(|| ApiError::new("NOT_FOUND", "no pending interaction for this session"))?;
-    if stored_id != request_id {
-        return Err(ApiError::new(
-            "INVALID_PARAMS",
-            format!("request_id mismatch: expected {stored_id}, got {request_id}"),
-        ));
-    }
-
-    // 2. Build collapsed summary text for the interaction message
-    let summary = format_interaction_summary(&response);
-
-    // 3. Send the response through the oneshot to unblock the agent tool immediately
-    let _ = sender.send(response);
-
-    // 4. Persist as a synthetic "interaction" message (agent already unblocked)
-    let msg_id = uuid::Uuid::new_v4();
-    let metadata = serde_json::json!({
-        "type": "interaction_response",
-        "requestId": request_id,
-    });
-    if let Err(e) = repos
-        .sessions
-        .add_message(
-            &session_key,
-            msg_id,
-            "interaction",
-            &summary,
-            None,
-            None,
-            Some(&metadata),
-        )
-        .await
-    {
-        tracing::warn!("failed to persist interaction message for {session_key}: {e}");
-    }
-
-    Ok(())
-}
 
 pub async fn chat_send(
     repos: &Repos,
@@ -487,116 +264,69 @@ pub async fn chat_send(
     Ok((user_msg, stream_info))
 }
 
-// ── AppCore convenience methods ─────────────────────────────────────────
-
-impl AppCore {
-    pub async fn chat_threads(&self) -> Result<Vec<ChatThreadResponse>, ApiError> {
-        chat_threads(&self.repos).await
+pub async fn chat_cancel(
+    active_streams: &ActiveStreams,
+    pending_interactions: &PendingInteractions,
+    session_key: String,
+) -> Result<(), ApiError> {
+    // Cancel stream
+    if let Some((_, token)) = active_streams.remove(&session_key) {
+        token.cancel();
     }
-
-    pub async fn chat_messages(
-        &self,
-        session_key: String,
-        limit: Option<i64>,
-    ) -> Result<Vec<ChatMessageResponse>, ApiError> {
-        chat_messages(&self.repos, session_key, limit).await
+    // Cancel any pending interaction
+    if let Some((_, (_, tx))) = pending_interactions.remove(&session_key) {
+        let _ = tx.send(common::FormResponse::Cancelled);
     }
+    Ok(())
+}
 
-    pub async fn chat_pin_thread(&self, session_key: String) -> Result<(), ApiError> {
-        chat_pin_thread(&self.repos, session_key).await
-    }
-
-    pub async fn chat_rename_thread(
-        &self,
-        session_key: String,
-        title: String,
-    ) -> Result<(), ApiError> {
-        chat_rename_thread(&self.repos, session_key, title).await
-    }
-
-    pub async fn chat_delete_thread(&self, session_key: String) -> Result<(), ApiError> {
-        chat_delete_thread(
-            &self.repos,
-            &self.active_streams,
-            &self.pending_interactions,
-            session_key,
-        )
-        .await
-    }
-
-    pub async fn chat_cancel(&self, session_key: String) -> Result<(), ApiError> {
-        chat_cancel(
-            &self.active_streams,
-            &self.pending_interactions,
-            session_key,
-        )
-        .await
-    }
-
-    pub async fn chat_respond_interaction(
-        &self,
-        session_key: String,
-        request_id: String,
-        response: common::FormResponse,
-    ) -> Result<(), ApiError> {
-        chat_respond_interaction(
-            &self.repos,
-            &self.pending_interactions,
-            session_key,
-            request_id,
-            response,
-        )
-        .await
-    }
-
-    pub async fn chat_send(
-        &self,
-        content: String,
-        session_key: String,
-        context: Option<SessionContextInput>,
-    ) -> Result<(ChatMessageResponse, ChatStreamInfo), ApiError> {
-        let result = chat_send(
-            &self.repos,
-            &self.agent,
-            &self.active_streams,
-            content.clone(),
-            session_key.clone(),
-            context,
-        )
-        .await?;
-
-        // Publish chat turn to cognitive consolidation pipeline
-        if let Some(bus) = &self.domain_event_bus {
-            bus.publish(bus::DomainEvent::ChatTurnCompleted {
-                user_message: content,
-                session_key,
-            });
-        }
-
-        Ok(result)
-    }
-
-    /// Spawn the streaming relay as a background task with the given emitter.
-    pub fn spawn_chat_relay(
-        &self,
-        stream_info: ChatStreamInfo,
-        emitter: Arc<dyn crate::events::AppEventEmitter>,
-    ) {
-        let repos = self.repos.clone();
-        let active_streams = Arc::clone(&self.active_streams);
-        let pending_interactions = Arc::clone(&self.pending_interactions);
-
-        tokio::spawn(relay_chat_stream(
-            repos,
-            stream_info.session_key,
-            active_streams,
-            pending_interactions,
-            stream_info.event_rx,
-            stream_info.interaction_rx,
-            emitter,
-            stream_info.has_context,
+pub async fn chat_respond_interaction(
+    repos: &Repos,
+    pending_interactions: &PendingInteractions,
+    session_key: String,
+    request_id: String,
+    response: common::FormResponse,
+) -> Result<(), ApiError> {
+    // 1. Find and remove the pending oneshot sender, validating request_id
+    let (_, (stored_id, sender)) = pending_interactions
+        .remove(&session_key)
+        .ok_or_else(|| ApiError::new("NOT_FOUND", "no pending interaction for this session"))?;
+    if stored_id != request_id {
+        return Err(ApiError::new(
+            "INVALID_PARAMS",
+            format!("request_id mismatch: expected {stored_id}, got {request_id}"),
         ));
     }
+
+    // 2. Build collapsed summary text for the interaction message
+    let summary = format_interaction_summary(&response);
+
+    // 3. Send the response through the oneshot to unblock the agent tool immediately
+    let _ = sender.send(response);
+
+    // 4. Persist as a synthetic "interaction" message (agent already unblocked)
+    let msg_id = uuid::Uuid::new_v4();
+    let metadata = serde_json::json!({
+        "type": "interaction_response",
+        "requestId": request_id,
+    });
+    if let Err(e) = repos
+        .sessions
+        .add_message(
+            &session_key,
+            msg_id,
+            "interaction",
+            &summary,
+            None,
+            None,
+            Some(&metadata),
+        )
+        .await
+    {
+        tracing::warn!("failed to persist interaction message for {session_key}: {e}");
+    }
+
+    Ok(())
 }
 
 // ── Streaming relay ─────────────────────────────────────────────────────
@@ -1110,5 +840,83 @@ pub async fn relay_chat_stream(
         if let Err(e) = auto_detect_context(&repos, sk, &tool_names, &entity_cards).await {
             tracing::debug!("auto-detect context skipped for {sk}: {e}");
         }
+    }
+}
+
+// ── AppCore convenience methods ─────────────────────────────────────────
+
+impl AppCore {
+    pub async fn chat_send(
+        &self,
+        content: String,
+        session_key: String,
+        context: Option<SessionContextInput>,
+    ) -> Result<(ChatMessageResponse, ChatStreamInfo), ApiError> {
+        let result = chat_send(
+            &self.repos,
+            &self.agent,
+            &self.active_streams,
+            content.clone(),
+            session_key.clone(),
+            context,
+        )
+        .await?;
+
+        // Publish chat turn to cognitive consolidation pipeline
+        if let Some(bus) = &self.domain_event_bus {
+            bus.publish(bus::DomainEvent::ChatTurnCompleted {
+                user_message: content,
+                session_key,
+            });
+        }
+
+        Ok(result)
+    }
+
+    pub async fn chat_cancel(&self, session_key: String) -> Result<(), ApiError> {
+        chat_cancel(
+            &self.active_streams,
+            &self.pending_interactions,
+            session_key,
+        )
+        .await
+    }
+
+    pub async fn chat_respond_interaction(
+        &self,
+        session_key: String,
+        request_id: String,
+        response: common::FormResponse,
+    ) -> Result<(), ApiError> {
+        chat_respond_interaction(
+            &self.repos,
+            &self.pending_interactions,
+            session_key,
+            request_id,
+            response,
+        )
+        .await
+    }
+
+    /// Spawn the streaming relay as a background task with the given emitter.
+    pub fn spawn_chat_relay(
+        &self,
+        stream_info: ChatStreamInfo,
+        emitter: Arc<dyn crate::events::AppEventEmitter>,
+    ) {
+        let repos = self.repos.clone();
+        let active_streams = Arc::clone(&self.active_streams);
+        let pending_interactions = Arc::clone(&self.pending_interactions);
+
+        tokio::spawn(relay_chat_stream(
+            repos,
+            stream_info.session_key,
+            active_streams,
+            pending_interactions,
+            stream_info.event_rx,
+            stream_info.interaction_rx,
+            emitter,
+            stream_info.has_context,
+        ));
     }
 }

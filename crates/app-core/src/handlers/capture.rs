@@ -91,7 +91,7 @@ impl AppCore {
 
     pub async fn install_shell_hook(&self) -> Result<String, ApiError> {
         let cfg = self.config.read().await;
-        let shell = crate::shell_hook::detect_shell();
+        let shell = crate::infrastructure::shell_hook::detect_shell();
         let api_url = format!("http://127.0.0.1:{}", cfg.capture.ingestion_api.port);
         let token = cfg
             .capture
@@ -100,21 +100,21 @@ impl AppCore {
             .as_deref()
             .ok_or_else(|| ApiError::new("VALIDATION", "Ingestion token not configured"))?;
 
-        crate::shell_hook::install(&shell, &api_url, token)
+        crate::infrastructure::shell_hook::install(&shell, &api_url, token)
             .map_err(|e| ApiError::new("INTERNAL", format!("{e}")))
     }
 
     pub async fn uninstall_shell_hook(&self) -> Result<String, ApiError> {
-        let shell = crate::shell_hook::detect_shell();
-        crate::shell_hook::uninstall(&shell).map_err(|e| ApiError::new("INTERNAL", format!("{e}")))
+        let shell = crate::infrastructure::shell_hook::detect_shell();
+        crate::infrastructure::shell_hook::uninstall(&shell).map_err(|e| ApiError::new("INTERNAL", format!("{e}")))
     }
 
     pub async fn get_shell_hook_status(&self) -> Result<ShellHookStatusResponse, ApiError> {
-        let shell = crate::shell_hook::detect_shell();
-        let rc_file = crate::shell_hook::rc_file_for_shell(&shell)
+        let shell = crate::infrastructure::shell_hook::detect_shell();
+        let rc_file = crate::infrastructure::shell_hook::rc_file_for_shell(&shell)
             .map_err(|e| ApiError::new("INTERNAL", format!("{e}")))?;
         let installed = std::fs::read_to_string(&rc_file)
-            .map(|c| c.contains(crate::shell_hook::MARKER_START))
+            .map(|c| c.contains(crate::infrastructure::shell_hook::MARKER_START))
             .unwrap_or(false);
 
         Ok(ShellHookStatusResponse {
