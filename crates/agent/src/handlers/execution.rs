@@ -37,16 +37,9 @@ impl LlmTaskExecutionHandler {
     }
 
     async fn fetch_execution(&self, execution_id: &str) -> Result<storage::TaskExecutionRow> {
-        self.repo
-            .get_execution(execution_id)
-            .await?
-            .ok_or_else(|| {
-                common::KlyntbotError::StorageNotFound(format!(
-                    "Execution {execution_id} not found"
-                ))
-            })
-
-
+        self.repo.get_execution(execution_id).await?.ok_or_else(|| {
+            common::KlyntbotError::StorageNotFound(format!("Execution {execution_id} not found"))
+        })
     }
 
     fn emit(&self, event: DomainEvent) {

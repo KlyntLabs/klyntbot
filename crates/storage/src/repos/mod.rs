@@ -54,7 +54,7 @@ pub use outcome::OutcomeRepo;
 pub use project_repo::{ProjectFilter, ProjectPatch, ProjectRepo, ProjectWithStats};
 pub use project_source_repo::ProjectSourceRepo;
 pub use session::SessionRepo;
-pub use session_context::SessionContextRepo;
+pub use session_context::{SessionContextParams, SessionContextRepo};
 pub use status_workflow::StatusWorkflowRepo;
 pub use strategy::{OverallStats, StrategyRepo, ToolStatsRow};
 pub use task_group::TaskGroupRepo;

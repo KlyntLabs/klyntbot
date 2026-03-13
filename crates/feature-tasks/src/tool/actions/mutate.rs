@@ -205,7 +205,7 @@ impl TaskTool {
                             if let Err(e) = self.repo.record_estimation(&estimation).await {
                                 warn!("Failed to record estimation history: {}", e);
                             } else if let Some(ref bus) = self.domain_bus {
-                                let _ = bus.publish(DomainEvent::EstimationRecorded {
+                                bus.publish(DomainEvent::EstimationRecorded {
                                     task_id: id.to_string(),
                                     estimated_mins: est_mins as u32,
                                     actual_mins: actual_mins as u32,

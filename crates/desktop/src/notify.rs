@@ -29,12 +29,7 @@ impl TauriNotificationSender {
             .title(title)
             .body(body)
             .show()
-            .map_err(|e| {
-                std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    format!("notification failed: {e}"),
-                )
-            })?;
+            .map_err(|e| std::io::Error::other(format!("notification failed: {e}")))?;
         Ok(())
     }
 }

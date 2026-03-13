@@ -22,6 +22,7 @@ pub(crate) mod schemas;
 #[cfg(test)]
 mod tests;
 
+pub use cognitive::CognitiveFactParams;
 pub use crud::sanitize_predicate_value;
 
 /// LanceDB-backed vector store for embedding similarity search.

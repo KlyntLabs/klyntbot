@@ -379,9 +379,10 @@ impl LlmProvider for OpenAiCompatProvider {
         }
 
         // OpenAI SSE has no event: lines — ignore the event_type parameter
-        Ok(crate::streaming::sse_chunk_stream(response, |_event_type, data| {
-            Self::parse_sse_chunk(data)
-        }))
+        Ok(crate::streaming::sse_chunk_stream(
+            response,
+            |_event_type, data| Self::parse_sse_chunk(data),
+        ))
     }
 
     fn supports_streaming(&self) -> bool {

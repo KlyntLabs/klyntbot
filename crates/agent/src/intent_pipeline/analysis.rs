@@ -1626,8 +1626,7 @@ mod tests {
         for cmd in &["ok cool", "thanks", "yes", "got it", "nice"] {
             let result = analyze_heuristic(cmd);
             assert!(
-                result.is_some()
-                    && matches!(result.as_ref().unwrap().mode, ExecutionMode::Direct),
+                result.is_some() && matches!(result.as_ref().unwrap().mode, ExecutionMode::Direct),
                 "Expected Direct for '{}', got {:?}",
                 cmd,
                 result

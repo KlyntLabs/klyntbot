@@ -7,8 +7,8 @@ use async_trait::async_trait;
 use chrono::Utc;
 use serde_json::Value;
 
-use crate::{RoutingContext, Tool};
 use crate::params::ParamExtractor;
+use crate::{RoutingContext, Tool};
 use common::{Result, ToolError};
 
 /// ProjectTool for managing projects and project-task relationships

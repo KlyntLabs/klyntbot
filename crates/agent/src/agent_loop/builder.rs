@@ -308,19 +308,27 @@ impl AgentLoopBuilder {
                     ) = if let Some(ref cp) = self.cognitive_provider {
                         let params = providers::cognitive_chat_params(&config, 1024);
                         (
-                            Arc::new(crate::adapters::cognitive_handlers::LlmExtractionHandler::new(
-                                cp.clone(),
-                                params.clone(),
-                            )),
-                            Arc::new(crate::adapters::cognitive_handlers::LlmConsolidationHandler::new(
-                                cp.clone(),
-                                params,
-                            )),
+                            Arc::new(
+                                crate::adapters::cognitive_handlers::LlmExtractionHandler::new(
+                                    cp.clone(),
+                                    params.clone(),
+                                ),
+                            ),
+                            Arc::new(
+                                crate::adapters::cognitive_handlers::LlmConsolidationHandler::new(
+                                    cp.clone(),
+                                    params,
+                                ),
+                            ),
                         )
                     } else {
                         (
-                            Arc::new(crate::adapters::cognitive_handlers::HeuristicExtractionHandler),
-                            Arc::new(crate::adapters::cognitive_handlers::HeuristicConsolidationHandler),
+                            Arc::new(
+                                crate::adapters::cognitive_handlers::HeuristicExtractionHandler,
+                            ),
+                            Arc::new(
+                                crate::adapters::cognitive_handlers::HeuristicConsolidationHandler,
+                            ),
                         )
                     };
                     let episodic_repo = cognitive::EpisodicMemoryRepo::new(pool.clone());
@@ -328,18 +336,20 @@ impl AgentLoopBuilder {
                     let failed_obs_repo = cognitive::FailedObservationRepo::new(pool.clone());
                     let cancel = CancellationToken::new();
                     let bg_service = cognitive::background::BackgroundConsolidationService::start(
-                        event_rx,
-                        extraction,
-                        consolidation,
-                        fact_repo,
-                        Some(episodic_repo),
-                        cognitive_embedder_local,
-                        cancel.clone(),
-                        self.pipeline_tx.take(),
-                        Some(accum_repo),
-                        Some(failed_obs_repo),
-                        config.cognitive.accumulate_promote_threshold,
-                        config.cognitive.accumulate_min_days,
+                        cognitive::background::BackgroundServiceConfig {
+                            event_rx,
+                            extraction,
+                            consolidation,
+                            repo: fact_repo,
+                            episodic_repo: Some(episodic_repo),
+                            embedder: cognitive_embedder_local,
+                            cancel: cancel.clone(),
+                            pipeline_tx: self.pipeline_tx.take(),
+                            accum_repo: Some(accum_repo),
+                            failed_obs_repo: Some(failed_obs_repo),
+                            promote_threshold: config.cognitive.accumulate_promote_threshold,
+                            min_days: config.cognitive.accumulate_min_days,
+                        },
                     );
                     info!("Cognitive background consolidation service started");
                     Some(bg_service)
@@ -371,9 +381,10 @@ impl AgentLoopBuilder {
                 )));
 
                 // Start inference engine + background loop
-                let text_embedder = Arc::new(crate::adapters::cognitive_embedder::TextEmbedderImpl::new(
-                    Arc::clone(&embedding_engine),
-                ));
+                let text_embedder =
+                    Arc::new(crate::adapters::cognitive_embedder::TextEmbedderImpl::new(
+                        Arc::clone(&embedding_engine),
+                    ));
                 let inference_config =
                     activity_log::inference::ContextInferenceConfig::from_work_context_config(
                         &config.work_context,
@@ -529,9 +540,10 @@ impl AgentLoopBuilder {
                 config.conversation.embedding.enabled,
                 self.vector_store.clone(),
             ) {
-                let text_embedder = Arc::new(crate::adapters::cognitive_embedder::TextEmbedderImpl::new(
-                    Arc::clone(&embedding_engine),
-                ));
+                let text_embedder =
+                    Arc::new(crate::adapters::cognitive_embedder::TextEmbedderImpl::new(
+                        Arc::clone(&embedding_engine),
+                    ));
                 Some(Arc::new(cognitive::ConversationRecallService::new(
                     vs.clone(),
                     text_embedder,
@@ -591,10 +603,11 @@ impl AgentLoopBuilder {
                         .with_provider(provider.clone(), config.agents.defaults.model.clone());
                 }
                 let enrichment_engine = Arc::new(enrichment_engine);
-                let task_enrichment_adapter =
-                    Arc::new(crate::adapters::task_enrichment::TaskEnrichmentAdapter::new(
-                        Arc::clone(&enrichment_engine),
-                    ));
+                let task_enrichment_adapter = Arc::new(
+                    crate::adapters::task_enrichment::TaskEnrichmentAdapter::new(Arc::clone(
+                        &enrichment_engine,
+                    )),
+                );
                 task_tool = task_tool.with_enrichment_handler(Arc::clone(&task_enrichment_adapter)
                     as Arc<dyn feature_tasks::EnrichmentHandler>);
             }
@@ -823,10 +836,11 @@ impl AgentLoopBuilder {
                 prod_repos.clone(),
                 config.productivity.focus.clone(),
             ));
-            let prod_handler = Arc::new(crate::adapters::productivity::ProductivityHandlerImpl::new(
-                provider.clone(),
-                config.agents.defaults.model.clone(),
-            ));
+            let prod_handler =
+                Arc::new(crate::adapters::productivity::ProductivityHandlerImpl::new(
+                    provider.clone(),
+                    config.agents.defaults.model.clone(),
+                ));
             let mut daily_agg = feature_productivity::DailyAggregator::new(prod_repos.clone())
                 .with_handler(prod_handler);
             if let Some(ref domain_bus) = self.domain_event_bus {

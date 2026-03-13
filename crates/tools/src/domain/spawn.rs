@@ -5,8 +5,8 @@ use serde_json::Value;
 use std::sync::Arc;
 use tracing::debug;
 
-use crate::{PermissionLevel, RoutingContext, Tool};
 use crate::params::ParamExtractor;
+use crate::{PermissionLevel, RoutingContext, Tool};
 use common::{Result, ToolError};
 
 /// Trait for spawning subagents (dependency inversion to avoid circular dependencies).

@@ -22,9 +22,9 @@ pub mod utils;
 pub mod ws_manager;
 
 // ── Adapters ──────────────────────────────────────────────
-pub use adapters::{DiscordChannel, SlackChannel, TelegramChannel};
 #[cfg(feature = "email")]
 pub use adapters::EmailChannel;
+pub use adapters::{DiscordChannel, SlackChannel, TelegramChannel};
 
 // ── Manager ───────────────────────────────────────────────
 pub use manager::ChannelManager;

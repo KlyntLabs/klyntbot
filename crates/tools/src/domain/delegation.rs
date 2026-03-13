@@ -9,8 +9,8 @@ use serde_json::Value;
 use std::sync::Arc;
 use tracing::debug;
 
-use crate::{PermissionLevel, RoutingContext, Tool};
 use crate::params::ParamExtractor;
+use crate::{PermissionLevel, RoutingContext, Tool};
 use common::ToolError;
 
 /// Default maximum delegation depth to prevent infinite loops.

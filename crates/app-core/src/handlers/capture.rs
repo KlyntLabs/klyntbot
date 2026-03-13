@@ -106,7 +106,8 @@ impl AppCore {
 
     pub async fn uninstall_shell_hook(&self) -> Result<String, ApiError> {
         let shell = crate::infrastructure::shell_hook::detect_shell();
-        crate::infrastructure::shell_hook::uninstall(&shell).map_err(|e| ApiError::new("INTERNAL", format!("{e}")))
+        crate::infrastructure::shell_hook::uninstall(&shell)
+            .map_err(|e| ApiError::new("INTERNAL", format!("{e}")))
     }
 
     pub async fn get_shell_hook_status(&self) -> Result<ShellHookStatusResponse, ApiError> {

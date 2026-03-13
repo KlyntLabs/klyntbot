@@ -8,28 +8,33 @@ use crate::error::StorageError;
 
 use super::{crud::sanitize_predicate_value, VectorStore};
 
+/// Parameters for upserting a cognitive fact embedding.
+pub struct CognitiveFactParams<'a> {
+    pub fact_id: &'a str,
+    pub vector: &'a [f32],
+    pub domain: &'a str,
+    pub text: &'a str,
+    pub importance: f32,
+    pub stability: f32,
+    pub confidence: f32,
+}
+
 impl VectorStore {
     /// Upsert a cognitive fact embedding.
     pub async fn upsert_cognitive_fact(
         &self,
-        fact_id: &str,
-        vector: &[f32],
-        domain: &str,
-        text: &str,
-        importance: f32,
-        stability: f32,
-        confidence: f32,
+        params: CognitiveFactParams<'_>,
     ) -> Result<(), StorageError> {
         self.upsert_embedding(
             "cognitive_fact_embeddings",
-            fact_id,
-            vector,
+            params.fact_id,
+            params.vector,
             &[
-                ("domain", domain),
-                ("text", text),
-                ("importance", &importance.to_string()),
-                ("stability", &stability.to_string()),
-                ("confidence", &confidence.to_string()),
+                ("domain", params.domain),
+                ("text", params.text),
+                ("importance", &params.importance.to_string()),
+                ("stability", &params.stability.to_string()),
+                ("confidence", &params.confidence.to_string()),
             ],
         )
         .await

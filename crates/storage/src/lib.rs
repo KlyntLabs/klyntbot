@@ -18,7 +18,7 @@ pub mod vector_store;
 pub use error::{OptionExt, StorageError};
 pub use pool::StoragePool;
 pub use repos::Repos;
-pub use vector_store::{sanitize_predicate_value, VectorStore};
+pub use vector_store::{sanitize_predicate_value, CognitiveFactParams, VectorStore};
 
 // ── Actions / Tasks / Projects ──────────────────────────────────────
 pub use repos::action_repo::TimeEntryWithTask;
@@ -32,7 +32,7 @@ pub use repos::{TaskFilter, TaskPatch, TaskRepo, TaskSummary};
 pub use repos::{AreaRepo, KeyResultRepo, ObjectiveRepo};
 
 // ── Sessions / Context ──────────────────────────────────────────────
-pub use repos::{SessionContextRepo, SessionRepo};
+pub use repos::{SessionContextParams, SessionContextRepo, SessionRepo};
 
 // ── Agent / Learning ────────────────────────────────────────────────
 pub use repos::StatusWorkflowRepo;
@@ -55,6 +55,7 @@ pub use rows::area::AreaRow;
 pub use rows::cron::CronJobRow;
 pub use rows::custom_column::{CustomColumnRow, CustomColumnValueRow};
 pub use rows::entity_link::EntityLinkRow;
+pub use rows::finance::FinanceInvestmentTxRow;
 pub use rows::key_result::KeyResultRow;
 pub use rows::learning::{
     DecisionLogRow, EnrichmentFeedbackRow, InteractionLogRow, LearningStateRow, OutcomeRow,
@@ -69,5 +70,4 @@ pub use rows::task::{
     TaskExecutionRow, TaskRow, TaskSuggestionRow, TaskTimeEntryRow,
 };
 pub use rows::task_group::TaskGroupRow;
-pub use rows::finance::FinanceInvestmentTxRow;
 pub use rows::usage::UsageRecordRow;

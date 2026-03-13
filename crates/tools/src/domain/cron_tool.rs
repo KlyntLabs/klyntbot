@@ -5,8 +5,8 @@ use serde_json::Value;
 use std::sync::Arc;
 use tracing::debug;
 
-use crate::{RoutingContext, Tool};
 use crate::params::ParamExtractor;
+use crate::{RoutingContext, Tool};
 use common::{Result, ToolError};
 
 /// Format timestamp milliseconds to human-readable string

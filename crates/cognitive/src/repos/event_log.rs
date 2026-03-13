@@ -31,6 +31,17 @@ pub struct PipelineEventRow {
     pub timestamp: String,
 }
 
+/// Parameters for inserting a pipeline event (avoids too-many-arguments).
+pub struct PipelineEventRecord<'a> {
+    pub id: &'a str,
+    pub event_kind: &'a str,
+    pub observation: Option<&'a str>,
+    pub facts_extracted: Option<i64>,
+    pub operation: Option<&'a str>,
+    pub fact_triple: Option<&'a str>,
+    pub timestamp: &'a str,
+}
+
 impl EventLogRepo {
     pub fn new(pool: SqlitePool) -> Self {
         Self { pool }
@@ -66,13 +77,7 @@ impl EventLogRepo {
     /// Insert a pipeline event into the log.
     pub async fn insert_pipeline_event(
         &self,
-        id: &str,
-        event_kind: &str,
-        observation: Option<&str>,
-        facts_extracted: Option<i64>,
-        operation: Option<&str>,
-        fact_triple: Option<&str>,
-        timestamp: &str,
+        record: &PipelineEventRecord<'_>,
     ) -> Result<(), sqlx::Error> {
         sqlx::query(
             r#"
@@ -81,13 +86,13 @@ impl EventLogRepo {
             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
             "#,
         )
-        .bind(id)
-        .bind(event_kind)
-        .bind(observation)
-        .bind(facts_extracted)
-        .bind(operation)
-        .bind(fact_triple)
-        .bind(timestamp)
+        .bind(record.id)
+        .bind(record.event_kind)
+        .bind(record.observation)
+        .bind(record.facts_extracted)
+        .bind(record.operation)
+        .bind(record.fact_triple)
+        .bind(record.timestamp)
         .execute(&self.pool)
         .await?;
         Ok(())
@@ -270,27 +275,27 @@ mod tests {
         let pool = setup().await;
         let repo = EventLogRepo::new(pool);
 
-        repo.insert_pipeline_event(
-            "pipe-1",
-            "extraction",
-            Some("user said hello"),
-            Some(1),
-            None,
-            None,
-            "2026-03-09T00:00:00Z",
-        )
+        repo.insert_pipeline_event(&PipelineEventRecord {
+            id: "pipe-1",
+            event_kind: "extraction",
+            observation: Some("user said hello"),
+            facts_extracted: Some(1),
+            operation: None,
+            fact_triple: None,
+            timestamp: "2026-03-09T00:00:00Z",
+        })
         .await
         .unwrap();
 
-        repo.insert_pipeline_event(
-            "pipe-2",
-            "consolidation",
-            None,
-            None,
-            Some("add"),
-            Some("user.greeting = hello"),
-            "2026-03-09T00:00:01Z",
-        )
+        repo.insert_pipeline_event(&PipelineEventRecord {
+            id: "pipe-2",
+            event_kind: "consolidation",
+            observation: None,
+            facts_extracted: None,
+            operation: Some("add"),
+            fact_triple: Some("user.greeting = hello"),
+            timestamp: "2026-03-09T00:00:01Z",
+        })
         .await
         .unwrap();
 

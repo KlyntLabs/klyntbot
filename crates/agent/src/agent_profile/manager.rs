@@ -44,7 +44,6 @@ const BUILTIN_AGENT_SKILLS: &[(&str, &str, &str)] = &[
     include_agent_skill!("general", "search"),
     include_agent_skill!("general", "browser"),
     include_agent_skill!("general", "summarize"),
-
     include_agent_skill!("general", "skill-creator"),
     include_agent_skill!("task", "todo"),
     include_agent_skill!("task", "daily-planner"),

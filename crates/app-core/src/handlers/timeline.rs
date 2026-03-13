@@ -186,23 +186,6 @@ fn normalize_app_event(e: feature_productivity::ActivityEvent) -> TimelineEntry 
     }
 }
 
-fn normalize_focus_session(s: feature_productivity::FocusSession) -> TimelineEntry {
-    TimelineEntry {
-        id: s.id,
-        source: TimelineSource::Focus,
-        entry_type: TimelineEntryType::FocusSession,
-        title: "Focus Session".into(),
-        description: Some(s.session_type.to_string()),
-        started_at: s.started_at.to_rfc3339(),
-        ended_at: s.ended_at.map(|t| t.to_rfc3339()),
-        duration_secs: s.actual_mins.map(|m| m * 60),
-        entity_id: None,
-        entity_route: Some("/productivity".into()),
-        color: "var(--timeline-focus)".into(),
-        metadata: None,
-    }
-}
-
 fn normalize_time_entry(te: storage::TimeEntryWithTask) -> TimelineEntry {
     TimelineEntry {
         id: te.id.to_string(),

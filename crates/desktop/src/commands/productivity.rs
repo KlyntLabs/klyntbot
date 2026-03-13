@@ -264,7 +264,7 @@ pub async fn productivity_auto_focus_end(
 
 #[tauri::command(rename_all = "snake_case")]
 pub async fn distraction_respond(
-    state: State<'_, Arc<AppCore>>,
+    _state: State<'_, Arc<AppCore>>,
     _response: DistractionResponse,
 ) -> Result<(), ApiError> {
     // Stub for now — will be populated with actual distraction handling logic

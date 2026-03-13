@@ -29,8 +29,7 @@ pub(super) async fn init_storage(
 
     // 2. Connect storage
     let data_dir = config.data_dir_path();
-    std::fs::create_dir_all(&data_dir)
-        .map_err(|e| format!("failed to create data dir: {e}"))?;
+    std::fs::create_dir_all(&data_dir).map_err(|e| format!("failed to create data dir: {e}"))?;
 
     let storage_pool = StoragePool::connect(&data_dir)
         .await

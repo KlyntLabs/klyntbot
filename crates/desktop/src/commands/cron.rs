@@ -66,7 +66,7 @@ pub async fn cron_update(
 
 // ── Dev server dispatch ──
 
-#[cfg(debug_assertions)]
+#[cfg(test)]
 pub(crate) const DEV_COMMANDS: &[&str] = &[
     "cron_list",
     "cron_status",

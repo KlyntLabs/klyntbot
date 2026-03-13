@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
+use chrono::{Duration, Timelike, Utc};
 use cognitive::situation::{compute_situation, SituationInputs, UserSituation};
 use feature_coaching::{FeedbackTracker, InterventionRouter, PatternDetector, SignalAccumulator};
 use feature_productivity::repos::ProductivityRepos;
-use chrono::{Duration, Timelike, Utc};
 use storage::Repos;
 use tokio::sync::{mpsc, Mutex};
 use tokio_util::sync::CancellationToken;
@@ -46,8 +46,7 @@ pub(super) async fn init_coaching(
         // Initialize coaching engine state.
         let signal_accumulator = Arc::new(Mutex::new(SignalAccumulator::new()));
         let pattern_detector = Arc::new(Mutex::new(PatternDetector::new()));
-        let intervention_router =
-            Arc::new(Mutex::new(InterventionRouter::new(Default::default())));
+        let intervention_router = Arc::new(Mutex::new(InterventionRouter::new(Default::default())));
         let coaching_repo = storage::CoachingStrategyRepo::new(storage_pool.inner().clone());
         let mut tracker = FeedbackTracker::new().with_repo(coaching_repo);
         tracker.load_from_db().await;

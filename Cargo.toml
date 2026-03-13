@@ -117,6 +117,7 @@ tempfile = "3.14"
 chrono-tz = "0.10"
 iana-time-zone = "0.1"
 rrule = "0.14"
+aho-corasick = "1"
 fastembed = "5"
 lancedb = "0.26"
 arrow = { version = "57", features = ["prettyprint"] }

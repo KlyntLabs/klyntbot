@@ -163,13 +163,7 @@ impl AppCore {
         .await;
 
         // ── Phase 7: Cognitive (capture, file watcher, work context) ─────
-        cognitive::init_cognitive(
-            &mut config,
-            &storage_pool,
-            &activity_svc,
-            &shutdown_token,
-        )
-        .await;
+        cognitive::init_cognitive(&mut config, &storage_pool, &activity_svc, &shutdown_token).await;
 
         // ── Assemble AppCore ─────────────────────────────────────────────
         let core = AppCore {
@@ -201,9 +195,7 @@ impl AppCore {
             coaching_service: coaching_service.map(|cs| Arc::new(Mutex::new(cs))),
             cognitive_provider,
             pipeline_broadcast: Some(pipeline_broadcast_tx),
-            event_log_repo: Some(::cognitive::EventLogRepo::new(
-                storage_pool.inner().clone(),
-            )),
+            event_log_repo: Some(::cognitive::EventLogRepo::new(storage_pool.inner().clone())),
             consecutive_coaching_ignores: Arc::new(std::sync::atomic::AtomicI32::new(0)),
             activity_ingestion_service: Some(Arc::clone(&activity_svc)),
         };

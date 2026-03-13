@@ -41,15 +41,15 @@ impl SemanticFactEmbedder for SemanticFactEmbedderImpl {
         let embedding = self.engine.clone().embed_async(text.clone()).await?;
 
         self.store
-            .upsert_cognitive_fact(
-                &fact.id,
-                &embedding,
-                &fact.domain,
-                &text,
-                (fact.confidence * fact.stability) as f32,
-                fact.stability as f32,
-                fact.confidence as f32,
-            )
+            .upsert_cognitive_fact(storage::CognitiveFactParams {
+                fact_id: &fact.id,
+                vector: &embedding,
+                domain: &fact.domain,
+                text: &text,
+                importance: (fact.confidence * fact.stability) as f32,
+                stability: fact.stability as f32,
+                confidence: fact.confidence as f32,
+            })
             .await?;
 
         debug!(fact_id = %fact.id, "Embedded cognitive fact");

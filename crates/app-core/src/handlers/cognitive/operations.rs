@@ -53,7 +53,7 @@ impl AppCore {
             None,
         )
         .await
-        .map_err(|e| ApiError::new("REFLECTION_FAILED", &e.to_string()))?;
+        .map_err(|e| ApiError::new("REFLECTION_FAILED", e.to_string()))?;
 
         Ok(ReflectionResultResponse {
             fact_updates: output.fact_updates.len(),

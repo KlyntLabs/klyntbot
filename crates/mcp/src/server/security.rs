@@ -3,7 +3,7 @@
 //! Provides path traversal protection and input sanitization for
 //! tools exposed to external AI agents via MCP.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Maximum allowed input length for MCP tool parameters.
 pub const MAX_INPUT_LENGTH: usize = 50_000;
@@ -12,7 +12,7 @@ pub const MAX_INPUT_LENGTH: usize = 50_000;
 ///
 /// Returns the canonicalized path on success, or an error if the path
 /// escapes the allowed base via traversal or absolute path.
-pub fn validate_path(path: &str, allowed_base: &PathBuf) -> Result<PathBuf, String> {
+pub fn validate_path(path: &str, allowed_base: &Path) -> Result<PathBuf, String> {
     let resolved = PathBuf::from(path);
     let canonical = resolved
         .canonicalize()

@@ -438,18 +438,20 @@ async fn test_batch_pipeline_processes_domain_events_end_to_end() {
         std::sync::Arc::new(HeuristicConsolidationHandler);
 
     let _service = BackgroundConsolidationService::start(
-        domain_rx,
-        extraction,
-        consolidation,
-        repo.clone(),
-        Some(episodic_repo),
-        None, // no embedder needed for heuristic
-        cancel.clone(),
-        Some(pipeline_tx),
-        Some(accum_repo),
-        Some(failed_obs_repo),
-        3, // promote_threshold
-        2, // min_days
+        klyntbot::cognitive::background::BackgroundServiceConfig {
+            event_rx: domain_rx,
+            extraction,
+            consolidation,
+            repo: repo.clone(),
+            episodic_repo: Some(episodic_repo),
+            embedder: None, // no embedder needed for heuristic
+            cancel: cancel.clone(),
+            pipeline_tx: Some(pipeline_tx),
+            accum_repo: Some(accum_repo),
+            failed_obs_repo: Some(failed_obs_repo),
+            promote_threshold: 3,
+            min_days: 2,
+        },
     );
 
     // Verify DB is empty before we begin

@@ -92,8 +92,7 @@ pub(super) fn spawn_post_core_services(
         let repos_bg = core.repos.clone();
         let token = shutdown_token.clone();
         tokio::spawn(async move {
-            let mut interval =
-                tokio::time::interval(std::time::Duration::from_secs(24 * 60 * 60));
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(24 * 60 * 60));
             interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
             // Skip first tick (don't run immediately on startup).
             interval.tick().await;
@@ -199,13 +198,15 @@ fn spawn_event_log_persistence(
                                         ..
                                     } => {
                                         repo.insert_pipeline_event(
-                                            &id,
-                                            "extraction",
-                                            Some(observation.as_str()),
-                                            Some(*facts_extracted as i64),
-                                            None,
-                                            None,
-                                            &ts,
+                                            &cognitive::PipelineEventRecord {
+                                                id: &id,
+                                                event_kind: "extraction",
+                                                observation: Some(observation.as_str()),
+                                                facts_extracted: Some(*facts_extracted as i64),
+                                                operation: None,
+                                                fact_triple: None,
+                                                timestamp: &ts,
+                                            },
                                         )
                                         .await
                                     }
@@ -215,13 +216,15 @@ fn spawn_event_log_persistence(
                                         ..
                                     } => {
                                         repo.insert_pipeline_event(
-                                            &id,
-                                            "consolidation",
-                                            None,
-                                            None,
-                                            Some(operation.as_str()),
-                                            Some(fact.as_str()),
-                                            &ts,
+                                            &cognitive::PipelineEventRecord {
+                                                id: &id,
+                                                event_kind: "consolidation",
+                                                observation: None,
+                                                facts_extracted: None,
+                                                operation: Some(operation.as_str()),
+                                                fact_triple: Some(fact.as_str()),
+                                                timestamp: &ts,
+                                            },
                                         )
                                         .await
                                     }

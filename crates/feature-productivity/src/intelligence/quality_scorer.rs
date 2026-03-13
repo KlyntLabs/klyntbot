@@ -323,7 +323,7 @@ mod tests {
         let pool = setup_pool().await;
         let bus = make_bus();
         let session_repo = IntelligenceSessionRepo::new(pool.clone());
-        let score_repo = QualityScoreRepo::new(pool.clone());
+        let _score_repo = QualityScoreRepo::new(pool.clone());
 
         // Create two sessions
         let s1 = sample_session("qs-day-1", 0.9, 5, 10);

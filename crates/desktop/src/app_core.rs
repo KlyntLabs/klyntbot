@@ -52,7 +52,7 @@ fn wire_event_channels(core: &AppCore, channels: EventChannels, app_handle: &tau
                     started_at,
                     ended_at,
                     dominant_app,
-                    dominant_category,
+                    dominant_category: _,
                     productive_ratio,
                     total_secs,
                 } => {

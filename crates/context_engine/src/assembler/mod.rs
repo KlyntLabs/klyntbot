@@ -18,9 +18,7 @@ use crate::summary_provider::SummaryProvider;
 use crate::token_counter::{default_token_counter, TokenCounter};
 use common::helpers::tool_def_name;
 
-use crate::{
-    BudgetAllocator, BudgetConfig, CompressorConfig, HistoryCompressor, Priority,
-};
+use crate::{BudgetAllocator, BudgetConfig, CompressorConfig, HistoryCompressor, Priority};
 
 use cache::{ContextCache, DEFAULT_CACHE_CAPACITY};
 use types::DEFAULT_MEMORY_RETRIEVAL_LIMIT;

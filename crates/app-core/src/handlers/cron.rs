@@ -65,8 +65,8 @@ impl AppCore {
             .cron_service
             .enable_job(&id, enabled)
             .await
-            .map_err(|e| ApiError::new("CRON_ERROR", &e.to_string()))?
-            .ok_or_else(|| ApiError::new("NOT_FOUND", &format!("cron job '{id}'")))?;
+            .map_err(|e| ApiError::new("CRON_ERROR", e.to_string()))?
+            .ok_or_else(|| ApiError::new("NOT_FOUND", format!("cron job '{id}'")))?;
         Ok((to_response(&job), vec![]))
     }
 
@@ -74,7 +74,7 @@ impl AppCore {
         self.cron_service
             .run_job(&id, true)
             .await
-            .map_err(|e| ApiError::new("CRON_ERROR", &e.to_string()))
+            .map_err(|e| ApiError::new("CRON_ERROR", e.to_string()))
     }
 
     pub async fn cron_delete(&self, id: String) -> Result<bool, ApiError> {
@@ -87,12 +87,12 @@ impl AppCore {
         self.cron_service
             .remove_job(&id)
             .await
-            .map_err(|e| ApiError::new("CRON_ERROR", &e.to_string()))
+            .map_err(|e| ApiError::new("CRON_ERROR", e.to_string()))
     }
 
     pub async fn cron_create(&self, params: CronJobCreateParams) -> HandlerResult<CronJobResponse> {
         let schedule: scheduling::CronSchedule = serde_json::from_value(params.schedule)
-            .map_err(|e| ApiError::new("INVALID_PARAMS", &format!("invalid schedule: {e}")))?;
+            .map_err(|e| ApiError::new("INVALID_PARAMS", format!("invalid schedule: {e}")))?;
 
         let job = self
             .cron_service
@@ -107,7 +107,7 @@ impl AppCore {
                 scheduling::CronOrigin::User,
             )
             .await
-            .map_err(|e| ApiError::new("CRON_ERROR", &e.to_string()))?;
+            .map_err(|e| ApiError::new("CRON_ERROR", e.to_string()))?;
 
         Ok((to_response(&job), vec![]))
     }
@@ -117,7 +117,7 @@ impl AppCore {
         let existing = jobs
             .iter()
             .find(|j| j.id == params.id)
-            .ok_or_else(|| ApiError::new("NOT_FOUND", &format!("cron job '{}'", params.id)))?;
+            .ok_or_else(|| ApiError::new("NOT_FOUND", format!("cron job '{}'", params.id)))?;
 
         if existing.origin == scheduling::CronOrigin::System {
             return Err(ApiError::new("FORBIDDEN", "Cannot edit system cron jobs"));
@@ -126,7 +126,7 @@ impl AppCore {
         let name = params.name.unwrap_or_else(|| existing.name.clone());
         let schedule = match params.schedule {
             Some(s) => serde_json::from_value(s)
-                .map_err(|e| ApiError::new("INVALID_PARAMS", &format!("invalid schedule: {e}")))?,
+                .map_err(|e| ApiError::new("INVALID_PARAMS", format!("invalid schedule: {e}")))?,
             None => existing.schedule.clone(),
         };
         let message = params
@@ -157,12 +157,12 @@ impl AppCore {
                 origin,
             )
             .await
-            .map_err(|e| ApiError::new("CRON_ERROR", &e.to_string()))?;
+            .map_err(|e| ApiError::new("CRON_ERROR", e.to_string()))?;
 
         self.cron_service
             .remove_job(&params.id)
             .await
-            .map_err(|e| ApiError::new("CRON_ERROR", &e.to_string()))?;
+            .map_err(|e| ApiError::new("CRON_ERROR", e.to_string()))?;
 
         Ok((to_response(&job), vec![]))
     }

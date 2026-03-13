@@ -9,8 +9,8 @@ use chrono::Utc;
 use serde_json::Value;
 use std::sync::Arc;
 
-use crate::{RoutingContext, Tool};
 use crate::params::ParamExtractor;
+use crate::{RoutingContext, Tool};
 use common::{Result, ToolError};
 use storage::{KeyResultRepo, ObjectiveRepo};
 use tools_core::ProgressHandler;

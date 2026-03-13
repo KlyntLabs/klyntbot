@@ -45,6 +45,7 @@ name = "agent"
 version = "0.1.0"
 dependencies = [
  "activity-log",
+ "aho-corasick",
  "async-trait",
  "base64 0.22.1",
  "bus",

@@ -5,8 +5,8 @@ use config::TrustLevel;
 use serde_json::Value;
 use tracing::{debug, warn};
 
-use crate::{PermissionLevel, RoutingContext, Tool};
 use crate::params::ParamExtractor;
+use crate::{PermissionLevel, RoutingContext, Tool};
 use common::{Result, ToolError};
 
 // ── Write-action detection ────────────────────────────────────────────────────

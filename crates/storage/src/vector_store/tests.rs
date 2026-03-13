@@ -9,6 +9,7 @@ use arrow_schema::Field;
 use tempfile::TempDir;
 
 use super::VectorStore;
+use crate::vector_store::cognitive::CognitiveFactParams;
 use crate::vector_store::crud::sanitize_predicate_value;
 
 async fn test_store() -> (VectorStore, TempDir) {
@@ -161,15 +162,15 @@ async fn test_cognitive_upsert_and_search() {
     let (store, _dir) = test_store().await;
 
     store
-        .upsert_cognitive_fact(
-            "fact1",
-            &[0.5; 384],
-            "identity",
-            "user name Jayden",
-            0.9,
-            1.0,
-            0.85,
-        )
+        .upsert_cognitive_fact(CognitiveFactParams {
+            fact_id: "fact1",
+            vector: &[0.5; 384],
+            domain: "identity",
+            text: "user name Jayden",
+            importance: 0.9,
+            stability: 1.0,
+            confidence: 0.85,
+        })
         .await
         .unwrap();
 
@@ -187,11 +188,27 @@ async fn test_cognitive_domain_filter() {
     let (store, _dir) = test_store().await;
 
     store
-        .upsert_cognitive_fact("f1", &[0.5; 384], "identity", "text1", 0.9, 1.0, 0.8)
+        .upsert_cognitive_fact(CognitiveFactParams {
+            fact_id: "f1",
+            vector: &[0.5; 384],
+            domain: "identity",
+            text: "text1",
+            importance: 0.9,
+            stability: 1.0,
+            confidence: 0.8,
+        })
         .await
         .unwrap();
     store
-        .upsert_cognitive_fact("f2", &[0.5; 384], "finance", "text2", 0.8, 1.0, 0.7)
+        .upsert_cognitive_fact(CognitiveFactParams {
+            fact_id: "f2",
+            vector: &[0.5; 384],
+            domain: "finance",
+            text: "text2",
+            importance: 0.8,
+            stability: 1.0,
+            confidence: 0.7,
+        })
         .await
         .unwrap();
 
@@ -209,7 +226,15 @@ async fn test_cognitive_delete() {
     let (store, _dir) = test_store().await;
 
     store
-        .upsert_cognitive_fact("f1", &[0.5; 384], "identity", "text", 0.9, 1.0, 0.8)
+        .upsert_cognitive_fact(CognitiveFactParams {
+            fact_id: "f1",
+            vector: &[0.5; 384],
+            domain: "identity",
+            text: "text",
+            importance: 0.9,
+            stability: 1.0,
+            confidence: 0.8,
+        })
         .await
         .unwrap();
     store

@@ -8,8 +8,8 @@ use async_trait::async_trait;
 use serde_json::Value;
 use std::sync::Arc;
 
-use crate::{PermissionLevel, RoutingContext, Tool};
 use crate::params::ParamExtractor;
+use crate::{PermissionLevel, RoutingContext, Tool};
 use common::{Result, ToolError};
 
 /// Handler trait for agent task operations (dependency inversion).

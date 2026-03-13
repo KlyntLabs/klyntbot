@@ -89,7 +89,7 @@ impl TaskTool {
 
             // Emit domain event
             if let Some(ref bus) = self.domain_bus {
-                let _ = bus.publish(bus::DomainEvent::TaskDecomposed {
+                bus.publish(bus::DomainEvent::TaskDecomposed {
                     source_task_id: task.id.clone(),
                     subtask_ids: created_ids.clone(),
                     total_estimated_mins: result.tree.total_estimated_mins.map(|m| m as i64),

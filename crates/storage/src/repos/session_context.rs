@@ -6,6 +6,17 @@ use sqlx::SqlitePool;
 use crate::error::StorageError;
 use crate::rows::session_context::SessionContextRow;
 
+/// Parameters for upserting a session context.
+pub struct SessionContextParams<'a> {
+    pub session_key: &'a str,
+    pub context_type: &'a str,
+    pub entity_kind: Option<&'a str>,
+    pub entity_id: Option<&'a str>,
+    pub area_id: Option<&'a str>,
+    pub project_id: Option<&'a str>,
+    pub is_ephemeral: bool,
+}
+
 /// Repository for session context persistence and querying.
 #[derive(Debug, Clone)]
 pub struct SessionContextRepo {
@@ -20,13 +31,7 @@ impl SessionContextRepo {
     /// Upsert a session context — insert or update on conflict.
     pub async fn upsert(
         &self,
-        session_key: &str,
-        context_type: &str,
-        entity_kind: Option<&str>,
-        entity_id: Option<&str>,
-        area_id: Option<&str>,
-        project_id: Option<&str>,
-        is_ephemeral: bool,
+        params: SessionContextParams<'_>,
     ) -> Result<SessionContextRow, StorageError> {
         let now = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
         let row = sqlx::query_as::<_, SessionContextRow>(
@@ -43,13 +48,13 @@ impl SessionContextRepo {
                  updated_at   = excluded.updated_at
              RETURNING *",
         )
-        .bind(session_key)
-        .bind(context_type)
-        .bind(entity_kind)
-        .bind(entity_id)
-        .bind(area_id)
-        .bind(project_id)
-        .bind(is_ephemeral)
+        .bind(params.session_key)
+        .bind(params.context_type)
+        .bind(params.entity_kind)
+        .bind(params.entity_id)
+        .bind(params.area_id)
+        .bind(params.project_id)
+        .bind(params.is_ephemeral)
         .bind(&now)
         .bind(&now)
         .fetch_one(&self.pool)
@@ -198,15 +203,15 @@ mod tests {
         create_session(&sessions, "test:ctx1").await;
 
         let row = repo
-            .upsert(
-                "test:ctx1",
-                "project",
-                Some("project"),
-                Some("p-1"),
-                Some("a-1"),
-                None,
-                false,
-            )
+            .upsert(SessionContextParams {
+                session_key: "test:ctx1",
+                context_type: "project",
+                entity_kind: Some("project"),
+                entity_id: Some("p-1"),
+                area_id: Some("a-1"),
+                project_id: None,
+                is_ephemeral: false,
+            })
             .await
             .unwrap();
         assert_eq!(row.session_key, "test:ctx1");
@@ -228,19 +233,27 @@ mod tests {
         };
         create_session(&sessions, "test:ctx2").await;
 
-        repo.upsert("test:ctx2", "general", None, None, None, None, false)
-            .await
-            .unwrap();
+        repo.upsert(SessionContextParams {
+            session_key: "test:ctx2",
+            context_type: "general",
+            entity_kind: None,
+            entity_id: None,
+            area_id: None,
+            project_id: None,
+            is_ephemeral: false,
+        })
+        .await
+        .unwrap();
         let updated = repo
-            .upsert(
-                "test:ctx2",
-                "task",
-                Some("task"),
-                Some("t-1"),
-                None,
-                Some("p-1"),
-                false,
-            )
+            .upsert(SessionContextParams {
+                session_key: "test:ctx2",
+                context_type: "task",
+                entity_kind: Some("task"),
+                entity_id: Some("t-1"),
+                area_id: None,
+                project_id: Some("p-1"),
+                is_ephemeral: false,
+            })
             .await
             .unwrap();
         assert_eq!(updated.context_type, "task");
@@ -255,9 +268,17 @@ mod tests {
         };
         create_session(&sessions, "test:ctx3").await;
 
-        repo.upsert("test:ctx3", "general", None, None, None, None, false)
-            .await
-            .unwrap();
+        repo.upsert(SessionContextParams {
+            session_key: "test:ctx3",
+            context_type: "general",
+            entity_kind: None,
+            entity_id: None,
+            area_id: None,
+            project_id: None,
+            is_ephemeral: false,
+        })
+        .await
+        .unwrap();
         let updated = repo
             .update(
                 "test:ctx3",
@@ -281,9 +302,17 @@ mod tests {
         };
         create_session(&sessions, "test:ctx4").await;
 
-        repo.upsert("test:ctx4", "general", None, None, None, None, false)
-            .await
-            .unwrap();
+        repo.upsert(SessionContextParams {
+            session_key: "test:ctx4",
+            context_type: "general",
+            entity_kind: None,
+            entity_id: None,
+            area_id: None,
+            project_id: None,
+            is_ephemeral: false,
+        })
+        .await
+        .unwrap();
         assert!(repo.delete("test:ctx4").await.unwrap());
         assert!(repo.get("test:ctx4").await.unwrap().is_none());
         assert!(!repo.delete("test:ctx4").await.unwrap());
@@ -298,37 +327,37 @@ mod tests {
         create_session(&sessions, "test:a2").await;
         create_session(&sessions, "test:b1").await;
 
-        repo.upsert(
-            "test:a1",
-            "project",
-            Some("project"),
-            Some("p-1"),
-            Some("area-1"),
-            None,
-            false,
-        )
+        repo.upsert(SessionContextParams {
+            session_key: "test:a1",
+            context_type: "project",
+            entity_kind: Some("project"),
+            entity_id: Some("p-1"),
+            area_id: Some("area-1"),
+            project_id: None,
+            is_ephemeral: false,
+        })
         .await
         .unwrap();
-        repo.upsert(
-            "test:a2",
-            "project",
-            Some("project"),
-            Some("p-2"),
-            Some("area-1"),
-            None,
-            false,
-        )
+        repo.upsert(SessionContextParams {
+            session_key: "test:a2",
+            context_type: "project",
+            entity_kind: Some("project"),
+            entity_id: Some("p-2"),
+            area_id: Some("area-1"),
+            project_id: None,
+            is_ephemeral: false,
+        })
         .await
         .unwrap();
-        repo.upsert(
-            "test:b1",
-            "project",
-            Some("project"),
-            Some("p-3"),
-            Some("area-2"),
-            None,
-            false,
-        )
+        repo.upsert(SessionContextParams {
+            session_key: "test:b1",
+            context_type: "project",
+            entity_kind: Some("project"),
+            entity_id: Some("p-3"),
+            area_id: Some("area-2"),
+            project_id: None,
+            is_ephemeral: false,
+        })
         .await
         .unwrap();
 
@@ -349,31 +378,39 @@ mod tests {
         create_session(&sessions, "test:v3").await;
 
         // Non-ephemeral → visible
-        repo.upsert("test:v1", "general", None, None, None, None, false)
-            .await
-            .unwrap();
+        repo.upsert(SessionContextParams {
+            session_key: "test:v1",
+            context_type: "general",
+            entity_kind: None,
+            entity_id: None,
+            area_id: None,
+            project_id: None,
+            is_ephemeral: false,
+        })
+        .await
+        .unwrap();
         // Ephemeral, not pinned → hidden
-        repo.upsert(
-            "test:v2",
-            "task",
-            Some("task"),
-            Some("t-1"),
-            None,
-            None,
-            true,
-        )
+        repo.upsert(SessionContextParams {
+            session_key: "test:v2",
+            context_type: "task",
+            entity_kind: Some("task"),
+            entity_id: Some("t-1"),
+            area_id: None,
+            project_id: None,
+            is_ephemeral: true,
+        })
         .await
         .unwrap();
         // Ephemeral, pinned → visible
-        repo.upsert(
-            "test:v3",
-            "task",
-            Some("task"),
-            Some("t-2"),
-            None,
-            None,
-            true,
-        )
+        repo.upsert(SessionContextParams {
+            session_key: "test:v3",
+            context_type: "task",
+            entity_kind: Some("task"),
+            entity_id: Some("t-2"),
+            area_id: None,
+            project_id: None,
+            is_ephemeral: true,
+        })
         .await
         .unwrap();
         repo.pin("test:v3").await.unwrap();
@@ -394,12 +431,28 @@ mod tests {
         create_session(&sessions, "test:e2").await;
 
         // Create two ephemeral contexts
-        repo.upsert("test:e1", "general", None, None, None, None, true)
-            .await
-            .unwrap();
-        repo.upsert("test:e2", "general", None, None, None, None, true)
-            .await
-            .unwrap();
+        repo.upsert(SessionContextParams {
+            session_key: "test:e1",
+            context_type: "general",
+            entity_kind: None,
+            entity_id: None,
+            area_id: None,
+            project_id: None,
+            is_ephemeral: true,
+        })
+        .await
+        .unwrap();
+        repo.upsert(SessionContextParams {
+            session_key: "test:e2",
+            context_type: "general",
+            entity_kind: None,
+            entity_id: None,
+            area_id: None,
+            project_id: None,
+            is_ephemeral: true,
+        })
+        .await
+        .unwrap();
 
         // Make e1 old by manually setting updated_at
         sqlx::query(
@@ -426,15 +479,15 @@ mod tests {
         };
         create_session(&sessions, "test:pin1").await;
 
-        repo.upsert(
-            "test:pin1",
-            "task",
-            Some("task"),
-            Some("t-1"),
-            None,
-            None,
-            true,
-        )
+        repo.upsert(SessionContextParams {
+            session_key: "test:pin1",
+            context_type: "task",
+            entity_kind: Some("task"),
+            entity_id: Some("t-1"),
+            area_id: None,
+            project_id: None,
+            is_ephemeral: true,
+        })
         .await
         .unwrap();
         let row = repo.get("test:pin1").await.unwrap().unwrap();

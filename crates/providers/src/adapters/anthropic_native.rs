@@ -581,9 +581,10 @@ impl LlmProvider for AnthropicNativeProvider {
         }
 
         // Anthropic SSE has both `event:` and `data:` lines.
-        Ok(crate::streaming::sse_chunk_stream(response, |event_type, data| {
-            Self::parse_anthropic_sse(event_type.unwrap_or(""), data)
-        }))
+        Ok(crate::streaming::sse_chunk_stream(
+            response,
+            |event_type, data| Self::parse_anthropic_sse(event_type.unwrap_or(""), data),
+        ))
     }
 
     async fn count_tokens(&self, messages: &[Message], tools: Option<&[Value]>) -> Result<usize> {

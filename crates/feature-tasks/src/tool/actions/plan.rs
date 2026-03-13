@@ -50,7 +50,7 @@ impl TaskTool {
         let tasks: Vec<Task> = rows
             .into_iter()
             .map(Task::from)
-            .filter(|t| is_plannable(t))
+            .filter(is_plannable)
             .collect();
         // Give LLM a broader candidate set (sorted by created_at from DB)
         let tasks: Vec<Task> = tasks.into_iter().take(count * 3).collect();
@@ -124,7 +124,7 @@ impl TaskTool {
         debug!("Total tasks in store: {}", all_tasks.len());
 
         let now = Utc::now();
-        let candidates: Vec<_> = all_tasks.into_iter().filter(|t| is_plannable(t)).collect();
+        let candidates: Vec<_> = all_tasks.into_iter().filter(is_plannable).collect();
 
         // Batch-check blockers concurrently instead of N sequential queries
         let blocker_results: Vec<Vec<_>> = try_join_all(

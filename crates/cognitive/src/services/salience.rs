@@ -58,7 +58,7 @@ pub fn evaluate_salience(event: &DomainEvent) -> SalienceVerdict {
         DomainEvent::DistractionDetected { .. } => SalienceVerdict::Accumulate,
         DomainEvent::TaskCreated { .. } => SalienceVerdict::Accumulate,
         DomainEvent::TaskCompleted { deviation_pct, .. } => {
-            if deviation_pct.map_or(false, |d| d.abs() > HIGH_DEVIATION_THRESHOLD) {
+            if deviation_pct.is_some_and(|d| d.abs() > HIGH_DEVIATION_THRESHOLD) {
                 SalienceVerdict::Extract
             } else {
                 SalienceVerdict::Accumulate

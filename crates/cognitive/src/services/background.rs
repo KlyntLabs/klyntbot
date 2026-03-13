@@ -185,6 +185,22 @@ async fn prefetch_existing(
         .collect()
 }
 
+/// Configuration for starting the background consolidation service (avoids too-many-arguments).
+pub struct BackgroundServiceConfig {
+    pub event_rx: broadcast::Receiver<DomainEvent>,
+    pub extraction: Arc<dyn ExtractionHandler>,
+    pub consolidation: Arc<dyn ConsolidationHandler>,
+    pub repo: SemanticFactRepo,
+    pub episodic_repo: Option<EpisodicMemoryRepo>,
+    pub embedder: Option<Arc<dyn SemanticFactEmbedder>>,
+    pub cancel: CancellationToken,
+    pub pipeline_tx: Option<tokio::sync::broadcast::Sender<PipelineEvent>>,
+    pub accum_repo: Option<AccumulatedObservationRepo>,
+    pub failed_obs_repo: Option<FailedObservationRepo>,
+    pub promote_threshold: usize,
+    pub min_days: usize,
+}
+
 /// Background service that processes domain events into cognitive memory.
 pub struct BackgroundConsolidationService {
     cancel_token: CancellationToken,
@@ -193,26 +209,21 @@ pub struct BackgroundConsolidationService {
 
 impl BackgroundConsolidationService {
     /// Start the background service.
-    ///
-    /// - `event_rx`: Receiver from `DomainEventBus`
-    /// - `extraction`: Handler for extracting facts from observations
-    /// - `consolidation`: Handler for consolidation decisions
-    /// - `repo`: Semantic fact repository
-    /// - `cancel`: Cancellation token for graceful shutdown
-    pub fn start(
-        mut event_rx: broadcast::Receiver<DomainEvent>,
-        extraction: Arc<dyn ExtractionHandler>,
-        consolidation: Arc<dyn ConsolidationHandler>,
-        repo: SemanticFactRepo,
-        episodic_repo: Option<EpisodicMemoryRepo>,
-        embedder: Option<Arc<dyn SemanticFactEmbedder>>,
-        cancel: CancellationToken,
-        pipeline_tx: Option<tokio::sync::broadcast::Sender<PipelineEvent>>,
-        accum_repo: Option<AccumulatedObservationRepo>,
-        failed_obs_repo: Option<FailedObservationRepo>,
-        promote_threshold: usize,
-        min_days: usize,
-    ) -> Self {
+    pub fn start(config: BackgroundServiceConfig) -> Self {
+        let BackgroundServiceConfig {
+            mut event_rx,
+            extraction,
+            consolidation,
+            repo,
+            episodic_repo,
+            embedder,
+            cancel,
+            pipeline_tx,
+            accum_repo,
+            failed_obs_repo,
+            promote_threshold,
+            min_days,
+        } = config;
         let cancel_clone = cancel.clone();
         let handle = tokio::spawn(async move {
             // Restore accumulated entries from previous session

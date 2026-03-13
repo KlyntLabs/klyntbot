@@ -8,7 +8,7 @@ use common::EntityCard;
 use desktop_shared::commands::{ChatMessageResponse, SessionContextInput};
 use desktop_shared::errors::ApiError;
 use desktop_shared::events::{self, *};
-use storage::Repos;
+use storage::{Repos, SessionContextParams};
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
@@ -129,15 +129,15 @@ async fn auto_detect_context(
 
     repos
         .session_context
-        .upsert(
+        .upsert(SessionContextParams {
             session_key,
-            "auto",
-            Some(domain),
+            context_type: "auto",
+            entity_kind: Some(domain),
             entity_id,
-            area_id.as_deref(),
-            project_id.as_deref(),
-            false, // non-ephemeral — auto-detected sessions are persistent
-        )
+            area_id: area_id.as_deref(),
+            project_id: project_id.as_deref(),
+            is_ephemeral: false, // non-ephemeral — auto-detected sessions are persistent
+        })
         .await
         .map_err(map_storage_err)?;
 
@@ -219,15 +219,15 @@ pub async fn chat_send(
     if let Some(ctx) = &context {
         repos
             .session_context
-            .upsert(
-                &session_key,
-                ctx.context_type.as_deref().unwrap_or("general"),
-                ctx.entity_kind.as_deref(),
-                ctx.entity_id.as_deref(),
-                None, // area_id resolved later
-                None, // project_id resolved later
-                ctx.is_ephemeral.unwrap_or(false),
-            )
+            .upsert(SessionContextParams {
+                session_key: &session_key,
+                context_type: ctx.context_type.as_deref().unwrap_or("general"),
+                entity_kind: ctx.entity_kind.as_deref(),
+                entity_id: ctx.entity_id.as_deref(),
+                area_id: None,    // area_id resolved later
+                project_id: None, // project_id resolved later
+                is_ephemeral: ctx.is_ephemeral.unwrap_or(false),
+            })
             .await
             .map_err(map_storage_err)?;
     }

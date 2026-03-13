@@ -85,19 +85,14 @@ pub struct CronJobState {
 }
 
 /// Origin of a cron job — who created it
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum CronOrigin {
+    #[default]
     System,
     User,
     Ai,
     Plugin,
-}
-
-impl Default for CronOrigin {
-    fn default() -> Self {
-        Self::System
-    }
 }
 
 /// A scheduled job

@@ -7,7 +7,7 @@ use tracing::warn;
 use crate::errors::{map_storage_err, parse_date};
 use crate::state::{AppCore, EntityUpdate, HandlerResult};
 
-use super::converters::{row_to_task, row_to_task_response, rows_to_tasks, resolve_status_label};
+use super::converters::{resolve_status_label, row_to_task, row_to_task_response, rows_to_tasks};
 
 impl AppCore {
     pub async fn task_get(&self, id: String) -> Result<Option<TaskResponse>, ApiError> {
@@ -252,13 +252,13 @@ impl AppCore {
         // Emit domain event when completing
         if updated.completed {
             if let Ok(bus) = self.domain_event_bus() {
-                let actual_mins = updated.actual_minutes.map(|m| m as i64).or_else(|| {
+                let actual_mins = updated.actual_minutes.map(|m| m as i64).or(
                     if updated.total_tracked_secs > 0 {
                         Some(updated.total_tracked_secs / 60)
                     } else {
                         None
-                    }
-                });
+                    },
+                );
                 let estimated_mins = updated.estimated_minutes.map(|m| m as i64);
                 let deviation_pct = match (actual_mins, estimated_mins) {
                     (Some(a), Some(e)) if e > 0 => Some(((a as f64) / (e as f64) - 1.0) * 100.0),

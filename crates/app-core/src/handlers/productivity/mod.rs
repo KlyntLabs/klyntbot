@@ -1,8 +1,8 @@
 //! Productivity handlers — daily summaries, focus sessions, activity timeline,
 //! goals, time entries, insights, auto-focus, and project tracking.
 
-pub mod converters;
 mod calendar;
+pub mod converters;
 mod focus;
 mod summaries;
 mod tracking;
