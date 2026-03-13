@@ -11,6 +11,7 @@ mod settings;
 mod tasks;
 mod timeline;
 mod work_context;
+mod workspace;
 
 pub use areas::*;
 pub use calendar::*;
@@ -25,3 +26,4 @@ pub use settings::*;
 pub use tasks::*;
 pub use timeline::*;
 pub use work_context::*;
+pub use workspace::*;
