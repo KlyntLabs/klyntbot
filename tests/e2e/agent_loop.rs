@@ -183,7 +183,7 @@ async fn streaming_emits_done_event() {
     while let Some(event) = event_rx.recv().await {
         match event {
             AgentEvent::ContentChunk { .. } => got_content = true,
-            AgentEvent::Done { content } => {
+            AgentEvent::Done { content, .. } => {
                 got_done = true;
                 done_content = content;
                 break;

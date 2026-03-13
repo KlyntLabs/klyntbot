@@ -178,6 +178,7 @@ mod tests {
         event_tx
             .send(AgentEvent::Done {
                 content: String::new(),
+                message_id: None,
             })
             .await
             .unwrap();
@@ -235,6 +236,7 @@ mod tests {
         event_tx
             .send(AgentEvent::Done {
                 content: String::new(),
+                message_id: None,
             })
             .await
             .unwrap();

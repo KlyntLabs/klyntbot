@@ -266,6 +266,8 @@ impl SessionRepo {
     /// Update the tool_calls and metadata columns on the most recent assistant
     /// message for the given session key. Used by the dashboard WebSocket handler
     /// to persist tool-call and entity-card data after the agent saves the message.
+    ///
+    /// Prefer `update_assistant_metadata_by_id` when the message ID is known.
     pub async fn update_last_assistant_metadata(
         &self,
         session_key: &str,
@@ -279,11 +281,34 @@ impl SessionRepo {
              WHERE id = (
                  SELECT id FROM session_messages
                  WHERE session_key = ?1 AND role = 'assistant'
-                 ORDER BY timestamp DESC
+                 ORDER BY timestamp DESC, id DESC
                  LIMIT 1
              )",
         )
         .bind(session_key)
+        .bind(tool_calls)
+        .bind(metadata)
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected() > 0)
+    }
+
+    /// Update metadata on a specific assistant message by ID.
+    /// This avoids the race condition of `update_last_assistant_metadata`
+    /// when multiple assistant messages exist in the same session.
+    pub async fn update_assistant_metadata_by_id(
+        &self,
+        message_id: &str,
+        tool_calls: Option<&serde_json::Value>,
+        metadata: Option<&serde_json::Value>,
+    ) -> Result<bool, StorageError> {
+        let result = sqlx::query(
+            "UPDATE session_messages
+             SET tool_calls = COALESCE(?2, tool_calls),
+                 metadata   = COALESCE(?3, metadata)
+             WHERE id = ?1 AND role = 'assistant'",
+        )
+        .bind(message_id)
         .bind(tool_calls)
         .bind(metadata)
         .execute(&self.pool)

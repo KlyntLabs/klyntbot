@@ -519,25 +519,30 @@ impl AgentLoop {
         }
     }
 
-    async fn save_to_session(&self, session_key: &str, content: &str) {
+    /// Save assistant response to session and return the persisted message ID.
+    async fn save_to_session(&self, session_key: &str, content: &str) -> Option<String> {
         if let Ok(session_arc) = self.session_manager.get_or_create(session_key).await {
             // Mutate under per-session lock, clone for async save
-            let session_clone = {
+            let (session_clone, msg_id) = {
                 let mut session = session_arc.lock().await;
                 session.add_message("assistant", content);
 
-                if let Some(msg_id) = session.messages.last().map(|m| m.id.clone()) {
-                    self.spawn_embed_message(session_key, "assistant", content, &msg_id);
+                let msg_id = session.messages.last().map(|m| m.id.clone());
+                if let Some(ref id) = msg_id {
+                    self.spawn_embed_message(session_key, "assistant", content, id);
                 }
 
-                session.clone()
+                (session.clone(), msg_id)
                 // per-session lock released here
             };
 
             if let Err(e) = self.session_manager.save(&session_clone).await {
                 warn!("Failed to save session: {}", e);
+                return None;
             }
+            return msg_id;
         }
+        None
     }
 
     /// Convert session history to provider Messages.
@@ -700,11 +705,14 @@ impl AgentLoop {
                 .await
             {
                 Ok(response) => {
-                    // ContentChunk events are emitted per-token inside run_cycle
-                    // (via call_provider_streaming), so we only emit Done here.
+                    // Save to session BEFORE emitting Done so the message ID
+                    // is available and the DB row exists when the streaming
+                    // relay tries to update metadata.
+                    let message_id = agent.save_to_session(&sk, &response).await;
                     let _ = event_tx
                         .send(AgentEvent::Done {
                             content: response.clone(),
+                            message_id,
                         })
                         .await;
                     Ok(response)
@@ -718,11 +726,6 @@ impl AgentLoop {
                     Err(e)
                 }
             };
-
-            // Save to session regardless of success/failure
-            if let Ok(ref content) = result {
-                agent.save_to_session(&sk, content).await;
-            }
 
             result
         });

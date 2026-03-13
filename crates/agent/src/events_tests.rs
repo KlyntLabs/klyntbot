@@ -58,6 +58,7 @@ mod tests {
         // AC-3.2: Done { content } serializes as {"type":"done","content":"final response"}
         let event = AgentEvent::Done {
             content: "final response".to_string(),
+            message_id: None,
         };
         let v = serialize(&event);
         assert_eq!(v["type"], "done");
@@ -270,6 +271,7 @@ mod tests {
             },
             AgentEvent::Done {
                 content: "done".to_string(),
+                message_id: None,
             },
             AgentEvent::ConfidenceAssessed {
                 score: 0.8,

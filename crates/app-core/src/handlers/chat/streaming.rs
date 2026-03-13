@@ -515,12 +515,14 @@ pub async fn relay_chat_stream(
                         }
                         entity_cards.push(card);
                     }
-                    AgentEvent::Done { content } => {
+                    AgentEvent::Done { content, message_id } => {
                         flush_text(&mut current_text, &mut segments);
                         if tool_token_sum > 0 {
                             transparency.tool_tokens_total = Some(tool_token_sum);
                         }
-                        // Persist segments + transparency to the assistant message metadata
+                        // Persist segments + transparency to the assistant message metadata.
+                        // Use targeted update by message ID when available to avoid
+                        // overwriting the wrong message in multi-turn conversations.
                         let mut meta = serde_json::Map::new();
                         if !segments.is_empty() {
                             meta.insert(
@@ -533,21 +535,31 @@ pub async fn relay_chat_stream(
                             serde_json::to_value(&transparency).unwrap_or_default(),
                         );
                         let meta_value = serde_json::Value::Object(meta);
-                        match repos.sessions.update_last_assistant_metadata(
-                            sk, None, Some(&meta_value),
-                        ).await {
-                            Ok(true) => {}
-                            Ok(false) => {
-                                tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-                                match repos.sessions.update_last_assistant_metadata(
-                                    sk, None, Some(&meta_value),
-                                ).await {
-                                    Ok(false) => tracing::warn!("metadata persist: no assistant message found for {sk}"),
-                                    Err(e) => tracing::warn!("metadata persist retry failed for {sk}: {e}"),
-                                    _ => {}
-                                }
+                        if let Some(ref mid) = message_id {
+                            // Targeted update by message ID — no race condition
+                            if let Err(e) = repos.sessions.update_assistant_metadata_by_id(
+                                mid, None, Some(&meta_value),
+                            ).await {
+                                tracing::warn!("metadata persist by id failed for {sk}/{mid}: {e}");
                             }
-                            Err(e) => tracing::warn!("metadata persist failed for {sk}: {e}"),
+                        } else {
+                            // Fallback: legacy path for messages without ID
+                            match repos.sessions.update_last_assistant_metadata(
+                                sk, None, Some(&meta_value),
+                            ).await {
+                                Ok(true) => {}
+                                Ok(false) => {
+                                    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+                                    match repos.sessions.update_last_assistant_metadata(
+                                        sk, None, Some(&meta_value),
+                                    ).await {
+                                        Ok(false) => tracing::warn!("metadata persist: no assistant message found for {sk}"),
+                                        Err(e) => tracing::warn!("metadata persist retry failed for {sk}: {e}"),
+                                        _ => {}
+                                    }
+                                }
+                                Err(e) => tracing::warn!("metadata persist failed for {sk}: {e}"),
+                            }
                         }
                         emit!(
                             AGENT_DONE,

@@ -63,7 +63,12 @@ pub enum AgentEvent {
     },
 
     /// Processing is complete with the final accumulated content.
-    Done { content: String },
+    Done {
+        content: String,
+        /// The persisted assistant message ID (for targeted metadata updates).
+        #[serde(rename = "messageId", skip_serializing_if = "Option::is_none")]
+        message_id: Option<String>,
+    },
 
     /// Internal confidence assessment completed (not shown to user in CLI).
     ConfidenceAssessed { score: f32, action: String },
