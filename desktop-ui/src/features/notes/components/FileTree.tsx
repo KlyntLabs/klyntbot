@@ -2,6 +2,7 @@ import { useClickOutside } from "@shared/hooks/useClickOutside";
 import { formatDate } from "@shared/lib/dates";
 import type { Note, Notebook } from "@shared/types";
 import { ContextMenu, ContextMenuItem, ContextMenuSeparator, ContextMenuSubmenu } from "@shared/ui";
+import { WorkspaceFileTree } from "./WorkspaceFileTree";
 import {
   ChevronRight,
   FileText,
@@ -33,6 +34,8 @@ interface FileTreeProps {
   onRenameNote: (id: string, title: string) => void;
   onMoveNote: (id: string, notebookId: string | null) => void;
   onMoveNotebook: (id: string, parentId: string | null) => void;
+  activeWorkspaceFile: string | null;
+  onSelectWorkspaceFile: (filename: string) => void;
 }
 
 type ContextTarget =
@@ -75,6 +78,8 @@ export function FileTree({
   onRenameNote,
   onMoveNote,
   onMoveNotebook,
+  activeWorkspaceFile,
+  onSelectWorkspaceFile,
 }: FileTreeProps) {
   const [contextMenu, setContextMenu] = useState<ContextTarget>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -225,6 +230,11 @@ export function FileTree({
           <div className="text-xs text-dim text-center py-6">No notes yet</div>
         )}
       </div>
+
+      <WorkspaceFileTree
+        activeFile={activeWorkspaceFile}
+        onSelectFile={onSelectWorkspaceFile}
+      />
 
       {/* Context Menu */}
       {contextMenu && (
