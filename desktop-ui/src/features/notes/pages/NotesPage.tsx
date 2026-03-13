@@ -22,50 +22,6 @@ import { NoteSearchBar, type NoteSearchBarHandle } from "../components/NoteSearc
 
 type NotesViewMode = "editor" | "graph";
 
-/** Minimal markdown-to-HTML for workspace config files. */
-function mdToHtml(md: string): string {
-  return md
-    .split("\n\n")
-    .map((block) => {
-      const trimmed = block.trim();
-      if (!trimmed) return "";
-      // Headings
-      const hMatch = trimmed.match(/^(#{1,6})\s+(.*)/);
-      if (hMatch) {
-        const level = hMatch[1].length;
-        return `<h${level}>${escapeHtml(hMatch[2])}</h${level}>`;
-      }
-      // Unordered list
-      if (/^[-*]\s/.test(trimmed)) {
-        const items = trimmed
-          .split("\n")
-          .filter((l) => /^[-*]\s/.test(l.trim()))
-          .map((l) => `<li><p>${inlinemd(l.replace(/^[-*]\s+/, "").trim())}</p></li>`)
-          .join("");
-        return `<ul>${items}</ul>`;
-      }
-      // Code block
-      if (trimmed.startsWith("```")) {
-        const lines = trimmed.split("\n");
-        const code = lines.slice(1, lines.length - 1).join("\n");
-        return `<pre><code>${escapeHtml(code)}</code></pre>`;
-      }
-      // Paragraph (may be multi-line)
-      return `<p>${inlinemd(trimmed.replace(/\n/g, " "))}</p>`;
-    })
-    .join("");
-}
-
-function inlinemd(s: string): string {
-  return escapeHtml(s)
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/`(.+?)`/g, "<code>$1</code>");
-}
-
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
-
 /** Split YAML frontmatter from markdown body. */
 function parseFrontmatter(content: string): { frontmatter: string; body: string } {
   const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
@@ -334,7 +290,7 @@ export default function NotesPage() {
       notebookId: null,
       title: activeWorkspaceFile,
       body: workspaceContent,
-      bodyHtml: mdToHtml(workspaceContent),
+      bodyHtml: "",
       pinned: false,
       archived: false,
       tags: [],
@@ -351,7 +307,7 @@ export default function NotesPage() {
       notebookId: null,
       title: activeAgentFilename,
       body: agentBody,
-      bodyHtml: mdToHtml(agentBody),
+      bodyHtml: "",
       pinned: false,
       archived: false,
       tags: [],
