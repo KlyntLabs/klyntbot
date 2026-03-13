@@ -152,6 +152,38 @@ pub fn create_provider_with_failover(config: &Config) -> Result<(DynProvider, St
     ))
 }
 
+/// Like [`create_provider_with_failover`] but also returns the inner [`ProviderManager`]
+/// when one is created, allowing callers to attach persistence callbacks and restore
+/// circuit breaker state across restarts.
+///
+/// Returns `None` for the manager when no fallback is configured (no `ProviderManager`
+/// is created in that case).
+pub fn create_provider_with_failover_full(
+    config: &Config,
+) -> Result<(DynProvider, Option<Arc<ProviderManager>>, String)> {
+    let (primary, resolved_model) = create_provider(config)?;
+
+    let pm_config = &config.provider_manager;
+    let fallback_name = match &pm_config.fallback {
+        Some(name) if !name.is_empty() => name,
+        _ => return Ok((primary, None, resolved_model)),
+    };
+
+    let fallback = create_fallback_provider(config, fallback_name)?;
+
+    let classifier = pm_config
+        .classifier_model
+        .as_deref()
+        .and_then(|model| create_classifier_provider(config, model));
+
+    info!(
+        "Created ProviderManager with fallback provider: {}",
+        fallback_name
+    );
+    let manager = Arc::new(ProviderManager::new(primary, Some(fallback), classifier));
+    Ok((manager.clone(), Some(manager), resolved_model))
+}
+
 /// Create a fallback provider by name from config.
 fn create_fallback_provider(config: &Config, provider_name: &str) -> Result<DynProvider> {
     let spec = ProviderRegistry::find_by_name(provider_name).ok_or_else(|| {

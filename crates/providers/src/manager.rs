@@ -5,6 +5,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 use serde_json::Value;
 use tokio::sync::RwLock;
 
@@ -30,6 +31,10 @@ impl Default for CircuitBreakerConfig {
     }
 }
 
+/// Called when the circuit opens. Receives the UTC wall-clock deadline.
+/// Used by app-core to persist state across restarts.
+pub type OnCircuitOpen = Arc<dyn Fn(DateTime<Utc>) + Send + Sync>;
+
 /// Manages primary/fallback providers with retry, failover, and circuit breaker logic.
 pub struct ProviderManager {
     primary: DynProvider,
@@ -38,7 +43,12 @@ pub struct ProviderManager {
     pub classifier_provider: Option<DynProvider>,
     failure_count: Arc<AtomicU32>,
     circuit_open_until: Arc<RwLock<Option<tokio::time::Instant>>>,
+    /// Wall-clock counterpart to `circuit_open_until` — serializable for persistence.
+    circuit_open_until_utc: Arc<RwLock<Option<DateTime<Utc>>>>,
     circuit_config: CircuitBreakerConfig,
+    /// Optional callback invoked when the circuit opens, for persistence.
+    /// Stored behind RwLock so it can be set after Arc construction.
+    on_circuit_open: RwLock<Option<OnCircuitOpen>>,
 }
 
 impl ProviderManager {
@@ -67,8 +77,32 @@ impl ProviderManager {
             classifier_provider,
             failure_count: Arc::new(AtomicU32::new(0)),
             circuit_open_until: Arc::new(RwLock::new(None)),
+            circuit_open_until_utc: Arc::new(RwLock::new(None)),
             circuit_config,
+            on_circuit_open: RwLock::new(None),
         }
+    }
+
+    /// Attach a callback invoked when the circuit opens (used by app-core for persistence).
+    /// Can be called after `Arc` construction.
+    pub async fn set_circuit_open_callback(&self, callback: OnCircuitOpen) {
+        *self.on_circuit_open.write().await = Some(callback);
+    }
+
+    /// Restore circuit breaker state from a persisted UTC deadline.
+    /// Call this on startup after loading from storage. No-ops if deadline has already passed.
+    pub async fn restore_circuit_state(&self, open_until_utc: DateTime<Utc>) {
+        let remaining = open_until_utc - Utc::now();
+        if remaining.num_milliseconds() <= 0 {
+            return; // already expired — treat as closed
+        }
+        let duration = std::time::Duration::from_millis(remaining.num_milliseconds() as u64);
+        *self.circuit_open_until.write().await = Some(tokio::time::Instant::now() + duration);
+        *self.circuit_open_until_utc.write().await = Some(open_until_utc);
+        tracing::info!(
+            open_until = %open_until_utc,
+            "circuit breaker restored from persisted state"
+        );
     }
 
     /// Check if circuit is open (primary should be bypassed)
@@ -84,12 +118,19 @@ impl ProviderManager {
     async fn record_failure(&self) {
         let count = self.failure_count.fetch_add(1, Ordering::SeqCst) + 1;
         if count >= self.circuit_config.failure_threshold {
-            let mut open_until = self.circuit_open_until.write().await;
-            *open_until = Some(
-                tokio::time::Instant::now()
-                    + std::time::Duration::from_secs(self.circuit_config.reset_timeout_secs),
-            );
+            let reset_dur =
+                std::time::Duration::from_secs(self.circuit_config.reset_timeout_secs);
+            let open_until_utc = Utc::now()
+                + chrono::Duration::from_std(reset_dur).unwrap_or(chrono::Duration::seconds(60));
+
+            *self.circuit_open_until.write().await =
+                Some(tokio::time::Instant::now() + reset_dur);
+            *self.circuit_open_until_utc.write().await = Some(open_until_utc);
             self.failure_count.store(0, Ordering::SeqCst);
+
+            if let Some(ref cb) = *self.on_circuit_open.read().await {
+                cb(open_until_utc);
+            }
         }
     }
 

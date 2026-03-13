@@ -7,6 +7,7 @@
 #[macro_use]
 mod macros;
 
+pub mod circuit_breaker;
 pub mod error;
 pub mod finance_storage;
 pub mod pool;

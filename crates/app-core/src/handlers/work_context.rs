@@ -3,6 +3,7 @@
 use std::collections::{BTreeMap, HashMap};
 
 use chrono::{Duration, Utc};
+use cognitive::SemanticFactRepo;
 use desktop_shared::commands::{
     ContextResumeResponse, ContextTimelineBlockResponse, DashboardIntelligenceResponse,
     DashboardNudge, InferenceConfigUpdate, InferenceStatsResponse, ResourceCluster, SessionBlock,
@@ -10,7 +11,7 @@ use desktop_shared::commands::{
 };
 use desktop_shared::errors::ApiError;
 
-use crate::errors::map_activity_log_err as map_err;
+use crate::errors::{map_activity_log_err as map_err, map_cognitive_err};
 use crate::state::AppCore;
 
 impl AppCore {
@@ -362,9 +363,11 @@ impl AppCore {
         tz_offset_mins: Option<i32>,
     ) -> Result<DashboardIntelligenceResponse, ApiError> {
         let (start, end) = crate::errors::parse_local_day_range(date, tz_offset_mins)?;
+        let yesterday_start = start - Duration::days(1);
 
-        // Fetch day's events and active contexts in parallel
-        let (events, contexts) = tokio::try_join!(
+        // Fetch today's events, yesterday's events, active contexts, and semantic facts in parallel
+        let fact_repo = SemanticFactRepo::new(self.repos.pool().clone());
+        let (events, yesterday_events, contexts, work_facts) = tokio::try_join!(
             async {
                 activity_log::ActivityLogRepo::query_range(
                     &self.storage_pool,
@@ -377,9 +380,26 @@ impl AppCore {
                 .map_err(map_err)
             },
             async {
+                activity_log::ActivityLogRepo::query_range(
+                    &self.storage_pool,
+                    yesterday_start,
+                    start,
+                    10_000,
+                    0,
+                )
+                .await
+                .map_err(map_err)
+            },
+            async {
                 activity_log::WorkContextRepo::list_active(&self.storage_pool)
                     .await
                     .map_err(map_err)
+            },
+            async {
+                fact_repo
+                    .list_active("productivity")
+                    .await
+                    .map_err(map_cognitive_err)
             },
         )?;
 
@@ -491,8 +511,27 @@ impl AppCore {
             context_switches,
             switch_quality,
             productivity_score,
-            score_trend: 0.0, // TODO: compare with yesterday
-            patterns: vec![], // TODO: pull from cognitive semantic facts
+            score_trend: {
+                let yday_total: i64 =
+                    yesterday_events.iter().filter_map(|e| e.duration_secs).sum();
+                let yday_assigned: i64 = yesterday_events
+                    .iter()
+                    .filter(|e| e.work_context_id.is_some())
+                    .filter_map(|e| e.duration_secs)
+                    .sum();
+                let yday_score = if yday_total > 0 {
+                    (yday_assigned as f64 / yday_total as f64).clamp(0.0, 1.0)
+                } else {
+                    0.0
+                };
+                productivity_score - yday_score
+            },
+            patterns: work_facts
+                .iter()
+                .filter(|f| f.confidence >= 0.6)
+                .take(5)
+                .map(|f| format!("{} {} {}", f.subject, f.predicate, f.object))
+                .collect(),
             nudges,
             resource_clusters,
         })

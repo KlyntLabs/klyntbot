@@ -17,7 +17,7 @@ pub use adapters::{
 };
 
 // ── Manager ───────────────────────────────────────────────
-pub use manager::{CircuitBreakerConfig, ProviderManager};
+pub use manager::{CircuitBreakerConfig, OnCircuitOpen, ProviderManager};
 
 // ── Registry ──────────────────────────────────────────────
 pub use registry::{ProviderRegistry, ProviderSpec, PROVIDERS};
@@ -33,5 +33,5 @@ pub use types::{
 // ── Factory ───────────────────────────────────────────────
 pub use factory::{
     cognitive_chat_params, create_cognitive_provider, create_provider,
-    create_provider_with_failover,
+    create_provider_with_failover, create_provider_with_failover_full,
 };

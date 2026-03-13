@@ -27,19 +27,6 @@ These items were identified during the 2026-03-12 structural refactor analysis.
 
 ---
 
-### A-007 🟢 Low | `app-core/handlers/work_context` — "Compare With Yesterday" Not Implemented
-
-**Summary:** The daily work summary handler has placeholders for cross-day comparison (productivity trends) and pulling context from cognitive memory.
-
-**Impact:** Daily summaries are less actionable. No trend visibility.
-
-**Proposed Fix:**
-- Add yesterday comparison in `WorkContextSummaryHandler::summarize_day()`
-- Query `cognitive` semantic facts for work-related context before generating summary
-
-**References:** `crates/app-core/src/handlers/work_context.rs`
-
----
 
 ### A-010 🟡 Medium | `feature-tasks` — Phase 3 Implementation Pending
 
@@ -110,19 +97,6 @@ These items were identified during the 2026-03-12 structural refactor analysis.
 
 ---
 
-### A-019 🟡 Medium | `providers` — Circuit Breaker State is In-Memory Only
-
-**Summary:** `ProviderManager` circuit breaker state is in-memory. On restart, all circuit breakers reset to closed even if a provider was failing repeatedly.
-
-**Impact:** After restart, the agent will hammer a failing provider again until the circuit reopens.
-
-**Proposed Fix:**
-- Persist circuit breaker state in SQLite (`circuit_breaker_state` table)
-- Include `open_until: Option<DateTime<Utc>>` so breakers survive restarts
-
-**References:** `crates/providers/src/manager.rs`
-
----
 
 ### A-020 🟢 Low | `scheduling` — No Missed-Run Catchup Logic
 
