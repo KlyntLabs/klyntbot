@@ -19,7 +19,7 @@ pub struct Area {
 
 impl Area {
     pub fn generate_id() -> String {
-        uuid::Uuid::new_v4().to_string()[..8].to_string()
+        uuid::Uuid::new_v4().to_string()
     }
 }
 
@@ -100,7 +100,8 @@ mod tests {
     #[test]
     fn test_area_id_generation() {
         let id = Area::generate_id();
-        assert_eq!(id.len(), 8);
+        assert_eq!(id.len(), 36); // full UUID
+        assert_ne!(id, Area::generate_id());
     }
 
     #[test]

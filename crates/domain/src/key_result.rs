@@ -23,7 +23,7 @@ pub struct KeyResult {
 
 impl KeyResult {
     pub fn generate_id() -> String {
-        uuid::Uuid::new_v4().to_string()[..8].to_string()
+        uuid::Uuid::new_v4().to_string()
     }
 
     /// Recalculate progress based on tracking mode.

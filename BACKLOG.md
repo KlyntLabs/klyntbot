@@ -27,25 +27,17 @@ These items were identified during the 2026-03-12 structural refactor analysis.
 
 ---
 
-### A-003 🔴 High | `channels` — Feishu/Lark Channel: Config Present, Implementation Missing
+### A-003 🟡 Medium | `channels` — Feishu/Lark Channel: Implementation Missing
 
-**Summary:** `FeishuConfig` exists in `crates/config/src/schema/channels.rs` with full field definitions (`app_id`, `app_secret`, `encrypt_key`, `verification_token`, `allow_from`). No corresponding `Channel` trait implementation exists anywhere in `crates/channels/src/`. The `ChannelManager` silently ignores enabled Feishu config.
-
-**Impact:** Users who set `channels.feishu.enabled = true` get no error and no channel. Silent misconfiguration.
-
-**Proposed Fix:**
-- Short-term: Add validation in `ChannelManager::from_config()` — if `feishu.enabled = true`, log a clear `tracing::error!("Feishu channel is not yet implemented")` and return an error
-- Long-term: Implement `FeishuChannel` using Feishu Open Platform webhook/event subscription API
+**Summary:** `FeishuConfig` exists but no `Channel` trait implementation. `ChannelManager` now logs `tracing::error!` when `feishu.enabled = true` (short-term fix done). Long-term: implement `FeishuChannel` using Feishu Open Platform API.
 
 **References:** `crates/config/src/schema/channels.rs`, `crates/channels/src/manager.rs`
 
 ---
 
-### A-004 🔴 High | `channels` — DingTalk Channel: Config Present, Implementation Missing
+### A-004 🟡 Medium | `channels` — DingTalk Channel: Implementation Missing
 
-**Summary:** Same as A-003 for DingTalk. `DingTalkConfig` (`client_id`, `client_secret`, `allow_from`) exists in config but no `Channel` implementation exists.
-
-**Proposed Fix:** Same pattern as A-003 — add validation warning + stub, then implement using DingTalk Chatbot API.
+**Summary:** Same as A-003 for DingTalk. `ChannelManager` now logs `tracing::error!` when `dingtalk.enabled = true` (short-term fix done). Long-term: implement using DingTalk Chatbot API.
 
 **References:** `crates/config/src/schema/channels.rs`, `crates/channels/src/manager.rs`
 
@@ -276,16 +268,6 @@ These items were identified during the 2026-03-12 structural refactor analysis.
 
 ---
 
-### A-025 🟡 Medium | `desktop` — Tauri `tauri.conf.json` Uses `npm` Instead of `bun`
-
-**Summary:** `beforeDevCommand: "npm run dev"` but project requires `bun`. `cargo tauri dev` fails with ENOENT.
-
-**Proposed Fix:** Change `beforeDevCommand` to `"bun run dev"`.
-
-**References:** `crates/desktop/tauri.conf.json`, CLAUDE.md Gotchas
-
----
-
 ### A-026 🟢 Low | `common/types.rs` — `ChatId` Lacks Typed Constructors
 
 **Summary:** `ChatId` is constructed via raw string literals everywhere, making it easy to construct invalid IDs.
@@ -350,18 +332,6 @@ These items were identified during the 2026-03-12 structural refactor analysis.
 
 ---
 
-### A-032 🔴 High | `domain` — `generate_id()` Produces 8-Char Truncated UUIDs
-
-**Summary:** Domain type `generate_id()` methods produce 8-char IDs while app-core produces full 36-char UUIDs. Mixed ID lengths exist in the database.
-
-**Impact:** Cross-table FK lookups and LLM context injection are more error-prone.
-
-**Proposed Fix:** Remove `generate_id()` from domain types. Use full UUIDs from a single utility in `common`.
-
-**References:** `crates/domain/src/area.rs`, `crates/domain/src/key_result.rs`, `crates/domain/src/objective.rs`, `crates/domain/src/project.rs`
-
----
-
 ### A-033 🟡 Medium | `storage` — `resources` and `archive_items` Tables Schema-Only
 
 **Summary:** Two tables have no row struct, repo, or tool implementation. They create false impressions of implemented features.
@@ -407,26 +377,6 @@ These items were identified during the 2026-03-12 structural refactor analysis.
 **Summary:** Field named `task_id` but FK references `actions(id)` (legacy). Needs updating when `feature-todo` is deprecated (see A-009).
 
 **References:** `crates/storage/migrations/001_initial.sql`
-
----
-
-### A-039 🟢 Low | `storage` — `session_context.rs` Tests Use File-Based Pool
-
-**Summary:** Only repo test file using file-based pool instead of `connect_in_memory()`. Leaves orphaned temp directories.
-
-**Proposed Fix:** Migrate to `connect_in_memory()`.
-
-**References:** `crates/storage/src/repos/session_context.rs`
-
----
-
-### A-040 🟢 Low | `storage` — `session_context.rs` Manual Timestamp Formatting
-
-**Summary:** Four places manually format timestamps instead of binding `chrono::DateTime<Utc>` directly via sqlx.
-
-**Proposed Fix:** Replace manual format strings with direct chrono binding.
-
-**References:** `crates/storage/src/repos/session_context.rs`
 
 ---
 
@@ -482,14 +432,14 @@ These items were identified during the 2026-03-12 structural refactor analysis.
 - Recurring task generation with FSRS-adjusted intervals
 
 ### C-002 🟡 Medium | Feishu/Lark Channel Implementation
-**Prerequisites:** A-003 stub in place
+**Prerequisites:** A-003 error logging in place (done)
 - OAuth App Token flow
 - Receive events via webhook (message, action card)
 - Send text, card, file messages
 - Interactive card with button/select support
 
 ### C-003 🟡 Medium | DingTalk Channel Implementation
-**Prerequisites:** A-004 stub in place
+**Prerequisites:** A-004 error logging in place (done)
 - Outgoing webhook message receive
 - `access_token` sign + send messages
 - Action card interactions

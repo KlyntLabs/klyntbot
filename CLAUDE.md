@@ -133,6 +133,6 @@ Klyntbot exposes tools to external AI clients (Claude Code, Cursor, etc.) via MC
 - **Config changes require restart** of the desktop app.
 - **Dependency inversion** — new tools needing agent context must inject via `Arc<dyn Trait>` to avoid circular deps.
 - **`email` feature** (on by default) gates IMAP/SMTP deps in `channels` crate.
-- **`tauri.conf.json` uses `npm` in `beforeDevCommand`** but project requires `bun`. `cargo tauri dev` may fail with ENOENT. Workaround: start Vite manually (`cd desktop-ui && bun run dev`) then run `cargo tauri dev`, or use browser-only dev mode.
+- **`tauri.conf.json` uses `bun`** in `beforeBuildCommand`. Ensure `bun` is installed globally.
 - **Timestamps are UTC** — Rust emits `chrono::Utc::now().to_rfc3339()`. Never `.slice()` ISO strings for display — always parse via `new Date(iso)` and use `toLocaleTimeString()`. Shared helper: `formatTime()` in `desktop-ui/src/shared/lib/dates.ts`.
 - **Pre-release — no user data to migrate.** All schema changes can be made directly (alter tables, drop and recreate) without writing migration scripts. No need for backwards-compatible migrations until first release. When a migration is consolidated, update the `FeatureMigration` version and SQL in-place rather than adding incremental migration files. After first release, all schema changes require proper versioned migrations with `INSERT OR IGNORE` for idempotency. Legacy `feature-todo` crate can be removed once `feature-tasks` fully replaces it.

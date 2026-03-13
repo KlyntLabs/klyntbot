@@ -33,7 +33,7 @@ impl SessionContextRepo {
         &self,
         params: SessionContextParams<'_>,
     ) -> Result<SessionContextRow, StorageError> {
-        let now = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+        let now = Utc::now();
         let row = sqlx::query_as::<_, SessionContextRow>(
             "INSERT INTO session_context
                  (session_key, context_type, entity_kind, entity_id, area_id, project_id, is_ephemeral, created_at, updated_at)
@@ -55,8 +55,8 @@ impl SessionContextRepo {
         .bind(params.area_id)
         .bind(params.project_id)
         .bind(params.is_ephemeral)
-        .bind(&now)
-        .bind(&now)
+        .bind(now)
+        .bind(now)
         .fetch_one(&self.pool)
         .await?;
         Ok(row)
@@ -83,7 +83,7 @@ impl SessionContextRepo {
         area_id: Option<&str>,
         project_id: Option<&str>,
     ) -> Result<Option<SessionContextRow>, StorageError> {
-        let now = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+        let now = Utc::now();
         let row = sqlx::query_as::<_, SessionContextRow>(
             "UPDATE session_context SET
                  context_type = COALESCE(?2, context_type),
@@ -101,7 +101,7 @@ impl SessionContextRepo {
         .bind(entity_id)
         .bind(area_id)
         .bind(project_id)
-        .bind(&now)
+        .bind(now)
         .fetch_optional(&self.pool)
         .await?;
         Ok(row)
@@ -144,14 +144,12 @@ impl SessionContextRepo {
 
     /// Delete ephemeral (non-pinned) session contexts older than `days`.
     pub async fn cleanup_old_ephemeral(&self, days: i64) -> Result<u64, StorageError> {
-        let cutoff = (Utc::now() - chrono::Duration::days(days))
-            .format("%Y-%m-%dT%H:%M:%SZ")
-            .to_string();
+        let cutoff = Utc::now() - chrono::Duration::days(days);
         let result = sqlx::query(
             "DELETE FROM session_context
              WHERE is_ephemeral = 1 AND is_pinned = 0 AND updated_at < ?1",
         )
-        .bind(&cutoff)
+        .bind(cutoff)
         .execute(&self.pool)
         .await?;
         Ok(result.rows_affected())
@@ -159,12 +157,12 @@ impl SessionContextRepo {
 
     /// Pin a session context (makes ephemeral sessions visible in the thread list).
     pub async fn pin(&self, session_key: &str) -> Result<bool, StorageError> {
-        let now = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+        let now = Utc::now();
         let result = sqlx::query(
             "UPDATE session_context SET is_pinned = 1, updated_at = ?2 WHERE session_key = ?1",
         )
         .bind(session_key)
-        .bind(&now)
+        .bind(now)
         .execute(&self.pool)
         .await?;
         Ok(result.rows_affected() > 0)
@@ -176,15 +174,13 @@ mod tests {
     use super::*;
     use crate::StoragePool;
 
-    async fn test_repo() -> Option<(SessionContextRepo, crate::repos::SessionRepo)> {
-        let dir = tempfile::tempdir().ok()?;
-        let pool = StoragePool::connect(dir.path()).await.ok()?;
-        let _ = dir.keep();
+    async fn test_repo() -> (SessionContextRepo, crate::repos::SessionRepo) {
+        let pool = StoragePool::connect_in_memory().await.unwrap();
         let db = pool.inner().clone();
-        Some((
+        (
             SessionContextRepo::new(db.clone()),
             crate::repos::SessionRepo::new(db),
-        ))
+        )
     }
 
     /// Helper: create a session so foreign key constraint is satisfied.
@@ -197,9 +193,7 @@ mod tests {
 
     #[tokio::test]
     async fn session_context_upsert_and_get() {
-        let Some((repo, sessions)) = test_repo().await else {
-            return;
-        };
+        let (repo, sessions) = test_repo().await;
         create_session(&sessions, "test:ctx1").await;
 
         let row = repo
@@ -228,9 +222,7 @@ mod tests {
 
     #[tokio::test]
     async fn session_context_upsert_updates_on_conflict() {
-        let Some((repo, sessions)) = test_repo().await else {
-            return;
-        };
+        let (repo, sessions) = test_repo().await;
         create_session(&sessions, "test:ctx2").await;
 
         repo.upsert(SessionContextParams {
@@ -263,9 +255,7 @@ mod tests {
 
     #[tokio::test]
     async fn session_context_update() {
-        let Some((repo, sessions)) = test_repo().await else {
-            return;
-        };
+        let (repo, sessions) = test_repo().await;
         create_session(&sessions, "test:ctx3").await;
 
         repo.upsert(SessionContextParams {
@@ -297,9 +287,7 @@ mod tests {
 
     #[tokio::test]
     async fn session_context_delete() {
-        let Some((repo, sessions)) = test_repo().await else {
-            return;
-        };
+        let (repo, sessions) = test_repo().await;
         create_session(&sessions, "test:ctx4").await;
 
         repo.upsert(SessionContextParams {
@@ -320,9 +308,7 @@ mod tests {
 
     #[tokio::test]
     async fn session_context_list_by_area() {
-        let Some((repo, sessions)) = test_repo().await else {
-            return;
-        };
+        let (repo, sessions) = test_repo().await;
         create_session(&sessions, "test:a1").await;
         create_session(&sessions, "test:a2").await;
         create_session(&sessions, "test:b1").await;
@@ -370,9 +356,7 @@ mod tests {
 
     #[tokio::test]
     async fn session_context_list_visible() {
-        let Some((repo, sessions)) = test_repo().await else {
-            return;
-        };
+        let (repo, sessions) = test_repo().await;
         create_session(&sessions, "test:v1").await;
         create_session(&sessions, "test:v2").await;
         create_session(&sessions, "test:v3").await;
@@ -424,9 +408,7 @@ mod tests {
 
     #[tokio::test]
     async fn session_context_cleanup_ephemeral() {
-        let Some((repo, sessions)) = test_repo().await else {
-            return;
-        };
+        let (repo, sessions) = test_repo().await;
         create_session(&sessions, "test:e1").await;
         create_session(&sessions, "test:e2").await;
 
@@ -474,9 +456,7 @@ mod tests {
 
     #[tokio::test]
     async fn session_context_pin() {
-        let Some((repo, sessions)) = test_repo().await else {
-            return;
-        };
+        let (repo, sessions) = test_repo().await;
         create_session(&sessions, "test:pin1").await;
 
         repo.upsert(SessionContextParams {

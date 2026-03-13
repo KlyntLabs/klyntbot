@@ -106,6 +106,14 @@ impl ChannelManager {
             EmailChannel::new(self.config.channels.email.clone())
         );
 
+        // Warn about unimplemented channels configured as enabled
+        if self.config.channels.feishu.enabled {
+            error!("Feishu/Lark channel is not yet implemented — ignoring channels.feishu.enabled = true");
+        }
+        if self.config.channels.dingtalk.enabled {
+            error!("DingTalk channel is not yet implemented — ignoring channels.dingtalk.enabled = true");
+        }
+
         Ok(())
     }
 

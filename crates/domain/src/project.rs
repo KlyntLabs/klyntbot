@@ -18,7 +18,7 @@ pub struct Project {
 
 impl Project {
     pub fn generate_id() -> String {
-        uuid::Uuid::new_v4().to_string()[..8].to_string()
+        uuid::Uuid::new_v4().to_string()
     }
 }
 
@@ -149,8 +149,7 @@ mod tests {
     #[test]
     fn test_project_id_generation() {
         let id = Project::generate_id();
-        assert_eq!(id.len(), 8);
-        // Two generated IDs must differ (with overwhelming probability)
+        assert_eq!(id.len(), 36); // full UUID
         assert_ne!(id, Project::generate_id());
     }
 }
