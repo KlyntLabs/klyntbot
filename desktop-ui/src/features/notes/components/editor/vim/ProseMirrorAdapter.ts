@@ -352,7 +352,10 @@ export class ProseMirrorAdapter {
       if (s.ch === 0) {
         // Deleting from start of a line — remove the starting block(s)
         blockFrom = $from.before($from.depth);
-        blockTo = e && e.ch === 0 ? $to.before($to.depth) : $to.after($to.depth);
+        // e.ch===0 means "up to but not including this block" — UNLESS e.line
+        // is past the document end (clamped), which means "delete through the end"
+        const eWithinBounds = e && e.line < this.model.lineCount();
+        blockTo = e && e.ch === 0 && eWithinBounds ? $to.before($to.depth) : $to.after($to.depth);
       } else {
         // Deleting from end/middle of a line (last-line dd) — keep starting block,
         // remove the ending block(s)
