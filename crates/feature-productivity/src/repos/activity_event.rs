@@ -261,6 +261,36 @@ impl ActivityEventRepo {
             .collect())
     }
 
+    pub async fn aggregate_by_project(
+        &self,
+        start_date: &str,
+        end_date: &str,
+    ) -> common::Result<Vec<(String, i64)>> {
+        #[derive(sqlx::FromRow)]
+        struct Row {
+            project_id: String,
+            total_secs: i64,
+        }
+        let rows = sqlx::query_as::<_, Row>(
+            r#"SELECT project_id, COALESCE(SUM(duration_secs), 0) as total_secs
+               FROM activity_events
+               WHERE started_at >= ?1
+                 AND started_at < date(?2, '+1 day')
+                 AND project_id IS NOT NULL
+               GROUP BY project_id
+               ORDER BY total_secs DESC"#,
+        )
+        .bind(start_date)
+        .bind(end_date)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        Ok(rows
+            .into_iter()
+            .map(|r| (r.project_id, r.total_secs))
+            .collect())
+    }
+
     /// Returns all distinct app/site combinations with their category name and total duration.
     pub async fn tracked_apps(&self) -> common::Result<Vec<TrackedAppRow>> {
         #[derive(Debug, Clone, sqlx::FromRow)]

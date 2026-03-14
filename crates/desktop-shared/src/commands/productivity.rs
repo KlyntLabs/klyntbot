@@ -26,6 +26,9 @@ pub struct ProductivitySummaryResponse {
     pub score_trend: Option<f64>,
     pub focus_time_trend: Option<f64>,
     pub active_time_trend: Option<f64>,
+    pub deep_work_blocks: i64,
+    pub deep_work_secs: i64,
+    pub avg_recovery_secs: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -219,6 +222,33 @@ pub struct WeeklyAssessmentResponse {
     pub total_distracting_secs: Option<i64>,
     pub top_apps: Option<String>,
     pub summary: Option<String>,
+}
+
+// ── Productivity Patterns ────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProductivityPatternsResponse {
+    pub peak_focus_hours: Vec<u32>,
+    pub avg_session_mins: f64,
+    pub productive_ratio: f64,
+    pub avg_context_switches: f64,
+    pub best_day_of_week: Option<String>,
+    pub days_analyzed: usize,
+}
+
+// ── Hourly Breakdown ─────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HourlyBreakdownResponse {
+    pub hour: u32,
+    pub productive_secs: i64,
+    pub neutral_secs: i64,
+    pub distracting_secs: i64,
+    pub idle_secs: i64,
+    pub total_secs: i64,
+    pub productive_ratio: f64,
 }
 
 // ── Distraction ────────────────────────────────────────────────────────

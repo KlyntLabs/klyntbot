@@ -1,7 +1,10 @@
 //! Productivity summary handlers — today, timeline, weekly, date ranges, activity feed.
 
 use chrono::Utc;
-use desktop_shared::commands::{ActivityTimelineResponse, ProductivitySummaryResponse};
+use desktop_shared::commands::{
+    ActivityTimelineResponse, HourlyBreakdownResponse, ProductivityPatternsResponse,
+    ProductivitySummaryResponse,
+};
 use desktop_shared::errors::ApiError;
 
 use super::converters::{event_to_timeline, summary_to_response};
@@ -126,6 +129,55 @@ impl AppCore {
         }
 
         Ok(responses)
+    }
+
+    pub async fn productivity_patterns(
+        &self,
+        days: Option<u32>,
+    ) -> Result<ProductivityPatternsResponse, ApiError> {
+        let repos = self.productivity_repos()?;
+        let analyzer = feature_productivity::ProductivityPatternAnalyzer::new(repos.clone());
+        let patterns = analyzer
+            .analyze(days.unwrap_or(14))
+            .await
+            .map_err(map_prod_err)?;
+        Ok(ProductivityPatternsResponse {
+            peak_focus_hours: patterns.peak_focus_hours,
+            avg_session_mins: patterns.avg_session_mins,
+            productive_ratio: patterns.productive_ratio,
+            avg_context_switches: patterns.avg_context_switches,
+            best_day_of_week: patterns.best_day_of_week.map(|d| d.to_string()),
+            days_analyzed: patterns.days_analyzed,
+        })
+    }
+
+    pub async fn productivity_hourly_breakdown(
+        &self,
+        start_date: String,
+        end_date: String,
+    ) -> Result<Vec<HourlyBreakdownResponse>, ApiError> {
+        let repos = self.productivity_repos()?;
+        let rows = repos
+            .buckets
+            .aggregate_by_hour(&start_date, &end_date)
+            .await
+            .map_err(map_prod_err)?;
+        Ok(rows
+            .into_iter()
+            .map(|r| HourlyBreakdownResponse {
+                hour: r.hour as u32,
+                productive_secs: r.productive_secs,
+                neutral_secs: r.neutral_secs,
+                distracting_secs: r.distracting_secs,
+                idle_secs: r.idle_secs,
+                total_secs: r.total_secs,
+                productive_ratio: if r.total_secs > 0 {
+                    r.productive_secs as f64 / r.total_secs as f64
+                } else {
+                    0.0
+                },
+            })
+            .collect())
     }
 
     pub async fn productivity_activity_feed(

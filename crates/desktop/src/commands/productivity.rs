@@ -4,9 +4,10 @@ use std::sync::Arc;
 
 use desktop_shared::commands::{
     ActivityCategoryResponse, ActivityTimelineResponse, CategoryRulesResponse, DistractionResponse,
-    FocusSessionResponse, GoalProgressResponse, InsightCardResponse, IntelligenceSessionResponse,
-    ProductivityProjectResponse, ProductivitySummaryResponse, TimeEntryResponse,
-    TrackedAppResponse, WeeklyAssessmentResponse,
+    FocusSessionResponse, GoalProgressResponse, HourlyBreakdownResponse, InsightCardResponse,
+    IntelligenceSessionResponse, ProductivityPatternsResponse, ProductivityProjectResponse,
+    ProductivitySummaryResponse, TimeEntryResponse, TrackedAppResponse,
+    WeeklyAssessmentResponse,
 };
 use desktop_shared::errors::ApiError;
 use feature_productivity::auto_focus::AutoFocusEvent;
@@ -451,6 +452,27 @@ pub async fn focus_timer_resume(timer: State<'_, Arc<FocusTimer>>) -> Result<boo
     Ok(timer.resume().await)
 }
 
+// ── Patterns & Hourly Breakdown ─────────────────────────────────────
+
+#[tauri::command]
+pub async fn productivity_patterns(
+    state: State<'_, Arc<AppCore>>,
+    days: Option<u32>,
+) -> Result<ProductivityPatternsResponse, ApiError> {
+    state.productivity_patterns(days).await
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn productivity_hourly_breakdown(
+    state: State<'_, Arc<AppCore>>,
+    start_date: String,
+    end_date: String,
+) -> Result<Vec<HourlyBreakdownResponse>, ApiError> {
+    state
+        .productivity_hourly_breakdown(start_date, end_date)
+        .await
+}
+
 // ── Dev server dispatch ─────────────────────────────────────────────
 
 #[cfg(test)]
@@ -489,6 +511,8 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "productivity_auto_focus_start",
     "productivity_auto_focus_end",
     "distraction_respond",
+    "productivity_patterns",
+    "productivity_hourly_breakdown",
 ];
 
 #[cfg(debug_assertions)]
@@ -668,6 +692,17 @@ pub(crate) async fn dispatch_dev(
                 .await,
         ),
         "distraction_respond" => Ok(serde_json::Value::Null),
+        "productivity_patterns" => dev::val(
+            core.productivity_patterns(dev::get(body, "days")).await,
+        ),
+        "productivity_hourly_breakdown" => {
+            let start_date = try_field!(dev::get_str(body, "startDate"));
+            let end_date = try_field!(dev::get_str(body, "endDate"));
+            dev::val(
+                core.productivity_hourly_breakdown(start_date, end_date)
+                    .await,
+            )
+        }
         _ => return None,
     })
 }

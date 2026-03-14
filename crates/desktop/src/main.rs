@@ -317,6 +317,8 @@ fn main() {
             commands::productivity::productivity_weekly_assessment,
             commands::productivity::productivity_calendar_events,
             commands::productivity::calendar_sync_events,
+            commands::productivity::productivity_patterns,
+            commands::productivity::productivity_hourly_breakdown,
             // Focus Timer
             commands::productivity::focus_timer_start,
             commands::productivity::focus_timer_stop,
