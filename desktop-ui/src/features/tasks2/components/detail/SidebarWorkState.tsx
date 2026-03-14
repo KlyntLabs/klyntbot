@@ -1,0 +1,133 @@
+import { formatElapsed } from "@shared/lib/dates";
+import { Pause, Square } from "lucide-react";
+import { useEffect, useState } from "react";
+import { cn } from "../../lib/utils";
+import type { MockDetailTask, MockFocusSession, TaskState } from "../../mock-data/issue-detail";
+import { SectionLabel } from "./SectionLabel";
+
+interface SidebarWorkStateProps {
+  task: MockDetailTask;
+  taskState: TaskState;
+  focusSession: MockFocusSession | null;
+}
+
+export function SidebarWorkState({ task, taskState, focusSession }: SidebarWorkStateProps) {
+  if (taskState === "completed") {
+    return (
+      <div className="px-4 py-3">
+        <SectionLabel>Session Summary</SectionLabel>
+        <p className="text-sm text-[hsl(var(--muted-foreground))] mt-1">
+          Total tracked: {formatElapsed(task.totalTrackedSecs)}
+        </p>
+      </div>
+    );
+  }
+
+  if (!focusSession) return null;
+
+  return (
+    <div className="px-4 py-3 space-y-3">
+      <SectionLabel>Work State</SectionLabel>
+      <FocusTimer focusedAt={task.focusedAt!} />
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-[hsl(var(--muted-foreground))]">Mode</span>
+        <span className="text-xs px-1.5 py-0.5 rounded bg-[hsl(var(--accent))] text-[hsl(var(--foreground))] capitalize">
+          {focusSession.focusMode.replace("-", " ")}
+        </span>
+      </div>
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-[hsl(var(--muted-foreground))]">Quality</span>
+        <span
+          className={cn(
+            "text-sm font-mono tabular-nums",
+            focusSession.qualityScore > 0.7
+              ? "text-green-400"
+              : focusSession.qualityScore > 0.4
+                ? "text-amber-400"
+                : "text-red-400",
+          )}
+        >
+          {focusSession.qualityScore.toFixed(2)}
+        </span>
+      </div>
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-[hsl(var(--muted-foreground))]">Distractions</span>
+        <span className="text-sm text-[hsl(var(--foreground))]">
+          {focusSession.distractionCount}
+        </span>
+      </div>
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-[hsl(var(--muted-foreground))]">Flow</span>
+        <FlowBadge state={focusSession.flowState} />
+      </div>
+      <QualitySparkline values={focusSession.qualityHistory} />
+      <div className="flex gap-2">
+        <button
+          type="button"
+          className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs rounded border border-[hsl(var(--border))] text-[hsl(var(--foreground))] hover:bg-[hsl(var(--accent))]/50 transition-colors"
+        >
+          <Pause className="size-3" />
+          Pause
+        </button>
+        <button
+          type="button"
+          className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs rounded border border-[hsl(var(--border))] text-red-400 hover:bg-red-500/10 transition-colors"
+        >
+          <Square className="size-3" />
+          Stop
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function FocusTimer({ focusedAt }: { focusedAt: string }) {
+  const [elapsed, setElapsed] = useState(() =>
+    Math.floor((Date.now() - new Date(focusedAt).getTime()) / 1000),
+  );
+
+  useEffect(() => {
+    const origin = new Date(focusedAt).getTime();
+    const interval = setInterval(() => {
+      const next = Math.floor((Date.now() - origin) / 1000);
+      setElapsed((prev) => (prev === next ? prev : next));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [focusedAt]);
+
+  return (
+    <div className="text-2xl font-mono tabular-nums text-[hsl(var(--foreground))] text-center">
+      {formatElapsed(elapsed)}
+    </div>
+  );
+}
+
+function FlowBadge({ state }: { state: string }) {
+  const color =
+    state === "active"
+      ? "text-green-400"
+      : state === "building"
+        ? "text-amber-400"
+        : "text-red-400";
+
+  return (
+    <span className={cn("text-xs px-1.5 py-0.5 rounded bg-[hsl(var(--accent))] capitalize", color)}>
+      {state}
+    </span>
+  );
+}
+
+function QualitySparkline({ values }: { values: number[] }) {
+  const max = Math.max(...values, 1);
+  return (
+    <div className="flex items-end gap-px h-8">
+      {values.map((v, i) => {
+        const height = `${(v / max) * 100}%`;
+        const color = v > 0.7 ? "bg-green-400/70" : v > 0.4 ? "bg-amber-400/70" : "bg-red-400/70";
+        return (
+          <div key={`bar-${i}`} className={cn("flex-1 rounded-sm", color)} style={{ height }} />
+        );
+      })}
+    </div>
+  );
+}
