@@ -2,7 +2,7 @@
 
 **Date:** 2026-03-14
 **Sub-project:** 1 of 4 (Analytical Engine → Multi-step Workflows → Investment Intelligence → Proactive Coaching)
-**Status:** Approved (all 8 sections reviewed)
+**Status:** Approved (8 sections + skill upgrade plan, 3 automated review rounds passed)
 
 ## Context
 
@@ -782,42 +782,64 @@ The internal orchestrator skill teaches the klyntbot agent how to use the financ
 
 **SKILL.md changes:**
 
-1. **New triggers** (add to existing 54):
-   ```
-   anomaly, anomalies, unusual spending, spending spike, spending drop
-   recurring charges, subscriptions, subscription audit
-   drift, allocation drift, rebalance, rebalancing, portfolio check
-   monte carlo, simulation, probability, success rate, survival rate
-   coast fire, lean fire, fat fire, fire number, withdrawal rate
-   backtest, historical, sequence of returns, what-if, sensitivity
-   trend, trends, spending trend, income trend, savings rate trend
-   correlation, category correlation, asset correlation
-   snapshot, net worth history, net worth over time
+1. **New triggers** — append to the existing `triggers:` YAML array in SKILL.md frontmatter (this is where `SkillRouter` reads them from):
+   ```yaml
+   # Append to existing triggers: array in SKILL.md frontmatter
+   - anomaly
+   - anomalies
+   - unusual spending
+   - spending spike
+   - spending drop
+   - recurring charges
+   - subscriptions
+   - subscription audit
+   - drift
+   - allocation drift
+   - rebalance
+   - rebalancing
+   - portfolio check
+   - monte carlo
+   - simulation
+   - probability
+   - success rate
+   - survival rate
+   - coast fire
+   - lean fire
+   - fat fire
+   - fire number
+   - withdrawal rate
+   - backtest
+   - historical
+   - sequence of returns
+   - what-if
+   - sensitivity
+   - trend
+   - trends
+   - spending trend
+   - income trend
+   - savings rate trend
+   - correlation
+   - category correlation
+   - asset correlation
+   - snapshot
+   - net worth history
+   - net worth over time
    ```
 
-2. **Updated decision flowchart** — add analytical branches:
-   ```
-   Is the user asking about FIRE / retirement planning?
-     → YES: Which variant?
-       → "when can I retire?" → fire_traditional (compare multiple SWR)
-       → "can I stop saving?" → fire_coast
-       → "bare minimum to retire?" → fire_lean
-       → "comfortable retirement?" → fire_fat
-       → "will my money last?" → fire_withdrawal_sim (Monte Carlo)
-       → "would this have worked historically?" → fire_backtest
-       → "what if I change X?" → fire_sensitivity
-     → NO: Continue to next branch
+2. **Updated decision flowchart** — add these rows to the existing Markdown table (the table at line ~70 in the current SKILL.md uses `| Step | Question | If YES | If NO |` format):
 
-   Is the user asking about spending patterns / anomalies?
-     → YES: Route to spending analysis workflow (see references/spending-intelligence.md)
-     → NO: Continue
+   | Step | Question | If YES | If NO |
+   |---|---|---|---|
+   | 2a | Is user asking about FIRE / retirement planning? | See `references/fire-planning.md` for the guided workflow | → Step 2b |
+   | 2b | Is user asking about spending patterns, anomalies, or subscriptions? | See `references/spending-intelligence.md` | → Step 2c |
+   | 2c | Is user asking about portfolio analysis (drift, rebalancing, returns, correlation)? | See `references/portfolio-analysis.md` | → Step 2d |
+   | 2d | Is user asking about net worth history or snapshots? | Use `snapshot_record` or `snapshot_history` | → existing Step 3 |
 
-   Is the user asking about portfolio / investments beyond basic CRUD?
-     → YES: Route to portfolio analysis workflow (see references/portfolio-analysis.md)
-     → NO: Continue to existing flowchart branches
-   ```
+   These new rows are inserted before the existing budget/transaction routing steps. The FIRE/analytics branches take priority because they often involve chained multi-action workflows.
 
-3. **Updated `always_skills`**: Keep `[budgeting]`, add nothing — new references are Tier 3 (loaded on demand to avoid bloating every finance conversation with analytics context).
+3. **Updated `always_skills`**: Keep `[budgeting]`, add nothing — new references are loaded on demand (not in `always_skills`) to avoid bloating every finance conversation with analytics context. The skill system loads references when the agent's context engine determines they're relevant to the current message, based on the decision flowchart routing.
+
+4. **Delete `references/spending-analysis.md`** — replaced by `spending-intelligence.md`. Update the cross-reference in SKILL.md body (currently says "See references/spending-analysis.md for analysis workflows") to point to `references/spending-intelligence.md`.
 
 **New reference files:**
 
@@ -855,6 +877,7 @@ Action routing table for all 19 new analytical actions, structured like the exis
 | "how are my investments doing?" | portfolio_returns | portfolio_id |
 | "are my assets diversified?" | portfolio_correlation | portfolio_id |
 | "set target allocation" | allocation_target_set | portfolio_id, asset_class, weight |
+| "show target allocation" | allocation_target_list | portfolio_id |
 
 ### Snapshots
 | User says... | Action | Key params |
@@ -904,7 +927,7 @@ If the user wants more confidence:
 ### Critical Rules
 - Always show multiple SWR variants (4%, 3.5%, 3%) — don't assume 4% is safe
 - Always mention inflation adjustment: "These are in today's dollars"
-- If success rate < 95%, suggest: increase savings, reduce expenses, or delay retirement
+- If success rate < 90%, suggest: increase savings, reduce expenses, or delay retirement
 - Never present Monte Carlo results without explaining what "success rate" means
 ```
 
@@ -968,14 +991,17 @@ Run these in sequence:
 4. Show total annual subscription cost
 ```
 
-**Updated `budgeting.md`** — add cross-references to new analytical actions where relevant (e.g., after showing budget status, suggest `analyze_spending_anomalies` if any budget is over 90%).
+**Updated `budgeting.md`** — add these specific cross-references to analytical actions:
+- After `budget_status` action: "If any budget is over 80% of limit, follow up with `analyze_spending_anomalies` for that category to check for unusual charges"
+- After `report_spending` action: "For deeper analysis, use `analyze_spending_trends` to see direction over time, or `analyze_category_correlation` to find related spending patterns"
+- In the "First-time setup" section: "After creating budgets, suggest `analyze_recurring_charges` to identify subscription costs that should be budgeted"
 
 ### Skill Updates — Claude Code Skill (`.claude/skills/klyntbot-finance/`)
 
 **SKILL.md changes:**
 - Add new actions to the quick reference table (currently 7 rows → expand to ~15 with the most important analytical actions)
 - Add new common mistakes for analytics (e.g., "Don't call fire_withdrawal_sim without first getting portfolio value via net_worth")
-- Add workflow tips: "For FIRE questions, chain: net_worth → fire_traditional → fire_withdrawal_sim"
+- Add workflow tips: "For FIRE questions, always start with `net_worth` to gather current state, then select the appropriate FIRE variant (traditional/coast/lean/fat), then validate with `fire_withdrawal_sim` for Monte Carlo probability"
 
 **`references/actions.md` changes:**
 - Add all 19 new actions with parameters, organized under new headings:
@@ -993,11 +1019,11 @@ After this upgrade, the finance skill system consists of:
 
 ```
 skills/finance-management/
-├── SKILL.md                            — orchestrator (updated triggers, flowchart)
+├── SKILL.md                            — orchestrator (updated triggers, flowchart, cross-refs)
 └── references/
     ├── budgeting.md                    — existing (updated with analytics cross-refs)
-    ├── spending-intelligence.md        — NEW (replaces spending-analysis.md)
-    ├── analytics-actions.md            — NEW (action routing table for 19 new actions)
+    ├── spending-intelligence.md        — NEW (replaces spending-analysis.md — DELETE old file)
+    ├── analytics-actions.md            — NEW (action routing table for all 19 new actions)
     ├── fire-planning.md                — NEW (guided FIRE workflow)
     └── portfolio-analysis.md           — NEW (guided portfolio workflow)
 
