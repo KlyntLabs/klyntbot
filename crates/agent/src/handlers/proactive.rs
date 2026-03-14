@@ -153,8 +153,7 @@ impl ProactiveHandler for LlmProactiveHandler {
 
         let mut all_suggestions = Vec::new();
         let now = Utc::now();
-        let stale_cutoff =
-            now - Duration::days(self.tasks_config.stale_task_days as i64);
+        let stale_cutoff = now - Duration::days(self.tasks_config.stale_task_days as i64);
 
         // --- TaskOverdue ---
         for row in &tasks {
@@ -201,11 +200,7 @@ impl ProactiveHandler for LlmProactiveHandler {
 
         // --- BlockedChainStale ---
         for row in &tasks {
-            let blocker_rows = self
-                .repo
-                .get_blockers(&row.id)
-                .await
-                .unwrap_or_default();
+            let blocker_rows = self.repo.get_blockers(&row.id).await.unwrap_or_default();
             if blocker_rows.is_empty() {
                 continue;
             }

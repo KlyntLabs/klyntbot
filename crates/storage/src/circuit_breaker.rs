@@ -26,11 +26,9 @@ pub async fn load(pool: &StoragePool) -> Result<Option<DateTime<Utc>>, StorageEr
 
 /// Persist the circuit-open deadline (upsert — only one row ever exists).
 pub async fn save(pool: &StoragePool, open_until: DateTime<Utc>) -> Result<(), StorageError> {
-    sqlx::query(
-        "INSERT OR REPLACE INTO circuit_breaker_state (id, open_until_utc) VALUES (1, ?1)",
-    )
-    .bind(open_until.to_rfc3339())
-    .execute(pool.inner())
-    .await?;
+    sqlx::query("INSERT OR REPLACE INTO circuit_breaker_state (id, open_until_utc) VALUES (1, ?1)")
+        .bind(open_until.to_rfc3339())
+        .execute(pool.inner())
+        .await?;
     Ok(())
 }

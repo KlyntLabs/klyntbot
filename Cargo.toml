@@ -8,6 +8,7 @@ members = [
     "crates/providers",
     "crates/session",
     "crates/scheduling",
+    "crates/skill-system",
     "crates/tools",
     "crates/channels",
     "crates/agent",
@@ -44,6 +45,7 @@ bus = { path = "crates/bus" }
 providers = { path = "crates/providers" }
 session = { path = "crates/session" }
 scheduling = { path = "crates/scheduling" }
+skill-system = { path = "crates/skill-system" }
 tools = { path = "crates/tools" }
 channels = { path = "crates/channels" }
 agent = { path = "crates/agent" }

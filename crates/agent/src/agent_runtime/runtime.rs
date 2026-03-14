@@ -1,7 +1,7 @@
 //! AgentRuntime — agent-first execution pipeline.
 //!
-//! Flow: AgentManager.match_agent → set active profile → IntentAnalyzer →
-//! ContextEngine → tool filtering via AgentProfile → ExecutionRouter →
+//! Flow: SkillRouter.select_orchestrator → set active profile → IntentAnalyzer →
+//! ContextEngine → tool filtering via SkillPackage → ExecutionRouter →
 //! ResponseValidator → CostTracker → StrategyRepo
 
 use std::sync::Arc;
@@ -10,11 +10,11 @@ use std::time::Instant;
 use common::{helpers::tool_def_name, Result};
 use context_engine::{ContextEngine, ContextRequest, ExecutionStrategy};
 use providers::Message;
+use skill_system::types::{SkillCatalog, SkillPackage};
 use tokio::sync::RwLock;
 use tools::RoutingContext;
 use tracing::{debug, warn};
 
-use crate::agent_profile::{AgentManager, AgentProfile};
 use crate::events::AgentEvent;
 
 use crate::execution::ExecutionParams;
@@ -55,7 +55,8 @@ pub struct RuntimeResult {
 /// The key difference: agent selection happens first, and the agent profile
 /// shapes everything downstream (system prompt, tool filtering, iteration budget).
 pub struct AgentRuntime {
-    agent_manager: Arc<RwLock<AgentManager>>,
+    skill_catalog: Arc<RwLock<SkillCatalog>>,
+    skill_router: Arc<RwLock<skill_system::router::SkillRouter>>,
     analyzer: IntentAnalyzer,
     context_engine: Arc<ContextEngine>,
     router: ExecutionRouter,
@@ -64,8 +65,8 @@ pub struct AgentRuntime {
     config: PipelineConfig,
     strategy_repo: Option<storage::StrategyRepo>,
     confidence_evaluator: Option<Arc<crate::confidence::ConfidenceEvaluator>>,
-    /// Shared with AgentContextSource — written here, read during context assembly.
-    active_profile: Arc<RwLock<Option<Arc<AgentProfile>>>>,
+    /// Shared with SkillContextSource — written here, read during context assembly.
+    active_profile: Arc<RwLock<Option<Arc<SkillPackage>>>>,
     /// Records interactions for behavioral pattern analysis.
     interaction_recorder: Option<crate::learning::InteractionRecorder>,
     /// Procedural rules repo for transparency (L5 cognitive rules).
@@ -80,16 +81,18 @@ pub struct AgentRuntime {
 
 impl AgentRuntime {
     pub fn new(
-        agent_manager: Arc<RwLock<AgentManager>>,
+        skill_catalog: Arc<RwLock<SkillCatalog>>,
+        skill_router: Arc<RwLock<skill_system::router::SkillRouter>>,
         analyzer: IntentAnalyzer,
         context_engine: Arc<ContextEngine>,
         router: ExecutionRouter,
         cost_tracker: Arc<CostTracker>,
         config: PipelineConfig,
-        active_profile: Arc<RwLock<Option<Arc<AgentProfile>>>>,
+        active_profile: Arc<RwLock<Option<Arc<SkillPackage>>>>,
     ) -> Self {
         Self {
-            agent_manager,
+            skill_catalog,
+            skill_router,
             analyzer,
             context_engine,
             router,
@@ -147,9 +150,19 @@ impl AgentRuntime {
         let _ = self.delegation_self_ref.set(handler);
     }
 
-    /// Get the shared active profile handle (for AgentContextSource).
-    pub fn active_profile_handle(&self) -> Arc<RwLock<Option<Arc<AgentProfile>>>> {
+    /// Get the shared active profile handle (for SkillContextSource).
+    pub fn active_profile_handle(&self) -> Arc<RwLock<Option<Arc<SkillPackage>>>> {
         Arc::clone(&self.active_profile)
+    }
+
+    /// Get the shared skill catalog handle (for reload, delegation lookups, etc.).
+    pub fn skill_catalog_handle(&self) -> Arc<RwLock<SkillCatalog>> {
+        Arc::clone(&self.skill_catalog)
+    }
+
+    /// Get the shared skill router handle.
+    pub fn skill_router_handle(&self) -> Arc<RwLock<skill_system::router::SkillRouter>> {
+        Arc::clone(&self.skill_router)
     }
 
     /// Process a user message through the agent runtime.
@@ -178,31 +191,16 @@ impl AgentRuntime {
     ) -> Result<RuntimeResult> {
         let pipeline_start = Instant::now();
 
-        // Step 1: Match message to agent (two-phase to keep the lock brief across the await)
-        // Phase A — collect keyword scores and embedder clone without holding lock across await.
-        let (kw_scores, embedder) = {
-            let mgr = self.agent_manager.read().await;
-            (mgr.keyword_scores_owned(message), mgr.get_embedder())
-        };
-        // Phase B — embed query asynchronously (no lock held).
-        let query_vec: Option<Vec<f32>> = if let Some(ref emb) = embedder {
-            emb.embed(message).await.ok().filter(|v| !v.is_empty())
-        } else {
-            None
-        };
-        // Phase C — select profile using blended or keyword-only scoring.
+        // Step 1: Match message to orchestrator skill via SkillRouter
         let mut profile = {
-            let mgr = self.agent_manager.read().await;
-            Arc::clone(if let Some(ref qv) = query_vec {
-                mgr.blend_scores(&kw_scores, qv)
-            } else {
-                mgr.match_agent(message)
-            })
+            let catalog = self.skill_catalog.read().await;
+            let router = self.skill_router.read().await;
+            Arc::clone(router.select_orchestrator(message, &catalog))
         };
         let mut agent_name = profile.name.clone();
-        debug!("AgentRuntime: matched agent '{}'", agent_name);
+        debug!("AgentRuntime: matched skill '{}'", agent_name);
 
-        // Emit agent selection + skill events for transparency
+        // Emit agent selection event for transparency
         if let Some(ref tx) = event_tx {
             let _ = tx
                 .send(AgentEvent::AgentSelected {
@@ -211,24 +209,12 @@ impl AgentRuntime {
                 })
                 .await;
 
-            // Emit loaded skills for this agent
-            let activated: std::collections::HashSet<&str> = profile
-                .message_activated_skills(message)
-                .into_iter()
-                .map(|s| s.name.as_str())
-                .collect();
-            for skill in &profile.skills {
-                let trigger = if profile.is_always_loaded(skill) {
-                    "always".to_string()
-                } else if activated.contains(skill.name.as_str()) {
-                    "activated".to_string()
-                } else {
-                    "on-demand".to_string()
-                };
+            // Emit always-loaded skill references
+            for skill_name in profile.always_skills() {
                 let _ = tx
                     .send(AgentEvent::SkillLoaded {
-                        name: skill.name.clone(),
-                        trigger,
+                        name: skill_name.clone(),
+                        trigger: "always".to_string(),
                         agent: Some(profile.name.clone()),
                     })
                     .await;
@@ -276,8 +262,8 @@ impl AgentRuntime {
         // Step 3b: Orchestration override — route multi-agent intents to orchestrator
         if analysis.needs_orchestration {
             let general = {
-                let mgr = self.agent_manager.read().await;
-                mgr.get(ORCHESTRATOR_AGENT).cloned()
+                let catalog = self.skill_catalog.read().await;
+                catalog.get(ORCHESTRATOR_AGENT).cloned()
             };
             if let Some(general) = general {
                 debug!(
@@ -319,7 +305,7 @@ impl AgentRuntime {
             ref mut max_iterations,
         } = analysis.mode
         {
-            *max_iterations = (*max_iterations).min(profile.max_iterations);
+            *max_iterations = (*max_iterations).min(profile.max_iterations());
         }
 
         // Step 5: Confidence check — downgrade to Direct mode for low-confidence
@@ -692,12 +678,12 @@ fn delegation_event_filter(
     filtered_tx
 }
 
-/// Filter tool definitions to only those allowed by the agent profile.
-/// Native tools are filtered by `profile.tools` (empty = all allowed).
-/// MCP tools are filtered by `profile.mcp_tools` (empty = none allowed, `["*"]` = all).
+/// Filter tool definitions to only those allowed by the skill package.
+/// Native tools are filtered by `pkg.tools` (None = all allowed, Some([]) = deny-all).
+/// MCP tools are filtered by `pkg.mcp_tools` (empty = none allowed, `["*"]` = all).
 fn filter_tools_for_profile(
     tool_defs: &[serde_json::Value],
-    profile: &AgentProfile,
+    profile: &SkillPackage,
 ) -> Vec<serde_json::Value> {
     let native_allowlist = profile.allowed_tool_names();
 
@@ -724,13 +710,13 @@ fn filter_tools_for_profile(
 /// Inject a DelegationTool into the tool list and registry if the agent can delegate
 /// and we haven't reached max depth. Returns true if the tool was injected.
 async fn inject_delegation_tool(
-    profile: &AgentProfile,
+    profile: &SkillPackage,
     depth: u32,
     delegation_self_ref: &std::sync::OnceLock<Arc<dyn tools::DelegationHandler>>,
     tool_registry: &Option<Arc<RwLock<tools::registry::ToolRegistry>>>,
     filtered_tools: &mut Vec<serde_json::Value>,
 ) {
-    if profile.can_delegate_to.is_empty() || depth >= MAX_DELEGATION_DEPTH {
+    if profile.can_delegate_to().is_empty() || depth >= MAX_DELEGATION_DEPTH {
         return;
     }
 
@@ -739,7 +725,7 @@ async fn inject_delegation_tool(
     };
 
     let delegation_tool = tools::DelegationTool::with_handler(handler.clone())
-        .with_allowed_agents(profile.can_delegate_to.clone())
+        .with_allowed_agents(profile.can_delegate_to().to_vec())
         .with_depth(depth, MAX_DELEGATION_DEPTH);
 
     filtered_tools.push(tools::Tool::to_schema(&delegation_tool));
@@ -761,10 +747,10 @@ impl tools::DelegationHandler for AgentRuntime {
     ) -> Result<String> {
         let start = Instant::now();
 
-        // 1. Look up the delegated agent profile
+        // 1. Look up the delegated skill package
         let profile = {
-            let mgr = self.agent_manager.read().await;
-            mgr.get(agent_name).cloned()
+            let catalog = self.skill_catalog.read().await;
+            catalog.get(agent_name).cloned()
         }
         .ok_or_else(|| {
             common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(format!(
@@ -797,17 +783,12 @@ impl tools::DelegationHandler for AgentRuntime {
                 })
                 .await;
 
-            // Emit SkillLoaded for the delegated agent's skills
-            for skill in &profile.skills {
-                let trigger = if profile.is_always_loaded(skill) {
-                    "always".to_string()
-                } else {
-                    "on-demand".to_string()
-                };
+            // Emit SkillLoaded for the delegated skill's always-loaded references
+            for skill_name in profile.always_skills() {
                 let _ = tx
                     .send(AgentEvent::SkillLoaded {
-                        name: skill.name.clone(),
-                        trigger,
+                        name: skill_name.clone(),
+                        trigger: "always".to_string(),
                         agent: Some(agent_name.to_string()),
                     })
                     .await;
@@ -823,7 +804,7 @@ impl tools::DelegationHandler for AgentRuntime {
         // 3. Build context with the delegated agent's instructions
         let messages = vec![Message::user(query)];
         let strategy = ExecutionStrategy::ToolAssisted {
-            max_iterations: profile.max_iterations.min(8),
+            max_iterations: profile.max_iterations().min(8),
         };
         let context_request = ContextRequest {
             message_text: query.to_string(),
@@ -856,7 +837,7 @@ impl tools::DelegationHandler for AgentRuntime {
         .await;
 
         // 6. Execute via router with reduced budget
-        let max_iters = profile.max_iterations.min(8);
+        let max_iters = profile.max_iterations().min(8);
         let mode = crate::intent_pipeline::types::ExecutionMode::Reactive {
             max_iterations: max_iters,
         };
@@ -1003,10 +984,22 @@ mod tests {
         RoutingContext::new("test".into(), "test".into())
     }
 
-    fn make_agent_manager() -> Arc<RwLock<AgentManager>> {
-        let mut mgr = AgentManager::new();
-        mgr.load_builtin_agents().unwrap();
-        Arc::new(RwLock::new(mgr))
+    fn make_skill_catalog_and_router() -> (
+        Arc<RwLock<SkillCatalog>>,
+        Arc<RwLock<skill_system::router::SkillRouter>>,
+    ) {
+        let source = skill_system::discovery::SkillSource::BuiltIn(
+            skill_system::discovery::BUILTIN_SKILLS
+                .iter()
+                .map(|(n, c)| (n.to_string(), c.to_string()))
+                .collect(),
+        );
+        let catalog = SkillCatalog::discover_sync(&[source]).unwrap();
+        let router = skill_system::router::SkillRouter::new(&catalog);
+        (
+            Arc::new(RwLock::new(catalog)),
+            Arc::new(RwLock::new(router)),
+        )
     }
 
     async fn make_runtime(provider: Arc<dyn LlmProvider>) -> AgentRuntime {
@@ -1035,9 +1028,11 @@ mod tests {
         let cost_tracker = Arc::new(CostTracker::from_repo(usage_repo));
 
         let active_profile = Arc::new(RwLock::new(None));
+        let (skill_catalog, skill_router) = make_skill_catalog_and_router();
 
         let runtime = AgentRuntime::new(
-            make_agent_manager(),
+            skill_catalog,
+            skill_router,
             analyzer,
             Arc::new(ContextEngine::new()),
             router,
@@ -1049,11 +1044,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_agent_runtime_selects_correct_agent() {
-        let agent_manager = make_agent_manager();
-        let mgr = agent_manager.read().await;
-        let selected = mgr.match_agent("create a task to review budget");
-        assert_eq!(selected.name, "task");
+    async fn test_agent_runtime_selects_correct_skill() {
+        let (catalog, router) = make_skill_catalog_and_router();
+        let catalog = catalog.read().await;
+        let router = router.read().await;
+        let selected = router.select_orchestrator("create a task to review budget", &catalog);
+        assert_eq!(selected.name, "task-management");
     }
 
     #[tokio::test]
@@ -1077,7 +1073,7 @@ mod tests {
 
         let result = runtime
             .process_message(
-                "create a task for me",
+                "create a task for my project planning",
                 vec![],
                 &[],
                 &[],
@@ -1089,7 +1085,7 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(result.agent_name, "task");
+        assert_eq!(result.agent_name, "task-management");
         assert_eq!(result.content, "Task created!");
     }
 
@@ -1119,7 +1115,7 @@ mod tests {
         // After processing, active profile should be set
         let guard = handle.read().await;
         assert!(guard.is_some());
-        assert_eq!(guard.as_ref().unwrap().name, "finance");
+        assert_eq!(guard.as_ref().unwrap().name, "finance-management");
     }
 
     #[tokio::test]
@@ -1258,16 +1254,17 @@ mod tests {
         // Set up event channel and active profile for the delegation
         *runtime.current_event_tx.write().await = Some(tx);
         {
-            let mgr = runtime.agent_manager.read().await;
-            let general = mgr.get("general").unwrap();
+            let catalog = runtime.skill_catalog.read().await;
+            let general = catalog.get("general").unwrap();
             let mut guard = runtime.active_profile.write().await;
             *guard = Some(Arc::clone(general));
         }
 
         // Call delegate directly
         let ctx = routing_ctx();
-        let result: common::Result<String> =
-            runtime.delegate("task", "list my tasks", &ctx, 1).await;
+        let result: common::Result<String> = runtime
+            .delegate("task-management", "list my tasks", &ctx, 1)
+            .await;
 
         assert!(result.is_ok(), "Delegation should succeed: {:?}", result);
 
@@ -1280,19 +1277,28 @@ mod tests {
 
         // Should have DelegationStarted and DelegationCompleted
         let started = events.iter().any(
-            |e| matches!(e, AgentEvent::DelegationStarted { to_agent, .. } if to_agent == "task"),
+            |e| matches!(e, AgentEvent::DelegationStarted { to_agent, .. } if to_agent == "task-management"),
         );
         let completed = events.iter().any(|e| {
-            matches!(e, AgentEvent::DelegationCompleted { to_agent, success, .. } if to_agent == "task" && *success)
+            matches!(e, AgentEvent::DelegationCompleted { to_agent, success, .. } if to_agent == "task-management" && *success)
         });
 
-        assert!(started, "Expected DelegationStarted event for 'task'");
-        assert!(completed, "Expected DelegationCompleted event for 'task'");
+        assert!(
+            started,
+            "Expected DelegationStarted event for 'task-management'"
+        );
+        assert!(
+            completed,
+            "Expected DelegationCompleted event for 'task-management'"
+        );
     }
 
     mod filter_tests {
         use super::*;
         use serde_json::json;
+        use skill_system::types::{KlyntbotMeta, SkillMetadata, SkillScope, SkillType};
+        use std::path::PathBuf;
+        use std::time::SystemTime;
 
         fn make_tool_def(name: &str) -> serde_json::Value {
             json!({
@@ -1305,14 +1311,36 @@ mod tests {
             })
         }
 
+        fn make_test_pkg(
+            name: &str,
+            tools: Option<Vec<String>>,
+            mcp_tools: Vec<String>,
+        ) -> SkillPackage {
+            SkillPackage {
+                name: name.into(),
+                description: "test".into(),
+                skill_type: SkillType::Skill,
+                scope: SkillScope::BuiltIn,
+                location: PathBuf::new(),
+                body: String::new(),
+                manifest: None,
+                metadata: SkillMetadata {
+                    klyntbot: Some(KlyntbotMeta {
+                        tools,
+                        mcp_tools,
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                },
+                resources: Vec::new(),
+                loaded_at: SystemTime::now(),
+                trusted: true,
+            }
+        }
+
         #[test]
         fn test_filter_blocks_mcp_tools_for_restricted_agent() {
-            let profile = AgentProfile {
-                name: "task".into(),
-                tools: vec!["task".into(), "area".into()],
-                mcp_tools: vec![],
-                ..Default::default()
-            };
+            let profile = make_test_pkg("task", Some(vec!["task".into(), "area".into()]), vec![]);
 
             let tool_defs = vec![
                 make_tool_def("task"),
@@ -1325,6 +1353,7 @@ mod tests {
             let filtered = filter_tools_for_profile(&tool_defs, &profile);
             let names: Vec<&str> = filtered.iter().filter_map(|t| tool_def_name(t)).collect();
 
+            // ask_user is always added, so task and area pass, plus ask_user if present
             assert!(names.contains(&"task"));
             assert!(names.contains(&"area"));
             assert!(!names.contains(&"mcp_linear_create_issue"));
@@ -1334,12 +1363,8 @@ mod tests {
 
         #[test]
         fn test_filter_allows_mcp_tools_for_wildcard_agent() {
-            let profile = AgentProfile {
-                name: "general".into(),
-                tools: vec![],
-                mcp_tools: vec!["*".into()],
-                ..Default::default()
-            };
+            // tools: None means all native tools allowed
+            let profile = make_test_pkg("general", None, vec!["*".into()]);
 
             let tool_defs = vec![
                 make_tool_def("task"),
@@ -1357,12 +1382,8 @@ mod tests {
 
         #[test]
         fn test_filter_allows_specific_mcp_server() {
-            let profile = AgentProfile {
-                name: "comms".into(),
-                tools: vec!["message".into()],
-                mcp_tools: vec!["linear".into()],
-                ..Default::default()
-            };
+            let profile =
+                make_test_pkg("comms", Some(vec!["message".into()]), vec!["linear".into()]);
 
             let tool_defs = vec![
                 make_tool_def("message"),

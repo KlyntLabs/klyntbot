@@ -270,10 +270,7 @@ fn fnv_hash(data: &[u8]) -> u32 {
 /// sole explicit signal path. Additional explicit feedback channels are a post-v0.3 item.
 #[async_trait::async_trait]
 impl crate::learning::EnrichmentFeedbackHandler for OutcomeRecorder {
-    async fn record_feedback(
-        &self,
-        feedback: EnrichmentFeedbackEntry,
-    ) -> common::Result<()> {
+    async fn record_feedback(&self, feedback: EnrichmentFeedbackEntry) -> common::Result<()> {
         let store = self.store.write().await;
         store.record_feedback(feedback).await
     }

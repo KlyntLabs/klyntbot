@@ -30,9 +30,8 @@ use tools_core::FeaturePackage;
 
 use super::super::confidence::ConfidenceEvaluator;
 use super::super::context_sources::{
-    AgentContextSource, AreaSource, BootstrapSource, IdentitySource, PageContextSource,
-    PersonaContextSource, ProductivityContextSource, ProjectContextSource,
-    SessionContextSource, TodoSource,
+    AreaSource, BootstrapSource, IdentitySource, PageContextSource, PersonaContextSource,
+    ProductivityContextSource, ProjectContextSource, SessionContextSource, TodoSource,
 };
 use super::super::{CronHandlerAdapter, SubagentManager};
 use super::{AgentLoop, LastActiveChannel};
@@ -177,37 +176,65 @@ impl AgentLoopBuilder {
         };
         let repos = storage::Repos::from_pool(&storage_pool);
 
-        // ── Agent profiles ─────────────────────────────────────────────────
-        let mut agent_manager = crate::agent_profile::AgentManager::new();
-        agent_manager.load_builtin_agents()?;
-        if let Some(data_dir) = &config.data_dir {
-            agent_manager
-                .load_workspace_agents(std::path::Path::new(data_dir))
-                .await
-                .ok(); // non-fatal
+        // ── Skill discovery ─────────────────────────────────────────────────
+        let mut discovery_sources = vec![skill_system::discovery::SkillSource::BuiltIn(
+            skill_system::discovery::BUILTIN_SKILLS
+                .iter()
+                .map(|(n, c)| (n.to_string(), c.to_string()))
+                .collect(),
+        )];
+        // Scan user skills directory if data_dir is set
+        let data_dir_path = config.data_dir_path();
+        let user_skills_dir = data_dir_path.join("skills");
+        if user_skills_dir.exists() {
+            discovery_sources.push(skill_system::discovery::SkillSource::Directory(
+                user_skills_dir,
+                skill_system::types::SkillScope::User,
+            ));
         }
-        let agent_manager = Arc::new(tokio::sync::RwLock::new(agent_manager));
+        // Scan project-level skills if project_root is set
+        if let Some(ref project_root) = config.project_root {
+            let project_skills = std::path::PathBuf::from(project_root)
+                .join(".agents")
+                .join("skills");
+            if project_skills.exists() {
+                discovery_sources.push(skill_system::discovery::SkillSource::Directory(
+                    project_skills,
+                    skill_system::types::SkillScope::Project,
+                ));
+            }
+        }
 
-        // Shared active profile — written by AgentRuntime, read by AgentContextSource
+        let mut skill_catalog =
+            skill_system::types::SkillCatalog::discover(&discovery_sources).await?;
+        let skill_router = skill_system::router::SkillRouter::new(&skill_catalog);
+
+        // Build reference files map for SkillContextSource
+        let reference_files = Arc::new(skill_system::discovery::builtin_reference_map());
+
+        // Shared active profile — written by AgentRuntime, read by SkillContextSource
         let active_profile: Arc<
-            tokio::sync::RwLock<Option<Arc<crate::agent_profile::AgentProfile>>>,
+            tokio::sync::RwLock<Option<Arc<skill_system::types::SkillPackage>>>,
         > = Arc::new(tokio::sync::RwLock::new(None));
+
+        // Shared activated skills — written per-message, read by SkillContextSource
+        let activated_skills: Arc<
+            tokio::sync::RwLock<Vec<Arc<skill_system::types::SkillPackage>>>,
+        > = Arc::new(tokio::sync::RwLock::new(vec![]));
 
         // ── Shared embedding engine ──
         let embedding_engine = Arc::new(tools::EmbeddingEngine::new());
 
-        // Inject text embedder into agent manager for semantic agent matching,
-        // then precompute one representative embedding per agent.
+        // Precompute skill description embeddings for semantic matching
         {
-            let embedder: Arc<dyn cognitive::TextEmbedder> = Arc::new(
-                crate::adapters::cognitive_embedder::TextEmbedderImpl::new(Arc::clone(
-                    &embedding_engine,
-                )),
-            );
-            let mut mgr = agent_manager.write().await;
-            mgr.set_embedder(embedder);
-            mgr.precompute_embeddings().await;
+            let engine_clone = Arc::clone(&embedding_engine);
+            let embed_fn: skill_system::types::EmbedFn =
+                Arc::new(move |text: &str| engine_clone.embed(text));
+            skill_catalog.precompute_embeddings(&embed_fn).await;
         }
+
+        let skill_catalog = Arc::new(tokio::sync::RwLock::new(skill_catalog));
+        let skill_router = Arc::new(tokio::sync::RwLock::new(skill_router));
 
         // ── Context sources ───────────────────────────────────────────────
         let confidence_bits = Arc::new(std::sync::atomic::AtomicU32::new(
@@ -229,7 +256,11 @@ impl AgentLoopBuilder {
             Box::new(SessionContextSource::new(repos.clone())),
             Box::new(AreaSource::new(repos.areas.clone())),
             Box::new(TodoSource::new(repos.actions.clone())),
-            Box::new(AgentContextSource::new(Arc::clone(&active_profile))),
+            Box::new(skill_system::context::SkillContextSource::new(
+                Arc::clone(&active_profile),
+                Arc::clone(&activated_skills),
+                Arc::clone(&reference_files),
+            )),
             Box::new(PersonaContextSource::new(
                 Arc::clone(&persona_manager),
                 repos.session_context.clone(),
@@ -598,12 +629,14 @@ impl AgentLoopBuilder {
             let pool_ref = storage_pool.inner();
             let task_repo = storage::TaskRepo::new(pool_ref.clone());
             let task_repo_for_handlers = task_repo.clone();
+            let area_repo = storage::AreaRepo::new(pool_ref.clone());
             let mut task_tool = feature_tasks::TaskTool::new(
                 task_repo,
                 config.todo.focus.max_slots,
                 config.todo.focus.deadline_hours,
                 config.timezone.clone(),
-            );
+            )
+            .with_area_repo(area_repo);
 
             // Set enrichment threshold from config
             task_tool =
@@ -618,8 +651,9 @@ impl AgentLoopBuilder {
                         .with_provider(provider.clone(), config.agents.defaults.model.clone());
                 }
                 let enrichment_engine = Arc::new(enrichment_engine);
-                task_tool = task_tool.with_enrichment_handler(enrichment_engine
-                    as Arc<dyn feature_tasks::EnrichmentHandler>);
+                task_tool = task_tool.with_enrichment_handler(
+                    enrichment_engine as Arc<dyn feature_tasks::EnrichmentHandler>,
+                );
             }
 
             // Task embedding (semantic search)
@@ -1114,7 +1148,8 @@ impl AgentLoopBuilder {
         };
 
         let mut runtime = crate::agent_runtime::AgentRuntime::new(
-            Arc::clone(&agent_manager),
+            Arc::clone(&skill_catalog),
+            Arc::clone(&skill_router),
             analyzer,
             Arc::clone(&context_engine),
             router,
@@ -1204,7 +1239,8 @@ impl AgentLoopBuilder {
             cognitive_bg_service: tokio::sync::Mutex::new(cognitive_bg_service),
             _inference_loop_token,
             activity_svc: self.activity_svc,
-            agent_manager,
+            skill_catalog,
+            skill_router,
         })
     }
 }

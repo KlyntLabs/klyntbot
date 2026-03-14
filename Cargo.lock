@@ -72,6 +72,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "session",
+ "skill-system",
  "sqlx",
  "storage",
  "tempfile",
@@ -245,6 +246,7 @@ dependencies = [
  "serde",
  "serde_json",
  "session",
+ "skill-system",
  "storage",
  "tempfile",
  "tokio",
@@ -9732,6 +9734,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c1e9a774a6c28142ac54bb25d25562e6bcf957493a184f15ad4eebccb23e410a"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "skill-system"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "common",
+ "config",
+ "context_engine",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "tempfile",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

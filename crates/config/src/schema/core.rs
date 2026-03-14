@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::path::PathBuf;
 
-use super::agents::AgentsConfig;
+use super::agents::{AgentsConfig, SkillConfig};
 
 use super::capture::CaptureConfig;
 use super::channels::ChannelsConfig;
@@ -167,6 +167,15 @@ pub struct Config {
     /// MCP (Model Context Protocol) server connections and server settings.
     #[serde(default)]
     pub mcp: McpConfig,
+
+    /// Skill discovery system configuration.
+    #[serde(default)]
+    pub skills: SkillConfig,
+
+    /// Project root for .agents/skills/ scanning. Falls back to CWD.
+    /// Set by the desktop app on launch. Distinct from agents.defaults.workspace.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project_root: Option<String>,
 
     /// Whether the first-run setup wizard has been completed.
     #[serde(default)]

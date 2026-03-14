@@ -6,7 +6,6 @@
 
 use super::common::*;
 use chrono::Utc;
-use klyntbot::agent::learning::EnrichmentFeedbackHandler;
 use klyntbot::agent::confidence::prompt::confidence_prompt;
 use klyntbot::agent::confidence::ConfidenceEvaluator;
 use klyntbot::agent::learning::adaptive::AdaptiveThresholds;
@@ -14,6 +13,7 @@ use klyntbot::agent::learning::analyzer::LearningAnalyzer;
 use klyntbot::agent::learning::recorder::OutcomeRecorder;
 use klyntbot::agent::learning::recorder::OutcomeStore;
 use klyntbot::agent::learning::types::{AnalysisResult, EnrichmentStats};
+use klyntbot::agent::learning::EnrichmentFeedbackHandler;
 use klyntbot::agent::learning::{ExecutionMode, OutcomeRecord};
 use klyntbot::agent::learning_handler::LearningHandlerImpl;
 use klyntbot::agent::LearningService;

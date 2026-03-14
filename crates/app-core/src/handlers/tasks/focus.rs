@@ -48,9 +48,7 @@ impl AppCore {
             *lock = Some(ActiveTaskFocus {
                 task_id: task_id.clone(),
                 started_at: Utc::now(),
-                energy_level: energy_level
-                    .as_deref()
-                    .and_then(|s| s.parse().ok()),
+                energy_level: energy_level.as_deref().and_then(|s| s.parse().ok()),
             });
         }
 
@@ -58,10 +56,7 @@ impl AppCore {
         if let Some(bus) = &self.domain_event_bus {
             bus.publish(bus::DomainEvent::TaskFocusStarted {
                 task_id: task_id.clone(),
-                energy_level: energy_level
-                    .as_deref()
-                    .unwrap_or("medium")
-                    .to_string(),
+                energy_level: energy_level.as_deref().unwrap_or("medium").to_string(),
             });
         }
 
