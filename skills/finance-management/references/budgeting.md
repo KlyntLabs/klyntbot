@@ -25,6 +25,7 @@ If no accounts, guide setup:
 1. Create first account: `{"action": "account_add", "name": "Main Bank", "type": "bank", "currency": "VND", "balance": 0}`
 2. Confirm default currency: `{"action": "settings_get"}`
 3. Optionally create budget and portfolio
+4. Consider running `analyze_recurring_charges` to identify existing subscriptions and recurring costs
 
 ### Action Routing
 
@@ -33,9 +34,12 @@ If no accounts, guide setup:
 | "How much did I spend?" | `report_spending` | period (default: monthly) |
 | "Add $50 groceries" | `tx_add` | amount (in cents), category, type=expense |
 | "Check my budget" | `budget_status` | (no ID = show all) |
+| "Any unusual spending?" | `analyze_spending_anomalies` | lookback_months, sensitivity |
 | "What's my net worth?" | `net_worth` | — |
 | "Bitcoin price" | `price_fetch` | symbol=BTC, asset_type=crypto |
-| "FIRE number" | `goal_fire` | annual_expenses (or derive) |
+| "FIRE number" | `fire_traditional` | annual_expenses, savings_rate |
+| "Spending trends" | `analyze_spending_trends` | months, group_by |
+| "Spending correlations" | `analyze_category_correlation` | months, categories |
 
 ### Critical Rules
 
@@ -45,6 +49,13 @@ If no accounts, guide setup:
 4. **Period defaults to "monthly"** for reports when not specified.
 5. **Default currency** comes from `settings_get` — don't hardcode.
 6. **Don't create duplicate budgets** for same category + period.
+
+### Cross-References
+
+- After checking budget status, use `analyze_spending_anomalies` to detect unusual spending that may be affecting budgets
+- For trends and correlations, use `analyze_spending_trends` and `analyze_category_correlation` to understand spending drivers
+- Use `analyze_recurring_charges` to identify subscriptions and recurring costs during budget setup or review
+- For complete analytical action reference, see `references/analytics-actions.md`
 
 ### Response Formatting
 

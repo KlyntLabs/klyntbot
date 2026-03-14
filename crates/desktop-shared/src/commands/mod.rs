@@ -4,6 +4,7 @@ mod calendar;
 mod capture;
 mod chat;
 mod finance;
+mod integrations;
 mod notes;
 mod okr;
 mod productivity;
@@ -12,7 +13,6 @@ mod settings;
 mod tasks;
 mod timeline;
 mod work_context;
-mod integrations;
 mod workspace;
 
 pub use agents::*;

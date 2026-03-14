@@ -178,7 +178,7 @@ pub struct FinanceInvestmentCreateParams {
     pub portfolio_id: String,
     pub asset_type: String,
     pub cost_basis: i64,
-    pub quantity: f64,
+    pub quantity: String,
     pub symbol: Option<String>,
     pub name: Option<String>,
     pub currency: Option<String>,
@@ -192,7 +192,7 @@ pub struct FinanceInvestmentUpdateParams {
     pub id: String,
     pub current_price: Option<Option<i64>>,
     pub current_value: Option<Option<i64>>,
-    pub quantity: Option<f64>,
+    pub quantity: Option<String>,
     pub notes: Option<Option<String>>,
 }
 

@@ -36,6 +36,10 @@ impl FinanceTool {
             "investment_summary" => self.investment_summary(p).await,
             "price_fetch" => self.price_fetch(p).await,
             "price_refresh" => self.price_refresh(p).await,
+            "portfolio_drift" => self.portfolio_drift(p).await,
+            "portfolio_rebalance" => self.portfolio_rebalance(p).await,
+            "portfolio_returns" => self.portfolio_returns(p).await,
+            "portfolio_correlation" => self.portfolio_correlation(p).await,
             _ => {
                 Err(ToolError::InvalidParams(format!("Unknown investment action: {action}")).into())
             }
@@ -173,12 +177,13 @@ impl FinanceTool {
             asset_type: asset_type.as_str().to_string(),
             symbol: symbol.map(|s| s.to_string()),
             name: name.to_string(),
-            quantity,
+            quantity: quantity.to_string(),
             cost_basis,
             currency: currency.to_string(),
             current_price: None,
             current_value: None,
             purchase_date,
+            asset_class: None,
             notes: notes.map(|s| s.to_string()),
             created_at: now,
             updated_at: now,
@@ -186,13 +191,14 @@ impl FinanceTool {
 
         let inserted = self.storage.investments.add_investment(&row).await?;
 
+        let inserted_qty: f64 = inserted.quantity_f64();
         let investment = json!({
             "id": inserted.id,
             "portfolio_id": inserted.portfolio_id,
             "asset_type": inserted.asset_type,
             "symbol": inserted.symbol,
             "name": inserted.name,
-            "quantity": inserted.quantity,
+            "quantity": inserted_qty,
             "cost_basis": inserted.cost_basis,
             "currency": inserted.currency,
             "current_price": inserted.current_price,
@@ -214,20 +220,21 @@ impl FinanceTool {
             id: id.to_string(),
             current_price: current_price.map(Some),
             current_value: current_value.map(Some),
-            quantity,
+            quantity: quantity.map(|q| q.to_string()),
             cost_basis: None,
             notes: notes.map(|s| Some(s.to_string())),
         };
 
         let updated = self.storage.investments.update_investment(&patch).await?;
 
+        let updated_qty: f64 = updated.quantity_f64();
         let investment = json!({
             "id": updated.id,
             "portfolio_id": updated.portfolio_id,
             "asset_type": updated.asset_type,
             "symbol": updated.symbol,
             "name": updated.name,
-            "quantity": updated.quantity,
+            "quantity": updated_qty,
             "cost_basis": updated.cost_basis,
             "currency": updated.currency,
             "current_price": updated.current_price,
@@ -294,11 +301,11 @@ impl FinanceTool {
 
         // Validate sell quantity does not exceed current holding
         if tx_type == InvestmentTxType::Sell {
+            let inv_qty: f64 = inv.quantity_f64();
             if let Some(sell_qty) = quantity {
-                if sell_qty > inv.quantity {
+                if sell_qty > inv_qty {
                     return Err(ToolError::ExecutionFailed(format!(
-                        "Cannot sell more than current holding ({} available)",
-                        inv.quantity
+                        "Cannot sell more than current holding ({inv_qty} available)",
                     ))
                     .into());
                 }
@@ -338,9 +345,10 @@ impl FinanceTool {
             "notes": inserted_tx.notes,
         });
 
+        let updated_inv_qty: f64 = updated_inv.quantity_f64();
         let updated_investment = json!({
             "id": updated_inv.id,
-            "quantity": updated_inv.quantity,
+            "quantity": updated_inv_qty,
             "cost_basis": updated_inv.cost_basis,
             "current_price": updated_inv.current_price,
             "current_value": updated_inv.current_value,
@@ -353,6 +361,250 @@ impl FinanceTool {
         Ok(serde_json::to_string_pretty(&resp).unwrap())
     }
 
+    // ── Portfolio analytics ──────────────────────────────────────────────────
+
+    async fn portfolio_drift(&self, p: &ParamExtractor<'_>) -> Result<String> {
+        let portfolio_id = p.required_str("portfolio_id")?;
+
+        let (holdings, targets) = self.fetch_holdings_and_targets(portfolio_id).await?;
+
+        if holdings.is_empty() {
+            return Ok("No holdings found for this portfolio.".to_string());
+        }
+        if targets.is_empty() {
+            return Ok(
+                "No allocation targets set for this portfolio. Use allocation_target_set first."
+                    .to_string(),
+            );
+        }
+
+        let result = analytics::portfolio::PortfolioAnalyzer::allocation_drift(&holdings, &targets);
+        Ok(serde_json::to_string_pretty(&result).unwrap())
+    }
+
+    async fn portfolio_rebalance(&self, p: &ParamExtractor<'_>) -> Result<String> {
+        let portfolio_id = p.required_str("portfolio_id")?;
+        let contribution = p.i64_or("contribution", 0)?;
+        let min_trade = p.i64_or("min_trade_amount", 0)?;
+
+        let strategy_str = p.str_or("strategy", "full")?;
+        let strategy = match strategy_str {
+            "contribution_only" => analytics::portfolio::RebalanceStrategy::ContributionOnly,
+            "threshold_only" => analytics::portfolio::RebalanceStrategy::ThresholdOnly,
+            _ => analytics::portfolio::RebalanceStrategy::FullRebalance,
+        };
+
+        let (holdings, targets) = self.fetch_holdings_and_targets(portfolio_id).await?;
+
+        if holdings.is_empty() {
+            return Ok("No holdings found for this portfolio.".to_string());
+        }
+        if targets.is_empty() {
+            return Ok(
+                "No allocation targets set for this portfolio. Use allocation_target_set first."
+                    .to_string(),
+            );
+        }
+
+        let result = analytics::portfolio::PortfolioAnalyzer::rebalance_suggestions(
+            &holdings,
+            &targets,
+            strategy,
+            common::Decimal::new(contribution, 0),
+            common::Decimal::new(min_trade, 0),
+        );
+        Ok(serde_json::to_string_pretty(&result).unwrap())
+    }
+
+    async fn portfolio_returns(&self, p: &ParamExtractor<'_>) -> Result<String> {
+        let portfolio_id = p.required_str("portfolio_id")?;
+        let start_date_str = p.required_str("start_date")?;
+        let end_date_str = p.required_str("end_date")?;
+        let start_date = super::parse_date(start_date_str)?;
+        let end_date = super::parse_date(end_date_str)?;
+
+        // Compute portfolio start and end value from investments
+        let filter = storage::rows::finance::FinanceInvestmentFilter {
+            portfolio_id: Some(portfolio_id.to_string()),
+            ..Default::default()
+        };
+        let investments = self.storage.investments.list_investments(&filter).await?;
+
+        if investments.is_empty() {
+            return Ok("No investments found for this portfolio.".to_string());
+        }
+
+        // Sum up current values (end value) and cost basis (approximation for start value)
+        let mut end_value = common::Decimal::ZERO;
+        let mut start_value = common::Decimal::ZERO;
+        let mut cash_flows: Vec<analytics::InvestmentCashFlow> = Vec::new();
+
+        for inv in &investments {
+            let current_val = inv.current_value.unwrap_or(inv.cost_basis);
+            end_value += common::Decimal::new(current_val, 0);
+            start_value += common::Decimal::new(inv.cost_basis, 0);
+
+            // Fetch investment transactions as cash flows
+            let txs = self
+                .storage
+                .investments
+                .list_investment_txs(&inv.id)
+                .await?;
+            for tx in &txs {
+                if tx.tx_date >= start_date && tx.tx_date <= end_date {
+                    let amount = match tx.tx_type.as_str() {
+                        "buy" => common::Decimal::new(tx.total_amount, 0),
+                        "sell" => common::Decimal::new(-tx.total_amount, 0),
+                        _ => common::Decimal::ZERO,
+                    };
+                    if amount != common::Decimal::ZERO {
+                        cash_flows.push(analytics::InvestmentCashFlow {
+                            date: tx.tx_date,
+                            amount,
+                            holding_symbol: inv.symbol.clone(),
+                        });
+                    }
+                }
+            }
+        }
+
+        let result = analytics::portfolio::PortfolioAnalyzer::returns(
+            start_value,
+            end_value,
+            &cash_flows,
+            start_date,
+            end_date,
+        );
+        Ok(serde_json::to_string_pretty(&result).unwrap())
+    }
+
+    async fn portfolio_correlation(&self, p: &ParamExtractor<'_>) -> Result<String> {
+        let portfolio_id = p.required_str("portfolio_id")?;
+
+        let filter = storage::rows::finance::FinanceInvestmentFilter {
+            portfolio_id: Some(portfolio_id.to_string()),
+            has_symbol: Some(true),
+            ..Default::default()
+        };
+        let investments = self.storage.investments.list_investments(&filter).await?;
+
+        if investments.len() < 2 {
+            return Ok(
+                "Need at least 2 investments with symbols to compute correlation.".to_string(),
+            );
+        }
+
+        // Build price series from investment transactions
+        let mut series_list: Vec<analytics::PriceSeries> = Vec::new();
+
+        for inv in &investments {
+            let symbol = match &inv.symbol {
+                Some(s) => s.clone(),
+                None => continue,
+            };
+            let txs = self
+                .storage
+                .investments
+                .list_investment_txs(&inv.id)
+                .await?;
+            let prices: Vec<(chrono::NaiveDate, common::Decimal)> = txs
+                .iter()
+                .filter_map(|tx| {
+                    tx.price_per_unit
+                        .map(|price| (tx.tx_date, common::Decimal::new(price, 0)))
+                })
+                .collect();
+
+            if prices.len() >= 2 {
+                series_list.push(analytics::PriceSeries {
+                    symbol,
+                    asset_class: inv
+                        .asset_class
+                        .clone()
+                        .unwrap_or_else(|| inv.asset_type.clone()),
+                    prices,
+                });
+            }
+        }
+
+        if series_list.len() < 2 {
+            return Ok("Insufficient price history for correlation analysis. Need at least 2 assets with price data.".to_string());
+        }
+
+        let config = analytics::portfolio::AssetCorrelationConfig::default();
+        let matrix =
+            analytics::portfolio::PortfolioAnalyzer::asset_correlation(&series_list, &config);
+
+        // Format coefficients as strings for JSON
+        let coefficients: Vec<Vec<String>> = matrix
+            .coefficients
+            .iter()
+            .map(|row| row.iter().map(|c| c.to_string()).collect())
+            .collect();
+
+        Ok(serde_json::to_string_pretty(&serde_json::json!({
+            "assets": matrix.labels,
+            "correlation_matrix": coefficients,
+        }))
+        .unwrap())
+    }
+
+    /// Fetch holdings and allocation targets for a portfolio, converting to analytics types.
+    async fn fetch_holdings_and_targets(
+        &self,
+        portfolio_id: &str,
+    ) -> Result<(Vec<analytics::Holding>, Vec<analytics::AllocationTarget>)> {
+        let filter = storage::rows::finance::FinanceInvestmentFilter {
+            portfolio_id: Some(portfolio_id.to_string()),
+            ..Default::default()
+        };
+        let inv_rows = self.storage.investments.list_investments(&filter).await?;
+
+        let holdings: Vec<analytics::Holding> = inv_rows
+            .iter()
+            .map(|row| {
+                let qty: f64 = row.quantity_f64();
+                let current_value = row.current_value.unwrap_or(row.cost_basis);
+                analytics::Holding {
+                    name: row.name.clone(),
+                    symbol: row.symbol.clone(),
+                    asset_class: row
+                        .asset_class
+                        .clone()
+                        .unwrap_or_else(|| row.asset_type.clone()),
+                    current_value: common::Decimal::new(current_value, 0),
+                    cost_basis: common::Decimal::new(row.cost_basis, 0),
+                    quantity: common::Decimal::from_f64_retain(qty)
+                        .unwrap_or(common::Decimal::ZERO),
+                }
+            })
+            .collect();
+
+        let target_rows = self
+            .storage
+            .allocations
+            .list_by_portfolio(portfolio_id)
+            .await?;
+        let targets: Vec<analytics::AllocationTarget> = target_rows
+            .iter()
+            .map(|row| {
+                let target_weight: common::Decimal =
+                    row.target_weight.parse().unwrap_or(common::Decimal::ZERO);
+                let tolerance_band: common::Decimal = row
+                    .tolerance_band
+                    .parse()
+                    .unwrap_or(common::Decimal::new(5, 2));
+                analytics::AllocationTarget {
+                    asset_class: row.asset_class.clone(),
+                    target_weight,
+                    tolerance_band,
+                }
+            })
+            .collect();
+
+        Ok((holdings, targets))
+    }
+
     /// Build the `FinanceInvestmentPatch` that reflects a transaction's effect on the holding.
     fn compute_investment_patch(
         &self,
@@ -361,12 +613,13 @@ impl FinanceTool {
         quantity: Option<f64>,
         total_amount: i64,
     ) -> Result<FinanceInvestmentPatch> {
+        let inv_qty: f64 = inv.quantity_f64();
         let patch = match tx_type {
             InvestmentTxType::Buy => {
                 let qty = quantity.unwrap_or(0.0);
                 FinanceInvestmentPatch {
                     id: inv.id.clone(),
-                    quantity: Some(inv.quantity + qty),
+                    quantity: Some((inv_qty + qty).to_string()),
                     cost_basis: Some(inv.cost_basis + total_amount),
                     current_price: None,
                     current_value: None,
@@ -376,17 +629,17 @@ impl FinanceTool {
             InvestmentTxType::Sell => {
                 let sell_qty = quantity.unwrap_or(0.0);
                 // Average cost per unit (floating-point to avoid integer truncation)
-                let cost_per_unit = if inv.quantity > 0.0 {
-                    inv.cost_basis as f64 / inv.quantity
+                let cost_per_unit = if inv_qty > 0.0 {
+                    inv.cost_basis as f64 / inv_qty
                 } else {
                     0.0
                 };
                 let cost_reduction = (cost_per_unit * sell_qty).round() as i64;
-                let new_quantity = (inv.quantity - sell_qty).max(0.0);
+                let new_quantity = (inv_qty - sell_qty).max(0.0);
                 let new_cost_basis = (inv.cost_basis - cost_reduction).max(0);
                 FinanceInvestmentPatch {
                     id: inv.id.clone(),
-                    quantity: Some(new_quantity),
+                    quantity: Some(new_quantity.to_string()),
                     cost_basis: Some(new_cost_basis),
                     current_price: None,
                     current_value: None,
@@ -398,7 +651,7 @@ impl FinanceTool {
                 let ratio = quantity.unwrap_or(1.0);
                 FinanceInvestmentPatch {
                     id: inv.id.clone(),
-                    quantity: Some(inv.quantity * ratio),
+                    quantity: Some((inv_qty * ratio).to_string()),
                     cost_basis: None, // cost basis unchanged in a stock split
                     current_price: None,
                     current_value: None,

@@ -17,6 +17,7 @@ members = [
     "crates/tools-core",
     "crates/tools-core-macros",
     "crates/feature-finance",
+    "crates/analytics",
     "crates/plugin-runtime",
     "crates/mcp",
     "crates/desktop-shared",
@@ -124,6 +125,11 @@ arrow-schema = "57"
 dashmap = "6"
 open = "5"
 rand = "0.9"
+rust_decimal = { version = "1.36", features = ["serde-with-str", "maths"] }
+rust_decimal_macros = "1.36"
+rand_chacha = "0.9"
+proptest = "1.5"
+analytics = { path = "crates/analytics" }
 notify = "7"
 notify-debouncer-mini = "0.5"
 dotenvy = "0.15"

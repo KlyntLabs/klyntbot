@@ -45,7 +45,8 @@ impl FinanceTool {
         let price_int = (price_result.price * 100.0).round() as i64;
         let mut updated_count = 0usize;
         for inv in &matching {
-            let current_value = (price_result.price * inv.quantity * 100.0).round() as i64;
+            let inv_qty: f64 = inv.quantity_f64();
+            let current_value = (price_result.price * inv_qty * 100.0).round() as i64;
             if self
                 .storage
                 .investments
@@ -84,7 +85,8 @@ impl FinanceTool {
             match self.price_service.fetch_price(&symbol, asset_type).await {
                 Ok(price_result) => {
                     let price_int = (price_result.price * 100.0).round() as i64;
-                    let current_value = (price_result.price * inv.quantity * 100.0).round() as i64;
+                    let inv_qty: f64 = inv.quantity_f64();
+                    let current_value = (price_result.price * inv_qty * 100.0).round() as i64;
                     match self
                         .storage
                         .investments

@@ -6,8 +6,7 @@ use desktop_shared::commands::{
     ActivityCategoryResponse, ActivityTimelineResponse, CategoryRulesResponse, DistractionResponse,
     FocusSessionResponse, GoalProgressResponse, HourlyBreakdownResponse, InsightCardResponse,
     IntelligenceSessionResponse, ProductivityPatternsResponse, ProductivityProjectResponse,
-    ProductivitySummaryResponse, TimeEntryResponse, TrackedAppResponse,
-    WeeklyAssessmentResponse,
+    ProductivitySummaryResponse, TimeEntryResponse, TrackedAppResponse, WeeklyAssessmentResponse,
 };
 use desktop_shared::errors::ApiError;
 use feature_productivity::auto_focus::AutoFocusEvent;
@@ -692,9 +691,9 @@ pub(crate) async fn dispatch_dev(
                 .await,
         ),
         "distraction_respond" => Ok(serde_json::Value::Null),
-        "productivity_patterns" => dev::val(
-            core.productivity_patterns(dev::get(body, "days")).await,
-        ),
+        "productivity_patterns" => {
+            dev::val(core.productivity_patterns(dev::get(body, "days")).await)
+        }
         "productivity_hourly_breakdown" => {
             let start_date = try_field!(dev::get_str(body, "start_date"));
             let end_date = try_field!(dev::get_str(body, "end_date"));

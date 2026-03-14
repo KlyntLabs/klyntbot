@@ -4,12 +4,16 @@
 //! a group of `handle_*` methods implemented on `FinanceTool`.
 
 mod accounts;
+mod allocations;
+mod analyze_handlers;
 mod budgets;
+mod fire_handlers;
 mod goals;
 mod health;
 mod investments;
 mod reports;
 mod settings;
+mod snapshots;
 mod transactions;
 
 use async_trait::async_trait;
@@ -97,16 +101,23 @@ impl Tool for FinanceTool {
 
     fn description(&self) -> &str {
         "Manage personal finances: accounts, transactions, budgets, investments, portfolios, \
-         goals, liabilities, net worth, FIRE planning, spending reports, and settings. \
+         goals, liabilities, net worth, FIRE planning, spending analytics, portfolio analytics, \
+         allocation targets, snapshots, and settings. \
          Actions: account_add, account_list, account_update, account_delete, \
          tx_add, tx_list, tx_update, tx_delete, tx_search, tx_recurring_add, \
          budget_create, budget_list, budget_status, budget_update, budget_delete, \
          portfolio_create, portfolio_list, investment_add, investment_update, \
          investment_tx, investment_summary, price_fetch, price_refresh, \
+         portfolio_drift, portfolio_rebalance, portfolio_returns, portfolio_correlation, \
          liability_add, liability_list, liability_update, net_worth, \
          goal_create, goal_list, goal_update, goal_fire, goal_whatif, \
          report_spending, report_income, report_trends, report_net_worth_history, \
-         daily_review, settings_get, settings_update."
+         daily_review, analyze_spending_anomalies, analyze_spending_trends, \
+         analyze_recurring_charges, analyze_category_correlation, \
+         fire_traditional, fire_coast, fire_lean, fire_fat, \
+         fire_withdrawal_sim, fire_backtest, fire_sensitivity, \
+         allocation_target_set, allocation_target_list, \
+         snapshot_record, snapshot_history, settings_get, settings_update."
     }
 
     fn parameters(&self) -> Value {
@@ -122,11 +133,18 @@ impl Tool for FinanceTool {
                         "portfolio_create", "portfolio_list",
                         "investment_add", "investment_update", "investment_tx", "investment_summary",
                         "price_fetch", "price_refresh",
+                        "portfolio_drift", "portfolio_rebalance", "portfolio_returns", "portfolio_correlation",
                         "liability_add", "liability_list", "liability_update", "net_worth",
                         "goal_create", "goal_list", "goal_update", "goal_fire", "goal_whatif",
                         "report_spending", "report_income", "report_trends", "report_net_worth_history",
                         "daily_review",
                         "finance_health_check",
+                        "analyze_spending_anomalies", "analyze_spending_trends",
+                        "analyze_recurring_charges", "analyze_category_correlation",
+                        "fire_traditional", "fire_coast", "fire_lean", "fire_fat",
+                        "fire_withdrawal_sim", "fire_backtest", "fire_sensitivity",
+                        "allocation_target_set", "allocation_target_list",
+                        "snapshot_record", "snapshot_history",
                         "settings_get", "settings_update"
                     ],
                     "description": "Finance action to perform"
@@ -215,10 +233,18 @@ impl Tool for FinanceTool {
             "budget_create" | "budget_list" | "budget_status" | "budget_update"
             | "budget_delete" => self.handle_budget(action, &p, ctx).await,
 
-            "portfolio_create" | "portfolio_list" | "investment_add" | "investment_update"
-            | "investment_tx" | "investment_summary" | "price_fetch" | "price_refresh" => {
-                self.handle_investment(action, &p, ctx).await
-            }
+            "portfolio_create"
+            | "portfolio_list"
+            | "investment_add"
+            | "investment_update"
+            | "investment_tx"
+            | "investment_summary"
+            | "price_fetch"
+            | "price_refresh"
+            | "portfolio_drift"
+            | "portfolio_rebalance"
+            | "portfolio_returns"
+            | "portfolio_correlation" => self.handle_investment(action, &p, ctx).await,
 
             "goal_create" | "goal_list" | "goal_update" | "goal_fire" | "goal_whatif"
             | "liability_add" | "liability_list" | "liability_update" | "net_worth" => {
@@ -232,6 +258,29 @@ impl Tool for FinanceTool {
             | "daily_review" => self.handle_report(action, &p, ctx).await,
 
             "finance_health_check" => self.finance_health_check(ctx).await,
+
+            // Spending analytics
+            "analyze_spending_anomalies"
+            | "analyze_spending_trends"
+            | "analyze_recurring_charges"
+            | "analyze_category_correlation" => self.handle_analyze(action, &p, ctx).await,
+
+            // FIRE planning
+            "fire_traditional"
+            | "fire_coast"
+            | "fire_lean"
+            | "fire_fat"
+            | "fire_withdrawal_sim"
+            | "fire_backtest"
+            | "fire_sensitivity" => self.handle_fire(action, &p, ctx).await,
+
+            // Allocation targets
+            "allocation_target_set" | "allocation_target_list" => {
+                self.handle_allocation(action, &p, ctx).await
+            }
+
+            // Net worth snapshots
+            "snapshot_record" | "snapshot_history" => self.handle_snapshot(action, &p, ctx).await,
 
             "settings_get" | "settings_update" => self.handle_settings(action, &p, ctx).await,
 

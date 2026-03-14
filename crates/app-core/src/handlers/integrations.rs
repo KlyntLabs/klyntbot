@@ -1,8 +1,6 @@
 use std::path::PathBuf;
 
-use desktop_shared::commands::{
-    AiToolInfo, AiToolInstallResult, AiToolsInstallParams,
-};
+use desktop_shared::commands::{AiToolInfo, AiToolInstallResult, AiToolsInstallParams};
 use desktop_shared::errors::ApiError;
 
 use crate::state::AppCore;
@@ -480,8 +478,7 @@ fn install_claude_code() -> Result<Vec<String>, String> {
         let dir = skills_dir.join(skill.name);
         std::fs::create_dir_all(&dir).map_err(|e| format!("Mkdir error: {e}"))?;
         let path = dir.join("SKILL.md");
-        std::fs::write(&path, format_skill_md(skill))
-            .map_err(|e| format!("Write error: {e}"))?;
+        std::fs::write(&path, format_skill_md(skill)).map_err(|e| format!("Write error: {e}"))?;
         files.push(path.display().to_string());
     }
 
@@ -500,8 +497,7 @@ fn install_codex() -> Result<Vec<String>, String> {
         let dir = skills_dir.join(skill.name);
         std::fs::create_dir_all(&dir).map_err(|e| format!("Mkdir error: {e}"))?;
         let path = dir.join("SKILL.md");
-        std::fs::write(&path, format_skill_md(skill))
-            .map_err(|e| format!("Write error: {e}"))?;
+        std::fs::write(&path, format_skill_md(skill)).map_err(|e| format!("Write error: {e}"))?;
         files.push(path.display().to_string());
     }
 
@@ -535,8 +531,7 @@ fn install_cursor() -> Result<Vec<String>, String> {
     std::fs::create_dir_all(&rules_dir).map_err(|e| format!("Mkdir error: {e}"))?;
     for skill in SKILLS {
         let path = rules_dir.join(format!("{}.mdc", skill.name));
-        std::fs::write(&path, format_cursor_mdc(skill))
-            .map_err(|e| format!("Write error: {e}"))?;
+        std::fs::write(&path, format_cursor_mdc(skill)).map_err(|e| format!("Write error: {e}"))?;
         files.push(path.display().to_string());
     }
 
@@ -570,9 +565,7 @@ fn install_copilot() -> Result<Vec<String>, String> {
 
     // Write to user's VS Code settings — global instructions
     // Copilot instructions go per-project, but we write a global one
-    let instructions_dir = home_dir()
-        .join(".github")
-        .join("instructions");
+    let instructions_dir = home_dir().join(".github").join("instructions");
     std::fs::create_dir_all(&instructions_dir).map_err(|e| format!("Mkdir error: {e}"))?;
     for skill in SKILLS {
         let path = instructions_dir.join(format!("{}.instructions.md", skill.name));

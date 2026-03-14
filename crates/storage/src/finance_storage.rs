@@ -3,11 +3,11 @@
 use sqlx::SqlitePool;
 
 use crate::repos::{
-    FinanceAccountRepo, FinanceBudgetRepo, FinanceGoalRepo, FinanceInvestmentRepo,
-    FinanceLiabilityRepo, FinanceTransactionRepo,
+    FinanceAccountRepo, FinanceAllocationRepo, FinanceBudgetRepo, FinanceGoalRepo,
+    FinanceInvestmentRepo, FinanceLiabilityRepo, FinanceSnapshotRepo, FinanceTransactionRepo,
 };
 
-/// Aggregate of all 6 finance repositories, constructed from a single pool.
+/// Aggregate of all finance repositories, constructed from a single pool.
 #[derive(Debug, Clone)]
 pub struct FinanceStorage {
     pub accounts: FinanceAccountRepo,
@@ -16,6 +16,8 @@ pub struct FinanceStorage {
     pub investments: FinanceInvestmentRepo,
     pub goals: FinanceGoalRepo,
     pub liabilities: FinanceLiabilityRepo,
+    pub allocations: FinanceAllocationRepo,
+    pub snapshots: FinanceSnapshotRepo,
 }
 
 impl FinanceStorage {
@@ -27,6 +29,8 @@ impl FinanceStorage {
             investments: FinanceInvestmentRepo::new(pool.clone()),
             goals: FinanceGoalRepo::new(pool.clone()),
             liabilities: FinanceLiabilityRepo::new(pool.clone()),
+            allocations: FinanceAllocationRepo::new(pool.clone()),
+            snapshots: FinanceSnapshotRepo::new(pool.clone()),
         }
     }
 }

@@ -136,18 +136,24 @@ impl ProductivityTool {
                 }
                 Ok(lines.join("\n"))
             }
-            Some("week") => {
-                Ok(format_grouped_breakdown("Weekly", start_date, end_date, &summaries, |s| {
+            Some("week") => Ok(format_grouped_breakdown(
+                "Weekly",
+                start_date,
+                end_date,
+                &summaries,
+                |s| {
                     chrono::NaiveDate::parse_from_str(&s.date, "%Y-%m-%d")
                         .map(|d| format!("{}-W{:02}", d.iso_week().year(), d.iso_week().week()))
                         .unwrap_or_else(|_| "unknown".into())
-                }))
-            }
-            Some("month") => {
-                Ok(format_grouped_breakdown("Monthly", start_date, end_date, &summaries, |s| {
-                    s.date.get(..7).unwrap_or("unknown").to_string()
-                }))
-            }
+                },
+            )),
+            Some("month") => Ok(format_grouped_breakdown(
+                "Monthly",
+                start_date,
+                end_date,
+                &summaries,
+                |s| s.date.get(..7).unwrap_or("unknown").to_string(),
+            )),
             Some("project") => {
                 let results = self
                     .repos

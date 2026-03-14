@@ -27,10 +27,7 @@ struct SummaryRow {
     avg_recovery_secs: Option<f64>,
 }
 
-fn deser_json_col<T: serde::de::DeserializeOwned + Default>(
-    raw: Option<&str>,
-    field: &str,
-) -> T {
+fn deser_json_col<T: serde::de::DeserializeOwned + Default>(raw: Option<&str>, field: &str) -> T {
     raw.and_then(|s| match serde_json::from_str(s) {
         Ok(v) => Some(v),
         Err(e) => {

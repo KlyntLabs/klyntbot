@@ -94,11 +94,11 @@ impl FinanceInvestmentRepo {
             INSERT INTO finance_investments (
                 id, portfolio_id, asset_type, symbol, name, quantity,
                 cost_basis, currency, current_price, current_value,
-                purchase_date, notes, created_at, updated_at
+                purchase_date, asset_class, notes, created_at, updated_at
             ) VALUES (
                 ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?,
-                ?, ?, ?, ?
+                ?, ?, ?, ?, ?
             )
             RETURNING *
             "#,
@@ -108,12 +108,13 @@ impl FinanceInvestmentRepo {
         .bind(&row.asset_type)
         .bind(&row.symbol)
         .bind(&row.name)
-        .bind(row.quantity)
+        .bind(&row.quantity)
         .bind(row.cost_basis)
         .bind(&row.currency)
         .bind(row.current_price)
         .bind(row.current_value)
         .bind(row.purchase_date)
+        .bind(&row.asset_class)
         .bind(&row.notes)
         .bind(row.created_at)
         .bind(row.updated_at)
@@ -158,7 +159,7 @@ impl FinanceInvestmentRepo {
         .bind(patch.current_price.as_ref().and_then(|v| *v))
         .bind(patch.current_value.is_some())
         .bind(patch.current_value.as_ref().and_then(|v| *v))
-        .bind(patch.quantity)
+        .bind(patch.quantity.as_deref())
         .bind(patch.cost_basis)
         .bind(patch.notes.is_some())
         .bind(patch.notes.as_ref().and_then(|v| v.as_deref()))

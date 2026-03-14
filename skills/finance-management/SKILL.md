@@ -53,6 +53,47 @@ metadata:
       - transfer
       - account
       - wallet
+      # FIRE / retirement planning
+      - "fire number"
+      - "retirement"
+      - "financial independence"
+      - "coast fire"
+      - "lean fire"
+      - "fat fire"
+      - "withdrawal rate"
+      - "safe withdrawal"
+      - "4% rule"
+      - "sequence of returns"
+      - "monte carlo"
+      - "simulation"
+      - "sensitivity analysis"
+      - "how long until I can retire"
+      - "when can I retire"
+      - "withdrawal simulation"
+      # Spending intelligence
+      - "spending anomaly"
+      - "unusual spending"
+      - "spending trend"
+      - "spending pattern"
+      - "recurring charge"
+      - "spending correlation"
+      - "why did my spending"
+      - "spending spike"
+      # Portfolio analytics
+      - "portfolio drift"
+      - "rebalance"
+      - "allocation"
+      - "portfolio returns"
+      - "time-weighted return"
+      - "money-weighted return"
+      - "asset correlation"
+      - "portfolio analysis"
+      # Net worth tracking
+      - "net worth snapshot"
+      - "net worth history"
+      - "net worth trend"
+      - "record net worth"
+      - "track net worth"
 ---
 
 You are the finance agent. You help users manage personal finances including accounts,
@@ -73,8 +114,12 @@ If no accounts exist, guide the user through setup:
 | 2 | Is it a reporting/analysis request? | Use `report_spending` or `net_worth` | Go to step 3 |
 | 3 | Is it about budgets? | Use `budget_status` or `budget_create` | Go to step 4 |
 | 4 | Is it about investments/prices? | Use `price_fetch` or portfolio actions | Go to step 5 |
-| 5 | Does it need a follow-up task? | **Delegate to task-management** | Go to step 6 |
-| 6 | Does it need a recurring schedule? | **Delegate to automation** | Handle as general finance query |
+| 5 | Is it about FIRE / retirement planning? | See `references/fire-planning.md` | Go to step 6 |
+| 6 | Is it about spending analytics (anomalies, trends, correlations)? | See `references/spending-intelligence.md` | Go to step 7 |
+| 7 | Is it about portfolio analytics (drift, rebalance, returns)? | See `references/portfolio-analysis.md` | Go to step 8 |
+| 8 | Is it about net worth snapshots? | Use `snapshot_record` / `snapshot_history` | Go to step 9 |
+| 9 | Does it need a follow-up task? | **Delegate to task-management** | Go to step 10 |
+| 10 | Does it need a recurring schedule? | **Delegate to automation** | Handle as general finance query |
 
 ### When to Use Reminder vs Task Mode
 
@@ -98,10 +143,19 @@ If no accounts exist, guide the user through setup:
 | "Check my budget" | `budget_status` | (no ID = show all) |
 | "What's my net worth?" | `net_worth` | — |
 | "Bitcoin price" | `price_fetch` | symbol: "BTC", asset_type: "crypto" |
-| "FIRE number" | `goal_fire` | annual_expenses (or derive from spending) |
+| "FIRE number" | `fire_traditional` | annual_expenses, savings_rate |
+| "Coast FIRE" | `fire_coast` | current_savings, age, target_retirement_age |
+| "Any unusual spending?" | `analyze_spending_anomalies` | lookback_months, sensitivity |
+| "Spending trends" | `analyze_spending_trends` | months, group_by |
+| "Portfolio drift" | `portfolio_drift` | — |
+| "Record net worth" | `snapshot_record` | note (optional) |
+| "Net worth history" | `snapshot_history` | months (default: 12) |
 
 See `references/budgeting.md` for the complete action routing table.
-See `references/spending-analysis.md` for analysis workflows.
+See `references/analytics-actions.md` for all 19 analytical actions.
+See `references/fire-planning.md` for FIRE planning workflow.
+See `references/spending-intelligence.md` for spending analysis workflows.
+See `references/portfolio-analysis.md` for portfolio analytics workflow.
 
 ## Handoffs
 

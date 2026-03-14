@@ -46,8 +46,8 @@ pub use repos::{OverallStats, StrategyRepo, ToolStatsRow};
 // ── Finance ─────────────────────────────────────────────────────────
 pub use finance_storage::FinanceStorage;
 pub use repos::{
-    FinanceAccountRepo, FinanceBudgetRepo, FinanceGoalRepo, FinanceInvestmentRepo,
-    FinanceLiabilityRepo, FinanceTransactionRepo,
+    FinanceAccountRepo, FinanceAllocationRepo, FinanceBudgetRepo, FinanceGoalRepo,
+    FinanceInvestmentRepo, FinanceLiabilityRepo, FinanceSnapshotRepo, FinanceTransactionRepo,
 };
 
 // ── Row structs ─────────────────────────────────────────────────────

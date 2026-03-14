@@ -89,15 +89,23 @@ pub struct FinanceInvestmentRow {
     pub asset_type: String,
     pub symbol: Option<String>,
     pub name: String,
-    pub quantity: f64,
+    pub quantity: String,
     pub cost_basis: i64,
     pub currency: String,
     pub current_price: Option<i64>,
     pub current_value: Option<i64>,
     pub purchase_date: Option<NaiveDate>,
+    pub asset_class: Option<String>,
     pub notes: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+}
+
+impl FinanceInvestmentRow {
+    /// Parse the string `quantity` to `f64`, returning `0.0` on parse failure.
+    pub fn quantity_f64(&self) -> f64 {
+        self.quantity.parse().unwrap_or(0.0)
+    }
 }
 
 /// Row struct for the `finance_investment_transactions` table.
@@ -155,6 +163,34 @@ pub struct FinanceLiabilityRow {
     pub updated_at: DateTime<Utc>,
 }
 
+/// Row struct for the `finance_allocation_targets` table.
+#[derive(Debug, Clone, FromRow, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FinanceAllocationTargetRow {
+    pub id: String,
+    pub portfolio_id: String,
+    pub asset_class: String,
+    pub target_weight: String,
+    pub tolerance_band: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// Row struct for the `finance_net_worth_snapshots` table.
+#[derive(Debug, Clone, FromRow, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FinanceNetWorthSnapshotRow {
+    pub id: String,
+    pub snapshot_date: String,
+    pub currency: String,
+    pub accounts_total: i64,
+    pub investments_total: i64,
+    pub liabilities_total: i64,
+    pub net_worth: i64,
+    pub breakdown: String,
+    pub created_at: DateTime<Utc>,
+}
+
 // ============================================================
 // Patch structs (partial update)
 // ============================================================
@@ -202,7 +238,7 @@ pub struct FinanceInvestmentPatch {
     pub id: String,
     pub current_price: Option<Option<i64>>,
     pub current_value: Option<Option<i64>>,
-    pub quantity: Option<f64>,
+    pub quantity: Option<String>,
     /// Set a new total cost basis. `None` leaves it unchanged.
     pub cost_basis: Option<i64>,
     pub notes: Option<Option<String>>,

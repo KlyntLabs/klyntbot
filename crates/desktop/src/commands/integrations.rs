@@ -6,9 +6,7 @@ use tauri::State;
 use crate::app_core::AppCore;
 
 #[tauri::command]
-pub async fn ai_tools_detect(
-    state: State<'_, Arc<AppCore>>,
-) -> Result<Vec<AiToolInfo>, ApiError> {
+pub async fn ai_tools_detect(state: State<'_, Arc<AppCore>>) -> Result<Vec<AiToolInfo>, ApiError> {
     state.ai_tools_detect().await
 }
 
@@ -34,9 +32,10 @@ pub(crate) async fn dispatch_dev(
     use super::dev_helpers::{self as dev, try_field};
     Some(match cmd {
         "ai_tools_detect" => dev::val(core.ai_tools_detect().await),
-        "ai_tools_install" => {
-            dev::val(core.ai_tools_install(try_field!(dev::parse_params(body))).await)
-        }
+        "ai_tools_install" => dev::val(
+            core.ai_tools_install(try_field!(dev::parse_params(body)))
+                .await,
+        ),
         _ => return None,
     })
 }

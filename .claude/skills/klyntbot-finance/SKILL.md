@@ -26,7 +26,15 @@ metadata:
 | "net worth" | `net_worth` | -- |
 | "list accounts" | `account_list` | -- |
 | "bitcoin price" | `price_fetch` | symbol: "BTC", asset_type: "crypto" |
-| "FIRE number" | `goal_fire` | annual_expenses |
+| "FIRE number" | `fire_traditional` | annual_expenses, savings_rate, current_savings, annual_income |
+| "coast FIRE" | `fire_coast` | current_savings, age, target_retirement_age, annual_expenses |
+| "unusual spending" | `analyze_spending_anomalies` | lookback_months (3), sensitivity ("medium") |
+| "spending trends" | `analyze_spending_trends` | months (6), group_by ("category") |
+| "recurring charges" | `analyze_recurring_charges` | lookback_months (3) |
+| "portfolio drift" | `portfolio_drift` | -- |
+| "rebalance" | `portfolio_rebalance` | -- |
+| "record net worth" | `snapshot_record` | note (optional) |
+| "net worth history" | `snapshot_history` | months (12) |
 
 Use the `klyntbot - finance` MCP tool for financial management.
 
@@ -45,6 +53,16 @@ For all actions and setup workflow, read `references/actions.md`.
 3. **Hardcoding currency** — Call `settings_get` to determine the user's default currency. Don't assume USD.
 4. **Wrong transaction type** — Use "expense" for spending, "income" for earnings. Not "debit"/"credit".
 5. **Missing category on transactions** — Always include a category when adding transactions.
+6. **Wrong sensitivity direction** — For `analyze_spending_anomalies`, "low" catches MORE anomalies (lower threshold), "high" catches FEWER (stricter). Think of it as "how anomalous must it be to report."
+7. **Forgetting to set allocation targets before drift check** — `portfolio_drift` requires targets. Use `allocation_target_list` first; if empty, guide the user to set targets with `allocation_target_set`.
+8. **Not chaining FIRE actions** — A complete FIRE analysis chains: calculate variant -> withdrawal simulation -> sensitivity analysis. Don't just run one action in isolation.
+
+## Workflow Tip: FIRE Planning Chain
+
+For a complete FIRE analysis, chain these actions in sequence:
+1. `fire_traditional` (or coast/lean/fat) — get the FIRE number
+2. `fire_withdrawal_sim` — Monte Carlo validation of the plan
+3. `fire_sensitivity` — show how results change with different assumptions
 
 ## Red Flags — STOP
 

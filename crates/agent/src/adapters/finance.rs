@@ -161,7 +161,8 @@ impl FinanceHandler for FinanceHandlerImpl {
                 match self.price_service.fetch_price(symbol, asset_type).await {
                     Ok(result) => {
                         let price_cents = (result.price * 100.0).round() as i64;
-                        let value_cents = (result.price * inv.quantity * 100.0).round() as i64;
+                        let inv_qty: f64 = inv.quantity.parse().unwrap_or(0.0);
+                        let value_cents = (result.price * inv_qty * 100.0).round() as i64;
                         let _ = self
                             .repos
                             .finance

@@ -104,6 +104,7 @@ impl AppCore {
             current_price: None,
             current_value: None,
             purchase_date,
+            asset_class: None,
             notes: params.notes,
             created_at: now,
             updated_at: now,
