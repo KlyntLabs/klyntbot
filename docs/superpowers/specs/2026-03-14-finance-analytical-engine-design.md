@@ -776,11 +776,236 @@ Repos that participate in transactions get `_with_tx` variants that accept `&mut
 
 Used for `tx_add` (add + balance adjustment), `tx_add_transfer` (2 adds + 2 balance adjustments), and `tx_delete` (delete + reverse balance).
 
-### Skill Updates
+### Skill Updates — Internal Agent Skill (`skills/finance-management/`)
 
-**Internal skill** (`skills/finance-management/SKILL.md`): Add triggers for "anomaly", "recurring charges", "drift", "rebalance", "monte carlo", "simulation", "coast fire", "lean fire", "fat fire", "backtest". New reference: `references/analytics.md`.
+The internal orchestrator skill teaches the klyntbot agent how to use the finance tool. Without proper skill guidance, the agent won't know when to call `fire_traditional` vs `fire_coast`, won't follow multi-step analytical workflows, and won't chain actions together intelligently.
 
-**Claude Code skill** (`.claude/skills/klyntbot-finance/`): Update `references/actions.md` with all 19 new actions, parameters, and examples.
+**SKILL.md changes:**
+
+1. **New triggers** (add to existing 54):
+   ```
+   anomaly, anomalies, unusual spending, spending spike, spending drop
+   recurring charges, subscriptions, subscription audit
+   drift, allocation drift, rebalance, rebalancing, portfolio check
+   monte carlo, simulation, probability, success rate, survival rate
+   coast fire, lean fire, fat fire, fire number, withdrawal rate
+   backtest, historical, sequence of returns, what-if, sensitivity
+   trend, trends, spending trend, income trend, savings rate trend
+   correlation, category correlation, asset correlation
+   snapshot, net worth history, net worth over time
+   ```
+
+2. **Updated decision flowchart** — add analytical branches:
+   ```
+   Is the user asking about FIRE / retirement planning?
+     → YES: Which variant?
+       → "when can I retire?" → fire_traditional (compare multiple SWR)
+       → "can I stop saving?" → fire_coast
+       → "bare minimum to retire?" → fire_lean
+       → "comfortable retirement?" → fire_fat
+       → "will my money last?" → fire_withdrawal_sim (Monte Carlo)
+       → "would this have worked historically?" → fire_backtest
+       → "what if I change X?" → fire_sensitivity
+     → NO: Continue to next branch
+
+   Is the user asking about spending patterns / anomalies?
+     → YES: Route to spending analysis workflow (see references/spending-intelligence.md)
+     → NO: Continue
+
+   Is the user asking about portfolio / investments beyond basic CRUD?
+     → YES: Route to portfolio analysis workflow (see references/portfolio-analysis.md)
+     → NO: Continue to existing flowchart branches
+   ```
+
+3. **Updated `always_skills`**: Keep `[budgeting]`, add nothing — new references are Tier 3 (loaded on demand to avoid bloating every finance conversation with analytics context).
+
+**New reference files:**
+
+#### `references/analytics-actions.md` (Tier 3 — on demand)
+
+Action routing table for all 19 new analytical actions, structured like the existing `budgeting.md`:
+
+```markdown
+## Analytical Actions Routing
+
+### FIRE Planning
+| User says... | Action | Key params |
+|---|---|---|
+| "when can I FIRE?" | fire_traditional | annual_expenses, withdrawal_rates: [0.04, 0.035, 0.03] |
+| "can I stop saving?" | fire_coast | current_age, target_age |
+| "minimum to retire?" | fire_lean | essential_expenses |
+| "comfortable retirement?" | fire_fat | desired_annual_spending |
+| "will my money last 30 years?" | fire_withdrawal_sim | portfolio, annual_withdrawal, years: 30 |
+| "would 4% rule have worked?" | fire_backtest | withdrawal_rate: 0.04, years: 30 |
+| "what if I save more?" | fire_sensitivity | variable sweep |
+
+### Spending Intelligence
+| User says... | Action | Key params |
+|---|---|---|
+| "anything unusual in my spending?" | analyze_spending_anomalies | lookback_months: 6 |
+| "show spending trends" | analyze_spending_trends | period: monthly, lookback: 12 |
+| "what subscriptions do I have?" | analyze_recurring_charges | — |
+| "which categories move together?" | analyze_category_correlation | min_months: 6 |
+
+### Portfolio Analytics
+| User says... | Action | Key params |
+|---|---|---|
+| "is my portfolio balanced?" | portfolio_drift | portfolio_id |
+| "how should I rebalance?" | portfolio_rebalance | portfolio_id, method |
+| "how are my investments doing?" | portfolio_returns | portfolio_id |
+| "are my assets diversified?" | portfolio_correlation | portfolio_id |
+| "set target allocation" | allocation_target_set | portfolio_id, asset_class, weight |
+
+### Snapshots
+| User says... | Action | Key params |
+|---|---|---|
+| "record my net worth" | snapshot_record | — |
+| "net worth over time" | snapshot_history | period: year |
+```
+
+#### `references/fire-planning.md` (Tier 3 — on demand)
+
+Multi-step guided workflow for FIRE analysis, inspired by the Anthropic plugins' step-by-step approach:
+
+```markdown
+## FIRE Planning Workflow
+
+When a user asks about FIRE / retirement, follow this guided process:
+
+### Step 1: Gather Current State
+Before any calculation, collect the user's financial snapshot:
+1. Call `net_worth` to get current portfolio value across all accounts + investments
+2. Call `report_spending` with period "year" to get annual expenses
+3. Ask the user for any missing inputs: expected return rate, inflation assumption
+
+### Step 2: Run Primary FIRE Calculation
+Based on the user's question, select the appropriate variant:
+- General "when can I retire?" → `fire_traditional` with multiple SWRs [0.04, 0.035, 0.03]
+- Already has enough? → `fire_coast` with their current age and target retirement age
+- Frugal path → `fire_lean` using only essential spending categories
+- Comfortable path → `fire_fat` using desired lifestyle spending
+
+### Step 3: Validate with Monte Carlo
+For any FIRE calculation, always follow up with:
+- `fire_withdrawal_sim` using their portfolio + planned withdrawal + 30-40 year horizon
+- Report the success rate and percentile bands
+- Flag if success rate < 90%: "Your current plan has a [X]% chance of running out of money"
+
+### Step 4: Historical Perspective
+If the user wants more confidence:
+- `fire_backtest` against historical US stock returns
+- Compare the historical success rate with the Monte Carlo result
+- Identify the worst starting year and what would have happened
+
+### Step 5: Sensitivity Analysis (if user asks "what if")
+- `fire_sensitivity` sweeping the variable they're curious about
+- Present as a grid: "If you save $X/month at Y% return, here's your success rate"
+
+### Critical Rules
+- Always show multiple SWR variants (4%, 3.5%, 3%) — don't assume 4% is safe
+- Always mention inflation adjustment: "These are in today's dollars"
+- If success rate < 95%, suggest: increase savings, reduce expenses, or delay retirement
+- Never present Monte Carlo results without explaining what "success rate" means
+```
+
+#### `references/portfolio-analysis.md` (Tier 3 — on demand)
+
+```markdown
+## Portfolio Analysis Workflow
+
+### Step 1: Check Allocation Targets
+- `allocation_target_list` to see if targets exist for this portfolio
+- If no targets: ask the user what their target allocation is, then `allocation_target_set`
+
+### Step 2: Run Drift Analysis
+- `portfolio_drift` to compute current vs target allocation
+- If `needs_rebalancing` is true, proceed to step 3
+- If drift is small, report: "Your portfolio is well-balanced (max drift: X%)"
+
+### Step 3: Suggest Rebalancing
+- Ask the user: "Do you want to rebalance by selling overweight positions, or just direct new contributions?"
+- `portfolio_rebalance` with the chosen method (FullRebalance vs ContributionOnly)
+- Present each suggested trade with its rationale
+
+### Step 4: Performance Review
+- `portfolio_returns` to show TWR, MWR, and per-holding attribution
+- Compare against the user's expectations or a benchmark
+- Flag underperforming holdings
+
+### Step 5: Diversification Check
+- `portfolio_correlation` to check if assets are actually diversified
+- Flag holdings with correlation > 0.8: "These move together — limited diversification benefit"
+```
+
+#### `references/spending-intelligence.md` (Tier 3 — replaces existing `spending-analysis.md`)
+
+```markdown
+## Spending Intelligence Workflow
+
+Upgraded from the basic spending analysis to use the new analytical engine.
+
+### Proactive Analysis (when user asks "how am I doing?")
+Run these in sequence:
+1. `analyze_spending_anomalies` — flag anything unusual in the last 6 months
+2. `analyze_spending_trends` — show direction (increasing/decreasing/stable) for total spending + savings rate
+3. `analyze_recurring_charges` — list subscriptions with annual costs, flag overdue charges
+4. `budget_status` (existing) — compare spending to budget limits
+
+### Deep Dive (when user asks "where does my money go?")
+1. `report_spending` by category for the requested period
+2. `analyze_category_correlation` — reveal hidden relationships
+3. `analyze_spending_trends` with CategorySpending for the top 3 categories
+
+### Anomaly Investigation (when user asks "what was that charge?")
+1. `analyze_spending_anomalies` with PerTransaction granularity
+2. For each anomaly, explain: "Your [category] spending of $X on [date] was [z-score]σ above your 6-month average of $Y"
+3. Ask if this was expected — if not, suggest budget adjustment
+
+### Subscription Audit (when user asks "what am I paying for?")
+1. `analyze_recurring_charges` — list all detected recurring charges
+2. Sort by annual_cost descending
+3. Flag overdue charges: "You usually pay $X to [counterparty] monthly, but last charge was [date] — may be cancelled?"
+4. Show total annual subscription cost
+```
+
+**Updated `budgeting.md`** — add cross-references to new analytical actions where relevant (e.g., after showing budget status, suggest `analyze_spending_anomalies` if any budget is over 90%).
+
+### Skill Updates — Claude Code Skill (`.claude/skills/klyntbot-finance/`)
+
+**SKILL.md changes:**
+- Add new actions to the quick reference table (currently 7 rows → expand to ~15 with the most important analytical actions)
+- Add new common mistakes for analytics (e.g., "Don't call fire_withdrawal_sim without first getting portfolio value via net_worth")
+- Add workflow tips: "For FIRE questions, chain: net_worth → fire_traditional → fire_withdrawal_sim"
+
+**`references/actions.md` changes:**
+- Add all 19 new actions with parameters, organized under new headings:
+  - "Spending Analytics" (analyze_*)
+  - "FIRE Planning" (fire_*)
+  - "Portfolio Analytics" (portfolio_drift, portfolio_rebalance, portfolio_returns, portfolio_correlation)
+  - "Allocation Targets" (allocation_target_set, allocation_target_list)
+  - "Snapshots" (snapshot_record, snapshot_history)
+- Include example JSON for each action
+- Include expected output format descriptions
+
+### Skill File Inventory (Complete)
+
+After this upgrade, the finance skill system consists of:
+
+```
+skills/finance-management/
+├── SKILL.md                            — orchestrator (updated triggers, flowchart)
+└── references/
+    ├── budgeting.md                    — existing (updated with analytics cross-refs)
+    ├── spending-intelligence.md        — NEW (replaces spending-analysis.md)
+    ├── analytics-actions.md            — NEW (action routing table for 19 new actions)
+    ├── fire-planning.md                — NEW (guided FIRE workflow)
+    └── portfolio-analysis.md           — NEW (guided portfolio workflow)
+
+.claude/skills/klyntbot-finance/
+├── SKILL.md                            — Claude Code skill (updated quick ref)
+└── references/
+    └── actions.md                      — action reference (updated with 19 new actions)
+```
 
 ---
 
@@ -845,8 +1070,8 @@ crates/analytics/tests/
 - Custom metric DSL
 - ML-based anomaly detection (isolation forest, DBSCAN)
 - Portfolio optimization (mean-variance, Black-Litterman)
-- Multi-step guided skill workflows (sub-project 2)
-- Proactive coaching system (sub-project 4)
+- Interactive multi-step wizards with user confirmation gates (sub-project 2) — the skill workflows defined here are *guidance for the AI agent*, not interactive step-by-step wizards that pause for user confirmation at each stage
+- Proactive coaching system — agent-initiated insights without user prompting (sub-project 4)
 
 ## Dependencies
 
