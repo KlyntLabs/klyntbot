@@ -368,16 +368,19 @@ monthly_rate = (1 + real_return)^(1/12) - 1
 if current_portfolio >= fire_number:
     months_to_fire = 0  // already at FIRE
 elif monthly_savings <= 0:
-    months_to_fire = None  // unreachable
+    months_to_fire = None  // no savings, can't grow (portfolio-only growth handled below)
 elif monthly_rate <= 0:
     months_to_fire = ceil((fire_number - current_portfolio) / monthly_savings)  // no compounding
 else:
     // Standard future value of annuity formula, solved for n:
     // FV = PV*(1+r)^n + PMT*((1+r)^n - 1)/r
     // Solving for n: n = ln((fire_number * r + PMT) / (PV * r + PMT)) / ln(1 + r)
-    months_to_fire = ceil(ln((fire_number * monthly_rate + monthly_savings) /
-                              (current_portfolio * monthly_rate + monthly_savings)) /
-                          ln(1 + monthly_rate))
+    denominator = current_portfolio * monthly_rate + monthly_savings
+    numerator = fire_number * monthly_rate + monthly_savings
+    if denominator <= 0 or numerator / denominator <= 0:
+        months_to_fire = None  // unreachable (savings too small relative to portfolio decay)
+    else:
+        months_to_fire = ceil(ln(numerator / denominator) / ln(1 + monthly_rate))
 ```
 
 **Coast FIRE:** Uses discrete annual compounding (consistent with Monte Carlo):
@@ -387,7 +390,7 @@ years_to_retirement = target_age - current_age
 fire_number = annual_expenses_at_retirement / withdrawal_rate
 coast_number = fire_number / (1 + real_return)^years_to_retirement
 ```
-If `real_return <= 0`, Coast FIRE is unreachable (compounding doesn't help). If `current_portfolio >= coast_number`, you can stop saving.
+If `real_return <= 0`, Coast FIRE is unreachable (compounding doesn't help) — `years_to_coast` returns `None`. If `current_portfolio >= coast_number`, you can stop saving (`years_to_coast = Some(0)`).
 
 **Lean FIRE / Fat FIRE:** Same math as Traditional, different expense inputs (essentials-only vs. full lifestyle).
 
@@ -490,6 +493,13 @@ pub struct AnomalyConfig {
     pub threshold: Decimal,        // default: 2.5
     pub min_transactions: u32,     // default: 5
     pub granularity: AnomalyGranularity, // PerTransaction or PerCategoryMonth
+    pub direction: AnomalyDirection,     // default: SpikesOnly
+}
+
+pub enum AnomalyDirection {
+    SpikesOnly,   // only flag z > threshold (unexpected high spending)
+    DropsOnly,    // only flag z < -threshold (missed expected charges)
+    Both,         // flag |z| > threshold
 }
 ```
 
@@ -506,7 +516,10 @@ modified_z = 0.6745 * (current - median) / MAD
 
 **MAD = 0 guard:** When all baseline values are identical (MAD = 0), any deviation from the constant value is flagged as High severity. If the current value equals the baseline, no anomaly is emitted.
 
-Severity (for spikes): z >= 2.5 Low, z >= 3.5 Medium, z >= 5.0 High.
+Severity thresholds (same for spikes and drops, applied to the absolute z-score):
+- `|z| >= 2.5`: Low — notable but could be normal variation
+- `|z| >= 3.5`: Medium — likely unusual, worth flagging
+- `|z| >= 5.0`: High — almost certainly anomalous
 
 ### Trend Analysis
 
@@ -668,7 +681,7 @@ Triggered daily via `FinanceHandler::record_net_worth_snapshot()`, on-demand via
 
 ### Sensitivity / What-If Framework
 
-Typed wrappers that sweep variable ranges through Monte Carlo. Sensitivity sweeps use a **reduced run count** (default: 1,000 runs per combination instead of 10,000) to keep computation tractable — a 5×5 grid at 1,000 runs = 25M iterations, completing in seconds single-threaded.
+Typed wrappers that sweep variable ranges through Monte Carlo. Sensitivity sweeps use a **reduced run count** (default: 1,000 runs per combination instead of 10,000) to keep computation tractable — a 5×5 grid = 25 combinations × 1,000 runs × 50 years = ~1.25M year-steps, completing in seconds single-threaded.
 
 ```rust
 pub struct SensitivityConfig {
