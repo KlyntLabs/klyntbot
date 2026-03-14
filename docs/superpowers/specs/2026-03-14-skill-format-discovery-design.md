@@ -78,7 +78,7 @@ You are the task management specialist...
 | Field | Type | Default | Purpose |
 |-------|------|---------|---------|
 | `type` | `"skill"` \| `"orchestrator"` | `"skill"` | Orchestrators replace current agents |
-| `tools` | `string[]` | `null` (all) | Tool access allowlist. `null`/omitted = all tools allowed. `[]` = no tools (deny-all). Explicit list = only those tools. |
+| `tools` | `string[]` | `null` (all) | Tool access allowlist. `null`/omitted = all tools allowed. `[]` = no tools (deny-all). Explicit list = only those tools. **Migration note**: The current `AgentProfile` treats empty `tools: []` as "allow all" (`allowed_tool_names()` returns `None`). The new semantic INVERTS this: `None` = all, `Some([])` = deny-all. All existing agent AGENT.md files that use `tools: [...]` with explicit lists are unaffected. The only risk is if any agent has `tools: []` meaning "full access" — review during migration and convert to omitting the field. |
 | `mcp_tools` | `string[]` | `[]` | MCP server access. `["*"]` = all, `[]` = deny all. |
 | `can_delegate_to` | `string[]` | `[]` | Orchestrator delegation targets |
 | `max_iterations` | `u32` | `10` | ReAct loop iteration budget |
@@ -127,11 +127,11 @@ Entity declarations in `manifest.json` drive auto-provisioning (Subsystem 2):
 |-------|------|--------|---------|----------|
 | Built-in | Compiled via `include_str!` | N/A | Core skills shipped with Klyntbot | Lowest (0) |
 | User-level | `{data_dir}/skills/` | `Config::data_dir_path()` | User-installed skills | Medium (1) |
-| Project-level | `.agents/skills/` | `Config::workspace_path` (if set), else CWD at startup | Cross-client interop | Highest (2) |
+| Project-level | `.agents/skills/` | New `Config::project_root` field (if set), else CWD at startup | Cross-client interop | Highest (2) |
 
 **Priority rule**: Higher-priority scopes shadow lower-priority skills with the same `name`. A warning is logged when shadowing occurs.
 
-**Project-level path anchoring**: `.agents/skills/` is relative to the configured `workspace_path` in `Config` (which the desktop app sets on launch), falling back to CWD at startup. In daemon/headless mode where no workspace is configured, project-level scanning is skipped entirely (only built-in and user-level skills are available).
+**Project-level path anchoring**: `.agents/skills/` is relative to a new `Config::project_root` field (distinct from the existing `workspace_path` which points to `~/.klyntbot/workspace` for agent file storage). The desktop app sets `project_root` on launch. Falls back to CWD at startup. In daemon/headless mode where no project root is configured, project-level scanning is skipped entirely (only built-in and user-level skills are available).
 
 ### Scanning Algorithm
 
@@ -166,6 +166,7 @@ Entity declarations in `manifest.json` drive auto-provisioning (Subsystem 2):
 - Trust decisions are persisted in `{data_dir}/data.db` in a `skill_trust` table: `(skill_name TEXT, scope TEXT, workspace_path TEXT, trusted BOOLEAN, decided_at TEXT)`.
 - On first activation of a project-level skill, the system checks `skill_trust`. If no record exists, activation is deferred and the user is prompted via the active channel's `ask_user` interaction (desktop UI dialog, Telegram inline keyboard, or Discord reaction). If the channel has no interactive prompt capability (e.g., headless/cron), the skill is skipped with a warning logged.
 - Declining trust skips the skill for that session. The user can manage trust decisions via settings UI or a `skill trust` command.
+- **Call site**: Trust checks happen during `SkillCatalog::discover()` (at scan time), NOT during context assembly. Untrusted project-level skills are loaded into the catalog with a `trusted: false` flag but excluded from `SkillRouter` matching and `SkillContextSource` injection. The `ask_user` prompt for trust confirmation is triggered lazily on first `SkillRouter` match attempt, outside the hot path. This avoids races during concurrent context assembly.
 
 ### Hot Reload
 
@@ -216,6 +217,12 @@ Two activation paths:
 3. Best orchestrator skill selected → SKILL.md body injected as system context
 4. Orchestrator's `always_skills` loaded — see "Always-skills injection" below
 5. **Per-message skill activation**: non-orchestrator skills are scored against the user message using the same keyword + semantic matching. Skills above the activation threshold are injected into context alongside the orchestrator. This replaces the old `triggers`-based substring matching with description-based semantic matching.
+
+**Scoring normalization and thresholds**:
+- **Keyword scoring**: tokenize the skill description into words, count how many appear in the user message, normalize by `score / max(description_word_count / 3, 1)` capped at 1.0. This adapts the current `/5.0` normalization (tuned for ~5 trigger phrases) to variable-length descriptions.
+- **Orchestrator selection threshold**: blended score >= 0.3 (same as current agent matching). Below this, falls back to "general."
+- **Per-message skill activation threshold**: blended score >= 0.4 (slightly higher to avoid over-activation since many skills may partially match). Max 3 non-orchestrator skills activated per message to prevent context bloat.
+- These thresholds are configurable in `SkillConfig` for tuning.
 
 **Always-skills injection**: When an orchestrator declares `always_skills: [todo, daily-planner]`, these reference files are loaded as **Tier 2 content** (injected directly into the system prompt alongside the orchestrator's body), NOT as Tier 3 resources. The `references/todo.md` body is read and injected unconditionally — same behavior as the current `AgentContextSource` injecting `always: true` skills. This preserves the current behavioral contract where always-loaded skills are part of the base system prompt.
 
@@ -290,8 +297,8 @@ pub struct SkillPackage {
 pub struct SkillMetadata {
     pub license: Option<String>,
     pub compatibility: Option<String>,
-    pub custom: HashMap<String, serde_json::Value>,
-    pub klyntbot: Option<KlyntbotMeta>,
+    pub custom: HashMap<String, serde_json::Value>,  // All metadata.* EXCEPT "klyntbot" key
+    pub klyntbot: Option<KlyntbotMeta>,               // Extracted from metadata.klyntbot, excluded from custom
 }
 
 pub struct KlyntbotMeta {
@@ -373,7 +380,21 @@ L3: skill-system → depends on: common, config
 L5: agent → depends on: skill-system (uses SkillCatalog, SkillRouter, SkillContextSource)
 ```
 
-Note: `skill-system` does NOT depend on `storage`. Embeddings are in-memory and the `TextEmbedder` trait is injected from the `agent` layer via `precompute_embeddings(&mut self, embedder: &dyn TextEmbedder)`. The trait itself is defined in `cognitive` (or `providers`), not `storage`.
+**Embedding trait placement**: The `TextEmbedder` trait currently lives in `cognitive` (L5). Since `skill-system` is at L3, it cannot depend on `cognitive`. To resolve this, `skill-system` defines its own minimal embedding callback type:
+
+```rust
+// crates/skill-system/src/types.rs
+/// Callback type for embedding text. Avoids depending on cognitive::TextEmbedder.
+pub type EmbedFn = Box<dyn Fn(&str) -> common::Result<Vec<f32>> + Send + Sync>;
+```
+
+The `agent` crate (L5) provides the concrete implementation by wrapping `cognitive::TextEmbedder` into this callback when calling `precompute_embeddings()`. This keeps `skill-system` at L3 with no upward dependency.
+
+```rust
+impl SkillCatalog {
+    pub async fn precompute_embeddings(&mut self, embed: &EmbedFn) -> Result<()>;
+}
+```
 
 ## 5. Migration Path
 
