@@ -7,6 +7,7 @@ import { BreakdownDonuts } from "./BreakdownDonuts";
 import { CategoriesList } from "./CategoriesList";
 import { MonthlyChart } from "./MonthlyChart";
 import { MonthlyStats } from "./MonthlyStats";
+import { ScoreTrendChart } from "./ScoreTrendChart";
 
 interface MonthViewProps {
   yearMonth: string;
@@ -63,6 +64,7 @@ export function MonthView({ yearMonth }: MonthViewProps) {
       <CategoriesList categories={topCats} totalSecs={totalActive} />
       <BreakdownDonuts segments={breakdownSegments} totalSecs={totalActive} />
       <MonthlyStats yearMonth={yearMonth} summaries={summaries} />
+      <ScoreTrendChart summaries={summaries} />
     </div>
   );
 }
