@@ -1,26 +1,9 @@
-import type { StatusLabel, TimelineEntry } from "@shared/types/common";
+import type { TimelineEntry } from "@shared/types/common";
 import type { Area, Project, Task } from "@shared/types/tasks";
 import { Folder, type LucideProps } from "lucide-react";
 import type React from "react";
-import {
-  HighPriorityIcon,
-  LowPriorityIcon,
-  MediumPriorityIcon,
-  NoPriorityIcon,
-  type Priority,
-  priorities,
-  UrgentPriorityIcon,
-} from "./priority-icons";
-import {
-  status as allStatusDefs,
-  BacklogIcon,
-  CompletedIcon,
-  InProgressIcon,
-  PausedIcon,
-  type Status,
-  TechnicalReviewIcon,
-  ToDoIcon,
-} from "./status-icons";
+import { type Priority, priorities } from "./priority-icons";
+import { status as allStatusDefs, BacklogIcon, type Status } from "./status-icons";
 
 // ── Display types ─────────────────────────────────────────
 
