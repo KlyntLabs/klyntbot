@@ -2,7 +2,8 @@ import { useMutation } from "@shared/hooks/useMutation";
 import type { Task, TaskUpdateParams } from "@shared/types/tasks";
 import { Check } from "lucide-react";
 import { useState } from "react";
-import type { Status } from "../lib/mappers";
+import { statusToBackend } from "../lib/mappers";
+import type { Status } from "../lib/status-icons";
 import { status as allStatus } from "../lib/status-icons";
 import { renderStatusIcon } from "../lib/status-utils";
 import { cn } from "../lib/utils";
@@ -47,7 +48,7 @@ export function StatusSelector({ issueId, status }: StatusSelectorProps) {
                   key={s.id}
                   value={s.name}
                   onSelect={() => {
-                    updateTask.mutate({ id: issueId, statusLabelId: s.id });
+                    updateTask.mutate({ id: issueId, status: statusToBackend(s) });
                     setOpen(false);
                   }}
                 >

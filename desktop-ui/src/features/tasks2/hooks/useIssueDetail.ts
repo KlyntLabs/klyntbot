@@ -12,6 +12,7 @@ import {
   deriveTaskState,
   type FocusSession,
   priorityToNumber,
+  statusToBackend,
   type SubIssue,
   type Suggestion,
   type TaskMemory,
@@ -36,7 +37,7 @@ const PLACEHOLDER_TASK: DetailTask = {
   identifier: "",
   title: "Loading...",
   description: "",
-  status: { id: "backlog", name: "Backlog", color: "#94a3b8", icon: () => null },
+  status: { id: "backlog", name: "Backlog", color: "#94a3b8", icon: () => null, backendStatus: "backlog" },
   priority: { id: "no-priority", name: "No priority", icon: () => null },
   labels: [],
   project: null,
@@ -109,7 +110,7 @@ export function useIssueDetail(
           params.description = value as string;
           break;
         case "status":
-          params.statusLabelId = (value as DetailTask["status"]).id;
+          params.status = statusToBackend(value as DetailTask["status"]);
           break;
         case "priority":
           params.priority = priorityToNumber((value as DetailTask["priority"]).id);

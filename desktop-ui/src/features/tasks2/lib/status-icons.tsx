@@ -5,6 +5,8 @@ export interface Status {
   name: string;
   color: string;
   icon: React.FC;
+  /** The raw value stored in task.status — used for backend mutations */
+  backendStatus: string;
 }
 
 export const BacklogIcon: React.FC = () => (
@@ -116,12 +118,12 @@ export const CompletedIcon: React.FC = () => (
 );
 
 export const status: Status[] = [
-  { id: "in-progress", name: "In Progress", color: "#facc15", icon: InProgressIcon },
-  { id: "technical-review", name: "Technical Review", color: "#22c55e", icon: TechnicalReviewIcon },
-  { id: "completed", name: "Completed", color: "#8b5cf6", icon: CompletedIcon },
-  { id: "paused", name: "Paused", color: "#0ea5e9", icon: PausedIcon },
-  { id: "to-do", name: "Todo", color: "#f97316", icon: ToDoIcon },
-  { id: "backlog", name: "Backlog", color: "#ec4899", icon: BacklogIcon },
+  { id: "backlog", name: "Backlog", color: "#ec4899", icon: BacklogIcon, backendStatus: "backlog" },
+  { id: "to-do", name: "Todo", color: "#f97316", icon: ToDoIcon, backendStatus: "todo" },
+  { id: "in-progress", name: "In Progress", color: "#facc15", icon: InProgressIcon, backendStatus: "in_progress" },
+  { id: "technical-review", name: "Technical Review", color: "#22c55e", icon: TechnicalReviewIcon, backendStatus: "in_review" },
+  { id: "completed", name: "Completed", color: "#8b5cf6", icon: CompletedIcon, backendStatus: "done" },
+  { id: "paused", name: "Paused", color: "#0ea5e9", icon: PausedIcon, backendStatus: "paused" },
 ];
 
 const statusById: Record<string, Status> = Object.fromEntries(status.map((s) => [s.id, s]));

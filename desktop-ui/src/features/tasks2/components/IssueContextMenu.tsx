@@ -2,7 +2,7 @@ import { useMutation } from "@shared/hooks/useMutation";
 import type { Task, TaskUpdateParams } from "@shared/types/tasks";
 import type React from "react";
 import type { Issue } from "../lib/mappers";
-import { priorityToNumber } from "../lib/mappers";
+import { priorityToNumber, statusToBackend } from "../lib/mappers";
 import { priorities } from "../lib/priority-icons";
 import { status as allStatus } from "../lib/status-icons";
 import { renderStatusIcon } from "../lib/status-utils";
@@ -68,7 +68,7 @@ export function IssueContextMenu({ issue, children }: IssueContextMenuProps) {
             {allStatus.map((s) => (
               <ContextMenuItem
                 key={s.id}
-                onSelect={() => updateTask.mutate({ id: issue.id, statusLabelId: s.id })}
+                onSelect={() => updateTask.mutate({ id: issue.id, status: statusToBackend(s) })}
               >
                 <span className="mr-2 flex items-center">{renderStatusIcon(s.id)}</span>
                 {s.name}

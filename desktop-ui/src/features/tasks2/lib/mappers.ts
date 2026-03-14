@@ -108,59 +108,45 @@ export interface Issue {
   dueDate?: string;
 }
 
-// ── Status resolution (option C) ──────────────────────────
+// ── Status resolution ─────────────────────────────────────
+//
+// Backend stores `task.status` as a raw string ("todo", "in_progress", "done", etc.)
+// Each UI status definition has a `backendStatus` field for the reverse mapping.
+// Resolution: task.status → find matching backendStatus → return Status with icon.
 
-const KNOWN_STATUS_MAP: Record<string, Status> = {};
+const statusByBackend = new Map<string, Status>();
 for (const s of allStatusDefs) {
-  KNOWN_STATUS_MAP[s.name.toLowerCase()] = s;
+  statusByBackend.set(s.backendStatus, s);
 }
-const STATUS_ALIASES: Record<string, string> = {
-  "to do": "todo",
-  "on hold": "paused",
-  "in review": "technical review",
-  done: "completed",
-};
 
 export function resolveStatus(task: Task): Status {
-  // 1. Map from task.status string first (the actual runtime status)
-  const STATUS_STRING_MAP: Record<string, string> = {
-    done: "completed",
-    completed: "completed",
-    in_progress: "in-progress",
-    todo: "to-do",
-    open: "to-do",
-    paused: "paused",
-    backlog: "backlog",
-  };
+  // 1. Direct match from task.status → Status.backendStatus
+  const match = statusByBackend.get(task.status);
+  if (match) return match;
 
-  const mappedId = STATUS_STRING_MAP[task.status];
-  if (mappedId) {
-    const match = allStatusDefs.find((s) => s.id === mappedId);
-    if (match) return match;
-  }
-
-  // 2. Try statusLabel name match (for custom workflow labels)
+  // 2. Try statusLabel name for custom workflow labels
   if (task.statusLabel) {
-    const name = task.statusLabel.name.toLowerCase();
-    const aliased = STATUS_ALIASES[name] ?? name;
-    const match = KNOWN_STATUS_MAP[aliased];
-    if (match) return match;
+    const nameLower = task.statusLabel.name.toLowerCase();
+    const byName = allStatusDefs.find((s) => s.name.toLowerCase() === nameLower);
+    if (byName) return byName;
 
-    const found = allStatusDefs.find(
-      (s) => s.color.toLowerCase() === task.statusLabel!.color.toLowerCase(),
-    );
-    if (found) return { ...found, name: task.statusLabel.name };
-
+    // Generic fallback: use the label's color/name with a default icon
     return {
       id: task.statusLabel.id,
       name: task.statusLabel.name,
       color: task.statusLabel.color,
       icon: BacklogIcon,
+      backendStatus: task.status,
     };
   }
 
   // 3. Fallback
-  return allStatusDefs.find((s) => s.id === "backlog") ?? allStatusDefs[0];
+  return allStatusDefs[0]; // Backlog
+}
+
+/** Convert a UI Status to the backend status string for task_update mutations. */
+export function statusToBackend(status: Status): string {
+  return status.backendStatus;
 }
 
 // ── Priority resolution ───────────────────────────────────
