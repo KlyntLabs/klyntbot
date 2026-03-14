@@ -128,7 +128,13 @@ function DaySummary({
                 <span className="text-sm font-semibold text-primary tabular-nums">
                   {formatHumanDuration(ps.totalActiveSecs)}
                 </span>
-                <TrendArrow value={ps.activeTimeTrend} />
+                <TrendArrow
+                  value={
+                    ps.activeTimeTrend != null
+                      ? (ps.activeTimeTrend / Math.max(ps.totalActiveSecs - ps.activeTimeTrend, 1)) * 100
+                      : null
+                  }
+                />
                 <span className="text-[9px] text-dim">active</span>
               </div>
               <div className="flex h-1 rounded-full overflow-hidden bg-white/[0.06] mt-1">
