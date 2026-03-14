@@ -234,6 +234,7 @@ dependencies = [
  "config",
  "dashmap",
  "desktop-shared",
+ "dirs",
  "feature-coaching",
  "feature-notes",
  "feature-productivity",

@@ -14,6 +14,7 @@ use super::content::ContentConfig;
 use super::conversation::ConversationConfig;
 use super::finance::FinanceConfig;
 use super::gateway::GatewayConfig;
+use super::integrations::IntegrationsConfig;
 use super::learning::LearningConfig;
 use super::mcp::McpConfig;
 use super::orchestrator::OrchestratorConfig;
@@ -171,6 +172,10 @@ pub struct Config {
     /// Skill discovery system configuration.
     #[serde(default)]
     pub skills: SkillConfig,
+
+    /// AI coding tool integrations (Claude Code, Cursor, Codex, etc.).
+    #[serde(default)]
+    pub integrations: IntegrationsConfig,
 
     /// Project root for .agents/skills/ scanning. Falls back to CWD.
     /// Set by the desktop app on launch. Distinct from agents.defaults.workspace.

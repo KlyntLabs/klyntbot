@@ -12,6 +12,7 @@ mod settings;
 mod tasks;
 mod timeline;
 mod work_context;
+mod integrations;
 mod workspace;
 
 pub use agents::*;
@@ -20,6 +21,7 @@ pub use calendar::*;
 pub use capture::*;
 pub use chat::*;
 pub use finance::*;
+pub use integrations::*;
 pub use notes::*;
 pub use okr::*;
 pub use productivity::*;

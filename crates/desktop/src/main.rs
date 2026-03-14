@@ -435,6 +435,9 @@ fn main() {
             commands::workspace::workspace_list_files,
             commands::workspace::workspace_read_file,
             commands::workspace::workspace_write_file,
+            // AI Tool Integrations
+            commands::integrations::ai_tools_detect,
+            commands::integrations::ai_tools_install,
             // Agent Profiles
             commands::agents::agent_list_profiles,
             commands::agents::agent_read_file,

@@ -21,6 +21,7 @@ skill-system = { workspace = true }
 session = { workspace = true }
 storage = { workspace = true }
 dashmap = { workspace = true }
+dirs = { workspace = true }
 futures-util = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true }

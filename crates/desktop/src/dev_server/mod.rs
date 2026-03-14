@@ -200,6 +200,7 @@ mod tests {
             commands::project_conversations::DEV_COMMANDS,
             commands::agents::DEV_COMMANDS,
             commands::workspace::DEV_COMMANDS,
+            commands::integrations::DEV_COMMANDS,
         ];
         // chat_send is handled inline in dev_server.rs
         let mut set: BTreeSet<String> = modules

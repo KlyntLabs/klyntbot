@@ -9,6 +9,7 @@ pub mod distraction;
 pub mod entity_links;
 pub mod finance;
 pub mod groups;
+pub mod integrations;
 pub mod key_results;
 pub mod notes;
 pub mod objectives;
