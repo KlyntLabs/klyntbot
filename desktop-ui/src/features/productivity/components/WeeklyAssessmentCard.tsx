@@ -8,7 +8,7 @@ interface Props {
 
 export function WeeklyAssessmentCard({ weekStart }: Props) {
   const { data } = useQuery<WeeklyAssessment | null>("productivity_weekly_assessment", {
-    weekStart,
+    week_start: weekStart,
   });
 
   if (!data) return null;

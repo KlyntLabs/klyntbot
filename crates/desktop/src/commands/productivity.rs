@@ -675,7 +675,7 @@ pub(crate) async fn dispatch_dev(
             dev::val(core.productivity_project_delete(id).await)
         }
         "productivity_weekly_assessment" => {
-            let week_start = try_field!(dev::get_str(body, "weekStart"));
+            let week_start = try_field!(dev::get_str(body, "week_start"));
             dev::val(core.productivity_weekly_assessment(week_start).await)
         }
         "productivity_calendar_events" => {
@@ -696,8 +696,8 @@ pub(crate) async fn dispatch_dev(
             core.productivity_patterns(dev::get(body, "days")).await,
         ),
         "productivity_hourly_breakdown" => {
-            let start_date = try_field!(dev::get_str(body, "startDate"));
-            let end_date = try_field!(dev::get_str(body, "endDate"));
+            let start_date = try_field!(dev::get_str(body, "start_date"));
+            let end_date = try_field!(dev::get_str(body, "end_date"));
             dev::val(
                 core.productivity_hourly_breakdown(start_date, end_date)
                     .await,

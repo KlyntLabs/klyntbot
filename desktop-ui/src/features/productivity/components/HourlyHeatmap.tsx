@@ -9,7 +9,7 @@ interface Props {
 export function HourlyHeatmap({ startDate, endDate }: Props) {
   const { data } = useQuery<HourlyBreakdown[]>(
     "productivity_hourly_breakdown",
-    { startDate, endDate },
+    { start_date: startDate, end_date: endDate },
     undefined,
     60_000,
   );
