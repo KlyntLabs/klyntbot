@@ -220,11 +220,17 @@ Two activation paths:
 
 **Scoring normalization and thresholds**:
 - **Keyword scoring**: tokenize the skill description into words, count how many appear in the user message, normalize by `score / max(description_word_count / 3, 1)` capped at 1.0. This adapts the current `/5.0` normalization (tuned for ~5 trigger phrases) to variable-length descriptions.
-- **Orchestrator selection threshold**: blended score >= 0.3 (same as current agent matching). Below this, falls back to "general."
+- **Orchestrator candidacy gate** (preserves existing `blend_scores` logic): a skill is a candidate if `kw_score > 0` (any keyword hit) OR `sem_score >= 0.5`. Non-candidates are excluded before blending. Among candidates, `kw_score * 0.7 + sem_score * 0.3` determines ranking. If no candidates pass the gate, falls back to "general." This is a behavioral preservation of the existing `AgentManager::blend_scores()` compound gate — NOT a simple threshold on blended score.
 - **Per-message skill activation threshold**: blended score >= 0.4 (slightly higher to avoid over-activation since many skills may partially match). Max 3 non-orchestrator skills activated per message to prevent context bloat.
 - These thresholds are configurable in `SkillConfig` for tuning.
 
-**Always-skills injection**: When an orchestrator declares `always_skills: [todo, daily-planner]`, these reference files are loaded as **Tier 2 content** (injected directly into the system prompt alongside the orchestrator's body), NOT as Tier 3 resources. The `references/todo.md` body is read and injected unconditionally — same behavior as the current `AgentContextSource` injecting `always: true` skills. This preserves the current behavioral contract where always-loaded skills are part of the base system prompt.
+**Always-skills injection**: When an orchestrator declares `always_skills: [todo, daily-planner]`, these names resolve to **`references/<name>.md` files within the orchestrator's own skill directory**. For example, if orchestrator `task-management` declares `always_skills: [todo, daily-planner]`, the system reads:
+- `skills/task-management/references/todo.md`
+- `skills/task-management/references/daily-planner.md`
+
+These files are loaded as **Tier 2 content** — their full body is read from disk and injected directly into the system prompt alongside the orchestrator's SKILL.md body. They are NOT Tier 3 on-demand resources. This preserves the current behavioral contract where `always: true` skills are part of the base system prompt.
+
+**Resolution rule**: `always_skills` names are file-path references within the orchestrator's `references/` directory, NOT lookups into the `SkillCatalog` by skill name. This is a deliberate design choice: always-skills are tightly coupled to their orchestrator (they're sub-instructions, not standalone skills) and should not be independently installable or overridable. To reference a standalone skill from an orchestrator, use per-message description-based activation instead.
 
 **Direct skill activation** (fallback):
 
@@ -337,8 +343,10 @@ During SKILL.md parsing, `skill_type` is determined by:
 
 ```rust
 impl SkillCatalog {
-    /// Scan all sources and build catalog. Synchronous — does not compute embeddings.
-    pub fn discover(sources: &[SkillSource]) -> Result<Self>;
+    /// Scan all sources and build catalog. Async because it reads SKILL.md files
+    /// from the filesystem (user-level and project-level scopes use tokio::fs).
+    /// Does not compute embeddings — call precompute_embeddings() separately.
+    pub async fn discover(sources: &[SkillSource]) -> Result<Self>;
 
     /// Pre-compute description embeddings for semantic matching. Must be called
     /// after discover(). Separate from discover() because embedding requires
@@ -355,7 +363,9 @@ impl SkillCatalog {
 
 ### Embeddings: in-memory only
 
-Skill description embeddings are stored in-memory in `SkillCatalog.embeddings` (same as current `AgentManager::precompute_embeddings()`). They are NOT persisted to LanceDB — the `storage` dependency on the crate is for accessing the `TextEmbedder` trait, not for writing to the database. Embeddings are recomputed on startup and on `reload()`.
+Skill description embeddings are stored in-memory in `SkillCatalog.embeddings`. They are NOT persisted to LanceDB. Embeddings are recomputed on startup and on `reload()`.
+
+**Difference from current code**: The existing `AgentManager::precompute_embeddings()` builds embedding text as `"{description}. Triggers: {trigger_list}"` and skips agents with no triggers. The new design embeds the `description` field ONLY (no triggers — they don't exist in the Agent Skills format). All skills have descriptions, so none are skipped. Do NOT port the existing trigger-corpus approach.
 
 ### Crate Placement
 
