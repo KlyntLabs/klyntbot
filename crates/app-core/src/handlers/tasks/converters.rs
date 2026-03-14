@@ -45,6 +45,8 @@ pub fn row_to_task_response(
         complexity_score: row.complexity_score,
         total_tracked_secs: Some(row.total_tracked_secs),
         focused_at: row.focused_at.map(|dt| dt.to_rfc3339()),
+        created_at: Some(row.created_at.to_rfc3339()),
+        updated_at: Some(row.updated_at.to_rfc3339()),
     }
 }
 
