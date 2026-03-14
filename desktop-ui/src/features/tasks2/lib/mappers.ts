@@ -122,6 +122,24 @@ const STATUS_ALIASES: Record<string, string> = {
 };
 
 export function resolveStatus(task: Task): Status {
+  // 1. Map from task.status string first (the actual runtime status)
+  const STATUS_STRING_MAP: Record<string, string> = {
+    done: "completed",
+    completed: "completed",
+    in_progress: "in-progress",
+    todo: "to-do",
+    open: "to-do",
+    paused: "paused",
+    backlog: "backlog",
+  };
+
+  const mappedId = STATUS_STRING_MAP[task.status];
+  if (mappedId) {
+    const match = allStatusDefs.find((s) => s.id === mappedId);
+    if (match) return match;
+  }
+
+  // 2. Try statusLabel name match (for custom workflow labels)
   if (task.statusLabel) {
     const name = task.statusLabel.name.toLowerCase();
     const aliased = STATUS_ALIASES[name] ?? name;
@@ -141,16 +159,8 @@ export function resolveStatus(task: Task): Status {
     };
   }
 
-  switch (task.status) {
-    case "completed":
-      return allStatusDefs.find((s) => s.id === "completed") ?? allStatusDefs[0];
-    case "in_progress":
-      return allStatusDefs.find((s) => s.id === "in-progress") ?? allStatusDefs[0];
-    case "open":
-      return allStatusDefs.find((s) => s.id === "to-do") ?? allStatusDefs[0];
-    default:
-      return allStatusDefs.find((s) => s.id === "backlog") ?? allStatusDefs[0];
-  }
+  // 3. Fallback
+  return allStatusDefs.find((s) => s.id === "backlog") ?? allStatusDefs[0];
 }
 
 // ── Priority resolution ───────────────────────────────────
