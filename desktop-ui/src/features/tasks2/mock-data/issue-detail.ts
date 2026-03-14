@@ -111,8 +111,8 @@ function a(id: string): MockArea {
 
 const l = (...ids: string[]): LabelInterface[] => labels.filter((item) => ids.includes(item.id));
 
-// 25 minutes ago from "now" (2026-03-13T12:00:00Z as reference)
-const FOCUSED_AT = "2026-03-13T11:35:00Z";
+// Always 25 minutes ago so the timer shows a realistic elapsed time
+const FOCUSED_AT = new Date(Date.now() - 25 * 60 * 1000).toISOString();
 
 // --- Mock data exports ---
 

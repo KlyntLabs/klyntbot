@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { MockDetailTask, MockSuggestion, TaskState } from "../mock-data/issue-detail";
 import {
   mockActivityEntries,
@@ -16,14 +16,23 @@ export function deriveTaskState(task: MockDetailTask): TaskState {
   return "new";
 }
 
-export function useIssueDetail(_issueId: string) {
+export function useIssueDetail(issueId: string) {
   const [task, setTask] = useState<MockDetailTask>(mockDetailTask);
   const [suggestions, setSuggestions] = useState<MockSuggestion[]>(mockSuggestions);
   const taskState = deriveTaskState(task);
 
-  const updateTask = useCallback((field: string, value: unknown) => {
-    setTask((prev) => ({ ...prev, [field]: value }));
-  }, []);
+  // Reset state when navigating to a different issue
+  useEffect(() => {
+    setTask(mockDetailTask);
+    setSuggestions(mockSuggestions);
+  }, [issueId]);
+
+  const updateTask = useCallback(
+    <K extends keyof MockDetailTask>(field: K, value: MockDetailTask[K]) => {
+      setTask((prev) => ({ ...prev, [field]: value }));
+    },
+    [],
+  );
 
   const dismissSuggestion = useCallback((id: string) => {
     setSuggestions((prev) =>

@@ -19,7 +19,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 interface SidebarPropertiesProps {
   task: MockDetailTask;
   compact: boolean;
-  onUpdate: (field: string, value: unknown) => void;
+  onUpdate: <K extends keyof MockDetailTask>(field: K, value: MockDetailTask[K]) => void;
 }
 
 const ENERGY_LEVELS: EnergyLevel[] = ["low", "medium", "high", "deep"];
@@ -72,7 +72,9 @@ export function SidebarProperties({ task, compact, onUpdate }: SidebarProperties
 
   const PriorityIcon = task.priority.icon;
 
-  const dueDateDisplay = task.dueDate ? formatDate(task.dueDate.split("T")[0]) : "No due date";
+  const dueDateDisplay = task.dueDate
+    ? formatDate(new Date(task.dueDate).toISOString().slice(0, 10))
+    : "No due date";
 
   const estimateDisplay =
     task.estimatedMinutes != null ? formatHumanDuration(task.estimatedMinutes * 60) : "No estimate";

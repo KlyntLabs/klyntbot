@@ -7,7 +7,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 function formatActivityTime(iso: string): string {
   const age = Date.now() - new Date(iso).getTime();
   if (age < DAY_MS) return formatRelativeTime(iso);
-  return `${formatDate(iso.split("T")[0])} ${formatTime(iso)}`;
+  const d = new Date(iso);
+  return `${formatDate(d.toISOString().slice(0, 10))} ${formatTime(iso)}`;
 }
 
 interface IssueActivityTabProps {

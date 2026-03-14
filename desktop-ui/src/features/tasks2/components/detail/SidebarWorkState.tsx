@@ -23,16 +23,16 @@ export function SidebarWorkState({ task, taskState, focusSession }: SidebarWorkS
     );
   }
 
-  if (!focusSession) return null;
+  if (!focusSession || !task.focusedAt) return null;
 
   return (
     <div className="px-4 py-3 space-y-3">
       <SectionLabel>Work State</SectionLabel>
-      <FocusTimer focusedAt={task.focusedAt!} />
+      <FocusTimer focusedAt={task.focusedAt} />
       <div className="flex items-center justify-between">
         <span className="text-xs text-[hsl(var(--muted-foreground))]">Mode</span>
         <span className="text-xs px-1.5 py-0.5 rounded bg-[hsl(var(--accent))] text-[hsl(var(--foreground))] capitalize">
-          {focusSession.focusMode.replace("-", " ")}
+          {focusSession.focusMode.replaceAll("-", " ")}
         </span>
       </div>
       <div className="flex items-center justify-between">
@@ -64,14 +64,16 @@ export function SidebarWorkState({ task, taskState, focusSession }: SidebarWorkS
       <div className="flex gap-2">
         <button
           type="button"
-          className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs rounded border border-[hsl(var(--border))] text-[hsl(var(--foreground))] hover:bg-[hsl(var(--accent))]/50 transition-colors"
+          disabled
+          className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs rounded border border-[hsl(var(--border))] text-[hsl(var(--foreground))] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           <Pause className="size-3" />
           Pause
         </button>
         <button
           type="button"
-          className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs rounded border border-[hsl(var(--border))] text-red-400 hover:bg-red-500/10 transition-colors"
+          disabled
+          className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs rounded border border-[hsl(var(--border))] text-red-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           <Square className="size-3" />
           Stop

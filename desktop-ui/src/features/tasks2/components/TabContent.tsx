@@ -2,6 +2,7 @@ import { useShallow } from "zustand/react/shallow";
 import { useTabStore } from "../store/tab-store";
 import AllIssues from "./AllIssues";
 import { AreaView } from "./AreaView";
+import { IssueDetailErrorBoundary } from "./detail/IssueDetailError";
 import { IssueDetailView } from "./detail/IssueDetailView";
 import HeaderNav from "./HeaderNav";
 import HeaderOptions from "./HeaderOptions";
@@ -42,7 +43,11 @@ export function TabContent() {
       case "project":
         return <ProjectView projectId={currentView.targetId} />;
       case "issue":
-        return <IssueDetailView issueId={currentView.targetId} />;
+        return (
+          <IssueDetailErrorBoundary>
+            <IssueDetailView issueId={currentView.targetId} />
+          </IssueDetailErrorBoundary>
+        );
     }
   };
 
