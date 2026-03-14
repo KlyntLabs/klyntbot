@@ -1,19 +1,34 @@
 ---
 name: klyntbot-tasks
 description: >
-  Create, organize, and track tasks using Klyntbot.
-  Use when the user mentions todos, tasks, projects, areas, planning,
-  goals, focus, decompose, subtasks, or time tracking.
+  Use when the user mentions todos, tasks, projects, areas, planning, goals,
+  decompose, subtasks, time tracking, "add to my list", "what should I work on",
+  "plan my day", "break this down", or asks to organize work into actionable items.
 license: MIT
 metadata:
   author: klyntbot
-  version: "1.0.0"
+  version: "2.0.0"
   klyntbot:
     type: skill
     tools: [tasks, area, project]
     mcp_tools: ["google-calendar"]
     max_iterations: 12
+    invokes: [klyntbot-productivity, klyntbot-okr]
 ---
+
+## Quick Reference
+
+| Action | Tool | Key params |
+|--------|------|-----------|
+| Create task | `tasks` | action: "create", title, area_id, priority |
+| List tasks | `tasks` | action: "list", status, area_id |
+| Complete task | `tasks` | action: "complete", id |
+| Plan my day | `tasks` | action: "plan_day", count: 3 |
+| Break down task | `tasks` | action: "decompose", id |
+| Focus on task | `tasks` | action: "focus", id |
+| Search | `tasks` | action: "search", query |
+| List areas | `area` | action: "list" |
+| List projects | `project` | action: "list" |
 
 Use the `klyntbot` MCP tools (`tasks`, `area`, `project`) for task management.
 
@@ -62,15 +77,26 @@ Reply 'yes' to create, or tell me what to change."
 For full action reference, read `references/actions.md`.
 For worked examples, read `references/workflows.md`.
 
-## Other Actions — Quick Reference
+## Common Mistakes
 
-| Action | Tool | Key params |
-|--------|------|-----------|
-| List tasks | `tasks` | action: "list", status, area_id |
-| Complete task | `tasks` | action: "complete", id |
-| Plan my day | `tasks` | action: "plan_day", count: 3 |
-| Break down task | `tasks` | action: "decompose", id |
-| Focus on task | `tasks` | action: "focus", id |
-| Search | `tasks` | action: "search", query |
-| List areas | `area` | action: "list" |
-| List projects | `project` | action: "list" |
+1. **Creating a task without fetching areas first** — You MUST call `area(action: "list")` before creating. Never hardcode or guess an `area_id`.
+2. **Skipping AskUserQuestion** — Never create a task based on assumptions. Always confirm with the user via AskUserQuestion before calling create.
+3. **Guessing IDs** — Task IDs, area IDs, and project IDs must come from list/search results. Never fabricate them.
+4. **Using wrong status values** — Valid statuses: "todo", "in_progress", "done", "someday". Not "pending", "completed", etc.
+5. **Forgetting to suggest decompose** — When a task is complex or multi-step, suggest breaking it down with `action: "decompose"`.
+
+## Red Flags — STOP
+
+If you're about to do any of these, STOP:
+- Create a task without calling `area(action: "list")` first
+- Use a hardcoded or memorized `area_id` from a previous conversation
+- Skip the AskUserQuestion confirmation step
+- Pass an ID you didn't retrieve in this session
+- Create multiple tasks in a loop without user confirmation for each
+
+## Related Skills
+
+- **klyntbot-productivity** — Start focus sessions on tasks, track time spent
+- **klyntbot-okr** — Link tasks to objectives and key results for goal tracking
+- **klyntbot-automation** — Set up recurring task reminders
+- **klyntbot-work-context** — View what work context a task belongs to

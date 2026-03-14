@@ -33,6 +33,8 @@ struct RawKlyntbotMeta {
     max_iterations: Option<u32>,
     #[serde(default)]
     always_skills: Vec<String>,
+    #[serde(default)]
+    invokes: Vec<String>,
 }
 
 pub fn parse_skill_md(
@@ -202,6 +204,7 @@ fn parse_metadata_block(
             can_delegate_to: raw_km.can_delegate_to,
             max_iterations: raw_km.max_iterations,
             always_skills: raw_km.always_skills,
+            invokes: raw_km.invokes,
         })
     });
 

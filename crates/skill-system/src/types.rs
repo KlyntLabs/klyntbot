@@ -106,6 +106,8 @@ pub struct KlyntbotMeta {
     pub can_delegate_to: Vec<String>,
     pub max_iterations: Option<u32>,
     pub always_skills: Vec<String>,
+    /// Skills this one may chain to (e.g., task-management → productivity).
+    pub invokes: Vec<String>,
 }
 
 #[derive(Debug, Clone, Default)]
