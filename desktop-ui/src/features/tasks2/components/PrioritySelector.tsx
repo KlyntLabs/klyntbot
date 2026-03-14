@@ -6,6 +6,7 @@ import type { Priority } from "../lib/mappers";
 import { priorityToNumber } from "../lib/mappers";
 import { priorities } from "../lib/priority-icons";
 import { cn } from "../lib/utils";
+import { useRefetchTasks } from "../hooks/useTasksContext";
 import {
   Command,
   CommandEmpty,
@@ -19,11 +20,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 interface PrioritySelectorProps {
   issueId: string;
   priority: Priority;
+  onChanged?: () => void;
 }
 
-export function PrioritySelector({ issueId, priority }: PrioritySelectorProps) {
+export function PrioritySelector({ issueId, priority, onChanged }: PrioritySelectorProps) {
   const [open, setOpen] = useState(false);
   const updateTask = useMutation<Task, TaskUpdateParams>("task_update", "params");
+  const refetch = useRefetchTasks();
 
   const PriorityIcon = priority.icon;
 
@@ -50,8 +53,10 @@ export function PrioritySelector({ issueId, priority }: PrioritySelectorProps) {
                   <CommandItem
                     key={p.id}
                     value={p.name}
-                    onSelect={() => {
-                      updateTask.mutate({ id: issueId, priority: priorityToNumber(p.id) });
+                    onSelect={async () => {
+                      await updateTask.mutate({ id: issueId, priority: priorityToNumber(p.id) });
+                      refetch();
+                      onChanged?.();
                       setOpen(false);
                     }}
                   >

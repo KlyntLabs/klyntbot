@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import "../tasks2.css";
 import { CreateIssueModal } from "../components/CreateIssueModal";
 import { PortalContainerProvider } from "../components/portal-context";
@@ -6,6 +6,7 @@ import { TabBar } from "../components/TabBar";
 import { TabContent } from "../components/TabContent";
 import { Tasks2Layout } from "../components/Tasks2Layout";
 import { useTasks } from "../hooks/useTasks";
+import { TasksProvider } from "../hooks/useTasksContext";
 import { useTabStore } from "../store/tab-store";
 
 export function Tasks2Page() {
@@ -18,15 +19,19 @@ export function Tasks2Page() {
     }
   }, [tasksData.areas, initFromAreas]);
 
+  const ctxValue = useMemo(() => ({ refetch: tasksData.refetch }), [tasksData.refetch]);
+
   return (
-    <PortalContainerProvider>
-      <div className="tasks2-scope flex-1 h-full min-w-0">
-        <Tasks2Layout>
-          <TabBar areas={tasksData.areas} projects={tasksData.projects} />
-          <TabContent tasksData={tasksData} />
-        </Tasks2Layout>
-        <CreateIssueModal onCreateTask={tasksData.createTask} areas={tasksData.areas} />
-      </div>
-    </PortalContainerProvider>
+    <TasksProvider value={ctxValue}>
+      <PortalContainerProvider>
+        <div className="tasks2-scope flex-1 h-full min-w-0">
+          <Tasks2Layout>
+            <TabBar areas={tasksData.areas} projects={tasksData.projects} />
+            <TabContent tasksData={tasksData} />
+          </Tasks2Layout>
+          <CreateIssueModal onCreateTask={tasksData.createTask} areas={tasksData.areas} />
+        </div>
+      </PortalContainerProvider>
+    </TasksProvider>
   );
 }

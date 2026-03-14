@@ -7,6 +7,7 @@ import type { Status } from "../lib/status-icons";
 import { status as allStatus } from "../lib/status-icons";
 import { renderStatusIcon } from "../lib/status-utils";
 import { cn } from "../lib/utils";
+import { useRefetchTasks } from "../hooks/useTasksContext";
 import {
   Command,
   CommandEmpty,
@@ -20,11 +21,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 interface StatusSelectorProps {
   issueId: string;
   status: Status;
+  onChanged?: () => void;
 }
 
-export function StatusSelector({ issueId, status }: StatusSelectorProps) {
+export function StatusSelector({ issueId, status, onChanged }: StatusSelectorProps) {
   const [open, setOpen] = useState(false);
   const updateTask = useMutation<Task, TaskUpdateParams>("task_update", "params");
+  const refetch = useRefetchTasks();
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -47,8 +50,10 @@ export function StatusSelector({ issueId, status }: StatusSelectorProps) {
                 <CommandItem
                   key={s.id}
                   value={s.name}
-                  onSelect={() => {
-                    updateTask.mutate({ id: issueId, status: statusToBackend(s) });
+                  onSelect={async () => {
+                    await updateTask.mutate({ id: issueId, status: statusToBackend(s) });
+                    refetch();
+                    onChanged?.();
                     setOpen(false);
                   }}
                 >

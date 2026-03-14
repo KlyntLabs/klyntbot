@@ -6,6 +6,7 @@ import { priorityToNumber, statusToBackend } from "../lib/mappers";
 import { priorities } from "../lib/priority-icons";
 import { status as allStatus } from "../lib/status-icons";
 import { renderStatusIcon } from "../lib/status-utils";
+import { useRefetchTasks } from "../hooks/useTasksContext";
 import { useTabStore } from "../store/tab-store";
 import {
   ContextMenu,
@@ -27,6 +28,7 @@ interface IssueContextMenuProps {
 export function IssueContextMenu({ issue, children }: IssueContextMenuProps) {
   const updateTask = useMutation<Task, TaskUpdateParams>("task_update", "params");
   const deleteTask = useMutation<boolean, { id: string }>("task_delete");
+  const refetch = useRefetchTasks();
 
   return (
     <ContextMenu>
@@ -68,7 +70,7 @@ export function IssueContextMenu({ issue, children }: IssueContextMenuProps) {
             {allStatus.map((s) => (
               <ContextMenuItem
                 key={s.id}
-                onSelect={() => updateTask.mutate({ id: issue.id, status: statusToBackend(s) })}
+                onSelect={async () => { await updateTask.mutate({ id: issue.id, status: statusToBackend(s) }); refetch(); }}
               >
                 <span className="mr-2 flex items-center">{renderStatusIcon(s.id)}</span>
                 {s.name}
@@ -94,9 +96,10 @@ export function IssueContextMenu({ issue, children }: IssueContextMenuProps) {
               return (
                 <ContextMenuItem
                   key={p.id}
-                  onSelect={() =>
-                    updateTask.mutate({ id: issue.id, priority: priorityToNumber(p.id) })
-                  }
+                  onSelect={async () => {
+                    await updateTask.mutate({ id: issue.id, priority: priorityToNumber(p.id) });
+                    refetch();
+                  }}
                 >
                   <Icon className="mr-2 h-4 w-4 text-[hsl(var(--muted-foreground))]" />
                   {p.name}
@@ -115,7 +118,7 @@ export function IssueContextMenu({ issue, children }: IssueContextMenuProps) {
 
         <ContextMenuItem
           className="text-[hsl(var(--destructive))]"
-          onSelect={() => deleteTask.mutate({ id: issue.id })}
+          onSelect={async () => { await deleteTask.mutate({ id: issue.id }); refetch(); }}
         >
           Delete
         </ContextMenuItem>
