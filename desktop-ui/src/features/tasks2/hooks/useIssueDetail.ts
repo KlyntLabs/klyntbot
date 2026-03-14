@@ -8,20 +8,28 @@ import {
   type ActivityEntry,
   type DetailTask,
   type DisplayProject,
+  deriveFocusSession,
+  deriveTaskState,
   type FocusSession,
+  priorityToNumber,
   type SubIssue,
   type Suggestion,
   type TaskMemory,
   type TaskState,
-  deriveFocusSession,
-  deriveTaskState,
-  priorityToNumber,
   taskToDetailTask,
   taskToSubIssue,
   timelineToActivity,
 } from "../lib/mappers";
 
-export type { DetailTask, TaskState, SubIssue, Suggestion, FocusSession, TaskMemory, ActivityEntry };
+export type {
+  DetailTask,
+  TaskState,
+  SubIssue,
+  Suggestion,
+  FocusSession,
+  TaskMemory,
+  ActivityEntry,
+};
 
 const PLACEHOLDER_TASK: DetailTask = {
   id: "",
@@ -64,10 +72,7 @@ export function useIssueDetail(
 
   // Sub-issues
   const { data: rawChildren } = useQuery<Task[]>("task_list_children", { parentId: issueId }, []);
-  const subIssues: SubIssue[] = useMemo(
-    () => rawChildren.map(taskToSubIssue),
-    [rawChildren],
-  );
+  const subIssues: SubIssue[] = useMemo(() => rawChildren.map(taskToSubIssue), [rawChildren]);
 
   // Activity from timeline (client-side filtered by entityId)
   const endDate = useMemo(() => new Date().toISOString(), []);
@@ -85,10 +90,7 @@ export function useIssueDetail(
     EMPTY_TIMELINE_RESPONSE,
   );
   const activity: ActivityEntry[] = useMemo(
-    () =>
-      timeline.entries
-        .filter((entry) => entry.entityId === issueId)
-        .map(timelineToActivity),
+    () => timeline.entries.filter((entry) => entry.entityId === issueId).map(timelineToActivity),
     [timeline, issueId],
   );
 

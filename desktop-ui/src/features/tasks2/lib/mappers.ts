@@ -7,19 +7,19 @@ import {
   LowPriorityIcon,
   MediumPriorityIcon,
   NoPriorityIcon,
-  UrgentPriorityIcon,
-  priorities,
   type Priority,
+  priorities,
+  UrgentPriorityIcon,
 } from "./priority-icons";
 import {
+  status as allStatusDefs,
   BacklogIcon,
   CompletedIcon,
   InProgressIcon,
   PausedIcon,
+  type Status,
   TechnicalReviewIcon,
   ToDoIcon,
-  type Status,
-  status as allStatusDefs,
 } from "./status-icons";
 
 // ── Display types ─────────────────────────────────────────
@@ -204,8 +204,17 @@ export function priorityToNumber(priorityId: string): number | null {
 // ── Tags → Labels ─────────────────────────────────────────
 
 const TAG_COLORS = [
-  "purple", "red", "green", "blue", "yellow",
-  "orange", "pink", "gray", "indigo", "teal", "cyan",
+  "purple",
+  "red",
+  "green",
+  "blue",
+  "yellow",
+  "orange",
+  "pink",
+  "gray",
+  "indigo",
+  "teal",
+  "cyan",
 ];
 
 function hashString(str: string): number {
@@ -244,10 +253,7 @@ export function projectToDisplayProject(project: Project): DisplayProject {
 
 // ── Task → Issue ──────────────────────────────────────────
 
-export function taskToIssue(
-  task: Task,
-  projectMap: Map<string, DisplayProject>,
-): Issue {
+export function taskToIssue(task: Task, projectMap: Map<string, DisplayProject>): Issue {
   return {
     id: task.id,
     identifier: shortId(task.id),
@@ -376,14 +382,10 @@ export function filterIssues(issues: Issue[], filters: FilterState): Issue[] {
     result = result.filter((issue) => filters.priority.includes(issue.priority.id));
   }
   if (filters.labels.length > 0) {
-    result = result.filter((issue) =>
-      issue.labels.some((l) => filters.labels.includes(l.id)),
-    );
+    result = result.filter((issue) => issue.labels.some((l) => filters.labels.includes(l.id)));
   }
   if (filters.project.length > 0) {
-    result = result.filter(
-      (issue) => issue.project && filters.project.includes(issue.project.id),
-    );
+    result = result.filter((issue) => issue.project && filters.project.includes(issue.project.id));
   }
 
   return result;
@@ -416,9 +418,11 @@ export function groupIssuesByStatus(issueList: Issue[]): Record<string, Issue[]>
 
 export function sortIssuesByPriority(issueList: Issue[]): Issue[] {
   const order: Record<string, number> = {
-    urgent: 0, high: 1, medium: 2, low: 3, "no-priority": 4,
+    urgent: 0,
+    high: 1,
+    medium: 2,
+    low: 3,
+    "no-priority": 4,
   };
-  return [...issueList].sort(
-    (a, b) => (order[a.priority.id] ?? 99) - (order[b.priority.id] ?? 99),
-  );
+  return [...issueList].sort((a, b) => (order[a.priority.id] ?? 99) - (order[b.priority.id] ?? 99));
 }
