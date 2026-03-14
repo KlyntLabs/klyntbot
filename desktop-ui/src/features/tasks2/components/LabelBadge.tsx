@@ -1,4 +1,4 @@
-import type { LabelInterface } from "../mock-data/labels";
+import type { LabelInterface } from "../lib/mappers";
 
 export function LabelBadge({ label }: { label: LabelInterface[] }) {
   return (

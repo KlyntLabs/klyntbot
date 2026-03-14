@@ -1,9 +1,11 @@
+import { useMutation } from "@shared/hooks/useMutation";
+import type { Task, TaskUpdateParams } from "@shared/types/tasks";
 import { Check } from "lucide-react";
 import { useState } from "react";
+import type { Priority } from "../lib/mappers";
+import { priorityToNumber } from "../lib/mappers";
+import { priorities } from "../lib/priority-icons";
 import { cn } from "../lib/utils";
-import type { Priority } from "../mock-data/priorities";
-import { priorities } from "../mock-data/priorities";
-import { useIssuesStore } from "../store/issues-store";
 import {
   Command,
   CommandEmpty,
@@ -21,7 +23,7 @@ interface PrioritySelectorProps {
 
 export function PrioritySelector({ issueId, priority }: PrioritySelectorProps) {
   const [open, setOpen] = useState(false);
-  const updateIssuePriority = useIssuesStore((s) => s.updateIssuePriority);
+  const updateTask = useMutation<Task, TaskUpdateParams>("task_update", "params");
 
   const PriorityIcon = priority.icon;
 
@@ -49,7 +51,7 @@ export function PrioritySelector({ issueId, priority }: PrioritySelectorProps) {
                     key={p.id}
                     value={p.name}
                     onSelect={() => {
-                      updateIssuePriority(issueId, p);
+                      updateTask.mutate({ id: issueId, priority: priorityToNumber(p.id) });
                       setOpen(false);
                     }}
                   >

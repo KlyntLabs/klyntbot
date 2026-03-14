@@ -1,6 +1,11 @@
 import { CircleUserRound } from "lucide-react";
-import type { User } from "../mock-data/users";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+
+interface User {
+  id: string;
+  name: string;
+  avatarUrl: string;
+}
 
 interface AssigneeUserProps {
   user: User | null;

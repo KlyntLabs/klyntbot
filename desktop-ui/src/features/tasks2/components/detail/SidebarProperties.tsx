@@ -1,11 +1,11 @@
 import { formatDate, formatHumanDuration } from "@shared/lib/dates";
 import { Check } from "lucide-react";
 import { useState } from "react";
+import type { DetailTask } from "../../lib/mappers";
+import { priorities } from "../../lib/priority-icons";
+import { status as allStatus } from "../../lib/status-icons";
 import { renderStatusIcon } from "../../lib/status-utils";
 import { cn } from "../../lib/utils";
-import type { EnergyLevel, MockDetailTask, TaskType } from "../../mock-data/issue-detail";
-import { priorities } from "../../mock-data/priorities";
-import { status as allStatus } from "../../mock-data/status";
 import {
   Command,
   CommandEmpty,
@@ -16,10 +16,13 @@ import {
 } from "../ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 
+type EnergyLevel = "low" | "medium" | "high" | "deep";
+type TaskType = "manual" | "agentic" | "hybrid";
+
 interface SidebarPropertiesProps {
-  task: MockDetailTask;
+  task: DetailTask;
   compact: boolean;
-  onUpdate: <K extends keyof MockDetailTask>(field: K, value: MockDetailTask[K]) => void;
+  onUpdate: <K extends keyof DetailTask>(field: K, value: DetailTask[K]) => void;
 }
 
 const ENERGY_LEVELS: EnergyLevel[] = ["low", "medium", "high", "deep"];
@@ -278,7 +281,7 @@ export function SidebarProperties({ task, compact, onUpdate }: SidebarProperties
           {/* Area */}
           <PropertyRow label="Area">
             <span className="px-1.5 py-0.5 text-xs text-[hsl(var(--foreground))]">
-              {task.area.name}
+              {task.area?.name ?? "No area"}
             </span>
           </PropertyRow>
 

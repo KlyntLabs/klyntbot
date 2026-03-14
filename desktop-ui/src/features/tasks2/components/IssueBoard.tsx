@@ -9,20 +9,19 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { useMemo, useState } from "react";
-import type { Issue } from "../mock-data/issues";
-import { groupIssuesByStatus } from "../mock-data/issues";
-import { status as allStatus } from "../mock-data/status";
-import { useIssuesStore } from "../store/issues-store";
+import type { Issue } from "../lib/mappers";
+import { groupIssuesByStatus } from "../lib/mappers";
+import { status as allStatus } from "../lib/status-icons";
 import { useViewStore } from "../store/view-store";
 import { GroupIssues } from "./GroupIssues";
 import { IssueGrid } from "./IssueGrid";
 
 interface IssueBoardProps {
   issues: Issue[];
+  onUpdateStatus?: (issueId: string, statusId: string) => void;
 }
 
-export function IssueBoard({ issues }: IssueBoardProps) {
-  const updateIssueStatus = useIssuesStore((s) => s.updateIssueStatus);
+export function IssueBoard({ issues, onUpdateStatus }: IssueBoardProps) {
   const viewType = useViewStore((s) => s.viewType);
 
   const [activeIssue, setActiveIssue] = useState<Issue | null>(null);
@@ -43,7 +42,9 @@ export function IssueBoard({ issues }: IssueBoardProps) {
     if (!over) return;
     const issueId = active.id as string;
     const targetStatus = allStatus.find((s) => s.id === (over.id as string));
-    if (targetStatus) updateIssueStatus(issueId, targetStatus);
+    if (targetStatus && onUpdateStatus) {
+      onUpdateStatus(issueId, targetStatus.id);
+    }
   };
 
   return (

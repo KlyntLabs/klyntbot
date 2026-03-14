@@ -1,6 +1,6 @@
 import { formatDate, formatRelativeTime, formatTime } from "@shared/lib/dates";
 import { Bot, Monitor, User } from "lucide-react";
-import type { ActorType, MockActivityEntry } from "../../mock-data/issue-detail";
+import type { ActivityEntry as ActivityEntryType, ActorType } from "../../lib/mappers";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -12,7 +12,7 @@ function formatActivityTime(iso: string): string {
 }
 
 interface IssueActivityTabProps {
-  activity: MockActivityEntry[];
+  activity: ActivityEntryType[];
 }
 
 export function IssueActivityTab({ activity }: IssueActivityTabProps) {
@@ -25,7 +25,7 @@ export function IssueActivityTab({ activity }: IssueActivityTabProps) {
   );
 }
 
-function ActivityEntry({ entry }: { entry: MockActivityEntry }) {
+function ActivityEntry({ entry }: { entry: ActivityEntryType }) {
   return (
     <div className="flex gap-3 py-3 border-b border-[hsl(var(--border))]/50 last:border-b-0">
       <ActorAvatar type={entry.actorType} />

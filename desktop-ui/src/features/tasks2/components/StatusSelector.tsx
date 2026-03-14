@@ -1,10 +1,11 @@
+import { useMutation } from "@shared/hooks/useMutation";
+import type { Task, TaskUpdateParams } from "@shared/types/tasks";
 import { Check } from "lucide-react";
 import { useState } from "react";
+import type { Status } from "../lib/mappers";
+import { status as allStatus } from "../lib/status-icons";
 import { renderStatusIcon } from "../lib/status-utils";
 import { cn } from "../lib/utils";
-import type { Status } from "../mock-data/status";
-import { status as allStatus } from "../mock-data/status";
-import { useIssuesStore } from "../store/issues-store";
 import {
   Command,
   CommandEmpty,
@@ -22,7 +23,7 @@ interface StatusSelectorProps {
 
 export function StatusSelector({ issueId, status }: StatusSelectorProps) {
   const [open, setOpen] = useState(false);
-  const updateIssueStatus = useIssuesStore((s) => s.updateIssueStatus);
+  const updateTask = useMutation<Task, TaskUpdateParams>("task_update", "params");
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -46,7 +47,7 @@ export function StatusSelector({ issueId, status }: StatusSelectorProps) {
                   key={s.id}
                   value={s.name}
                   onSelect={() => {
-                    updateIssueStatus(issueId, s);
+                    updateTask.mutate({ id: issueId, statusLabelId: s.id });
                     setOpen(false);
                   }}
                 >

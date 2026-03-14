@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Status } from "../mock-data/status";
+import type { Status } from "../lib/mappers";
 
 interface CreateIssueState {
   isOpen: boolean;

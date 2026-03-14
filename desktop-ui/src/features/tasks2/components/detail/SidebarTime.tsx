@@ -1,10 +1,10 @@
 import { formatHumanDuration } from "@shared/lib/dates";
+import type { DetailTask, TaskState } from "../../lib/mappers";
 import { cn } from "../../lib/utils";
-import type { MockDetailTask, TaskState } from "../../mock-data/issue-detail";
 import { SectionLabel } from "./SectionLabel";
 
 interface SidebarTimeProps {
-  task: MockDetailTask;
+  task: DetailTask;
   taskState: TaskState;
 }
 

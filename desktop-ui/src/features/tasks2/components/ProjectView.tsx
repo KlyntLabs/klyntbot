@@ -1,17 +1,23 @@
-import { useMemo } from "react";
-import { useIssuesStore } from "../store/issues-store";
+import { useCallback, useMemo } from "react";
+import type { UseTasksResult } from "../hooks/useTasks";
 import { IssueBoard } from "./IssueBoard";
 
 interface ProjectViewProps {
   projectId: string;
+  tasksData: UseTasksResult;
 }
 
-export function ProjectView({ projectId }: ProjectViewProps) {
-  const issues = useIssuesStore((s) => s.issues);
-
+export function ProjectView({ projectId, tasksData }: ProjectViewProps) {
   const projectIssues = useMemo(
-    () => issues.filter((issue) => issue.project?.id === projectId),
-    [issues, projectId],
+    () => tasksData.issues.filter((issue) => issue.project?.id === projectId),
+    [tasksData.issues, projectId],
+  );
+
+  const handleUpdateStatus = useCallback(
+    (issueId: string, statusId: string) => {
+      tasksData.updateTask.mutate({ id: issueId, statusLabelId: statusId });
+    },
+    [tasksData.updateTask],
   );
 
   if (projectIssues.length === 0) {
@@ -22,5 +28,5 @@ export function ProjectView({ projectId }: ProjectViewProps) {
     );
   }
 
-  return <IssueBoard issues={projectIssues} />;
+  return <IssueBoard issues={projectIssues} onUpdateStatus={handleUpdateStatus} />;
 }

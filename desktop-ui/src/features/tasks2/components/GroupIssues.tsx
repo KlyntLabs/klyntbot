@@ -1,10 +1,9 @@
 import { useDroppable } from "@dnd-kit/core";
 import { Plus } from "lucide-react";
 import { useMemo } from "react";
+import type { Issue, Status } from "../lib/mappers";
+import { sortIssuesByPriority } from "../lib/mappers";
 import { renderStatusIcon } from "../lib/status-utils";
-import type { Issue } from "../mock-data/issues";
-import { sortIssuesByPriority } from "../mock-data/issues";
-import type { Status } from "../mock-data/status";
 import { useCreateIssueStore } from "../store/create-issue-store";
 import { useViewStore } from "../store/view-store";
 import { IssueGrid } from "./IssueGrid";

@@ -1,14 +1,14 @@
 import { formatElapsed } from "@shared/lib/dates";
 import { Pause, Square } from "lucide-react";
 import { useEffect, useState } from "react";
+import type { DetailTask, FocusSession, TaskState } from "../../lib/mappers";
 import { cn } from "../../lib/utils";
-import type { MockDetailTask, MockFocusSession, TaskState } from "../../mock-data/issue-detail";
 import { SectionLabel } from "./SectionLabel";
 
 interface SidebarWorkStateProps {
-  task: MockDetailTask;
+  task: DetailTask;
   taskState: TaskState;
-  focusSession: MockFocusSession | null;
+  focusSession: FocusSession | null;
 }
 
 export function SidebarWorkState({ task, taskState, focusSession }: SidebarWorkStateProps) {
