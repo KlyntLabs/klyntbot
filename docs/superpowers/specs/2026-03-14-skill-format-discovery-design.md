@@ -78,8 +78,8 @@ You are the task management specialist...
 | Field | Type | Default | Purpose |
 |-------|------|---------|---------|
 | `type` | `"skill"` \| `"orchestrator"` | `"skill"` | Orchestrators replace current agents |
-| `tools` | `string[]` | `[]` (all) | Tool access allowlist |
-| `mcp_tools` | `string[]` | `[]` | MCP server access (`["*"]` = all) |
+| `tools` | `string[]` | `null` (all) | Tool access allowlist. `null`/omitted = all tools allowed. `[]` = no tools (deny-all). Explicit list = only those tools. |
+| `mcp_tools` | `string[]` | `[]` | MCP server access. `["*"]` = all, `[]` = deny all. |
 | `can_delegate_to` | `string[]` | `[]` | Orchestrator delegation targets |
 | `max_iterations` | `u32` | `10` | ReAct loop iteration budget |
 | `always_skills` | `string[]` | `[]` | Skills always loaded with this orchestrator |
@@ -123,13 +123,15 @@ Entity declarations in `manifest.json` drive auto-provisioning (Subsystem 2):
 
 ### Discovery Scopes
 
-| Scope | Path | Purpose | Priority |
-|-------|------|---------|----------|
-| Built-in | Compiled via `include_str!` | Core skills shipped with Klyntbot | Lowest (0) |
-| User-level | `{data_dir}/skills/` | User-installed skills | Medium (1) |
-| Project-level | `.agents/skills/` | Cross-client interop | Highest (2) |
+| Scope | Path | Anchor | Purpose | Priority |
+|-------|------|--------|---------|----------|
+| Built-in | Compiled via `include_str!` | N/A | Core skills shipped with Klyntbot | Lowest (0) |
+| User-level | `{data_dir}/skills/` | `Config::data_dir_path()` | User-installed skills | Medium (1) |
+| Project-level | `.agents/skills/` | `Config::workspace_path` (if set), else CWD at startup | Cross-client interop | Highest (2) |
 
 **Priority rule**: Higher-priority scopes shadow lower-priority skills with the same `name`. A warning is logged when shadowing occurs.
+
+**Project-level path anchoring**: `.agents/skills/` is relative to the configured `workspace_path` in `Config` (which the desktop app sets on launch), falling back to CWD at startup. In daemon/headless mode where no workspace is configured, project-level scanning is skipped entirely (only built-in and user-level skills are available).
 
 ### Scanning Algorithm
 
@@ -142,7 +144,7 @@ Entity declarations in `manifest.json` drive auto-provisioning (Subsystem 2):
    b. Check for manifest.json in same directory → parse if present
    c. Validate name matches directory name (warn if not, load anyway)
    d. Apply priority rules for name collisions (log shadowing)
-5. Build SkillCatalog: HashMap<String, Arc<SkillEntry>>
+5. Build SkillCatalog: HashMap<String, Arc<SkillPackage>>
 6. Pre-compute description embeddings for semantic matching
 7. Record loaded_at timestamp for each entry
 ```
@@ -160,12 +162,25 @@ Entity declarations in `manifest.json` drive auto-provisioning (Subsystem 2):
 | User-level | Trusted by default | User explicitly installed these |
 | Project-level | Requires confirmation | Prompt user before first activation (prevents untrusted repo injection) |
 
+**Trust confirmation mechanism**:
+- Trust decisions are persisted in `{data_dir}/data.db` in a `skill_trust` table: `(skill_name TEXT, scope TEXT, workspace_path TEXT, trusted BOOLEAN, decided_at TEXT)`.
+- On first activation of a project-level skill, the system checks `skill_trust`. If no record exists, activation is deferred and the user is prompted via the active channel's `ask_user` interaction (desktop UI dialog, Telegram inline keyboard, or Discord reaction). If the channel has no interactive prompt capability (e.g., headless/cron), the skill is skipped with a warning logged.
+- Declining trust skips the skill for that session. The user can manage trust decisions via settings UI or a `skill trust` command.
+
 ### Hot Reload
 
 `SkillCatalog` supports hot-reload for development and marketplace updates:
-- `loaded_at: SystemTime` on each `SkillEntry`
+- `loaded_at: SystemTime` on each `SkillPackage`
 - `SkillCatalog::reload() -> Result<Vec<SkillChange>>` re-scans all sources, returns diff
 - File watcher on skill directories triggers reload (optional, debounced)
+
+```rust
+pub enum SkillChange {
+    Added(String),      // skill name
+    Removed(String),
+    Updated(String),    // SKILL.md or manifest.json changed (mtime comparison)
+}
+```
 
 ## 3. Progressive Disclosure & Activation
 
@@ -195,12 +210,14 @@ Two activation paths:
 
 1. User message arrives
 2. `SkillRouter` runs matching cascade:
-   - Keyword matching against skill descriptions + `metadata.klyntbot` hints
-   - Semantic matching (embedding cosine similarity, 70% keyword + 30% semantic blend)
-   - LLM classifier fallback (if confidence below threshold)
+   - **Keyword matching**: tokenizes user message and scores against skill description words + skill name tokens. The description is the keyword corpus (replaces the old `triggers` array).
+   - **Semantic matching**: embedding cosine similarity between message embedding and pre-computed description embeddings. Blend formula: `kw_score * 0.7 + sem_score * 0.3`.
+   - **LLM classifier fallback**: if blended confidence below threshold, ask the LLM to classify.
 3. Best orchestrator skill selected → SKILL.md body injected as system context
-4. Orchestrator's `always_skills` references loaded
-5. Per-message skill activation: non-orchestrator skills whose descriptions match are also injected
+4. Orchestrator's `always_skills` loaded — see "Always-skills injection" below
+5. **Per-message skill activation**: non-orchestrator skills are scored against the user message using the same keyword + semantic matching. Skills above the activation threshold are injected into context alongside the orchestrator. This replaces the old `triggers`-based substring matching with description-based semantic matching.
+
+**Always-skills injection**: When an orchestrator declares `always_skills: [todo, daily-planner]`, these reference files are loaded as **Tier 2 content** (injected directly into the system prompt alongside the orchestrator's body), NOT as Tier 3 resources. The `references/todo.md` body is read and injected unconditionally — same behavior as the current `AgentContextSource` injecting `always: true` skills. This preserves the current behavioral contract where always-loaded skills are part of the base system prompt.
 
 **Direct skill activation** (fallback):
 
@@ -211,9 +228,11 @@ Two activation paths:
 ### Tier 3: Resources (as-needed)
 
 When activated skill instructions reference files:
-- Referenced markdown (`references/*.md`) → injected into context when LLM requests them
-- Scripts (`scripts/*.py`) → executed via `run_script` tool, only output enters context
+- Referenced markdown (`references/*.md`) → injected into context when LLM reads them (via existing `read_file` tool)
+- Scripts (`scripts/*.py`) → executed via Bash tool, only output enters context
 - Assets (`assets/*`) → read by tools as needed
+
+**Note**: No new `run_script` tool is needed. The LLM uses existing `read_file` and Bash execution capabilities to access Tier 3 resources, consistent with how the Agent Skills spec works in Claude Code.
 
 ### Mapping to Current Code
 
@@ -221,9 +240,9 @@ When activated skill instructions reference files:
 |---------|-----|
 | `AgentManager::match_agent()` | `SkillRouter::select_orchestrator()` |
 | `AgentContextSource::provide()` | `SkillContextSource::provide()` |
-| `AgentProfile` struct | `SkillEntry` with `type: orchestrator` |
-| `AgentSkill` struct | `SkillEntry` with `type: skill` |
-| `IntentAnalyzer` 4-layer cascade | `SkillRouter` matching cascade (same algorithm, new inputs) |
+| `AgentProfile` struct | `SkillPackage` with `type: orchestrator` |
+| `AgentSkill` struct | `SkillPackage` with `type: skill` |
+| `IntentAnalyzer` 4-layer cascade | `IntentAnalyzer` unchanged (classifies execution mode). `SkillRouter` handles skill/orchestrator selection (separate concern). |
 | `ContentRegistry` | Retired — unified into `SkillCatalog` |
 | `always_skills` frontmatter | `metadata.klyntbot.always_skills` |
 | `triggers` frontmatter | Replaced by description-based matching (spec-compliant) |
@@ -246,17 +265,27 @@ pub enum SkillScope {
     Project,        // .agents/skills/
 }
 
-pub struct SkillEntry {
+/// Primary skill data type. Named `SkillPackage` (not `SkillEntry`)
+/// to avoid collision with the existing `content_registry::SkillEntry`
+/// which is deleted as part of this migration.
+pub struct SkillPackage {
     pub name: String,
     pub description: String,
-    pub skill_type: SkillType,
+    pub skill_type: SkillType,          // Parsed from metadata.klyntbot.type, defaults to Skill
     pub scope: SkillScope,
     pub location: PathBuf,
-    pub body: Option<String>,
-    pub manifest: Option<SkillManifest>,
+    pub body: String,                   // SKILL.md body (always loaded; see note below)
+    pub manifest: Option<SkillManifest>,// Parsed manifest.json (if present)
     pub metadata: SkillMetadata,
     pub loaded_at: SystemTime,
 }
+
+// Note on `body: String` (not Option<String>):
+// The body is always populated at discovery time. For built-in skills, it comes
+// from include_str!. For filesystem skills, SKILL.md is read during scanning.
+// If the file exists but the body after frontmatter is empty, body = "".
+// If SKILL.md is unparseable, the skill is skipped entirely (not loaded with None body).
+// This guarantees SkillContextSource always has text to inject.
 
 pub struct SkillMetadata {
     pub license: Option<String>,
@@ -266,7 +295,8 @@ pub struct SkillMetadata {
 }
 
 pub struct KlyntbotMeta {
-    pub tools: Vec<String>,
+    pub skill_type: SkillType,          // "skill" or "orchestrator", promoted to SkillPackage.skill_type
+    pub tools: Option<Vec<String>>,     // None = all allowed, Some([]) = deny-all, Some([...]) = allowlist
     pub mcp_tools: Vec<String>,
     pub can_delegate_to: Vec<String>,
     pub max_iterations: Option<u32>,
@@ -282,24 +312,43 @@ pub struct SkillManifest {
 }
 
 pub struct SkillCatalog {
-    skills: HashMap<String, Arc<SkillEntry>>,
-    embeddings: HashMap<String, Vec<f32>>,
+    skills: HashMap<String, Arc<SkillPackage>>,
+    embeddings: HashMap<String, Vec<f32>>,  // In-memory only (not persisted to LanceDB)
     loaded_at: SystemTime,
 }
 ```
+
+### Parsing `skill_type` from frontmatter
+
+During SKILL.md parsing, `skill_type` is determined by:
+1. Read `metadata.klyntbot.type` from YAML frontmatter
+2. If present and equals `"orchestrator"`, set `SkillType::Orchestrator`
+3. Otherwise, default to `SkillType::Skill`
+4. Promote the parsed value to `SkillPackage.skill_type`
 
 ### SkillCatalog API
 
 ```rust
 impl SkillCatalog {
+    /// Scan all sources and build catalog. Synchronous — does not compute embeddings.
     pub fn discover(sources: &[SkillSource]) -> Result<Self>;
+
+    /// Pre-compute description embeddings for semantic matching. Must be called
+    /// after discover(). Separate from discover() because embedding requires
+    /// an async TextEmbedder.
+    pub async fn precompute_embeddings(&mut self, embedder: &dyn TextEmbedder) -> Result<()>;
+
     pub fn reload(&mut self) -> Result<Vec<SkillChange>>;
-    pub fn orchestrators(&self) -> Vec<&SkillEntry>;
-    pub fn regular_skills(&self) -> Vec<&SkillEntry>;
-    pub fn get(&self, name: &str) -> Option<&Arc<SkillEntry>>;
+    pub fn orchestrators(&self) -> Vec<&SkillPackage>;
+    pub fn regular_skills(&self) -> Vec<&SkillPackage>;
+    pub fn get(&self, name: &str) -> Option<&Arc<SkillPackage>>;
     pub fn catalog_prompt(&self) -> String;
 }
 ```
+
+### Embeddings: in-memory only
+
+Skill description embeddings are stored in-memory in `SkillCatalog.embeddings` (same as current `AgentManager::precompute_embeddings()`). They are NOT persisted to LanceDB — the `storage` dependency on the crate is for accessing the `TextEmbedder` trait, not for writing to the database. Embeddings are recomputed on startup and on `reload()`.
 
 ### Crate Placement
 
@@ -308,7 +357,7 @@ crates/
   skill-system/        # NEW crate at L3 (same layer as session, scheduling)
     src/
       lib.rs
-      types.rs          # SkillEntry, SkillManifest, SkillCatalog
+      types.rs          # SkillPackage, SkillManifest, SkillCatalog
       discovery.rs      # Scanning, parsing, priority resolution
       router.rs         # Orchestrator selection, skill activation matching
       context.rs        # SkillContextSource (replaces AgentContextSource)
@@ -320,9 +369,11 @@ crates/
 ### Dependency Graph
 
 ```
-L3: skill-system → depends on: common, config, storage (for embeddings)
+L3: skill-system → depends on: common, config
 L5: agent → depends on: skill-system (uses SkillCatalog, SkillRouter, SkillContextSource)
 ```
+
+Note: `skill-system` does NOT depend on `storage`. Embeddings are in-memory and the `TextEmbedder` trait is injected from the `agent` layer via `precompute_embeddings(&mut self, embedder: &dyn TextEmbedder)`. The trait itself is defined in `cognitive` (or `providers`), not `storage`.
 
 ## 5. Migration Path
 
@@ -364,7 +415,7 @@ agents/communication/skills/notification.md → skills/communication/references/
 | `crates/skill-system/` | **Create** | New L3 crate with types, discovery, router, context, manifest |
 | `crates/agent/src/agent_profile/` | **Replace** | Logic moves to `skill-system/`; delete `types.rs`, `manager.rs` |
 | `crates/agent/src/context_sources/agent.rs` | **Replace** | Becomes `skill-system/context.rs` (same injection pattern, new types) |
-| `crates/agent/src/content_registry/` | **Delete** | Subsumed by `SkillCatalog` |
+| `crates/agent/src/content_registry/` | **Delete** | Subsumed by `SkillCatalog`. Note: `content_registry::SkillEntry` is also deleted — no naming conflict with `SkillPackage`. |
 | `crates/agent/src/agent_runtime/runtime.rs` | **Modify** | Swap `AgentManager` refs → `SkillCatalog` + `SkillRouter` |
 | `crates/agent/src/intent_pipeline/analysis.rs` | **Modify** | Feed `SkillRouter` instead of `AgentManager` |
 | `crates/agent/src/agent_loop/builder.rs` | **Modify** | Wire `SkillCatalog` instead of `AgentManager` |
@@ -376,7 +427,7 @@ agents/communication/skills/notification.md → skills/communication/references/
 - `ToolRegistry`, `Tool` trait, `FeaturePackage` — untouched (Subsystem 2 evolves these)
 - `ExecutionRouter`, `ReactiveEngine` — untouched (consume tool definitions, not skill types)
 - MCP server/client — untouched (operates on `ToolRegistry`)
-- `IntentAnalyzer` cascade logic — reused, wired to `SkillRouter`
+- `IntentAnalyzer` cascade logic — reused for execution mode classification (Direct vs. Reactive). Note: `IntentAnalyzer` classifies *how* to execute (iteration budget, tool complexity), NOT *which* skill to select. Skill selection is handled by `SkillRouter` which is a separate concern.
 - All `feature-*` crates — untouched until Subsystem 2
 - WASM plugin system — untouched until Subsystem 2
 
