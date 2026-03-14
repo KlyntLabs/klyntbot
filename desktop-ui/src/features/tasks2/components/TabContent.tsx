@@ -2,6 +2,8 @@ import { useShallow } from "zustand/react/shallow";
 import { useTabStore } from "../store/tab-store";
 import AllIssues from "./AllIssues";
 import { AreaView } from "./AreaView";
+import { IssueDetailErrorBoundary } from "./detail/IssueDetailError";
+import { IssueDetailView } from "./detail/IssueDetailView";
 import HeaderNav from "./HeaderNav";
 import HeaderOptions from "./HeaderOptions";
 import { ProjectView } from "./ProjectView";
@@ -42,9 +44,9 @@ export function TabContent() {
         return <ProjectView projectId={currentView.targetId} />;
       case "issue":
         return (
-          <div className="px-6 py-8 text-sm text-[hsl(var(--muted-foreground))]">
-            Issue detail view coming soon: {currentView.label}
-          </div>
+          <IssueDetailErrorBoundary>
+            <IssueDetailView issueId={currentView.targetId} />
+          </IssueDetailErrorBoundary>
         );
     }
   };
