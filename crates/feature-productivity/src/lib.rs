@@ -56,20 +56,12 @@ impl ProductivityFeature {
     }
 
     pub fn migrations_static() -> Vec<FeatureMigration> {
-        vec![
-            FeatureMigration {
-                feature_name: "productivity".to_string(),
-                version: 1,
-                description: "Create productivity tracking tables".to_string(),
-                sql: Self::migration_sql().to_string(),
-            },
-            FeatureMigration {
-                feature_name: "productivity".to_string(),
-                version: 2,
-                description: "Add top_projects column to daily_summaries".to_string(),
-                sql: include_str!("../migrations/002_add_top_projects_column.sql").to_string(),
-            },
-        ]
+        vec![FeatureMigration {
+            feature_name: "productivity".to_string(),
+            version: 1,
+            description: "Create productivity tracking tables".to_string(),
+            sql: Self::migration_sql().to_string(),
+        }]
     }
 
     pub fn default_config_static() -> Value {

@@ -70,6 +70,14 @@ pub(super) async fn init_storage(
     .await
     .map_err(|e| format!("tasks migration failed: {e}"))?;
 
+    // Run finance feature migrations.
+    StoragePool::run_feature_migrations(
+        storage_pool.inner(),
+        &feature_finance::FinanceFeature::migrations_static(),
+    )
+    .await
+    .map_err(|e| format!("finance migration failed: {e}"))?;
+
     // 3. Create LLM provider (graceful — falls back to noop for setup wizard).
     // Use the "full" variant to get the inner ProviderManager (when a fallback is configured)
     // so we can wire circuit breaker persistence before the manager starts handling calls.

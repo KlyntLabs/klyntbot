@@ -155,4 +155,3 @@ fn pearson_correlation(xs: &[Decimal], ys: &[Decimal]) -> Decimal {
         r
     }
 }
-

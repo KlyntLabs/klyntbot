@@ -11,7 +11,7 @@ import { Donut } from "../components/Donut";
 import { FinanceLayout } from "../components/FinanceLayout";
 import { FinanceSkeleton } from "../components/FinanceSkeleton";
 import { FormField, FormModal, fieldClass } from "../components/FormModal";
-import { COLORS, fmtCompact, fmtMoney, pct, toVnd } from "../lib/finance";
+import { COLORS, fmtCompact, fmtMoney, pct, toBase } from "../lib/finance";
 
 export function FinanceBudgets() {
   const {
@@ -21,17 +21,23 @@ export function FinanceBudgets() {
     refetch,
   } = useQuery<FinanceBudgetUsage[]>("finance_budget_usage", undefined, []);
   const { data: rates } = useQuery<Record<string, number>>("finance_exchange_rates", undefined, {});
+  const { data: settings } = useQuery<{ defaultCurrency: string }>(
+    "finance_settings",
+    undefined,
+    {},
+  );
+  const baseCurrency = settings?.defaultCurrency ?? "USD";
   useEvent<{ entityKind: string }>("entity:updated", refetch);
 
   const activeBudgets = useMemo(() => budgets.filter((b) => b.isActive), [budgets]);
 
-  // Convert to VND before summing to handle multi-currency
+  // Convert to base currency before summing to handle multi-currency
   const totalBudget = useMemo(
-    () => activeBudgets.reduce((s, b) => s + toVnd(b.amount, b.currency, rates), 0),
+    () => activeBudgets.reduce((s, b) => s + toBase(b.amount, b.currency, rates, baseCurrency), 0),
     [activeBudgets, rates],
   );
   const totalSpent = useMemo(
-    () => activeBudgets.reduce((s, b) => s + toVnd(b.spent, b.currency, rates), 0),
+    () => activeBudgets.reduce((s, b) => s + toBase(b.spent, b.currency, rates, baseCurrency), 0),
     [activeBudgets, rates],
   );
   const overBudget = activeBudgets.filter((b) => b.spent > b.amount);
@@ -40,7 +46,7 @@ export function FinanceBudgets() {
     () =>
       activeBudgets.map((b, i) => ({
         name: b.name,
-        value: toVnd(b.spent, b.currency, rates),
+        value: toBase(b.spent, b.currency, rates, baseCurrency),
         color: COLORS[i % COLORS.length],
       })),
     [activeBudgets, rates],
@@ -49,7 +55,7 @@ export function FinanceBudgets() {
     () =>
       activeBudgets.map((b, i) => ({
         name: b.name,
-        value: toVnd(b.amount, b.currency, rates),
+        value: toBase(b.amount, b.currency, rates, baseCurrency),
         color: COLORS[i % COLORS.length],
       })),
     [activeBudgets, rates],
@@ -119,7 +125,7 @@ export function FinanceBudgets() {
               Total Budget
             </p>
             <p className="text-[20px] font-light text-primary tabular-nums">
-              {fmtCompact(totalBudget)}đ
+              {fmtCompact(totalBudget, baseCurrency)}
             </p>
           </Card>
           <Card className="p-4">
@@ -127,7 +133,7 @@ export function FinanceBudgets() {
               Total Spent
             </p>
             <p className="text-[20px] font-light text-destructive tabular-nums">
-              {fmtCompact(totalSpent)}đ
+              {fmtCompact(totalSpent, baseCurrency)}
             </p>
           </Card>
           <Card className="p-4">
@@ -140,7 +146,7 @@ export function FinanceBudgets() {
                 totalBudget - totalSpent >= 0 ? "text-success" : "text-destructive",
               )}
             >
-              {fmtCompact(totalBudget - totalSpent)}đ
+              {fmtCompact(totalBudget - totalSpent, baseCurrency)}
             </p>
           </Card>
           <Card className="p-4">
@@ -244,7 +250,7 @@ export function FinanceBudgets() {
               <Donut
                 segments={spentSegs}
                 label="Spent"
-                value={`${fmtCompact(totalSpent)}đ`}
+                value={fmtCompact(totalSpent, baseCurrency)}
                 size={150}
               />
             </div>
@@ -255,7 +261,7 @@ export function FinanceBudgets() {
               <Donut
                 segments={budgetSegs}
                 label="Allocated"
-                value={`${fmtCompact(totalBudget)}đ`}
+                value={fmtCompact(totalBudget, baseCurrency)}
                 size={150}
               />
             </div>

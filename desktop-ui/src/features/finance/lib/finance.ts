@@ -52,20 +52,41 @@ export function fmtMoney(amount: number, currency: string): string {
   }).format(value);
 }
 
-export function toVnd(amount: number, currency: string, rates: Record<string, number>): number {
-  return Math.round(amount * (rates[currency] ?? 1));
+/** Convert an amount in `currency` to the base/display currency using rates.
+ *  If the currency matches the base (rate=1 or no entry needed), returns as-is.
+ *  If a foreign currency has no rate configured, returns 0 (excluded from totals). */
+export function toBase(
+  amount: number,
+  currency: string,
+  rates: Record<string, number>,
+  baseCurrency = "USD",
+): number {
+  if (currency === baseCurrency) return amount;
+  const rate = rates[currency];
+  if (rate == null || rate === 0) return 0;
+  return Math.round(amount * rate);
 }
 
-export function fmtVnd(amount: number): string {
-  return `${new Intl.NumberFormat("vi-VN").format(Math.round(amount))}đ`;
-}
-
-export function fmtCompact(amount: number, currency = "VND"): string {
+export function fmtCompact(amount: number, currency = "USD"): string {
   const v = toMajor(amount, currency);
-  if (Math.abs(v) >= 1e9) return `${(v / 1e9).toFixed(1)}B`;
-  if (Math.abs(v) >= 1e6) return `${(v / 1e6).toFixed(1)}M`;
-  if (Math.abs(v) >= 1e3) return `${(v / 1e3).toFixed(0)}K`;
-  return new Intl.NumberFormat("vi-VN").format(Math.round(v));
+  const symbol =
+    currency === "VND"
+      ? "đ"
+      : currency === "USD" || currency === "USDT"
+        ? "$"
+        : currency === "EUR"
+          ? "€"
+          : currency === "GBP"
+            ? "£"
+            : currency === "THB"
+              ? "฿"
+              : `${currency} `;
+  const prefix = currency === "VND" ? "" : symbol;
+  const suffix = currency === "VND" ? "đ" : "";
+  if (Math.abs(v) >= 1e9) return `${prefix}${(v / 1e9).toFixed(1)}B${suffix}`;
+  if (Math.abs(v) >= 1e6) return `${prefix}${(v / 1e6).toFixed(1)}M${suffix}`;
+  if (Math.abs(v) >= 1e3) return `${prefix}${(v / 1e3).toFixed(0)}K${suffix}`;
+  return `${prefix}${new Intl.NumberFormat("en-US").format(Math.round(v))}${suffix}`;
 }
 
 export function pct(cur: number, tot: number): number {

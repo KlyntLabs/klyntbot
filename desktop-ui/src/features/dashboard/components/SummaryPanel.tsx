@@ -131,7 +131,9 @@ function DaySummary({
                 <TrendArrow
                   value={
                     ps.activeTimeTrend != null
-                      ? (ps.activeTimeTrend / Math.max(ps.totalActiveSecs - ps.activeTimeTrend, 1)) * 100
+                      ? (ps.activeTimeTrend /
+                          Math.max(ps.totalActiveSecs - ps.activeTimeTrend, 1)) *
+                        100
                       : null
                   }
                 />

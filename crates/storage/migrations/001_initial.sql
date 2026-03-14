@@ -466,12 +466,13 @@ CREATE TABLE finance_investments (
     asset_type    TEXT NOT NULL,
     symbol        TEXT,
     name          TEXT NOT NULL,
-    quantity      REAL NOT NULL,
+    quantity      TEXT NOT NULL,
     cost_basis    INTEGER NOT NULL,
     currency      TEXT NOT NULL,
     current_price INTEGER,
     current_value INTEGER,
     purchase_date TEXT,
+    asset_class   TEXT,
     notes         TEXT,
     created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
     updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
@@ -537,6 +538,38 @@ CREATE TABLE finance_liabilities (
     updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );
 CREATE INDEX idx_finance_liabilities_currency ON finance_liabilities(currency);
+
+-- ============================================================
+-- Finance Allocation Targets
+-- ============================================================
+CREATE TABLE IF NOT EXISTS finance_allocation_targets (
+    id TEXT PRIMARY KEY,
+    portfolio_id TEXT NOT NULL REFERENCES finance_portfolios(id) ON DELETE CASCADE,
+    asset_class TEXT NOT NULL,
+    target_weight TEXT NOT NULL,
+    tolerance_band TEXT NOT NULL DEFAULT '0.05',
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    UNIQUE(portfolio_id, asset_class)
+);
+
+-- ============================================================
+-- Finance Net Worth Snapshots
+-- ============================================================
+CREATE TABLE IF NOT EXISTS finance_net_worth_snapshots (
+    id TEXT PRIMARY KEY,
+    snapshot_date TEXT NOT NULL,
+    currency TEXT NOT NULL DEFAULT 'USD',
+    accounts_total INTEGER NOT NULL,
+    investments_total INTEGER NOT NULL,
+    liabilities_total INTEGER NOT NULL,
+    net_worth INTEGER NOT NULL,
+    breakdown TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    UNIQUE(snapshot_date, currency)
+);
+CREATE INDEX IF NOT EXISTS idx_net_worth_snapshots_date ON finance_net_worth_snapshots(snapshot_date);
+CREATE INDEX IF NOT EXISTS idx_net_worth_snapshots_currency_date ON finance_net_worth_snapshots(currency, snapshot_date);
 
 -- ============================================================
 -- Feature Migration Tracking

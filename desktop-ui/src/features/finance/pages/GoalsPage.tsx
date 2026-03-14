@@ -11,7 +11,7 @@ import { Donut } from "../components/Donut";
 import { FinanceLayout } from "../components/FinanceLayout";
 import { FinanceSkeleton } from "../components/FinanceSkeleton";
 import { FormField, FormModal, fieldClass } from "../components/FormModal";
-import { COLORS, fmtCompact, fmtMoney, GOAL_ICONS, pct, toVnd } from "../lib/finance";
+import { COLORS, fmtCompact, fmtMoney, GOAL_ICONS, pct, toBase } from "../lib/finance";
 
 type GoalTab = "active" | "achieved" | "abandoned";
 
@@ -23,24 +23,36 @@ export function FinanceGoals() {
     refetch,
   } = useQuery<FinanceGoal[]>("finance_goals", undefined, []);
   const { data: rates } = useQuery<Record<string, number>>("finance_exchange_rates", undefined, {});
+  const { data: settings } = useQuery<{ defaultCurrency: string }>(
+    "finance_settings",
+    undefined,
+    {},
+  );
+  const baseCurrency = settings?.defaultCurrency ?? "USD";
   useEvent<{ entityKind: string }>("entity:updated", refetch);
 
   const [tab, setTab] = useState<GoalTab>("active");
 
   const filteredGoals = useMemo(() => goals.filter((g) => g.status === tab), [goals, tab]);
 
-  // Convert to VND for cross-currency summing
+  // Convert to base currency for cross-currency summing
   const activeGoals = useMemo(() => goals.filter((g) => g.status === "active"), [goals]);
   const totalTarget = useMemo(
-    () => activeGoals.reduce((s, g) => s + toVnd(g.targetAmount, g.currency, rates), 0),
+    () =>
+      activeGoals.reduce((s, g) => s + toBase(g.targetAmount, g.currency, rates, baseCurrency), 0),
     [activeGoals, rates],
   );
   const totalSaved = useMemo(
-    () => activeGoals.reduce((s, g) => s + toVnd(g.currentAmount, g.currency, rates), 0),
+    () =>
+      activeGoals.reduce((s, g) => s + toBase(g.currentAmount, g.currency, rates, baseCurrency), 0),
     [activeGoals, rates],
   );
   const monthlyTotal = useMemo(
-    () => activeGoals.reduce((s, g) => s + toVnd(g.monthlyContribution ?? 0, g.currency, rates), 0),
+    () =>
+      activeGoals.reduce(
+        (s, g) => s + toBase(g.monthlyContribution ?? 0, g.currency, rates, baseCurrency),
+        0,
+      ),
     [activeGoals, rates],
   );
 
@@ -48,7 +60,7 @@ export function FinanceGoals() {
     () =>
       activeGoals.map((g, i) => ({
         name: g.name,
-        value: toVnd(g.currentAmount, g.currency, rates),
+        value: toBase(g.currentAmount, g.currency, rates, baseCurrency),
         color: COLORS[i % COLORS.length],
       })),
     [activeGoals, rates],
@@ -135,7 +147,7 @@ export function FinanceGoals() {
               Total Saved
             </p>
             <p className="text-[20px] font-light text-success tabular-nums">
-              {fmtCompact(totalSaved)}đ
+              {fmtCompact(totalSaved, baseCurrency)}
             </p>
           </Card>
           <Card className="p-4">
@@ -143,7 +155,7 @@ export function FinanceGoals() {
               Total Target
             </p>
             <p className="text-[20px] font-light text-primary tabular-nums">
-              {fmtCompact(totalTarget)}đ
+              {fmtCompact(totalTarget, baseCurrency)}
             </p>
           </Card>
           <Card className="p-4">
@@ -151,7 +163,7 @@ export function FinanceGoals() {
               Monthly Contributions
             </p>
             <p className="text-[20px] font-light text-brand tabular-nums">
-              {fmtCompact(monthlyTotal)}đ
+              {fmtCompact(monthlyTotal, baseCurrency)}
             </p>
           </Card>
         </div>
@@ -267,7 +279,7 @@ export function FinanceGoals() {
               <Donut
                 segments={goalSegs}
                 label="Saved"
-                value={`${fmtCompact(totalSaved)}đ`}
+                value={fmtCompact(totalSaved, baseCurrency)}
                 size={150}
               />
             </div>

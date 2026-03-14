@@ -63,8 +63,7 @@ impl SpendingAnalyzer {
 
             let amounts: Vec<Decimal> = txns.iter().map(|t| t.amount).collect();
             let median = compute_median(&amounts);
-            let deviations: Vec<Decimal> =
-                amounts.iter().map(|a| (*a - median).abs()).collect();
+            let deviations: Vec<Decimal> = amounts.iter().map(|a| (*a - median).abs()).collect();
             let mad = compute_median(&deviations);
 
             // Constant for modified z-score: 0.6745

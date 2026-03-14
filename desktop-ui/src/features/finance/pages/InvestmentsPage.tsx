@@ -15,7 +15,7 @@ import { Donut } from "../components/Donut";
 import { FinanceLayout } from "../components/FinanceLayout";
 import { FinanceSkeleton } from "../components/FinanceSkeleton";
 import { FormField, FormModal, fieldClass } from "../components/FormModal";
-import { COLORS, fmtCompact, fmtMoney, retPct, toVnd } from "../lib/finance";
+import { COLORS, fmtCompact, fmtMoney, retPct, toBase } from "../lib/finance";
 
 export function FinanceInvestments() {
   const {
@@ -30,6 +30,12 @@ export function FinanceInvestments() {
     [],
   );
   const { data: rates } = useQuery<Record<string, number>>("finance_exchange_rates", undefined, {});
+  const { data: settings } = useQuery<{ defaultCurrency: string }>(
+    "finance_settings",
+    undefined,
+    {},
+  );
+  const baseCurrency = settings?.defaultCurrency ?? "USD";
 
   const refetchAll = () => {
     rP();
@@ -40,11 +46,12 @@ export function FinanceInvestments() {
   const [selectedPortfolio, setSelectedPortfolio] = useState<string | null>(null);
 
   const totalValue = useMemo(
-    () => portfolios.reduce((s, p) => s + toVnd(p.totalValue, p.currency, rates), 0),
+    () => portfolios.reduce((s, p) => s + toBase(p.totalValue, p.currency, rates, baseCurrency), 0),
     [portfolios, rates],
   );
   const totalCost = useMemo(
-    () => portfolios.reduce((s, p) => s + toVnd(p.totalCostBasis, p.currency, rates), 0),
+    () =>
+      portfolios.reduce((s, p) => s + toBase(p.totalCostBasis, p.currency, rates, baseCurrency), 0),
     [portfolios, rates],
   );
   const totalReturn = retPct(totalValue, totalCost);
@@ -54,7 +61,8 @@ export function FinanceInvestments() {
     for (const inv of investments) {
       m.set(
         inv.assetType,
-        (m.get(inv.assetType) ?? 0) + toVnd(inv.currentValue ?? 0, inv.currency, rates),
+        (m.get(inv.assetType) ?? 0) +
+          toBase(inv.currentValue ?? 0, inv.currency, rates, baseCurrency),
       );
     }
     return Array.from(m.entries())
@@ -66,7 +74,7 @@ export function FinanceInvestments() {
     () =>
       portfolios.map((p, i) => ({
         name: p.name,
-        value: toVnd(p.totalValue, p.currency, rates),
+        value: toBase(p.totalValue, p.currency, rates, baseCurrency),
         color: COLORS[i % COLORS.length],
       })),
     [portfolios, rates],
@@ -165,7 +173,7 @@ export function FinanceInvestments() {
               Total Value
             </p>
             <p className="text-[20px] font-light text-primary tabular-nums">
-              {fmtCompact(totalValue)}đ
+              {fmtCompact(totalValue, baseCurrency)}
             </p>
           </Card>
           <Card className="p-4">
@@ -173,7 +181,7 @@ export function FinanceInvestments() {
               Cost Basis
             </p>
             <p className="text-[20px] font-light text-muted tabular-nums">
-              {fmtCompact(totalCost)}đ
+              {fmtCompact(totalCost, baseCurrency)}
             </p>
           </Card>
           <Card className="p-4">
@@ -358,7 +366,7 @@ export function FinanceInvestments() {
               <Donut
                 segments={assetSegs}
                 label="By type"
-                value={`${fmtCompact(totalValue)}đ`}
+                value={fmtCompact(totalValue, baseCurrency)}
                 size={140}
               />
             </div>
@@ -369,7 +377,7 @@ export function FinanceInvestments() {
               <Donut
                 segments={portfolioSegs}
                 label="Portfolios"
-                value={`${fmtCompact(totalValue)}đ`}
+                value={fmtCompact(totalValue, baseCurrency)}
                 size={140}
               />
             </div>

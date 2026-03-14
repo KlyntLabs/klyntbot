@@ -144,6 +144,7 @@ impl FinanceBudgetRepo {
             FROM finance_budgets b
             LEFT JOIN finance_transactions ft ON
                 ft.tx_type = 'expense'
+                AND ft.currency = b.currency
                 AND (b.category IS NULL OR ft.category = b.category)
                 AND ft.tx_date >= CASE
                     WHEN b.period = 'monthly' THEN date('now', 'localtime', 'start of month')
@@ -194,6 +195,7 @@ impl FinanceBudgetRepo {
             FROM finance_budgets b
             LEFT JOIN finance_transactions ft ON
                 ft.tx_type = 'expense'
+                AND ft.currency = b.currency
                 AND (b.category IS NULL OR ft.category = b.category)
                 AND ft.tx_date >= CASE
                     WHEN b.period = 'monthly' THEN date('now', 'localtime', 'start of month')

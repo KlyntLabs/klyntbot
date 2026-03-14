@@ -14,12 +14,11 @@ export {
   COLORS,
   fmtCompact,
   fmtMoney,
-  fmtVnd,
   GOAL_ICONS,
   LIAB_ICONS,
   pct,
   retPct,
-  toVnd,
+  toBase,
 } from "./lib/finance";
 export { FinanceAccounts as AccountsPage } from "./pages/AccountsPage";
 export { FinanceBudgets as BudgetsPage } from "./pages/BudgetsPage";

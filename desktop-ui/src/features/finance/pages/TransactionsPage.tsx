@@ -16,7 +16,7 @@ import { FinanceLayout } from "../components/FinanceLayout";
 import { FinanceSkeleton } from "../components/FinanceSkeleton";
 import { FormField, fieldClass } from "../components/FormModal";
 import { SlidePanel } from "../components/SlidePanel";
-import { COLORS, fmtCompact, fmtMoney, toVnd } from "../lib/finance";
+import { COLORS, fmtCompact, fmtMoney, toBase } from "../lib/finance";
 
 type TxFilter = "all" | "income" | "expense" | "transfer";
 
@@ -27,6 +27,12 @@ export function FinanceTransactions() {
     [],
   );
   const { data: rates } = useQuery<Record<string, number>>("finance_exchange_rates", undefined, {});
+  const { data: settings } = useQuery<{ defaultCurrency: string }>(
+    "finance_settings",
+    undefined,
+    {},
+  );
+  const baseCurrency = settings?.defaultCurrency ?? "USD";
 
   // ── Server-side filter state ──
   const [filter, setFilter] = useState<TxFilter>("all");
@@ -81,7 +87,7 @@ export function FinanceTransactions() {
     const catMap = new Map<string, number>();
 
     for (const t of transactions) {
-      const vnd = toVnd(t.amount, t.currency, rates);
+      const vnd = toBase(t.amount, t.currency, rates, baseCurrency);
       if (t.txType === "income") {
         income += vnd;
       } else if (t.txType === "expense") {
@@ -181,7 +187,7 @@ export function FinanceTransactions() {
           <Card className="p-4">
             <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">Income</p>
             <p className="text-[20px] font-light text-success tabular-nums">
-              {fmtCompact(totalIncome)}đ
+              {fmtCompact(totalIncome, baseCurrency)}
             </p>
           </Card>
           <Card className="p-4">
@@ -189,7 +195,7 @@ export function FinanceTransactions() {
               Expenses
             </p>
             <p className="text-[20px] font-light text-destructive tabular-nums">
-              {fmtCompact(totalExpense)}đ
+              {fmtCompact(totalExpense, baseCurrency)}
             </p>
           </Card>
           <Card className="p-4">
@@ -201,7 +207,7 @@ export function FinanceTransactions() {
               )}
             >
               {totalIncome - totalExpense >= 0 ? "+" : ""}
-              {fmtCompact(totalIncome - totalExpense)}đ
+              {fmtCompact(totalIncome - totalExpense, baseCurrency)}
             </p>
           </Card>
         </div>
@@ -339,7 +345,7 @@ export function FinanceTransactions() {
                 <Donut
                   segments={catSegs}
                   label="Spending"
-                  value={`${fmtCompact(totalExpense)}đ`}
+                  value={fmtCompact(totalExpense, baseCurrency)}
                   size={140}
                 />
                 <div className="mt-3 pt-2.5 border-t border-white/[0.04] space-y-1.5">
@@ -353,7 +359,7 @@ export function FinanceTransactions() {
                         <span className="text-[10px] text-muted font-light">{seg.name}</span>
                       </div>
                       <span className="text-[10px] text-secondary font-light">
-                        {fmtCompact(seg.value)}đ
+                        {fmtCompact(seg.value, baseCurrency)}
                       </span>
                     </div>
                   ))}

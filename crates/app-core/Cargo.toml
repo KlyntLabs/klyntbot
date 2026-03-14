@@ -12,6 +12,7 @@ cognitive = { workspace = true }
 common = { workspace = true }
 config = { workspace = true }
 feature-coaching = { workspace = true }
+feature-finance = { workspace = true }
 feature-notes = { workspace = true }
 feature-productivity = { workspace = true }
 feature-tasks = { workspace = true }

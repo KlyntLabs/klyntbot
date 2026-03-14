@@ -10,7 +10,7 @@ import { Card, CardHeader } from "../components/Card";
 import { FinanceLayout } from "../components/FinanceLayout";
 import { FinanceSkeleton } from "../components/FinanceSkeleton";
 import { FormField, FormModal, fieldClass } from "../components/FormModal";
-import { ACCT_ICONS, fmtMoney, fmtVnd, toVnd } from "../lib/finance";
+import { ACCT_ICONS, fmtCompact, fmtMoney, toBase } from "../lib/finance";
 
 export function FinanceAccounts() {
   const [searchParams] = useSearchParams();
@@ -26,6 +26,12 @@ export function FinanceAccounts() {
     [],
   );
   const { data: rates } = useQuery<Record<string, number>>("finance_exchange_rates", undefined, {});
+  const { data: settings } = useQuery<{ defaultCurrency: string }>(
+    "finance_settings",
+    undefined,
+    {},
+  );
+  const baseCurrency = settings?.defaultCurrency ?? "USD";
 
   const refetchAll = () => {
     rA();
@@ -49,8 +55,8 @@ export function FinanceAccounts() {
     () => (selectedId ? transactions.filter((t) => t.accountId === selectedId) : []),
     [transactions, selectedId],
   );
-  const totalVnd = useMemo(
-    () => active.reduce((s, a) => s + toVnd(a.balance, a.currency, rates), 0),
+  const totalBalance = useMemo(
+    () => active.reduce((s, a) => s + toBase(a.balance, a.currency, rates, baseCurrency), 0),
     [active, rates],
   );
 
@@ -115,7 +121,9 @@ export function FinanceAccounts() {
             <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">
               Total Balance
             </p>
-            <p className="text-[20px] font-light text-primary">{fmtVnd(totalVnd)}</p>
+            <p className="text-[20px] font-light text-primary">
+              {fmtCompact(totalBalance, baseCurrency)}
+            </p>
           </Card>
           <Card className="p-4">
             <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">
@@ -151,7 +159,7 @@ export function FinanceAccounts() {
             <div className="grid grid-cols-2 gap-4">
               {active.map((acct) => {
                 const Icon = ACCT_ICONS[acct.accountType] ?? Wallet;
-                const vnd = toVnd(acct.balance, acct.currency, rates);
+                const baseAmt = toBase(acct.balance, acct.currency, rates, baseCurrency);
                 const isSelected = acct.id === selectedId;
                 return (
                   <div
@@ -183,8 +191,10 @@ export function FinanceAccounts() {
                     <p className="text-[18px] font-light text-primary tabular-nums">
                       {fmtMoney(acct.balance, acct.currency)}
                     </p>
-                    {acct.currency !== "VND" && (
-                      <p className="text-[10px] text-dim font-light mt-0.5">≈ {fmtVnd(vnd)}</p>
+                    {acct.currency !== baseCurrency && (
+                      <p className="text-[10px] text-dim font-light mt-0.5">
+                        ≈ {fmtCompact(baseAmt, baseCurrency)}
+                      </p>
                     )}
                     {acct.notes && (
                       <p className="text-[9px] text-dim font-light mt-2">{acct.notes}</p>

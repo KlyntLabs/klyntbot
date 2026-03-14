@@ -33,12 +33,11 @@ import {
   COLORS,
   fmtCompact,
   fmtMoney,
-  fmtVnd,
   GOAL_ICONS,
   LIAB_ICONS,
   pct,
   retPct,
-  toVnd,
+  toBase,
 } from "../lib/finance";
 
 export function Finance() {
@@ -82,6 +81,12 @@ export function Finance() {
     { totalsByCurrency: [] },
   );
   const { data: rates } = useQuery<Record<string, number>>("finance_exchange_rates", undefined, {});
+  const { data: settings } = useQuery<{ defaultCurrency: string }>(
+    "finance_settings",
+    undefined,
+    {},
+  );
+  const baseCurrency = settings?.defaultCurrency ?? "USD";
   const { data: spendingReport } = useQuery<FinanceCategoryReport>(
     "finance_report_spending",
     undefined,
@@ -101,46 +106,67 @@ export function Finance() {
   useEvent<{ entityKind: string }>("entity:updated", refetchAll);
 
   const totalNet = useMemo(
-    () => netWorth.totalsByCurrency.reduce((s, c) => s + toVnd(c.net, c.currency, rates), 0),
+    () =>
+      netWorth.totalsByCurrency.reduce(
+        (s, c) => s + toBase(c.net, c.currency, rates, baseCurrency),
+        0,
+      ),
     [netWorth, rates],
   );
   const totalAssets = useMemo(
     () =>
       netWorth.totalsByCurrency.reduce(
-        (s, c) => s + toVnd(c.accounts + c.investments, c.currency, rates),
+        (s, c) => s + toBase(c.accounts + c.investments, c.currency, rates, baseCurrency),
         0,
       ),
     [netWorth, rates],
   );
   const totalDebt = useMemo(
     () =>
-      netWorth.totalsByCurrency.reduce((s, c) => s + toVnd(c.liabilities, c.currency, rates), 0),
+      netWorth.totalsByCurrency.reduce(
+        (s, c) => s + toBase(c.liabilities, c.currency, rates, baseCurrency),
+        0,
+      ),
     [netWorth, rates],
   );
 
-  const spendingSegs = useMemo(
+  // Compute spending from transactions client-side (currency-aware)
+  const totalSpend = useMemo(
     () =>
-      spendingReport.breakdown.map((b, i) => ({
-        name: b.category,
-        value: b.amount,
-        color: COLORS[i % COLORS.length],
-      })),
-    [spendingReport],
+      transactions
+        .filter((t) => t.txType === "expense")
+        .reduce((s, t) => s + toBase(t.amount, t.currency, rates, baseCurrency), 0),
+    [transactions, rates, baseCurrency],
   );
 
-  const totalSpend = spendingReport.total;
+  const spendingSegs = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const t of transactions.filter((t) => t.txType === "expense")) {
+      const base = toBase(t.amount, t.currency, rates, baseCurrency);
+      if (base > 0) m.set(t.category ?? "other", (m.get(t.category ?? "other") ?? 0) + base);
+    }
+    return [...m.entries()].map(([name, value], i) => ({
+      name,
+      value,
+      color: COLORS[i % COLORS.length],
+    }));
+  }, [transactions, rates, baseCurrency]);
+
   const totalIncome = useMemo(
     () =>
       transactions
         .filter((t) => t.txType === "income")
-        .reduce((s, t) => s + toVnd(t.amount, t.currency, rates), 0),
-    [transactions, rates],
+        .reduce((s, t) => s + toBase(t.amount, t.currency, rates, baseCurrency), 0),
+    [transactions, rates, baseCurrency],
   );
 
   const investSegs = useMemo(() => {
     const m = new Map<string, number>();
     for (const i of investments) {
-      m.set(i.assetType, (m.get(i.assetType) ?? 0) + toVnd(i.currentValue ?? 0, i.currency, rates));
+      m.set(
+        i.assetType,
+        (m.get(i.assetType) ?? 0) + toBase(i.currentValue ?? 0, i.currency, rates, baseCurrency),
+      );
     }
     return Array.from(m.entries())
       .sort((a, b) => b[1] - a[1])
@@ -184,7 +210,7 @@ export function Finance() {
           <Card className="p-4">
             <CardHeader title="Net Worth" />
             <p className="text-[28px] font-light text-primary tracking-tight leading-none mb-3 tabular-nums">
-              {fmtCompact(totalNet)}đ
+              {fmtCompact(totalNet, baseCurrency)}
             </p>
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
@@ -193,7 +219,7 @@ export function Finance() {
                   <span className="text-[10px] text-muted font-light">Assets</span>
                 </div>
                 <span className="text-[10px] text-success font-light tabular-nums">
-                  {fmtCompact(totalAssets)}đ
+                  {fmtCompact(totalAssets, baseCurrency)}
                 </span>
               </div>
               <div className="flex items-center justify-between">
@@ -202,7 +228,7 @@ export function Finance() {
                   <span className="text-[10px] text-muted font-light">Debt</span>
                 </div>
                 <span className="text-[10px] text-destructive font-light tabular-nums">
-                  {fmtCompact(totalDebt)}đ
+                  {fmtCompact(totalDebt, baseCurrency)}
                 </span>
               </div>
             </div>
@@ -223,7 +249,7 @@ export function Finance() {
             <div className="grid grid-cols-5 gap-3">
               {active.slice(0, 5).map((acct) => {
                 const Icon = ACCT_ICONS[acct.accountType] ?? Wallet;
-                const vnd = toVnd(acct.balance, acct.currency, rates);
+                const baseAmt = toBase(acct.balance, acct.currency, rates, baseCurrency);
                 return (
                   <div
                     key={acct.id}
@@ -251,8 +277,10 @@ export function Finance() {
                     <p className="text-[14px] font-light text-primary tabular-nums">
                       {fmtMoney(acct.balance, acct.currency)}
                     </p>
-                    {acct.currency !== "VND" && (
-                      <p className="text-[9px] text-dim font-light mt-0.5">≈ {fmtVnd(vnd)}</p>
+                    {acct.currency !== baseCurrency && (
+                      <p className="text-[9px] text-dim font-light mt-0.5">
+                        ≈ {fmtCompact(baseAmt, baseCurrency)}
+                      </p>
                     )}
                   </div>
                 );
@@ -329,7 +357,7 @@ export function Finance() {
             <Donut
               segments={spendingSegs}
               label="Total spending"
-              value={`${fmtCompact(totalSpend)}đ`}
+              value={fmtCompact(totalSpend, baseCurrency)}
             />
           </Card>
         </div>
@@ -399,13 +427,13 @@ export function Finance() {
               <div className="flex justify-between">
                 <span className="text-[10px] text-muted font-light">Income</span>
                 <span className="text-[10px] text-success font-light">
-                  {fmtCompact(totalIncome)}đ
+                  {fmtCompact(totalIncome, baseCurrency)}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-[10px] text-muted font-light">Spending</span>
                 <span className="text-[10px] text-destructive font-light">
-                  {fmtCompact(totalSpend)}đ
+                  {fmtCompact(totalSpend, baseCurrency)}
                 </span>
               </div>
               <div className="border-t border-white/[0.04] pt-2 flex justify-between">
@@ -422,7 +450,7 @@ export function Finance() {
             <Donut
               segments={investSegs}
               label="Portfolio"
-              value={`${fmtCompact(totalInvest)}đ`}
+              value={fmtCompact(totalInvest, baseCurrency)}
               size={130}
             />
             <div className="mt-3 pt-2.5 border-t border-white/[0.04] space-y-1.5">
@@ -475,7 +503,8 @@ export function Finance() {
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-[10px] text-dim font-light">
-                          {fmtCompact(g.currentAmount)} / {fmtCompact(g.targetAmount)}đ
+                          {fmtCompact(g.currentAmount, g.currency)} /{" "}
+                          {fmtCompact(g.targetAmount, g.currency)}
                         </span>
                         <span className="text-[10px] text-brand font-light">{p}%</span>
                       </div>
@@ -487,7 +516,7 @@ export function Finance() {
                       )}
                       {g.monthlyContribution && (
                         <span className="text-[9px] text-dim font-light">
-                          {fmtCompact(g.monthlyContribution)}đ/mo
+                          {fmtCompact(g.monthlyContribution, g.currency)}/mo
                         </span>
                       )}
                     </div>
@@ -543,7 +572,13 @@ export function Finance() {
             <div className="px-4 py-2.5 border-t border-white/[0.08] bg-white/[0.02] flex justify-between">
               <span className="text-[10px] font-light text-muted">Total Debt</span>
               <span className="text-[10px] font-light text-destructive">
-                {fmtVnd(liabilities.reduce((s, l) => s + toVnd(l.remaining, l.currency, rates), 0))}
+                {fmtCompact(
+                  liabilities.reduce(
+                    (s, l) => s + toBase(l.remaining, l.currency, rates, baseCurrency),
+                    0,
+                  ),
+                  baseCurrency,
+                )}
               </span>
             </div>
           </Card>

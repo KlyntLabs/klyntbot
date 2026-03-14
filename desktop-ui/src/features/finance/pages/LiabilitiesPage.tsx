@@ -10,7 +10,7 @@ import { Donut } from "../components/Donut";
 import { FinanceLayout } from "../components/FinanceLayout";
 import { FinanceSkeleton } from "../components/FinanceSkeleton";
 import { FormField, FormModal, fieldClass } from "../components/FormModal";
-import { COLORS, fmtCompact, fmtMoney, fmtVnd, LIAB_ICONS, pct, toVnd } from "../lib/finance";
+import { COLORS, fmtCompact, fmtMoney, LIAB_ICONS, pct, toBase } from "../lib/finance";
 
 export function FinanceLiabilities() {
   const {
@@ -20,19 +20,29 @@ export function FinanceLiabilities() {
     refetch,
   } = useQuery<FinanceLiability[]>("finance_liabilities", undefined, []);
   const { data: rates } = useQuery<Record<string, number>>("finance_exchange_rates", undefined, {});
+  const { data: settings } = useQuery<{ defaultCurrency: string }>(
+    "finance_settings",
+    undefined,
+    {},
+  );
+  const baseCurrency = settings?.defaultCurrency ?? "USD";
   useEvent<{ entityKind: string }>("entity:updated", refetch);
 
   const totalRemaining = useMemo(
-    () => liabilities.reduce((s, l) => s + toVnd(l.remaining, l.currency, rates), 0),
+    () => liabilities.reduce((s, l) => s + toBase(l.remaining, l.currency, rates, baseCurrency), 0),
     [liabilities, rates],
   );
   const totalPrincipal = useMemo(
-    () => liabilities.reduce((s, l) => s + toVnd(l.principal, l.currency, rates), 0),
+    () => liabilities.reduce((s, l) => s + toBase(l.principal, l.currency, rates, baseCurrency), 0),
     [liabilities, rates],
   );
   const totalPaid = totalPrincipal - totalRemaining;
   const monthlyTotal = useMemo(
-    () => liabilities.reduce((s, l) => s + toVnd(l.monthlyPayment ?? 0, l.currency, rates), 0),
+    () =>
+      liabilities.reduce(
+        (s, l) => s + toBase(l.monthlyPayment ?? 0, l.currency, rates, baseCurrency),
+        0,
+      ),
     [liabilities, rates],
   );
 
@@ -40,7 +50,7 @@ export function FinanceLiabilities() {
     () =>
       liabilities.map((l, i) => ({
         name: l.name,
-        value: toVnd(l.remaining, l.currency, rates),
+        value: toBase(l.remaining, l.currency, rates, baseCurrency),
         color: COLORS[i % COLORS.length],
       })),
     [liabilities, rates],
@@ -50,7 +60,7 @@ export function FinanceLiabilities() {
     const m = new Map<string, number>();
     for (const l of liabilities) {
       const t = l.liabilityType.replaceAll("_", " ");
-      m.set(t, (m.get(t) ?? 0) + toVnd(l.remaining, l.currency, rates));
+      m.set(t, (m.get(t) ?? 0) + toBase(l.remaining, l.currency, rates, baseCurrency));
     }
     return Array.from(m.entries())
       .sort((a, b) => b[1] - a[1])
@@ -127,7 +137,7 @@ export function FinanceLiabilities() {
               Total Debt
             </p>
             <p className="text-[20px] font-light text-destructive tabular-nums">
-              {fmtCompact(totalRemaining)}đ
+              {fmtCompact(totalRemaining, baseCurrency)}
             </p>
           </Card>
           <Card className="p-4">
@@ -135,7 +145,7 @@ export function FinanceLiabilities() {
               Total Paid
             </p>
             <p className="text-[20px] font-light text-success tabular-nums">
-              {fmtCompact(totalPaid)}đ
+              {fmtCompact(totalPaid, baseCurrency)}
             </p>
           </Card>
           <Card className="p-4">
@@ -151,7 +161,7 @@ export function FinanceLiabilities() {
               Monthly Payments
             </p>
             <p className="text-[20px] font-light text-brand tabular-nums">
-              {fmtCompact(monthlyTotal)}đ
+              {fmtCompact(monthlyTotal, baseCurrency)}
             </p>
           </Card>
         </div>
@@ -270,7 +280,7 @@ export function FinanceLiabilities() {
               <div className="mt-3 glass-card px-4 py-3 flex justify-between items-center">
                 <span className="text-[11px] font-light text-muted">Total Outstanding Debt</span>
                 <span className="text-[14px] font-light text-destructive">
-                  {fmtVnd(totalRemaining)}
+                  {fmtCompact(totalRemaining, baseCurrency)}
                 </span>
               </div>
             )}
@@ -284,7 +294,7 @@ export function FinanceLiabilities() {
               <Donut
                 segments={liabSegs}
                 label="Remaining"
-                value={`${fmtCompact(totalRemaining)}đ`}
+                value={fmtCompact(totalRemaining, baseCurrency)}
                 size={150}
               />
             </div>
@@ -295,7 +305,7 @@ export function FinanceLiabilities() {
               <Donut
                 segments={typeSegs}
                 label="By type"
-                value={`${fmtCompact(totalRemaining)}đ`}
+                value={fmtCompact(totalRemaining, baseCurrency)}
                 size={150}
               />
             </div>
@@ -315,7 +325,9 @@ export function FinanceLiabilities() {
                 ))}
               <div className="border-t border-white/[0.04] pt-2 flex justify-between">
                 <span className="text-[10px] text-muted font-light">Total Monthly</span>
-                <span className="text-[10px] text-brand font-light">{fmtVnd(monthlyTotal)}/mo</span>
+                <span className="text-[10px] text-brand font-light">
+                  {fmtCompact(monthlyTotal, baseCurrency)}/mo
+                </span>
               </div>
             </div>
           </Card>
