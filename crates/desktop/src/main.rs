@@ -123,7 +123,14 @@ fn run_mcp_stdio() {
         // Serve over stdio
         tracing::info!("Starting MCP server (stdio)");
         let transport = rmcp::transport::io::stdio();
-        let service = handler.serve(transport).await.expect("Failed to serve MCP");
+        let service = match handler.serve(transport).await {
+            Ok(s) => s,
+            Err(e) => {
+                tracing::error!("Failed to serve MCP: {e}");
+                app.shutdown().await;
+                return;
+            }
+        };
 
         tokio::select! {
             result = service.waiting() => {
