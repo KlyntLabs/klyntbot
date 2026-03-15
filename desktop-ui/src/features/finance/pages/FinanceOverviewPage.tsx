@@ -123,22 +123,6 @@ export function Finance() {
     [liabilities],
   );
 
-  const totalSpend = useMemo(
-    () =>
-      transactions
-        .filter((t) => t.txType === "expense")
-        .reduce((s, t) => s + (t.baseAmount ?? 0), 0),
-    [transactions],
-  );
-
-  const totalIncome = useMemo(
-    () =>
-      transactions
-        .filter((t) => t.txType === "income")
-        .reduce((s, t) => s + (t.baseAmount ?? 0), 0),
-    [transactions],
-  );
-
   const totalInvest = useMemo(
     () => investments.reduce((s, i) => s + (i.baseCurrentValue ?? 0), 0),
     [investments],
@@ -150,8 +134,8 @@ export function Finance() {
   const healthScore = useMemo(
     () =>
       computeHealthScore({
-        totalIncome,
-        totalSpending: totalSpend,
+        totalIncome: monthlySummary.currentIncome,
+        totalSpending: monthlySummary.currentSpending,
         totalAssets,
         totalDebt,
         budgets: budgets
@@ -159,7 +143,7 @@ export function Finance() {
           .map((b) => ({ spent: b.spent, amount: b.amount })),
         goals: goals.map((g) => ({ currentAmount: g.currentAmount, targetAmount: g.targetAmount })),
       }),
-    [transactions, accounts, investments, liabilities, budgets, goals],
+    [monthlySummary, accounts, investments, liabilities, budgets, goals],
   );
 
   const pulseRows = useMemo(() => computeMonthlyPulse(monthlySummary), [monthlySummary]);
