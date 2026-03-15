@@ -199,20 +199,36 @@ impl LauncherSearchEngine {
     }
 
     async fn apply_frequency_boosts(&self, items: &mut [LauncherItem]) {
-        for item in items.iter_mut() {
-            let kind_str = match &item.kind {
-                LauncherItemKind::Application { .. } => "app",
-                LauncherItemKind::Task { .. } => "task",
-                LauncherItemKind::Note { .. } => "note",
-                LauncherItemKind::ClipboardEntry { .. } => "clip",
-                LauncherItemKind::SystemCommand { .. } => "system",
-                LauncherItemKind::Script { .. } => "script",
-                LauncherItemKind::Calculator { .. } => continue,
-                LauncherItemKind::Calendar { .. } => "calendar",
-                LauncherItemKind::AiChat { .. } => continue,
-            };
-            if let Ok(boost) = self.frequency_repo.get_boost(&item.id, kind_str).await {
-                item.score += boost * 0.1;
+        // Collect (item_id, kind) pairs for boostable items
+        let pairs: Vec<(usize, String, String)> = items
+            .iter()
+            .enumerate()
+            .filter_map(|(i, item)| {
+                let kind_str = match &item.kind {
+                    LauncherItemKind::Application { .. } => "app",
+                    LauncherItemKind::Task { .. } => "task",
+                    LauncherItemKind::Note { .. } => "note",
+                    LauncherItemKind::ClipboardEntry { .. } => "clip",
+                    LauncherItemKind::SystemCommand { .. } => "system",
+                    LauncherItemKind::Script { .. } => "script",
+                    LauncherItemKind::Calculator { .. } => return None,
+                    LauncherItemKind::Calendar { .. } => "calendar",
+                    LauncherItemKind::AiChat { .. } => return None,
+                };
+                Some((i, item.id.clone(), kind_str.to_string()))
+            })
+            .collect();
+
+        if pairs.is_empty() {
+            return;
+        }
+
+        let batch_keys: Vec<(String, String)> =
+            pairs.iter().map(|(_, id, k)| (id.clone(), k.clone())).collect();
+
+        if let Ok(boosts) = self.frequency_repo.get_boosts_batch(&batch_keys).await {
+            for ((idx, _, _), boost) in pairs.iter().zip(boosts.iter()) {
+                items[*idx].score += boost * 0.1;
             }
         }
     }

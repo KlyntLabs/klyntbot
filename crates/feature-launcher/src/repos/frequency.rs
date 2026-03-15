@@ -44,13 +44,41 @@ impl FrequencyRepo {
         Ok((count as f64 + 1.0).log2())
     }
 
+    /// Fetch boosts for multiple items in a single query.
+    /// Returns boosts in the same order as the input items.
     pub async fn get_boosts_batch(
         &self,
         items: &[(String, String)],
     ) -> Result<Vec<f64>, StorageError> {
+        if items.is_empty() {
+            return Ok(vec![]);
+        }
+
+        // Build a single query with OR clauses
+        let conditions: Vec<String> = items
+            .iter()
+            .enumerate()
+            .map(|(i, _)| format!("(item_id = ?{} AND kind = ?{})", i * 2 + 1, i * 2 + 2))
+            .collect();
+        let sql = format!(
+            "SELECT item_id, kind, count FROM launcher_frequencies WHERE {}",
+            conditions.join(" OR ")
+        );
+
+        let mut query = sqlx::query_as::<_, (String, String, i64)>(&sql);
+        for (item_id, kind) in items {
+            query = query.bind(item_id).bind(kind);
+        }
+        let rows = query.fetch_all(&self.pool).await?;
+
+        // Map results back to input order
         let mut boosts = Vec::with_capacity(items.len());
         for (item_id, kind) in items {
-            boosts.push(self.get_boost(item_id, kind).await?);
+            let count = rows
+                .iter()
+                .find(|(id, k, _)| id == item_id && k == kind)
+                .map_or(0, |(_, _, c)| *c);
+            boosts.push((count as f64 + 1.0).log2());
         }
         Ok(boosts)
     }
@@ -98,5 +126,24 @@ mod tests {
         let frequent_boost = repo.get_boost("frequent", "app").await.unwrap();
         let rare_boost = repo.get_boost("rare", "app").await.unwrap();
         assert!(frequent_boost > rare_boost);
+    }
+
+    #[tokio::test]
+    async fn test_batch_boosts_single_query() {
+        let repo = setup().await;
+        for _ in 0..5 {
+            repo.increment("safari", "app").await.unwrap();
+        }
+        repo.increment("slack", "app").await.unwrap();
+
+        let items = vec![
+            ("safari".to_string(), "app".to_string()),
+            ("slack".to_string(), "app".to_string()),
+            ("missing".to_string(), "app".to_string()),
+        ];
+        let boosts = repo.get_boosts_batch(&items).await.unwrap();
+        assert_eq!(boosts.len(), 3);
+        assert!(boosts[0] > boosts[1]); // safari > slack
+        assert!((boosts[2] - 0.0).abs() < f64::EPSILON); // missing = log2(1) = 0
     }
 }

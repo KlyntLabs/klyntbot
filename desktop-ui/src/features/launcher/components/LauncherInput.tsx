@@ -1,3 +1,5 @@
+import { isTauri } from "@shared/lib/utils";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useRef } from "react";
 import { useLauncherStore } from "../stores/launcherStore";
 
@@ -6,8 +8,26 @@ export function LauncherInput() {
   const query = useLauncherStore((s) => s.query);
   const setQuery = useLauncherStore((s) => s.setQuery);
 
+  // Focus on mount
   useEffect(() => {
     inputRef.current?.focus();
+  }, []);
+
+  // Re-focus when the window becomes visible (global shortcut)
+  useEffect(() => {
+    if (!isTauri) return;
+    let unlisten: (() => void) | undefined;
+    getCurrentWindow()
+      .onFocusChanged(({ payload: focused }) => {
+        if (focused) {
+          // Small delay lets the window finish animating before we grab focus
+          setTimeout(() => inputRef.current?.focus(), 50);
+        }
+      })
+      .then((fn) => {
+        unlisten = fn;
+      });
+    return () => unlisten?.();
   }, []);
 
   return (

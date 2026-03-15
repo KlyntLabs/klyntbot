@@ -35,7 +35,8 @@ pub(super) async fn init_launcher(
 
     let frequency_repo = FrequencyRepo::new(pool.clone());
     let clipboard_repo = ClipboardRepo::new(pool);
-    let app_index = AppIndex::new();
+    let icon_cache_dir = config.data_dir_path().join("cache").join("app-icons");
+    let app_index = AppIndex::with_cache_dir(icon_cache_dir);
     let script_runner = ScriptRunner::new();
 
     // Discover scripts from data dir

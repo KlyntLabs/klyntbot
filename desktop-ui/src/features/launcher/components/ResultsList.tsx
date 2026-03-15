@@ -66,7 +66,7 @@ function ResultRow({
       }}
       onMouseEnter={onMouseEnter}
     >
-      <ItemIcon kind={item.kind.type} />
+      <ItemIcon kind={item.kind.type} icon={item.icon} />
       <div className="flex-1 min-w-0">
         <div className="text-sm text-foreground truncate">{item.title}</div>
         {item.subtitle && <div className="text-xs text-muted truncate">{item.subtitle}</div>}
@@ -88,7 +88,10 @@ const ICON_MAP: Record<string, string> = {
   aiChat: "\u2728",
 };
 
-function ItemIcon({ kind }: { kind: string }) {
+function ItemIcon({ kind, icon }: { kind: string; icon?: string | null }) {
+  if (icon?.startsWith("data:")) {
+    return <img src={icon} alt="" className="w-6 h-6 shrink-0 rounded" />;
+  }
   return (
     <span className="w-6 h-6 flex items-center justify-center text-sm shrink-0">
       {ICON_MAP[kind] || "\u2022"}
