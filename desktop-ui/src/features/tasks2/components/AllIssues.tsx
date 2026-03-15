@@ -1,7 +1,6 @@
 import { useCallback, useMemo } from "react";
 import type { UseTasksResult } from "../hooks/useTasks";
 import { filterIssues } from "../lib/mappers";
-import { status as allStatus } from "../lib/status-icons";
 import { useFilterStore } from "../store/filter-store";
 import { useSearchStore } from "../store/search-store";
 import { IssueBoard } from "./IssueBoard";
@@ -23,14 +22,11 @@ export default function AllIssues({ tasksData }: AllIssuesProps) {
   );
 
   const handleUpdateStatus = useCallback(
-    (issueId: string, statusId: string) => {
-      // statusId is the UI status id (e.g. "in-progress"). Find the backend value.
-      const statusDef = allStatus.find((s) => s.id === statusId);
-      if (statusDef) {
-        updateTask.mutate({ id: issueId, status: statusDef.backendStatus });
-      }
+    async (issueId: string, status: string, statusLabelId: string | null) => {
+      await updateTask.mutate({ id: issueId, status, statusLabelId });
+      tasksData.refetch();
     },
-    [updateTask],
+    [updateTask, tasksData],
   );
 
   if (isSearchOpen) {
