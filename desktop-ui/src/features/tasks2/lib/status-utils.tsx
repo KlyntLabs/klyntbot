@@ -1,6 +1,5 @@
-import type React from "react";
-import { StatusIcon } from "./status-icons";
+import { StatusIcon, type Status } from "./status-icons";
 
-export function renderStatusIcon(statusId: string): React.ReactElement | null {
-  return <StatusIcon statusId={statusId} />;
+export function renderStatusIcon(status: Status, className?: string) {
+  return <StatusIcon status={status} className={className} />;
 }
