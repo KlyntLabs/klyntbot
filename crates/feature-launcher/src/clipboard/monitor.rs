@@ -56,7 +56,7 @@ impl ClipboardMonitor {
 
     #[cfg(target_os = "macos")]
     fn get_frontmost_app_name(&self) -> Option<String> {
-        platform_macos::window::get_frontmost_window().map(|w| w.app_name)
+        platform_macos::window::get_frontmost_app_name()
     }
 
     #[cfg(not(target_os = "macos"))]

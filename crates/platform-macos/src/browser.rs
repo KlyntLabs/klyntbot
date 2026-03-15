@@ -12,7 +12,7 @@ pub struct BrowserDef {
     /// Chromium user-data profile subdirectory under ~/Library/Application Support/
     /// (None for non-Chromium browsers).
     pub profile_dir: Option<&'static str>,
-    /// Suffix appended to window titles by this browser.
+    /// Suffix appended to window titles by this browser (mixed case, matched case-insensitively).
     pub title_suffix: &'static str,
 }
 
@@ -87,38 +87,37 @@ pub const BROWSERS: &[BrowserDef] = &[
 ];
 
 /// Check whether an app is a known browser by name or bundle ID.
+/// Uses case-insensitive comparison without allocating.
 pub fn is_browser(app_name: &str, bundle_id: Option<&str>) -> bool {
-    let name_lower = app_name.to_lowercase();
-    for b in BROWSERS {
-        if name_lower == b.name.to_lowercase() {
-            return true;
-        }
-    }
-    if let Some(bid) = bundle_id {
-        let bid_lower = bid.to_lowercase();
-        for b in BROWSERS {
-            if !b.bundle_prefix.is_empty() && bid_lower.starts_with(b.bundle_prefix) {
-                return true;
-            }
-        }
-    }
-    false
+    BROWSERS.iter().any(|b| {
+        app_name.eq_ignore_ascii_case(b.name)
+            || (bundle_id.is_some()
+                && !b.bundle_prefix.is_empty()
+                && bundle_id
+                    .unwrap()
+                    .to_ascii_lowercase()
+                    .starts_with(b.bundle_prefix))
+    })
 }
 
 /// Resolve a Chromium-based browser's profile directory.
 ///
-/// The `browser_name` should be a short key: `"chrome"`, `"arc"`, `"brave"`, or `"edge"`.
-/// Returns `~/Library/Application Support/<profile_dir>` or `None` for unknown/non-Chromium browsers.
+/// Accepts short keys (`"chrome"`, `"arc"`) or full names (`"Google Chrome"`).
+/// Looks up from the `BROWSERS` registry. Returns `~/Library/Application Support/<profile_dir>`.
 pub fn chromium_profile_dir(browser_name: &str) -> Option<PathBuf> {
     let home = std::env::var("HOME").ok()?;
     let app_support = PathBuf::from(&home).join("Library/Application Support");
-    match browser_name {
-        "chrome" => Some(app_support.join("Google/Chrome/Default")),
-        "arc" => Some(app_support.join("Arc/User Data/Default")),
-        "brave" => Some(app_support.join("BraveSoftware/Brave-Browser/Default")),
-        "edge" => Some(app_support.join("Microsoft Edge/Default")),
-        _ => None,
-    }
+
+    let query = browser_name.to_ascii_lowercase();
+    BROWSERS
+        .iter()
+        .find(|b| {
+            b.profile_dir.is_some()
+                && (b.name.to_ascii_lowercase() == query
+                    || b.name.to_ascii_lowercase().contains(&query))
+        })
+        .and_then(|b| b.profile_dir)
+        .map(|dir| app_support.join(dir))
 }
 
 /// Extract a human-readable site name from a browser window title by stripping
@@ -129,7 +128,8 @@ pub fn chromium_profile_dir(browser_name: &str) -> Option<PathBuf> {
 pub fn extract_site_name(window_title: &str) -> Option<String> {
     let title_lower = window_title.to_lowercase();
     for b in BROWSERS {
-        let suffix_lower = b.title_suffix.to_lowercase();
+        // title_suffix is already ASCII — lowercase it at compile-time equivalent cost
+        let suffix_lower = b.title_suffix.to_ascii_lowercase();
         if let Some(pos) = title_lower.rfind(&suffix_lower) {
             let name = window_title[..pos].trim();
             if name.is_empty() {
@@ -151,9 +151,7 @@ pub fn get_browser_url(app_name: &str, bundle_id: Option<&str>) -> Option<String
         return None;
     }
 
-    let name_lower = app_name.to_lowercase();
-
-    let script = if name_lower == "safari" {
+    let script = if app_name.eq_ignore_ascii_case("safari") {
         r#"tell application "Safari" to get URL of front document"#.to_string()
     } else {
         // Chrome, Brave, Vivaldi, Edge, Opera, Arc, Chromium all use Chrome's scripting API
@@ -225,9 +223,8 @@ mod tests {
 
     #[test]
     fn test_chromium_profile_dir() {
-        // Can't check exact path (depends on HOME), but check that known browsers return Some
-        // and unknown return None
         assert!(chromium_profile_dir("chrome").is_some());
+        assert!(chromium_profile_dir("Google Chrome").is_some());
         assert!(chromium_profile_dir("arc").is_some());
         assert!(chromium_profile_dir("brave").is_some());
         assert!(chromium_profile_dir("edge").is_some());

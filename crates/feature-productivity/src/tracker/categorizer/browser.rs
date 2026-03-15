@@ -1,19 +1,15 @@
-/// Browser name suffixes typically appended to window titles (pre-lowercased
-/// to avoid allocating on every call to `extract_site_name`).
-pub(super) const BROWSER_SUFFIXES: &[&str] = &[
-    " - google chrome",
-    " - mozilla firefox",
-    " - safari",
-    " - arc",
-    " - brave",
-    " - vivaldi",
-    " - microsoft edge",
-    " - opera",
-    " - chromium",
-    " — mozilla firefox",
-    " — safari",
-    " - zen browser",
-];
+/// Build browser suffixes from the shared platform-macos registry.
+/// Returns lowercase suffixes for case-insensitive matching.
+fn browser_suffixes() -> Vec<String> {
+    let mut suffixes: Vec<String> = platform_macos::browser::BROWSERS
+        .iter()
+        .map(|b| b.title_suffix.to_ascii_lowercase())
+        .collect();
+    // Add em-dash variants for browsers that commonly use them
+    suffixes.push(" \u{2014} mozilla firefox".to_string());
+    suffixes.push(" \u{2014} safari".to_string());
+    suffixes
+}
 
 /// Known site keywords -> domain display name.
 /// Checked against the lowercased title. Order matters: first match wins.
@@ -160,10 +156,11 @@ pub fn is_browser(app_name: &str, bundle_id: Option<&str>) -> bool {
 pub fn extract_site_name(window_title: &str) -> String {
     let mut title = window_title;
 
-    // Strip browser suffix (case-insensitive check using pre-lowercased suffixes)
+    // Strip browser suffix (case-insensitive check against shared registry)
     let title_lower = title.to_lowercase();
-    for suffix in BROWSER_SUFFIXES {
-        if let Some(pos) = title_lower.rfind(suffix) {
+    let suffixes = browser_suffixes();
+    for suffix in &suffixes {
+        if let Some(pos) = title_lower.rfind(suffix.as_str()) {
             title = &title[..pos];
             break;
         }

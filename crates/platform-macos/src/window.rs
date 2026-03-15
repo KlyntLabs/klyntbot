@@ -52,6 +52,23 @@ pub fn get_frontmost_window() -> Option<WindowInfo> {
     None
 }
 
+/// Lightweight: get only the frontmost app's name without AX/CG title lookups.
+/// Use this when you only need the app name (e.g., clipboard source tracking).
+#[cfg(target_os = "macos")]
+pub fn get_frontmost_app_name() -> Option<String> {
+    use objc2_app_kit::NSWorkspace;
+
+    let workspace = NSWorkspace::sharedWorkspace();
+    let app = workspace.frontmostApplication()?;
+    let name = app.localizedName()?;
+    Some(name.to_string())
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn get_frontmost_app_name() -> Option<String> {
+    None
+}
+
 /// Extract the focused window title using the Accessibility API.
 #[cfg(target_os = "macos")]
 fn get_window_title_ax(pid: i32) -> Option<String> {
@@ -230,21 +247,8 @@ pub fn get_screen_frame() -> (f64, f64, f64, f64) {
 pub fn set_window_frame(pid: i32, x: f64, y: f64, w: f64, h: f64) -> bool {
     use core_foundation::base::TCFType;
     use core_foundation::string::CFString;
+    use core_graphics::geometry::{CGPoint, CGSize};
     use std::ptr;
-
-    #[repr(C)]
-    #[derive(Clone, Copy)]
-    struct CGPoint {
-        x: f64,
-        y: f64,
-    }
-
-    #[repr(C)]
-    #[derive(Clone, Copy)]
-    struct CGSize {
-        width: f64,
-        height: f64,
-    }
 
     const AX_VALUE_TYPE_CGPOINT: u32 = 1;
     const AX_VALUE_TYPE_CGSIZE: u32 = 2;
@@ -287,7 +291,7 @@ pub fn set_window_frame(pid: i32, x: f64, y: f64, w: f64, h: f64) -> bool {
         }
 
         // Set position
-        let position = CGPoint { x, y };
+        let position = CGPoint::new(x, y);
         let position_value = AXValueCreate(
             AX_VALUE_TYPE_CGPOINT,
             &position as *const CGPoint as *const std::ffi::c_void,
@@ -309,10 +313,7 @@ pub fn set_window_frame(pid: i32, x: f64, y: f64, w: f64, h: f64) -> bool {
         }
 
         // Set size
-        let size = CGSize {
-            width: w,
-            height: h,
-        };
+        let size = CGSize::new(w, h);
         let size_value = AXValueCreate(
             AX_VALUE_TYPE_CGSIZE,
             &size as *const CGSize as *const std::ffi::c_void,
