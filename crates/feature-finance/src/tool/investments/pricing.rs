@@ -17,10 +17,7 @@ impl FinanceTool {
         inv: &FinanceInvestmentRow,
         current_value: i64,
     ) -> (i64, f64) {
-        let market_currency = inv
-            .market_currency
-            .as_deref()
-            .unwrap_or(&inv.currency);
+        let market_currency = inv.market_currency.as_deref().unwrap_or(&inv.currency);
 
         if market_currency.eq_ignore_ascii_case(&self.default_currency) {
             return (current_value, 1.0);
@@ -88,7 +85,13 @@ impl FinanceTool {
             if self
                 .storage
                 .investments
-                .update_price(&inv.id, price_int, current_value, base_current_value, market_rate)
+                .update_price(
+                    &inv.id,
+                    price_int,
+                    current_value,
+                    base_current_value,
+                    market_rate,
+                )
                 .await
                 .is_ok()
             {
@@ -130,7 +133,13 @@ impl FinanceTool {
                     match self
                         .storage
                         .investments
-                        .update_price(&inv.id, price_int, current_value, base_current_value, market_rate)
+                        .update_price(
+                            &inv.id,
+                            price_int,
+                            current_value,
+                            base_current_value,
+                            market_rate,
+                        )
                         .await
                     {
                         Ok(_) => {

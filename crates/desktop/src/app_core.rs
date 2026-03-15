@@ -152,6 +152,39 @@ fn wire_event_channels(core: &AppCore, channels: EventChannels, app_handle: &tau
         });
     }
 
+    // Distraction alerts → Tauri events (intervention overlay + detected banner)
+    if let Some(distraction_rx) = channels.distraction_alert_rx {
+        spawn_channel_forwarder(distraction_rx, app_handle, shutdown, |handle, alert| {
+            // Emit intervention event (for DistractionOverlay.tsx)
+            let intervention = events::InterventionPayload {
+                app_name: alert.app_name.clone(),
+                window_title: alert.window_title, // moved — not needed by detected payload
+                session_id: alert.session_id.clone(),
+                needs_llm: alert.needs_llm,
+                heuristic_verdict: if alert.needs_llm {
+                    "ambiguous".to_string()
+                } else {
+                    "confident_distracting".to_string()
+                },
+            };
+            if let Err(e) = handle.emit(events::DISTRACTION_INTERVENTION, intervention) {
+                warn!("failed to emit distraction intervention: {e}");
+            }
+
+            // Emit detected event (for DistractionInterventionBanner.tsx)
+            let detected = events::DistractionDetectedPayload {
+                app_name: alert.app_name,
+                session_id: alert.session_id,
+                previous_app: alert.previous_app,
+                previous_context: alert.previous_context,
+                reason: "Distracting app detected during focus session".to_string(),
+            };
+            if let Err(e) = handle.emit(events::DISTRACTION_DETECTED, detected) {
+                warn!("failed to emit distraction detected: {e}");
+            }
+        });
+    }
+
     // Coaching interventions → Tauri event + tray popup when main window is unfocused
     spawn_channel_forwarder(
         channels.intervention_rx,

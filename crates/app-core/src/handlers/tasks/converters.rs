@@ -68,8 +68,12 @@ pub fn action_to_today_task(row: &TaskRow, now: DateTime<Utc>) -> TodayTaskRespo
             }
         })
     } else if is_due_today {
-        row.due_date
-            .map(|d| format!("Due {}", d.with_timezone(&chrono::Local).format("%-I:%M %p")))
+        row.due_date.map(|d| {
+            format!(
+                "Due {}",
+                d.with_timezone(&chrono::Local).format("%-I:%M %p")
+            )
+        })
     } else {
         row.due_date.map(|d| d.format("%b %-d").to_string())
     };

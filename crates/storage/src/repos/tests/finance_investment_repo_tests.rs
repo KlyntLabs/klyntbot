@@ -177,7 +177,10 @@ mod tests {
         repo.add_investment(&sample_investment(&inv_id, &port_id))
             .await
             .unwrap();
-        let updated = repo.update_price(&inv_id, 50_000, 5_000_000, 5_000_000, 1.0).await.unwrap();
+        let updated = repo
+            .update_price(&inv_id, 50_000, 5_000_000, 5_000_000, 1.0)
+            .await
+            .unwrap();
         assert_eq!(updated.current_price, Some(50_000));
         assert_eq!(updated.current_value, Some(5_000_000));
         assert_eq!(updated.base_current_value, 5_000_000);

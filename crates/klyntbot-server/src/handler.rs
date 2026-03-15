@@ -172,10 +172,7 @@ fn emit_entity_update_for_tool(
     tool_name: &str,
     params: &serde_json::Value,
 ) {
-    let action = params
-        .get("action")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
+    let action = params.get("action").and_then(|v| v.as_str()).unwrap_or("");
 
     if READ_ONLY_ACTIONS.contains(&action) {
         return;
@@ -193,10 +190,7 @@ fn emit_entity_update_for_tool(
         _ => return,
     };
 
-    let id = params
-        .get("id")
-        .and_then(|v| v.as_str())
-        .unwrap_or("*");
+    let id = params.get("id").and_then(|v| v.as_str()).unwrap_or("*");
 
     emitter.emit_entity_updated(entity_kind.clone(), id);
 

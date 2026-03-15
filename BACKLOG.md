@@ -177,6 +177,85 @@ These items were identified during the 2026-03-12 structural refactor analysis.
 
 ---
 
+## Section E — Distraction Monitor Follow-ups
+
+Items identified during the 2026-03-15 DistractionMonitor implementation code review.
+
+---
+
+### E-001 🟡 Medium | `feature-productivity` — DistractionMonitor Queries DB on Every Tick
+
+**Summary:** `FocusManager::get_active()` hits SQLite on every non-idle activity tick. When no focus session is active (the common case), this is pure waste. The codebase already has a `FOCUS_ACTIVE` atomic flag pattern (used by the tray countdown).
+
+**Impact:** Unnecessary DB load on the hot path (~1 query/sec during tracking).
+
+**Proposed Fix:**
+- Gate the `get_active()` call behind the existing `FOCUS_ACTIVE` atomic flag
+- Only query the DB when the flag indicates a session is running
+
+**References:** `crates/feature-productivity/src/distraction/monitor.rs:L116`, `crates/desktop/src/tray_countdown.rs` (FOCUS_ACTIVE pattern)
+
+---
+
+### E-002 🟡 Medium | `feature-productivity` — DistractionInterceptor Mutex Held Across DB Call
+
+**Summary:** `DistractionMonitor::process_tick` holds `Mutex<DistractionInterceptor>` for the entire duration of `evaluate()`, which includes DB queries to `learned_rules_repo`. This serializes all tick processing during focus sessions.
+
+**Impact:** Tick processing latency during focus sessions. Single-user app so unlikely to cause real contention, but the lock scope is wider than necessary.
+
+**Proposed Fix:**
+- Split interceptor into lock-free read path (whitelist/temp_pass checks) and separate DB query path
+- Or narrow lock scope: check in-memory state under lock, release, then do DB query
+
+**References:** `crates/feature-productivity/src/distraction/monitor.rs:L147-L153`, `crates/feature-productivity/src/distraction/interceptor.rs:L68`
+
+---
+
+### E-003 🟢 Low | `feature-productivity` — Test Helper `setup_pool()` Duplicated Across 28+ Files
+
+**Summary:** The test helper `setup_pool()` (connect in-memory SQLite + run productivity migrations) is copy-pasted in 28+ test modules across `feature-productivity`. The distraction monitor adds a 29th copy.
+
+**Proposed Fix:**
+- Create `#[cfg(test)] pub(crate) mod test_utils` in `feature-productivity/src/`
+- Move `setup_pool()` and `make_tick()` helpers there
+- Update all existing test modules to use the shared helpers
+
+**References:** `crates/feature-productivity/src/distraction/monitor.rs:L207-L217`
+
+---
+
+### E-004 🟢 Low | `desktop-shared` — Dead Distraction Event Constants
+
+**Summary:** `PRODUCTIVITY_DISTRACTION` constant and `DistractionPayload` struct are defined but never used anywhere. They were superseded by `DISTRACTION_INTERVENTION` / `InterventionPayload` and `DISTRACTION_DETECTED` / `DistractionDetectedPayload`.
+
+**Proposed Fix:** Remove `PRODUCTIVITY_DISTRACTION` and `DistractionPayload` from `events.rs`.
+
+**References:** `crates/desktop-shared/src/events.rs:L57`, `crates/desktop-shared/src/events.rs:L282-L285`
+
+---
+
+### E-005 🟢 Low | `desktop-shared` — `heuristic_verdict` Is Stringly-Typed
+
+**Summary:** `InterventionPayload.heuristic_verdict` is `String` with magic values `"ambiguous"` and `"confident_distracting"`. No compiler enforcement of valid values.
+
+**Proposed Fix:**
+- Define `HeuristicVerdict` enum in `desktop-shared` with `Serialize`/`Deserialize`
+- Change `InterventionPayload.heuristic_verdict` to use the enum type
+
+**References:** `crates/desktop-shared/src/events.rs:L300-L306`, `crates/desktop/src/app_core.rs:L164-L168`
+
+---
+
+### E-006 🟢 Low | `app-core` — 10-Element Tuple in `init_productivity`
+
+**Summary:** `init_productivity` uses a 10-element tuple to destructure optional results, requiring three identical `(None, None, ..., None)` sites. `ProductivityResult` struct already exists but the tuple re-introduces the brittleness.
+
+**Proposed Fix:** Build `ProductivityResult` directly inside each branch instead of using the tuple intermediary.
+
+**References:** `crates/app-core/src/init/productivity.rs:L41-L62`
+
+---
+
 ## Section D — Technical Debt Without Immediate Fix
 
 | ID | Priority | Crate | Description |

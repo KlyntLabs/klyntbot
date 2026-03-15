@@ -22,6 +22,8 @@ pub(super) struct ProductivityResult {
         Option<Arc<Mutex<feature_productivity::distraction::DistractionInterceptor>>>,
     pub auto_focus_rx: Option<mpsc::Receiver<AutoFocusEvent>>,
     pub nudge_rx: Option<mpsc::Receiver<feature_productivity::types::NudgeRecord>>,
+    pub distraction_alert_rx:
+        Option<tokio::sync::mpsc::Receiver<feature_productivity::distraction::DistractionAlert>>,
     pub dashboard_tick_rx:
         Option<tokio::sync::broadcast::Receiver<feature_productivity::ActivityTick>>,
 }
@@ -43,6 +45,7 @@ pub(super) async fn init_productivity(
         aggregator,
         nudge_service,
         distraction_interceptor,
+        distraction_alert_rx,
         auto_focus_rx,
         nudge_rx,
         dashboard_tick_rx,
@@ -56,7 +59,7 @@ pub(super) async fn init_productivity(
         .await
         {
             error!("productivity migration failed — feature disabled: {e}");
-            (None, None, None, None, None, None, None, None, None)
+            (None, None, None, None, None, None, None, None, None, None)
         } else {
             let prod_repos = ProductivityRepos::new(pool);
             let prod_config = &config.productivity;
@@ -93,6 +96,19 @@ pub(super) async fn init_productivity(
             let dashboard_tick_rx = Some(engine.subscribe());
 
             engine.start();
+
+            // Start distraction monitor — watches for distracting apps during focus sessions.
+            let distraction_alert_rx = {
+                let monitor_rx = engine.subscribe();
+                let monitor = feature_productivity::distraction::DistractionMonitor::new(
+                    monitor_rx,
+                    Arc::clone(&mgr),
+                    Arc::clone(&interceptor),
+                    prod_config.focus.clone(),
+                    shutdown_token.child_token(),
+                );
+                Some(monitor.start())
+            };
 
             // Wire ProductivityIntelligenceLayer — subscribes to tick broadcast
             // for classification, session aggregation, quality scoring, and interventions.
@@ -144,13 +160,14 @@ pub(super) async fn init_productivity(
                 Some(agg),
                 Some(nudge_svc),
                 Some(interceptor),
+                distraction_alert_rx,
                 auto_focus_rx,
                 Some(nudge_rx),
                 dashboard_tick_rx,
             )
         }
     } else {
-        (None, None, None, None, None, None, None, None, None)
+        (None, None, None, None, None, None, None, None, None, None)
     };
 
     ProductivityResult {
@@ -161,6 +178,7 @@ pub(super) async fn init_productivity(
         aggregator,
         nudge_service,
         distraction_interceptor,
+        distraction_alert_rx,
         auto_focus_rx,
         nudge_rx,
         dashboard_tick_rx,

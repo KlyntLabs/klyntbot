@@ -541,7 +541,10 @@ async fn net_worth_calculation() {
     assert_eq!(v["base_currency"], "VND", "base_currency should be VND");
     // accounts = 100000, liabilities = 200000, net = -100000
     let nw = v["net_worth"].as_i64().unwrap();
-    assert!(nw < 0, "net worth should be negative (more liabilities): {nw}");
+    assert!(
+        nw < 0,
+        "net worth should be negative (more liabilities): {nw}"
+    );
 
     // Cleanup
     let _ = tool

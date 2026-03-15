@@ -89,7 +89,10 @@ impl AppIndex {
                 id: format!("app:{}", app.path.display()),
                 title: app.name.clone(),
                 subtitle: Some(app.path.display().to_string()),
-                icon: app.icon_data.clone().or_else(|| Some("app-window".to_string())),
+                icon: app
+                    .icon_data
+                    .clone()
+                    .or_else(|| Some("app-window".to_string())),
                 kind: LauncherItemKind::Application {
                     path: app.path.clone(),
                     running: false,
@@ -157,8 +160,7 @@ impl AppIndex {
                         // Cache hit — read PNG and encode
                         if let Ok(png_bytes) = std::fs::read(&cached_png) {
                             use base64::Engine;
-                            let b64 =
-                                base64::engine::general_purpose::STANDARD.encode(&png_bytes);
+                            let b64 = base64::engine::general_purpose::STANDARD.encode(&png_bytes);
                             return (Some(format!("data:image/png;base64,{b64}")), true);
                         }
                     }
@@ -191,12 +193,7 @@ impl AppIndex {
     fn get_mtime(path: &Path) -> Option<u64> {
         let meta = std::fs::metadata(path).ok()?;
         let mtime = meta.modified().ok()?;
-        Some(
-            mtime
-                .duration_since(std::time::UNIX_EPOCH)
-                .ok()?
-                .as_secs(),
-        )
+        Some(mtime.duration_since(std::time::UNIX_EPOCH).ok()?.as_secs())
     }
 
     /// Extract an app's icon as a base64 data URI using sips.

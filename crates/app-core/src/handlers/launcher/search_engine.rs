@@ -223,8 +223,10 @@ impl LauncherSearchEngine {
             return;
         }
 
-        let batch_keys: Vec<(String, String)> =
-            pairs.iter().map(|(_, id, k)| (id.clone(), k.clone())).collect();
+        let batch_keys: Vec<(String, String)> = pairs
+            .iter()
+            .map(|(_, id, k)| (id.clone(), k.clone()))
+            .collect();
 
         if let Ok(boosts) = self.frequency_repo.get_boosts_batch(&batch_keys).await {
             for ((idx, _, _), boost) in pairs.iter().zip(boosts.iter()) {

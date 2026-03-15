@@ -30,6 +30,8 @@ pub struct EventChannels {
     pub dashboard_tick_rx:
         Option<tokio::sync::broadcast::Receiver<feature_productivity::ActivityTick>>,
     pub dashboard_poll_interval_secs: u64,
+    pub distraction_alert_rx:
+        Option<tokio::sync::mpsc::Receiver<feature_productivity::distraction::DistractionAlert>>,
 }
 
 impl AppCore {
@@ -142,6 +144,7 @@ impl AppCore {
             aggregator,
             nudge_service,
             distraction_interceptor,
+            distraction_alert_rx,
             auto_focus_rx,
             nudge_rx,
             dashboard_tick_rx,
@@ -219,8 +222,7 @@ impl AppCore {
             consecutive_coaching_ignores: Arc::new(std::sync::atomic::AtomicI32::new(0)),
             activity_ingestion_service: Some(Arc::clone(&activity_svc)),
             active_task_focus: Arc::new(std::sync::Mutex::new(None)),
-            event_emitter: event_emitter
-                .unwrap_or_else(|| Arc::new(NoopEmitter)),
+            event_emitter: event_emitter.unwrap_or_else(|| Arc::new(NoopEmitter)),
             launcher_engine,
             launcher_clipboard_repo,
         };
@@ -259,6 +261,7 @@ impl AppCore {
             nudge_rx,
             dashboard_tick_rx,
             dashboard_poll_interval_secs,
+            distraction_alert_rx,
         };
 
         Ok((core, channels))
