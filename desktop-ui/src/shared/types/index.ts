@@ -103,11 +103,13 @@ export type {
 // ── Finance Types ─────────────────────────────────────────
 
 export type {
+  DailySpending,
   FinanceAccount,
   FinanceAccountCreateParams,
   FinanceBudgetCreateParams,
   FinanceBudgetUsage,
   FinanceCategoryReport,
+  FinanceDailySpendingResponse,
   FinanceGoal,
   FinanceGoalCreateParams,
   FinanceInvestment,
@@ -115,6 +117,7 @@ export type {
   FinanceLiability,
   FinanceLiabilityCreateParams,
   FinanceNetWorth,
+  FinancePeriodSummary,
   FinancePortfolio,
   FinancePortfolioCreateParams,
   FinanceTransaction,
