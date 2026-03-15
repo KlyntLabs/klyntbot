@@ -12,12 +12,14 @@ import { FinanceLayout } from "../components/FinanceLayout";
 import { FinanceSkeleton } from "../components/FinanceSkeleton";
 import { FormField, FormModal, fieldClass } from "../components/FormModal";
 import { useFinanceCurrency } from "../hooks/useFinanceCurrency";
+import { usePrivacyMode } from "../hooks/usePrivacyMode";
 import { displayAmount } from "../lib/displayAmount";
 import { COLORS, fmtCompact, pct } from "../lib/finance";
 
 export function FinanceBudgets() {
   const { mode, setMode, baseCurrency, rates, currencies, displayCur, convertTotal } =
     useFinanceCurrency();
+  const { hidden, toggle } = usePrivacyMode();
   const {
     data: budgets,
     loading,
@@ -99,7 +101,8 @@ export function FinanceBudgets() {
   if (loading && budgets.length === 0) {
     return (
       <FinanceLayout
-        onRefresh={refetch}
+        hidden={hidden}
+        onTogglePrivacy={toggle}
         currencyMode={mode}
         currencies={currencies}
         onSelectCurrency={setMode}
@@ -112,7 +115,8 @@ export function FinanceBudgets() {
   if (error && budgets.length === 0) {
     return (
       <FinanceLayout
-        onRefresh={refetch}
+        hidden={hidden}
+        onTogglePrivacy={toggle}
         currencyMode={mode}
         currencies={currencies}
         onSelectCurrency={setMode}
@@ -133,7 +137,8 @@ export function FinanceBudgets() {
 
   return (
     <FinanceLayout
-      onRefresh={refetch}
+      hidden={hidden}
+      onTogglePrivacy={toggle}
       currencyMode={mode}
       currencies={currencies}
       onSelectCurrency={setMode}
@@ -145,16 +150,16 @@ export function FinanceBudgets() {
             <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">
               Total Budget
             </p>
-            <p className="text-[20px] font-light text-primary tabular-nums">
-              {fmtCompact(convertTotal(totalBudget), displayCur)}
+            <p className="text-[24px] font-light text-primary tabular-nums">
+              {fmtCompact(convertTotal(totalBudget), displayCur, hidden)}
             </p>
           </Card>
           <Card className="p-4">
             <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">
               Total Spent
             </p>
-            <p className="text-[20px] font-light text-destructive tabular-nums">
-              {fmtCompact(convertTotal(totalSpent), displayCur)}
+            <p className="text-[24px] font-light text-destructive tabular-nums">
+              {fmtCompact(convertTotal(totalSpent), displayCur, hidden)}
             </p>
           </Card>
           <Card className="p-4">
@@ -163,11 +168,11 @@ export function FinanceBudgets() {
             </p>
             <p
               className={cn(
-                "text-[20px] font-light tabular-nums",
+                "text-[24px] font-light tabular-nums",
                 totalBudget - totalSpent >= 0 ? "text-success" : "text-destructive",
               )}
             >
-              {fmtCompact(convertTotal(totalBudget - totalSpent), displayCur)}
+              {fmtCompact(convertTotal(totalBudget - totalSpent), displayCur, hidden)}
             </p>
           </Card>
           <Card className="p-4">
@@ -176,7 +181,7 @@ export function FinanceBudgets() {
             </p>
             <p
               className={cn(
-                "text-[20px] font-light",
+                "text-[24px] font-light",
                 overBudget.length > 0 ? "text-destructive" : "text-success",
               )}
             >
@@ -235,6 +240,7 @@ export function FinanceBudgets() {
                             baseCurrency,
                             mode,
                             rates,
+                            hidden,
                           })}{" "}
                           /{" "}
                           {displayAmount({
@@ -244,6 +250,7 @@ export function FinanceBudgets() {
                             baseCurrency,
                             mode,
                             rates,
+                            hidden,
                           })}
                         </span>
                         <span
@@ -269,8 +276,8 @@ export function FinanceBudgets() {
                         )}
                       >
                         {isOver
-                          ? `${displayAmount({ amount: Math.abs(rem), currency: b.currency, baseAmount: b.baseAmount != null && b.amount !== 0 ? Math.abs(Math.round(rem * (b.baseAmount / b.amount))) : undefined, baseCurrency, mode, rates })} over budget`
-                          : `${displayAmount({ amount: rem, currency: b.currency, baseAmount: b.baseAmount != null && b.amount !== 0 ? Math.round(rem * (b.baseAmount / b.amount)) : undefined, baseCurrency, mode, rates })} remaining`}
+                          ? `${displayAmount({ amount: Math.abs(rem), currency: b.currency, baseAmount: b.baseAmount != null && b.amount !== 0 ? Math.abs(Math.round(rem * (b.baseAmount / b.amount))) : undefined, baseCurrency, mode, rates, hidden })} over budget`
+                          : `${displayAmount({ amount: rem, currency: b.currency, baseAmount: b.baseAmount != null && b.amount !== 0 ? Math.round(rem * (b.baseAmount / b.amount)) : undefined, baseCurrency, mode, rates, hidden })} remaining`}
                       </span>
                       {p >= b.alertThreshold && !isOver && (
                         <span className="text-[9px] text-brand font-light">Approaching limit</span>
@@ -290,7 +297,7 @@ export function FinanceBudgets() {
               <Donut
                 segments={spentSegs}
                 label="Spent"
-                value={fmtCompact(convertTotal(totalSpent), displayCur)}
+                value={fmtCompact(convertTotal(totalSpent), displayCur, hidden)}
                 size={150}
               />
             </div>
@@ -301,7 +308,7 @@ export function FinanceBudgets() {
               <Donut
                 segments={budgetSegs}
                 label="Allocated"
-                value={fmtCompact(convertTotal(totalBudget), displayCur)}
+                value={fmtCompact(convertTotal(totalBudget), displayCur, hidden)}
                 size={150}
               />
             </div>

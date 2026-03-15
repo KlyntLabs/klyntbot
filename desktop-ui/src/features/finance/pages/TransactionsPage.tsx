@@ -17,6 +17,7 @@ import { FinanceSkeleton } from "../components/FinanceSkeleton";
 import { FormField, fieldClass } from "../components/FormModal";
 import { SlidePanel } from "../components/SlidePanel";
 import { useFinanceCurrency } from "../hooks/useFinanceCurrency";
+import { usePrivacyMode } from "../hooks/usePrivacyMode";
 import { displayAmount } from "../lib/displayAmount";
 import { COLORS, fmtCompact } from "../lib/finance";
 
@@ -25,6 +26,7 @@ type TxFilter = "all" | "income" | "expense" | "transfer";
 export function FinanceTransactions() {
   const { mode, setMode, baseCurrency, rates, currencies, displayCur, convertTotal } =
     useFinanceCurrency();
+  const { hidden, toggle } = usePrivacyMode();
   const { data: accounts, refetch: rA } = useQuery<FinanceAccount[]>(
     "finance_accounts",
     undefined,
@@ -148,7 +150,8 @@ export function FinanceTransactions() {
   if (loading && transactions.length === 0) {
     return (
       <FinanceLayout
-        onRefresh={refetchAll}
+        hidden={hidden}
+        onTogglePrivacy={toggle}
         currencyMode={mode}
         currencies={currencies}
         onSelectCurrency={setMode}
@@ -161,7 +164,8 @@ export function FinanceTransactions() {
   if (error && transactions.length === 0) {
     return (
       <FinanceLayout
-        onRefresh={refetchAll}
+        hidden={hidden}
+        onTogglePrivacy={toggle}
         currencyMode={mode}
         currencies={currencies}
         onSelectCurrency={setMode}
@@ -182,7 +186,8 @@ export function FinanceTransactions() {
 
   return (
     <FinanceLayout
-      onRefresh={refetchAll}
+      hidden={hidden}
+      onTogglePrivacy={toggle}
       currencyMode={mode}
       currencies={currencies}
       onSelectCurrency={setMode}
@@ -194,32 +199,32 @@ export function FinanceTransactions() {
             <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">
               Total Transactions
             </p>
-            <p className="text-[20px] font-light text-primary">{transactions.length}</p>
+            <p className="text-[24px] font-light text-primary">{transactions.length}</p>
           </Card>
           <Card className="p-4">
             <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">Income</p>
-            <p className="text-[20px] font-light text-success tabular-nums">
-              {fmtCompact(convertTotal(totalIncome), displayCur)}
+            <p className="text-[24px] font-light text-success tabular-nums">
+              {fmtCompact(convertTotal(totalIncome), displayCur, hidden)}
             </p>
           </Card>
           <Card className="p-4">
             <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">
               Expenses
             </p>
-            <p className="text-[20px] font-light text-destructive tabular-nums">
-              {fmtCompact(convertTotal(totalExpense), displayCur)}
+            <p className="text-[24px] font-light text-destructive tabular-nums">
+              {fmtCompact(convertTotal(totalExpense), displayCur, hidden)}
             </p>
           </Card>
           <Card className="p-4">
             <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">Net</p>
             <p
               className={cn(
-                "text-[20px] font-light tabular-nums",
+                "text-[24px] font-light tabular-nums",
                 totalIncome - totalExpense >= 0 ? "text-success" : "text-destructive",
               )}
             >
               {totalIncome - totalExpense >= 0 ? "+" : ""}
-              {fmtCompact(convertTotal(totalIncome - totalExpense), displayCur)}
+              {fmtCompact(convertTotal(totalIncome - totalExpense), displayCur, hidden)}
             </p>
           </Card>
         </div>
@@ -347,6 +352,7 @@ export function FinanceTransactions() {
                         baseCurrency,
                         mode,
                         rates,
+                        hidden,
                       })}
                     </span>
                   </div>
@@ -364,7 +370,7 @@ export function FinanceTransactions() {
                 <Donut
                   segments={catSegs}
                   label="Spending"
-                  value={fmtCompact(convertTotal(totalExpense), displayCur)}
+                  value={fmtCompact(convertTotal(totalExpense), displayCur, hidden)}
                   size={140}
                 />
                 <div className="mt-3 pt-2.5 border-t border-white/[0.04] space-y-1.5">
@@ -378,7 +384,7 @@ export function FinanceTransactions() {
                         <span className="text-[10px] text-muted font-light">{seg.name}</span>
                       </div>
                       <span className="text-[10px] text-secondary font-light">
-                        {fmtCompact(convertTotal(seg.value), displayCur)}
+                        {fmtCompact(convertTotal(seg.value), displayCur, hidden)}
                       </span>
                     </div>
                   ))}

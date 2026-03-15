@@ -16,12 +16,14 @@ import { FinanceLayout } from "../components/FinanceLayout";
 import { FinanceSkeleton } from "../components/FinanceSkeleton";
 import { FormField, FormModal, fieldClass } from "../components/FormModal";
 import { useFinanceCurrency } from "../hooks/useFinanceCurrency";
+import { usePrivacyMode } from "../hooks/usePrivacyMode";
 import { displayAmount } from "../lib/displayAmount";
 import { COLORS, fmtCompact, fmtMoney, retPct } from "../lib/finance";
 
 export function FinanceInvestments() {
   const { mode, setMode, baseCurrency, rates, currencies, displayCur, convertTotal } =
     useFinanceCurrency();
+  const { hidden, toggle } = usePrivacyMode();
   const {
     data: portfolios,
     loading,
@@ -135,7 +137,8 @@ export function FinanceInvestments() {
   if (loading && portfolios.length === 0) {
     return (
       <FinanceLayout
-        onRefresh={refetchAll}
+        hidden={hidden}
+        onTogglePrivacy={toggle}
         currencyMode={mode}
         currencies={currencies}
         onSelectCurrency={setMode}
@@ -148,7 +151,8 @@ export function FinanceInvestments() {
   if (error && portfolios.length === 0) {
     return (
       <FinanceLayout
-        onRefresh={refetchAll}
+        hidden={hidden}
+        onTogglePrivacy={toggle}
         currencyMode={mode}
         currencies={currencies}
         onSelectCurrency={setMode}
@@ -169,7 +173,8 @@ export function FinanceInvestments() {
 
   return (
     <FinanceLayout
-      onRefresh={refetchAll}
+      hidden={hidden}
+      onTogglePrivacy={toggle}
       currencyMode={mode}
       currencies={currencies}
       onSelectCurrency={setMode}
@@ -181,16 +186,16 @@ export function FinanceInvestments() {
             <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">
               Total Value
             </p>
-            <p className="text-[20px] font-light text-primary tabular-nums">
-              {fmtCompact(convertTotal(totalValue), displayCur)}
+            <p className="text-[24px] font-light text-primary tabular-nums">
+              {fmtCompact(convertTotal(totalValue), displayCur, hidden)}
             </p>
           </Card>
           <Card className="p-4">
             <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">
               Cost Basis
             </p>
-            <p className="text-[20px] font-light text-muted tabular-nums">
-              {fmtCompact(convertTotal(totalCost), displayCur)}
+            <p className="text-[24px] font-light text-muted tabular-nums">
+              {fmtCompact(convertTotal(totalCost), displayCur, hidden)}
             </p>
           </Card>
           <Card className="p-4">
@@ -199,7 +204,7 @@ export function FinanceInvestments() {
             </p>
             <p
               className={cn(
-                "text-[20px] font-light tabular-nums",
+                "text-[24px] font-light tabular-nums",
                 totalReturn >= 0 ? "text-success" : "text-destructive",
               )}
             >
@@ -211,7 +216,7 @@ export function FinanceInvestments() {
             <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">
               Holdings
             </p>
-            <p className="text-[20px] font-light text-primary">{investments.length}</p>
+            <p className="text-[24px] font-light text-primary">{investments.length}</p>
           </Card>
         </div>
 
@@ -274,11 +279,11 @@ export function FinanceInvestments() {
                       </div>
                     </div>
                     <p className="text-[18px] font-light text-primary tabular-nums">
-                      {fmtMoney(p.totalValue, p.currency)}
+                      {fmtMoney(p.totalValue, p.currency, hidden)}
                     </p>
                     <div className="flex items-center gap-2 mt-1">
                       <span className="text-[9px] text-dim font-light">
-                        Cost: {fmtMoney(p.totalCostBasis, p.currency)}
+                        Cost: {fmtMoney(p.totalCostBasis, p.currency, hidden)}
                       </span>
                       <span className="text-[9px] text-dim font-light">
                         {p.holdingCount} holdings
@@ -346,20 +351,20 @@ export function FinanceInvestments() {
                   </span>
                   <span className="text-right text-[11px] text-muted font-light tabular-nums">
                     {inv.currentPrice != null
-                      ? fmtMoney(inv.currentPrice, inv.marketCurrency ?? inv.currency)
+                      ? fmtMoney(inv.currentPrice, inv.marketCurrency ?? inv.currency, hidden)
                       : "—"}
                   </span>
                   <div className="text-right">
                     <span className="text-[12px] text-primary font-light tabular-nums">
                       {inv.currentValue != null
-                        ? fmtMoney(inv.currentValue, inv.marketCurrency ?? inv.currency)
+                        ? fmtMoney(inv.currentValue, inv.marketCurrency ?? inv.currency, hidden)
                         : "—"}
                     </span>
                     {mode === "multi" &&
                       (inv.marketCurrency ?? inv.currency) !== baseCurrency &&
                       inv.baseCurrentValue != null && (
                         <p className="text-[9px] text-dim font-light">
-                          {fmtCompact(inv.baseCurrentValue, baseCurrency)}
+                          {fmtCompact(inv.baseCurrentValue, baseCurrency, hidden)}
                         </p>
                       )}
                   </div>
@@ -371,6 +376,7 @@ export function FinanceInvestments() {
                       baseCurrency,
                       mode,
                       rates,
+                      hidden,
                     })}
                   </span>
                   <span
@@ -395,7 +401,7 @@ export function FinanceInvestments() {
               <Donut
                 segments={assetSegs}
                 label="By type"
-                value={fmtCompact(convertTotal(totalValue), displayCur)}
+                value={fmtCompact(convertTotal(totalValue), displayCur, hidden)}
                 size={140}
               />
             </div>
@@ -406,7 +412,7 @@ export function FinanceInvestments() {
               <Donut
                 segments={portfolioSegs}
                 label="Portfolios"
-                value={fmtCompact(convertTotal(totalValue), displayCur)}
+                value={fmtCompact(convertTotal(totalValue), displayCur, hidden)}
                 size={140}
               />
             </div>

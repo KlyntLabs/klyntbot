@@ -11,12 +11,14 @@ import { FinanceLayout } from "../components/FinanceLayout";
 import { FinanceSkeleton } from "../components/FinanceSkeleton";
 import { FormField, FormModal, fieldClass } from "../components/FormModal";
 import { useFinanceCurrency } from "../hooks/useFinanceCurrency";
+import { usePrivacyMode } from "../hooks/usePrivacyMode";
 import { displayAmount, displayHint } from "../lib/displayAmount";
 import { ACCT_ICONS, fmtCompact, fmtMoney } from "../lib/finance";
 
 export function FinanceAccounts() {
   const { mode, setMode, baseCurrency, rates, currencies, displayCur, convertTotal } =
     useFinanceCurrency();
+  const { hidden, toggle } = usePrivacyMode();
   const [searchParams] = useSearchParams();
   const {
     data: accounts,
@@ -87,7 +89,8 @@ export function FinanceAccounts() {
   if (loading && accounts.length === 0) {
     return (
       <FinanceLayout
-        onRefresh={refetchAll}
+        hidden={hidden}
+        onTogglePrivacy={toggle}
         currencyMode={mode}
         currencies={currencies}
         onSelectCurrency={setMode}
@@ -100,7 +103,8 @@ export function FinanceAccounts() {
   if (error && accounts.length === 0) {
     return (
       <FinanceLayout
-        onRefresh={refetchAll}
+        hidden={hidden}
+        onTogglePrivacy={toggle}
         currencyMode={mode}
         currencies={currencies}
         onSelectCurrency={setMode}
@@ -121,7 +125,8 @@ export function FinanceAccounts() {
 
   return (
     <FinanceLayout
-      onRefresh={refetchAll}
+      hidden={hidden}
+      onTogglePrivacy={toggle}
       currencyMode={mode}
       currencies={currencies}
       onSelectCurrency={setMode}
@@ -133,21 +138,21 @@ export function FinanceAccounts() {
             <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">
               Total Balance
             </p>
-            <p className="text-[20px] font-light text-primary">
-              {fmtCompact(convertTotal(totalBalance), displayCur)}
+            <p className="text-[24px] font-light text-primary">
+              {fmtCompact(convertTotal(totalBalance), displayCur, hidden)}
             </p>
           </Card>
           <Card className="p-4">
             <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">
               Active Accounts
             </p>
-            <p className="text-[20px] font-light text-primary">{active.length}</p>
+            <p className="text-[24px] font-light text-primary">{active.length}</p>
           </Card>
           <Card className="p-4">
             <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">
               Currencies
             </p>
-            <p className="text-[20px] font-light text-primary">
+            <p className="text-[24px] font-light text-primary">
               {new Set(active.map((a) => a.currency)).size}
             </p>
           </Card>
@@ -207,6 +212,7 @@ export function FinanceAccounts() {
                         baseCurrency,
                         mode,
                         rates,
+                        hidden,
                       })}
                     </p>
                     {(() => {
@@ -314,6 +320,7 @@ export function FinanceAccounts() {
                           baseCurrency,
                           mode,
                           rates,
+                          hidden,
                         })}
                       </span>
                     </div>

@@ -12,6 +12,7 @@ import { FinanceLayout } from "../components/FinanceLayout";
 import { FinanceSkeleton } from "../components/FinanceSkeleton";
 import { FormField, FormModal, fieldClass } from "../components/FormModal";
 import { useFinanceCurrency } from "../hooks/useFinanceCurrency";
+import { usePrivacyMode } from "../hooks/usePrivacyMode";
 import { displayAmount } from "../lib/displayAmount";
 import { COLORS, fmtCompact, GOAL_ICONS, pct } from "../lib/finance";
 
@@ -20,6 +21,7 @@ type GoalTab = "active" | "achieved" | "abandoned";
 export function FinanceGoals() {
   const { mode, setMode, baseCurrency, rates, currencies, displayCur, convertTotal } =
     useFinanceCurrency();
+  const { hidden, toggle } = usePrivacyMode();
   const {
     data: goals,
     loading,
@@ -107,7 +109,8 @@ export function FinanceGoals() {
   if (loading && goals.length === 0) {
     return (
       <FinanceLayout
-        onRefresh={refetch}
+        hidden={hidden}
+        onTogglePrivacy={toggle}
         currencyMode={mode}
         currencies={currencies}
         onSelectCurrency={setMode}
@@ -120,7 +123,8 @@ export function FinanceGoals() {
   if (error && goals.length === 0) {
     return (
       <FinanceLayout
-        onRefresh={refetch}
+        hidden={hidden}
+        onTogglePrivacy={toggle}
         currencyMode={mode}
         currencies={currencies}
         onSelectCurrency={setMode}
@@ -141,7 +145,8 @@ export function FinanceGoals() {
 
   return (
     <FinanceLayout
-      onRefresh={refetch}
+      hidden={hidden}
+      onTogglePrivacy={toggle}
       currencyMode={mode}
       currencies={currencies}
       onSelectCurrency={setMode}
@@ -153,30 +158,30 @@ export function FinanceGoals() {
             <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">
               Active Goals
             </p>
-            <p className="text-[20px] font-light text-primary">{activeGoals.length}</p>
+            <p className="text-[24px] font-light text-primary">{activeGoals.length}</p>
           </Card>
           <Card className="p-4">
             <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">
               Total Saved
             </p>
-            <p className="text-[20px] font-light text-success tabular-nums">
-              {fmtCompact(convertTotal(totalSaved), displayCur)}
+            <p className="text-[24px] font-light text-success tabular-nums">
+              {fmtCompact(convertTotal(totalSaved), displayCur, hidden)}
             </p>
           </Card>
           <Card className="p-4">
             <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">
               Total Target
             </p>
-            <p className="text-[20px] font-light text-primary tabular-nums">
-              {fmtCompact(convertTotal(totalTarget), displayCur)}
+            <p className="text-[24px] font-light text-primary tabular-nums">
+              {fmtCompact(convertTotal(totalTarget), displayCur, hidden)}
             </p>
           </Card>
           <Card className="p-4">
             <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">
               Monthly Contributions
             </p>
-            <p className="text-[20px] font-light text-brand tabular-nums">
-              {fmtCompact(convertTotal(monthlyTotal), displayCur)}
+            <p className="text-[24px] font-light text-brand tabular-nums">
+              {fmtCompact(convertTotal(monthlyTotal), displayCur, hidden)}
             </p>
           </Card>
         </div>
@@ -255,6 +260,7 @@ export function FinanceGoals() {
                               baseCurrency,
                               mode,
                               rates,
+                              hidden,
                             })}{" "}
                             <span className="text-dim text-[10px]">
                               /{" "}
@@ -293,6 +299,7 @@ export function FinanceGoals() {
                               baseCurrency,
                               mode,
                               rates,
+                              hidden,
                             })}
                             /mo
                           </span>
@@ -332,7 +339,7 @@ export function FinanceGoals() {
               <Donut
                 segments={goalSegs}
                 label="Saved"
-                value={fmtCompact(convertTotal(totalSaved), displayCur)}
+                value={fmtCompact(convertTotal(totalSaved), displayCur, hidden)}
                 size={150}
               />
             </div>
