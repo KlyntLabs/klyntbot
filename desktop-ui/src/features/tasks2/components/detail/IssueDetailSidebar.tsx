@@ -42,6 +42,7 @@ export function IssueDetailSidebar({ detail, onClose }: IssueDetailSidebarProps)
             task={detail.task}
             taskState={taskState}
             focusSession={detail.focusSession}
+            onStopFocus={detail.stopFocus}
           />
         )}
         {showTime && <SidebarTime task={detail.task} taskState={taskState} />}

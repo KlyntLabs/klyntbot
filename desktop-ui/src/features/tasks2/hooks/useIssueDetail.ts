@@ -4,17 +4,18 @@ import { EMPTY_TIMELINE_RESPONSE } from "@shared/types";
 import type { TimelineResponse } from "@shared/types/common";
 import type { Area, Task, TaskUpdateParams } from "@shared/types/tasks";
 import { useCallback, useMemo } from "react";
+import { useStatusWorkflow } from "../contexts/StatusWorkflowContext";
 import {
   type ActivityEntry,
+  buildFocusSession,
   type DetailTask,
   type DisplayProject,
-  deriveFocusSession,
   deriveTaskState,
   type FocusSession,
   priorityToNumber,
-  statusToBackend,
   type SubIssue,
   type Suggestion,
+  statusToMutationParams,
   type TaskMemory,
   type TaskState,
   taskToDetailTask,
@@ -37,7 +38,13 @@ const PLACEHOLDER_TASK: DetailTask = {
   identifier: "",
   title: "Loading...",
   description: "",
-  status: { id: "backlog", name: "Backlog", color: "#94a3b8", icon: () => null, backendStatus: "backlog" },
+  status: {
+    id: "backlog",
+    name: "Backlog",
+    color: "#94a3b8",
+    icon: () => null,
+    backendStatus: "backlog",
+  },
   priority: { id: "no-priority", name: "No priority", icon: () => null },
   labels: [],
   project: null,
@@ -61,19 +68,24 @@ export function useIssueDetail(
   projectMap: Map<string, DisplayProject>,
   areaMap: Map<string, Area>,
 ) {
+  const { labels } = useStatusWorkflow();
+
   // Core task data
   const { data: rawTask } = useQuery<Task | null>("task_get", { id: issueId }, null);
 
   const task: DetailTask = useMemo(
-    () => (rawTask ? taskToDetailTask(rawTask, projectMap, areaMap) : PLACEHOLDER_TASK),
-    [rawTask, projectMap, areaMap],
+    () => (rawTask ? taskToDetailTask(rawTask, projectMap, areaMap, labels) : PLACEHOLDER_TASK),
+    [rawTask, projectMap, areaMap, labels],
   );
 
   const taskState: TaskState = deriveTaskState(task);
 
   // Sub-issues
   const { data: rawChildren } = useQuery<Task[]>("task_list_children", { parentId: issueId }, []);
-  const subIssues: SubIssue[] = useMemo(() => rawChildren.map(taskToSubIssue), [rawChildren]);
+  const subIssues: SubIssue[] = useMemo(
+    () => rawChildren.map((c) => taskToSubIssue(c, labels)),
+    [rawChildren, labels],
+  );
 
   // Activity from timeline (client-side filtered by entityId)
   const endDate = useMemo(() => new Date().toISOString(), []);
@@ -109,9 +121,12 @@ export function useIssueDetail(
         case "description":
           params.description = value as string;
           break;
-        case "status":
-          params.status = statusToBackend(value as DetailTask["status"]);
+        case "status": {
+          const mutationParams = statusToMutationParams(value as DetailTask["status"]);
+          params.status = mutationParams.status;
+          params.statusLabelId = mutationParams.statusLabelId;
           break;
+        }
         case "priority":
           params.priority = priorityToNumber((value as DetailTask["priority"]).id);
           break;
@@ -151,10 +166,18 @@ export function useIssueDetail(
   // Stubbed features (future backend support)
   const suggestions: Suggestion[] = [];
   const taskMemory: TaskMemory | null = null;
-  const focusSession: FocusSession | null = deriveFocusSession(task);
+  const focusSession: FocusSession | null = buildFocusSession(task);
 
   const dismissSuggestion = useCallback((_id: string) => {}, []);
   const applySuggestion = useCallback((_id: string) => {}, []);
+
+  // Focus mutations
+  const endFocusMutation = useMutation<Task | null, { id: string }>("task_end_focus", "params");
+
+  const stopFocus = useCallback(async () => {
+    if (!issueId) return;
+    await endFocusMutation.mutate({ id: issueId });
+  }, [issueId, endFocusMutation]);
 
   return {
     task,
@@ -167,5 +190,6 @@ export function useIssueDetail(
     updateTask,
     dismissSuggestion,
     applySuggestion,
+    stopFocus,
   };
 }

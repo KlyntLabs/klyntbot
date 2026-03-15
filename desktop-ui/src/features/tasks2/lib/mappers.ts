@@ -3,7 +3,7 @@ import type { Area, Project, Task } from "@shared/types/tasks";
 import { Folder, type LucideProps } from "lucide-react";
 import type React from "react";
 import { type Priority, priorities } from "./priority-icons";
-import { BacklogIcon, type Status, makeColoredCircle, matchIcon } from "./status-icons";
+import { BacklogIcon, makeColoredCircle, matchIcon, type Status } from "./status-icons";
 
 // ── Display types ─────────────────────────────────────────
 
@@ -83,11 +83,13 @@ export interface TaskMemory {
 }
 
 export interface FocusSession {
-  focusMode: string;
-  qualityScore: number;
-  distractionCount: number;
-  flowState: string;
-  qualityHistory: number[];
+  startedAt: string;
+  elapsed: number;
+  totalTracked: number;
+  qualityScore: number | null;
+  distractionCount: number | null;
+  flowState: string | null;
+  qualityHistory: number[] | null;
 }
 
 /** The Issue shape consumed by list/board components. */
@@ -351,16 +353,22 @@ export function timelineToActivity(entry: TimelineEntry): ActivityEntry {
   };
 }
 
-// ── Derive focus session ──────────────────────────────────
+// ── Build focus session ───────────────────────────────────
 
-export function deriveFocusSession(task: DetailTask): FocusSession | null {
+export function buildFocusSession(task: DetailTask): FocusSession | null {
   if (!task.focusedAt) return null;
+
+  const startedAt = task.focusedAt;
+  const elapsed = Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000);
+
   return {
-    focusMode: "focus",
-    qualityScore: 0.7,
-    distractionCount: 0,
-    flowState: "building",
-    qualityHistory: [0.5, 0.6, 0.7],
+    startedAt,
+    elapsed,
+    totalTracked: task.totalTrackedSecs ?? 0,
+    qualityScore: null,
+    distractionCount: null,
+    flowState: null,
+    qualityHistory: null,
   };
 }
 
