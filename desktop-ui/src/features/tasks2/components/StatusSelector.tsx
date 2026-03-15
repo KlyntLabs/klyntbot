@@ -2,12 +2,12 @@ import { useMutation } from "@shared/hooks/useMutation";
 import type { Task, TaskUpdateParams } from "@shared/types/tasks";
 import { Check } from "lucide-react";
 import { useState } from "react";
-import { statusToBackend } from "../lib/mappers";
+import { useStatusWorkflow } from "../contexts/StatusWorkflowContext";
+import { useRefetchTasks } from "../hooks/useTasksContext";
+import { statusToMutationParams } from "../lib/mappers";
 import type { Status } from "../lib/status-icons";
-import { status as allStatus } from "../lib/status-icons";
 import { renderStatusIcon } from "../lib/status-utils";
 import { cn } from "../lib/utils";
-import { useRefetchTasks } from "../hooks/useTasksContext";
 import {
   Command,
   CommandEmpty,
@@ -26,6 +26,7 @@ interface StatusSelectorProps {
 
 export function StatusSelector({ issueId, status, onChanged }: StatusSelectorProps) {
   const [open, setOpen] = useState(false);
+  const { statuses } = useStatusWorkflow();
   const updateTask = useMutation<Task, TaskUpdateParams>("task_update", "params");
   const refetch = useRefetchTasks();
 
@@ -37,7 +38,7 @@ export function StatusSelector({ issueId, status, onChanged }: StatusSelectorPro
           className="flex items-center justify-center size-5 rounded hover:bg-[hsl(var(--accent))] transition-colors"
           aria-label={`Status: ${status.name}`}
         >
-          {renderStatusIcon(status.id)}
+          {renderStatusIcon(status)}
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-[200px] p-0" align="start">
@@ -46,18 +47,19 @@ export function StatusSelector({ issueId, status, onChanged }: StatusSelectorPro
           <CommandList>
             <CommandEmpty>No status found.</CommandEmpty>
             <CommandGroup>
-              {allStatus.map((s) => (
+              {statuses.map((s) => (
                 <CommandItem
                   key={s.id}
                   value={s.name}
                   onSelect={async () => {
-                    await updateTask.mutate({ id: issueId, status: statusToBackend(s) });
+                    const { status: backendStatus, statusLabelId } = statusToMutationParams(s);
+                    await updateTask.mutate({ id: issueId, status: backendStatus, statusLabelId });
                     refetch();
                     onChanged?.();
                     setOpen(false);
                   }}
                 >
-                  <span className="mr-2 flex items-center">{renderStatusIcon(s.id)}</span>
+                  <span className="mr-2 flex items-center">{renderStatusIcon(s)}</span>
                   {s.name}
                   <Check
                     className={cn(

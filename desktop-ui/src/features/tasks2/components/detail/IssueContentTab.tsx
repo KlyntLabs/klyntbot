@@ -94,7 +94,7 @@ function SubIssuesList({ issues }: { issues: SubIssue[] }) {
               className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-[hsl(var(--accent))]/50 transition-colors text-left"
             >
               <span className="flex items-center justify-center size-4">
-                {renderStatusIcon(issue.status.id)}
+                {renderStatusIcon(issue.status)}
               </span>
               <PriorityIcon className="size-3.5 text-[hsl(var(--muted-foreground))] shrink-0" />
               <span className="text-xs text-[hsl(var(--muted-foreground))] shrink-0">

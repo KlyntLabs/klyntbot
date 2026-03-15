@@ -1,10 +1,10 @@
 import type { useMutation } from "@shared/hooks/useMutation";
 import type { Area, Task, TaskCreateParams } from "@shared/types/tasks";
 import { useState } from "react";
+import { useStatusWorkflow } from "../contexts/StatusWorkflowContext";
 import type { Priority, Status } from "../lib/mappers";
 import { priorityToNumber } from "../lib/mappers";
 import { priorities } from "../lib/priority-icons";
-import { status as allStatus } from "../lib/status-icons";
 import { renderStatusIcon } from "../lib/status-utils";
 import { useCreateIssueStore } from "../store/create-issue-store";
 import { Button } from "./ui/button";
@@ -16,16 +16,17 @@ interface CreateIssueModalProps {
 }
 
 export function CreateIssueModal({ onCreateTask, areas }: CreateIssueModalProps) {
+  const { statuses } = useStatusWorkflow();
   const { isOpen, defaultStatus, closeModal } = useCreateIssueStore();
 
   const [title, setTitle] = useState("");
-  const [selectedStatus, setSelectedStatus] = useState<Status | null>(allStatus[0] ?? null);
+  const [selectedStatus, setSelectedStatus] = useState<Status | null>(statuses[0] ?? null);
   const [selectedPriority, setSelectedPriority] = useState<Priority | null>(priorities[0] ?? null);
 
   const handleOpenChange = (open: boolean) => {
     if (open) {
       // Sync form status from store when opening
-      setSelectedStatus(defaultStatus ?? allStatus[0] ?? null);
+      setSelectedStatus(defaultStatus ?? statuses[0] ?? null);
       setTitle("");
       setSelectedPriority(priorities[0] ?? null);
     } else {
@@ -77,7 +78,7 @@ export function CreateIssueModal({ onCreateTask, areas }: CreateIssueModalProps)
           <div className="space-y-2">
             <span className="text-sm font-medium text-[hsl(var(--foreground))]">Status</span>
             <div className="flex flex-wrap gap-1.5">
-              {allStatus.map((s) => (
+              {statuses.map((s) => (
                 <button
                   key={s.id}
                   type="button"
@@ -88,7 +89,7 @@ export function CreateIssueModal({ onCreateTask, areas }: CreateIssueModalProps)
                       : "border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))]"
                   }`}
                 >
-                  <span className="flex items-center">{renderStatusIcon(s.id)}</span>
+                  <span className="flex items-center">{renderStatusIcon(s)}</span>
                   {s.name}
                 </button>
               ))}

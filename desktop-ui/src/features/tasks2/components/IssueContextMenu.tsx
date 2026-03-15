@@ -1,12 +1,12 @@
 import { useMutation } from "@shared/hooks/useMutation";
 import type { Task, TaskUpdateParams } from "@shared/types/tasks";
 import type React from "react";
-import type { Issue } from "../lib/mappers";
-import { priorityToNumber, statusToBackend } from "../lib/mappers";
-import { priorities } from "../lib/priority-icons";
-import { status as allStatus } from "../lib/status-icons";
-import { renderStatusIcon } from "../lib/status-utils";
+import { useStatusWorkflow } from "../contexts/StatusWorkflowContext";
 import { useRefetchTasks } from "../hooks/useTasksContext";
+import type { Issue } from "../lib/mappers";
+import { priorityToNumber, statusToMutationParams } from "../lib/mappers";
+import { priorities } from "../lib/priority-icons";
+import { renderStatusIcon } from "../lib/status-utils";
 import { useTabStore } from "../store/tab-store";
 import {
   ContextMenu,
@@ -26,6 +26,7 @@ interface IssueContextMenuProps {
 }
 
 export function IssueContextMenu({ issue, children }: IssueContextMenuProps) {
+  const { statuses } = useStatusWorkflow();
   const updateTask = useMutation<Task, TaskUpdateParams>("task_update", "params");
   const deleteTask = useMutation<boolean, { id: string }>("task_delete");
   const refetch = useRefetchTasks();
@@ -63,16 +64,20 @@ export function IssueContextMenu({ issue, children }: IssueContextMenuProps) {
         {/* Status submenu */}
         <ContextMenuSub>
           <ContextMenuSubTrigger>
-            <span className="mr-2 flex items-center">{renderStatusIcon(issue.status.id)}</span>
+            <span className="mr-2 flex items-center">{renderStatusIcon(issue.status)}</span>
             Status
           </ContextMenuSubTrigger>
           <ContextMenuSubContent className="w-48">
-            {allStatus.map((s) => (
+            {statuses.map((s) => (
               <ContextMenuItem
                 key={s.id}
-                onSelect={async () => { await updateTask.mutate({ id: issue.id, status: statusToBackend(s) }); refetch(); }}
+                onSelect={async () => {
+                  const { status: backendStatus, statusLabelId } = statusToMutationParams(s);
+                  await updateTask.mutate({ id: issue.id, status: backendStatus, statusLabelId });
+                  refetch();
+                }}
               >
-                <span className="mr-2 flex items-center">{renderStatusIcon(s.id)}</span>
+                <span className="mr-2 flex items-center">{renderStatusIcon(s)}</span>
                 {s.name}
                 {issue.status.id === s.id && (
                   <span className="ml-auto text-xs text-[hsl(var(--muted-foreground))]">
@@ -118,7 +123,10 @@ export function IssueContextMenu({ issue, children }: IssueContextMenuProps) {
 
         <ContextMenuItem
           className="text-[hsl(var(--destructive))]"
-          onSelect={async () => { await deleteTask.mutate({ id: issue.id }); refetch(); }}
+          onSelect={async () => {
+            await deleteTask.mutate({ id: issue.id });
+            refetch();
+          }}
         >
           Delete
         </ContextMenuItem>

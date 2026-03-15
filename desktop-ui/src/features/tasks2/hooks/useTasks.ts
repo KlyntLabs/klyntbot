@@ -4,6 +4,7 @@ import { useQuery } from "@shared/hooks/useQuery";
 import type { ApiError } from "@shared/types";
 import type { Area, Project, Task, TaskCreateParams, TaskUpdateParams } from "@shared/types/tasks";
 import { useCallback, useMemo } from "react";
+import { useStatusWorkflow } from "../contexts/StatusWorkflowContext";
 import {
   type DisplayProject,
   type Issue,
@@ -27,6 +28,7 @@ export interface UseTasksResult {
 }
 
 export function useTasks(): UseTasksResult {
+  const { labels } = useStatusWorkflow();
   const {
     data: tasks,
     loading: tasksLoading,
@@ -51,7 +53,10 @@ export function useTasks(): UseTasksResult {
   const deleteTask = useMutation<boolean, { id: string }>("task_delete");
   const toggleComplete = useMutation<Task, { id: string }>("task_toggle_complete");
 
-  const issues = useMemo(() => tasks.map((t) => taskToIssue(t, projectMap)), [tasks, projectMap]);
+  const issues = useMemo(
+    () => tasks.map((t) => taskToIssue(t, projectMap, labels)),
+    [tasks, projectMap, labels],
+  );
 
   const refetch = useCallback(() => {
     refetchTasks();

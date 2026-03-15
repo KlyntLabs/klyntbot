@@ -1,8 +1,8 @@
 import { Check, ChevronLeft, ChevronRight, ListFilter, X } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useStatusWorkflow } from "../contexts/StatusWorkflowContext";
 import type { DisplayProject, Issue } from "../lib/mappers";
 import { priorities } from "../lib/priority-icons";
-import { status as allStatus } from "../lib/status-icons";
 import { renderStatusIcon } from "../lib/status-utils";
 import { useFilterStore } from "../store/filter-store";
 import { Button } from "./ui/button";
@@ -32,6 +32,7 @@ interface FilterProps {
 }
 
 export function Filter({ issues, projects }: FilterProps) {
+  const { statuses } = useStatusWorkflow();
   const [open, setOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState<FilterCategory | null>(null);
 
@@ -133,7 +134,7 @@ export function Filter({ issues, projects }: FilterProps) {
         <CommandList>
           <CommandEmpty>No status found.</CommandEmpty>
           <CommandGroup>
-            {allStatus.map((s) => {
+            {statuses.map((s) => {
               const isSelected = filters.status.includes(s.id);
               const count = counts.status[s.id] ?? 0;
               return (
@@ -145,7 +146,7 @@ export function Filter({ issues, projects }: FilterProps) {
                   <div className="flex items-center justify-center size-4">
                     {isSelected ? <Check className="size-4" /> : <span className="size-4" />}
                   </div>
-                  <span className="flex items-center">{renderStatusIcon(s.id)}</span>
+                  <span className="flex items-center">{renderStatusIcon(s)}</span>
                   <span className="flex-1">{s.name}</span>
                   <span className="text-xs text-[hsl(var(--muted-foreground))]">{count}</span>
                 </CommandItem>

@@ -29,7 +29,7 @@ export function GroupIssues({ status, issues }: GroupIssuesProps) {
       <div className="w-[348px] shrink-0 flex flex-col">
         {/* Column Header */}
         <div className="flex items-center gap-2 px-3 py-2 sticky top-0 z-10 bg-[hsl(var(--container))]">
-          <span className="flex items-center">{renderStatusIcon(status.id)}</span>
+          <span className="flex items-center">{renderStatusIcon(status)}</span>
           <span className="text-sm font-medium text-[hsl(var(--foreground))]">{status.name}</span>
           <span className="text-xs text-[hsl(var(--muted-foreground))]">{issues.length}</span>
           <button
@@ -61,7 +61,7 @@ export function GroupIssues({ status, issues }: GroupIssuesProps) {
     <div className="mb-2">
       {/* Header */}
       <div className="flex items-center gap-2 px-4 py-2 sticky top-0 z-10 bg-[hsl(var(--container))]">
-        <span className="flex items-center">{renderStatusIcon(status.id)}</span>
+        <span className="flex items-center">{renderStatusIcon(status)}</span>
         <span className="text-sm font-medium text-[hsl(var(--foreground))]">{status.name}</span>
         <span className="text-xs text-[hsl(var(--muted-foreground))]">{issues.length}</span>
         <button
