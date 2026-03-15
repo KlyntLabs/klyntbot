@@ -1,9 +1,9 @@
-import type { TimelineEntry } from "@shared/types/common";
+import type { StatusLabel, TimelineEntry } from "@shared/types/common";
 import type { Area, Project, Task } from "@shared/types/tasks";
 import { Folder, type LucideProps } from "lucide-react";
 import type React from "react";
 import { type Priority, priorities } from "./priority-icons";
-import { status as allStatusDefs, BacklogIcon, type Status } from "./status-icons";
+import { BacklogIcon, type Status, makeColoredCircle, matchIcon } from "./status-icons";
 
 // ── Display types ─────────────────────────────────────────
 
@@ -110,43 +110,61 @@ export interface Issue {
 
 // ── Status resolution ─────────────────────────────────────
 //
-// Backend stores `task.status` as a raw string ("todo", "in_progress", "done", etc.)
-// Each UI status definition has a `backendStatus` field for the reverse mapping.
-// Resolution: task.status → find matching backendStatus → return Status with icon.
+// Resolves a task's status using workflow labels from the backend.
+// Tries statusLabel first, then matches task.status against labels,
+// with a final fallback to Backlog.
 
-const statusByBackend = new Map<string, Status>();
-for (const s of allStatusDefs) {
-  statusByBackend.set(s.backendStatus, s);
-}
-
-export function resolveStatus(task: Task): Status {
-  // 1. Direct match from task.status → Status.backendStatus
-  const match = statusByBackend.get(task.status);
-  if (match) return match;
-
-  // 2. Try statusLabel name for custom workflow labels
+export function resolveStatus(task: Task, labels: StatusLabel[]): Status {
+  // 1. Use task.statusLabel if present
   if (task.statusLabel) {
-    const nameLower = task.statusLabel.name.toLowerCase();
-    const byName = allStatusDefs.find((s) => s.name.toLowerCase() === nameLower);
-    if (byName) return byName;
-
-    // Generic fallback: use the label's color/name with a default icon
+    const icon = matchIcon(task.statusLabel.name) ?? makeColoredCircle(task.statusLabel.color);
     return {
       id: task.statusLabel.id,
       name: task.statusLabel.name,
       color: task.statusLabel.color,
-      icon: BacklogIcon,
+      icon,
       backendStatus: task.status,
+      statusGroup: task.statusLabel.statusGroup,
     };
   }
 
-  // 3. Fallback
-  return allStatusDefs[0]; // Backlog
+  // 2. Try matching task.status against labels by statusGroup or name
+  const statusLower = task.status.toLowerCase();
+  const labelMatch = labels.find(
+    (l) => l.statusGroup === task.status || l.name.toLowerCase() === statusLower,
+  );
+  if (labelMatch) {
+    const icon = matchIcon(labelMatch.name) ?? makeColoredCircle(labelMatch.color);
+    return {
+      id: labelMatch.id,
+      name: labelMatch.name,
+      color: labelMatch.color,
+      icon,
+      backendStatus: task.status,
+      statusGroup: labelMatch.statusGroup,
+    };
+  }
+
+  // 3. Final fallback
+  return {
+    id: "fallback",
+    name: "Backlog",
+    color: "#bec2c8",
+    icon: BacklogIcon,
+    backendStatus: task.status,
+    statusGroup: "not_started",
+  };
 }
 
-/** Convert a UI Status to the backend status string for task_update mutations. */
-export function statusToBackend(status: Status): string {
-  return status.backendStatus;
+/** Convert a UI Status to mutation parameters for backend updates. */
+export function statusToMutationParams(status: Status): {
+  status: string;
+  statusLabelId: string | null;
+} {
+  return {
+    status: status.statusGroup ?? status.backendStatus,
+    statusLabelId: status.id === "fallback" ? null : status.id,
+  };
 }
 
 // ── Priority resolution ───────────────────────────────────
@@ -232,13 +250,17 @@ export function projectToDisplayProject(project: Project): DisplayProject {
 
 // ── Task → Issue ──────────────────────────────────────────
 
-export function taskToIssue(task: Task, projectMap: Map<string, DisplayProject>): Issue {
+export function taskToIssue(
+  task: Task,
+  projectMap: Map<string, DisplayProject>,
+  labels: StatusLabel[],
+): Issue {
   return {
     id: task.id,
     identifier: shortId(task.id),
     title: task.title,
     description: task.description ?? "",
-    status: resolveStatus(task),
+    status: resolveStatus(task, labels),
     assignee: null,
     priority: resolvePriority(task),
     labels: tagsToLabels(task.tags),
@@ -257,6 +279,7 @@ export function taskToDetailTask(
   task: Task,
   projectMap: Map<string, DisplayProject>,
   areaMap: Map<string, Area>,
+  labels: StatusLabel[],
 ): DetailTask {
   const area = areaMap.get(task.areaId);
   return {
@@ -264,7 +287,7 @@ export function taskToDetailTask(
     identifier: shortId(task.id),
     title: task.title,
     description: task.description ?? "",
-    status: resolveStatus(task),
+    status: resolveStatus(task, labels),
     priority: resolvePriority(task),
     labels: tagsToLabels(task.tags),
     project: task.projectId ? (projectMap.get(task.projectId) ?? null) : null,
@@ -286,12 +309,12 @@ export function taskToDetailTask(
 
 // ── Child Task → SubIssue ─────────────────────────────────
 
-export function taskToSubIssue(task: Task): SubIssue {
+export function taskToSubIssue(task: Task, labels: StatusLabel[]): SubIssue {
   return {
     id: task.id,
     identifier: shortId(task.id),
     title: task.title,
-    status: resolveStatus(task),
+    status: resolveStatus(task, labels),
     priority: resolvePriority(task),
     completed: task.completed,
   };
