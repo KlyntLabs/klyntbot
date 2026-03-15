@@ -128,8 +128,10 @@ export const CONVERSATION_SCHEMA: ConversationNode[] = [
       await Promise.all(
         newNames.map((name, i) =>
           ipc("area_create", {
-            name: name.trim(),
-            color: AREA_COLORS[(existingNames.size + i) % AREA_COLORS.length],
+            params: {
+              name: name.trim(),
+              color: AREA_COLORS[(existingNames.size + i) % AREA_COLORS.length],
+            },
           }),
         ),
       );

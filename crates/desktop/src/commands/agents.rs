@@ -4,7 +4,8 @@ use app_core::AppCore;
 use desktop_shared::commands::{AgentFileContent, AgentFileSummary, AgentProfileSummary};
 use desktop_shared::errors::ApiError;
 
-pub const DEV_COMMANDS: &[&str] = &[
+#[cfg(test)]
+pub(crate) const DEV_COMMANDS: &[&str] = &[
     "agent_list_profiles",
     "agent_read_file",
     "agent_write_file",

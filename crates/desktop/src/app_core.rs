@@ -5,6 +5,7 @@ pub use ::app_core::AppCore;
 
 use std::sync::Arc;
 
+use ::app_core::events::AppEventEmitter;
 use ::app_core::EventChannels;
 use desktop_shared::events;
 use feature_productivity::auto_focus::AutoFocusEvent;
@@ -14,13 +15,30 @@ use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 use tracing::warn;
 
+/// Bridges `AppEventEmitter` to Tauri's native event system.
+struct TauriEventEmitter {
+    app_handle: tauri::AppHandle,
+}
+
+impl AppEventEmitter for TauriEventEmitter {
+    fn emit_event(&self, event_name: &str, payload: serde_json::Value) {
+        if let Err(e) = self.app_handle.emit(event_name, payload) {
+            warn!("TauriEventEmitter: failed to emit {event_name}: {e}");
+        }
+    }
+}
+
 /// Initialize `AppCore` and wire event channels to Tauri emitters.
 pub async fn init(app_handle: tauri::AppHandle) -> Result<AppCore, String> {
     let sender = Arc::new(crate::notify::TauriNotificationSender::new(
         app_handle.clone(),
     ));
+    let emitter: Arc<dyn AppEventEmitter> = Arc::new(TauriEventEmitter {
+        app_handle: app_handle.clone(),
+    });
     let (core, channels) =
-        AppCore::init_with_sender(common::AppMode::Desktop, None, Some(sender)).await?;
+        AppCore::init_with_sender(common::AppMode::Desktop, None, Some(sender), Some(emitter))
+            .await?;
     wire_event_channels(&core, channels, &app_handle);
     Ok(core)
 }
