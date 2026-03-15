@@ -11,6 +11,14 @@ import { TasksProvider } from "../hooks/useTasksContext";
 import { useTabStore } from "../store/tab-store";
 
 export function Tasks2Page() {
+  return (
+    <StatusWorkflowProvider projectId={null}>
+      <Tasks2PageInner />
+    </StatusWorkflowProvider>
+  );
+}
+
+function Tasks2PageInner() {
   const tasksData = useTasks();
   const initFromAreas = useTabStore((s) => s.initFromAreas);
 
@@ -24,17 +32,15 @@ export function Tasks2Page() {
 
   return (
     <TasksProvider value={ctxValue}>
-      <StatusWorkflowProvider projectId={null}>
-        <PortalContainerProvider>
-          <div className="tasks2-scope flex-1 h-full min-w-0">
-            <Tasks2Layout>
-              <TabBar areas={tasksData.areas} projects={tasksData.projects} />
-              <TabContent tasksData={tasksData} />
-            </Tasks2Layout>
-            <CreateIssueModal onCreateTask={tasksData.createTask} areas={tasksData.areas} />
-          </div>
-        </PortalContainerProvider>
-      </StatusWorkflowProvider>
+      <PortalContainerProvider>
+        <div className="tasks2-scope flex-1 h-full min-w-0">
+          <Tasks2Layout>
+            <TabBar areas={tasksData.areas} projects={tasksData.projects} />
+            <TabContent tasksData={tasksData} />
+          </Tasks2Layout>
+          <CreateIssueModal onCreateTask={tasksData.createTask} areas={tasksData.areas} />
+        </div>
+      </PortalContainerProvider>
     </TasksProvider>
   );
 }
