@@ -34,12 +34,9 @@ export {
   pct,
   retPct,
 } from "./lib/finance";
-export { FinanceAccounts as AccountsPage } from "./pages/AccountsPage";
-export { FinanceBudgets as BudgetsPage } from "./pages/BudgetsPage";
 // Pages
 export { CashFlowPage } from "./pages/CashFlowPage";
 export { Finance as FinanceOverviewPage } from "./pages/FinanceOverviewPage";
 export { FinanceGoals as GoalsPage } from "./pages/GoalsPage";
 export { FinanceInvestments as InvestmentsPage } from "./pages/InvestmentsPage";
 export { FinanceLiabilities as LiabilitiesPage } from "./pages/LiabilitiesPage";
-export { FinanceTransactions as TransactionsPage } from "./pages/TransactionsPage";
