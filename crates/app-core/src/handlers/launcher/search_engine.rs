@@ -1,6 +1,10 @@
+use std::collections::HashMap;
+
+use chrono::Utc;
 use desktop_shared::errors::ApiError;
 use feature_launcher::{
     Calculator, ClipboardRepo, FrequencyRepo, LauncherItem, LauncherItemKind, SourceRegistry,
+    UrlNavigation,
 };
 use feature_notes::repo::NoteRepo;
 use storage::Repos;
@@ -61,8 +65,16 @@ impl LauncherSearchEngine {
         // Add calculator results
         results.extend(calc_results);
 
+        // URL navigation — detect URL-like queries and offer to open in browser
+        if let Some(url_item) = UrlNavigation::try_match(query) {
+            results.push(url_item);
+        }
+
         // Apply frequency boosts
         self.apply_frequency_boosts(&mut results).await;
+
+        // Deduplicate by canonical key (URL or path), keeping the higher-scored item
+        results = Self::deduplicate(results);
 
         // Sort by score descending
         results.sort_by(|a, b| {
@@ -157,9 +169,9 @@ impl LauncherSearchEngine {
                     LauncherItemKind::ClipboardEntry { .. } => "clip",
                     LauncherItemKind::SystemCommand { .. } => "system",
                     LauncherItemKind::Script { .. } => "script",
-                    LauncherItemKind::Calculator { .. } | LauncherItemKind::AiChat { .. } => {
-                        return None
-                    }
+                    LauncherItemKind::Calculator { .. }
+                    | LauncherItemKind::AiChat { .. }
+                    | LauncherItemKind::UrlNavigation { .. } => return None,
                     LauncherItemKind::Calendar { .. } => "calendar",
                     LauncherItemKind::File { .. } => "file",
                     LauncherItemKind::ContentMatch { .. } => "grep",
@@ -186,10 +198,61 @@ impl LauncherSearchEngine {
             .collect();
 
         if let Ok(boosts) = self.frequency_repo.get_boosts_batch(&batch_keys).await {
-            for ((idx, _, _), boost) in pairs.iter().zip(boosts.iter()) {
-                items[*idx].score += boost * 0.1;
+            let now = Utc::now();
+            for ((idx, _, _), (boost, last_used)) in pairs.iter().zip(boosts.iter()) {
+                let recency_multiplier = last_used
+                    .as_ref()
+                    .and_then(|ts| chrono::DateTime::parse_from_rfc3339(ts).ok())
+                    .map(|dt| {
+                        let age = now.signed_duration_since(dt);
+                        if age.num_hours() < 1 {
+                            2.0
+                        } else if age.num_hours() < 24 {
+                            1.5
+                        } else if age.num_days() < 7 {
+                            1.0
+                        } else {
+                            0.5
+                        }
+                    })
+                    .unwrap_or(1.0);
+                items[*idx].score += boost * 0.1 * recency_multiplier;
             }
         }
+    }
+
+    /// Extract a canonical key for deduplication.
+    /// Items that represent the same underlying resource share a key.
+    fn canonical_key(item: &LauncherItem) -> String {
+        match &item.kind {
+            LauncherItemKind::Application { path, .. }
+            | LauncherItemKind::RunningApp { path, .. } => {
+                format!("path:{}", path.to_string_lossy().to_lowercase())
+            }
+            LauncherItemKind::Bookmark { url, .. }
+            | LauncherItemKind::BrowserHistory { url, .. }
+            | LauncherItemKind::UrlNavigation { url } => {
+                // Normalize URL: strip trailing slash and lowercase
+                let normalized = url.trim_end_matches('/').to_lowercase();
+                format!("url:{}", normalized)
+            }
+            _ => format!("id:{}", item.id),
+        }
+    }
+
+    /// Deduplicate items by canonical key, keeping the higher-scored item.
+    fn deduplicate(items: Vec<LauncherItem>) -> Vec<LauncherItem> {
+        let mut best: HashMap<String, LauncherItem> = HashMap::new();
+        for item in items {
+            let key = Self::canonical_key(&item);
+            match best.get(&key) {
+                Some(existing) if existing.score >= item.score => {}
+                _ => {
+                    best.insert(key, item);
+                }
+            }
+        }
+        best.into_values().collect()
     }
 
     /// Record that an item was executed (for frequency boosting).

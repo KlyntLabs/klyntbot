@@ -24,16 +24,10 @@ export function computeHealthScore(params: {
   const { totalIncome, totalSpending, totalAssets, totalDebt, budgets, goals } = params;
 
   const savingsRate =
-    totalIncome > 0
-      ? clamp(0, 100, ((totalIncome - totalSpending) / totalIncome) * 200)
-      : 0;
+    totalIncome > 0 ? clamp(0, 100, ((totalIncome - totalSpending) / totalIncome) * 200) : 0;
 
   const debtRatio =
-    totalAssets > 0
-      ? clamp(0, 100, (1 - totalDebt / totalAssets) * 100)
-      : totalDebt > 0
-        ? 0
-        : 75;
+    totalAssets > 0 ? clamp(0, 100, (1 - totalDebt / totalAssets) * 100) : totalDebt > 0 ? 0 : 75;
 
   const budgetAdherence =
     budgets.length > 0
@@ -43,10 +37,8 @@ export function computeHealthScore(params: {
 
   const goalProgress =
     goals.length > 0
-      ? goals.reduce(
-          (sum, g) => sum + clamp(0, 100, (g.currentAmount / g.targetAmount) * 100),
-          0,
-        ) / goals.length
+      ? goals.reduce((sum, g) => sum + clamp(0, 100, (g.currentAmount / g.targetAmount) * 100), 0) /
+        goals.length
       : 50;
 
   const score = Math.round((savingsRate + debtRatio + budgetAdherence + goalProgress) / 4);
@@ -58,7 +50,12 @@ export function computeHealthScore(params: {
     { name: "Goal Progress", value: Math.round(goalProgress), color: "#a78bfa" },
   ];
 
-  const status = score >= 70 ? "Good — improving ↑" : score >= 40 ? "Fair — watch spending" : "Needs attention ↓";
+  const status =
+    score >= 70
+      ? "Good — improving ↑"
+      : score >= 40
+        ? "Fair — watch spending"
+        : "Needs attention ↓";
   const statusColor = score >= 70 ? "#34d399" : score >= 40 ? "#f97316" : "#f43f5e";
 
   return { score, factors, status, statusColor };

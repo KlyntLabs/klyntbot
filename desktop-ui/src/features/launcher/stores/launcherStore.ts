@@ -6,18 +6,24 @@ interface LauncherState {
   query: string;
   results: LauncherItem[];
   selectedIndex: number;
+  isSearching: boolean;
   dashboard: DashboardData | null;
   queryHistory: string[];
   historyIndex: number;
+  detailItem: LauncherItem | null;
+  actionMenuOpen: boolean;
 
   setMode: (mode: LauncherMode) => void;
   setQuery: (query: string) => void;
   setResults: (results: LauncherItem[]) => void;
   setSelectedIndex: (index: number) => void;
+  setIsSearching: (loading: boolean) => void;
   setDashboard: (data: DashboardData) => void;
   moveSelection: (delta: number) => void;
   pushHistory: (query: string) => void;
   navigateHistory: (direction: "up" | "down") => void;
+  setDetailItem: (item: LauncherItem | null) => void;
+  setActionMenuOpen: (open: boolean) => void;
   reset: () => void;
 }
 
@@ -26,17 +32,21 @@ export const useLauncherStore = create<LauncherState>((set, get) => ({
   query: "",
   results: [],
   selectedIndex: 0,
+  isSearching: false,
   dashboard: null,
   queryHistory: [],
   historyIndex: -1,
+  detailItem: null,
+  actionMenuOpen: false,
 
   setMode: (mode) => set({ mode }),
   setQuery: (query) => {
     const mode = query.length > 0 ? "search" : "dashboard";
     set({ query, mode, selectedIndex: 0, historyIndex: -1 });
   },
-  setResults: (results) => set({ results }),
+  setResults: (results) => set({ results, isSearching: false }),
   setSelectedIndex: (index) => set({ selectedIndex: index }),
+  setIsSearching: (isSearching) => set({ isSearching }),
   setDashboard: (data) => set({ dashboard: data }),
   moveSelection: (delta) => {
     const { results, selectedIndex } = get();
@@ -49,6 +59,8 @@ export const useLauncherStore = create<LauncherState>((set, get) => ({
     const filtered = queryHistory.filter((q) => q !== query);
     set({ queryHistory: [query, ...filtered].slice(0, 50) });
   },
+  setDetailItem: (item) => set({ detailItem: item }),
+  setActionMenuOpen: (open) => set({ actionMenuOpen: open }),
   navigateHistory: (direction) => {
     const { queryHistory, historyIndex } = get();
     if (queryHistory.length === 0) return;
@@ -68,6 +80,9 @@ export const useLauncherStore = create<LauncherState>((set, get) => ({
       query: "",
       results: [],
       selectedIndex: 0,
+      isSearching: false,
       historyIndex: -1,
+      detailItem: null,
+      actionMenuOpen: false,
     }),
 }));

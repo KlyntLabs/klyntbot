@@ -37,7 +37,8 @@ export type LauncherItemKind =
   | { type: "browserHistory"; url: string; visitedAt: string }
   | { type: "brewPackage"; name: string; isCask: boolean }
   | { type: "sshHost"; host: string; user: string | null }
-  | { type: "gitRepo"; path: string };
+  | { type: "gitRepo"; path: string }
+  | { type: "urlNavigation"; url: string };
 
 export interface DashboardData {
   focus: FocusDashboard | null;

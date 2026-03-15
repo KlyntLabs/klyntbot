@@ -330,9 +330,7 @@ impl AppCore {
         Ok(points)
     }
 
-    pub async fn finance_monthly_summary(
-        &self,
-    ) -> Result<FinanceMonthlySummaryResponse, ApiError> {
+    pub async fn finance_monthly_summary(&self) -> Result<FinanceMonthlySummaryResponse, ApiError> {
         let currency = self.default_currency().await;
         let now = chrono::Local::now();
         let current_month_label = now.format("%Y-%m").to_string();

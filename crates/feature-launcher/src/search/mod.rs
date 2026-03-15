@@ -14,6 +14,7 @@ pub mod script_runner;
 pub mod ssh_hosts;
 pub mod system_commands;
 pub mod system_prefs;
+pub mod url_navigation;
 
 pub use app_index::{AppEntry, AppIndex};
 pub use background::{BackgroundRefresher, RefreshEntry};
@@ -31,6 +32,7 @@ pub use script_runner::ScriptRunner;
 pub use ssh_hosts::SshHostsSource;
 pub use system_commands::SystemCommands;
 pub use system_prefs::SystemPrefsSource;
+pub use url_navigation::UrlNavigation;
 
 use crate::types::LauncherItem;
 use async_trait::async_trait;

@@ -45,11 +45,12 @@ impl FrequencyRepo {
     }
 
     /// Fetch boosts for multiple items in a single query.
-    /// Returns boosts in the same order as the input items.
+    /// Returns `(boost, last_used)` in the same order as the input items.
+    /// `last_used` is the RFC3339 timestamp of last use, or `None` if never used.
     pub async fn get_boosts_batch(
         &self,
         items: &[(String, String)],
-    ) -> Result<Vec<f64>, StorageError> {
+    ) -> Result<Vec<(f64, Option<String>)>, StorageError> {
         if items.is_empty() {
             return Ok(vec![]);
         }
@@ -61,11 +62,11 @@ impl FrequencyRepo {
             .map(|(i, _)| format!("(item_id = ?{} AND kind = ?{})", i * 2 + 1, i * 2 + 2))
             .collect();
         let sql = format!(
-            "SELECT item_id, kind, count FROM launcher_frequencies WHERE {}",
+            "SELECT item_id, kind, count, last_used FROM launcher_frequencies WHERE {}",
             conditions.join(" OR ")
         );
 
-        let mut query = sqlx::query_as::<_, (String, String, i64)>(&sql);
+        let mut query = sqlx::query_as::<_, (String, String, i64, String)>(&sql);
         for (item_id, kind) in items {
             query = query.bind(item_id).bind(kind);
         }
@@ -74,11 +75,12 @@ impl FrequencyRepo {
         // Map results back to input order
         let mut boosts = Vec::with_capacity(items.len());
         for (item_id, kind) in items {
-            let count = rows
-                .iter()
-                .find(|(id, k, _)| id == item_id && k == kind)
-                .map_or(0, |(_, _, c)| *c);
-            boosts.push((count as f64 + 1.0).log2());
+            let row = rows.iter().find(|(id, k, _, _)| id == item_id && k == kind);
+            let (count, last_used) = match row {
+                Some((_, _, c, lu)) => (*c, Some(lu.clone())),
+                None => (0, None),
+            };
+            boosts.push(((count as f64 + 1.0).log2(), last_used));
         }
         Ok(boosts)
     }
@@ -143,7 +145,10 @@ mod tests {
         ];
         let boosts = repo.get_boosts_batch(&items).await.unwrap();
         assert_eq!(boosts.len(), 3);
-        assert!(boosts[0] > boosts[1]); // safari > slack
-        assert!((boosts[2] - 0.0).abs() < f64::EPSILON); // missing = log2(1) = 0
+        assert!(boosts[0].0 > boosts[1].0); // safari > slack
+        assert!((boosts[2].0 - 0.0).abs() < f64::EPSILON); // missing = log2(1) = 0
+        assert!(boosts[0].1.is_some()); // safari has last_used
+        assert!(boosts[1].1.is_some()); // slack has last_used
+        assert!(boosts[2].1.is_none()); // missing has no last_used
     }
 }

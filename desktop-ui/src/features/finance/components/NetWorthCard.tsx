@@ -1,5 +1,5 @@
-import { Card } from "./Card";
 import { fmtCompact } from "../lib/finance";
+import { Card } from "./Card";
 
 export function NetWorthCard({
   totalNet,

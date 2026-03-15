@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useLauncherStore } from "../stores/launcherStore";
 import type { DashboardData } from "../types";
 
@@ -44,14 +45,21 @@ export function Dashboard({ onOpenTask }: DashboardProps) {
 /* ── Focus Session ────────────────────────────────────────────── */
 
 function FocusWidget({ focus }: { focus: NonNullable<DashboardData["focus"]> }) {
-  const mins = Math.floor(focus.elapsedSecs / 60);
-  const secs = focus.elapsedSecs % 60;
-  const progress = focus.targetSecs
-    ? Math.min(100, (focus.elapsedSecs / focus.targetSecs) * 100)
-    : null;
+  const [elapsed, setElapsed] = useState(focus.elapsedSecs);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: sessionId resets the timer when a new session starts
+  useEffect(() => {
+    setElapsed(focus.elapsedSecs);
+    const interval = setInterval(() => setElapsed((e) => e + 1), 1000);
+    return () => clearInterval(interval);
+  }, [focus.elapsedSecs, focus.sessionId]);
+
+  const mins = Math.floor(elapsed / 60);
+  const secs = elapsed % 60;
+  const progress = focus.targetSecs ? Math.min(100, (elapsed / focus.targetSecs) * 100) : null;
 
   return (
-    <div className="rounded-lg bg-[rgba(249,115,22,0.06)] border border-[rgba(249,115,22,0.15)] p-3">
+    <div className="rounded-lg bg-brand/[0.06] border border-brand/15 p-3">
       <div className="flex items-center gap-2 mb-1.5">
         <div className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse" />
         <span className="text-[11px] font-medium uppercase tracking-wider text-brand/80">

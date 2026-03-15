@@ -100,6 +100,9 @@ pub enum LauncherItemKind {
     GitRepo {
         path: PathBuf,
     },
+    UrlNavigation {
+        url: String,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

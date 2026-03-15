@@ -20,16 +20,30 @@ pub async fn build_dashboard_data(
     let focus = match prod_repos {
         Some(pr) => {
             let session = pr.sessions.get_active().await.map_err(map_prod_err)?;
-            session.map(|s| {
-                let elapsed = (now - s.started_at).num_seconds();
-                let target_secs = s.target_mins.map(|m| m * 60);
-                FocusDashboard {
-                    task_name: s.action_id.clone(),
-                    elapsed_secs: elapsed,
-                    target_secs,
-                    session_id: s.id.clone(),
+            match session {
+                Some(s) => {
+                    let elapsed = (now - s.started_at).num_seconds();
+                    let target_secs = s.target_mins.map(|m| m * 60);
+                    let task_name = if let Some(ref action_id) = s.action_id {
+                        repos
+                            .tasks
+                            .get(action_id)
+                            .await
+                            .ok()
+                            .flatten()
+                            .map(|t| t.title)
+                    } else {
+                        None
+                    };
+                    Some(FocusDashboard {
+                        task_name,
+                        elapsed_secs: elapsed,
+                        target_secs,
+                        session_id: s.id.clone(),
+                    })
                 }
-            })
+                None => None,
+            }
         }
         None => None,
     };

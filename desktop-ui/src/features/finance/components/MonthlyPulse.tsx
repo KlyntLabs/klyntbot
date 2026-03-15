@@ -19,7 +19,11 @@ export function MonthlyPulse({ rows }: { rows: PulseRow[] }) {
             <div className="h-1 bg-white/[0.06] rounded-full mt-1.5">
               <div
                 className="h-full rounded-full"
-                style={{ width: `${row.barWidth}%`, background: row.color, transition: "width 0.8s ease" }}
+                style={{
+                  width: `${row.barWidth}%`,
+                  background: row.color,
+                  transition: "width 0.8s ease",
+                }}
               />
             </div>
           </div>

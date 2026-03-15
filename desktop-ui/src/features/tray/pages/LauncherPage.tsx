@@ -1,8 +1,11 @@
+import { ActionMenu } from "@features/launcher/components/ActionMenu";
 import { Dashboard } from "@features/launcher/components/Dashboard";
+import { DetailPanel } from "@features/launcher/components/DetailPanel";
 import { LauncherChat } from "@features/launcher/components/LauncherChat";
 import { LauncherInput } from "@features/launcher/components/LauncherInput";
 import { ResultsList } from "@features/launcher/components/ResultsList";
 import { useDashboardData } from "@features/launcher/hooks/useDashboardData";
+import { executeItem } from "@features/launcher/hooks/useExecuteItem";
 import { useKeyboardNavigation } from "@features/launcher/hooks/useKeyboardNavigation";
 import { useLauncherSearch } from "@features/launcher/hooks/useLauncherSearch";
 import { useLauncherStore } from "@features/launcher/stores/launcherStore";
@@ -83,16 +86,18 @@ export function Launcher() {
     onHide: hideWindow,
   });
 
-  const executeItem = useCallback(
+  const handleExecute = useCallback(
     (index: number) => {
       const results = useLauncherStore.getState().results;
       const item = results[index];
       if (!item) return;
-      if (item.kind.type === "aiChat") {
-        enterChat(item.kind.query);
-      }
+      executeItem(item, {
+        onEnterChat: enterChat,
+        onExpandToMain: expandToMain,
+        onHide: hideWindow,
+      });
     },
-    [enterChat],
+    [enterChat, expandToMain, hideWindow],
   );
 
   return (
@@ -113,12 +118,14 @@ export function Launcher() {
             onExpand={expandToMain}
           />
         ) : (
-          <div className="rounded-[var(--glass-radius-inner)] overflow-hidden">
+          <div className="relative rounded-[var(--glass-radius-inner)] overflow-hidden">
             <LauncherInput />
             {mode === "dashboard" && (
               <Dashboard onOpenTask={(id) => navigateToMain(`/task/${id}`)} />
             )}
-            {mode === "search" && <ResultsList onExecute={executeItem} />}
+            {mode === "search" && <ResultsList onExecute={handleExecute} />}
+            {mode === "detail" && <DetailPanel />}
+            <ActionMenu />
           </div>
         )}
       </div>

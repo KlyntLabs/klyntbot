@@ -14,13 +14,7 @@ import type {
   FinanceTransaction,
 } from "@shared/types";
 import { Progress } from "@shared/ui";
-import {
-  ArrowDownRight,
-  ArrowLeftRight,
-  ArrowUpRight,
-  Target,
-  Wallet,
-} from "lucide-react";
+import { ArrowDownRight, ArrowLeftRight, ArrowUpRight, Target, Wallet } from "lucide-react";
 import { useCallback, useMemo } from "react";
 import { Link } from "react-router";
 import { BudgetStrip } from "../components/BudgetStrip";
@@ -34,8 +28,6 @@ import { SensitiveDivider } from "../components/SensitiveDivider";
 import { useFinanceCurrency } from "../hooks/useFinanceCurrency";
 import { usePrivacyMode } from "../hooks/usePrivacyMode";
 import { displayAmount, displayHint } from "../lib/displayAmount";
-import { computeHealthScore } from "../lib/healthScore";
-import { computeMonthlyPulse } from "../lib/monthlyPulse";
 import {
   ACCT_ICONS,
   COLORS,
@@ -45,6 +37,8 @@ import {
   pct,
   retPct,
 } from "../lib/finance";
+import { computeHealthScore } from "../lib/healthScore";
+import { computeMonthlyPulse } from "../lib/monthlyPulse";
 
 export function Finance() {
   const { mode, setMode, baseCurrency, rates, currencies, displayCur, convertTotal } =
@@ -156,17 +150,13 @@ export function Finance() {
   const healthScore = useMemo(
     () =>
       computeHealthScore({
-        totalIncome: transactions
-          .filter((t) => t.txType === "income")
-          .reduce((s, t) => s + (t.baseAmount ?? 0), 0),
-        totalSpending: transactions
-          .filter((t) => t.txType === "expense")
-          .reduce((s, t) => s + (t.baseAmount ?? 0), 0),
-        totalAssets:
-          accounts.reduce((s, a) => s + (a.baseBalance ?? 0), 0) +
-          investments.reduce((s, i) => s + (i.baseCurrentValue ?? 0), 0),
-        totalDebt: liabilities.reduce((s, l) => s + (l.baseRemaining ?? 0), 0),
-        budgets: budgets.filter((b) => b.isActive).map((b) => ({ spent: b.spent, amount: b.amount })),
+        totalIncome,
+        totalSpending: totalSpend,
+        totalAssets,
+        totalDebt,
+        budgets: budgets
+          .filter((b) => b.isActive)
+          .map((b) => ({ spent: b.spent, amount: b.amount })),
         goals: goals.map((g) => ({ currentAmount: g.currentAmount, targetAmount: g.targetAmount })),
       }),
     [transactions, accounts, investments, liabilities, budgets, goals],
@@ -321,9 +311,7 @@ export function Finance() {
                           hidden,
                         })}
                       </p>
-                      {hint && (
-                        <p className="text-[9px] text-dim font-light mt-0.5">≈ {hint}</p>
-                      )}
+                      {hint && <p className="text-[9px] text-dim font-light mt-0.5">≈ {hint}</p>}
                     </div>
                   </div>
                 );
@@ -349,10 +337,7 @@ export function Finance() {
                 const p = pct(g.currentAmount, g.targetAmount);
                 const Icon = GOAL_ICONS[g.goalType] ?? Target;
                 return (
-                  <div
-                    key={g.id}
-                    className="px-4 py-3 hover:bg-white/[0.06] transition-colors"
-                  >
+                  <div key={g.id} className="px-4 py-3 hover:bg-white/[0.06] transition-colors">
                     <div className="flex items-center gap-2 mb-1.5">
                       <Icon
                         className={cn(
@@ -411,7 +396,9 @@ export function Finance() {
           <Card className="overflow-hidden">
             <div className="px-4 pt-4 pb-1">
               <div className="flex items-center justify-between mb-2.5 px-1">
-                <span className="text-[10px] text-muted uppercase tracking-widest">Investments</span>
+                <span className="text-[10px] text-muted uppercase tracking-widest">
+                  Investments
+                </span>
                 <Link
                   to="/finance/investments"
                   className="text-[10px] text-brand normal-case tracking-normal"
@@ -456,7 +443,9 @@ export function Finance() {
           <Card className="overflow-hidden">
             <div className="px-4 pt-4 pb-1">
               <div className="flex items-center justify-between mb-2.5 px-1">
-                <span className="text-[10px] text-muted uppercase tracking-widest">Liabilities</span>
+                <span className="text-[10px] text-muted uppercase tracking-widest">
+                  Liabilities
+                </span>
                 <Link
                   to="/finance/liabilities"
                   className="text-[10px] text-brand normal-case tracking-normal"
@@ -470,10 +459,7 @@ export function Finance() {
                 const Icon = LIAB_ICONS[l.liabilityType] ?? Wallet;
                 const paid = pct(l.principal - l.remaining, l.principal);
                 return (
-                  <div
-                    key={l.id}
-                    className="px-4 py-3 hover:bg-white/[0.06] transition-colors"
-                  >
+                  <div key={l.id} className="px-4 py-3 hover:bg-white/[0.06] transition-colors">
                     <div className="flex items-center gap-2 mb-1.5">
                       <Icon
                         className="w-3.5 h-3.5 text-destructive/60 flex-shrink-0"
@@ -589,9 +575,7 @@ export function Finance() {
                       {tx.category}
                     </span>
                   )}
-                  {acct && (
-                    <span className="text-[9px] text-dim font-light">{acct.name}</span>
-                  )}
+                  {acct && <span className="text-[9px] text-dim font-light">{acct.name}</span>}
                 </div>
               </div>
               <span

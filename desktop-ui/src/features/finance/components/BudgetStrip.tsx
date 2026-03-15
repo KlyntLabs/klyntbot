@@ -1,6 +1,6 @@
 import type { FinanceBudgetUsage } from "@shared/types";
-import { Card } from "./Card";
 import { pct } from "../lib/finance";
+import { Card } from "./Card";
 
 function budgetStatusText(p: number): string {
   if (p >= 90) return `⚠ Near limit — ${100 - p}% remaining`;
@@ -27,10 +27,19 @@ export function BudgetStrip({ budgets }: { budgets: FinanceBudgetUsage[] }) {
           <Card key={b.id} className="p-3.5">
             <div className="flex justify-between items-center mb-2">
               <span className="text-[12px] text-secondary">{b.name}</span>
-              <span className="text-[13px] font-light tabular-nums" style={{ color }}>{p}%</span>
+              <span className="text-[13px] font-light tabular-nums" style={{ color }}>
+                {p}%
+              </span>
             </div>
             <div className="h-1 bg-white/[0.06] rounded-full">
-              <div className="h-full rounded-full" style={{ width: `${Math.min(p, 100)}%`, background: color, transition: "width 0.6s ease" }} />
+              <div
+                className="h-full rounded-full"
+                style={{
+                  width: `${Math.min(p, 100)}%`,
+                  background: color,
+                  transition: "width 0.6s ease",
+                }}
+              />
             </div>
             <p className="text-[9px] text-dim mt-1.5">{budgetStatusText(p)}</p>
           </Card>

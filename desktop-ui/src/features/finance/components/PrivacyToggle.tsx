@@ -1,12 +1,6 @@
 import { Eye, EyeOff } from "lucide-react";
 
-export function PrivacyToggle({
-  hidden,
-  onToggle,
-}: {
-  hidden: boolean;
-  onToggle: () => void;
-}) {
+export function PrivacyToggle({ hidden, onToggle }: { hidden: boolean; onToggle: () => void }) {
   const Icon = hidden ? EyeOff : Eye;
   return (
     <button

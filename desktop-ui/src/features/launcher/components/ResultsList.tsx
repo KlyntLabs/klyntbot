@@ -9,6 +9,7 @@ interface ResultsListProps {
 export function ResultsList({ onExecute }: ResultsListProps) {
   const results = useLauncherStore((s) => s.results);
   const selectedIndex = useLauncherStore((s) => s.selectedIndex);
+  const isSearching = useLauncherStore((s) => s.isSearching);
   const listRef = useRef<HTMLDivElement>(null);
 
   // Scroll selected item into view
@@ -18,6 +19,28 @@ export function ResultsList({ onExecute }: ResultsListProps) {
     const selected = list.children[selectedIndex] as HTMLElement | undefined;
     selected?.scrollIntoView({ block: "nearest" });
   }, [selectedIndex]);
+
+  if (isSearching && results.length === 0) {
+    return (
+      <div className="p-4 flex items-center justify-center gap-2">
+        <div className="flex gap-1">
+          <div
+            className="w-1.5 h-1.5 rounded-full bg-muted/60 animate-bounce"
+            style={{ animationDelay: "0ms" }}
+          />
+          <div
+            className="w-1.5 h-1.5 rounded-full bg-muted/60 animate-bounce"
+            style={{ animationDelay: "150ms" }}
+          />
+          <div
+            className="w-1.5 h-1.5 rounded-full bg-muted/60 animate-bounce"
+            style={{ animationDelay: "300ms" }}
+          />
+        </div>
+        <span className="text-muted text-sm">Searching...</span>
+      </div>
+    );
+  }
 
   if (results.length === 0) {
     return <div className="p-4 text-center text-muted text-sm">No results</div>;
@@ -29,6 +52,7 @@ export function ResultsList({ onExecute }: ResultsListProps) {
         <ResultRow
           key={item.id}
           item={item}
+          index={index}
           isSelected={index === selectedIndex}
           onClick={() => onExecute(index)}
           onMouseEnter={() => useLauncherStore.getState().setSelectedIndex(index)}
@@ -40,11 +64,13 @@ export function ResultsList({ onExecute }: ResultsListProps) {
 
 function ResultRow({
   item,
+  index,
   isSelected,
   onClick,
   onMouseEnter,
 }: {
   item: LauncherItem;
+  index: number;
   isSelected: boolean;
   onClick: () => void;
   onMouseEnter: () => void;
@@ -54,9 +80,10 @@ function ResultRow({
       role="option"
       tabIndex={-1}
       aria-selected={isSelected}
-      className={`flex items-center gap-3 px-4 py-2 cursor-pointer transition-colors ${
+      className={`flex items-center gap-3 px-4 py-2 cursor-pointer transition-colors duration-100 animate-[result-in_0.15s_ease-out_both] ${
         isSelected ? "bg-surface-raised" : "hover:bg-surface-raised/50"
       }`}
+      style={{ animationDelay: `${Math.min(index * 20, 200)}ms` }}
       onClick={onClick}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -96,6 +123,7 @@ const ICON_MAP: Record<string, string> = {
   brewPackage: "\uD83C\uDF7A",
   sshHost: "\uD83D\uDD11",
   gitRepo: "\uD83D\uDCC2",
+  urlNavigation: "\uD83C\uDF10",
 };
 
 function ItemIcon({ kind, icon }: { kind: string; icon?: string | null }) {
@@ -129,6 +157,7 @@ const KIND_LABELS: Record<string, string> = {
   brewPackage: "Brew",
   sshHost: "SSH",
   gitRepo: "Repo",
+  urlNavigation: "URL",
 };
 
 function KindBadge({ type }: { type: string }) {

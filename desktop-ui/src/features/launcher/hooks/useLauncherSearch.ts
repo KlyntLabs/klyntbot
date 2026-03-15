@@ -6,6 +6,7 @@ import type { LauncherItem } from "../types";
 export function useLauncherSearch() {
   const query = useLauncherStore((s) => s.query);
   const setResults = useLauncherStore((s) => s.setResults);
+  const setIsSearching = useLauncherStore((s) => s.setIsSearching);
   const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
@@ -14,6 +15,7 @@ export function useLauncherSearch() {
       return;
     }
 
+    setIsSearching(true);
     clearTimeout(timerRef.current);
     timerRef.current = setTimeout(async () => {
       try {
@@ -21,9 +23,10 @@ export function useLauncherSearch() {
         setResults(results);
       } catch (e) {
         console.error("Launcher search failed:", e);
+        setResults([]);
       }
     }, 100);
 
     return () => clearTimeout(timerRef.current);
-  }, [query, setResults]);
+  }, [query, setResults, setIsSearching]);
 }
