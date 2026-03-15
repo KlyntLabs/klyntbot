@@ -35,7 +35,8 @@ function toMajor(amount: number, currency: string): number {
   return ZERO_DECIMAL.has(currency) ? amount : amount / 100;
 }
 
-export function fmtMoney(amount: number, currency: string): string {
+export function fmtMoney(amount: number, currency: string, hidden?: boolean): string {
+  if (hidden) return "•••••••";
   const value = toMajor(amount, currency);
   if (currency === "VND") return `${new Intl.NumberFormat("vi-VN").format(Math.round(value))}đ`;
   if (currency === "USDT")
@@ -53,7 +54,8 @@ export function fmtMoney(amount: number, currency: string): string {
   }).format(value);
 }
 
-export function fmtCompact(amount: number, currency = "USD"): string {
+export function fmtCompact(amount: number, currency = "USD", hidden?: boolean): string {
+  if (hidden) return "•••••••";
   const v = toMajor(amount, currency);
   const symbol =
     currency === "VND"

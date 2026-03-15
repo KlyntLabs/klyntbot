@@ -38,6 +38,7 @@ interface AmountDisplayOptions {
   compact?: boolean;
   /** Rates to convert baseCurrency → target. Optional, needed for cross-currency display. */
   rates?: RateMap;
+  hidden?: boolean;
 }
 
 /**
@@ -83,6 +84,7 @@ function resolveAmount(opts: AmountDisplayOptions): { value: number; currency: s
  * Primary display amount based on mode.
  */
 export function displayAmount(opts: AmountDisplayOptions): string {
+  if (opts.hidden) return "•••••••";
   const fmt = opts.compact ? fmtCompact : fmtMoney;
   const { value, currency } = resolveAmount(opts);
   return fmt(value, currency);
@@ -108,6 +110,7 @@ export function resolvedCurrency(opts: AmountDisplayOptions): string {
  * In multi mode: shows base equivalent if different.
  */
 export function displayHint(opts: AmountDisplayOptions): string | null {
+  if (opts.hidden) return null;
   const fmt = opts.compact ? fmtCompact : fmtMoney;
   const resolved = resolveAmount(opts);
 
