@@ -10,11 +10,38 @@ mod oauth;
 
 use std::sync::Arc;
 
+use clap::{Parser, Subcommand};
 use commands::window::{WINDOW_LAUNCHER, WINDOW_TRAY};
 use tauri::image::Image;
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::Manager;
 use tauri_plugin_global_shortcut::{Code, Modifiers, ShortcutState};
+
+#[derive(Parser)]
+#[command(name = "Klynt", about = "Klynt personal AI agent")]
+struct Cli {
+    #[command(subcommand)]
+    command: Option<Commands>,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// Run the MCP server
+    Mcp {
+        #[command(subcommand)]
+        command: McpCommands,
+    },
+}
+
+#[derive(Subcommand)]
+enum McpCommands {
+    /// Serve MCP over stdin/stdout
+    Serve {
+        /// Use stdio transport
+        #[arg(long)]
+        stdio: bool,
+    },
+}
 
 /// Register a dismiss-on-blur handler that hides the window when it loses focus.
 fn dismiss_on_blur(window: &tauri::WebviewWindow) {
@@ -27,6 +54,31 @@ fn dismiss_on_blur(window: &tauri::WebviewWindow) {
 }
 
 fn main() {
+    let cli = Cli::parse();
+
+    match cli.command {
+        Some(Commands::Mcp { command }) => match command {
+            McpCommands::Serve { stdio } => {
+                if stdio {
+                    run_mcp_stdio();
+                } else {
+                    eprintln!("Only --stdio transport is currently supported");
+                    std::process::exit(1);
+                }
+            }
+        },
+        None => {
+            run_desktop_app();
+        }
+    }
+}
+
+fn run_mcp_stdio() {
+    eprintln!("MCP stdio server not yet implemented");
+    std::process::exit(1);
+}
+
+fn run_desktop_app() {
     tauri::Builder::default()
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
