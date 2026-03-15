@@ -74,8 +74,68 @@ fn main() {
 }
 
 fn run_mcp_stdio() {
-    eprintln!("MCP stdio server not yet implemented");
-    std::process::exit(1);
+    use klyntbot_server::handler::KlyntbotServerHandler;
+    use rmcp::service::ServiceExt;
+    use tracing_subscriber::EnvFilter;
+
+    // Init tracing to stderr (stdout is reserved for MCP transport)
+    tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::from_default_env())
+        .with_writer(std::io::stderr)
+        .init();
+
+    let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
+    rt.block_on(async {
+        // Load config
+        let config = config::load_with_env_overrides()
+            .await
+            .expect("config load failed");
+
+        // Init AppCore in Server mode
+        let (app, events) =
+            app_core::AppCore::init(common::AppMode::Server, Some(config.clone()))
+                .await
+                .expect("init failed");
+        let app = Arc::new(app);
+
+        // Drain unused EventChannels — both receivers must close before task exits.
+        tokio::spawn(async move {
+            let mut intervention_rx = events.intervention_rx;
+            let mut pipeline_rx = events.pipeline_rx;
+            let mut intervention_closed = false;
+            let mut pipeline_closed = false;
+            while !intervention_closed || !pipeline_closed {
+                tokio::select! {
+                    msg = intervention_rx.recv(), if !intervention_closed => {
+                        if msg.is_none() { intervention_closed = true; }
+                    }
+                    result = pipeline_rx.recv(), if !pipeline_closed => {
+                        if result.is_err() { pipeline_closed = true; }
+                    }
+                }
+            }
+        });
+
+        // Build MCP handler
+        let whitelist = config.mcp.server.exposed_tools.clone();
+        let handler = KlyntbotServerHandler::new(app.clone(), whitelist);
+
+        // Serve over stdio
+        tracing::info!("Starting MCP server (stdio)");
+        let transport = rmcp::transport::io::stdio();
+        let service = handler.serve(transport).await.expect("Failed to serve MCP");
+
+        tokio::select! {
+            result = service.waiting() => {
+                if let Err(e) = result { eprintln!("Server error: {e}"); }
+            }
+            _ = tokio::signal::ctrl_c() => {
+                tracing::info!("Shutting down...");
+            }
+        }
+
+        app.shutdown().await;
+    });
 }
 
 fn run_desktop_app() {
