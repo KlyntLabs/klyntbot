@@ -46,29 +46,17 @@ impl ClipboardMonitor {
 
     #[cfg(target_os = "macos")]
     fn get_change_count(&self) -> i64 {
-        use objc2_app_kit::NSPasteboard;
-
-        let pasteboard = NSPasteboard::generalPasteboard();
-        pasteboard.changeCount() as i64
+        platform_macos::pasteboard::pasteboard_change_count()
     }
 
     #[cfg(target_os = "macos")]
     fn read_pasteboard(&self) -> Option<String> {
-        use objc2_app_kit::{NSPasteboard, NSPasteboardTypeString};
-
-        let pasteboard = NSPasteboard::generalPasteboard();
-        let string = unsafe { pasteboard.stringForType(NSPasteboardTypeString) }?;
-        Some(string.to_string())
+        platform_macos::pasteboard::read_pasteboard_string()
     }
 
     #[cfg(target_os = "macos")]
     fn get_frontmost_app_name(&self) -> Option<String> {
-        use objc2_app_kit::NSWorkspace;
-
-        let workspace = NSWorkspace::sharedWorkspace();
-        let app = workspace.frontmostApplication()?;
-        let name = app.localizedName()?;
-        Some(name.to_string())
+        platform_macos::window::get_frontmost_window().map(|w| w.app_name)
     }
 
     #[cfg(not(target_os = "macos"))]

@@ -31,6 +31,7 @@ members = [
     "crates/feature-tasks",
     "crates/feature-launcher",
     "crates/klyntbot-server",
+    "crates/platform-macos",
 ]
 
 [workspace.package]
@@ -68,6 +69,7 @@ activity-log = { path = "crates/activity-log" }
 feature-tasks = { path = "crates/feature-tasks" }
 feature-launcher = { path = "crates/feature-launcher" }
 klyntbot-server = { path = "crates/klyntbot-server" }
+platform-macos = { path = "crates/platform-macos" }
 extism = "1"
 mcp = { path = "crates/mcp" }
 rmcp = { version = "0.17", default-features = false }

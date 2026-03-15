@@ -24,14 +24,14 @@ impl WindowManager {
     pub fn execute(&self, action: &WindowAction) -> common::Result<()> {
         use super::accessibility;
 
-        let window = accessibility::get_frontmost_window().ok_or_else(|| {
+        let pid = accessibility::get_frontmost_pid().ok_or_else(|| {
             common::KlyntbotError::Io(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
                 "No frontmost window",
             ))
         })?;
         let screen = accessibility::get_screen_frame();
-        let window_id = window.id();
+        let window_id = pid as u32;
 
         let cycle_index = {
             let mut last = self.last_actions.lock();
@@ -59,8 +59,7 @@ impl WindowManager {
         };
 
         let (x, y, w, h) = self.compute_frame(action, &screen, cycle_index);
-        window.set_position(x, y);
-        window.set_size(w, h);
+        accessibility::set_window_frame(pid, x, y, w, h);
         Ok(())
     }
 

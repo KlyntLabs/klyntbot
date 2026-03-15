@@ -247,15 +247,4 @@ pub fn fuzzy_match2<'a, T>(
     scored
 }
 
-/// Resolve a Chromium-based browser's profile directory.
-pub fn chromium_profile_dir(browser: &str) -> Option<std::path::PathBuf> {
-    let home = std::env::var("HOME").ok()?;
-    let app_support = std::path::PathBuf::from(&home).join("Library/Application Support");
-    match browser {
-        "chrome" => Some(app_support.join("Google/Chrome/Default")),
-        "arc" => Some(app_support.join("Arc/User Data/Default")),
-        "brave" => Some(app_support.join("BraveSoftware/Brave-Browser/Default")),
-        "edge" => Some(app_support.join("Microsoft Edge/Default")),
-        _ => None,
-    }
-}
+pub use platform_macos::browser::chromium_profile_dir;

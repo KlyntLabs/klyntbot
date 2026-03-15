@@ -1,30 +1,3 @@
-/// Known browser app names (lowercased for comparison).
-pub(super) const BROWSER_APPS: &[&str] = &[
-    "google chrome",
-    "safari",
-    "firefox",
-    "arc",
-    "brave browser",
-    "orion",
-    "vivaldi",
-    "microsoft edge",
-    "opera",
-    "chromium",
-    "zen browser",
-];
-
-/// Known browser bundle ID prefixes.
-pub(super) const BROWSER_BUNDLE_PREFIXES: &[&str] = &[
-    "com.google.chrome",
-    "com.apple.safari",
-    "org.mozilla.firefox",
-    "company.thebrowser.browser", // Arc
-    "com.brave.browser",
-    "com.microsoft.edgemac",
-    "com.operasoftware.opera",
-    "com.vivaldi.vivaldi",
-];
-
 /// Browser name suffixes typically appended to window titles (pre-lowercased
 /// to avoid allocating on every call to `extract_site_name`).
 pub(super) const BROWSER_SUFFIXES: &[&str] = &[
@@ -164,21 +137,10 @@ pub(super) fn lookup_known_site(title: &str) -> Option<&'static str> {
 }
 
 /// Check whether an app is a known browser by name or bundle ID.
+///
+/// Delegates to the shared `platform-macos` browser registry.
 pub fn is_browser(app_name: &str, bundle_id: Option<&str>) -> bool {
-    let name_lower = app_name.to_lowercase();
-    if BROWSER_APPS.iter().any(|b| name_lower == *b) {
-        return true;
-    }
-    if let Some(bid) = bundle_id {
-        let bid_lower = bid.to_lowercase();
-        if BROWSER_BUNDLE_PREFIXES
-            .iter()
-            .any(|p| bid_lower.starts_with(p))
-        {
-            return true;
-        }
-    }
-    false
+    platform_macos::browser::is_browser(app_name, bundle_id)
 }
 
 /// Extract a human-readable site name from a browser window title.

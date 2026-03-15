@@ -19,6 +19,13 @@ impl RunningAppsSource {
             apps: Arc::new(RwLock::new(Vec::new())),
         }
     }
+
+    fn get_running_apps() -> Vec<(String, u32, std::path::PathBuf)> {
+        platform_macos::apps::running_applications()
+            .into_iter()
+            .map(|a| (a.name, a.pid as u32, a.path.unwrap_or_default()))
+            .collect()
+    }
 }
 
 #[async_trait::async_trait]
@@ -53,56 +60,5 @@ impl super::SearchSource for RunningAppsSource {
                 score: (score as f64) / 1000.0 * 1.2,
             })
             .collect()
-    }
-}
-
-#[cfg(target_os = "macos")]
-impl RunningAppsSource {
-    fn get_running_apps() -> Vec<(String, u32, std::path::PathBuf)> {
-        // Use sysctl/ps approach instead of objc2 to avoid heavy dependencies
-        let output = match std::process::Command::new("osascript")
-            .args([
-                "-l",
-                "JavaScript",
-                "-e",
-                r#"
-                var apps = Application("System Events").processes.whose({backgroundOnly: false})();
-                var results = [];
-                for (var i = 0; i < apps.length; i++) {
-                    try {
-                        results.push({
-                            name: apps[i].name(),
-                            pid: apps[i].unixId(),
-                            path: apps[i].file() ? apps[i].file().posixPath() : ""
-                        });
-                    } catch(e) {}
-                }
-                JSON.stringify(results);
-                "#,
-            ])
-            .output()
-        {
-            Ok(o) if o.status.success() => o,
-            _ => return vec![],
-        };
-
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let apps: Vec<serde_json::Value> = serde_json::from_str(stdout.trim()).unwrap_or_default();
-
-        apps.into_iter()
-            .filter_map(|a| {
-                let name = a.get("name")?.as_str()?.to_string();
-                let pid = a.get("pid")?.as_u64()? as u32;
-                let path_str = a.get("path").and_then(|p| p.as_str()).unwrap_or("");
-                Some((name, pid, std::path::PathBuf::from(path_str)))
-            })
-            .collect()
-    }
-}
-
-#[cfg(not(target_os = "macos"))]
-impl RunningAppsSource {
-    fn get_running_apps() -> Vec<(String, u32, std::path::PathBuf)> {
-        vec![]
     }
 }
