@@ -5,6 +5,7 @@ import { PortalContainerProvider } from "../components/portal-context";
 import { TabBar } from "../components/TabBar";
 import { TabContent } from "../components/TabContent";
 import { Tasks2Layout } from "../components/Tasks2Layout";
+import { StatusWorkflowProvider } from "../contexts/StatusWorkflowContext";
 import { useTasks } from "../hooks/useTasks";
 import { TasksProvider } from "../hooks/useTasksContext";
 import { useTabStore } from "../store/tab-store";
@@ -23,15 +24,17 @@ export function Tasks2Page() {
 
   return (
     <TasksProvider value={ctxValue}>
-      <PortalContainerProvider>
-        <div className="tasks2-scope flex-1 h-full min-w-0">
-          <Tasks2Layout>
-            <TabBar areas={tasksData.areas} projects={tasksData.projects} />
-            <TabContent tasksData={tasksData} />
-          </Tasks2Layout>
-          <CreateIssueModal onCreateTask={tasksData.createTask} areas={tasksData.areas} />
-        </div>
-      </PortalContainerProvider>
+      <StatusWorkflowProvider projectId={null}>
+        <PortalContainerProvider>
+          <div className="tasks2-scope flex-1 h-full min-w-0">
+            <Tasks2Layout>
+              <TabBar areas={tasksData.areas} projects={tasksData.projects} />
+              <TabContent tasksData={tasksData} />
+            </Tasks2Layout>
+            <CreateIssueModal onCreateTask={tasksData.createTask} areas={tasksData.areas} />
+          </div>
+        </PortalContainerProvider>
+      </StatusWorkflowProvider>
     </TasksProvider>
   );
 }
