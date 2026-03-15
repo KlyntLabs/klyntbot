@@ -31,8 +31,8 @@ jobs:
       - name: Install Tauri CLI
         run: cargo install tauri-cli --locked
 
-      - name: Install frontend dependencies
-        run: cd desktop-ui && bun install
+      - name: Install and build frontend
+        run: cd desktop-ui && bun install && bun run build
 
       # TODO: Re-enable after fixing clippy warnings on CI
       # - name: Install cargo-nextest
@@ -56,7 +56,7 @@ jobs:
           releaseBody: 'Download the .dmg to install Klynt.'
           releaseDraft: false
           prerelease: false
-          args: --target aarch64-apple-darwin
+          args: --target aarch64-apple-darwin --config '{"build":{"beforeBuildCommand":""}}'
           projectPath: crates/desktop
           tauriScript: cargo tauri
 
