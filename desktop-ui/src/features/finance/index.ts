@@ -12,6 +12,7 @@ export type { CurrencyDisplayMode } from "./hooks/useCurrencyDisplayMode";
 // Hooks
 export { useCurrencyDisplayMode } from "./hooks/useCurrencyDisplayMode";
 export { useFinanceCurrency } from "./hooks/useFinanceCurrency";
+export { usePrivacyMode } from "./hooks/usePrivacyMode";
 export type { RateMap } from "./lib/displayAmount";
 // Lib
 export {
