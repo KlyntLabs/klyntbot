@@ -13,6 +13,7 @@ common = { workspace = true }
 config = { workspace = true }
 feature-coaching = { workspace = true }
 feature-finance = { workspace = true }
+feature-launcher = { workspace = true }
 feature-notes = { workspace = true }
 feature-productivity = { workspace = true }
 feature-tasks = { workspace = true }
@@ -23,6 +24,7 @@ session = { workspace = true }
 storage = { workspace = true }
 dashmap = { workspace = true }
 dirs = { workspace = true }
+shellexpand = { workspace = true }
 futures-util = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
