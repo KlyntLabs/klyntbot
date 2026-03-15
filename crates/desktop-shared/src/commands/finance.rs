@@ -243,3 +243,24 @@ pub struct FinanceMonthlySummaryResponse {
     pub previous_income: i64,
     pub previous_spending: i64,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DailySpending {
+    pub date: String,
+    pub total_spending: i64,
+    pub tx_count: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FinanceDailySpendingResponse {
+    pub days: Vec<DailySpending>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FinancePeriodSummaryResponse {
+    pub income: i64,
+    pub spending: i64,
+}

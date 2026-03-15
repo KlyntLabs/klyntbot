@@ -2,10 +2,10 @@ use std::collections::HashMap;
 
 use chrono::Datelike;
 use desktop_shared::commands::{
-    CurrencyNetWorth, FinanceCategoryBreakdown, FinanceCategoryReportResponse,
-    FinanceGoalCreateParams, FinanceGoalUpdateParams, FinanceLiabilityCreateParams,
-    FinanceLiabilityUpdateParams, FinanceMonthlySummaryResponse, FinanceNetWorthResponse,
-    FinanceTrendPoint,
+    CurrencyNetWorth, DailySpending, FinanceCategoryBreakdown, FinanceCategoryReportResponse,
+    FinanceDailySpendingResponse, FinanceGoalCreateParams, FinanceGoalUpdateParams,
+    FinanceLiabilityCreateParams, FinanceLiabilityUpdateParams, FinanceMonthlySummaryResponse,
+    FinanceNetWorthResponse, FinancePeriodSummaryResponse, FinanceTrendPoint,
 };
 use desktop_shared::errors::ApiError;
 use storage::rows::finance::{
@@ -328,6 +328,67 @@ impl AppCore {
             .collect();
 
         Ok(points)
+    }
+
+    pub async fn finance_daily_spending(
+        &self,
+        date_from: String,
+        date_to: String,
+    ) -> Result<FinanceDailySpendingResponse, ApiError> {
+        let from = parse_naive_date(&date_from).ok_or_else(|| {
+            ApiError::new("INVALID_PARAMS", format!("invalid date_from: {date_from}"))
+        })?;
+        let to = parse_naive_date(&date_to).ok_or_else(|| {
+            ApiError::new("INVALID_PARAMS", format!("invalid date_to: {date_to}"))
+        })?;
+
+        let rows = self
+            .repos
+            .finance
+            .transactions
+            .daily_spending(from, to, &self.default_currency().await)
+            .await
+            .map_err(map_storage_err)?;
+
+        let days = rows
+            .into_iter()
+            .map(|(date, total_spending, tx_count)| DailySpending {
+                date,
+                total_spending,
+                tx_count,
+            })
+            .collect();
+
+        Ok(FinanceDailySpendingResponse { days })
+    }
+
+    pub async fn finance_period_summary(
+        &self,
+        date_from: String,
+        date_to: String,
+    ) -> Result<FinancePeriodSummaryResponse, ApiError> {
+        let from = parse_naive_date(&date_from).ok_or_else(|| {
+            ApiError::new("INVALID_PARAMS", format!("invalid date_from: {date_from}"))
+        })?;
+        let to = parse_naive_date(&date_to).ok_or_else(|| {
+            ApiError::new("INVALID_PARAMS", format!("invalid date_to: {date_to}"))
+        })?;
+
+        let currency = self.default_currency().await;
+
+        let (income, spending) = tokio::try_join!(
+            self.repos
+                .finance
+                .transactions
+                .sum_by_type_in_range("income", from, to, &currency),
+            self.repos
+                .finance
+                .transactions
+                .sum_by_type_in_range("expense", from, to, &currency),
+        )
+        .map_err(map_storage_err)?;
+
+        Ok(FinancePeriodSummaryResponse { income, spending })
     }
 
     pub async fn finance_monthly_summary(&self) -> Result<FinanceMonthlySummaryResponse, ApiError> {

@@ -280,6 +280,65 @@ impl FinanceTransactionRepo {
         Ok(rows)
     }
 
+    /// Sum daily spending (expenses) for a date range in the user's base currency.
+    /// Returns `(date_str, total_spending, tx_count)` triples ordered by date ascending.
+    pub async fn daily_spending(
+        &self,
+        date_from: NaiveDate,
+        date_to: NaiveDate,
+        base_currency: &str,
+    ) -> Result<Vec<(String, i64, i32)>, crate::error::StorageError> {
+        let rows: Vec<(String, i64, i32)> = sqlx::query_as(
+            r#"
+            SELECT
+                tx_date AS date,
+                COALESCE(SUM(base_amount), 0) AS total_spending,
+                CAST(COUNT(*) AS INTEGER) AS tx_count
+            FROM finance_transactions
+            WHERE tx_type = 'expense'
+              AND tx_date >= ?
+              AND tx_date <= ?
+              AND base_currency = ?
+            GROUP BY tx_date
+            ORDER BY tx_date
+            "#,
+        )
+        .bind(date_from)
+        .bind(date_to)
+        .bind(base_currency)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
+    }
+
+    /// Sum transaction base amounts for a given type and date range in the user's base currency.
+    /// Returns the total or 0 if no matching transactions exist.
+    pub async fn sum_by_type_in_range(
+        &self,
+        tx_type: &str,
+        date_from: NaiveDate,
+        date_to: NaiveDate,
+        base_currency: &str,
+    ) -> Result<i64, crate::error::StorageError> {
+        let (total,): (i64,) = sqlx::query_as(
+            r#"
+            SELECT COALESCE(SUM(base_amount), 0)
+            FROM finance_transactions
+            WHERE tx_type = ?
+              AND tx_date >= ?
+              AND tx_date <= ?
+              AND base_currency = ?
+            "#,
+        )
+        .bind(tx_type)
+        .bind(date_from)
+        .bind(date_to)
+        .bind(base_currency)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(total)
+    }
+
     /// Return the most frequent counterparty→category pairings for auto-categorisation.
     /// Returns `(counterparty, category, count)` triples, sorted by count descending.
     pub async fn category_history(

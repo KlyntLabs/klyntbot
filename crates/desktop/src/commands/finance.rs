@@ -3,11 +3,12 @@ use std::sync::Arc;
 
 use desktop_shared::commands::{
     FinanceAccountCreateParams, FinanceAccountUpdateParams, FinanceBudgetCreateParams,
-    FinanceBudgetUpdateParams, FinanceCategoryReportResponse, FinanceGoalCreateParams,
-    FinanceGoalUpdateParams, FinanceInvestmentCreateParams, FinanceInvestmentUpdateParams,
-    FinanceLiabilityCreateParams, FinanceLiabilityUpdateParams, FinanceMonthlySummaryResponse,
-    FinanceNetWorthResponse, FinancePortfolioCreateParams, FinancePortfolioResponse,
-    FinanceTransactionCreateParams, FinanceTransactionFilterParams, FinanceTrendPoint,
+    FinanceBudgetUpdateParams, FinanceCategoryReportResponse, FinanceDailySpendingResponse,
+    FinanceGoalCreateParams, FinanceGoalUpdateParams, FinanceInvestmentCreateParams,
+    FinanceInvestmentUpdateParams, FinanceLiabilityCreateParams, FinanceLiabilityUpdateParams,
+    FinanceMonthlySummaryResponse, FinanceNetWorthResponse, FinancePeriodSummaryResponse,
+    FinancePortfolioCreateParams, FinancePortfolioResponse, FinanceTransactionCreateParams,
+    FinanceTransactionFilterParams, FinanceTrendPoint,
 };
 use desktop_shared::errors::ApiError;
 use storage::rows::finance::{
@@ -325,6 +326,24 @@ pub async fn finance_monthly_summary(
     state.finance_monthly_summary().await
 }
 
+#[tauri::command]
+pub async fn finance_daily_spending(
+    state: State<'_, Arc<AppCore>>,
+    date_from: String,
+    date_to: String,
+) -> Result<FinanceDailySpendingResponse, ApiError> {
+    state.finance_daily_spending(date_from, date_to).await
+}
+
+#[tauri::command]
+pub async fn finance_period_summary(
+    state: State<'_, Arc<AppCore>>,
+    date_from: String,
+    date_to: String,
+) -> Result<FinancePeriodSummaryResponse, ApiError> {
+    state.finance_period_summary(date_from, date_to).await
+}
+
 // ── Dev server dispatch ─────────────────────────────────────────────
 
 #[cfg(test)]
@@ -361,6 +380,8 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "finance_report_income",
     "finance_report_trends",
     "finance_monthly_summary",
+    "finance_daily_spending",
+    "finance_period_summary",
 ];
 
 #[cfg(debug_assertions)]
@@ -477,6 +498,16 @@ pub(crate) async fn dispatch_dev(
             )
         }
         "finance_monthly_summary" => dev::val(core.finance_monthly_summary().await),
+        "finance_daily_spending" => {
+            let date_from = try_field!(dev::get_str(body, "date_from"));
+            let date_to = try_field!(dev::get_str(body, "date_to"));
+            dev::val(core.finance_daily_spending(date_from, date_to).await)
+        }
+        "finance_period_summary" => {
+            let date_from = try_field!(dev::get_str(body, "date_from"));
+            let date_to = try_field!(dev::get_str(body, "date_to"));
+            dev::val(core.finance_period_summary(date_from, date_to).await)
+        }
         _ => return None,
     })
 }

@@ -407,6 +407,8 @@ fn run_desktop_app() {
             commands::finance::finance_report_income,
             commands::finance::finance_report_trends,
             commands::finance::finance_monthly_summary,
+            commands::finance::finance_daily_spending,
+            commands::finance::finance_period_summary,
             // Productivity
             commands::productivity::productivity_today,
             commands::productivity::productivity_timeline,
