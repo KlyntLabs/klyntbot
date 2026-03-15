@@ -4,7 +4,8 @@ use chrono::Datelike;
 use desktop_shared::commands::{
     CurrencyNetWorth, FinanceCategoryBreakdown, FinanceCategoryReportResponse,
     FinanceGoalCreateParams, FinanceGoalUpdateParams, FinanceLiabilityCreateParams,
-    FinanceLiabilityUpdateParams, FinanceNetWorthResponse, FinanceTrendPoint,
+    FinanceLiabilityUpdateParams, FinanceMonthlySummaryResponse, FinanceNetWorthResponse,
+    FinanceTrendPoint,
 };
 use desktop_shared::errors::ApiError;
 use storage::rows::finance::{
@@ -327,5 +328,41 @@ impl AppCore {
             .collect();
 
         Ok(points)
+    }
+
+    pub async fn finance_monthly_summary(
+        &self,
+    ) -> Result<FinanceMonthlySummaryResponse, ApiError> {
+        let currency = self.default_currency().await;
+        let now = chrono::Local::now();
+        let current_month_label = now.format("%Y-%m").to_string();
+        let previous_month = now
+            .with_day(1)
+            .unwrap_or(now)
+            .checked_sub_months(chrono::Months::new(1))
+            .unwrap_or(now);
+        let previous_month_label = previous_month.format("%Y-%m").to_string();
+
+        let (income_rows, expense_rows) = tokio::try_join!(
+            self.repos
+                .finance
+                .transactions
+                .sum_by_period("income", 3, "monthly", &currency),
+            self.repos
+                .finance
+                .transactions
+                .sum_by_period("expense", 3, "monthly", &currency),
+        )
+        .map_err(map_storage_err)?;
+
+        let income_map: HashMap<String, i64> = income_rows.into_iter().collect();
+        let expense_map: HashMap<String, i64> = expense_rows.into_iter().collect();
+
+        Ok(FinanceMonthlySummaryResponse {
+            current_income: *income_map.get(&current_month_label).unwrap_or(&0),
+            current_spending: *expense_map.get(&current_month_label).unwrap_or(&0),
+            previous_income: *income_map.get(&previous_month_label).unwrap_or(&0),
+            previous_spending: *expense_map.get(&previous_month_label).unwrap_or(&0),
+        })
     }
 }

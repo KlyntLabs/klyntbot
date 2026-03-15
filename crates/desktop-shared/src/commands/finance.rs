@@ -234,3 +234,12 @@ pub struct FinanceTrendPoint {
     pub value: i64,
     pub change_pct: Option<f64>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FinanceMonthlySummaryResponse {
+    pub current_income: i64,
+    pub current_spending: i64,
+    pub previous_income: i64,
+    pub previous_spending: i64,
+}

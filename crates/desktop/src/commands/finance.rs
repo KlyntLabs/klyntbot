@@ -5,9 +5,9 @@ use desktop_shared::commands::{
     FinanceAccountCreateParams, FinanceAccountUpdateParams, FinanceBudgetCreateParams,
     FinanceBudgetUpdateParams, FinanceCategoryReportResponse, FinanceGoalCreateParams,
     FinanceGoalUpdateParams, FinanceInvestmentCreateParams, FinanceInvestmentUpdateParams,
-    FinanceLiabilityCreateParams, FinanceLiabilityUpdateParams, FinanceNetWorthResponse,
-    FinancePortfolioCreateParams, FinancePortfolioResponse, FinanceTransactionCreateParams,
-    FinanceTransactionFilterParams, FinanceTrendPoint,
+    FinanceLiabilityCreateParams, FinanceLiabilityUpdateParams, FinanceMonthlySummaryResponse,
+    FinanceNetWorthResponse, FinancePortfolioCreateParams, FinancePortfolioResponse,
+    FinanceTransactionCreateParams, FinanceTransactionFilterParams, FinanceTrendPoint,
 };
 use desktop_shared::errors::ApiError;
 use storage::rows::finance::{
@@ -318,6 +318,13 @@ pub async fn finance_report_trends(
     state.finance_report_trends(metric, periods).await
 }
 
+#[tauri::command]
+pub async fn finance_monthly_summary(
+    state: State<'_, Arc<AppCore>>,
+) -> Result<FinanceMonthlySummaryResponse, ApiError> {
+    state.finance_monthly_summary().await
+}
+
 // ── Dev server dispatch ─────────────────────────────────────────────
 
 #[cfg(test)]
@@ -353,6 +360,7 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "finance_report_spending",
     "finance_report_income",
     "finance_report_trends",
+    "finance_monthly_summary",
 ];
 
 #[cfg(debug_assertions)]
@@ -468,6 +476,7 @@ pub(crate) async fn dispatch_dev(
                     .await,
             )
         }
+        "finance_monthly_summary" => dev::val(core.finance_monthly_summary().await),
         _ => return None,
     })
 }

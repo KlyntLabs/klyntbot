@@ -128,6 +128,13 @@ export interface FinanceNetWorth {
 
 // ── Finance Reports ────────────────────────────────────────
 
+export interface FinanceMonthlySummary {
+  currentIncome: number;
+  currentSpending: number;
+  previousIncome: number;
+  previousSpending: number;
+}
+
 export interface FinanceCategoryReport {
   total: number;
   breakdown: { category: string; amount: number; pct: number }[];
