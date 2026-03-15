@@ -146,6 +146,23 @@ export interface FinanceTrendPoint {
   changePct: number | null;
 }
 
+// ── Finance Daily Spending ────────────────────────────────
+
+export interface DailySpending {
+  date: string;
+  totalSpending: number;
+  txCount: number;
+}
+
+export interface FinanceDailySpendingResponse {
+  days: DailySpending[];
+}
+
+export interface FinancePeriodSummary {
+  income: number;
+  spending: number;
+}
+
 // ── Finance Mutation Parameters ────────────────────────────
 
 export interface FinanceAccountCreateParams {
