@@ -88,6 +88,7 @@ pub enum WindowAction {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DashboardData {
     pub focus: Option<FocusDashboard>,
     pub calendar: Vec<CalendarDashboard>,
@@ -96,6 +97,7 @@ pub struct DashboardData {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FocusDashboard {
     pub task_name: Option<String>,
     pub elapsed_secs: i64,
@@ -104,6 +106,7 @@ pub struct FocusDashboard {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CalendarDashboard {
     pub event_id: String,
     pub title: String,
@@ -113,6 +116,7 @@ pub struct CalendarDashboard {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TaskDashboard {
     pub id: String,
     pub title: String,
@@ -121,6 +125,7 @@ pub struct TaskDashboard {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ProductivityDashboard {
     pub total_minutes: i64,
     pub top_category: String,

@@ -47,24 +47,35 @@ export function Launcher() {
     [setMode],
   );
 
-  const expandToMain = useCallback(async () => {
-    if (!isTauri) return;
-    try {
-      const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
-      const mainWindow = await WebviewWindow.getByLabel("main");
-      if (mainWindow) {
-        if (chatSessionKey) {
-          await emit("open-chat", { sessionKey: chatSessionKey });
+  const navigateToMain = useCallback(
+    async (path: string, event?: { name: string; payload: unknown }) => {
+      if (!isTauri) return;
+      try {
+        const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
+        const mainWindow = await WebviewWindow.getByLabel("main");
+        if (mainWindow) {
+          if (event) {
+            await emit(event.name, event.payload);
+          }
+          await emit("navigate", { path });
+          await mainWindow.show();
+          await mainWindow.setFocus();
         }
-        await mainWindow.show();
-        await mainWindow.setFocus();
+        await getCurrentWindow().hide();
+      } catch {
+        // Tauri API unavailable
       }
-      await getCurrentWindow().hide();
-    } catch {
-      // Tauri API unavailable
-    }
-    reset();
-  }, [chatSessionKey, reset]);
+      reset();
+    },
+    [reset],
+  );
+
+  const expandToMain = useCallback(async () => {
+    await navigateToMain(
+      chatSessionKey ? "/chat" : "/",
+      chatSessionKey ? { name: "open-chat", payload: { sessionKey: chatSessionKey } } : undefined,
+    );
+  }, [chatSessionKey, navigateToMain]);
 
   useKeyboardNavigation({
     onEnterChat: enterChat,
@@ -104,7 +115,9 @@ export function Launcher() {
         ) : (
           <div className="rounded-[var(--glass-radius-inner)] overflow-hidden">
             <LauncherInput />
-            {mode === "dashboard" && <Dashboard />}
+            {mode === "dashboard" && (
+              <Dashboard onOpenTask={(id) => navigateToMain(`/task/${id}`)} />
+            )}
             {mode === "search" && <ResultsList onExecute={executeItem} />}
           </div>
         )}
