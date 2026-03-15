@@ -101,6 +101,80 @@ export function useKeyboardNavigation({ onEnterChat, onExpandToMain, onHide }: K
                 console.error("Failed to copy:", err);
               }
               break;
+            case "file":
+            case "contentMatch":
+            case "gitRepo":
+              try {
+                await ipc("launcher_open_app", { path: item.kind.path });
+                await ipc("launcher_execute", { itemId: item.id, kind: item.kind.type });
+                onHide();
+              } catch (err) {
+                console.error("Failed to open:", err);
+              }
+              break;
+            case "bookmark":
+            case "browserHistory":
+              try {
+                await ipc("launcher_open_app", { path: item.kind.url });
+                await ipc("launcher_execute", { itemId: item.id, kind: item.kind.type });
+                onHide();
+              } catch (err) {
+                console.error("Failed to open URL:", err);
+              }
+              break;
+            case "systemPref":
+              try {
+                await ipc("launcher_open_app", {
+                  path: `x-apple.systempreferences:${item.kind.paneId}`,
+                });
+                await ipc("launcher_execute", { itemId: item.id, kind: "pref" });
+                onHide();
+              } catch (err) {
+                console.error("Failed to open pref:", err);
+              }
+              break;
+            case "runningApp":
+              try {
+                await ipc("launcher_open_app", { path: item.kind.path });
+                await ipc("launcher_execute", { itemId: item.id, kind: "running_app" });
+                onHide();
+              } catch (err) {
+                console.error("Failed to focus app:", err);
+              }
+              break;
+            case "sshHost":
+              try {
+                const sshCmd = item.kind.user
+                  ? `ssh://${item.kind.user}@${item.kind.host}`
+                  : `ssh://${item.kind.host}`;
+                await ipc("launcher_open_app", { path: sshCmd });
+                await ipc("launcher_execute", { itemId: item.id, kind: "ssh" });
+                onHide();
+              } catch (err) {
+                console.error("Failed to open SSH:", err);
+              }
+              break;
+            case "contact":
+              try {
+                if (item.kind.email) {
+                  await ipc("launcher_open_app", { path: `mailto:${item.kind.email}` });
+                } else if (item.kind.phone) {
+                  await ipc("launcher_open_app", { path: `tel:${item.kind.phone}` });
+                }
+                await ipc("launcher_execute", { itemId: item.id, kind: "contact" });
+                onHide();
+              } catch (err) {
+                console.error("Failed to open contact:", err);
+              }
+              break;
+            case "brewPackage":
+              try {
+                await navigator.clipboard.writeText(item.kind.name);
+                onHide();
+              } catch (err) {
+                console.error("Failed to copy package name:", err);
+              }
+              break;
             default:
               // task, note, calendar — navigate to them
               await ipc("launcher_execute", {
