@@ -14,9 +14,7 @@ interface FinanceLayoutProps {
 
 const subNav = [
   { label: "Dashboard", path: "/finance" },
-  { label: "Accounts", path: "/finance/accounts" },
-  { label: "Transactions", path: "/finance/transactions" },
-  { label: "Budgets", path: "/finance/budgets" },
+  { label: "Cash Flow", path: "/finance/cashflow" },
   { label: "Investments", path: "/finance/investments" },
   { label: "Goals", path: "/finance/goals" },
   { label: "Liabilities", path: "/finance/liabilities" },
