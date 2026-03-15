@@ -28,6 +28,9 @@ jobs:
         with:
           bun-version: latest
 
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --locked
+
       - name: Install frontend dependencies
         run: cd desktop-ui && bun install
 
