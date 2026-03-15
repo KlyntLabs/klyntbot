@@ -3709,11 +3709,16 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "common",
+ "dashmap",
+ "futures-util",
  "meval",
+ "notify",
+ "notify-debouncer-mini",
  "nucleo-matcher",
  "parking_lot",
  "serde",
  "serde_json",
+ "shellexpand",
  "sqlx",
  "storage",
  "tempfile",
@@ -3721,6 +3726,7 @@ dependencies = [
  "tokio-util",
  "tools-core",
  "tracing",
+ "which",
 ]
 
 [[package]]

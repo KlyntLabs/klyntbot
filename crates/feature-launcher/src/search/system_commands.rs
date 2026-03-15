@@ -62,26 +62,10 @@ pub struct SystemCommands;
 
 impl SystemCommands {
     pub fn search(query: &str) -> Vec<LauncherItem> {
-        let query_lower = query.to_lowercase();
-        COMMANDS
-            .iter()
-            .filter(|cmd| {
-                if query.is_empty() {
-                    return true;
-                }
-                let title_match = cmd.title.to_lowercase().contains(&query_lower);
-                let keyword_match = cmd.keywords.iter().any(|k| k.contains(&query_lower));
-                title_match || keyword_match
-            })
-            .map(|cmd| {
-                let score = if query.is_empty() {
-                    0.5
-                } else if cmd.title.to_lowercase().starts_with(&query_lower) {
-                    1.0
-                } else {
-                    0.7
-                };
-                LauncherItem {
+        if query.is_empty() {
+            return COMMANDS
+                .iter()
+                .map(|cmd| LauncherItem {
                     id: format!("system:{:?}", cmd.action),
                     title: cmd.title.to_string(),
                     subtitle: Some(cmd.subtitle.to_string()),
@@ -89,8 +73,55 @@ impl SystemCommands {
                     kind: LauncherItemKind::SystemCommand {
                         action: cmd.action.clone(),
                     },
-                    score,
-                }
+                    score: 0.5,
+                })
+                .collect();
+        }
+
+        // Score on title first via fuzzy_match, then boost with keyword matches
+        use nucleo_matcher::{
+            pattern::{CaseMatching, Normalization, Pattern},
+            Config, Matcher, Utf32Str,
+        };
+
+        let mut matcher = Matcher::new(Config::DEFAULT);
+        let pattern = Pattern::parse(query, CaseMatching::Ignore, Normalization::Smart);
+
+        let mut scored: Vec<(u32, &CommandDef)> = COMMANDS
+            .iter()
+            .filter_map(|cmd| {
+                let mut buf = Vec::new();
+                let title_score = pattern.score(Utf32Str::new(cmd.title, &mut buf), &mut matcher);
+                let keyword_score = cmd
+                    .keywords
+                    .iter()
+                    .filter_map(|k| {
+                        let mut buf2 = Vec::new();
+                        pattern.score(Utf32Str::new(k, &mut buf2), &mut matcher)
+                    })
+                    .max();
+                let best = match (title_score, keyword_score) {
+                    (Some(a), Some(b)) => Some(a.max(b)),
+                    (Some(a), None) | (None, Some(a)) => Some(a),
+                    (None, None) => None,
+                };
+                best.map(|s| (s, cmd))
+            })
+            .collect();
+
+        scored.sort_by(|a, b| b.0.cmp(&a.0));
+
+        scored
+            .into_iter()
+            .map(|(score, cmd)| LauncherItem {
+                id: format!("system:{:?}", cmd.action),
+                title: cmd.title.to_string(),
+                subtitle: Some(cmd.subtitle.to_string()),
+                icon: Some("terminal".to_string()),
+                kind: LauncherItemKind::SystemCommand {
+                    action: cmd.action.clone(),
+                },
+                score: (score as f64) / 1000.0 * 1.0,
             })
             .collect()
     }
@@ -148,6 +179,23 @@ impl SystemCommands {
             std::io::ErrorKind::Unsupported,
             "System commands only supported on macOS",
         )))
+    }
+}
+
+#[async_trait::async_trait]
+impl super::SearchSource for SystemCommands {
+    fn name(&self) -> &'static str {
+        "system_commands"
+    }
+
+    fn prefix(&self) -> Option<char> {
+        Some('>')
+    }
+
+    async fn search(&self, query: &str, limit: usize) -> Vec<crate::types::LauncherItem> {
+        let mut results = Self::search(query);
+        results.truncate(limit);
+        results
     }
 }
 

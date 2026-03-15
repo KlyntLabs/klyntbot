@@ -20,12 +20,21 @@ pub struct ScriptMetadata {
 #[derive(Clone)]
 pub struct ScriptRunner {
     scripts: Arc<RwLock<Vec<ScriptEntry>>>,
+    scripts_dir: Option<PathBuf>,
 }
 
 impl ScriptRunner {
     pub fn new() -> Self {
         Self {
             scripts: Arc::new(RwLock::new(Vec::new())),
+            scripts_dir: None,
+        }
+    }
+
+    pub fn with_dir(dir: PathBuf) -> Self {
+        Self {
+            scripts: Arc::new(RwLock::new(Vec::new())),
+            scripts_dir: Some(dir),
         }
     }
 
@@ -84,18 +93,17 @@ impl ScriptRunner {
 
     pub fn search(&self, query: &str, limit: usize) -> Vec<LauncherItem> {
         let scripts = self.scripts.read();
-        let query_lower = query.to_lowercase();
+        let scored = super::fuzzy_match2(
+            query,
+            &scripts,
+            |s| &s.name,
+            |s| s.description.as_deref(),
+            limit,
+        );
 
-        let mut results: Vec<LauncherItem> = scripts
-            .iter()
-            .filter(|s| {
-                query.is_empty()
-                    || s.name.to_lowercase().contains(&query_lower)
-                    || s.description
-                        .as_ref()
-                        .map_or(false, |d| d.to_lowercase().contains(&query_lower))
-            })
-            .map(|s| LauncherItem {
+        scored
+            .into_iter()
+            .map(|(score, s)| LauncherItem {
                 id: format!("script:{}", s.path.display()),
                 title: s.name.clone(),
                 subtitle: s.description.clone(),
@@ -104,16 +112,9 @@ impl ScriptRunner {
                     path: s.path.clone(),
                     name: s.name.clone(),
                 },
-                score: if s.name.to_lowercase().starts_with(&query_lower) {
-                    1.0
-                } else {
-                    0.7
-                },
+                score: (score as f64) / 1000.0 * 0.6,
             })
-            .collect();
-
-        results.truncate(limit);
-        results
+            .collect()
     }
 
     pub async fn execute(path: &Path) -> common::Result<String> {
@@ -131,11 +132,35 @@ impl ScriptRunner {
             Ok(String::from_utf8_lossy(&output.stdout).to_string())
         } else {
             let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-            Err(common::KlyntbotError::Io(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                format!("Script failed: {}", stderr),
-            )))
+            Err(common::KlyntbotError::Io(std::io::Error::other(format!(
+                "Script failed: {}",
+                stderr
+            ))))
         }
+    }
+}
+
+#[async_trait::async_trait]
+impl super::SearchSource for ScriptRunner {
+    fn name(&self) -> &'static str {
+        "scripts"
+    }
+
+    fn prefix(&self) -> Option<char> {
+        Some('/')
+    }
+
+    async fn refresh(&self) {
+        if let Some(dir) = &self.scripts_dir {
+            if dir.exists() {
+                let scripts = Self::discover(dir);
+                self.set_scripts(scripts);
+            }
+        }
+    }
+
+    async fn search(&self, query: &str, limit: usize) -> Vec<LauncherItem> {
+        self.search(query, limit)
     }
 }
 

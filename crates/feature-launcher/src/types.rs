@@ -13,6 +13,17 @@ pub struct LauncherItem {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum FileKind {
+    File,
+    Folder,
+    Image,
+    Document,
+    Code,
+    Archive,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum LauncherItemKind {
     Application {
@@ -48,6 +59,46 @@ pub enum LauncherItemKind {
     },
     AiChat {
         query: String,
+    },
+    File {
+        path: PathBuf,
+        kind: FileKind,
+    },
+    ContentMatch {
+        path: PathBuf,
+        line: u32,
+        preview: String,
+    },
+    Contact {
+        name: String,
+        email: Option<String>,
+        phone: Option<String>,
+    },
+    SystemPref {
+        pane_id: String,
+    },
+    RunningApp {
+        pid: u32,
+        path: PathBuf,
+    },
+    Bookmark {
+        url: String,
+        browser: String,
+    },
+    BrowserHistory {
+        url: String,
+        visited_at: String,
+    },
+    BrewPackage {
+        name: String,
+        is_cask: bool,
+    },
+    SshHost {
+        host: String,
+        user: Option<String>,
+    },
+    GitRepo {
+        path: PathBuf,
     },
 }
 

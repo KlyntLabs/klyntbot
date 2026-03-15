@@ -18,7 +18,26 @@ export type LauncherItemKind =
   | { type: "script"; path: string; name: string }
   | { type: "calculator"; expression: string; result: number }
   | { type: "calendar"; eventId: string; startsAt: string }
-  | { type: "aiChat"; query: string };
+  | { type: "aiChat"; query: string }
+  | {
+      type: "file";
+      path: string;
+      kind: "file" | "folder" | "image" | "document" | "code" | "archive";
+    }
+  | { type: "contentMatch"; path: string; line: number; preview: string }
+  | {
+      type: "contact";
+      name: string;
+      email: string | null;
+      phone: string | null;
+    }
+  | { type: "systemPref"; paneId: string }
+  | { type: "runningApp"; pid: number; path: string }
+  | { type: "bookmark"; url: string; browser: string }
+  | { type: "browserHistory"; url: string; visitedAt: string }
+  | { type: "brewPackage"; name: string; isCask: boolean }
+  | { type: "sshHost"; host: string; user: string | null }
+  | { type: "gitRepo"; path: string };
 
 export interface DashboardData {
   focus: FocusDashboard | null;

@@ -1,0 +1,173 @@
+use serde::{Deserialize, Serialize};
+
+fn default_scan_dirs() -> Vec<String> {
+    vec!["~/Projects".to_string(), "~/Developer".to_string()]
+}
+fn default_chrome() -> String {
+    "chrome".to_string()
+}
+fn default_30() -> i64 {
+    30
+}
+fn default_dot() -> String {
+    ".".to_string()
+}
+fn default_1000() -> i64 {
+    1000
+}
+fn default_scripts_dir() -> String {
+    "~/.klyntbot/scripts".to_string()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct LauncherConfig {
+    pub enabled: bool,
+    pub sources: LauncherSourcesConfig,
+}
+
+impl Default for LauncherConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            sources: LauncherSourcesConfig::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct LauncherSourcesConfig {
+    pub apps: SourceToggle,
+    pub system_prefs: SourceToggle,
+    pub brew: SourceToggle,
+    pub ssh_hosts: SourceToggle,
+    pub git_repos: GitReposConfig,
+    pub scripts: ScriptsConfig,
+    pub files: SourceToggle,
+    pub content_grep: ContentGrepConfig,
+    pub contacts: SourceToggle,
+    pub running_apps: SourceToggle,
+    pub bookmarks: BrowserSourceConfig,
+    pub browser_history: BrowserHistoryConfig,
+    pub tasks: SourceToggle,
+    pub notes: SourceToggle,
+    pub clipboard: ClipboardSourceConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct SourceToggle {
+    pub enabled: bool,
+}
+
+impl Default for SourceToggle {
+    fn default() -> Self {
+        Self { enabled: true }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct GitReposConfig {
+    pub enabled: bool,
+    #[serde(default = "default_scan_dirs")]
+    pub scan_dirs: Vec<String>,
+}
+
+impl Default for GitReposConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            scan_dirs: default_scan_dirs(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ScriptsConfig {
+    pub enabled: bool,
+    #[serde(default = "default_scripts_dir")]
+    pub dir: String,
+}
+
+impl Default for ScriptsConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            dir: default_scripts_dir(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct BrowserSourceConfig {
+    pub enabled: bool,
+    #[serde(default = "default_chrome")]
+    pub browser: String,
+}
+
+impl Default for BrowserSourceConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            browser: default_chrome(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct BrowserHistoryConfig {
+    pub enabled: bool,
+    #[serde(default = "default_chrome")]
+    pub browser: String,
+    #[serde(default = "default_30")]
+    pub max_days: i64,
+}
+
+impl Default for BrowserHistoryConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            browser: default_chrome(),
+            max_days: 30,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ContentGrepConfig {
+    pub enabled: bool,
+    #[serde(default = "default_dot")]
+    pub default_scope: String,
+}
+
+impl Default for ContentGrepConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            default_scope: default_dot(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ClipboardSourceConfig {
+    pub enabled: bool,
+    #[serde(default = "default_1000")]
+    pub max_entries: i64,
+}
+
+impl Default for ClipboardSourceConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            max_entries: 1000,
+        }
+    }
+}

@@ -91,8 +91,6 @@ pub struct AppCore {
     pub event_emitter: Arc<dyn AppEventEmitter>,
     /// Launcher search engine (None when launcher feature is disabled).
     pub launcher_engine: Option<Arc<LauncherSearchEngine>>,
-    /// Launcher clipboard repo (None when launcher feature is disabled).
-    pub launcher_clipboard_repo: Option<feature_launcher::ClipboardRepo>,
 }
 
 impl AppCore {
@@ -172,8 +170,9 @@ impl AppCore {
 
     /// Return launcher clipboard repo or a "feature disabled" error.
     pub fn launcher_clipboard_repo(&self) -> Result<&feature_launcher::ClipboardRepo, ApiError> {
-        self.launcher_clipboard_repo
+        self.launcher_engine
             .as_ref()
+            .map(|e| &e.clipboard_repo)
             .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "launcher feature is not enabled"))
     }
 

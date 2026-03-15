@@ -15,6 +15,7 @@ use super::conversation::ConversationConfig;
 use super::finance::FinanceConfig;
 use super::gateway::GatewayConfig;
 use super::integrations::IntegrationsConfig;
+use super::launcher::LauncherConfig;
 use super::learning::LearningConfig;
 use super::mcp::McpConfig;
 use super::orchestrator::OrchestratorConfig;
@@ -181,6 +182,10 @@ pub struct Config {
     /// Set by the desktop app on launch. Distinct from agents.defaults.workspace.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub project_root: Option<String>,
+
+    /// Launcher search sources configuration.
+    #[serde(default)]
+    pub launcher: LauncherConfig,
 
     /// Whether the first-run setup wizard has been completed.
     #[serde(default)]

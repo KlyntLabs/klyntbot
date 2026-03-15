@@ -1,7 +1,6 @@
 use desktop_shared::errors::ApiError;
 use feature_launcher::{
-    AppIndex, Calculator, ClipboardContentType, ClipboardRepo, FrequencyRepo, LauncherItem,
-    LauncherItemKind, ScriptRunner, SystemCommands,
+    Calculator, ClipboardRepo, FrequencyRepo, LauncherItem, LauncherItemKind, SourceRegistry,
 };
 use feature_notes::repo::NoteRepo;
 use storage::Repos;
@@ -10,10 +9,11 @@ use crate::errors::map_storage_err;
 
 /// Central search engine that fans out queries to all providers.
 pub struct LauncherSearchEngine {
-    pub app_index: AppIndex,
-    pub script_runner: ScriptRunner,
+    pub registry: SourceRegistry,
     pub frequency_repo: FrequencyRepo,
     pub clipboard_repo: ClipboardRepo,
+    /// Stored here so the OS watcher thread is joined on drop.
+    pub _file_watcher: Option<feature_launcher::SourceFileWatcher>,
 }
 
 impl LauncherSearchEngine {
@@ -29,36 +29,37 @@ impl LauncherSearchEngine {
             return Ok(vec![]);
         }
 
-        // Prefix routing
-        if query.starts_with('=') {
-            return Ok(self.search_calculator(query));
-        }
-        if let Some(rest) = query.strip_prefix('>') {
-            return Ok(SystemCommands::search(rest.trim()));
-        }
-        if let Some(rest) = query.strip_prefix('/') {
-            return Ok(self.script_runner.search(rest.trim(), 20));
-        }
+        // Calculator handles both prefix (=) and universal
+        let calc_results = Calculator::try_eval(query)
+            .map(|r| {
+                vec![LauncherItem {
+                    id: format!("calc:{}", r.expression),
+                    title: format!("{}", r.result),
+                    subtitle: Some(r.expression.clone()),
+                    icon: Some("calculator".to_string()),
+                    kind: LauncherItemKind::Calculator {
+                        expression: r.expression,
+                        result: r.result,
+                    },
+                    score: 2.0,
+                }]
+            })
+            .unwrap_or_default();
 
-        // Universal search: fan out to all providers
-        let (apps, tasks, notes, clipboard, calc) = tokio::join!(
-            self.search_apps(query),
+        // Registry handles prefix routing + fan-out
+        let mut results = self.registry.search(query, 10).await;
+
+        // Add DB-backed sources (tasks, notes) — these aren't in registry
+        // because they need external repos
+        let (tasks, notes) = tokio::join!(
             self.search_tasks(query, repos),
             self.search_notes(query, note_repo),
-            self.search_clipboard(query),
-            async { self.search_calculator(query) },
         );
-
-        let mut results: Vec<LauncherItem> = Vec::new();
-        results.extend(apps);
         results.extend(tasks.unwrap_or_default());
         results.extend(notes.unwrap_or_default());
-        results.extend(clipboard.unwrap_or_default());
-        results.extend(calc);
 
-        // Add system commands if they match
-        let system = SystemCommands::search(query);
-        results.extend(system);
+        // Add calculator results
+        results.extend(calc_results);
 
         // Apply frequency boosts
         self.apply_frequency_boosts(&mut results).await;
@@ -84,27 +85,6 @@ impl LauncherSearchEngine {
         });
 
         Ok(results)
-    }
-
-    async fn search_apps(&self, query: &str) -> Vec<LauncherItem> {
-        self.app_index.search(query, 10)
-    }
-
-    fn search_calculator(&self, query: &str) -> Vec<LauncherItem> {
-        match Calculator::try_eval(query) {
-            Some(result) => vec![LauncherItem {
-                id: format!("calc:{}", result.expression),
-                title: format!("{}", result.result),
-                subtitle: Some(result.expression.clone()),
-                icon: Some("calculator".to_string()),
-                kind: LauncherItemKind::Calculator {
-                    expression: result.expression,
-                    result: result.result,
-                },
-                score: 2.0, // Calculator results rank highest when matched
-            }],
-            None => vec![],
-        }
     }
 
     async fn search_tasks(
@@ -164,40 +144,6 @@ impl LauncherSearchEngine {
             .collect())
     }
 
-    async fn search_clipboard(&self, query: &str) -> Result<Vec<LauncherItem>, ApiError> {
-        let entries = self
-            .clipboard_repo
-            .search(query, 5)
-            .await
-            .map_err(map_storage_err)?;
-
-        Ok(entries
-            .into_iter()
-            .map(|e| {
-                let content_type = match e.content_type.as_str() {
-                    "image" => ClipboardContentType::Image,
-                    "file" => ClipboardContentType::File,
-                    _ => ClipboardContentType::Text,
-                };
-                let preview: String = e
-                    .preview
-                    .clone()
-                    .unwrap_or_else(|| e.content.chars().take(80).collect());
-                LauncherItem {
-                    id: format!("clip:{}", e.id),
-                    title: preview,
-                    subtitle: e.source_app.clone(),
-                    icon: Some("clipboard".to_string()),
-                    kind: LauncherItemKind::ClipboardEntry {
-                        entry_id: e.id,
-                        content_type,
-                    },
-                    score: 0.5,
-                }
-            })
-            .collect())
-    }
-
     async fn apply_frequency_boosts(&self, items: &mut [LauncherItem]) {
         // Collect (item_id, kind) pairs for boostable items
         let pairs: Vec<(usize, String, String)> = items
@@ -211,9 +157,20 @@ impl LauncherSearchEngine {
                     LauncherItemKind::ClipboardEntry { .. } => "clip",
                     LauncherItemKind::SystemCommand { .. } => "system",
                     LauncherItemKind::Script { .. } => "script",
-                    LauncherItemKind::Calculator { .. } => return None,
+                    LauncherItemKind::Calculator { .. } | LauncherItemKind::AiChat { .. } => {
+                        return None
+                    }
                     LauncherItemKind::Calendar { .. } => "calendar",
-                    LauncherItemKind::AiChat { .. } => return None,
+                    LauncherItemKind::File { .. } => "file",
+                    LauncherItemKind::ContentMatch { .. } => "grep",
+                    LauncherItemKind::Contact { .. } => "contact",
+                    LauncherItemKind::SystemPref { .. } => "pref",
+                    LauncherItemKind::RunningApp { .. } => "running_app",
+                    LauncherItemKind::Bookmark { .. } => "bookmark",
+                    LauncherItemKind::BrowserHistory { .. } => "history",
+                    LauncherItemKind::BrewPackage { .. } => "brew",
+                    LauncherItemKind::SshHost { .. } => "ssh",
+                    LauncherItemKind::GitRepo { .. } => "repo",
                 };
                 Some((i, item.id.clone(), kind_str.to_string()))
             })

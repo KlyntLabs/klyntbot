@@ -86,6 +86,16 @@ const ICON_MAP: Record<string, string> = {
   calculator: "\uD83D\uDD22",
   calendar: "\uD83D\uDCC5",
   aiChat: "\u2728",
+  file: "\uD83D\uDCC4",
+  contentMatch: "\uD83D\uDD0D",
+  contact: "\uD83D\uDC64",
+  systemPref: "\u2699\uFE0F",
+  runningApp: "\uD83D\uDFE2",
+  bookmark: "\uD83D\uDD16",
+  browserHistory: "\uD83C\uDF10",
+  brewPackage: "\uD83C\uDF7A",
+  sshHost: "\uD83D\uDD11",
+  gitRepo: "\uD83D\uDCC2",
 };
 
 function ItemIcon({ kind, icon }: { kind: string; icon?: string | null }) {
@@ -109,6 +119,16 @@ const KIND_LABELS: Record<string, string> = {
   calculator: "Calc",
   calendar: "Event",
   aiChat: "AI",
+  file: "File",
+  contentMatch: "Match",
+  contact: "Contact",
+  systemPref: "Pref",
+  runningApp: "Running",
+  bookmark: "Bookmark",
+  browserHistory: "History",
+  brewPackage: "Brew",
+  sshHost: "SSH",
+  gitRepo: "Repo",
 };
 
 function KindBadge({ type }: { type: string }) {

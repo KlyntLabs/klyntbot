@@ -121,6 +121,45 @@ impl ClipboardRepo {
     }
 }
 
+#[async_trait::async_trait]
+impl crate::search::SearchSource for ClipboardRepo {
+    fn name(&self) -> &'static str {
+        "clipboard"
+    }
+
+    async fn search(&self, query: &str, limit: usize) -> Vec<crate::LauncherItem> {
+        let entries = match self.search(query, limit as i64).await {
+            Ok(e) => e,
+            Err(_) => return vec![],
+        };
+        entries
+            .into_iter()
+            .map(|e| {
+                let content_type = match e.content_type.as_str() {
+                    "image" => crate::ClipboardContentType::Image,
+                    "file" => crate::ClipboardContentType::File,
+                    _ => crate::ClipboardContentType::Text,
+                };
+                let preview: String = e
+                    .preview
+                    .clone()
+                    .unwrap_or_else(|| e.content.chars().take(80).collect());
+                crate::LauncherItem {
+                    id: format!("clip:{}", e.id),
+                    title: preview,
+                    subtitle: e.source_app.clone(),
+                    icon: Some("clipboard".to_string()),
+                    kind: crate::LauncherItemKind::ClipboardEntry {
+                        entry_id: e.id,
+                        content_type,
+                    },
+                    score: 0.5,
+                }
+            })
+            .collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

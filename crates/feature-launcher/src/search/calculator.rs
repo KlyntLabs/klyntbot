@@ -24,6 +24,7 @@ impl Calculator {
                 return None;
             }
         }
+        #[allow(clippy::unnecessary_map_or)] // is_none_or requires Rust 1.82, MSRV is 1.75
         if first == '-'
             && expr
                 .chars()

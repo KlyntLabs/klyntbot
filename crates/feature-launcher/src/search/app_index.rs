@@ -1,8 +1,4 @@
 use crate::types::*;
-use nucleo_matcher::{
-    pattern::{CaseMatching, Normalization, Pattern},
-    Config, Matcher,
-};
 use parking_lot::RwLock;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -60,28 +56,8 @@ impl AppIndex {
     }
 
     pub fn search(&self, query: &str, limit: usize) -> Vec<LauncherItem> {
-        if query.is_empty() {
-            return vec![];
-        }
-
         let apps = self.apps.read();
-        let mut matcher = Matcher::new(Config::DEFAULT);
-        let pattern = Pattern::parse(query, CaseMatching::Ignore, Normalization::Smart);
-
-        let mut scored: Vec<(u32, &AppEntry)> = apps
-            .iter()
-            .filter_map(|app| {
-                let mut buf = Vec::new();
-                let score = pattern.score(
-                    nucleo_matcher::Utf32Str::new(&app.name, &mut buf),
-                    &mut matcher,
-                )?;
-                Some((score, app))
-            })
-            .collect();
-
-        scored.sort_by(|a, b| b.0.cmp(&a.0));
-        scored.truncate(limit);
+        let scored = super::fuzzy_match(query, &apps, |app| &app.name, limit);
 
         scored
             .into_iter()
@@ -263,7 +239,7 @@ impl AppIndex {
         for entry in std::fs::read_dir(dir)? {
             let entry = entry?;
             let path = entry.path();
-            if path.extension().map_or(false, |e| e == "app") {
+            if path.extension().is_some_and(|e| e == "app") {
                 if let Some(app) = AppEntry::from_path(&path) {
                     apps.push(app);
                 }
@@ -285,6 +261,21 @@ impl AppIndex {
 impl Default for AppIndex {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[async_trait::async_trait]
+impl super::SearchSource for AppIndex {
+    fn name(&self) -> &'static str {
+        "apps"
+    }
+
+    async fn search(&self, query: &str, limit: usize) -> Vec<LauncherItem> {
+        self.search(query, limit)
+    }
+
+    async fn refresh(&self) {
+        self.index_applications().await;
     }
 }
 
