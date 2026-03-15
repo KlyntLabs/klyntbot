@@ -76,6 +76,17 @@ impl CalendarEventRepo {
         self.list_range(&from, &to).await
     }
 
+    /// Get the next upcoming calendar event (started_at > now).
+    pub async fn next_upcoming(&self, now: &str) -> common::Result<Option<CalendarEvent>> {
+        sqlx::query_as::<_, CalendarEvent>(
+            "SELECT * FROM calendar_events WHERE started_at > ?1 ORDER BY started_at LIMIT 1",
+        )
+        .bind(now)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))
+    }
+
     /// Delete by external UID (for sync removals).
     pub async fn delete_by_external_uid(&self, external_uid: &str) -> common::Result<()> {
         sqlx::query("DELETE FROM calendar_events WHERE external_uid = ?1")

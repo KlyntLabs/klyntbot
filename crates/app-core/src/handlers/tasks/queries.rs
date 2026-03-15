@@ -55,6 +55,19 @@ impl AppCore {
             .collect())
     }
 
+    /// Get the next upcoming task (earliest `due_date > now`, not completed).
+    /// Used by the tray countdown to show a task deadline timer.
+    pub async fn next_upcoming_task(&self) -> Option<TaskRow> {
+        let now = chrono::Utc::now();
+        let filter = TaskFilter {
+            due_after: Some(now),
+            limit: Some(1),
+            ..Default::default()
+        };
+        let tasks = self.repos.tasks.list(&filter).await.ok()?;
+        tasks.into_iter().find(|t| !t.completed)
+    }
+
     pub async fn project_list_for_tasks(
         &self,
         area_id: Option<String>,

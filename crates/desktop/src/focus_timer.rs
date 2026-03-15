@@ -14,6 +14,7 @@ use tokio::task::JoinHandle;
 
 use crate::app_core::AppCore;
 use crate::commands::window::WINDOW_TRAY;
+use crate::tray_countdown;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TimerMode {
@@ -83,6 +84,8 @@ impl FocusTimer {
             return Err(common::ToolError::ExecutionFailed("Timer already running".into()).into());
         }
 
+        tray_countdown::FOCUS_ACTIVE.store(true, std::sync::atomic::Ordering::Relaxed);
+
         let total_secs = work_mins * 60;
         let (cmd_tx, cmd_rx) = mpsc::channel(8);
         let handle = tokio::spawn(timer_loop(
@@ -114,6 +117,8 @@ impl FocusTimer {
         if guard.is_some() {
             return Err(common::ToolError::ExecutionFailed("Timer already running".into()).into());
         }
+
+        tray_countdown::FOCUS_ACTIVE.store(true, std::sync::atomic::Ordering::Relaxed);
 
         let total_secs = break_mins * 60;
         let (cmd_tx, cmd_rx) = mpsc::channel(8);
@@ -172,6 +177,7 @@ impl FocusTimer {
             // `update_tray_title` runs after our `clear_tray_title`.
             let _ = state.handle.await;
             clear_tray_title(app);
+            tray_countdown::notify_focus_ended(app);
             true
         } else {
             false
@@ -303,6 +309,7 @@ async fn timer_loop(
     }
 
     clear_tray_title(&app);
+    tray_countdown::notify_focus_ended(&app);
 
     if let Some(timer) = app.try_state::<Arc<FocusTimer>>() {
         timer.mark_completed().await;

@@ -7,6 +7,7 @@ mod dev_server;
 mod focus_timer;
 mod notify;
 mod oauth;
+mod tray_countdown;
 
 use std::sync::Arc;
 
@@ -286,6 +287,9 @@ fn run_desktop_app() {
             if let Some(launcher_window) = app.get_webview_window(WINDOW_LAUNCHER) {
                 dismiss_on_blur(&launcher_window);
             }
+
+            // Start the tray countdown (next upcoming event in menu bar)
+            tray_countdown::spawn(app.handle());
 
             Ok(())
         })

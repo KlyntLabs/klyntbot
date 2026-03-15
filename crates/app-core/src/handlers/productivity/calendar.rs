@@ -61,6 +61,15 @@ impl AppCore {
         Ok(results)
     }
 
+    /// Get the next upcoming calendar event (for tray countdown).
+    pub async fn next_upcoming_event(
+        &self,
+    ) -> Option<feature_productivity::types::CalendarEvent> {
+        let repos = self.productivity_repos().ok()?;
+        let now = Utc::now().to_rfc3339();
+        repos.calendar_events.next_upcoming(&now).await.ok().flatten()
+    }
+
     // ── Weekly Assessment ───────────────────────────────────────────
 
     pub async fn productivity_weekly_assessment(

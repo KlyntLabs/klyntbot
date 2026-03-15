@@ -1,7 +1,5 @@
 import { FOCUS_PRESETS, type FocusSettings, type useFocusTimer } from "@shared/hooks/useFocusTimer";
-import { useQuery } from "@shared/hooks/useQuery";
 import { formatElapsed, formatHumanDuration } from "@shared/lib/dates";
-import type { TodayTask } from "@shared/types";
 import { Checkbox } from "@shared/ui";
 import {
   ChevronRight,
@@ -53,72 +51,6 @@ function SettingsButton({ onClick }: { onClick: () => void }) {
     <button type="button" className={ICON_BTN} onClick={onClick} title="Settings">
       <Settings className="w-3.5 h-3.5" strokeWidth={1.5} />
     </button>
-  );
-}
-
-// ── Task picker ──────────────────────────────────────────────────────
-
-function TaskPicker({
-  selectedId,
-  onSelect,
-}: {
-  selectedId: string | null;
-  onSelect: (id: string | null, title: string | null) => void;
-}) {
-  const { data: tasks } = useQuery<TodayTask[]>("today_tasks", undefined, []);
-  const [open, setOpen] = useState(false);
-
-  const selected = tasks.find((t) => t.id === selectedId);
-
-  return (
-    <div className="relative w-full">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="w-full px-3 py-1.5 text-xs text-left rounded-lg bg-surface-raised/50
-                   text-muted hover:text-foreground transition-colors truncate"
-      >
-        {selected ? selected.title : "No task linked"}
-      </button>
-      {open && (
-        <div
-          className="absolute bottom-full left-0 right-0 mb-1 rounded-lg glass-dropdown
-                        p-1 max-h-40 overflow-y-auto z-50"
-        >
-          <button
-            type="button"
-            onClick={() => {
-              onSelect(null, null);
-              setOpen(false);
-            }}
-            className="w-full px-2 py-1 text-xs text-left text-muted hover:text-foreground
-                       hover:bg-surface-raised/50 rounded"
-          >
-            No task
-          </button>
-          {tasks
-            .filter((t) => !t.completed)
-            .map((task) => (
-              <button
-                key={task.id}
-                type="button"
-                onClick={() => {
-                  onSelect(task.id, task.title);
-                  setOpen(false);
-                }}
-                className={`w-full px-2 py-1 text-xs text-left rounded truncate
-                ${
-                  task.id === selectedId
-                    ? "text-brand bg-brand/10"
-                    : "text-muted hover:text-foreground hover:bg-surface-raised/50"
-                }`}
-              >
-                {task.title}
-              </button>
-            ))}
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -467,19 +399,16 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
               <SettingsButton onClick={onOpenSettings} />
             </>
           ) : (
-            <div className="flex flex-col gap-3 w-full">
-              <TaskPicker selectedId={timer.selectedTaskId} onSelect={timer.selectTask} />
-              <div className="flex items-center justify-center gap-3 w-full">
-                <button
-                  type="button"
-                  onClick={timer.start}
-                  disabled={loading}
-                  className="px-8 py-2 rounded-full bg-white/[0.08] text-[11px] uppercase tracking-[0.15em] text-primary font-light hover:bg-white/[0.12] transition-colors disabled:opacity-50"
-                >
-                  Start
-                </button>
-                <SettingsButton onClick={onOpenSettings} />
-              </div>
+            <div className="flex items-center justify-center gap-3 w-full">
+              <button
+                type="button"
+                onClick={timer.start}
+                disabled={loading}
+                className="px-8 py-2 rounded-full bg-white/[0.08] text-[11px] uppercase tracking-[0.15em] text-primary font-light hover:bg-white/[0.12] transition-colors disabled:opacity-50"
+              >
+                Start
+              </button>
+              <SettingsButton onClick={onOpenSettings} />
             </div>
           )}
         </div>
