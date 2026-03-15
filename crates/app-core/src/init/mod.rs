@@ -3,6 +3,7 @@ mod channels;
 mod coaching;
 mod cognitive;
 mod cron;
+mod launcher;
 mod productivity;
 mod storage;
 
@@ -178,6 +179,12 @@ impl AppCore {
         // ── Phase 7: Cognitive (capture, file watcher, work context) ─────
         cognitive::init_cognitive(&mut config, &storage_pool, &activity_svc, &shutdown_token).await;
 
+        // ── Phase 8: Launcher ─────────────────────────────────────────────
+        let launcher::LauncherResult {
+            launcher_engine,
+            clipboard_repo: launcher_clipboard_repo,
+        } = launcher::init_launcher(&config, &storage_pool).await;
+
         // ── Assemble AppCore ─────────────────────────────────────────────
         let core = AppCore {
             mode,
@@ -214,6 +221,8 @@ impl AppCore {
             active_task_focus: Arc::new(std::sync::Mutex::new(None)),
             event_emitter: event_emitter
                 .unwrap_or_else(|| Arc::new(NoopEmitter)),
+            launcher_engine,
+            launcher_clipboard_repo,
         };
 
         // ── Post-core background services ────────────────────────────────

@@ -92,10 +92,9 @@ fn run_mcp_stdio() {
             .expect("config load failed");
 
         // Init AppCore in Server mode
-        let (app, events) =
-            app_core::AppCore::init(common::AppMode::Server, Some(config.clone()))
-                .await
-                .expect("init failed");
+        let (app, events) = app_core::AppCore::init(common::AppMode::Server, Some(config.clone()))
+            .await
+            .expect("init failed");
         let app = Arc::new(app);
 
         // Drain unused EventChannels — both receivers must close before task exits.
@@ -568,6 +567,17 @@ fn run_desktop_app() {
             commands::agents::agent_create_profile,
             commands::agents::agent_create_skill,
             commands::agents::agent_delete_file,
+            // Launcher
+            commands::launcher::launcher_search,
+            commands::launcher::launcher_execute,
+            commands::launcher::launcher_dashboard,
+            commands::launcher::launcher_clipboard_paste,
+            commands::launcher::launcher_clipboard_delete,
+            commands::launcher::launcher_clipboard_pin,
+            commands::launcher::launcher_window_action,
+            commands::launcher::launcher_run_script,
+            commands::launcher::launcher_system_command,
+            commands::launcher::launcher_open_app,
             commands::window::resize_window,
             commands::window::open_url,
             commands::window::show_dashboard,

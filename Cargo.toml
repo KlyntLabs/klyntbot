@@ -29,6 +29,7 @@ members = [
     "crates/app-core",
     "crates/activity-log",
     "crates/feature-tasks",
+    "crates/feature-launcher",
     "crates/klyntbot-server",
 ]
 
@@ -65,6 +66,7 @@ desktop = { path = "crates/desktop" }
 app-core = { path = "crates/app-core" }
 activity-log = { path = "crates/activity-log" }
 feature-tasks = { path = "crates/feature-tasks" }
+feature-launcher = { path = "crates/feature-launcher" }
 klyntbot-server = { path = "crates/klyntbot-server" }
 extism = "1"
 mcp = { path = "crates/mcp" }

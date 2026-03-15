@@ -231,7 +231,10 @@ impl DistractionMonitor {
 
         match decision {
             InterceptDecision::ShowOverlay { needs_llm } => {
-                // 7a. Record distraction on the session
+                // Clone session_id before record_distraction_for consumes session by value
+                let session_id = session.id.clone();
+
+                // 7a. Record distraction on the session (consumes session)
                 if let Err(e) = self
                     .focus_manager
                     .record_distraction_for(session, &tick.app_name)
@@ -242,7 +245,7 @@ impl DistractionMonitor {
 
                 // 7b. Send alert
                 let alert = DistractionAlert {
-                    session_id: session.id.clone(),
+                    session_id,
                     app_name: tick.app_name.clone(),
                     window_title: tick.window_title.clone(),
                     previous_app: previous_app.clone(),
@@ -630,10 +633,8 @@ mod tests {
         mgr.start_session(None, None, Some(25)).await.unwrap();
 
         tx.send(make_tick("Netflix", None, false)).unwrap();
+        // recv() acts as synchronization — alert is sent after record_distraction_for completes
         alert_rx.recv().await.expect("alert");
-
-        // Small yield for record_distraction_for to complete
-        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
 
         // Check session was updated
         let session = mgr.get_active().await.unwrap().unwrap();
@@ -653,7 +654,7 @@ In `crates/feature-productivity/src/lib.rs`, the `distraction` module is already
 - [ ] **Step 4: Run tests**
 
 Run: `cargo nextest run -p feature-productivity -E 'test(distraction::monitor)'`
-Expected: all 8 tests pass
+Expected: all 9 tests pass
 
 - [ ] **Step 5: Run clippy**
 
@@ -686,7 +687,7 @@ In `crates/app-core/src/init/productivity.rs`, add field to struct (after line 2
 
 ```rust
 pub distraction_alert_rx:
-    Option<tokio::sync::mpsc::Receiver<feature_productivity::distraction::monitor::DistractionAlert>>,
+    Option<tokio::sync::mpsc::Receiver<feature_productivity::distraction::DistractionAlert>>,
 ```
 
 - [ ] **Step 2: Create and start the monitor in `init_productivity`**
@@ -708,16 +709,79 @@ let distraction_alert_rx = {
 };
 ```
 
-- [ ] **Step 3: Add to the return tuple**
+- [ ] **Step 3: Add to all three tuple/struct sites**
 
-In the success tuple (around line 140), add `distraction_alert_rx` after `interceptor`:
+There are **three** places to update in `init_productivity`:
+
+**Site 1: Error branch (line 59)** — add a 10th `None`:
 
 ```rust
-// The tuple currently has 9 elements — add distraction_alert_rx as the 10th.
-// Update the None tuple in the error/disabled branches to match (add None).
+// Before:
+(None, None, None, None, None, None, None, None, None)
+// After:
+(None, None, None, None, None, None, None, None, None, None)
 ```
 
-Specifically, change both the success return and the `None` tuples to include the new field. The `ProductivityResult` construction at the bottom also needs the new field.
+**Site 2: Success tuple (around line 140)** — add `distraction_alert_rx` after `Some(interceptor)`:
+
+```rust
+(
+    Some(prod_repos),
+    Some(mgr),
+    Some(engine),
+    Some(agg),
+    Some(nudge_svc),
+    Some(interceptor),
+    distraction_alert_rx,  // NEW — already Option from the block above
+    auto_focus_rx,
+    Some(nudge_rx),
+    dashboard_tick_rx,
+)
+```
+
+**Site 3: Disabled branch (line 153)** — add a 10th `None`:
+
+```rust
+// Before:
+(None, None, None, None, None, None, None, None, None)
+// After:
+(None, None, None, None, None, None, None, None, None, None)
+```
+
+**Site 4: Destructuring (line 39-49)** — add `distraction_alert_rx` to match:
+
+```rust
+let (
+    productivity_repos,
+    focus_manager,
+    productivity_engine,
+    aggregator,
+    nudge_service,
+    distraction_interceptor,
+    distraction_alert_rx,  // NEW
+    auto_focus_rx,
+    nudge_rx,
+    dashboard_tick_rx,
+) = if config.productivity.enabled {
+```
+
+**Site 5: `ProductivityResult` struct construction (line 156-167)** — add the new field:
+
+```rust
+ProductivityResult {
+    dashboard_poll_interval_secs,
+    productivity_repos,
+    focus_manager,
+    productivity_engine,
+    aggregator,
+    nudge_service,
+    distraction_interceptor,
+    distraction_alert_rx,  // NEW
+    auto_focus_rx,
+    nudge_rx,
+    dashboard_tick_rx,
+}
+```
 
 - [ ] **Step 4: Verify it compiles**
 
@@ -747,18 +811,45 @@ In `crates/app-core/src/init/mod.rs`, add after line 31 (`dashboard_poll_interva
 
 ```rust
 pub distraction_alert_rx:
-    Option<tokio::sync::mpsc::Receiver<feature_productivity::distraction::monitor::DistractionAlert>>,
+    Option<tokio::sync::mpsc::Receiver<feature_productivity::distraction::DistractionAlert>>,
 ```
 
 - [ ] **Step 2: Populate the field in `init_with_sender`**
 
-In the `EventChannels` construction (around line 245), add:
+Two sites to update in `crates/app-core/src/init/mod.rs`:
+
+**Site 1: Destructuring (line 136-146)** — add `distraction_alert_rx`:
 
 ```rust
-distraction_alert_rx: productivity_result.distraction_alert_rx,
+let productivity::ProductivityResult {
+    dashboard_poll_interval_secs,
+    productivity_repos,
+    focus_manager,
+    productivity_engine,
+    aggregator,
+    nudge_service,
+    distraction_interceptor,
+    distraction_alert_rx,  // NEW
+    auto_focus_rx,
+    nudge_rx,
+    dashboard_tick_rx,
+} = productivity::init_productivity(
 ```
 
-(Where `productivity_result` is the destructured `ProductivityResult` — match the existing destructuring pattern.)
+**Site 2: `EventChannels` literal (around line 245-253)** — add the field:
+
+```rust
+let channels = EventChannels {
+    intervention_rx,
+    domain_event_bus,
+    pipeline_rx,
+    auto_focus_rx,
+    nudge_rx,
+    dashboard_tick_rx,
+    dashboard_poll_interval_secs,
+    distraction_alert_rx,  // NEW
+};
+```
 
 - [ ] **Step 3: Verify it compiles**
 
