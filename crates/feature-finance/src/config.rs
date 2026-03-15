@@ -28,6 +28,10 @@ pub struct FinanceConfig {
     pub scheduling: FinanceSchedulingConfig,
     #[serde(default)]
     pub categories: FinanceCategoryConfig,
+    /// Manual exchange rate overrides. Key format: "FROM:TO" (e.g., "THB:VND").
+    /// Takes precedence over API-fetched rates.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exchange_rates: Option<std::collections::HashMap<String, f64>>,
 }
 
 impl Default for FinanceConfig {
@@ -42,6 +46,7 @@ impl Default for FinanceConfig {
             price_refresh: Default::default(),
             scheduling: Default::default(),
             categories: Default::default(),
+            exchange_rates: None,
         }
     }
 }

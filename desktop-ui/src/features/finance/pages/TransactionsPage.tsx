@@ -16,7 +16,7 @@ import { FinanceLayout } from "../components/FinanceLayout";
 import { FinanceSkeleton } from "../components/FinanceSkeleton";
 import { FormField, fieldClass } from "../components/FormModal";
 import { SlidePanel } from "../components/SlidePanel";
-import { COLORS, fmtCompact, fmtMoney, toBase } from "../lib/finance";
+import { COLORS, fmtCompact, fmtMoney } from "../lib/finance";
 
 type TxFilter = "all" | "income" | "expense" | "transfer";
 
@@ -26,7 +26,6 @@ export function FinanceTransactions() {
     undefined,
     [],
   );
-  const { data: rates } = useQuery<Record<string, number>>("finance_exchange_rates", undefined, {});
   const { data: settings } = useQuery<{ defaultCurrency: string }>(
     "finance_settings",
     undefined,
@@ -87,13 +86,13 @@ export function FinanceTransactions() {
     const catMap = new Map<string, number>();
 
     for (const t of transactions) {
-      const vnd = toBase(t.amount, t.currency, rates, baseCurrency);
+      const base = t.baseAmount ?? 0;
       if (t.txType === "income") {
-        income += vnd;
+        income += base;
       } else if (t.txType === "expense") {
-        expense += vnd;
+        expense += base;
         const c = t.category ?? "Other";
-        catMap.set(c, (catMap.get(c) ?? 0) + vnd);
+        catMap.set(c, (catMap.get(c) ?? 0) + base);
       }
     }
 
@@ -102,7 +101,7 @@ export function FinanceTransactions() {
       .map(([name, value], i) => ({ name, value, color: COLORS[i % COLORS.length] }));
 
     return { totalIncome: income, totalExpense: expense, catSegs: segments };
-  }, [transactions, rates]);
+  }, [transactions]);
 
   // ── Add Transaction slide panel ──
   const [panelOpen, setPanelOpen] = useState(false);

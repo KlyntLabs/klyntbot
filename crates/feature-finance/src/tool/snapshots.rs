@@ -4,7 +4,6 @@
 
 use chrono::{Duration, Local};
 use serde_json::json;
-use std::collections::BTreeMap;
 
 use common::{Result, ToolError};
 use tools_core::ParamExtractor;
@@ -26,49 +25,27 @@ impl FinanceTool {
         }
     }
 
-    /// Record a point-in-time net worth snapshot by computing current totals.
+    /// Record a point-in-time net worth snapshot by computing current base-currency totals.
     async fn snapshot_record(&self, _p: &ParamExtractor<'_>) -> Result<String> {
         let today = Local::now().date_naive();
+        let base = &self.default_currency;
 
-        let (account_balances, investment_values, liability_totals) = tokio::try_join!(
-            self.storage.accounts.total_balance_by_currency(),
-            self.storage.investments.total_value_by_currency(),
-            self.storage.liabilities.total_remaining_by_currency(),
+        let (accounts_total, investments_total, liabilities_total) = tokio::try_join!(
+            self.storage.accounts.total_base_balance(base),
+            self.storage.investments.total_base_value(base),
+            self.storage.liabilities.total_base_remaining(base),
         )?;
 
-        let accounts_total: i64 = account_balances.iter().map(|(_, v)| v).sum();
-        let investments_total: i64 = investment_values.iter().map(|(_, v)| v).sum();
-        let liabilities_total: i64 = liability_totals.iter().map(|(_, v)| v).sum();
         let net_worth = accounts_total + investments_total - liabilities_total;
 
-        // Build a per-currency breakdown
-        let mut currencies: BTreeMap<String, [i64; 3]> = BTreeMap::new();
-        for (cur, val) in &account_balances {
-            currencies.entry(cur.clone()).or_default()[0] += val;
-        }
-        for (cur, val) in &investment_values {
-            currencies.entry(cur.clone()).or_default()[1] += val;
-        }
-        for (cur, val) in &liability_totals {
-            currencies.entry(cur.clone()).or_default()[2] += val;
-        }
-
-        let breakdown: serde_json::Map<String, serde_json::Value> = currencies
-            .iter()
-            .map(|(cur, totals)| {
-                let net = totals[0] + totals[1] - totals[2];
-                (
-                    cur.clone(),
-                    json!({
-                        "accounts": totals[0],
-                        "investments": totals[1],
-                        "liabilities": totals[2],
-                        "net": net,
-                    }),
-                )
-            })
-            .collect();
-
+        let breakdown = json!({
+            base: {
+                "accounts": accounts_total,
+                "investments": investments_total,
+                "liabilities": liabilities_total,
+                "net": net_worth,
+            }
+        });
         let breakdown_json = serde_json::to_string(&breakdown).unwrap_or_else(|_| "{}".into());
 
         let row = self
@@ -76,7 +53,7 @@ impl FinanceTool {
             .snapshots
             .add(
                 &today.to_string(),
-                &self.default_currency,
+                base,
                 accounts_total,
                 investments_total,
                 liabilities_total,
@@ -93,7 +70,7 @@ impl FinanceTool {
             "investments_total": row.investments_total,
             "liabilities_total": row.liabilities_total,
             "net_worth": row.net_worth,
-            "breakdown": serde_json::Value::Object(breakdown),
+            "breakdown": breakdown,
         }))
         .unwrap())
     }

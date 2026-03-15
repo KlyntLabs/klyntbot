@@ -21,7 +21,7 @@ description: Complete reference for all finance tool actions
 ## Transactions
 | Action | Params |
 |--------|--------|
-| `tx_add` | amount (cents!), category, type ("income"/"expense"/"transfer"), account_id, description, date |
+| `tx_add` | amount (cents!), category, **type** ("income"/"expense"/"transfer") ⚠️ NOT `tx_type`, account_id, description, date |
 | `tx_list` | account_id, category, type, period, limit |
 | `tx_update` | id, amount/category/description |
 | `tx_delete` | id |
@@ -45,6 +45,7 @@ description: Complete reference for all finance tool actions
 | Action | Params |
 |--------|--------|
 | `portfolio_summary` | — |
+| `investment_add` | portfolio_id, name, **asset_type** ⚠️ NOT `type`, symbol, quantity, cost_basis, purchase_date, market_currency (optional — currency the asset trades in, e.g. "USD" for BTC) |
 | `price_fetch` | symbol, asset_type ("stock"/"crypto"/"commodity") |
 | `goal_fire` | annual_expenses, withdrawal_rate |
 | `goal_add` | name, target_amount, deadline |
@@ -93,3 +94,9 @@ description: Complete reference for all finance tool actions
 |--------|--------|-------------|-----------------|
 | `snapshot_record` | note: Option<String> (optional description) | Record a point-in-time net worth snapshot from current account balances. | `mcp__klyntbot__finance(action: "snapshot_record", note: "End of Q1 2026")` |
 | `snapshot_history` | months: u32 (default: 12) | View net worth trend over time. | `mcp__klyntbot__finance(action: "snapshot_history", months: 12)` |
+
+## Currency Notes
+
+- **`base_amount` is auto-computed** — when `currency` differs from the default, the system fetches the exchange rate and fills `base_amount` automatically. Never pass `base_amount` manually.
+- **`market_currency`** on `investment_add` — specifies the exchange currency for the asset (e.g., "USD" for BTC). Enables three-tier display: quantity + market price + home equivalent.
+- **Changing default currency** via `settings_update(default_currency: "VND")` triggers a rebase of all `base_amount` fields across all tables.

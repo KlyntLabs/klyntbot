@@ -5,6 +5,7 @@
 use chrono::Utc;
 use serde_json::json;
 
+use crate::currency::ensure_base_amount;
 use crate::types::{AccountType, FinanceAccount};
 use common::{Result, ToolError};
 use storage::rows::finance::{FinanceAccountPatch, FinanceAccountRow, FinanceTransactionFilter};
@@ -60,6 +61,14 @@ impl FinanceTool {
         let now = Utc::now();
         let id = uuid::Uuid::new_v4().to_string();
 
+        let conv = ensure_base_amount(
+            balance,
+            currency,
+            &self.default_currency,
+            &self.price_service,
+        )
+        .await?;
+
         let row = FinanceAccountRow {
             id,
             name: name.to_string(),
@@ -71,6 +80,9 @@ impl FinanceTool {
             is_archived: false,
             created_at: now,
             updated_at: now,
+            base_balance: conv.base_amount,
+            base_currency: conv.base_currency,
+            exchange_rate: conv.exchange_rate,
         };
 
         let inserted = self.storage.accounts.add(&row).await?;
@@ -172,6 +184,28 @@ impl FinanceTool {
             return Err(ToolError::InvalidParams("No fields to update".to_string()).into());
         }
 
+        // If the balance is being updated, recompute base conversion.
+        let (base_balance, base_currency, exchange_rate) = if let Some(new_balance) = balance {
+            let account_row =
+                self.storage.accounts.get(id).await?.ok_or_else(|| {
+                    ToolError::ExecutionFailed(format!("Account {} not found", id))
+                })?;
+            let conv = ensure_base_amount(
+                new_balance,
+                &account_row.currency,
+                &self.default_currency,
+                &self.price_service,
+            )
+            .await?;
+            (
+                Some(conv.base_amount),
+                Some(conv.base_currency),
+                Some(conv.exchange_rate),
+            )
+        } else {
+            (None, None, None)
+        };
+
         let patch = FinanceAccountPatch {
             id: id.to_string(),
             name: name.map(|s| s.to_string()),
@@ -179,6 +213,9 @@ impl FinanceTool {
             institution: institution.map(|s| Some(s.to_string())),
             notes: notes.map(|s| Some(s.to_string())),
             is_archived,
+            base_balance,
+            base_currency,
+            exchange_rate,
         };
 
         let row = self

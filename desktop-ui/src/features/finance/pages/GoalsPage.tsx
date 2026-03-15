@@ -11,7 +11,7 @@ import { Donut } from "../components/Donut";
 import { FinanceLayout } from "../components/FinanceLayout";
 import { FinanceSkeleton } from "../components/FinanceSkeleton";
 import { FormField, FormModal, fieldClass } from "../components/FormModal";
-import { COLORS, fmtCompact, fmtMoney, GOAL_ICONS, pct, toBase } from "../lib/finance";
+import { COLORS, fmtCompact, fmtMoney, GOAL_ICONS, pct } from "../lib/finance";
 
 type GoalTab = "active" | "achieved" | "abandoned";
 
@@ -22,7 +22,6 @@ export function FinanceGoals() {
     error,
     refetch,
   } = useQuery<FinanceGoal[]>("finance_goals", undefined, []);
-  const { data: rates } = useQuery<Record<string, number>>("finance_exchange_rates", undefined, {});
   const { data: settings } = useQuery<{ defaultCurrency: string }>(
     "finance_settings",
     undefined,
@@ -35,35 +34,35 @@ export function FinanceGoals() {
 
   const filteredGoals = useMemo(() => goals.filter((g) => g.status === tab), [goals, tab]);
 
-  // Convert to base currency for cross-currency summing
   const activeGoals = useMemo(() => goals.filter((g) => g.status === "active"), [goals]);
   const totalTarget = useMemo(
-    () =>
-      activeGoals.reduce((s, g) => s + toBase(g.targetAmount, g.currency, rates, baseCurrency), 0),
-    [activeGoals, rates],
+    () => activeGoals.reduce((s, g) => s + (g.baseTargetAmount ?? g.targetAmount), 0),
+    [activeGoals],
   );
   const totalSaved = useMemo(
-    () =>
-      activeGoals.reduce((s, g) => s + toBase(g.currentAmount, g.currency, rates, baseCurrency), 0),
-    [activeGoals, rates],
+    () => activeGoals.reduce((s, g) => s + (g.baseCurrentAmount ?? g.currentAmount), 0),
+    [activeGoals],
   );
   const monthlyTotal = useMemo(
     () =>
-      activeGoals.reduce(
-        (s, g) => s + toBase(g.monthlyContribution ?? 0, g.currency, rates, baseCurrency),
-        0,
-      ),
-    [activeGoals, rates],
+      activeGoals.reduce((s, g) => {
+        if (g.monthlyContribution == null) return s;
+        if (g.baseTargetAmount != null && g.targetAmount !== 0) {
+          return s + Math.round(g.monthlyContribution * (g.baseTargetAmount / g.targetAmount));
+        }
+        return s + g.monthlyContribution;
+      }, 0),
+    [activeGoals],
   );
 
   const goalSegs = useMemo(
     () =>
       activeGoals.map((g, i) => ({
         name: g.name,
-        value: toBase(g.currentAmount, g.currency, rates, baseCurrency),
+        value: g.baseCurrentAmount ?? g.currentAmount,
         color: COLORS[i % COLORS.length],
       })),
-    [activeGoals, rates],
+    [activeGoals],
   );
 
   // ── Add Goal modal ──

@@ -51,6 +51,7 @@ For all actions and setup workflow, read `references/actions.md`.
 1. **Using dollars instead of cents** — All amounts are in the smallest currency unit. $25.50 = 2550, not 25.50. This is the most critical rule.
 2. **Negative amounts on tx_add** — Amounts must ALWAYS be positive. The `type` field ("expense"/"income") determines the direction. Never pass negative amounts.
 3. **Using `tx_type` instead of `type`** — The transaction type parameter is `type`, not `tx_type`. Use `type: "expense"` or `type: "income"`.
+   - **But for investments, use `asset_type`** — NOT `type`. Use `asset_type: "stock"` or `asset_type: "crypto"`. The `type` param is ONLY for transactions.
 4. **Guessing account or budget IDs** — Always call `account_list` or `budget_list` first. Never reuse IDs from a previous conversation.
 5. **Hardcoding currency** — Call `settings_get` to determine the user's default currency. Don't assume USD.
 6. **Wrong transaction type values** — Use "expense" for spending, "income" for earnings. Not "debit"/"credit".
@@ -60,6 +61,16 @@ For all actions and setup workflow, read `references/actions.md`.
 10. **Forgetting to set allocation targets before drift check** — `portfolio_drift` requires targets. Use `allocation_target_list` first; if empty, guide the user to set targets with `allocation_target_set`.
 11. **Not chaining FIRE actions** — A complete FIRE analysis chains: calculate variant -> withdrawal simulation -> sensitivity analysis. Don't just run one action in isolation.
 12. **Wrong account type on account_add** — Use `type: "bank"`, not "checking"/"savings". Valid types: bank, credit, cash, investment, crypto, other.
+
+**Parameter name cheat sheet — `type` vs `asset_type`:**
+| Action | Param name | Values |
+|--------|-----------|--------|
+| `tx_add` | `type` | "expense", "income", "transfer" |
+| `account_add` | `type` | "bank", "credit", "cash", "investment", "crypto" |
+| `investment_add` | `asset_type` | "stock", "crypto", "bond", "real_estate", "commodity" |
+| `liability_add` | `type` | "personal_loan", "student_loan", "credit_card", "mortgage" |
+13. **Ignoring auto-conversion** — When adding a transaction with a `currency` different from the default, `base_amount` is computed automatically. Do NOT manually pass `base_amount`.
+14. **Forgetting market_currency on investments** — For investments quoted in a foreign currency (e.g., BTC in USD), pass `market_currency: "USD"` on `investment_add`. This enables three-tier display: quantity + market price + home equivalent.
 
 ## Workflow Tip: FIRE Planning Chain
 

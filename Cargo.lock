@@ -3669,6 +3669,7 @@ dependencies = [
  "rust_decimal",
  "serde",
  "serde_json",
+ "sqlx",
  "storage",
  "tempfile",
  "tokio",

@@ -8,8 +8,11 @@ CREATE TABLE IF NOT EXISTS finance_accounts (
     institution  TEXT,
     notes        TEXT,
     is_archived  INTEGER NOT NULL DEFAULT 0,
-    created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    updated_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    base_balance   INTEGER NOT NULL DEFAULT 0,
+    base_currency  TEXT NOT NULL DEFAULT 'USD',
+    exchange_rate  REAL NOT NULL DEFAULT 1.0
 );
 
 CREATE INDEX IF NOT EXISTS idx_finance_accounts_currency ON finance_accounts(currency);
@@ -30,7 +33,10 @@ CREATE TABLE IF NOT EXISTS finance_transactions (
     is_recurring   INTEGER NOT NULL DEFAULT 0,
     recurring_rule TEXT,
     created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    updated_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    updated_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    base_amount    INTEGER NOT NULL DEFAULT 0,
+    base_currency  TEXT NOT NULL DEFAULT 'USD',
+    exchange_rate  REAL NOT NULL DEFAULT 1.0
 );
 
 CREATE INDEX IF NOT EXISTS idx_finance_tx_account_id ON finance_transactions(account_id);
@@ -53,7 +59,10 @@ CREATE TABLE IF NOT EXISTS finance_budgets (
     is_active       INTEGER NOT NULL DEFAULT 1,
     alert_threshold INTEGER NOT NULL DEFAULT 80,
     created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    base_amount     INTEGER NOT NULL DEFAULT 0,
+    base_currency   TEXT NOT NULL DEFAULT 'USD',
+    exchange_rate   REAL NOT NULL DEFAULT 1.0
 );
 
 CREATE INDEX IF NOT EXISTS idx_finance_budgets_is_active ON finance_budgets(is_active) WHERE is_active = 1;
@@ -82,8 +91,14 @@ CREATE TABLE IF NOT EXISTS finance_investments (
     purchase_date TEXT,
     asset_class   TEXT,
     notes         TEXT,
-    created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    updated_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    market_currency    TEXT,
+    base_cost_basis    INTEGER NOT NULL DEFAULT 0,
+    base_current_value INTEGER NOT NULL DEFAULT 0,
+    base_currency      TEXT NOT NULL DEFAULT 'USD',
+    purchase_rate      REAL NOT NULL DEFAULT 1.0,
+    market_rate        REAL NOT NULL DEFAULT 1.0
 );
 
 CREATE INDEX IF NOT EXISTS idx_finance_investments_portfolio_id ON finance_investments(portfolio_id);
@@ -100,7 +115,10 @@ CREATE TABLE IF NOT EXISTS finance_investment_transactions (
     fees           INTEGER NOT NULL DEFAULT 0,
     tx_date        TEXT NOT NULL DEFAULT (date('now')),
     notes          TEXT,
-    created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    base_total_amount  INTEGER NOT NULL DEFAULT 0,
+    base_currency      TEXT NOT NULL DEFAULT 'USD',
+    exchange_rate      REAL NOT NULL DEFAULT 1.0
 );
 
 CREATE INDEX IF NOT EXISTS idx_finance_inv_txs_investment_id ON finance_investment_transactions(investment_id);
@@ -120,7 +138,11 @@ CREATE TABLE IF NOT EXISTS finance_goals (
     inflation_rate       REAL,
     notes                TEXT,
     created_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    updated_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    updated_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    base_target_amount   INTEGER NOT NULL DEFAULT 0,
+    base_current_amount  INTEGER NOT NULL DEFAULT 0,
+    base_currency        TEXT NOT NULL DEFAULT 'USD',
+    exchange_rate        REAL NOT NULL DEFAULT 1.0
 );
 
 CREATE INDEX IF NOT EXISTS idx_finance_goals_status ON finance_goals(status);
@@ -137,10 +159,25 @@ CREATE TABLE IF NOT EXISTS finance_liabilities (
     due_date        TEXT,
     notes           TEXT,
     created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    base_principal  INTEGER NOT NULL DEFAULT 0,
+    base_remaining  INTEGER NOT NULL DEFAULT 0,
+    base_currency   TEXT NOT NULL DEFAULT 'USD',
+    exchange_rate   REAL NOT NULL DEFAULT 1.0
 );
 
 CREATE INDEX IF NOT EXISTS idx_finance_liabilities_currency ON finance_liabilities(currency);
+
+-- Exchange rate cache
+CREATE TABLE IF NOT EXISTS finance_exchange_rates (
+    from_currency  TEXT NOT NULL,
+    to_currency    TEXT NOT NULL,
+    rate           REAL NOT NULL,
+    fetched_at     TEXT NOT NULL,
+    PRIMARY KEY (from_currency, to_currency)
+);
+CREATE INDEX IF NOT EXISTS idx_exchange_rates_staleness
+    ON finance_exchange_rates (to_currency, from_currency, fetched_at);
 
 -- Allocation targets
 CREATE TABLE IF NOT EXISTS finance_allocation_targets (

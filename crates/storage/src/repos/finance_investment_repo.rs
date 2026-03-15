@@ -94,11 +94,15 @@ impl FinanceInvestmentRepo {
             INSERT INTO finance_investments (
                 id, portfolio_id, asset_type, symbol, name, quantity,
                 cost_basis, currency, current_price, current_value,
-                purchase_date, asset_class, notes, created_at, updated_at
+                purchase_date, asset_class, notes, created_at, updated_at,
+                market_currency, base_cost_basis, base_current_value,
+                base_currency, purchase_rate, market_rate
             ) VALUES (
                 ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?,
-                ?, ?, ?, ?, ?
+                ?, ?, ?, ?, ?,
+                ?, ?, ?,
+                ?, ?, ?
             )
             RETURNING *
             "#,
@@ -118,6 +122,12 @@ impl FinanceInvestmentRepo {
         .bind(&row.notes)
         .bind(row.created_at)
         .bind(row.updated_at)
+        .bind(&row.market_currency)
+        .bind(row.base_cost_basis)
+        .bind(row.base_current_value)
+        .bind(&row.base_currency)
+        .bind(row.purchase_rate)
+        .bind(row.market_rate)
         .fetch_one(&self.pool)
         .await?;
         Ok(inserted)
@@ -145,12 +155,18 @@ impl FinanceInvestmentRepo {
         let row = sqlx::query_as::<_, FinanceInvestmentRow>(
             r#"
             UPDATE finance_investments SET
-                current_price = CASE WHEN ? THEN ? ELSE current_price END,
-                current_value = CASE WHEN ? THEN ? ELSE current_value END,
-                quantity      = COALESCE(?, quantity),
-                cost_basis    = COALESCE(?, cost_basis),
-                notes         = CASE WHEN ? THEN ? ELSE notes END,
-                updated_at    = datetime('now')
+                current_price      = CASE WHEN ? THEN ? ELSE current_price END,
+                current_value      = CASE WHEN ? THEN ? ELSE current_value END,
+                quantity           = COALESCE(?, quantity),
+                cost_basis         = COALESCE(?, cost_basis),
+                notes              = CASE WHEN ? THEN ? ELSE notes END,
+                market_currency    = CASE WHEN ? THEN ? ELSE market_currency END,
+                base_cost_basis    = COALESCE(?, base_cost_basis),
+                base_current_value = COALESCE(?, base_current_value),
+                base_currency      = COALESCE(?, base_currency),
+                purchase_rate      = COALESCE(?, purchase_rate),
+                market_rate        = COALESCE(?, market_rate),
+                updated_at         = datetime('now')
             WHERE id = ?
             RETURNING *
             "#,
@@ -163,6 +179,13 @@ impl FinanceInvestmentRepo {
         .bind(patch.cost_basis)
         .bind(patch.notes.is_some())
         .bind(patch.notes.as_ref().and_then(|v| v.as_deref()))
+        .bind(patch.market_currency.is_some())
+        .bind(patch.market_currency.as_ref().and_then(|v| v.as_deref()))
+        .bind(patch.base_cost_basis)
+        .bind(patch.base_current_value)
+        .bind(patch.base_currency.as_deref())
+        .bind(patch.purchase_rate)
+        .bind(patch.market_rate)
         .bind(&patch.id)
         .fetch_optional(&self.pool)
         .await?
@@ -171,22 +194,29 @@ impl FinanceInvestmentRepo {
     }
 
     /// Set the current price and value for an investment (convenience method for price refresh).
+    /// Also updates `base_current_value` and `market_rate` for currency engine.
     pub async fn update_price(
         &self,
         id: &str,
         current_price: i64,
         current_value: i64,
+        base_current_value: i64,
+        market_rate: f64,
     ) -> Result<FinanceInvestmentRow, StorageError> {
         let row = sqlx::query_as::<_, FinanceInvestmentRow>(
             r#"
             UPDATE finance_investments
-            SET current_price = ?, current_value = ?, updated_at = datetime('now')
+            SET current_price = ?, current_value = ?,
+                base_current_value = ?, market_rate = ?,
+                updated_at = datetime('now')
             WHERE id = ?
             RETURNING *
             "#,
         )
         .bind(current_price)
         .bind(current_value)
+        .bind(base_current_value)
+        .bind(market_rate)
         .bind(id)
         .fetch_optional(&self.pool)
         .await?
@@ -260,10 +290,12 @@ impl FinanceInvestmentRepo {
             r#"
             INSERT INTO finance_investment_transactions (
                 id, investment_id, tx_type, quantity, price_per_unit,
-                total_amount, currency, fees, tx_date, notes, created_at
+                total_amount, currency, fees, tx_date, notes, created_at,
+                base_total_amount, base_currency, exchange_rate
             ) VALUES (
                 ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?, ?
+                ?, ?, ?, ?, ?, ?,
+                ?, ?, ?
             )
             RETURNING *
             "#,
@@ -279,6 +311,9 @@ impl FinanceInvestmentRepo {
         .bind(row.tx_date)
         .bind(&row.notes)
         .bind(row.created_at)
+        .bind(row.base_total_amount)
+        .bind(&row.base_currency)
+        .bind(row.exchange_rate)
         .fetch_one(&self.pool)
         .await?;
         Ok(inserted)
@@ -302,24 +337,28 @@ impl FinanceInvestmentRepo {
     // Aggregation
     // -----------------------------------------------------------------------
 
-    /// Aggregate summary for a single portfolio (total cost basis, current value, holding count).
+    /// Aggregate summary for a single portfolio in the user's base currency.
+    ///
+    /// Uses `base_cost_basis` and `base_current_value` so all holdings are summed in one currency.
     pub async fn portfolio_summary(
         &self,
         portfolio_id: &str,
+        base_currency: &str,
     ) -> Result<PortfolioSummaryRow, StorageError> {
         let row = sqlx::query_as::<_, PortfolioSummaryRow>(
             r#"
             SELECT
                 p.id                                              AS portfolio_id,
-                COALESCE(SUM(i.cost_basis), 0)                    AS total_cost_basis,
-                COALESCE(SUM(i.current_value), 0)                 AS total_current_value,
+                COALESCE(SUM(i.base_cost_basis), 0)               AS total_cost_basis,
+                COALESCE(SUM(i.base_current_value), 0)            AS total_current_value,
                 COUNT(i.id)                                       AS holding_count
             FROM finance_portfolios p
-            LEFT JOIN finance_investments i ON i.portfolio_id = p.id
+            LEFT JOIN finance_investments i ON i.portfolio_id = p.id AND i.base_currency = ?
             WHERE p.id = ?
             GROUP BY p.id
             "#,
         )
+        .bind(base_currency)
         .bind(portfolio_id)
         .fetch_optional(&self.pool)
         .await?
@@ -342,5 +381,18 @@ impl FinanceInvestmentRepo {
         .fetch_all(&self.pool)
         .await?;
         Ok(rows)
+    }
+
+    /// Sum `base_current_value` of all investments whose `base_currency` matches.
+    ///
+    /// Returns a single consolidated total in the user's home currency.
+    pub async fn total_base_value(&self, base_currency: &str) -> Result<i64, StorageError> {
+        let row = sqlx::query_as::<_, (i64,)>(
+            "SELECT COALESCE(SUM(base_current_value), 0) FROM finance_investments WHERE base_currency = ?",
+        )
+        .bind(base_currency)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(row.0)
     }
 }

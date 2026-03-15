@@ -15,7 +15,7 @@ import { Donut } from "../components/Donut";
 import { FinanceLayout } from "../components/FinanceLayout";
 import { FinanceSkeleton } from "../components/FinanceSkeleton";
 import { FormField, FormModal, fieldClass } from "../components/FormModal";
-import { COLORS, fmtCompact, fmtMoney, retPct, toBase } from "../lib/finance";
+import { COLORS, fmtCompact, fmtMoney, retPct } from "../lib/finance";
 
 export function FinanceInvestments() {
   const {
@@ -29,7 +29,6 @@ export function FinanceInvestments() {
     undefined,
     [],
   );
-  const { data: rates } = useQuery<Record<string, number>>("finance_exchange_rates", undefined, {});
   const { data: settings } = useQuery<{ defaultCurrency: string }>(
     "finance_settings",
     undefined,
@@ -46,39 +45,36 @@ export function FinanceInvestments() {
   const [selectedPortfolio, setSelectedPortfolio] = useState<string | null>(null);
 
   const totalValue = useMemo(
-    () => portfolios.reduce((s, p) => s + toBase(p.totalValue, p.currency, rates, baseCurrency), 0),
-    [portfolios, rates],
+    () => investments.reduce((s, i) => s + (i.baseCurrentValue ?? 0), 0),
+    [investments],
   );
   const totalCost = useMemo(
-    () =>
-      portfolios.reduce((s, p) => s + toBase(p.totalCostBasis, p.currency, rates, baseCurrency), 0),
-    [portfolios, rates],
+    () => investments.reduce((s, i) => s + (i.baseCostBasis ?? 0), 0),
+    [investments],
   );
   const totalReturn = retPct(totalValue, totalCost);
 
   const assetSegs = useMemo(() => {
     const m = new Map<string, number>();
     for (const inv of investments) {
-      m.set(
-        inv.assetType,
-        (m.get(inv.assetType) ?? 0) +
-          toBase(inv.currentValue ?? 0, inv.currency, rates, baseCurrency),
-      );
+      m.set(inv.assetType, (m.get(inv.assetType) ?? 0) + (inv.baseCurrentValue ?? 0));
     }
     return Array.from(m.entries())
       .sort((a, b) => b[1] - a[1])
       .map(([name, value], i) => ({ name, value, color: COLORS[i % COLORS.length] }));
-  }, [investments, rates]);
+  }, [investments]);
 
-  const portfolioSegs = useMemo(
-    () =>
-      portfolios.map((p, i) => ({
-        name: p.name,
-        value: toBase(p.totalValue, p.currency, rates, baseCurrency),
-        color: COLORS[i % COLORS.length],
-      })),
-    [portfolios, rates],
-  );
+  const portfolioSegs = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const inv of investments) {
+      m.set(inv.portfolioId, (m.get(inv.portfolioId) ?? 0) + (inv.baseCurrentValue ?? 0));
+    }
+    return portfolios.map((p, i) => ({
+      name: p.name,
+      value: m.get(p.id) ?? 0,
+      color: COLORS[i % COLORS.length],
+    }));
+  }, [portfolios, investments]);
 
   const filteredInvestments = selectedPortfolio
     ? investments.filter((i) => i.portfolioId === selectedPortfolio)
@@ -336,11 +332,23 @@ export function FinanceInvestments() {
                     {inv.quantity}
                   </span>
                   <span className="text-right text-[11px] text-muted font-light tabular-nums">
-                    {inv.currentPrice != null ? fmtMoney(inv.currentPrice, inv.currency) : "—"}
+                    {inv.currentPrice != null
+                      ? fmtMoney(inv.currentPrice, inv.marketCurrency ?? inv.currency)
+                      : "—"}
                   </span>
-                  <span className="text-right text-[12px] text-primary font-light tabular-nums">
-                    {inv.currentValue != null ? fmtMoney(inv.currentValue, inv.currency) : "—"}
-                  </span>
+                  <div className="text-right">
+                    <span className="text-[12px] text-primary font-light tabular-nums">
+                      {inv.currentValue != null
+                        ? fmtMoney(inv.currentValue, inv.marketCurrency ?? inv.currency)
+                        : "—"}
+                    </span>
+                    {(inv.marketCurrency ?? inv.currency) !== baseCurrency &&
+                      inv.baseCurrentValue != null && (
+                        <p className="text-[9px] text-dim font-light">
+                          {fmtCompact(inv.baseCurrentValue, baseCurrency)}
+                        </p>
+                      )}
+                  </div>
                   <span className="text-right text-[11px] text-dim font-light tabular-nums">
                     {fmtMoney(inv.costBasis, inv.currency)}
                   </span>

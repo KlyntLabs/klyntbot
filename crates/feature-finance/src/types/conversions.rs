@@ -39,6 +39,9 @@ impl From<&FinanceAccount> for FinanceAccountRow {
             is_archived: account.is_archived,
             created_at: account.created_at,
             updated_at: account.updated_at,
+            base_balance: 0,
+            base_currency: "USD".to_string(),
+            exchange_rate: 1.0,
         }
     }
 }
@@ -85,6 +88,9 @@ impl From<&FinanceTransaction> for FinanceTransactionRow {
             recurring_rule: tx.recurring_rule.clone(),
             created_at: tx.created_at,
             updated_at: tx.updated_at,
+            base_amount: 0,
+            base_currency: "USD".to_string(),
+            exchange_rate: 1.0,
         }
     }
 }
@@ -129,6 +135,9 @@ impl From<&FinanceBudget> for FinanceBudgetRow {
             alert_threshold: budget.alert_threshold,
             created_at: budget.created_at,
             updated_at: budget.updated_at,
+            base_amount: 0,
+            base_currency: "USD".to_string(),
+            exchange_rate: 1.0,
         }
     }
 }
@@ -203,6 +212,12 @@ impl From<&FinanceInvestment> for FinanceInvestmentRow {
             notes: inv.notes.clone(),
             created_at: inv.created_at,
             updated_at: inv.updated_at,
+            market_currency: None,
+            base_cost_basis: 0,
+            base_current_value: 0,
+            base_currency: "USD".to_string(),
+            purchase_rate: 1.0,
+            market_rate: 1.0,
         }
     }
 }
@@ -241,6 +256,9 @@ impl From<&FinanceInvestmentTx> for FinanceInvestmentTxRow {
             tx_date: tx.tx_date,
             notes: tx.notes.clone(),
             created_at: tx.created_at,
+            base_total_amount: 0,
+            base_currency: "USD".to_string(),
+            exchange_rate: 1.0,
         }
     }
 }
@@ -285,6 +303,10 @@ impl From<&FinanceGoal> for FinanceGoalRow {
             notes: goal.notes.clone(),
             created_at: goal.created_at,
             updated_at: goal.updated_at,
+            base_target_amount: 0,
+            base_current_amount: 0,
+            base_currency: "USD".to_string(),
+            exchange_rate: 1.0,
         }
     }
 }
@@ -325,6 +347,10 @@ impl From<&FinanceLiability> for FinanceLiabilityRow {
             notes: liability.notes.clone(),
             created_at: liability.created_at,
             updated_at: liability.updated_at,
+            base_principal: 0,
+            base_remaining: 0,
+            base_currency: "USD".to_string(),
+            exchange_rate: 1.0,
         }
     }
 }

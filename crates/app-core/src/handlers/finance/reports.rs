@@ -105,6 +105,10 @@ impl AppCore {
             notes: params.notes,
             created_at: now,
             updated_at: now,
+            base_target_amount: 0,
+            base_current_amount: 0,
+            base_currency: "USD".to_string(),
+            exchange_rate: 1.0,
         };
 
         self.repos
@@ -177,6 +181,10 @@ impl AppCore {
             notes: params.notes,
             created_at: now,
             updated_at: now,
+            base_principal: 0,
+            base_remaining: 0,
+            base_currency: "USD".to_string(),
+            exchange_rate: 1.0,
         };
 
         self.repos
@@ -198,6 +206,10 @@ impl AppCore {
             monthly_payment: params.monthly_payment,
             interest_rate: params.interest_rate,
             notes: params.notes,
+            base_principal: None,
+            base_remaining: None,
+            base_currency: None,
+            exchange_rate: None,
         };
         let row = self
             .repos
@@ -253,7 +265,7 @@ impl AppCore {
             .repos
             .finance
             .transactions
-            .sum_by_category(from, to, tx_type)
+            .sum_by_category(from, to, tx_type, &self.default_currency().await)
             .await
             .map_err(map_storage_err)?;
 
@@ -288,7 +300,7 @@ impl AppCore {
             .repos
             .finance
             .transactions
-            .sum_by_period(tx_type, n as i32, "monthly")
+            .sum_by_period(tx_type, n as i32, "monthly", &self.default_currency().await)
             .await
             .map_err(map_storage_err)?;
 

@@ -815,9 +815,19 @@ impl AgentLoopBuilder {
         // ── Finance tool (requires real pool) ─────────────────────────────
         if let Some(pool) = &self.pool {
             if config.finance.enabled {
-                let price_service = feature_finance::PriceService::new(
-                    config.finance.price_refresh.cache_ttl_minutes,
+                let cache_ttl = config.finance.price_refresh.cache_ttl_minutes;
+                let finance_storage = storage::FinanceStorage::from_pool(pool);
+                let rate_cache = feature_finance::rate_cache::RateCache::new(
+                    finance_storage.exchange_rates.clone(),
+                    i64::from(cache_ttl),
                 );
+                let mut price_service =
+                    feature_finance::PriceService::with_rate_cache(cache_ttl, rate_cache.clone());
+
+                // Apply config exchange rate overrides
+                if let Some(ref overrides) = config.finance.exchange_rates {
+                    price_service.set_exchange_rate_overrides(overrides.clone());
+                }
 
                 let finance_handler_impl =
                     Arc::new(crate::adapters::finance::FinanceHandlerImpl::new(
@@ -826,12 +836,12 @@ impl AgentLoopBuilder {
                         config.finance.clone(),
                     ));
 
-                let finance_storage = storage::FinanceStorage::from_pool(pool);
                 let mut finance_tool = feature_finance::FinanceTool::new(
                     finance_storage,
                     price_service,
                     config.finance.default_currency.clone(),
                 )
+                .with_rate_cache(rate_cache)
                 .with_finance_handler(
                     Arc::clone(&finance_handler_impl) as Arc<dyn feature_finance::FinanceHandler>
                 );

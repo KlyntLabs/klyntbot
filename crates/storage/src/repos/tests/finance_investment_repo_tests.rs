@@ -49,6 +49,12 @@ mod tests {
             notes: None,
             created_at: now,
             updated_at: now,
+            market_currency: None,
+            base_cost_basis: 0,
+            base_current_value: 0,
+            base_currency: "USD".to_string(),
+            purchase_rate: 1.0,
+            market_rate: 1.0,
         }
     }
 
@@ -66,6 +72,9 @@ mod tests {
             tx_date: chrono::Local::now().date_naive(),
             notes: None,
             created_at: now,
+            base_total_amount: 0,
+            base_currency: "USD".to_string(),
+            exchange_rate: 1.0,
         }
     }
 
@@ -168,9 +177,11 @@ mod tests {
         repo.add_investment(&sample_investment(&inv_id, &port_id))
             .await
             .unwrap();
-        let updated = repo.update_price(&inv_id, 50_000, 5_000_000).await.unwrap();
+        let updated = repo.update_price(&inv_id, 50_000, 5_000_000, 5_000_000, 1.0).await.unwrap();
         assert_eq!(updated.current_price, Some(50_000));
         assert_eq!(updated.current_value, Some(5_000_000));
+        assert_eq!(updated.base_current_value, 5_000_000);
+        assert_eq!(updated.market_rate, 1.0);
         let _ = repo.delete_portfolio(&port_id).await;
     }
 
@@ -329,9 +340,11 @@ mod tests {
             let mut inv = sample_investment(&id, &port_id);
             inv.cost_basis = *cost;
             inv.current_value = Some(*value);
+            inv.base_cost_basis = *cost;
+            inv.base_current_value = *value;
             repo.add_investment(&inv).await.unwrap();
         }
-        let summary = repo.portfolio_summary(&port_id).await.unwrap();
+        let summary = repo.portfolio_summary(&port_id, "USD").await.unwrap();
         assert_eq!(summary.total_cost_basis, 1_700_000);
         assert_eq!(summary.total_current_value, 1_950_000);
         assert_eq!(summary.holding_count, 3);
@@ -347,7 +360,7 @@ mod tests {
         repo.add_portfolio(&sample_portfolio(&port_id, "Empty"))
             .await
             .unwrap();
-        let summary = repo.portfolio_summary(&port_id).await.unwrap();
+        let summary = repo.portfolio_summary(&port_id, "USD").await.unwrap();
         assert_eq!(summary.total_cost_basis, 0);
         assert_eq!(summary.total_current_value, 0);
         assert_eq!(summary.holding_count, 0);

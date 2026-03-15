@@ -37,7 +37,6 @@ import {
   LIAB_ICONS,
   pct,
   retPct,
-  toBase,
 } from "../lib/finance";
 
 export function Finance() {
@@ -80,7 +79,6 @@ export function Finance() {
     undefined,
     { totalsByCurrency: [] },
   );
-  const { data: rates } = useQuery<Record<string, number>>("finance_exchange_rates", undefined, {});
   const { data: settings } = useQuery<{ defaultCurrency: string }>(
     "finance_settings",
     undefined,
@@ -107,42 +105,35 @@ export function Finance() {
 
   const totalNet = useMemo(
     () =>
-      netWorth.totalsByCurrency.reduce(
-        (s, c) => s + toBase(c.net, c.currency, rates, baseCurrency),
-        0,
-      ),
-    [netWorth, rates],
+      accounts.reduce((s, a) => s + (a.baseBalance ?? 0), 0) +
+      investments.reduce((s, i) => s + (i.baseCurrentValue ?? 0), 0) -
+      liabilities.reduce((s, l) => s + (l.baseRemaining ?? 0), 0),
+    [accounts, investments, liabilities],
   );
   const totalAssets = useMemo(
     () =>
-      netWorth.totalsByCurrency.reduce(
-        (s, c) => s + toBase(c.accounts + c.investments, c.currency, rates, baseCurrency),
-        0,
-      ),
-    [netWorth, rates],
+      accounts.reduce((s, a) => s + (a.baseBalance ?? 0), 0) +
+      investments.reduce((s, i) => s + (i.baseCurrentValue ?? 0), 0),
+    [accounts, investments],
   );
   const totalDebt = useMemo(
-    () =>
-      netWorth.totalsByCurrency.reduce(
-        (s, c) => s + toBase(c.liabilities, c.currency, rates, baseCurrency),
-        0,
-      ),
-    [netWorth, rates],
+    () => liabilities.reduce((s, l) => s + (l.baseRemaining ?? 0), 0),
+    [liabilities],
   );
 
-  // Compute spending from transactions client-side (currency-aware)
+  // Compute spending from transactions using pre-computed base amounts
   const totalSpend = useMemo(
     () =>
       transactions
         .filter((t) => t.txType === "expense")
-        .reduce((s, t) => s + toBase(t.amount, t.currency, rates, baseCurrency), 0),
-    [transactions, rates, baseCurrency],
+        .reduce((s, t) => s + (t.baseAmount ?? 0), 0),
+    [transactions],
   );
 
   const spendingSegs = useMemo(() => {
     const m = new Map<string, number>();
     for (const t of transactions.filter((t) => t.txType === "expense")) {
-      const base = toBase(t.amount, t.currency, rates, baseCurrency);
+      const base = t.baseAmount ?? 0;
       if (base > 0) m.set(t.category ?? "other", (m.get(t.category ?? "other") ?? 0) + base);
     }
     return [...m.entries()].map(([name, value], i) => ({
@@ -150,28 +141,25 @@ export function Finance() {
       value,
       color: COLORS[i % COLORS.length],
     }));
-  }, [transactions, rates, baseCurrency]);
+  }, [transactions]);
 
   const totalIncome = useMemo(
     () =>
       transactions
         .filter((t) => t.txType === "income")
-        .reduce((s, t) => s + toBase(t.amount, t.currency, rates, baseCurrency), 0),
-    [transactions, rates, baseCurrency],
+        .reduce((s, t) => s + (t.baseAmount ?? 0), 0),
+    [transactions],
   );
 
   const investSegs = useMemo(() => {
     const m = new Map<string, number>();
     for (const i of investments) {
-      m.set(
-        i.assetType,
-        (m.get(i.assetType) ?? 0) + toBase(i.currentValue ?? 0, i.currency, rates, baseCurrency),
-      );
+      m.set(i.assetType, (m.get(i.assetType) ?? 0) + (i.baseCurrentValue ?? 0));
     }
     return Array.from(m.entries())
       .sort((a, b) => b[1] - a[1])
       .map(([name, value], i) => ({ name, value, color: COLORS[i % COLORS.length] }));
-  }, [investments, rates]);
+  }, [investments]);
   const totalInvest = useMemo(() => investSegs.reduce((s, a) => s + a.value, 0), [investSegs]);
 
   const accountMap = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts]);
@@ -249,7 +237,6 @@ export function Finance() {
             <div className="grid grid-cols-5 gap-3">
               {active.slice(0, 5).map((acct) => {
                 const Icon = ACCT_ICONS[acct.accountType] ?? Wallet;
-                const baseAmt = toBase(acct.balance, acct.currency, rates, baseCurrency);
                 return (
                   <div
                     key={acct.id}
@@ -277,9 +264,9 @@ export function Finance() {
                     <p className="text-[14px] font-light text-primary tabular-nums">
                       {fmtMoney(acct.balance, acct.currency)}
                     </p>
-                    {acct.currency !== baseCurrency && (
+                    {acct.currency !== baseCurrency && acct.baseBalance != null && (
                       <p className="text-[9px] text-dim font-light mt-0.5">
-                        ≈ {fmtCompact(baseAmt, baseCurrency)}
+                        ≈ {fmtCompact(acct.baseBalance, baseCurrency)}
                       </p>
                     )}
                   </div>
@@ -572,13 +559,7 @@ export function Finance() {
             <div className="px-4 py-2.5 border-t border-white/[0.08] bg-white/[0.02] flex justify-between">
               <span className="text-[10px] font-light text-muted">Total Debt</span>
               <span className="text-[10px] font-light text-destructive">
-                {fmtCompact(
-                  liabilities.reduce(
-                    (s, l) => s + toBase(l.remaining, l.currency, rates, baseCurrency),
-                    0,
-                  ),
-                  baseCurrency,
-                )}
+                {fmtCompact(totalDebt, baseCurrency)}
               </span>
             </div>
           </Card>

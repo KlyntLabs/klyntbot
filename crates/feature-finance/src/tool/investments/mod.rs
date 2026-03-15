@@ -10,6 +10,7 @@ use chrono::{Local, Utc};
 use serde_json::json;
 use uuid::Uuid;
 
+use crate::currency::{ensure_base_amount, ensure_investment_base};
 use crate::types::{AssetType, InvestmentTxType};
 use common::{Result, ToolError};
 use storage::rows::finance::{
@@ -91,7 +92,7 @@ impl FinanceTool {
             let summary = self
                 .storage
                 .investments
-                .portfolio_summary(&portfolio.id)
+                .portfolio_summary(&portfolio.id, &self.default_currency)
                 .await?;
             let total_return = summary.total_current_value - summary.total_cost_basis;
             let return_pct = if summary.total_cost_basis > 0 {
@@ -167,6 +168,17 @@ impl FinanceTool {
             .map(parse_date)
             .transpose()?;
         let notes = p.optional_str("notes")?;
+        let market_currency = p.optional_str("market_currency")?;
+
+        let inv_conv = ensure_investment_base(
+            cost_basis,
+            currency,
+            None,
+            market_currency,
+            &self.default_currency,
+            &self.price_service,
+        )
+        .await?;
 
         let now = Utc::now();
         let id = Uuid::new_v4().to_string();
@@ -187,6 +199,12 @@ impl FinanceTool {
             notes: notes.map(|s| s.to_string()),
             created_at: now,
             updated_at: now,
+            market_currency: market_currency.map(|s| s.to_string()),
+            base_cost_basis: inv_conv.base_cost_basis,
+            base_current_value: inv_conv.base_current_value,
+            base_currency: inv_conv.base_currency,
+            purchase_rate: inv_conv.purchase_rate,
+            market_rate: inv_conv.market_rate,
         };
 
         let inserted = self.storage.investments.add_investment(&row).await?;
@@ -223,6 +241,12 @@ impl FinanceTool {
             quantity: quantity.map(|q| q.to_string()),
             cost_basis: None,
             notes: notes.map(|s| Some(s.to_string())),
+            market_currency: None,
+            base_cost_basis: None,
+            base_current_value: None,
+            base_currency: None,
+            purchase_rate: None,
+            market_rate: None,
         };
 
         let updated = self.storage.investments.update_investment(&patch).await?;
@@ -312,6 +336,14 @@ impl FinanceTool {
             }
         }
 
+        let tx_conv = ensure_base_amount(
+            total_amount,
+            &currency,
+            &self.default_currency,
+            &self.price_service,
+        )
+        .await?;
+
         let tx_row = FinanceInvestmentTxRow {
             id: tx_id,
             investment_id: investment_id.to_string(),
@@ -324,6 +356,9 @@ impl FinanceTool {
             tx_date,
             notes: notes.map(|s| s.to_string()),
             created_at: now,
+            base_total_amount: tx_conv.base_amount,
+            base_currency: tx_conv.base_currency,
+            exchange_rate: tx_conv.exchange_rate,
         };
 
         let inserted_tx = self.storage.investments.add_investment_tx(&tx_row).await?;
@@ -624,6 +659,12 @@ impl FinanceTool {
                     current_price: None,
                     current_value: None,
                     notes: None,
+                    market_currency: None,
+                    base_cost_basis: None,
+                    base_current_value: None,
+                    base_currency: None,
+                    purchase_rate: None,
+                    market_rate: None,
                 }
             }
             InvestmentTxType::Sell => {
@@ -644,6 +685,12 @@ impl FinanceTool {
                     current_price: None,
                     current_value: None,
                     notes: None,
+                    market_currency: None,
+                    base_cost_basis: None,
+                    base_current_value: None,
+                    base_currency: None,
+                    purchase_rate: None,
+                    market_rate: None,
                 }
             }
             InvestmentTxType::Split => {
@@ -656,6 +703,12 @@ impl FinanceTool {
                     current_price: None,
                     current_value: None,
                     notes: None,
+                    market_currency: None,
+                    base_cost_basis: None,
+                    base_current_value: None,
+                    base_currency: None,
+                    purchase_rate: None,
+                    market_rate: None,
                 }
             }
             // Dividend, rental income, interest: record income only — no quantity/basis change
@@ -668,6 +721,12 @@ impl FinanceTool {
                 current_price: None,
                 current_value: None,
                 notes: None,
+                market_currency: None,
+                base_cost_basis: None,
+                base_current_value: None,
+                base_currency: None,
+                purchase_rate: None,
+                market_rate: None,
             },
         };
         Ok(patch)

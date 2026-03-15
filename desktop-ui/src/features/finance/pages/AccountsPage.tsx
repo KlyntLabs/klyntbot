@@ -10,7 +10,7 @@ import { Card, CardHeader } from "../components/Card";
 import { FinanceLayout } from "../components/FinanceLayout";
 import { FinanceSkeleton } from "../components/FinanceSkeleton";
 import { FormField, FormModal, fieldClass } from "../components/FormModal";
-import { ACCT_ICONS, fmtCompact, fmtMoney, toBase } from "../lib/finance";
+import { ACCT_ICONS, fmtCompact, fmtMoney } from "../lib/finance";
 
 export function FinanceAccounts() {
   const [searchParams] = useSearchParams();
@@ -25,7 +25,6 @@ export function FinanceAccounts() {
     undefined,
     [],
   );
-  const { data: rates } = useQuery<Record<string, number>>("finance_exchange_rates", undefined, {});
   const { data: settings } = useQuery<{ defaultCurrency: string }>(
     "finance_settings",
     undefined,
@@ -56,8 +55,8 @@ export function FinanceAccounts() {
     [transactions, selectedId],
   );
   const totalBalance = useMemo(
-    () => active.reduce((s, a) => s + toBase(a.balance, a.currency, rates, baseCurrency), 0),
-    [active, rates],
+    () => active.reduce((s, a) => s + (a.baseBalance ?? 0), 0),
+    [active],
   );
 
   // ── Add Account form state ──
@@ -159,7 +158,6 @@ export function FinanceAccounts() {
             <div className="grid grid-cols-2 gap-4">
               {active.map((acct) => {
                 const Icon = ACCT_ICONS[acct.accountType] ?? Wallet;
-                const baseAmt = toBase(acct.balance, acct.currency, rates, baseCurrency);
                 const isSelected = acct.id === selectedId;
                 return (
                   <div
@@ -191,9 +189,9 @@ export function FinanceAccounts() {
                     <p className="text-[18px] font-light text-primary tabular-nums">
                       {fmtMoney(acct.balance, acct.currency)}
                     </p>
-                    {acct.currency !== baseCurrency && (
+                    {acct.currency !== baseCurrency && acct.baseBalance != null && (
                       <p className="text-[10px] text-dim font-light mt-0.5">
-                        ≈ {fmtCompact(baseAmt, baseCurrency)}
+                        ≈ {fmtCompact(acct.baseBalance, baseCurrency)}
                       </p>
                     )}
                     {acct.notes && (

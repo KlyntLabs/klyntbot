@@ -43,6 +43,7 @@ pub struct FinanceTool {
     pub(crate) default_currency: String,
     pub(crate) config_persistence: Option<Arc<dyn ConfigPersistence>>,
     pub(crate) domain_bus: Option<Arc<DomainEventBus>>,
+    pub(crate) rate_cache: Option<crate::rate_cache::RateCache>,
 }
 
 impl FinanceTool {
@@ -59,6 +60,7 @@ impl FinanceTool {
             default_currency,
             config_persistence: None,
             domain_bus: None,
+            rate_cache: None,
         }
     }
 
@@ -80,16 +82,30 @@ impl FinanceTool {
         self
     }
 
+    /// Attach a `RateCache` for two-layer exchange rate caching. Returns `self` for chaining.
+    pub fn with_rate_cache(mut self, cache: crate::rate_cache::RateCache) -> Self {
+        self.rate_cache = Some(cache);
+        self
+    }
+
     /// Convenience constructor: build a `FinanceTool` from a `StoragePool`.
+    ///
+    /// Creates a `RateCache` backed by the pool and wires it into the `PriceService`.
     pub fn from_storage_pool(
         pool: &storage::StoragePool,
         default_currency: impl Into<String>,
     ) -> Self {
-        Self::new(
+        let exchange_rates = storage::repos::FinanceExchangeRateRepo::new(pool.inner().clone());
+        let rate_cache = crate::rate_cache::RateCache::new(exchange_rates, 15);
+        let price_service =
+            crate::price_service::PriceService::with_rate_cache(15, rate_cache.clone());
+        let mut tool = Self::new(
             storage::FinanceStorage::from_pool(pool.inner()),
-            crate::price_service::PriceService::new(15),
+            price_service,
             default_currency.into(),
-        )
+        );
+        tool.rate_cache = Some(rate_cache);
+        tool
     }
 }
 
@@ -239,7 +255,8 @@ impl Tool for FinanceTool {
                 "tolerance_band": { "type": "number" },
                 "contribution": { "type": "integer" },
                 "min_trade_amount": { "type": "integer" },
-                "rebalance_strategy": { "type": "string" }
+                "rebalance_strategy": { "type": "string" },
+                "market_currency": { "type": "string", "description": "Currency the asset is quoted in on exchanges (e.g., USD for BTC). Defaults to purchase currency." }
             },
             "required": ["action"]
         })

@@ -9,8 +9,11 @@
 //! - Services: `PriceService` (live market data), `FinanceHandler` (proactive analysis)
 
 pub mod config;
+pub mod currency;
 pub mod handler;
 pub mod price_service;
+pub mod rate_cache;
+pub mod rebase;
 pub mod tool;
 pub mod types;
 

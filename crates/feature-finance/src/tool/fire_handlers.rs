@@ -52,22 +52,11 @@ impl FinanceTool {
             return Ok(dec_from_i64(val));
         }
 
-        let accounts_total: i64 = self
-            .storage
-            .accounts
-            .total_balance_by_currency()
-            .await?
-            .iter()
-            .map(|(_, v)| v)
-            .sum();
-        let investments_total: i64 = self
-            .storage
-            .investments
-            .total_value_by_currency()
-            .await?
-            .iter()
-            .map(|(_, v)| v)
-            .sum();
+        let base = &self.default_currency;
+        let (accounts_total, investments_total) = tokio::try_join!(
+            self.storage.accounts.total_base_balance(base),
+            self.storage.investments.total_base_value(base),
+        )?;
 
         Ok(dec_from_i64(accounts_total + investments_total))
     }

@@ -52,21 +52,6 @@ export function fmtMoney(amount: number, currency: string): string {
   }).format(value);
 }
 
-/** Convert an amount in `currency` to the base/display currency using rates.
- *  If the currency matches the base (rate=1 or no entry needed), returns as-is.
- *  If a foreign currency has no rate configured, returns 0 (excluded from totals). */
-export function toBase(
-  amount: number,
-  currency: string,
-  rates: Record<string, number>,
-  baseCurrency = "USD",
-): number {
-  if (currency === baseCurrency) return amount;
-  const rate = rates[currency];
-  if (rate == null || rate === 0) return 0;
-  return Math.round(amount * rate);
-}
-
 export function fmtCompact(amount: number, currency = "USD"): string {
   const v = toMajor(amount, currency);
   const symbol =

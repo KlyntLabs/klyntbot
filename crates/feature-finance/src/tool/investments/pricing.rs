@@ -4,11 +4,45 @@ use serde_json::json;
 
 use crate::types::AssetType;
 use common::{Result, ToolError};
+use storage::rows::finance::FinanceInvestmentRow;
 use tools_core::ParamExtractor;
 
 use super::super::FinanceTool;
 
 impl FinanceTool {
+    /// Compute base_current_value and market_rate for an investment after a price update.
+    async fn compute_base_value(
+        &self,
+        inv: &FinanceInvestmentRow,
+        current_value: i64,
+    ) -> (i64, f64) {
+        let market_currency = inv
+            .market_currency
+            .as_deref()
+            .unwrap_or(&inv.currency);
+
+        if market_currency.eq_ignore_ascii_case(&self.default_currency) {
+            return (current_value, 1.0);
+        }
+
+        match self
+            .price_service
+            .get_rate(market_currency, &self.default_currency)
+            .await
+        {
+            Ok(rate) => {
+                let base = (current_value as f64 * rate).round() as i64;
+                (base, rate)
+            }
+            Err(_) => {
+                // Fallback: use existing market_rate if API fails
+                let rate = inv.market_rate;
+                let base = (current_value as f64 * rate).round() as i64;
+                (base, rate)
+            }
+        }
+    }
+
     pub(super) async fn price_fetch(&self, p: &ParamExtractor<'_>) -> Result<String> {
         let symbol = p.required_str("symbol")?;
         let asset_type_str = p.required_str("asset_type")?;
@@ -47,10 +81,12 @@ impl FinanceTool {
         for inv in &matching {
             let inv_qty: f64 = inv.quantity_f64();
             let current_value = (price_result.price * inv_qty * 100.0).round() as i64;
+            let (base_current_value, market_rate) =
+                self.compute_base_value(inv, current_value).await;
             if self
                 .storage
                 .investments
-                .update_price(&inv.id, price_int, current_value)
+                .update_price(&inv.id, price_int, current_value, base_current_value, market_rate)
                 .await
                 .is_ok()
             {
@@ -87,10 +123,12 @@ impl FinanceTool {
                     let price_int = (price_result.price * 100.0).round() as i64;
                     let inv_qty: f64 = inv.quantity_f64();
                     let current_value = (price_result.price * inv_qty * 100.0).round() as i64;
+                    let (base_current_value, market_rate) =
+                        self.compute_base_value(inv, current_value).await;
                     match self
                         .storage
                         .investments
-                        .update_price(&inv.id, price_int, current_value)
+                        .update_price(&inv.id, price_int, current_value, base_current_value, market_rate)
                         .await
                     {
                         Ok(_) => {

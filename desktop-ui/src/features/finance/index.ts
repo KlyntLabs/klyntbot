@@ -18,7 +18,6 @@ export {
   LIAB_ICONS,
   pct,
   retPct,
-  toBase,
 } from "./lib/finance";
 export { FinanceAccounts as AccountsPage } from "./pages/AccountsPage";
 export { FinanceBudgets as BudgetsPage } from "./pages/BudgetsPage";

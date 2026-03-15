@@ -10,7 +10,7 @@ import { Donut } from "../components/Donut";
 import { FinanceLayout } from "../components/FinanceLayout";
 import { FinanceSkeleton } from "../components/FinanceSkeleton";
 import { FormField, FormModal, fieldClass } from "../components/FormModal";
-import { COLORS, fmtCompact, fmtMoney, LIAB_ICONS, pct, toBase } from "../lib/finance";
+import { COLORS, fmtCompact, fmtMoney, LIAB_ICONS, pct } from "../lib/finance";
 
 export function FinanceLiabilities() {
   const {
@@ -19,7 +19,6 @@ export function FinanceLiabilities() {
     error,
     refetch,
   } = useQuery<FinanceLiability[]>("finance_liabilities", undefined, []);
-  const { data: rates } = useQuery<Record<string, number>>("finance_exchange_rates", undefined, {});
   const { data: settings } = useQuery<{ defaultCurrency: string }>(
     "finance_settings",
     undefined,
@@ -29,43 +28,46 @@ export function FinanceLiabilities() {
   useEvent<{ entityKind: string }>("entity:updated", refetch);
 
   const totalRemaining = useMemo(
-    () => liabilities.reduce((s, l) => s + toBase(l.remaining, l.currency, rates, baseCurrency), 0),
-    [liabilities, rates],
+    () => liabilities.reduce((s, l) => s + (l.baseRemaining ?? l.remaining), 0),
+    [liabilities],
   );
   const totalPrincipal = useMemo(
-    () => liabilities.reduce((s, l) => s + toBase(l.principal, l.currency, rates, baseCurrency), 0),
-    [liabilities, rates],
+    () => liabilities.reduce((s, l) => s + (l.basePrincipal ?? l.principal), 0),
+    [liabilities],
   );
   const totalPaid = totalPrincipal - totalRemaining;
   const monthlyTotal = useMemo(
     () =>
-      liabilities.reduce(
-        (s, l) => s + toBase(l.monthlyPayment ?? 0, l.currency, rates, baseCurrency),
-        0,
-      ),
-    [liabilities, rates],
+      liabilities.reduce((s, l) => {
+        if (l.monthlyPayment == null) return s;
+        if (l.basePrincipal != null && l.principal !== 0) {
+          return s + Math.round(l.monthlyPayment * (l.basePrincipal / l.principal));
+        }
+        return s + l.monthlyPayment;
+      }, 0),
+    [liabilities],
   );
 
   const liabSegs = useMemo(
     () =>
       liabilities.map((l, i) => ({
         name: l.name,
-        value: toBase(l.remaining, l.currency, rates, baseCurrency),
+        value: l.baseRemaining ?? l.remaining,
         color: COLORS[i % COLORS.length],
       })),
-    [liabilities, rates],
+    [liabilities],
   );
 
   const typeSegs = useMemo(() => {
     const m = new Map<string, number>();
     for (const l of liabilities) {
       const t = l.liabilityType.replaceAll("_", " ");
-      m.set(t, (m.get(t) ?? 0) + toBase(l.remaining, l.currency, rates, baseCurrency));
+      m.set(t, (m.get(t) ?? 0) + (l.baseRemaining ?? l.remaining));
     }
     return Array.from(m.entries())
       .sort((a, b) => b[1] - a[1])
       .map(([name, value], i) => ({ name, value, color: COLORS[i % COLORS.length] }));
-  }, [liabilities, rates]);
+  }, [liabilities]);
 
   // ── Add Liability modal ──
   const [modalOpen, setModalOpen] = useState(false);

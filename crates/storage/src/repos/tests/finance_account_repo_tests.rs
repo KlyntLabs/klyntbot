@@ -29,6 +29,9 @@ mod tests {
             is_archived: false,
             created_at: now,
             updated_at: now,
+            base_balance: 0,
+            base_currency: "USD".to_string(),
+            exchange_rate: 1.0,
         }
     }
 

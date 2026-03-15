@@ -6,6 +6,7 @@
 use chrono::{Datelike, NaiveDate, Utc};
 use serde_json::json;
 
+use crate::currency::ensure_base_amount;
 use crate::types::{FinanceGoal, FinanceLiability, GoalStatus, GoalType, LiabilityType};
 use common::{Result, ToolError};
 use storage::rows::finance::{
@@ -72,6 +73,15 @@ impl FinanceTool {
         let now = Utc::now();
         let id = uuid::Uuid::new_v4().to_string();
 
+        let conv = ensure_base_amount(
+            target_amount,
+            currency,
+            &self.default_currency,
+            &self.price_service,
+        )
+        .await?;
+        let base_current_amount = (current_amount as f64 * conv.exchange_rate).round() as i64;
+
         let row = FinanceGoalRow {
             id,
             name: name.to_string(),
@@ -87,6 +97,10 @@ impl FinanceTool {
             notes: notes.map(|s| s.to_string()),
             created_at: now,
             updated_at: now,
+            base_target_amount: conv.base_amount,
+            base_current_amount,
+            base_currency: conv.base_currency,
+            exchange_rate: conv.exchange_rate,
         };
 
         let inserted = self.storage.goals.add(&row).await?;
@@ -188,6 +202,10 @@ impl FinanceTool {
             inflation_rate: None,
             deadline: deadline.map(Some),
             status: status.map(|s| s.as_str().to_string()),
+            base_target_amount: None,
+            base_current_amount: None,
+            base_currency: None,
+            exchange_rate: None,
         };
 
         let row = self
@@ -249,7 +267,7 @@ impl FinanceTool {
                 let cats = self
                     .storage
                     .transactions
-                    .sum_by_category(date_from, today, "expense")
+                    .sum_by_category(date_from, today, "expense", &self.default_currency)
                     .await?;
                 cats.iter().map(|(_, total)| total).sum()
             }
@@ -262,30 +280,12 @@ impl FinanceTool {
             .into());
         }
 
-        let accounts_total: i64 = self
-            .storage
-            .accounts
-            .total_balance_by_currency()
-            .await?
-            .iter()
-            .map(|(_, v)| v)
-            .sum();
-        let investments_total: i64 = self
-            .storage
-            .investments
-            .total_value_by_currency()
-            .await?
-            .iter()
-            .map(|(_, v)| v)
-            .sum();
-        let liabilities_total: i64 = self
-            .storage
-            .liabilities
-            .total_remaining_by_currency()
-            .await?
-            .iter()
-            .map(|(_, v)| v)
-            .sum();
+        let base = &self.default_currency;
+        let (accounts_total, investments_total, liabilities_total) = tokio::try_join!(
+            self.storage.accounts.total_base_balance(base),
+            self.storage.investments.total_base_value(base),
+            self.storage.liabilities.total_base_remaining(base),
+        )?;
 
         let current_net_worth = accounts_total + investments_total - liabilities_total;
         let fire_number = (annual_expenses as f64 * (100.0 / withdrawal_rate)) as i64;
@@ -415,6 +415,15 @@ impl FinanceTool {
         let now = Utc::now();
         let id = uuid::Uuid::new_v4().to_string();
 
+        let conv = ensure_base_amount(
+            principal,
+            currency,
+            &self.default_currency,
+            &self.price_service,
+        )
+        .await?;
+        let base_remaining = (remaining as f64 * conv.exchange_rate).round() as i64;
+
         let row = FinanceLiabilityRow {
             id,
             name: name.to_string(),
@@ -428,6 +437,10 @@ impl FinanceTool {
             notes: notes.map(|s| s.to_string()),
             created_at: now,
             updated_at: now,
+            base_principal: conv.base_amount,
+            base_remaining,
+            base_currency: conv.base_currency,
+            exchange_rate: conv.exchange_rate,
         };
 
         let inserted = self.storage.liabilities.add(&row).await?;
@@ -511,6 +524,10 @@ impl FinanceTool {
             monthly_payment: monthly_payment.map(Some),
             interest_rate: interest_rate.map(Some),
             notes: notes.map(|s| Some(s.to_string())),
+            base_principal: None,
+            base_remaining: None,
+            base_currency: None,
+            exchange_rate: None,
         };
 
         let row = self
@@ -544,50 +561,22 @@ impl FinanceTool {
     }
 
     async fn net_worth(&self, _p: &ParamExtractor<'_>) -> Result<String> {
-        let accounts = self.storage.accounts.total_balance_by_currency().await?;
-        let investments = self.storage.investments.total_value_by_currency().await?;
-        let liabilities = self
-            .storage
-            .liabilities
-            .total_remaining_by_currency()
-            .await?;
+        let base = &self.default_currency;
 
-        let mut currencies: std::collections::BTreeMap<String, [i64; 3]> =
-            std::collections::BTreeMap::new();
-        for (cur, val) in &accounts {
-            currencies.entry(cur.clone()).or_default()[0] += val;
-        }
-        for (cur, val) in &investments {
-            currencies.entry(cur.clone()).or_default()[1] += val;
-        }
-        for (cur, val) in &liabilities {
-            currencies.entry(cur.clone()).or_default()[2] += val;
-        }
+        let (accounts_total, investments_total, liabilities_total) = tokio::try_join!(
+            self.storage.accounts.total_base_balance(base),
+            self.storage.investments.total_base_value(base),
+            self.storage.liabilities.total_base_remaining(base),
+        )?;
 
-        let breakdown: serde_json::Map<String, serde_json::Value> = currencies
-            .iter()
-            .map(|(cur, totals)| {
-                let net = totals[0] + totals[1] - totals[2];
-                (
-                    cur.clone(),
-                    json!({
-                        "accounts": totals[0],
-                        "investments": totals[1],
-                        "liabilities": totals[2],
-                        "net": net,
-                    }),
-                )
-            })
-            .collect();
-
-        let total_net_worth: i64 = currencies
-            .values()
-            .map(|totals| totals[0] + totals[1] - totals[2])
-            .sum();
+        let net_worth = accounts_total + investments_total - liabilities_total;
 
         Ok(serde_json::to_string_pretty(&json!({
-            "net_worth": total_net_worth,
-            "breakdown": serde_json::Value::Object(breakdown),
+            "base_currency": base,
+            "net_worth": net_worth,
+            "accounts": accounts_total,
+            "investments": investments_total,
+            "liabilities": liabilities_total,
         }))
         .unwrap())
     }

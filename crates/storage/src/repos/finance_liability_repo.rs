@@ -24,10 +24,12 @@ impl FinanceLiabilityRepo {
             INSERT INTO finance_liabilities (
                 id, name, liability_type, principal, remaining,
                 currency, interest_rate, monthly_payment,
-                due_date, notes, created_at, updated_at
+                due_date, notes, created_at, updated_at,
+                base_principal, base_remaining, base_currency, exchange_rate
             ) VALUES (
                 ?, ?, ?, ?, ?,
                 ?, ?, ?,
+                ?, ?, ?, ?,
                 ?, ?, ?, ?
             )
             RETURNING *
@@ -45,6 +47,10 @@ impl FinanceLiabilityRepo {
         .bind(&row.notes)
         .bind(row.created_at)
         .bind(row.updated_at)
+        .bind(row.base_principal)
+        .bind(row.base_remaining)
+        .bind(&row.base_currency)
+        .bind(row.exchange_rate)
         .fetch_one(&self.pool)
         .await?;
 
@@ -63,6 +69,10 @@ impl FinanceLiabilityRepo {
                 monthly_payment = CASE WHEN ? THEN ? ELSE monthly_payment END,
                 interest_rate   = CASE WHEN ? THEN ? ELSE interest_rate END,
                 notes           = CASE WHEN ? THEN ? ELSE notes END,
+                base_principal  = COALESCE(?, base_principal),
+                base_remaining  = COALESCE(?, base_remaining),
+                base_currency   = COALESCE(?, base_currency),
+                exchange_rate   = COALESCE(?, exchange_rate),
                 updated_at      = datetime('now')
             WHERE id = ?
             RETURNING *
@@ -75,6 +85,10 @@ impl FinanceLiabilityRepo {
         .bind(patch.interest_rate.as_ref().and_then(|v| *v))
         .bind(patch.notes.is_some())
         .bind(patch.notes.as_ref().and_then(|v| v.as_deref()))
+        .bind(patch.base_principal)
+        .bind(patch.base_remaining)
+        .bind(patch.base_currency.as_deref())
+        .bind(patch.exchange_rate)
         .bind(&patch.id)
         .fetch_optional(&self.pool)
         .await?
@@ -119,5 +133,21 @@ impl FinanceLiabilityRepo {
         .fetch_all(&self.pool)
         .await?;
         Ok(rows)
+    }
+
+    /// Sum `base_remaining` of all liabilities whose `base_currency` matches.
+    ///
+    /// Returns a single consolidated total in the user's home currency.
+    pub async fn total_base_remaining(
+        &self,
+        base_currency: &str,
+    ) -> Result<i64, crate::error::StorageError> {
+        let row = sqlx::query_as::<_, (i64,)>(
+            "SELECT COALESCE(SUM(base_remaining), 0) FROM finance_liabilities WHERE base_currency = ?",
+        )
+        .bind(base_currency)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(row.0)
     }
 }
