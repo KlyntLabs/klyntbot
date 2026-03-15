@@ -20,6 +20,9 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
 
+      - name: Install system dependencies
+        run: brew install protobuf
+
       - name: Install Bun
         uses: oven-sh/setup-bun@v2
         with:
