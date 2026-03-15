@@ -1,112 +1,145 @@
-# Task2 Integration — Remaining Work
+# Task2 Integration — Status Tracker
 
 **Date:** 2026-03-15
-**Status:** Tracking
-**Context:** The task2 UI is wired to real data. This document tracks features that are still stubbed or placeholder.
+**Last updated:** 2026-03-15
+**Context:** The task2 UI is wired to real data. This document tracks what's done and what's still stubbed or placeholder.
 
 ---
 
-## 1. Activity Tab — Richer Event Logging
+## Completed Features
 
-**Current:** Shows `timeline_query` entries filtered by `entityId`. Only system-generated events appear (e.g., "created task"). No status change history, no comments, no agent actions.
+### ✅ Core Data Integration (2026-03-14)
 
-**Needed:**
-- Log status/priority changes as timeline entries when `task_update` is called
-- Log agent actions (suggestions applied, linked issues) as timeline entries
-- Support comment-type entries (user-authored text)
-- Map actor types properly: "You" for user actions, "Klyntbot" for agent, "System" for automated
+All core task views are wired to real backend data:
+- Task list, board, grid views via `task_list`
+- Task detail view via `task_get`
+- Sub-issues via `task_list_children`
+- Create / update / delete / toggle-complete mutations
+- Projects and areas from real data
+- Tags/labels from task tags
+- Real-time updates via `entity:updated` events (Tauri) + refetch after mutations (browser dev)
 
-**Backend:** `crates/app-core/src/handlers/tasks/crud.rs` — `task_update()` should emit richer `DomainEvent` variants that the timeline system captures.
+### ✅ Status Workflow Integration (2026-03-15)
 
-**Frontend:** `desktop-ui/src/features/tasks2/components/detail/IssueActivityTab.tsx` — already renders `ActivityEntry[]`, just needs richer data.
+**What was done:**
+- `StatusWorkflowProvider` context fetches real workflow labels per-project via `useEffectiveLabels(projectId)`
+- `matchIcon()` maps known status names to SVG icons; unknown names get a colored circle fallback
+- All 7+ consumer components (`StatusSelector`, `SidebarProperties`, `IssueContextMenu`, `IssueBoard`, `AllIssues`, `CreateIssueModal`, `Filter`) use dynamic statuses from context
+- Board columns derive from workflow labels
+- Drag-and-drop sends `status` + `statusLabelId` in mutations
+- Graceful degradation: tasks with unmatched statuses are bucketed by `statusGroup`
+- `resolveStatus(task, labels)` is a pure function accepting `StatusLabel[]`
+
+**Key files:**
+- `desktop-ui/src/features/tasks2/contexts/StatusWorkflowContext.tsx`
+- `desktop-ui/src/features/tasks2/lib/status-icons.tsx` — icon registry + `matchIcon()`
+- `desktop-ui/src/features/tasks2/lib/mappers.ts` — `resolveStatus()`, `statusToMutationParams()`
+
+### ✅ Focus Session Controls (2026-03-15)
+
+**What was done:**
+- `FocusSession` interface replaced — no fake data, nullable quality fields
+- `buildFocusSession(task)` returns real `startedAt`/`elapsed`/`totalTracked`, null for quality metrics
+- Stop button wired to `task_end_focus` mutation
+- Quality score, distraction count, flow state, sparkline sections hidden when null
+- Pause button disabled with "Coming soon" tooltip
+
+**Key files:**
+- `desktop-ui/src/features/tasks2/lib/mappers.ts` — `FocusSession`, `buildFocusSession()`
+- `desktop-ui/src/features/tasks2/hooks/useIssueDetail.ts` — `stopFocus` callback
+- `desktop-ui/src/features/tasks2/components/detail/SidebarWorkState.tsx`
+
+### ✅ Activity Tab Enrichment (2026-03-15)
+
+**What was done:**
+- Backend: `task_update` diffs old vs new, emits `TaskStatusChanged`, `TaskPriorityChanged`, `TaskFieldUpdated` domain events with actor info
+- Backend: `normalize_domain_event` handles new events → timeline entries with metadata
+- Backend: actor stored in `metadata.actor` (`"user"` / `"agent"` / `"system"`)
+- Frontend: `timelineToActivity()` enriched with `resolveActor()` and `buildActivityDetail()`
+- Activity shows "You changed status: todo → in_progress", "You changed priority: Medium → High"
+
+**Key files:**
+- `crates/bus/src/domain_events.rs` — 3 new `DomainEvent` variants
+- `crates/app-core/src/handlers/tasks/crud.rs` — diff + emit in `task_update`
+- `crates/app-core/src/handlers/timeline.rs` — `normalize_domain_event` handlers
+- `desktop-ui/src/features/tasks2/lib/mappers.ts` — `resolveActor()`, `buildActivityDetail()`
 
 ---
 
-## 2. AI Suggestions
+## Remaining Work (Placeholder / Stubbed)
 
-**Current:** Returns empty `[]`. Shows static "Why This Task Now?" card with hardcoded reasons.
+### 1. AI Suggestions — High effort
 
-**Needed:**
-- Backend endpoint to generate task-specific suggestions (break into subtasks, related issues, priority recommendations)
+**Current state:** Returns `[]`. Shows static "Why This Task Now?" card with hardcoded reasons.
+
+**What's needed:**
+- New backend handler in `app-core` that uses the agent pipeline to analyze a task and produce suggestions (break into subtasks, related issues, priority recommendations)
 - Suggestion apply/dismiss persistence
 - Confidence scoring
 
-**Backend:** No endpoint exists. Would need a new handler in `app-core` that uses the agent pipeline to analyze a task and produce suggestions.
+**Frontend is ready:** `SidebarAiInsights.tsx` is fully built with apply/dismiss UI, confidence badges, expandable list. Just needs real data from `useIssueDetail.ts → suggestions`.
 
-**Frontend:** `desktop-ui/src/features/tasks2/components/detail/SidebarAiInsights.tsx` — fully built, just needs real data. `useIssueDetail.ts` returns empty suggestions — wire to new endpoint when ready.
+**Backend:** No endpoint exists yet.
 
----
+### 2. Task Memory (Cognitive Bridge) — Medium effort
 
-## 3. Task Memory (Cognitive Bridge)
+**Current state:** Returns `null`. "Task Memory" section doesn't render.
 
-**Current:** Returns `null`. The "Task Memory" section (last session summary, continuity note, related facts) doesn't render.
-
-**Needed:**
+**What's needed:**
 - Bridge `crates/cognitive/` memory system to per-task context
 - Endpoint to fetch memory entries related to a specific task
 - Surface last session summary, continuity notes, and related facts
 
-**Backend:** The cognitive memory system exists in `crates/cognitive/`. Needs a query interface filtered by task entity.
+**Frontend is ready:** `WhatAiLearned` and `TaskMemorySection` components in `SidebarAiInsights.tsx` are built, guarded by null checks. Wire `taskMemory` in `useIssueDetail.ts` when endpoint is ready.
 
-**Frontend:** `desktop-ui/src/features/tasks2/components/detail/SidebarAiInsights.tsx` — `WhatAiLearned` and `TaskMemorySection` components are built, guarded by null checks. Wire `taskMemory` in `useIssueDetail.ts` when endpoint is ready.
+**Backend:** Cognitive memory system exists. Needs a query interface filtered by task entity.
 
----
+### 3. Focus Quality Metrics — Medium effort
 
-## 4. Focus Session — Real Metrics + Controls
+**Current state:** Quality score, distraction count, flow state, and sparkline are hidden (fields return `null`).
 
-**Current:** `deriveFocusSession()` returns hardcoded defaults when `task.focusedAt` is set. Pause/Stop buttons are `disabled`.
+**What's needed:**
+- Backend tracking system for focus quality (quality score per 5-minute bucket, distraction events, flow state detection)
+- Endpoint or extension to `task_get` response with quality data
+- Pause/resume focus support (new DB fields + Tauri command)
 
-**Needed:**
-- Wire Pause button to pause the focus timer (no backend endpoint yet)
-- Wire Stop button to `task_end_focus` mutation
-- Fetch real quality metrics (quality score, distraction count, flow state) from the focus tracking system
-- Quality history sparkline from real 5-minute bucket data
+**Frontend is ready:** `SidebarWorkState.tsx` has quality score display, distraction counter, `FlowBadge`, and `QualitySparkline` components. All null-guarded — they render automatically when data is non-null.
 
-**Backend:** `task_start_focus` and `task_end_focus` Tauri commands exist. Quality metrics may need a new query or be part of the focus session response.
+### 4. Project Icons — Low effort
 
-**Frontend:**
-- `desktop-ui/src/features/tasks2/components/detail/SidebarWorkState.tsx` — enable Pause/Stop buttons, wire to mutations
-- `desktop-ui/src/features/tasks2/hooks/useIssueDetail.ts` — replace `deriveFocusSession()` with real data query
+**Current state:** All projects show a generic `Folder` icon.
 
----
-
-## 5. Status Workflow Integration
-
-**Current:** 6 hardcoded statuses in `lib/status-icons.tsx` with static `backendStatus` mapping. Status pickers show these fixed options regardless of project workflow.
-
-**Needed:**
-- Fetch real `StatusWorkflow` labels via `useEffectiveLabels(projectId)` (hook already exists in the old tasks feature)
-- Dynamically populate status pickers from workflow labels
-- Map workflow label colors/names to icons (option C from spec — match known names, fallback to colored circle)
-- Per-project workflow support (different projects can have different status options)
-
-**Backend:** Fully built — `StatusWorkflow`, `StatusLabel`, and CRUD endpoints all exist.
-
-**Frontend:**
-- `StatusSelector.tsx`, `SidebarProperties.tsx`, `IssueContextMenu.tsx`, `IssueBoard.tsx`, `GroupIssues.tsx`, `Filter.tsx` — all iterate `status` array from `status-icons.tsx`. Replace with dynamic workflow labels.
-- `lib/mappers.ts` — `resolveStatus()` already handles custom labels as fallback. Would become primary path.
-
----
-
-## 6. Project Icons
-
-**Current:** All projects show a generic `Folder` icon via `projectToDisplayProject()`.
-
-**Needed:**
+**What's needed:**
 - Map project color to a distinct icon, or add an `icon` field to the `Project` backend type
 - Show colored dot + project name in `ProjectBadge.tsx`
 
 **Scope:** Cosmetic. Low priority.
 
+### 5. Activity — Comments & Agent Actions — Medium effort
+
+**Current state:** Activity tab shows task lifecycle events and field changes. No user comments, no agent action logging.
+
+**What's needed:**
+- Comment-type timeline entries (user-authored text) — needs a comments system
+- Agent action logging (suggestions applied, linked issues) — depends on AI Suggestions being built first
+
 ---
 
-## Priority Order
+## Priority for Next Session
 
-| # | Feature | Impact | Effort |
-|---|---|---|---|
-| 1 | Status Workflow Integration | High — correct status options per project | Medium |
-| 2 | Focus Session Controls | High — core productivity feature | Low |
-| 3 | Activity Tab Enrichment | Medium — better task history | Medium |
-| 4 | AI Suggestions | Medium — differentiating feature | High |
-| 5 | Task Memory | Medium — continuity across sessions | Medium |
-| 6 | Project Icons | Low — cosmetic | Low |
+| # | Feature | Impact | Effort | Dependencies |
+|---|---------|--------|--------|-------------|
+| 1 | AI Suggestions | Medium — differentiating feature | High | Agent pipeline |
+| 2 | Task Memory | Medium — continuity across sessions | Medium | Cognitive system bridge |
+| 3 | Focus Quality Metrics | Medium — enriches focus tracking | Medium | Quality tracking backend |
+| 4 | Project Icons | Low — cosmetic | Low | None |
+| 5 | Activity Comments | Low — nice to have | Medium | Comments system |
+
+---
+
+## Design & Plan References
+
+- **Design spec:** `docs/superpowers/specs/2026-03-15-task2-remaining-b-design.md`
+- **Implementation plan:** `docs/superpowers/plans/2026-03-15-task2-remaining-b.md`
+- **Original integration spec:** `docs/superpowers/specs/2026-03-14-task2-integration-design.md`
+- **Detail view spec:** `docs/superpowers/specs/2026-03-13-task-detail-view-design.md`
