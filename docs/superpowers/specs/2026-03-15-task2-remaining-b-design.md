@@ -66,7 +66,7 @@ A `matchIcon(labelName: string)` function inside the provider's transform logic.
 
 #### 1.3 Component Updates
 
-All 6 components switch from `import { allStatus }` to `const { statuses } = useStatusWorkflow()`:
+All consumer components switch from `import { allStatus }` to `const { statuses } = useStatusWorkflow()`:
 
 | Component | Current | Change |
 |-----------|---------|--------|
@@ -74,19 +74,35 @@ All 6 components switch from `import { allStatus }` to `const { statuses } = use
 | `SidebarProperties.tsx` | Status picker from `allStatus` | Use `statuses` from context |
 | `IssueContextMenu.tsx` | Status submenu from `allStatus` | Use `statuses` from context |
 | `IssueBoard.tsx` | Board columns from hardcoded statuses | Columns from `statuses` via context |
-| `GroupIssues.tsx` | Group headers from hardcoded statuses | Headers from `statuses` via context |
+| `AllIssues.tsx` | Uses `allStatus` in `handleUpdateStatus` | Use `statuses` from context |
+| `CreateIssueModal.tsx` | Status options from `allStatus` | Use `statuses` from context |
 | `Filter.tsx` | Filter options from hardcoded statuses | Options from `statuses` via context |
+
+Note: `GroupIssues.tsx` receives `Status` as a prop (does not import `allStatus`), so it needs no import change — it will automatically receive dynamic statuses from its parent.
 
 #### 1.4 Board/Grouping Graceful Degradation
 
-Tasks whose `statusLabel` doesn't match any column get bucketed into the closest `statusGroup` match (open → first column, active → middle, closed → done column, blocked → last column) rather than disappearing.
+Tasks whose `statusLabel` doesn't match any column get bucketed into the closest `statusGroup` match (open → first column, active → middle, closed → done column, blocked → last column) rather than disappearing. The `Status` interface is extended with an optional `statusGroup: StatusGroup` field (carried from `StatusLabel.statusGroup`) to enable this matching.
 
-#### 1.5 Files Changed
+#### 1.5 `StatusIcon` Component and `status-utils.tsx`
+
+The existing `StatusIcon` component in `status-icons.tsx` uses a `statusById` lookup keyed by hardcoded IDs. This will break for dynamic status labels. Update `StatusIcon` to use `matchIcon(name)` instead of ID-based lookup. Components like `GroupIssues.tsx` and `SidebarProperties.tsx` that call `renderStatusIcon(status.id)` via `status-utils.tsx` will be updated to pass the status name instead, or use the `Status` object's `icon` property directly.
+
+#### 1.6 `resolveStatus()` Stays Pure
+
+`resolveStatus()` in `mappers.ts` remains a pure function — it accepts `StatusLabel[]` as a parameter rather than reaching into React context. The `StatusWorkflowProvider` calls `resolveStatus(task, labels)` internally. This keeps it testable and usable outside the component tree.
+
+#### 1.7 Known Limitation: Workflow Label Changes
+
+If workflow labels are edited while the board is open, the UI won't update until the next `useEffectiveLabels` refetch (typically on component remount or window focus via Tanstack Query defaults). No real-time event exists for workflow changes. This is acceptable for now — workflow edits are rare admin operations.
+
+#### 1.8 Files Changed
 
 - **New:** `tasks2/contexts/StatusWorkflowContext.tsx`
-- **Modified:** `tasks2/lib/status-icons.tsx` (refactor to icon registry + `matchIcon`)
-- **Modified:** `tasks2/lib/mappers.ts` (`resolveStatus` simplified — delegates to context)
-- **Modified:** 6 consumer components (swap `allStatus` → `useStatusWorkflow()`)
+- **Modified:** `tasks2/lib/status-icons.tsx` (refactor to icon registry + `matchIcon`, update `StatusIcon` component)
+- **Modified:** `tasks2/lib/status-utils.tsx` (update `renderStatusIcon` to use name-based matching)
+- **Modified:** `tasks2/lib/mappers.ts` (`resolveStatus` accepts `StatusLabel[]` param instead of using hardcoded list)
+- **Modified:** 7 consumer components (swap `allStatus` → `useStatusWorkflow()`)
 - **Modified:** tasks2 root layout/provider to wrap with `StatusWorkflowProvider`
 
 ---
@@ -121,24 +137,40 @@ No backend concept of "paused focus" exists. Adding one requires new DB fields, 
 
 #### 2.3 Replace `deriveFocusSession()` with `buildFocusSession(task)`
 
-Rename and refactor to return real data where available, `null` where not:
+Rename and refactor to return real data where available, `null` where not. This is an **interface replacement** — the old `FocusSession` shape (`focusMode`, `qualityScore` as required fields) is replaced with a new shape:
 
 ```typescript
+interface FocusSession {
+  startedAt: string;            // ISO timestamp from task.focusedAt
+  elapsed: number;              // seconds, computed from startedAt
+  totalTracked: number;         // seconds from task.totalTrackedSecs
+  qualityScore: number | null;  // no backend support yet
+  distractionCount: number | null;
+  flowState: string | null;
+  qualityHistory: number[] | null;
+}
+
 function buildFocusSession(task: Task): FocusSession | null {
   if (!task.focusedAt) return null;
   return {
     startedAt: task.focusedAt,
     elapsed: /* computed from focusedAt, already works */,
-    totalTracked: task.totalTrackedSecs,
-    qualityScore: null,      // no backend support yet
-    distractionCount: null,  // no backend support yet
-    flowState: null,         // no backend support yet
-    qualityHistory: null,    // no backend support yet
+    totalTracked: task.totalTrackedSecs ?? 0,
+    qualityScore: null,
+    distractionCount: null,
+    flowState: null,
+    qualityHistory: null,
   };
 }
 ```
 
-#### 2.4 Conditional UI in SidebarWorkState
+All consumers of `FocusSession` (primarily `SidebarWorkState.tsx`) must be updated to use the new shape. The old `focusMode` field is dropped — it was a hardcoded string with no backend equivalent.
+
+#### 2.4 Edge Case: `end_focus` In-Memory State
+
+Note: `end_focus` on the backend uses an in-memory `active_task_focus` tracker and ignores the passed `task_id` (parameter is `_task_id`). If the app restarts while a task has `focusedAt` set, the in-memory state is lost and `end_focus` returns `Ok(None)`. The Stop button should handle this gracefully — if the mutation returns no result, fall back to calling `task_update` to clear `focusedAt` directly. This is an edge case worth handling but not blocking.
+
+#### 2.5 Conditional UI in SidebarWorkState
 
 Update `SidebarWorkState.tsx` to conditionally hide sections when data is null:
 - Quality score section: hidden when `qualityScore === null`
@@ -149,7 +181,7 @@ Update `SidebarWorkState.tsx` to conditionally hide sections when data is null:
 
 **Net result:** Honest UI — live timer and working Stop button. No fake metrics.
 
-#### 2.5 Files Changed
+#### 2.6 Files Changed
 
 - **Modified:** `tasks2/hooks/useIssueDetail.ts` — rename `deriveFocusSession` → `buildFocusSession`, return nulls for unsupported fields
 - **Modified:** `tasks2/components/detail/SidebarWorkState.tsx` — enable Stop button with mutation, null-guard quality sections, add Pause tooltip
@@ -165,27 +197,45 @@ Log status/priority changes as specific timeline entries and distinguish actor t
 
 ### Current State
 
-- **Backend:** `task_update` handler performs updates but emits only generic `taskUpdated` timeline entries. No actor information on entries.
+- **Backend:** `task_update` handler in `crud.rs` performs updates and emits `EntityUpdate` events for UI refresh, but does NOT emit timeline entries directly. Timeline entries are generated from `DomainEvent` records via `normalize_domain_event` in `crates/app-core/src/handlers/timeline.rs`. `TimelineEntryType` is a Rust enum in `desktop-shared` with variants like `TaskUpdated`, `TaskCreated`, etc. No actor information on entries.
 - **Frontend:** `IssueActivityTab.tsx` renders `ActivityEntry[]` with actor avatars (User/Agent/System). `timelineToActivity()` mapper sets all actors to `"system"`. Rendering is complete — just needs richer data.
 
 ### Design
 
 #### 3.1 Backend — Change-Specific Timeline Entries
 
-In `crates/app-core/src/handlers/tasks/crud.rs`, when `task_update` is called:
+**Mechanism:** Emit new `DomainEvent` variants via the message bus, then handle them in `normalize_domain_event` to produce timeline entries. This follows the existing pattern — timeline entries are not written directly from handlers.
 
-1. **Diff old vs new** for key fields: `status`, `priority`, `title`, `description`, `project_id`, `parent_id`
-2. **Emit specific entries** for each changed field:
-   - `entry_type`: `"taskStatusChanged"`, `"taskPriorityChanged"`, `"taskFieldUpdated"`
+**Steps:**
+
+1. **Add new `DomainEvent` variants** (in `common` or wherever `DomainEvent` is defined):
+   - `TaskStatusChanged { task_id, from, to, actor }`
+   - `TaskPriorityChanged { task_id, from, to, actor }`
+   - `TaskFieldUpdated { task_id, field, from, to, actor }`
+
+2. **Add new `TimelineEntryType` variants** in `crates/desktop-shared/src/commands/timeline.rs`:
+   - `TaskStatusChanged`
+   - `TaskPriorityChanged`
+   - `TaskFieldUpdated`
+
+3. **In `task_update` handler** (`crud.rs`): before applying the patch, fetch the current task via `repos.tasks.get(&params.id)` to diff old vs new values. For each changed key field (`status`, `priority`, `title`, `description`, `project_id`, `parent_id`), emit the corresponding `DomainEvent` variant via the bus. This adds one extra DB read per update (acceptable tradeoff).
+
+4. **In `normalize_domain_event`** (`timeline.rs`): handle the new event variants to produce `TimelineEntry` records:
+   - `entry_type`: the new `TimelineEntryType` variant
    - `title`: human-readable, e.g. `"Status changed from Todo to In Progress"`
-   - `metadata` (JSON): `{ "field": "status", "from": "todo", "to": "in_progress" }` — structured data for rich frontend rendering
+   - `metadata` (JSON): `{ "field": "status", "from": "todo", "to": "in_progress", "actor": "user" }`
    - `source`: `"task"`
    - `entity_id`: the task ID
-3. The generic `taskUpdated` entry is replaced by these specific entries (not duplicated alongside)
+
+5. **Update `compute_summary()`** in `timeline.rs` to handle the new `TimelineEntryType` variants (otherwise they fall through the catch-all).
+
+6. **Update deduplication filter** (timeline.rs lines ~137-146) to retain the new entry types alongside `TaskUpdated`.
+
+7. The generic `TaskUpdated` event continues to fire for non-diffed fields. The new specific events replace it only for fields we explicitly track.
 
 #### 3.2 Backend — Actor Type
 
-Add an `actor` field to timeline entries.
+Store actor in the `metadata` JSON field of timeline entries (which is `Option<serde_json::Value>` — already exists, no schema change needed).
 
 **Approach:** Add an optional `actor: Option<String>` parameter to the `task_update` handler. Call sites determine the value:
 
@@ -195,9 +245,9 @@ Add an `actor` field to timeline entries.
 | Agent pipeline (AI-driven update) | `"agent"` |
 | Automated/cron/system triggers | `"system"` (default when `None`) |
 
-This keeps changes minimal — no new `ActorContext` struct, just an optional string threaded through.
+The actor value flows: Tauri command → `AppCore::task_update(params, actor)` → `DomainEvent` variant → `normalize_domain_event` → `metadata.actor` in the timeline entry.
 
-**Storage:** The timeline entry table likely has a `metadata` JSON column. Actor can be stored there, or as a new column if the schema allows direct addition (pre-release, no migration concerns per CLAUDE.md).
+**Tauri command layer:** The `task_update` Tauri command in `desktop/src/commands/tasks.rs` hardcodes `actor: Some("user".into())` when calling `AppCore::task_update()`. The `actor` does NOT go into `TaskUpdateParams` (which is a shared IPC type) — it's a separate parameter on the handler method. This avoids frontend needing to pass `actor` on every call.
 
 #### 3.3 Frontend — Enrich `timelineToActivity()` Mapper
 
@@ -228,12 +278,14 @@ The `IssueActivityTab.tsx` component already handles all three actor types with 
 #### 3.5 Files Changed
 
 **Backend:**
-- **Modified:** `crates/app-core/src/handlers/tasks/crud.rs` — diff fields, emit specific timeline entries, accept `actor` param
-- **Modified:** Timeline entry creation (wherever `TimelineEntry` is constructed) — include actor in metadata or new column
-- **Possibly modified:** `crates/storage/` — add `actor` column to timeline table if not using metadata JSON
+- **Modified:** `common` (or wherever `DomainEvent` is defined) — add `TaskStatusChanged`, `TaskPriorityChanged`, `TaskFieldUpdated` variants
+- **Modified:** `crates/desktop-shared/src/commands/timeline.rs` — add new `TimelineEntryType` enum variants
+- **Modified:** `crates/app-core/src/handlers/tasks/crud.rs` — fetch old task before update, diff fields, emit specific domain events, accept `actor` param
+- **Modified:** `crates/app-core/src/handlers/timeline.rs` — handle new events in `normalize_domain_event`, update `compute_summary()`, update deduplication filter
+- **Modified:** `crates/desktop/src/commands/tasks.rs` — pass `actor: Some("user".into())` to `task_update` handler
 
 **Frontend:**
-- **Modified:** `tasks2/lib/mappers.ts` — enrich `timelineToActivity()` with new entry types + actor mapping
+- **Modified:** `tasks2/lib/mappers.ts` — enrich `timelineToActivity()` with new entry types + actor mapping from metadata
 
 ---
 
