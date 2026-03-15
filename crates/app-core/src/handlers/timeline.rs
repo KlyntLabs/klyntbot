@@ -206,6 +206,12 @@ fn normalize_time_entry(te: storage::TimeEntryWithTask) -> TimelineEntry {
 fn normalize_domain_event(e: cognitive::DomainEventRow) -> Option<TimelineEntry> {
     let payload: serde_json::Value = serde_json::from_str(&e.payload).ok()?;
 
+    // DomainEvent uses serde's externally-tagged format: {"TaskStatusChanged": {..}}
+    // Extract the inner object for field access.
+    let inner = payload
+        .get(e.event_type.as_str())
+        .unwrap_or(&payload);
+
     /// Extract a string field from a JSON payload.
     fn field<'a>(payload: &'a serde_json::Value, key: &str) -> Option<&'a str> {
         payload.get(key).and_then(|v| v.as_str())
@@ -213,7 +219,7 @@ fn normalize_domain_event(e: cognitive::DomainEventRow) -> Option<TimelineEntry>
 
     let (entry_type, source, title, entity_id, entity_route, color) = match e.event_type.as_str() {
         "TaskCreated" => {
-            let task_id = field(&payload, "task_id");
+            let task_id = field(inner, "task_id");
             (
                 TimelineEntryType::TaskCreated,
                 TimelineSource::Task,
@@ -224,7 +230,7 @@ fn normalize_domain_event(e: cognitive::DomainEventRow) -> Option<TimelineEntry>
             )
         }
         "TaskCompleted" => {
-            let task_id = field(&payload, "task_id");
+            let task_id = field(inner, "task_id");
             (
                 TimelineEntryType::TaskCompleted,
                 TimelineSource::Task,
@@ -234,24 +240,64 @@ fn normalize_domain_event(e: cognitive::DomainEventRow) -> Option<TimelineEntry>
                 "var(--timeline-task)",
             )
         }
+        "TaskStatusChanged" => {
+            let task_id = field(inner, "task_id");
+            let from = field(inner, "from").unwrap_or("?");
+            let to = field(inner, "to").unwrap_or("?");
+            (
+                TimelineEntryType::TaskStatusChanged,
+                TimelineSource::Task,
+                format!("Status: {from} → {to}"),
+                task_id.map(String::from),
+                task_id.map(|id| format!("/task/{id}")),
+                "var(--timeline-task)",
+            )
+        }
+        "TaskPriorityChanged" => {
+            let task_id = field(inner, "task_id");
+            let from = field(inner, "from").unwrap_or("none");
+            let to = field(inner, "to").unwrap_or("none");
+            (
+                TimelineEntryType::TaskPriorityChanged,
+                TimelineSource::Task,
+                format!("Priority: {from} → {to}"),
+                task_id.map(String::from),
+                task_id.map(|id| format!("/task/{id}")),
+                "var(--timeline-task)",
+            )
+        }
+        "TaskFieldUpdated" => {
+            let task_id = field(inner, "task_id");
+            let field_name = field(inner, "field").unwrap_or("field");
+            let from = field(inner, "from").unwrap_or("");
+            let to = field(inner, "to").unwrap_or("");
+            (
+                TimelineEntryType::TaskFieldUpdated,
+                TimelineSource::Task,
+                format!("{field_name}: \"{from}\" → \"{to}\""),
+                task_id.map(String::from),
+                task_id.map(|id| format!("/task/{id}")),
+                "var(--timeline-task)",
+            )
+        }
         "NoteCreated" => {
-            let title_str = field(&payload, "title").unwrap_or("Untitled");
+            let title_str = field(inner, "title").unwrap_or("Untitled");
             (
                 TimelineEntryType::NoteCreated,
                 TimelineSource::Note,
                 format!("Note: {title_str}"),
-                field(&payload, "note_id").map(String::from),
+                field(inner, "note_id").map(String::from),
                 Some("/notes".into()),
                 "var(--timeline-note)",
             )
         }
         "NoteUpdated" => {
-            let title_str = field(&payload, "title").unwrap_or("Untitled");
+            let title_str = field(inner, "title").unwrap_or("Untitled");
             (
                 TimelineEntryType::NoteUpdated,
                 TimelineSource::Note,
                 format!("Edited: {title_str}"),
-                field(&payload, "note_id").map(String::from),
+                field(inner, "note_id").map(String::from),
                 Some("/notes".into()),
                 "var(--timeline-note)",
             )
@@ -261,7 +307,7 @@ fn normalize_domain_event(e: cognitive::DomainEventRow) -> Option<TimelineEntry>
             TimelineSource::Finance,
             format!(
                 "Transaction: {}",
-                field(&payload, "category").unwrap_or("Uncategorized")
+                field(inner, "category").unwrap_or("Uncategorized")
             ),
             None,
             Some("/finance/transactions".into()),
