@@ -68,6 +68,9 @@ pub enum TimelineEntryType {
     IncomeRecorded,
     SystemEvent,
     CalendarEvent,
+    TaskStatusChanged,
+    TaskPriorityChanged,
+    TaskFieldUpdated,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

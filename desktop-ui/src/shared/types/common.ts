@@ -118,7 +118,10 @@ export type TimelineEntryType =
   | "expenseRecorded"
   | "incomeRecorded"
   | "systemEvent"
-  | "calendarEvent";
+  | "calendarEvent"
+  | "taskStatusChanged"
+  | "taskPriorityChanged"
+  | "taskFieldUpdated";
 
 export interface TimelineEntry {
   id: string;

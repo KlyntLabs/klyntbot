@@ -133,6 +133,25 @@ pub enum DomainEvent {
         task_id: String,
         was_blocked_by: String,
     },
+    TaskStatusChanged {
+        task_id: String,
+        from: String,
+        to: String,
+        actor: Option<String>,
+    },
+    TaskPriorityChanged {
+        task_id: String,
+        from: String,
+        to: String,
+        actor: Option<String>,
+    },
+    TaskFieldUpdated {
+        task_id: String,
+        field: String,
+        from: String,
+        to: String,
+        actor: Option<String>,
+    },
     DayPlanGenerated {
         task_count: u32,
         total_estimated_mins: u32,
