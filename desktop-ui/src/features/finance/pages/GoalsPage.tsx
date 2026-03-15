@@ -11,23 +11,22 @@ import { Donut } from "../components/Donut";
 import { FinanceLayout } from "../components/FinanceLayout";
 import { FinanceSkeleton } from "../components/FinanceSkeleton";
 import { FormField, FormModal, fieldClass } from "../components/FormModal";
-import { COLORS, fmtCompact, fmtMoney, GOAL_ICONS, pct } from "../lib/finance";
+import { useFinanceCurrency } from "../hooks/useFinanceCurrency";
+import { displayAmount } from "../lib/displayAmount";
+import { COLORS, fmtCompact, GOAL_ICONS, pct } from "../lib/finance";
 
 type GoalTab = "active" | "achieved" | "abandoned";
 
 export function FinanceGoals() {
+  const { mode, setMode, baseCurrency, rates, currencies, displayCur, convertTotal } =
+    useFinanceCurrency();
   const {
     data: goals,
     loading,
     error,
     refetch,
   } = useQuery<FinanceGoal[]>("finance_goals", undefined, []);
-  const { data: settings } = useQuery<{ defaultCurrency: string }>(
-    "finance_settings",
-    undefined,
-    {},
-  );
-  const baseCurrency = settings?.defaultCurrency ?? "USD";
+
   useEvent<{ entityKind: string }>("entity:updated", refetch);
 
   const [tab, setTab] = useState<GoalTab>("active");
@@ -107,7 +106,12 @@ export function FinanceGoals() {
 
   if (loading && goals.length === 0) {
     return (
-      <FinanceLayout onRefresh={refetch}>
+      <FinanceLayout
+        onRefresh={refetch}
+        currencyMode={mode}
+        currencies={currencies}
+        onSelectCurrency={setMode}
+      >
         <FinanceSkeleton />
       </FinanceLayout>
     );
@@ -115,7 +119,12 @@ export function FinanceGoals() {
 
   if (error && goals.length === 0) {
     return (
-      <FinanceLayout onRefresh={refetch}>
+      <FinanceLayout
+        onRefresh={refetch}
+        currencyMode={mode}
+        currencies={currencies}
+        onSelectCurrency={setMode}
+      >
         <Card className="p-6 text-center">
           <p className="text-[12px] text-destructive mb-2">{error.message}</p>
           <button
@@ -131,7 +140,12 @@ export function FinanceGoals() {
   }
 
   return (
-    <FinanceLayout onRefresh={refetch}>
+    <FinanceLayout
+      onRefresh={refetch}
+      currencyMode={mode}
+      currencies={currencies}
+      onSelectCurrency={setMode}
+    >
       <div className="grid grid-cols-12 gap-4 auto-rows-min">
         {/* ── Stats row ─────────────────────────────────── */}
         <div className="col-span-12 grid grid-cols-4 gap-4">
@@ -146,7 +160,7 @@ export function FinanceGoals() {
               Total Saved
             </p>
             <p className="text-[20px] font-light text-success tabular-nums">
-              {fmtCompact(totalSaved, baseCurrency)}
+              {fmtCompact(convertTotal(totalSaved), displayCur)}
             </p>
           </Card>
           <Card className="p-4">
@@ -154,7 +168,7 @@ export function FinanceGoals() {
               Total Target
             </p>
             <p className="text-[20px] font-light text-primary tabular-nums">
-              {fmtCompact(totalTarget, baseCurrency)}
+              {fmtCompact(convertTotal(totalTarget), displayCur)}
             </p>
           </Card>
           <Card className="p-4">
@@ -162,7 +176,7 @@ export function FinanceGoals() {
               Monthly Contributions
             </p>
             <p className="text-[20px] font-light text-brand tabular-nums">
-              {fmtCompact(monthlyTotal, baseCurrency)}
+              {fmtCompact(convertTotal(monthlyTotal), displayCur)}
             </p>
           </Card>
         </div>
@@ -234,9 +248,24 @@ export function FinanceGoals() {
                         </div>
                         <div className="text-right">
                           <p className="text-[14px] font-light text-primary tabular-nums">
-                            {fmtMoney(g.currentAmount, g.currency)}{" "}
+                            {displayAmount({
+                              amount: g.currentAmount,
+                              currency: g.currency,
+                              baseAmount: g.baseCurrentAmount,
+                              baseCurrency,
+                              mode,
+                              rates,
+                            })}{" "}
                             <span className="text-dim text-[10px]">
-                              / {fmtMoney(g.targetAmount, g.currency)}
+                              /{" "}
+                              {displayAmount({
+                                amount: g.targetAmount,
+                                currency: g.currency,
+                                baseAmount: g.baseTargetAmount,
+                                baseCurrency,
+                                mode,
+                                rates,
+                              })}
                             </span>
                           </p>
                           <p className="text-[11px] font-light text-brand tabular-nums">{p}%</p>
@@ -251,7 +280,21 @@ export function FinanceGoals() {
                         )}
                         {g.monthlyContribution && (
                           <span className="text-[10px] text-dim font-light">
-                            Contributing: {fmtMoney(g.monthlyContribution, g.currency)}/mo
+                            Contributing:{" "}
+                            {displayAmount({
+                              amount: g.monthlyContribution,
+                              currency: g.currency,
+                              baseAmount:
+                                g.baseTargetAmount != null && g.targetAmount !== 0
+                                  ? Math.round(
+                                      g.monthlyContribution * (g.baseTargetAmount / g.targetAmount),
+                                    )
+                                  : undefined,
+                              baseCurrency,
+                              mode,
+                              rates,
+                            })}
+                            /mo
                           </span>
                         )}
                         {monthsLeft != null && (
@@ -260,7 +303,18 @@ export function FinanceGoals() {
                           </span>
                         )}
                         <span className="text-[10px] text-dim font-light">
-                          {fmtMoney(remaining, g.currency)} remaining
+                          {displayAmount({
+                            amount: remaining,
+                            currency: g.currency,
+                            baseAmount:
+                              g.baseTargetAmount != null && g.baseCurrentAmount != null
+                                ? g.baseTargetAmount - g.baseCurrentAmount
+                                : undefined,
+                            baseCurrency,
+                            mode,
+                            rates,
+                          })}{" "}
+                          remaining
                         </span>
                       </div>
                     </div>
@@ -278,7 +332,7 @@ export function FinanceGoals() {
               <Donut
                 segments={goalSegs}
                 label="Saved"
-                value={fmtCompact(totalSaved, baseCurrency)}
+                value={fmtCompact(convertTotal(totalSaved), displayCur)}
                 size={150}
               />
             </div>

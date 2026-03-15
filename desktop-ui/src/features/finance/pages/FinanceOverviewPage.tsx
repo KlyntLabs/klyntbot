@@ -28,6 +28,8 @@ import { Card, CardHeader } from "../components/Card";
 import { Donut } from "../components/Donut";
 import { FinanceLayout } from "../components/FinanceLayout";
 import { FinanceSkeleton } from "../components/FinanceSkeleton";
+import { useFinanceCurrency } from "../hooks/useFinanceCurrency";
+import { displayAmount, displayHint } from "../lib/displayAmount";
 import {
   ACCT_ICONS,
   COLORS,
@@ -41,6 +43,8 @@ import {
 
 export function Finance() {
   const navigate = useNavigate();
+  const { mode, setMode, baseCurrency, rates, currencies, displayCur, convertTotal } =
+    useFinanceCurrency();
 
   const {
     data: accounts,
@@ -79,12 +83,6 @@ export function Finance() {
     undefined,
     { totalsByCurrency: [] },
   );
-  const { data: settings } = useQuery<{ defaultCurrency: string }>(
-    "finance_settings",
-    undefined,
-    {},
-  );
-  const baseCurrency = settings?.defaultCurrency ?? "USD";
   const { data: spendingReport } = useQuery<FinanceCategoryReport>(
     "finance_report_spending",
     undefined,
@@ -167,7 +165,12 @@ export function Finance() {
 
   if (loading && accounts.length === 0) {
     return (
-      <FinanceLayout onRefresh={refetchAll}>
+      <FinanceLayout
+        onRefresh={refetchAll}
+        currencyMode={mode}
+        currencies={currencies}
+        onSelectCurrency={setMode}
+      >
         <FinanceSkeleton rows={6} />
       </FinanceLayout>
     );
@@ -175,7 +178,12 @@ export function Finance() {
 
   if (error && accounts.length === 0) {
     return (
-      <FinanceLayout onRefresh={refetchAll}>
+      <FinanceLayout
+        onRefresh={refetchAll}
+        currencyMode={mode}
+        currencies={currencies}
+        onSelectCurrency={setMode}
+      >
         <Card className="p-6 text-center">
           <p className="text-[12px] text-destructive mb-2">{error.message}</p>
           <button
@@ -191,14 +199,19 @@ export function Finance() {
   }
 
   return (
-    <FinanceLayout onRefresh={refetchAll}>
+    <FinanceLayout
+      onRefresh={refetchAll}
+      currencyMode={mode}
+      currencies={currencies}
+      onSelectCurrency={setMode}
+    >
       <div className="grid grid-cols-12 gap-4 auto-rows-min">
         {/* ── ROW 1: Net Worth (3col) + Accounts (9col) ────── */}
         <div className="col-span-3">
           <Card className="p-4">
             <CardHeader title="Net Worth" />
             <p className="text-[28px] font-light text-primary tracking-tight leading-none mb-3 tabular-nums">
-              {fmtCompact(totalNet, baseCurrency)}
+              {fmtCompact(convertTotal(totalNet), displayCur)}
             </p>
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
@@ -207,7 +220,7 @@ export function Finance() {
                   <span className="text-[10px] text-muted font-light">Assets</span>
                 </div>
                 <span className="text-[10px] text-success font-light tabular-nums">
-                  {fmtCompact(totalAssets, baseCurrency)}
+                  {fmtCompact(convertTotal(totalAssets), displayCur)}
                 </span>
               </div>
               <div className="flex items-center justify-between">
@@ -216,18 +229,20 @@ export function Finance() {
                   <span className="text-[10px] text-muted font-light">Debt</span>
                 </div>
                 <span className="text-[10px] text-destructive font-light tabular-nums">
-                  {fmtCompact(totalDebt, baseCurrency)}
+                  {fmtCompact(convertTotal(totalDebt), displayCur)}
                 </span>
               </div>
             </div>
-            <div className="flex gap-3 mt-3 pt-2.5 border-t border-white/[0.04]">
-              {netWorth.totalsByCurrency.map((c) => (
-                <span key={c.currency} className="text-[9px] font-light">
-                  <span className="text-dim">{c.currency}</span>{" "}
-                  <span className="text-secondary">{fmtMoney(c.net, c.currency)}</span>
-                </span>
-              ))}
-            </div>
+            {mode === "multi" && (
+              <div className="flex gap-3 mt-3 pt-2.5 border-t border-white/[0.04]">
+                {netWorth.totalsByCurrency.map((c) => (
+                  <span key={c.currency} className="text-[9px] font-light">
+                    <span className="text-dim">{c.currency}</span>{" "}
+                    <span className="text-secondary">{fmtMoney(c.net, c.currency)}</span>
+                  </span>
+                ))}
+              </div>
+            )}
           </Card>
         </div>
 
@@ -262,13 +277,28 @@ export function Finance() {
                       </div>
                     </div>
                     <p className="text-[14px] font-light text-primary tabular-nums">
-                      {fmtMoney(acct.balance, acct.currency)}
+                      {displayAmount({
+                        amount: acct.balance,
+                        currency: acct.currency,
+                        baseAmount: acct.baseBalance,
+                        baseCurrency,
+                        mode,
+                        rates,
+                      })}
                     </p>
-                    {acct.currency !== baseCurrency && acct.baseBalance != null && (
-                      <p className="text-[9px] text-dim font-light mt-0.5">
-                        ≈ {fmtCompact(acct.baseBalance, baseCurrency)}
-                      </p>
-                    )}
+                    {(() => {
+                      const hint = displayHint({
+                        amount: acct.balance,
+                        currency: acct.currency,
+                        baseAmount: acct.baseBalance,
+                        baseCurrency,
+                        mode,
+                        rates,
+                      });
+                      return hint ? (
+                        <p className="text-[9px] text-dim font-light mt-0.5">≈ {hint}</p>
+                      ) : null;
+                    })()}
                   </div>
                 );
               })}
@@ -307,10 +337,27 @@ export function Finance() {
                       <span className="text-[12px] font-medium text-secondary">{b.name}</span>
                     </div>
                     <div className="text-right text-[12px] font-light text-muted tabular-nums">
-                      {fmtMoney(b.amount, b.currency)}
+                      {displayAmount({
+                        amount: b.amount,
+                        currency: b.currency,
+                        baseAmount: b.baseAmount,
+                        baseCurrency,
+                        mode,
+                        rates,
+                      })}
                     </div>
                     <div className="text-right text-[12px] font-light text-primary tabular-nums">
-                      {fmtMoney(b.spent, b.currency)}
+                      {displayAmount({
+                        amount: b.spent,
+                        currency: b.currency,
+                        baseAmount:
+                          b.baseAmount != null && b.amount !== 0
+                            ? Math.round(b.spent * (b.baseAmount / b.amount))
+                            : undefined,
+                        baseCurrency,
+                        mode,
+                        rates,
+                      })}
                     </div>
                     <div
                       className={cn(
@@ -319,7 +366,17 @@ export function Finance() {
                       )}
                     >
                       {rem < 0 ? "-" : ""}
-                      {fmtMoney(Math.abs(rem), b.currency)}
+                      {displayAmount({
+                        amount: Math.abs(rem),
+                        currency: b.currency,
+                        baseAmount:
+                          b.baseAmount != null && b.amount !== 0
+                            ? Math.abs(Math.round(rem * (b.baseAmount / b.amount)))
+                            : undefined,
+                        baseCurrency,
+                        mode,
+                        rates,
+                      })}
                     </div>
                     <div
                       className={cn(
@@ -344,7 +401,7 @@ export function Finance() {
             <Donut
               segments={spendingSegs}
               label="Total spending"
-              value={fmtCompact(totalSpend, baseCurrency)}
+              value={fmtCompact(convertTotal(totalSpend), displayCur)}
             />
           </Card>
         </div>
@@ -395,7 +452,14 @@ export function Finance() {
                     )}
                   >
                     {pre}
-                    {fmtMoney(tx.amount, tx.currency)}
+                    {displayAmount({
+                      amount: tx.amount,
+                      currency: tx.currency,
+                      baseAmount: tx.baseAmount,
+                      baseCurrency,
+                      mode,
+                      rates,
+                    })}
                   </span>
                 </div>
               );
@@ -414,13 +478,13 @@ export function Finance() {
               <div className="flex justify-between">
                 <span className="text-[10px] text-muted font-light">Income</span>
                 <span className="text-[10px] text-success font-light">
-                  {fmtCompact(totalIncome, baseCurrency)}
+                  {fmtCompact(convertTotal(totalIncome), displayCur)}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-[10px] text-muted font-light">Spending</span>
                 <span className="text-[10px] text-destructive font-light">
-                  {fmtCompact(totalSpend, baseCurrency)}
+                  {fmtCompact(convertTotal(totalSpend), displayCur)}
                 </span>
               </div>
               <div className="border-t border-white/[0.04] pt-2 flex justify-between">
@@ -437,7 +501,7 @@ export function Finance() {
             <Donut
               segments={investSegs}
               label="Portfolio"
-              value={fmtCompact(totalInvest, baseCurrency)}
+              value={fmtCompact(convertTotal(totalInvest), displayCur)}
               size={130}
             />
             <div className="mt-3 pt-2.5 border-t border-white/[0.04] space-y-1.5">
@@ -490,8 +554,25 @@ export function Finance() {
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-[10px] text-dim font-light">
-                          {fmtCompact(g.currentAmount, g.currency)} /{" "}
-                          {fmtCompact(g.targetAmount, g.currency)}
+                          {displayAmount({
+                            amount: g.currentAmount,
+                            currency: g.currency,
+                            baseAmount: g.baseCurrentAmount,
+                            baseCurrency,
+                            mode,
+                            rates,
+                            compact: true,
+                          })}{" "}
+                          /{" "}
+                          {displayAmount({
+                            amount: g.targetAmount,
+                            currency: g.currency,
+                            baseAmount: g.baseTargetAmount,
+                            baseCurrency,
+                            mode,
+                            rates,
+                            compact: true,
+                          })}
                         </span>
                         <span className="text-[10px] text-brand font-light">{p}%</span>
                       </div>
@@ -503,7 +584,21 @@ export function Finance() {
                       )}
                       {g.monthlyContribution && (
                         <span className="text-[9px] text-dim font-light">
-                          {fmtCompact(g.monthlyContribution, g.currency)}/mo
+                          {displayAmount({
+                            amount: g.monthlyContribution,
+                            currency: g.currency,
+                            baseAmount:
+                              g.baseTargetAmount != null && g.targetAmount !== 0
+                                ? Math.round(
+                                    g.monthlyContribution * (g.baseTargetAmount / g.targetAmount),
+                                  )
+                                : undefined,
+                            baseCurrency,
+                            mode,
+                            rates,
+                            compact: true,
+                          })}
+                          /mo
                         </span>
                       )}
                     </div>
@@ -536,7 +631,14 @@ export function Finance() {
                       </span>
                     </div>
                     <span className="text-[12px] font-light text-destructive tabular-nums">
-                      {fmtMoney(l.remaining, l.currency)}
+                      {displayAmount({
+                        amount: l.remaining,
+                        currency: l.currency,
+                        baseAmount: l.baseRemaining,
+                        baseCurrency,
+                        mode,
+                        rates,
+                      })}
                     </span>
                   </div>
                   <div className="h-1.5 w-full bg-white/[0.08] rounded-full overflow-hidden">
@@ -549,7 +651,18 @@ export function Finance() {
                     )}
                     {l.monthlyPayment && (
                       <span className="text-[9px] text-dim font-light">
-                        {fmtMoney(l.monthlyPayment, l.currency)}/mo
+                        {displayAmount({
+                          amount: l.monthlyPayment,
+                          currency: l.currency,
+                          baseAmount:
+                            l.basePrincipal != null && l.principal !== 0
+                              ? Math.round(l.monthlyPayment * (l.basePrincipal / l.principal))
+                              : undefined,
+                          baseCurrency,
+                          mode,
+                          rates,
+                        })}
+                        /mo
                       </span>
                     )}
                   </div>
@@ -559,7 +672,7 @@ export function Finance() {
             <div className="px-4 py-2.5 border-t border-white/[0.08] bg-white/[0.02] flex justify-between">
               <span className="text-[10px] font-light text-muted">Total Debt</span>
               <span className="text-[10px] font-light text-destructive">
-                {fmtCompact(totalDebt, baseCurrency)}
+                {fmtCompact(convertTotal(totalDebt), displayCur)}
               </span>
             </div>
           </Card>

@@ -16,6 +16,7 @@ import {
 // ── Formatting ──────────────────────────────────────────────────────────
 
 // Zero-decimal currencies — stored amount IS the major unit (no subunits).
+// KEEP IN SYNC with `crates/feature-finance/src/currency.rs` ZERO_DECIMAL list.
 const ZERO_DECIMAL: ReadonlySet<string> = new Set([
   "VND",
   "JPY",

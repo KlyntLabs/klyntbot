@@ -15,9 +15,13 @@ import { Donut } from "../components/Donut";
 import { FinanceLayout } from "../components/FinanceLayout";
 import { FinanceSkeleton } from "../components/FinanceSkeleton";
 import { FormField, FormModal, fieldClass } from "../components/FormModal";
+import { useFinanceCurrency } from "../hooks/useFinanceCurrency";
+import { displayAmount } from "../lib/displayAmount";
 import { COLORS, fmtCompact, fmtMoney, retPct } from "../lib/finance";
 
 export function FinanceInvestments() {
+  const { mode, setMode, baseCurrency, rates, currencies, displayCur, convertTotal } =
+    useFinanceCurrency();
   const {
     data: portfolios,
     loading,
@@ -29,12 +33,6 @@ export function FinanceInvestments() {
     undefined,
     [],
   );
-  const { data: settings } = useQuery<{ defaultCurrency: string }>(
-    "finance_settings",
-    undefined,
-    {},
-  );
-  const baseCurrency = settings?.defaultCurrency ?? "USD";
 
   const refetchAll = () => {
     rP();
@@ -136,7 +134,12 @@ export function FinanceInvestments() {
 
   if (loading && portfolios.length === 0) {
     return (
-      <FinanceLayout onRefresh={refetchAll}>
+      <FinanceLayout
+        onRefresh={refetchAll}
+        currencyMode={mode}
+        currencies={currencies}
+        onSelectCurrency={setMode}
+      >
         <FinanceSkeleton />
       </FinanceLayout>
     );
@@ -144,7 +147,12 @@ export function FinanceInvestments() {
 
   if (error && portfolios.length === 0) {
     return (
-      <FinanceLayout onRefresh={refetchAll}>
+      <FinanceLayout
+        onRefresh={refetchAll}
+        currencyMode={mode}
+        currencies={currencies}
+        onSelectCurrency={setMode}
+      >
         <Card className="p-6 text-center">
           <p className="text-[12px] text-destructive mb-2">{error.message}</p>
           <button
@@ -160,7 +168,12 @@ export function FinanceInvestments() {
   }
 
   return (
-    <FinanceLayout onRefresh={refetchAll}>
+    <FinanceLayout
+      onRefresh={refetchAll}
+      currencyMode={mode}
+      currencies={currencies}
+      onSelectCurrency={setMode}
+    >
       <div className="grid grid-cols-12 gap-4 auto-rows-min">
         {/* ── Stats row ─────────────────────────────────── */}
         <div className="col-span-12 grid grid-cols-4 gap-4">
@@ -169,7 +182,7 @@ export function FinanceInvestments() {
               Total Value
             </p>
             <p className="text-[20px] font-light text-primary tabular-nums">
-              {fmtCompact(totalValue, baseCurrency)}
+              {fmtCompact(convertTotal(totalValue), displayCur)}
             </p>
           </Card>
           <Card className="p-4">
@@ -177,7 +190,7 @@ export function FinanceInvestments() {
               Cost Basis
             </p>
             <p className="text-[20px] font-light text-muted tabular-nums">
-              {fmtCompact(totalCost, baseCurrency)}
+              {fmtCompact(convertTotal(totalCost), displayCur)}
             </p>
           </Card>
           <Card className="p-4">
@@ -342,7 +355,8 @@ export function FinanceInvestments() {
                         ? fmtMoney(inv.currentValue, inv.marketCurrency ?? inv.currency)
                         : "—"}
                     </span>
-                    {(inv.marketCurrency ?? inv.currency) !== baseCurrency &&
+                    {mode === "multi" &&
+                      (inv.marketCurrency ?? inv.currency) !== baseCurrency &&
                       inv.baseCurrentValue != null && (
                         <p className="text-[9px] text-dim font-light">
                           {fmtCompact(inv.baseCurrentValue, baseCurrency)}
@@ -350,7 +364,14 @@ export function FinanceInvestments() {
                       )}
                   </div>
                   <span className="text-right text-[11px] text-dim font-light tabular-nums">
-                    {fmtMoney(inv.costBasis, inv.currency)}
+                    {displayAmount({
+                      amount: inv.costBasis,
+                      currency: inv.currency,
+                      baseAmount: inv.baseCostBasis,
+                      baseCurrency,
+                      mode,
+                      rates,
+                    })}
                   </span>
                   <span
                     className={cn(
@@ -374,7 +395,7 @@ export function FinanceInvestments() {
               <Donut
                 segments={assetSegs}
                 label="By type"
-                value={fmtCompact(totalValue, baseCurrency)}
+                value={fmtCompact(convertTotal(totalValue), displayCur)}
                 size={140}
               />
             </div>
@@ -385,7 +406,7 @@ export function FinanceInvestments() {
               <Donut
                 segments={portfolioSegs}
                 label="Portfolios"
-                value={fmtCompact(totalValue, baseCurrency)}
+                value={fmtCompact(convertTotal(totalValue), displayCur)}
                 size={140}
               />
             </div>

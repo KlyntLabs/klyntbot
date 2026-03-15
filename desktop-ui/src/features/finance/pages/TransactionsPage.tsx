@@ -16,22 +16,20 @@ import { FinanceLayout } from "../components/FinanceLayout";
 import { FinanceSkeleton } from "../components/FinanceSkeleton";
 import { FormField, fieldClass } from "../components/FormModal";
 import { SlidePanel } from "../components/SlidePanel";
-import { COLORS, fmtCompact, fmtMoney } from "../lib/finance";
+import { useFinanceCurrency } from "../hooks/useFinanceCurrency";
+import { displayAmount } from "../lib/displayAmount";
+import { COLORS, fmtCompact } from "../lib/finance";
 
 type TxFilter = "all" | "income" | "expense" | "transfer";
 
 export function FinanceTransactions() {
+  const { mode, setMode, baseCurrency, rates, currencies, displayCur, convertTotal } =
+    useFinanceCurrency();
   const { data: accounts, refetch: rA } = useQuery<FinanceAccount[]>(
     "finance_accounts",
     undefined,
     [],
   );
-  const { data: settings } = useQuery<{ defaultCurrency: string }>(
-    "finance_settings",
-    undefined,
-    {},
-  );
-  const baseCurrency = settings?.defaultCurrency ?? "USD";
 
   // ── Server-side filter state ──
   const [filter, setFilter] = useState<TxFilter>("all");
@@ -149,7 +147,12 @@ export function FinanceTransactions() {
 
   if (loading && transactions.length === 0) {
     return (
-      <FinanceLayout onRefresh={refetchAll}>
+      <FinanceLayout
+        onRefresh={refetchAll}
+        currencyMode={mode}
+        currencies={currencies}
+        onSelectCurrency={setMode}
+      >
         <FinanceSkeleton rows={5} />
       </FinanceLayout>
     );
@@ -157,7 +160,12 @@ export function FinanceTransactions() {
 
   if (error && transactions.length === 0) {
     return (
-      <FinanceLayout onRefresh={refetchAll}>
+      <FinanceLayout
+        onRefresh={refetchAll}
+        currencyMode={mode}
+        currencies={currencies}
+        onSelectCurrency={setMode}
+      >
         <Card className="p-6 text-center">
           <p className="text-[12px] text-destructive mb-2">{error.message}</p>
           <button
@@ -173,7 +181,12 @@ export function FinanceTransactions() {
   }
 
   return (
-    <FinanceLayout onRefresh={refetchAll}>
+    <FinanceLayout
+      onRefresh={refetchAll}
+      currencyMode={mode}
+      currencies={currencies}
+      onSelectCurrency={setMode}
+    >
       <div className="grid grid-cols-12 gap-4 auto-rows-min">
         {/* ── Stats row ─────────────────────────────────── */}
         <div className="col-span-12 grid grid-cols-4 gap-4">
@@ -186,7 +199,7 @@ export function FinanceTransactions() {
           <Card className="p-4">
             <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">Income</p>
             <p className="text-[20px] font-light text-success tabular-nums">
-              {fmtCompact(totalIncome, baseCurrency)}
+              {fmtCompact(convertTotal(totalIncome), displayCur)}
             </p>
           </Card>
           <Card className="p-4">
@@ -194,7 +207,7 @@ export function FinanceTransactions() {
               Expenses
             </p>
             <p className="text-[20px] font-light text-destructive tabular-nums">
-              {fmtCompact(totalExpense, baseCurrency)}
+              {fmtCompact(convertTotal(totalExpense), displayCur)}
             </p>
           </Card>
           <Card className="p-4">
@@ -206,7 +219,7 @@ export function FinanceTransactions() {
               )}
             >
               {totalIncome - totalExpense >= 0 ? "+" : ""}
-              {fmtCompact(totalIncome - totalExpense, baseCurrency)}
+              {fmtCompact(convertTotal(totalIncome - totalExpense), displayCur)}
             </p>
           </Card>
         </div>
@@ -327,7 +340,14 @@ export function FinanceTransactions() {
                     </span>
                     <span className={cn("text-[12px] font-light text-right tabular-nums", col)}>
                       {pre}
-                      {fmtMoney(tx.amount, tx.currency)}
+                      {displayAmount({
+                        amount: tx.amount,
+                        currency: tx.currency,
+                        baseAmount: tx.baseAmount,
+                        baseCurrency,
+                        mode,
+                        rates,
+                      })}
                     </span>
                   </div>
                 );
@@ -344,7 +364,7 @@ export function FinanceTransactions() {
                 <Donut
                   segments={catSegs}
                   label="Spending"
-                  value={fmtCompact(totalExpense, baseCurrency)}
+                  value={fmtCompact(convertTotal(totalExpense), displayCur)}
                   size={140}
                 />
                 <div className="mt-3 pt-2.5 border-t border-white/[0.04] space-y-1.5">
@@ -358,7 +378,7 @@ export function FinanceTransactions() {
                         <span className="text-[10px] text-muted font-light">{seg.name}</span>
                       </div>
                       <span className="text-[10px] text-secondary font-light">
-                        {fmtCompact(seg.value, baseCurrency)}
+                        {fmtCompact(convertTotal(seg.value), displayCur)}
                       </span>
                     </div>
                   ))}

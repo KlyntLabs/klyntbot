@@ -2,6 +2,7 @@
 
 use serde_json::json;
 
+use crate::currency::effective_rate;
 use crate::types::AssetType;
 use common::{Result, ToolError};
 use storage::rows::finance::FinanceInvestmentRow;
@@ -30,12 +31,13 @@ impl FinanceTool {
             .get_rate(market_currency, &self.default_currency)
             .await
         {
-            Ok(rate) => {
-                let base = (current_value as f64 * rate).round() as i64;
-                (base, rate)
+            Ok(api_rate) => {
+                let eff = effective_rate(api_rate, market_currency, &self.default_currency);
+                let base = (current_value as f64 * eff).round() as i64;
+                (base, eff)
             }
             Err(_) => {
-                // Fallback: use existing market_rate if API fails
+                // Fallback: use existing market_rate (already effective)
                 let rate = inv.market_rate;
                 let base = (current_value as f64 * rate).round() as i64;
                 (base, rate)

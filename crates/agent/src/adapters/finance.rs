@@ -175,7 +175,10 @@ impl FinanceHandler for FinanceHandlerImpl {
                                 (value_cents, 1.0)
                             } else {
                                 match self.price_service.get_rate(mkt_currency, &self.config.default_currency).await {
-                                    Ok(rate) => (((value_cents as f64) * rate).round() as i64, rate),
+                                    Ok(api_rate) => {
+                                        let eff = feature_finance::currency::effective_rate(api_rate, mkt_currency, &self.config.default_currency);
+                                        (((value_cents as f64) * eff).round() as i64, eff)
+                                    },
                                     Err(_) => (((value_cents as f64) * inv.market_rate).round() as i64, inv.market_rate),
                                 }
                             };

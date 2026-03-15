@@ -1,9 +1,14 @@
 import { RefreshCw } from "lucide-react";
 import { useLocation, useNavigate } from "react-router";
+import type { CurrencyDisplayMode } from "../hooks/useCurrencyDisplayMode";
+import { CurrencyToggle } from "./CurrencyToggle";
 
 interface FinanceLayoutProps {
   children: React.ReactNode;
   onRefresh?: () => void;
+  currencyMode?: CurrencyDisplayMode;
+  currencies?: string[];
+  onSelectCurrency?: (mode: CurrencyDisplayMode) => void;
 }
 
 const subNav = [
@@ -16,7 +21,13 @@ const subNav = [
   { label: "Liabilities", path: "/finance/liabilities" },
 ];
 
-export function FinanceLayout({ children, onRefresh }: FinanceLayoutProps) {
+export function FinanceLayout({
+  children,
+  onRefresh,
+  currencyMode,
+  currencies,
+  onSelectCurrency,
+}: FinanceLayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -47,6 +58,9 @@ export function FinanceLayout({ children, onRefresh }: FinanceLayoutProps) {
             );
           })}
         </div>
+        {currencyMode && currencies && onSelectCurrency && (
+          <CurrencyToggle mode={currencyMode} currencies={currencies} onSelect={onSelectCurrency} />
+        )}
         {onRefresh && (
           <button
             type="button"

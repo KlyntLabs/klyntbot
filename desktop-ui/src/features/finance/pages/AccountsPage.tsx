@@ -10,9 +10,13 @@ import { Card, CardHeader } from "../components/Card";
 import { FinanceLayout } from "../components/FinanceLayout";
 import { FinanceSkeleton } from "../components/FinanceSkeleton";
 import { FormField, FormModal, fieldClass } from "../components/FormModal";
+import { useFinanceCurrency } from "../hooks/useFinanceCurrency";
+import { displayAmount, displayHint } from "../lib/displayAmount";
 import { ACCT_ICONS, fmtCompact, fmtMoney } from "../lib/finance";
 
 export function FinanceAccounts() {
+  const { mode, setMode, baseCurrency, rates, currencies, displayCur, convertTotal } =
+    useFinanceCurrency();
   const [searchParams] = useSearchParams();
   const {
     data: accounts,
@@ -25,12 +29,6 @@ export function FinanceAccounts() {
     undefined,
     [],
   );
-  const { data: settings } = useQuery<{ defaultCurrency: string }>(
-    "finance_settings",
-    undefined,
-    {},
-  );
-  const baseCurrency = settings?.defaultCurrency ?? "USD";
 
   const refetchAll = () => {
     rA();
@@ -88,7 +86,12 @@ export function FinanceAccounts() {
 
   if (loading && accounts.length === 0) {
     return (
-      <FinanceLayout onRefresh={refetchAll}>
+      <FinanceLayout
+        onRefresh={refetchAll}
+        currencyMode={mode}
+        currencies={currencies}
+        onSelectCurrency={setMode}
+      >
         <FinanceSkeleton rows={3} />
       </FinanceLayout>
     );
@@ -96,7 +99,12 @@ export function FinanceAccounts() {
 
   if (error && accounts.length === 0) {
     return (
-      <FinanceLayout onRefresh={refetchAll}>
+      <FinanceLayout
+        onRefresh={refetchAll}
+        currencyMode={mode}
+        currencies={currencies}
+        onSelectCurrency={setMode}
+      >
         <Card className="p-6 text-center">
           <p className="text-[12px] text-destructive mb-2">{error.message}</p>
           <button
@@ -112,7 +120,12 @@ export function FinanceAccounts() {
   }
 
   return (
-    <FinanceLayout onRefresh={refetchAll}>
+    <FinanceLayout
+      onRefresh={refetchAll}
+      currencyMode={mode}
+      currencies={currencies}
+      onSelectCurrency={setMode}
+    >
       <div className="grid grid-cols-12 gap-4 auto-rows-min">
         {/* ── Header stats ────────────────────────────────── */}
         <div className="col-span-12 grid grid-cols-3 gap-4">
@@ -121,7 +134,7 @@ export function FinanceAccounts() {
               Total Balance
             </p>
             <p className="text-[20px] font-light text-primary">
-              {fmtCompact(totalBalance, baseCurrency)}
+              {fmtCompact(convertTotal(totalBalance), displayCur)}
             </p>
           </Card>
           <Card className="p-4">
@@ -187,13 +200,28 @@ export function FinanceAccounts() {
                       </div>
                     </div>
                     <p className="text-[18px] font-light text-primary tabular-nums">
-                      {fmtMoney(acct.balance, acct.currency)}
+                      {displayAmount({
+                        amount: acct.balance,
+                        currency: acct.currency,
+                        baseAmount: acct.baseBalance,
+                        baseCurrency,
+                        mode,
+                        rates,
+                      })}
                     </p>
-                    {acct.currency !== baseCurrency && acct.baseBalance != null && (
-                      <p className="text-[10px] text-dim font-light mt-0.5">
-                        ≈ {fmtCompact(acct.baseBalance, baseCurrency)}
-                      </p>
-                    )}
+                    {(() => {
+                      const hint = displayHint({
+                        amount: acct.balance,
+                        currency: acct.currency,
+                        baseAmount: acct.baseBalance,
+                        baseCurrency,
+                        mode,
+                        rates,
+                      });
+                      return hint ? (
+                        <p className="text-[10px] text-dim font-light mt-0.5">≈ {hint}</p>
+                      ) : null;
+                    })()}
                     {acct.notes && (
                       <p className="text-[9px] text-dim font-light mt-2">{acct.notes}</p>
                     )}
@@ -216,7 +244,14 @@ export function FinanceAccounts() {
                         <div className="min-w-0 flex-1">
                           <p className="text-[12px] font-light text-muted truncate">{acct.name}</p>
                           <p className="text-[10px] text-dim font-light">
-                            {fmtMoney(acct.balance, acct.currency)}
+                            {displayAmount({
+                              amount: acct.balance,
+                              currency: acct.currency,
+                              baseAmount: acct.baseBalance,
+                              baseCurrency,
+                              mode,
+                              rates,
+                            })}
                           </p>
                         </div>
                       </div>
@@ -272,7 +307,14 @@ export function FinanceAccounts() {
                         className={cn("text-[11px] font-light flex-shrink-0 tabular-nums", col)}
                       >
                         {pre}
-                        {fmtMoney(tx.amount, tx.currency)}
+                        {displayAmount({
+                          amount: tx.amount,
+                          currency: tx.currency,
+                          baseAmount: tx.baseAmount,
+                          baseCurrency,
+                          mode,
+                          rates,
+                        })}
                       </span>
                     </div>
                   );

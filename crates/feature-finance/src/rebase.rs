@@ -7,6 +7,7 @@
 use sqlx::SqlitePool;
 use storage::StorageError;
 
+use crate::currency::effective_rate;
 use crate::price_service::PriceService;
 use crate::rate_cache::RateCache;
 
@@ -79,11 +80,13 @@ pub async fn rebase_all_tables(
         .prefetch_rates(&new_base_upper, &all_currencies)
         .await?;
 
-    // Build a rate lookup: source_currency → rate_to_new_base
+    // Build a rate lookup: source_currency → effective_rate_to_new_base
+    // The effective rate accounts for subunit differences (e.g., VND is zero-decimal, USD has cents)
     let mut rate_map = std::collections::HashMap::<String, f64>::new();
     for currency in &all_currencies {
-        let rate = price_service.get_rate(currency, &new_base_upper).await?;
-        rate_map.insert(currency.to_uppercase(), rate);
+        let api_rate = price_service.get_rate(currency, &new_base_upper).await?;
+        let eff = effective_rate(api_rate, currency, &new_base_upper);
+        rate_map.insert(currency.to_uppercase(), eff);
     }
 
     let mut result = RebaseResult {

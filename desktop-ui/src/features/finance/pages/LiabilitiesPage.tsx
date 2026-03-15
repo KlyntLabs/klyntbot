@@ -10,21 +10,20 @@ import { Donut } from "../components/Donut";
 import { FinanceLayout } from "../components/FinanceLayout";
 import { FinanceSkeleton } from "../components/FinanceSkeleton";
 import { FormField, FormModal, fieldClass } from "../components/FormModal";
-import { COLORS, fmtCompact, fmtMoney, LIAB_ICONS, pct } from "../lib/finance";
+import { useFinanceCurrency } from "../hooks/useFinanceCurrency";
+import { displayAmount } from "../lib/displayAmount";
+import { COLORS, fmtCompact, LIAB_ICONS, pct } from "../lib/finance";
 
 export function FinanceLiabilities() {
+  const { mode, setMode, baseCurrency, rates, currencies, displayCur, convertTotal } =
+    useFinanceCurrency();
   const {
     data: liabilities,
     loading,
     error,
     refetch,
   } = useQuery<FinanceLiability[]>("finance_liabilities", undefined, []);
-  const { data: settings } = useQuery<{ defaultCurrency: string }>(
-    "finance_settings",
-    undefined,
-    {},
-  );
-  const baseCurrency = settings?.defaultCurrency ?? "USD";
+
   useEvent<{ entityKind: string }>("entity:updated", refetch);
 
   const totalRemaining = useMemo(
@@ -106,7 +105,12 @@ export function FinanceLiabilities() {
 
   if (loading && liabilities.length === 0) {
     return (
-      <FinanceLayout onRefresh={refetch}>
+      <FinanceLayout
+        onRefresh={refetch}
+        currencyMode={mode}
+        currencies={currencies}
+        onSelectCurrency={setMode}
+      >
         <FinanceSkeleton />
       </FinanceLayout>
     );
@@ -114,7 +118,12 @@ export function FinanceLiabilities() {
 
   if (error && liabilities.length === 0) {
     return (
-      <FinanceLayout onRefresh={refetch}>
+      <FinanceLayout
+        onRefresh={refetch}
+        currencyMode={mode}
+        currencies={currencies}
+        onSelectCurrency={setMode}
+      >
         <Card className="p-6 text-center">
           <p className="text-[12px] text-destructive mb-2">{error.message}</p>
           <button
@@ -130,7 +139,12 @@ export function FinanceLiabilities() {
   }
 
   return (
-    <FinanceLayout onRefresh={refetch}>
+    <FinanceLayout
+      onRefresh={refetch}
+      currencyMode={mode}
+      currencies={currencies}
+      onSelectCurrency={setMode}
+    >
       <div className="grid grid-cols-12 gap-4 auto-rows-min">
         {/* ── Stats row ─────────────────────────────────── */}
         <div className="col-span-12 grid grid-cols-4 gap-4">
@@ -139,7 +153,7 @@ export function FinanceLiabilities() {
               Total Debt
             </p>
             <p className="text-[20px] font-light text-destructive tabular-nums">
-              {fmtCompact(totalRemaining, baseCurrency)}
+              {fmtCompact(convertTotal(totalRemaining), displayCur)}
             </p>
           </Card>
           <Card className="p-4">
@@ -147,7 +161,7 @@ export function FinanceLiabilities() {
               Total Paid
             </p>
             <p className="text-[20px] font-light text-success tabular-nums">
-              {fmtCompact(totalPaid, baseCurrency)}
+              {fmtCompact(convertTotal(totalPaid), displayCur)}
             </p>
           </Card>
           <Card className="p-4">
@@ -163,7 +177,7 @@ export function FinanceLiabilities() {
               Monthly Payments
             </p>
             <p className="text-[20px] font-light text-brand tabular-nums">
-              {fmtCompact(monthlyTotal, baseCurrency)}
+              {fmtCompact(convertTotal(monthlyTotal), displayCur)}
             </p>
           </Card>
         </div>
@@ -220,10 +234,25 @@ export function FinanceLiabilities() {
                         </div>
                         <div className="text-right">
                           <p className="text-[14px] font-light text-destructive tabular-nums">
-                            {fmtMoney(l.remaining, l.currency)}
+                            {displayAmount({
+                              amount: l.remaining,
+                              currency: l.currency,
+                              baseAmount: l.baseRemaining,
+                              baseCurrency,
+                              mode,
+                              rates,
+                            })}
                           </p>
                           <p className="text-[10px] text-dim font-light">
-                            of {fmtMoney(l.principal, l.currency)}
+                            of{" "}
+                            {displayAmount({
+                              amount: l.principal,
+                              currency: l.currency,
+                              baseAmount: l.basePrincipal,
+                              baseCurrency,
+                              mode,
+                              rates,
+                            })}
                           </p>
                         </div>
                       </div>
@@ -234,7 +263,17 @@ export function FinanceLiabilities() {
                         <div>
                           <p className="text-[9px] text-dim font-light">Paid</p>
                           <p className="text-[11px] text-success font-light tabular-nums">
-                            {fmtMoney(paidAmt, l.currency)}
+                            {displayAmount({
+                              amount: paidAmt,
+                              currency: l.currency,
+                              baseAmount:
+                                l.basePrincipal != null && l.baseRemaining != null
+                                  ? l.basePrincipal - l.baseRemaining
+                                  : undefined,
+                              baseCurrency,
+                              mode,
+                              rates,
+                            })}
                           </p>
                         </div>
                         <div>
@@ -255,7 +294,17 @@ export function FinanceLiabilities() {
                           <div>
                             <p className="text-[9px] text-dim font-light">Monthly</p>
                             <p className="text-[11px] text-muted font-light">
-                              {fmtMoney(l.monthlyPayment, l.currency)}
+                              {displayAmount({
+                                amount: l.monthlyPayment,
+                                currency: l.currency,
+                                baseAmount:
+                                  l.basePrincipal != null && l.principal !== 0
+                                    ? Math.round(l.monthlyPayment * (l.basePrincipal / l.principal))
+                                    : undefined,
+                                baseCurrency,
+                                mode,
+                                rates,
+                              })}
                             </p>
                           </div>
                         )}
@@ -282,7 +331,7 @@ export function FinanceLiabilities() {
               <div className="mt-3 glass-card px-4 py-3 flex justify-between items-center">
                 <span className="text-[11px] font-light text-muted">Total Outstanding Debt</span>
                 <span className="text-[14px] font-light text-destructive">
-                  {fmtCompact(totalRemaining, baseCurrency)}
+                  {fmtCompact(convertTotal(totalRemaining), displayCur)}
                 </span>
               </div>
             )}
@@ -296,7 +345,7 @@ export function FinanceLiabilities() {
               <Donut
                 segments={liabSegs}
                 label="Remaining"
-                value={fmtCompact(totalRemaining, baseCurrency)}
+                value={fmtCompact(convertTotal(totalRemaining), displayCur)}
                 size={150}
               />
             </div>
@@ -307,7 +356,7 @@ export function FinanceLiabilities() {
               <Donut
                 segments={typeSegs}
                 label="By type"
-                value={fmtCompact(totalRemaining, baseCurrency)}
+                value={fmtCompact(convertTotal(totalRemaining), displayCur)}
                 size={150}
               />
             </div>
@@ -321,14 +370,25 @@ export function FinanceLiabilities() {
                   <div key={l.id} className="flex justify-between items-center">
                     <span className="text-[10px] text-muted font-light truncate">{l.name}</span>
                     <span className="text-[10px] text-secondary font-light">
-                      {fmtMoney(l.monthlyPayment ?? 0, l.currency)}/mo
+                      {displayAmount({
+                        amount: l.monthlyPayment ?? 0,
+                        currency: l.currency,
+                        baseAmount:
+                          l.basePrincipal != null && l.principal !== 0
+                            ? Math.round((l.monthlyPayment ?? 0) * (l.basePrincipal / l.principal))
+                            : undefined,
+                        baseCurrency,
+                        mode,
+                        rates,
+                      })}
+                      /mo
                     </span>
                   </div>
                 ))}
               <div className="border-t border-white/[0.04] pt-2 flex justify-between">
                 <span className="text-[10px] text-muted font-light">Total Monthly</span>
                 <span className="text-[10px] text-brand font-light">
-                  {fmtCompact(monthlyTotal, baseCurrency)}/mo
+                  {fmtCompact(convertTotal(monthlyTotal), displayCur)}/mo
                 </span>
               </div>
             </div>
