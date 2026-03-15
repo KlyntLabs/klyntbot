@@ -1,0 +1,97 @@
+name: 'Release'
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-release:
+    permissions:
+      contents: write
+    runs-on: macos-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install frontend dependencies
+        run: cd desktop-ui && bun install
+
+      - name: Install cargo-nextest
+        run: cargo install cargo-nextest --locked
+
+      - name: Run tests
+        run: cargo nextest run --workspace
+
+      - name: Run clippy
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: v__VERSION__
+          releaseName: 'Klynt v__VERSION__'
+          releaseBody: 'Download the .dmg to install Klynt.'
+          releaseDraft: false
+          prerelease: false
+          args: --target aarch64-apple-darwin
+          projectPath: crates/desktop
+          tauriScript: cargo tauri
+
+      - name: Upload to release repo
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_REPO_TOKEN }}
+        run: |
+          TAG_NAME="${GITHUB_REF#refs/tags/}"
+          VERSION="${TAG_NAME#v}"
+
+          # Find the built artifacts
+          DMG=$(find target/aarch64-apple-darwin/release/bundle/dmg -name "*.dmg" | head -1)
+          UPDATER_TAR=$(find target/aarch64-apple-darwin/release/bundle/macos -name "*.tar.gz" | head -1)
+          UPDATER_SIG="${UPDATER_TAR}.sig"
+
+          # Create latest.json for the updater
+          SIGNATURE=$(cat "$UPDATER_SIG")
+          TAR_BASENAME=$(basename "$UPDATER_TAR")
+          DOWNLOAD_URL="https://github.com/KlyntLabs/klynt-bot/releases/download/${TAG_NAME}/${TAR_BASENAME}"
+          PUB_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+          jq -n \
+            --arg version "$VERSION" \
+            --arg notes "Klynt $VERSION" \
+            --arg pub_date "$PUB_DATE" \
+            --arg url "$DOWNLOAD_URL" \
+            --arg sig "$SIGNATURE" \
+            '{
+              version: $version,
+              notes: $notes,
+              pub_date: $pub_date,
+              platforms: {
+                "darwin-aarch64": {
+                  url: $url,
+                  signature: $sig
+                }
+              }
+            }' > latest.json
+
+          # Create release on the public repo
+          gh release create "$TAG_NAME" \
+            --repo KlyntLabs/klynt-bot \
+            --title "Klynt $VERSION" \
+            --notes "Download the .dmg to install Klynt." \
+            "$DMG" "$UPDATER_TAR" latest.json
