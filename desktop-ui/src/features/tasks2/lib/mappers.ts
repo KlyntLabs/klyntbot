@@ -337,18 +337,71 @@ const ENTRY_TYPE_ACTIONS: Record<string, string> = {
   taskCreated: "created task",
   taskCompleted: "completed task",
   taskUpdated: "updated task",
+  taskStatusChanged: "changed status",
+  taskPriorityChanged: "changed priority",
+  taskFieldUpdated: "updated field",
   taskDue: "task due",
   taskTimeEntry: "tracked time",
   focusSession: "focus session",
 };
 
+function buildActivityDetail(entry: TimelineEntry): string | undefined {
+  if (!entry.metadata) return entry.description ?? undefined;
+
+  const meta = entry.metadata as Record<string, unknown>;
+  const from = meta.from as string | undefined;
+  const to = meta.to as string | undefined;
+  const field = meta.field as string | undefined;
+
+  if (entry.entryType === "taskStatusChanged" && from && to) {
+    return `${from} → ${to}`;
+  }
+  if (entry.entryType === "taskPriorityChanged" && from && to) {
+    const priorityNames: Record<string, string> = {
+      "1": "Urgent",
+      "2": "High",
+      "3": "Medium",
+      "4": "Low",
+    };
+    const fromName = priorityNames[from] ?? from;
+    const toName = priorityNames[to] ?? to;
+    return `${fromName} → ${toName}`;
+  }
+  if (entry.entryType === "taskFieldUpdated" && field) {
+    return `Updated ${field}`;
+  }
+
+  return entry.description ?? undefined;
+}
+
+function resolveActor(entry: TimelineEntry): {
+  actorType: ActorType;
+  actorName: string;
+} {
+  const meta = entry.metadata as Record<string, unknown> | undefined;
+  const actor = meta?.actor as string | undefined;
+
+  switch (actor) {
+    case "user":
+      return { actorType: "user", actorName: "You" };
+    case "agent":
+      return { actorType: "agent", actorName: "Klyntbot" };
+    default:
+      return { actorType: "system", actorName: "System" };
+  }
+}
+
 export function timelineToActivity(entry: TimelineEntry): ActivityEntry {
+  const { actorType, actorName } = resolveActor(entry);
+  const action = ENTRY_TYPE_ACTIONS[entry.entryType] ?? entry.entryType;
+  const detail = buildActivityDetail(entry);
+
   return {
     id: entry.id,
-    actorType: "system",
-    actorName: "System",
-    action: ENTRY_TYPE_ACTIONS[entry.entryType] ?? entry.entryType,
-    detail: entry.description ?? entry.title,
+    actorType,
+    actorName,
+    action,
+    detail: detail ?? null,
     createdAt: entry.startedAt,
   };
 }
