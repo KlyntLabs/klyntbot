@@ -111,6 +111,7 @@ impl AppCore {
             body_html: None,
             pinned: 0,
             archived: 0,
+            icon: None,
             embedding_updated_at: None,
             created_at: now.clone(),
             updated_at: now,
@@ -160,6 +161,7 @@ impl AppCore {
                 params.body_html.as_deref(),
                 params.pinned,
                 params.notebook_id.as_ref().map(|o| o.as_deref()),
+                params.icon.as_ref().map(|o| o.as_deref()),
             )
             .await
             .map_err(map_storage_err)?;
@@ -286,7 +288,7 @@ impl AppCore {
         // Restore the version body
         let updated = self
             .note_repo
-            .update_note(&note_id, None, Some(&version.body), None, None, None)
+            .update_note(&note_id, None, Some(&version.body), None, None, None, None)
             .await
             .map_err(map_storage_err)?;
 

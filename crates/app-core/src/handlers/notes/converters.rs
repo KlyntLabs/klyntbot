@@ -17,6 +17,7 @@ pub(crate) fn note_row_to_response(row: &NoteRow, tags: Vec<String>) -> NoteResp
         body_html: row.body_html.clone(),
         pinned: row.pinned != 0,
         archived: row.archived != 0,
+        icon: row.icon.clone(),
         tags,
         created_at: row.created_at.clone(),
         updated_at: row.updated_at.clone(),

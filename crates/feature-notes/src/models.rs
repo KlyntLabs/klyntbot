@@ -26,6 +26,7 @@ pub struct Note {
     pub body_html: Option<String>,
     pub pinned: bool,
     pub archived: bool,
+    pub icon: Option<String>,
     pub tags: Vec<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -70,6 +71,7 @@ pub struct NoteRow {
     pub body_html: Option<String>,
     pub pinned: i32,
     pub archived: i32,
+    pub icon: Option<String>,
     pub embedding_updated_at: Option<String>,
     pub created_at: String,
     pub updated_at: String,
@@ -85,6 +87,7 @@ pub struct NoteSearchResult {
     pub body_html: Option<String>,
     pub pinned: i32,
     pub archived: i32,
+    pub icon: Option<String>,
     pub embedding_updated_at: Option<String>,
     pub created_at: String,
     pub updated_at: String,
@@ -158,6 +161,7 @@ impl Note {
             body_html: row.body_html,
             pinned: row.pinned != 0,
             archived: row.archived != 0,
+            icon: row.icon,
             tags,
             created_at: row.created_at.parse().unwrap_or_else(|e| {
                 tracing::warn!(raw = %row.created_at, error = %e, "failed to parse note created_at");

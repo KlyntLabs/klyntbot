@@ -196,6 +196,13 @@ export default function KnowledgeBasePage() {
     [updateNotebook],
   );
 
+  const handleUpdateNote = useCallback(
+    async (id: string, updates: { icon?: string | null }) => {
+      await updateNote({ id, ...updates });
+    },
+    [updateNote],
+  );
+
   const handleInboxCreateAsNote = useCallback(
     async (content: string) => {
       const result = await createNote({ title: content.slice(0, 60), body: content });
@@ -361,6 +368,7 @@ export default function KnowledgeBasePage() {
               onMoveNote={handleMoveNote}
               onMoveNotebook={handleMoveNotebook}
               onUpdateNotebook={handleUpdateNotebook}
+              onUpdateNote={handleUpdateNote}
               inboxItems={inboxItems}
               onInboxCreateAsNote={handleInboxCreateAsNote}
               onInboxDiscard={handleInboxDiscard}

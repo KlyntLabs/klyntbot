@@ -120,6 +120,7 @@ impl NotesTool {
             body_html: None,
             pinned: 0,
             archived: 0,
+            icon: None,
             embedding_updated_at: None,
             created_at: now.clone(),
             updated_at: now,
@@ -167,7 +168,7 @@ impl NotesTool {
 
         let updated = self
             .repo
-            .update_note(id, title, body, None, pinned, notebook_id)
+            .update_note(id, title, body, None, pinned, notebook_id, None)
             .await?;
         self.maybe_set_tags(p, id).await?;
 

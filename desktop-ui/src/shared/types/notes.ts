@@ -8,6 +8,7 @@ export interface Note {
   bodyHtml: string | null;
   pinned: boolean;
   archived: boolean;
+  icon: string | null;
   tags: string[];
   createdAt: string;
   updatedAt: string;
@@ -67,6 +68,7 @@ export interface NoteUpdateParams {
   pinned?: boolean;
   notebookId?: string | null;
   tags?: string[];
+  icon?: string | null;
 }
 
 // ── Notebook Mutation Parameters ───────────────────────────

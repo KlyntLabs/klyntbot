@@ -49,11 +49,32 @@ interface NotebookTreeProps {
   onMoveNote: (id: string, notebookId: string | null) => void;
   onMoveNotebook: (id: string, parentId: string | null) => void;
   onUpdateNotebook: (id: string, updates: { icon?: string | null; color?: string | null }) => void;
+  onUpdateNote: (id: string, updates: { icon?: string | null }) => void;
 }
 
-const FOLDER_ICONS = ["📁", "📂", "🗂️", "📚", "💼", "🏠", "🔬", "🎨", "💡", "🚀", "⭐", "❤️", "🔥", "🌍", "🎯", "📌"];
-const FOLDER_COLORS = [
-  null, // no color (reset)
+const ITEM_ICONS = [
+  // Documents
+  "\u{1F4C4}", "\u{1F4DD}", "\u{1F4CB}", "\u{1F4D1}", "\u{1F4DC}",
+  // Folders/Organization
+  "\u{1F4C1}", "\u{1F4C2}", "\u{1F5C2}\uFE0F", "\u{1F4DA}", "\u{1F5C3}\uFE0F",
+  // Work
+  "\u{1F4BC}", "\u{1F3E2}", "\u{1F4CA}", "\u{1F4C8}", "\u{1F4BB}",
+  // Creative
+  "\u{1F3A8}", "\u270F\uFE0F", "\u{1F58A}\uFE0F", "\u{1F4D0}", "\u{1F3AD}",
+  // Science/Tech
+  "\u{1F52C}", "\u2697\uFE0F", "\u{1F9EA}", "\u{1F527}", "\u2699\uFE0F",
+  // Ideas/Goals
+  "\u{1F4A1}", "\u{1F3AF}", "\u{1F680}", "\u2B50", "\u{1F3C6}",
+  // Nature/Life
+  "\u{1F30D}", "\u{1F331}", "\u{1F30A}", "\u2600\uFE0F", "\u{1F319}",
+  // Symbols
+  "\u2764\uFE0F", "\u{1F525}", "\u26A1", "\u{1F511}", "\u{1F512}",
+  // People
+  "\u{1F464}", "\u{1F465}", "\u{1F9E0}", "\u{1F4AC}", "\u{1F4DE}",
+];
+
+const ITEM_COLORS = [
+  null, // reset
   "#a78bfa", // violet
   "#93c5fd", // blue
   "#6ee7b7", // green
@@ -62,6 +83,9 @@ const FOLDER_COLORS = [
   "#f9a8d4", // pink
   "#67e8f9", // cyan
   "#fdba74", // orange
+  "#86efac", // emerald
+  "#c4b5fd", // purple
+  "#fde68a", // yellow
 ];
 
 type ContextTarget =
@@ -89,6 +113,7 @@ export function NotebookTree({
   onMoveNote,
   onMoveNotebook: _onMoveNotebook,
   onUpdateNotebook,
+  onUpdateNote,
 }: NotebookTreeProps) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(
     () => new Set(notebooks.map((n) => n.id)),
@@ -168,6 +193,7 @@ export function NotebookTree({
               id: n.id,
               title: n.title,
               depth: depth + 1,
+              icon: n.icon ?? undefined,
               pinned: n.pinned,
               updatedAt: n.updatedAt,
             });
@@ -187,6 +213,7 @@ export function NotebookTree({
         id: n.id,
         title: n.title,
         depth: 0,
+        icon: n.icon ?? undefined,
         pinned: n.pinned,
         updatedAt: n.updatedAt,
       });
@@ -329,27 +356,25 @@ export function NotebookTree({
               )}
 
               {/* Icon */}
-              {isFolder && item.icon ? (
+              {item.icon ? (
                 <span className="text-sm shrink-0 w-4 text-center">{item.icon}</span>
               ) : isFolder ? (
                 item.isExpanded ? (
-                  <FolderOpen className="w-3.5 h-3.5 shrink-0 text-brand/60" />
+                  <FolderOpen
+                    className={`w-3.5 h-3.5 shrink-0 ${item.color ? "" : "text-brand/60"}`}
+                    style={item.color ? { color: item.color } : undefined}
+                  />
                 ) : (
-                  <FolderClosed className="w-3.5 h-3.5 shrink-0 text-brand/60" />
+                  <FolderClosed
+                    className={`w-3.5 h-3.5 shrink-0 ${item.color ? "" : "text-brand/60"}`}
+                    style={item.color ? { color: item.color } : undefined}
+                  />
                 )
               ) : isNote && item.pinned ? (
                 <Pin className="w-3 h-3 shrink-0 text-brand" />
               ) : (
                 <FileText
                   className={`w-3.5 h-3.5 shrink-0 ${isSelected ? "text-brand/70" : "text-dim"}`}
-                />
-              )}
-
-              {/* Color bar for notebooks */}
-              {isFolder && item.color && (
-                <div
-                  className="w-0.5 h-4 rounded-full shrink-0"
-                  style={{ backgroundColor: item.color }}
                 />
               )}
 
@@ -414,6 +439,7 @@ export function NotebookTree({
           onDeleteNotebook={onDeleteNotebook}
           onMoveNote={onMoveNote}
           onUpdateNotebook={onUpdateNotebook}
+          onUpdateNote={onUpdateNote}
           onClose={() => setContextMenu(null)}
         />
       )}
@@ -434,6 +460,7 @@ interface TreeContextMenuProps {
   onDeleteNotebook: (id: string) => void;
   onMoveNote: (id: string, notebookId: string | null) => void;
   onUpdateNotebook: (id: string, updates: { icon?: string | null; color?: string | null }) => void;
+  onUpdateNote: (id: string, updates: { icon?: string | null }) => void;
   onClose: () => void;
 }
 
@@ -448,6 +475,7 @@ function TreeContextMenu({
   onDeleteNotebook,
   onMoveNote,
   onUpdateNotebook,
+  onUpdateNote,
   onClose,
   ref,
 }: TreeContextMenuProps & { ref: React.Ref<HTMLDivElement> }) {
@@ -519,13 +547,13 @@ function TreeContextMenu({
           open={showIconPicker}
           onToggle={() => setShowIconPicker(!showIconPicker)}
         >
-          <div className="grid grid-cols-8 gap-0.5 p-1.5">
-            {FOLDER_ICONS.map((icon) => (
+          <div className="grid grid-cols-8 gap-0.5 p-1.5 max-h-40 overflow-y-auto">
+            {ITEM_ICONS.map((icon) => (
               <button
                 key={icon}
                 type="button"
                 onClick={() => {
-                  onUpdateNotebook(target.notebook.id, { icon });
+                  onUpdateNotebook(target.notebook.id, { icon, color: null });
                   onClose();
                 }}
                 className={`w-7 h-7 rounded flex items-center justify-center text-sm hover:bg-white/[0.1] transition-colors ${
@@ -556,12 +584,12 @@ function TreeContextMenu({
           onToggle={() => setShowColorPicker(!showColorPicker)}
         >
           <div className="flex gap-1 p-2">
-            {FOLDER_COLORS.map((color) => (
+            {ITEM_COLORS.map((color) => (
               <button
                 key={color ?? "none"}
                 type="button"
                 onClick={() => {
-                  onUpdateNotebook(target.notebook.id, { color });
+                  onUpdateNotebook(target.notebook.id, color ? { color, icon: null } : { color: null });
                   onClose();
                 }}
                 className={`w-5 h-5 rounded-full border transition-transform hover:scale-125 ${
@@ -570,7 +598,7 @@ function TreeContextMenu({
                 style={color ? { backgroundColor: color } : undefined}
                 title={color ?? "No color"}
               >
-                {!color && <span className="text-[8px] text-dim">×</span>}
+                {!color && <span className="text-[8px] text-dim">&times;</span>}
               </button>
             ))}
           </div>
@@ -613,6 +641,42 @@ function TreeContextMenu({
       >
         {note.pinned ? "Unpin" : "Pin"}
       </ContextMenuItem>
+
+      {/* Icon picker for notes */}
+      <ContextMenuSubmenu
+        icon={<Smile className="w-4 h-4" />}
+        label="Change Icon"
+        open={showIconPicker}
+        onToggle={() => setShowIconPicker(!showIconPicker)}
+      >
+        <div className="grid grid-cols-8 gap-0.5 p-1.5 max-h-40 overflow-y-auto">
+          {ITEM_ICONS.map((icon) => (
+            <button
+              key={icon}
+              type="button"
+              onClick={() => {
+                onUpdateNote(note.id, { icon });
+                onClose();
+              }}
+              className={`w-7 h-7 rounded flex items-center justify-center text-sm hover:bg-white/[0.1] transition-colors ${
+                note.icon === icon ? "bg-white/[0.12] ring-1 ring-brand/40" : ""
+              }`}
+            >
+              {icon}
+            </button>
+          ))}
+        </div>
+        {note.icon && (
+          <ContextMenuItem
+            onClick={() => {
+              onUpdateNote(note.id, { icon: null });
+              onClose();
+            }}
+          >
+            <span className="text-dim text-xs">Remove icon</span>
+          </ContextMenuItem>
+        )}
+      </ContextMenuSubmenu>
 
       {folders.length > 0 && (
         <ContextMenuSubmenu

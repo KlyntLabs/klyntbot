@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS notes (
     body_html   TEXT,
     pinned      INTEGER NOT NULL DEFAULT 0,
     archived    INTEGER NOT NULL DEFAULT 0,
+    icon        TEXT,
     embedding_updated_at TEXT,
     created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
     updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
