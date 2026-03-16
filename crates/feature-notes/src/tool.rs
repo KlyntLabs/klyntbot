@@ -26,7 +26,7 @@ impl Tool for NotesTool {
     }
 
     fn description(&self) -> &str {
-        "Manage notes and notebooks. Actions: create_note, get_note, update_note, delete_note, list_notes, search_notes, tag_note, link_notes, create_notebook, list_notebooks."
+        "Manage notes and notebooks. Actions: create_note, get_note, update_note, delete_note, list_notes, search_notes, tag_note, link_notes, create_notebook, list_notebooks, archive_note, unarchive_note, list_archived, get_backlinks, capture_inbox, list_inbox, update_notebook."
     }
 
     fn parameters(&self) -> Value {
@@ -38,7 +38,10 @@ impl Tool for NotesTool {
                     "enum": [
                         "create_note", "get_note", "update_note", "delete_note",
                         "list_notes", "search_notes", "tag_note", "link_notes",
-                        "create_notebook", "list_notebooks"
+                        "create_notebook", "list_notebooks",
+                        "archive_note", "unarchive_note", "list_archived",
+                        "get_backlinks", "capture_inbox", "list_inbox",
+                        "update_notebook"
                     ],
                     "description": "Action to perform"
                 },
@@ -58,7 +61,9 @@ impl Tool for NotesTool {
                     "items": { "type": "string" },
                     "description": "Target note IDs for linking"
                 },
-                "icon": { "type": "string", "description": "Notebook icon emoji" }
+                "icon": { "type": "string", "description": "Notebook icon emoji" },
+                "content": { "type": "string", "description": "Content for inbox capture" },
+                "parent_id": { "type": "string", "description": "Parent notebook ID" }
             },
             "required": ["action"]
         })
@@ -79,6 +84,13 @@ impl Tool for NotesTool {
             "link_notes" => self.handle_link_notes(&p).await,
             "create_notebook" => self.handle_create_notebook(&p).await,
             "list_notebooks" => self.handle_list_notebooks().await,
+            "archive_note" => self.handle_archive_note(&p).await,
+            "unarchive_note" => self.handle_unarchive_note(&p).await,
+            "list_archived" => self.handle_list_archived().await,
+            "get_backlinks" => self.handle_get_backlinks(&p).await,
+            "capture_inbox" => self.handle_capture_inbox(&p).await,
+            "list_inbox" => self.handle_list_inbox().await,
+            "update_notebook" => self.handle_update_notebook(&p).await,
             _ => Err(ToolError::InvalidParams(format!("Unknown action: {action}")).into()),
         }
     }
@@ -275,6 +287,84 @@ impl NotesTool {
         Ok(format!("Created notebook \"{title}\" (id: {id})"))
     }
 
+    async fn handle_archive_note(&self, p: &ParamExtractor<'_>) -> Result<String> {
+        let id = p.required_str("id")?;
+        let row = self.repo.archive_note(id).await?;
+        Ok(format!("Archived note \"{}\" (id: {})", row.title, row.id))
+    }
+
+    async fn handle_unarchive_note(&self, p: &ParamExtractor<'_>) -> Result<String> {
+        let id = p.required_str("id")?;
+        let row = self.repo.unarchive_note(id).await?;
+        Ok(format!(
+            "Unarchived note \"{}\" (id: {})",
+            row.title, row.id
+        ))
+    }
+
+    async fn handle_list_archived(&self) -> Result<String> {
+        let rows = self.repo.list_archived_notes().await?;
+        if rows.is_empty() {
+            return Ok("No archived notes.".to_string());
+        }
+        let mut out = format!("{} archived note(s):\n", rows.len());
+        for row in &rows {
+            out.push_str(&format!("\n- **{}** ({})", row.title, row.id));
+        }
+        Ok(out)
+    }
+
+    async fn handle_get_backlinks(&self, p: &ParamExtractor<'_>) -> Result<String> {
+        let id = p.required_str("id")?;
+        let rows = self.repo.get_backlinks_with_context(id).await?;
+        if rows.is_empty() {
+            return Ok(format!("No backlinks for note {id}."));
+        }
+        let mut out = format!("{} backlink(s):\n", rows.len());
+        for (row, context) in &rows {
+            let ctx_str = context
+                .as_deref()
+                .map(|c| format!(" — {c}"))
+                .unwrap_or_default();
+            out.push_str(&format!("\n- **{}** ({}){}", row.title, row.id, ctx_str));
+        }
+        Ok(out)
+    }
+
+    async fn handle_capture_inbox(&self, p: &ParamExtractor<'_>) -> Result<String> {
+        let content = p.required_str("content")?;
+        let item = self.repo.create_inbox_item(content).await?;
+        Ok(format!("Captured inbox item (id: {})", item.id))
+    }
+
+    async fn handle_list_inbox(&self) -> Result<String> {
+        let items = self.repo.list_inbox_items().await?;
+        if items.is_empty() {
+            return Ok("Inbox is empty.".to_string());
+        }
+        let mut out = format!("{} inbox item(s):\n", items.len());
+        for item in &items {
+            let preview = match item.content.char_indices().nth(80) {
+                Some((i, _)) => format!("{}...", &item.content[..i]),
+                None => item.content.clone(),
+            };
+            out.push_str(&format!("\n- {} ({})", preview, item.id));
+        }
+        Ok(out)
+    }
+
+    async fn handle_update_notebook(&self, p: &ParamExtractor<'_>) -> Result<String> {
+        let id = p.required_str("id")?;
+        let title = p.optional_str("title")?;
+        let icon = p.optional_str("icon")?;
+        let parent_id = p.optional_str("parent_id")?.map(Some);
+        let row = self.repo.update_notebook(id, title, icon, parent_id).await?;
+        Ok(format!(
+            "Updated notebook \"{}\" (id: {})",
+            row.title, row.id
+        ))
+    }
+
     async fn handle_list_notebooks(&self) -> Result<String> {
         let rows = self.repo.list_notebooks().await?;
         if rows.is_empty() {
@@ -375,6 +465,62 @@ mod tests {
             .await
             .unwrap();
         assert!(result.contains("Work"));
+    }
+
+    #[tokio::test]
+    async fn test_archive_and_list_archived() {
+        let tool = setup().await;
+        // Create a note
+        let result = tool
+            .execute(
+                serde_json::json!({"action": "create_note", "title": "Archive Me", "body": "test"}),
+                &ctx(),
+            )
+            .await
+            .unwrap();
+        // Extract ID from "Created note \"Archive Me\" (id: <uuid>)"
+        let id = result.split("id: ").nth(1).unwrap().trim_end_matches(')');
+
+        // Archive it
+        let result = tool
+            .execute(
+                serde_json::json!({"action": "archive_note", "id": id}),
+                &ctx(),
+            )
+            .await
+            .unwrap();
+        assert!(result.contains("Archived"));
+
+        // Verify it appears in list_archived
+        let result = tool
+            .execute(serde_json::json!({"action": "list_archived"}), &ctx())
+            .await
+            .unwrap();
+        assert!(result.contains("Archive Me"));
+
+        // Verify it does NOT appear in regular list_notes
+        let result = tool
+            .execute(serde_json::json!({"action": "list_notes"}), &ctx())
+            .await
+            .unwrap();
+        assert!(!result.contains("Archive Me"));
+
+        // Unarchive it
+        let result = tool
+            .execute(
+                serde_json::json!({"action": "unarchive_note", "id": id}),
+                &ctx(),
+            )
+            .await
+            .unwrap();
+        assert!(result.contains("Unarchived"));
+
+        // Verify it's back in list_notes
+        let result = tool
+            .execute(serde_json::json!({"action": "list_notes"}), &ctx())
+            .await
+            .unwrap();
+        assert!(result.contains("Archive Me"));
     }
 
     #[tokio::test]
