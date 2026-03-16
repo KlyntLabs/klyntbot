@@ -129,6 +129,11 @@ impl AppCore {
                 .map_err(map_storage_err)?;
         }
 
+        // Extract links and mentions if the note has a body (e.g. wiki-link creation)
+        if !created.body.is_empty() {
+            extract_links_and_mentions(self, &id, &created).await?;
+        }
+
         // Emit domain event for timeline tracking
         if let Ok(bus) = self.domain_event_bus() {
             bus.publish(bus::DomainEvent::NoteCreated {

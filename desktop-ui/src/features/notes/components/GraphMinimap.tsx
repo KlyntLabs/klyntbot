@@ -1,3 +1,4 @@
+import { useEvent } from "@shared/hooks/useEvent";
 import { useQuery } from "@shared/hooks/useQuery";
 import { tagColor } from "@shared/lib/tagColor";
 import type { Note, NoteLink } from "@shared/types";
@@ -68,8 +69,17 @@ function getNeighborhood(centerId: string, links: NoteLink[], maxHops: number): 
 // ── Component ────────────────────────────────────────────────────────────
 
 export function GraphMinimap({ noteId, notes, onSelectNote, onExpandGraph }: GraphMinimapProps) {
-  const { data: links } = useQuery<NoteLink[]>("note_links_all", undefined, []);
+  const { data: links, refetch: refetchLinks } = useQuery<NoteLink[]>(
+    "note_links_all",
+    undefined,
+    [],
+  );
   const [collapsed, setCollapsed] = useState(false);
+
+  // Refetch graph links when any note is mutated
+  useEvent<{ entityKind: string }>("entity:updated", (payload) => {
+    if (payload.entityKind === "note") refetchLinks();
+  });
   const svgRef = useRef<SVGSVGElement>(null);
   const [, setTick] = useState(0);
   const nodesRef = useRef<MiniNode[]>([]);

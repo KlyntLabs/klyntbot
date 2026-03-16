@@ -242,6 +242,8 @@ export function WikiLinkMenu({ editor, currentNoteTitle }: WikiLinkMenuProps) {
       try {
         const body = currentNoteTitle ? `Linked from [[${currentNoteTitle}]]` : "";
         const newNote = await ipc<Note>("note_create", { params: { title, body } });
+        // Emit browser-side event for dev mode reactivity
+        window.dispatchEvent(new CustomEvent("entity:updated", { detail: { entityKind: "note" } }));
         if (newNote) {
           const cursorPos = editor.state.selection.from;
           editor

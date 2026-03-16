@@ -9,6 +9,19 @@ interface MutationResult<T, P> {
   error: ApiError | null;
 }
 
+/** Map command prefix to entity kind for automatic event dispatch. */
+function inferEntityKind(cmd: string): string | null {
+  if (cmd.startsWith("note_")) return "note";
+  if (cmd.startsWith("notebook_")) return "notebook";
+  if (cmd.startsWith("inbox_")) return "inbox";
+  if (cmd.startsWith("task_")) return "task";
+  if (cmd.startsWith("project_")) return "project";
+  return null;
+}
+
+/** Mutating commands — emit entity:updated after success so listeners react. */
+const MUTATING_VERBS = ["create", "update", "delete", "archive", "unarchive", "restore", "move"];
+
 /**
  * Wraps a Tauri command (or dev HTTP server) for write operations.
  *
@@ -36,6 +49,11 @@ export function useMutation<T = void, P = Record<string, unknown>>(
         ? { [wrapKeyRef.current]: params }
         : (params as Record<string, unknown>);
       const result = await ipc<T>(cmdRef.current, args);
+      // Emit browser-side entity event so useEvent listeners fire in dev mode
+      const entityKind = inferEntityKind(cmdRef.current);
+      if (entityKind && MUTATING_VERBS.some((v) => cmdRef.current.includes(v))) {
+        window.dispatchEvent(new CustomEvent("entity:updated", { detail: { entityKind } }));
+      }
       return result;
     } catch (e) {
       setError(parseApiError(e));

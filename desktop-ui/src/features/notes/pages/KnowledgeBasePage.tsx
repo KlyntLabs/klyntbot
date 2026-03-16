@@ -1,6 +1,6 @@
 import { useEvent } from "@shared/hooks/useEvent";
 import { useMutation } from "@shared/hooks/useMutation";
-import { useQuery } from "@shared/hooks/useQuery";
+import { invalidateQueries, useQuery } from "@shared/hooks/useQuery";
 import type {
   Note,
   Notebook,
@@ -307,10 +307,17 @@ export default function KnowledgeBasePage() {
 
   // ── Event refresh ─────────────────────────────────────────────────────
   useEvent<{ entityKind: string }>("entity:updated", (payload) => {
-    if (payload.entityKind === "note") refetchNotes();
+    if (payload.entityKind === "note") {
+      refetchNotes();
+      invalidateQueries("note_backlinks");
+      invalidateQueries("note_links_all");
+    }
     if (payload.entityKind === "notebook") {
       refetchNotebooks();
       refetchNotes();
+    }
+    if (payload.entityKind === "inbox") {
+      invalidateQueries("inbox_list");
     }
   });
 
