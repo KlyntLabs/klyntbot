@@ -1,5 +1,5 @@
-import { FocusBanner } from "@features/tasks/components/FocusBanner";
 import { SidebarChat } from "@shared/components/chat/SidebarChat";
+import { FocusBanner } from "@shared/components/focus/FocusBanner";
 import { useEvent } from "@shared/hooks/useEvent";
 import { ipc } from "@shared/hooks/useIpc";
 import type { AppInfoResponse, SidebarItem, Task } from "@shared/types";

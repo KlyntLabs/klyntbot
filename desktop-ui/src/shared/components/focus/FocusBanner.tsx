@@ -1,4 +1,4 @@
-import { useFocusSession } from "../hooks/useFocusSession";
+import { useFocusSession } from "@shared/hooks/useFocusSession";
 
 interface ActiveTask {
   id: string;

@@ -17,7 +17,7 @@ export const useViewStore = create<ViewState>()(
       setViewType: (viewType) => set({ viewType }),
     }),
     {
-      name: "tasks2-view-storage",
+      name: "tasks-view-storage",
       onRehydrateStorage: () => (state) => {
         if (state && !VALID_VIEW_TYPES.includes(state.viewType)) {
           state.viewType = "list";

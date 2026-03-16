@@ -1,5 +1,5 @@
-/* tasks2 component theme — always dark, maps to project's dark palette */
-.tasks2-scope {
+/* tasks component theme — always dark, maps to project's dark palette */
+.tasks-scope {
   --background: 240 10% 3.9%;
   --foreground: 0 0% 98%;
   --card: 240 10% 3.9%;

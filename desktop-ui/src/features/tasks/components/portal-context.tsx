@@ -14,7 +14,7 @@ export function PortalContainerProvider({ children }: { children: React.ReactNod
   return (
     <PortalContainerContext.Provider value={container}>
       {children}
-      <div ref={ref} className="tasks2-scope" />
+      <div ref={ref} className="tasks-scope" />
     </PortalContainerContext.Provider>
   );
 }

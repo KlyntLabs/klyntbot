@@ -159,7 +159,8 @@ export function NoteEditor({
   useEffect(() => {
     if (!editor) return;
     const handler = (e: Event) => {
-      const { title, noteId: targetId } = (e as CustomEvent<{ title: string; noteId: string }>).detail;
+      const { title, noteId: targetId } = (e as CustomEvent<{ title: string; noteId: string }>)
+        .detail;
       if (!title) return;
       editor
         .chain()

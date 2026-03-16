@@ -1,4 +1,4 @@
-import { MiniCalendar } from "@features/tasks";
+import { MiniCalendar } from "@shared/components/MiniCalendar";
 import { DataTable, type DataTableColumn } from "@shared/composites/DataTable";
 import { useMutation } from "@shared/hooks/useMutation";
 import { invalidateQueries, useQuery } from "@shared/hooks/useQuery";

@@ -15,20 +15,6 @@ const AutomationsPage = lazy(() =>
 // ── Tasks Feature ─────────────────────────────────────────────────
 const TasksPage = lazy(() => import("../features/tasks").then((m) => ({ default: m.TasksPage })));
 
-// ── Tasks2 Feature ────────────────────────────────────────────────
-const Tasks2Page = lazy(() =>
-  import("../features/tasks2").then((m) => ({ default: m.Tasks2Page })),
-);
-const ProjectDetailPage = lazy(() =>
-  import("../features/tasks").then((m) => ({ default: m.ProjectDetailPage })),
-);
-const TaskDetailPage = lazy(() =>
-  import("../features/tasks").then((m) => ({ default: m.TaskDetailPage })),
-);
-const ObjectiveDetailPage = lazy(() =>
-  import("../features/tasks").then((m) => ({ default: m.ObjectiveDetailPage })),
-);
-
 // ── Chat Feature ──────────────────────────────────────────────────
 const ChatPage = lazy(() => import("../features/chat").then((m) => ({ default: m.ChatPage })));
 
@@ -187,13 +173,9 @@ export const router = createHashRouter([
       { path: "/system", element: <SystemPage /> },
       { path: "/system/:tab", element: <SystemPage /> },
       { path: "/tasks", element: <TasksPage /> },
-      { path: "/tasks2", element: <Tasks2Page /> },
       { path: "/chat", element: <ChatPage /> },
       { path: "/notes", element: <KnowledgeBasePage /> },
       { path: "/automations", element: <AutomationsPage /> },
-      { path: "/project/:id", element: <ProjectDetailPage /> },
-      { path: "/task/:id", element: <TaskDetailPage /> },
-      { path: "/objective/:id", element: <ObjectiveDetailPage /> },
       // Redirect old routes
       { path: "/productivity", element: <Navigate to="/" replace /> },
       { path: "/productivity/day/:date", element: <Navigate to="/" replace /> },

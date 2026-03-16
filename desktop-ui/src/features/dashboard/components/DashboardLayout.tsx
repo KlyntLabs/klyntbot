@@ -2,7 +2,7 @@ import { AutoFocusToast } from "@features/productivity/components/AutoFocusToast
 import { DistractionInterventionBanner } from "@features/productivity/components/DistractionInterventionBanner";
 import { FocusStateIndicator } from "@features/productivity/components/FocusStateIndicator";
 import { FocusTrayIndicator } from "@features/productivity/components/FocusTrayIndicator";
-import { MiniCalendar } from "@features/tasks/components/editors/MiniCalendar";
+import { MiniCalendar } from "@shared/components/MiniCalendar";
 import { useClickOutside } from "@shared/hooks/useClickOutside";
 import { todayISO, toLocalISO } from "@shared/lib/dates";
 import { cn } from "@shared/lib/utils";
