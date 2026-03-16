@@ -479,9 +479,8 @@ function TreeContextMenu({
   onClose,
   ref,
 }: TreeContextMenuProps & { ref: React.Ref<HTMLDivElement> }) {
-  const [showMoveSubmenu, setShowMoveSubmenu] = useState(false);
-  const [showIconPicker, setShowIconPicker] = useState(false);
-  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [openSubmenu, setOpenSubmenu] = useState<string | null>(null);
+  const toggleSubmenu = (name: string) => setOpenSubmenu((prev) => (prev === name ? null : name));
 
   if (target.kind === "blank") {
     return (
@@ -544,8 +543,8 @@ function TreeContextMenu({
         <ContextMenuSubmenu
           icon={<Smile className="w-4 h-4" />}
           label="Change Icon"
-          open={showIconPicker}
-          onToggle={() => setShowIconPicker(!showIconPicker)}
+          open={openSubmenu === "icon"}
+          onToggle={() => toggleSubmenu("icon")}
           panelClassName="context-menu absolute left-full top-0 ml-1 py-1 w-[280px] animate-[menu-appear_100ms_ease-out]"
         >
           <div className="grid grid-cols-8 gap-1 p-2 max-h-56 overflow-y-auto">
@@ -581,8 +580,8 @@ function TreeContextMenu({
         <ContextMenuSubmenu
           icon={<Palette className="w-4 h-4" />}
           label="Change Color"
-          open={showColorPicker}
-          onToggle={() => setShowColorPicker(!showColorPicker)}
+          open={openSubmenu === "color"}
+          onToggle={() => toggleSubmenu("color")}
         >
           <div className="flex gap-1 p-2">
             {ITEM_COLORS.map((color) => (
@@ -684,8 +683,8 @@ function TreeContextMenu({
         <ContextMenuSubmenu
           icon={<FolderInput className="w-4 h-4" />}
           label="Move to..."
-          open={showMoveSubmenu}
-          onToggle={() => setShowMoveSubmenu(!showMoveSubmenu)}
+          open={openSubmenu === "move"}
+          onToggle={() => toggleSubmenu("move")}
         >
           <ContextMenuItem
             onClick={() => {
