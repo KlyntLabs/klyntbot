@@ -396,3 +396,51 @@ CREATE TABLE IF NOT EXISTS insight_persona_pins (
     created_at TEXT NOT NULL,
     PRIMARY KEY (note_id, persona_id)
 );
+
+-- ── Flashcards (FSRS spaced repetition) ─────────────────────────
+
+CREATE TABLE IF NOT EXISTS flashcards (
+    id TEXT PRIMARY KEY,
+    source_note_id TEXT,
+    source_session_id TEXT,
+    insight_review_id TEXT,
+    deck TEXT NOT NULL DEFAULT 'general',
+    question TEXT NOT NULL,
+    answer TEXT NOT NULL,
+    card_type TEXT NOT NULL DEFAULT 'short_answer',
+    choices JSON,
+    stability REAL NOT NULL DEFAULT 1.0,
+    difficulty REAL NOT NULL DEFAULT 0.5,
+    due_at TEXT,
+    last_reviewed_at TEXT,
+    review_count INTEGER NOT NULL DEFAULT 0,
+    lapses INTEGER NOT NULL DEFAULT 0,
+    state TEXT NOT NULL DEFAULT 'new',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_flashcards_source_note ON flashcards(source_note_id);
+CREATE INDEX IF NOT EXISTS idx_flashcards_due ON flashcards(due_at);
+CREATE INDEX IF NOT EXISTS idx_flashcards_deck ON flashcards(deck);
+CREATE INDEX IF NOT EXISTS idx_flashcards_insight ON flashcards(insight_review_id);
+
+-- ── Insight Review Cache ────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS insight_review_cache (
+    id TEXT PRIMARY KEY,
+    note_id TEXT NOT NULL,
+    content_hash TEXT NOT NULL,
+    version INTEGER NOT NULL DEFAULT 1,
+    synthesis TEXT,
+    gap_analysis TEXT,
+    self_assessment TEXT,
+    concept_map TEXT,
+    perspectives TEXT,
+    persona_ids JSON,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(note_id, content_hash)
+);
+
+CREATE INDEX IF NOT EXISTS idx_insight_cache_note ON insight_review_cache(note_id);
