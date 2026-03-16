@@ -8,8 +8,8 @@ impl NoteRepo {
 
     pub async fn create_note(&self, row: &NoteRow) -> Result<NoteRow, StorageError> {
         let result = sqlx::query_as::<_, NoteRow>(
-            "INSERT INTO notes (id, notebook_id, title, body, body_html, pinned, archived, icon, embedding_updated_at, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+            "INSERT INTO notes (id, notebook_id, title, body, body_html, pinned, archived, icon, color, embedding_updated_at, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
              RETURNING *",
         )
         .bind(&row.id)
@@ -20,6 +20,7 @@ impl NoteRepo {
         .bind(row.pinned)
         .bind(row.archived)
         .bind(&row.icon)
+        .bind(&row.color)
         .bind(&row.embedding_updated_at)
         .bind(&row.created_at)
         .bind(&row.updated_at)
@@ -83,9 +84,11 @@ impl NoteRepo {
         pinned: Option<bool>,
         notebook_id: Option<Option<&str>>,
         icon: Option<Option<&str>>,
+        color: Option<Option<&str>>,
     ) -> Result<NoteRow, StorageError> {
         let nb_sentinel = nullable_to_sentinel(notebook_id);
         let icon_sentinel = nullable_to_sentinel(icon);
+        let color_sentinel = nullable_to_sentinel(color);
         let row = sqlx::query_as::<_, NoteRow>(
             "UPDATE notes SET
                 title = COALESCE(?2, title),
@@ -102,6 +105,11 @@ impl NoteRepo {
                     WHEN ?7 = '' THEN NULL
                     ELSE ?7
                 END,
+                color = CASE
+                    WHEN ?8 IS NULL THEN color
+                    WHEN ?8 = '' THEN NULL
+                    ELSE ?8
+                END,
                 updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
              WHERE id = ?1
              RETURNING *",
@@ -113,6 +121,7 @@ impl NoteRepo {
         .bind(pinned.map(|p| p as i32))
         .bind(nb_sentinel)
         .bind(icon_sentinel)
+        .bind(color_sentinel)
         .fetch_one(&self.pool)
         .await?;
         Ok(row)
@@ -233,7 +242,7 @@ impl NoteRepo {
         let rows = sqlx::query_as::<_, NoteRow>(
             "WITH scored AS (
                SELECT n.id, n.notebook_id, n.title, n.body, n.body_html,
-                      n.pinned, n.archived, n.icon, n.embedding_updated_at,
+                      n.pinned, n.archived, n.icon, n.color, n.embedding_updated_at,
                       n.created_at, n.updated_at,
                       (CASE WHEN n.title LIKE ?1 ESCAPE '\\' THEN 3 ELSE 0 END
                        + CASE WHEN n.body LIKE ?1 ESCAPE '\\' THEN 1 ELSE 0 END
@@ -245,7 +254,7 @@ impl NoteRepo {
                WHERE n.archived = 0
              )
              SELECT id, notebook_id, title, body, body_html,
-                    pinned, archived, icon, embedding_updated_at, created_at, updated_at
+                    pinned, archived, icon, color, embedding_updated_at, created_at, updated_at
              FROM scored
              WHERE score > 0
              ORDER BY score DESC, updated_at DESC",
@@ -262,7 +271,7 @@ impl NoteRepo {
     pub async fn search_fts(&self, query: &str) -> Result<Vec<NoteSearchResult>, StorageError> {
         let rows = sqlx::query_as::<_, NoteSearchResult>(
             "SELECT n.id, n.notebook_id, n.title, n.body, n.body_html,
-                    n.pinned, n.archived, n.icon, n.embedding_updated_at,
+                    n.pinned, n.archived, n.icon, n.color, n.embedding_updated_at,
                     n.created_at, n.updated_at,
                     -bm25(notes_fts, 5.0, 1.0) AS rank
              FROM notes_fts fts

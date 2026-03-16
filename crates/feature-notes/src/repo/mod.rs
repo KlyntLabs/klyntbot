@@ -60,6 +60,7 @@ mod tests {
             pinned: 0,
             archived: 0,
             icon: None,
+            color: None,
             embedding_updated_at: None,
             created_at: now.clone(),
             updated_at: now,
@@ -97,7 +98,7 @@ mod tests {
             .unwrap();
 
         let updated = repo
-            .update_note("n1", Some("Updated"), None, None, Some(true), None, None)
+            .update_note("n1", Some("Updated"), None, None, Some(true), None, None, None)
             .await
             .unwrap();
         assert_eq!(updated.title, "Updated");

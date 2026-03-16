@@ -13,6 +13,7 @@ pub struct NoteResponse {
     pub pinned: bool,
     pub archived: bool,
     pub icon: Option<String>,
+    pub color: Option<String>,
     pub tags: Vec<String>,
     pub created_at: String,
     pub updated_at: String,
@@ -42,6 +43,9 @@ pub struct NoteUpdateParams {
     /// `None` = don't change, `Some(None)` = clear icon, `Some(Some(emoji))` = set icon
     #[serde(default, deserialize_with = "deserialize_nullable_field")]
     pub icon: Option<Option<String>>,
+    /// `None` = don't change, `Some(None)` = clear color, `Some(Some(hex))` = set color
+    #[serde(default, deserialize_with = "deserialize_nullable_field")]
+    pub color: Option<Option<String>>,
 }
 
 /// Deserializes a field that distinguishes between absent, null, and present.

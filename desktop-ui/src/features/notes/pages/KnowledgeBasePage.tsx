@@ -197,7 +197,7 @@ export default function KnowledgeBasePage() {
   );
 
   const handleUpdateNote = useCallback(
-    async (id: string, updates: { icon?: string | null }) => {
+    async (id: string, updates: { icon?: string | null; color?: string | null }) => {
       await updateNote({ id, ...updates });
     },
     [updateNote],

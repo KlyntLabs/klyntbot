@@ -85,7 +85,7 @@ interface NotebookTreeProps {
   onMoveNote: (id: string, notebookId: string | null) => void;
   onMoveNotebook: (id: string, parentId: string | null) => void;
   onUpdateNotebook: (id: string, updates: { icon?: string | null; color?: string | null }) => void;
-  onUpdateNote: (id: string, updates: { icon?: string | null }) => void;
+  onUpdateNote: (id: string, updates: { icon?: string | null; color?: string | null }) => void;
 }
 
 // Icon registry: name → Lucide component. Stored as string in DB.
@@ -115,10 +115,10 @@ const ICON_MAP: Record<string, LucideIcon> = {
 const ICON_NAMES = Object.keys(ICON_MAP);
 
 /** Render a stored icon name as a Lucide component */
-export function ItemIcon({ name, className }: { name: string; className?: string }) {
+export function ItemIcon({ name, className, style }: { name: string; className?: string; style?: React.CSSProperties }) {
   const Icon = ICON_MAP[name];
-  if (!Icon) return <FileText className={className} />;
-  return <Icon className={className} />;
+  if (!Icon) return <FileText className={className} style={style} />;
+  return <Icon className={className} style={style} />;
 }
 
 const ITEM_COLORS = [
@@ -242,6 +242,7 @@ export function NotebookTree({
               title: n.title,
               depth: depth + 1,
               icon: n.icon ?? undefined,
+              color: n.color ?? undefined,
               pinned: n.pinned,
               updatedAt: n.updatedAt,
             });
@@ -262,6 +263,7 @@ export function NotebookTree({
         title: n.title,
         depth: 0,
         icon: n.icon ?? undefined,
+        color: n.color ?? undefined,
         pinned: n.pinned,
         updatedAt: n.updatedAt,
       });
@@ -403,9 +405,19 @@ export function NotebookTree({
                 />
               )}
 
-              {/* Icon */}
+              {/* Icon: Lucide icon name, color hex (#xxx), or default */}
               {item.icon && ICON_MAP[item.icon] ? (
-                <ItemIcon name={item.icon} className={`w-3.5 h-3.5 shrink-0 ${isSelected ? "text-brand" : "text-secondary"}`} />
+                <ItemIcon name={item.icon} className={`w-3.5 h-3.5 shrink-0 ${item.color ? "" : isSelected ? "text-brand" : "text-secondary"}`} style={item.color ? { color: item.color } : undefined} />
+              ) : item.icon?.startsWith("#") ? (
+                isFolder ? (
+                  item.isExpanded ? (
+                    <FolderOpen className="w-3.5 h-3.5 shrink-0" style={{ color: item.icon }} />
+                  ) : (
+                    <FolderClosed className="w-3.5 h-3.5 shrink-0" style={{ color: item.icon }} />
+                  )
+                ) : (
+                  <FileText className="w-3.5 h-3.5 shrink-0" style={{ color: item.icon }} />
+                )
               ) : isFolder ? (
                 item.isExpanded ? (
                   <FolderOpen
@@ -422,7 +434,8 @@ export function NotebookTree({
                 <Pin className="w-3 h-3 shrink-0 text-brand" />
               ) : (
                 <FileText
-                  className={`w-3.5 h-3.5 shrink-0 ${isSelected ? "text-brand/70" : "text-dim"}`}
+                  className={`w-3.5 h-3.5 shrink-0 ${item.color ? "" : isSelected ? "text-brand/70" : "text-dim"}`}
+                  style={item.color ? { color: item.color } : undefined}
                 />
               )}
 
@@ -508,7 +521,7 @@ interface TreeContextMenuProps {
   onDeleteNotebook: (id: string) => void;
   onMoveNote: (id: string, notebookId: string | null) => void;
   onUpdateNotebook: (id: string, updates: { icon?: string | null; color?: string | null }) => void;
-  onUpdateNote: (id: string, updates: { icon?: string | null }) => void;
+  onUpdateNote: (id: string, updates: { icon?: string | null; color?: string | null }) => void;
   onClose: () => void;
 }
 
@@ -595,46 +608,51 @@ function TreeContextMenu({
           onToggle={() => toggleSubmenu("appearance")}
           panelClassName="context-menu absolute left-full top-0 ml-1 py-1 w-[280px] animate-[menu-appear_100ms_ease-out]"
         >
-          {/* Lucide icons */}
-          <div className="grid grid-cols-6 gap-0.5 p-2 max-h-48 overflow-y-auto">
+          {/* Icon grid — colored by current notebook color */}
+          <div className="grid grid-cols-6 gap-1 p-2.5">
             {ICON_NAMES.map((name) => {
               const Icon = ICON_MAP[name];
+              const isActive = target.notebook.icon === name;
               return (
                 <button
                   key={name}
                   type="button"
                   onClick={() => {
-                    onUpdateNotebook(target.notebook.id, { icon: name, color: null });
+                    onUpdateNotebook(target.notebook.id, { icon: name });
                     onClose();
                   }}
                   className={`w-8 h-8 rounded-md flex items-center justify-center hover:bg-white/[0.1] transition-colors ${
-                    target.notebook.icon === name ? "bg-white/[0.12] ring-1 ring-brand/40" : ""
+                    isActive ? "bg-white/[0.12] ring-1 ring-brand/40" : ""
                   }`}
                   title={name}
                 >
-                  <Icon className="w-4 h-4 text-secondary" />
+                  <Icon className="w-4 h-4" style={target.notebook.color ? { color: target.notebook.color } : undefined} />
                 </button>
               );
             })}
           </div>
-          {/* Divider + color row */}
+          {/* Color row — tints the icon */}
           <div className="h-px bg-white/[0.08] mx-2" />
-          <div className="flex items-center gap-1.5 px-2 py-2">
+          <div className="flex items-center gap-1.5 px-2.5 py-2">
             {ITEM_COLORS.map((color) => (
               <button
                 key={color ?? "none"}
                 type="button"
                 onClick={() => {
-                  onUpdateNotebook(target.notebook.id, color ? { color, icon: null } : { color: null, icon: null });
+                  if (!color) {
+                    onUpdateNotebook(target.notebook.id, { color: null, icon: null });
+                  } else {
+                    onUpdateNotebook(target.notebook.id, { color });
+                  }
                   onClose();
                 }}
                 className={`w-5 h-5 rounded-full border transition-transform hover:scale-125 ${
-                  (color === null && !target.notebook.icon && !target.notebook.color) || target.notebook.color === color
+                  target.notebook.color === color && color !== null
                     ? "ring-2 ring-white/60 ring-offset-1 ring-offset-black"
                     : ""
                 } ${!color ? "border-white/20 bg-transparent" : "border-transparent"}`}
                 style={color ? { backgroundColor: color } : undefined}
-                title={color ?? "Default"}
+                title={color ?? "Reset"}
               >
                 {!color && <span className="text-[8px] text-dim">×</span>}
               </button>
@@ -680,7 +698,7 @@ function TreeContextMenu({
         {note.pinned ? "Unpin" : "Pin"}
       </ContextMenuItem>
 
-      {/* Appearance picker for notes (icons + reset) */}
+      {/* Appearance picker for notes (icons + colors) */}
       <ContextMenuSubmenu
         icon={<Palette className="w-4 h-4" />}
         label="Appearance"
@@ -688,9 +706,11 @@ function TreeContextMenu({
         onToggle={() => toggleSubmenu("appearance")}
         panelClassName="context-menu absolute left-full top-0 ml-1 py-1 w-[280px] animate-[menu-appear_100ms_ease-out]"
       >
-        <div className="grid grid-cols-6 gap-0.5 p-2 max-h-48 overflow-y-auto">
+        {/* Icon grid — colored by current note color */}
+        <div className="grid grid-cols-6 gap-1 p-2.5">
           {ICON_NAMES.map((name) => {
             const Icon = ICON_MAP[name];
+            const isActive = note.icon === name;
             return (
               <button
                 key={name}
@@ -700,27 +720,42 @@ function TreeContextMenu({
                   onClose();
                 }}
                 className={`w-8 h-8 rounded-md flex items-center justify-center hover:bg-white/[0.1] transition-colors ${
-                  note.icon === name ? "bg-white/[0.12] ring-1 ring-brand/40" : ""
+                  isActive ? "bg-white/[0.12] ring-1 ring-brand/40" : ""
                 }`}
                 title={name}
               >
-                <Icon className="w-4 h-4 text-secondary" />
+                <Icon className="w-4 h-4" style={note.color ? { color: note.color } : undefined} />
               </button>
             );
           })}
         </div>
-        {/* Reset button */}
+        {/* Color row — tints the icon */}
         <div className="h-px bg-white/[0.08] mx-2" />
-        <button
-          type="button"
-          onClick={() => {
-            onUpdateNote(note.id, { icon: null });
-            onClose();
-          }}
-          className="w-full px-3 py-1.5 text-xs text-dim hover:text-muted hover:bg-white/[0.06] text-left transition-colors"
-        >
-          Reset to default
-        </button>
+        <div className="flex items-center gap-1.5 px-2.5 py-2">
+          {ITEM_COLORS.map((color) => (
+            <button
+              key={color ?? "none"}
+              type="button"
+              onClick={() => {
+                if (!color) {
+                  onUpdateNote(note.id, { color: null, icon: null });
+                } else {
+                  onUpdateNote(note.id, { color });
+                }
+                onClose();
+              }}
+              className={`w-5 h-5 rounded-full border transition-transform hover:scale-125 ${
+                note.color === color && color !== null
+                  ? "ring-2 ring-white/60 ring-offset-1 ring-offset-black"
+                  : ""
+              } ${!color ? "border-white/20 bg-transparent" : "border-transparent"}`}
+              style={color ? { backgroundColor: color } : undefined}
+              title={color ?? "Reset"}
+            >
+              {!color && <span className="text-[8px] text-dim">×</span>}
+            </button>
+          ))}
+        </div>
       </ContextMenuSubmenu>
 
       {folders.length > 0 && (

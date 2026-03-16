@@ -33,7 +33,7 @@ interface NavigationSidebarProps {
   onMoveNote: (id: string, notebookId: string | null) => void;
   onMoveNotebook: (id: string, parentId: string | null) => void;
   onUpdateNotebook: (id: string, updates: { icon?: string | null; color?: string | null }) => void;
-  onUpdateNote: (id: string, updates: { icon?: string | null }) => void;
+  onUpdateNote: (id: string, updates: { icon?: string | null; color?: string | null }) => void;
   inboxItems: InboxItem[];
   onInboxCreateAsNote: (content: string) => void;
   onInboxDiscard: (id: string) => void;
