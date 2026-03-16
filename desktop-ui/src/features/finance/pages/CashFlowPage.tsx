@@ -39,20 +39,20 @@ export function CashFlowPage() {
   // ── Period-scoped queries ──────────────────────────────────────
   const { data: periodSummary, refetch: rPS } = useQuery<FinancePeriodSummary>(
     "finance_period_summary",
-    { dateFrom: period.dateFrom, dateTo: period.dateTo },
+    { date_from: period.dateFrom, date_to: period.dateTo },
     { income: 0, spending: 0 },
   );
 
   const { data: dailySpendingResp, refetch: rDS } =
     useQuery<FinanceDailySpendingResponse>(
       "finance_daily_spending",
-      { dateFrom: period.dateFrom, dateTo: period.dateTo },
+      { date_from: period.dateFrom, date_to: period.dateTo },
       { days: [] },
     );
 
   const { data: spendingReport, refetch: rSR } = useQuery<FinanceCategoryReport>(
     "finance_report_spending",
-    { dateFrom: period.dateFrom, dateTo: period.dateTo },
+    { date_from: period.dateFrom, date_to: period.dateTo },
     { total: 0, breakdown: [] },
   );
 
