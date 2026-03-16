@@ -16,8 +16,7 @@ const subNav = [
   { label: "Dashboard", path: "/finance" },
   { label: "Cash Flow", path: "/finance/cashflow" },
   { label: "Investments", path: "/finance/investments" },
-  { label: "Goals", path: "/finance/goals" },
-  { label: "Liabilities", path: "/finance/liabilities" },
+  { label: "Targets", path: "/finance/targets" },
 ];
 
 export function FinanceLayout({

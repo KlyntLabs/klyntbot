@@ -309,7 +309,7 @@ export function Finance() {
               <div className="flex items-center justify-between mb-2.5 px-1">
                 <span className="text-[10px] text-muted uppercase tracking-widest">Goals</span>
                 <Link
-                  to="/finance/goals"
+                  to="/finance/targets"
                   className="text-[10px] text-brand normal-case tracking-normal"
                 >
                   View all →
@@ -431,7 +431,7 @@ export function Finance() {
                   Liabilities
                 </span>
                 <Link
-                  to="/finance/liabilities"
+                  to="/finance/targets"
                   className="text-[10px] text-brand normal-case tracking-normal"
                 >
                   View all →

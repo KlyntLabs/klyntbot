@@ -45,9 +45,8 @@ const CashFlowPage = lazy(() =>
 const InvestmentsPage = lazy(() =>
   import("../features/finance").then((m) => ({ default: m.InvestmentsPage })),
 );
-const GoalsPage = lazy(() => import("../features/finance").then((m) => ({ default: m.GoalsPage })));
-const LiabilitiesPage = lazy(() =>
-  import("../features/finance").then((m) => ({ default: m.LiabilitiesPage })),
+const TargetsPage = lazy(() =>
+  import("../features/finance").then((m) => ({ default: m.TargetsPage })),
 );
 
 // ── System Feature ───────────────────────────────────────────────
@@ -201,8 +200,9 @@ export const router = createHashRouter([
       { path: "/finance/transactions", element: <Navigate to="/finance/cashflow" replace /> },
       { path: "/finance/budgets", element: <Navigate to="/finance/cashflow" replace /> },
       { path: "/finance/investments", element: <InvestmentsPage /> },
-      { path: "/finance/goals", element: <GoalsPage /> },
-      { path: "/finance/liabilities", element: <LiabilitiesPage /> },
+      { path: "/finance/targets", element: <TargetsPage /> },
+      { path: "/finance/goals", element: <Navigate to="/finance/targets" replace /> },
+      { path: "/finance/liabilities", element: <Navigate to="/finance/targets" replace /> },
       { path: "/debug", element: <Navigate to="/system/events" replace /> },
       { path: "/settings", element: <Navigate to="/settings/general" replace /> },
       {
