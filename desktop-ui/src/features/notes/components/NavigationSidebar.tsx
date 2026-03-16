@@ -178,6 +178,7 @@ export function NavigationSidebar({
             selectedNoteId={selectedNoteId}
             onSelectNote={onSelectNote}
             onPinNote={onPinNote}
+            onDeleteNote={onDeleteNote}
           />
 
           {/* 3. Tags Explorer */}

@@ -62,7 +62,6 @@ type ContextTarget =
 
 const INDENT = 16;
 const ROOT_ID = "root";
-const UNFILED_ID = "__unfiled__";
 
 // ── Main Component ───────────────────────────────────────────────────
 
@@ -99,16 +98,12 @@ export function NotebookTree({
   }, [notes]);
 
   const unfiledNotes = useMemo(() => notes.filter((n) => !n.notebookId && !n.archived), [notes]);
-  const hasUnfiled = unfiledNotes.length > 0;
 
   // Data map for tree items
   const dataMap = useMemo(() => {
     const m: Record<string, TreeNodeData> = {
       [ROOT_ID]: { type: "root", id: ROOT_ID, title: "Root" },
     };
-    if (hasUnfiled) {
-      m[UNFILED_ID] = { type: "notebook", id: UNFILED_ID, title: "Unfiled" };
-    }
     for (const nb of notebooks) {
       m[nb.id] = {
         type: "notebook",
@@ -130,13 +125,13 @@ export function NotebookTree({
       }
     }
     return m;
-  }, [notebooks, notes, hasUnfiled]);
+  }, [notebooks, notes]);
 
   // Children map for tree structure
   const childrenMap = useMemo(() => {
     const m: Record<string, string[]> = {};
 
-    // Root children: top-level notebooks + unfiled section
+    // Root children: top-level notebooks + unfiled notes at root level
     const rootChildren: string[] = [];
     for (const nb of notebooks) {
       if (!nb.parentId) rootChildren.push(nb.id);
@@ -146,7 +141,9 @@ export function NotebookTree({
       const nb2 = notebookMap.get(b);
       return (na?.title ?? "").localeCompare(nb2?.title ?? "");
     });
-    if (hasUnfiled) rootChildren.push(UNFILED_ID);
+    // Append unfiled notes directly at root, below notebooks
+    const sortedUnfiled = [...unfiledNotes].sort((a, b) => a.title.localeCompare(b.title));
+    for (const n of sortedUnfiled) rootChildren.push(`note:${n.id}`);
     m[ROOT_ID] = rootChildren;
 
     // Notebook children: sub-notebooks + notes in this notebook
@@ -169,15 +166,8 @@ export function NotebookTree({
       m[nb.id] = children;
     }
 
-    // Unfiled children
-    if (hasUnfiled) {
-      m[UNFILED_ID] = unfiledNotes
-        .sort((a, b) => a.title.localeCompare(b.title))
-        .map((n) => `note:${n.id}`);
-    }
-
     return m;
-  }, [notebooks, notes, notebookMap, hasUnfiled, unfiledNotes]);
+  }, [notebooks, notes, notebookMap, unfiledNotes]);
 
   const allFolders = useMemo(
     () => notebooks.map((nb) => ({ id: nb.id, title: nb.title })),
@@ -191,16 +181,10 @@ export function NotebookTree({
       for (const item of droppedItems) {
         const data = item.getItemData();
         if (data.type === "note") {
-          const newNotebookId =
-            targetData.type === "notebook"
-              ? targetData.id === UNFILED_ID
-                ? null
-                : targetData.id
-              : null;
+          const newNotebookId = targetData.type === "notebook" ? targetData.id : null;
           onMoveNote(data.id, newNotebookId);
-        } else if (data.type === "notebook" && data.id !== UNFILED_ID) {
-          const newParentId =
-            targetData.type === "notebook" && targetData.id !== UNFILED_ID ? targetData.id : null;
+        } else if (data.type === "notebook") {
+          const newParentId = targetData.type === "notebook" ? targetData.id : null;
           onMoveNotebook(data.id, newParentId);
         }
       }
@@ -213,7 +197,7 @@ export function NotebookTree({
       const data = item.getItemData();
       const trimmed = value.trim();
       if (!trimmed) return;
-      if (data.type === "notebook" && data.id !== UNFILED_ID) {
+      if (data.type === "notebook") {
         onRenameNotebook(data.id, trimmed);
       } else if (data.type === "note") {
         onRenameNote(data.id, trimmed);
@@ -241,13 +225,13 @@ export function NotebookTree({
     canDrag: (items) => {
       return items.every((item) => {
         const data = item.getItemData();
-        return data.id !== ROOT_ID && data.id !== UNFILED_ID;
+        return data.id !== ROOT_ID;
       });
     },
     onRename: handleRename,
     canRename: (item) => {
       const data = item.getItemData();
-      return data.id !== ROOT_ID && data.id !== UNFILED_ID;
+      return data.id !== ROOT_ID;
     },
     features: [
       syncDataLoaderFeature,
@@ -324,7 +308,6 @@ export function NotebookTree({
           const data = item.getItemData();
           const isFolder = item.isFolder();
           const isNote = data.type === "note";
-          const isUnfiled = data.id === UNFILED_ID;
           const level = item.getItemMeta().level;
           const isSelected = isNote && data.id === selectedNoteId;
           const isRenaming = item.isRenaming();
@@ -354,17 +337,13 @@ export function NotebookTree({
               )}
 
               {/* Icon */}
-              {isFolder && !isUnfiled && data.icon ? (
+              {isFolder && data.icon ? (
                 <span className="text-sm shrink-0 w-4 text-center">{data.icon}</span>
               ) : isFolder ? (
                 item.isExpanded() ? (
-                  <FolderOpen
-                    className={`w-3.5 h-3.5 shrink-0 ${isUnfiled ? "text-dim/50" : "text-brand/60"}`}
-                  />
+                  <FolderOpen className="w-3.5 h-3.5 shrink-0 text-brand/60" />
                 ) : (
-                  <FolderClosed
-                    className={`w-3.5 h-3.5 shrink-0 ${isUnfiled ? "text-dim/50" : "text-brand/60"}`}
-                  />
+                  <FolderClosed className="w-3.5 h-3.5 shrink-0 text-brand/60" />
                 )
               ) : isNote && data.pinned ? (
                 <Pin className="w-3 h-3 shrink-0 text-brand" />
@@ -391,11 +370,9 @@ export function NotebookTree({
               ) : (
                 <span
                   className={`truncate flex-1 ${
-                    isFolder && isUnfiled
+                    data.title === "Untitled" || data.title === "New Folder"
                       ? "text-dim italic"
-                      : data.title === "Untitled" || data.title === "New Folder"
-                        ? "text-dim italic"
-                        : ""
+                      : ""
                   }`}
                 >
                   {data.title}
