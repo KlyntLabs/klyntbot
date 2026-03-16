@@ -7,10 +7,12 @@ pub enum MemorySource {
     CognitiveFact,
     /// Past conversation message (time-decay scored).
     ConversationRecall,
+    /// Domain-specific search result (notes, tasks, finance, graph).
+    Domain { name: String },
 }
 
 /// A single retrieved memory entry.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MemoryEntry {
     /// Unique identifier (e.g., todo ID or memory key).
     pub id: String,
