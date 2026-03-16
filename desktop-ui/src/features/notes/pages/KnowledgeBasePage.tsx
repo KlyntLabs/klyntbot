@@ -14,7 +14,10 @@ import { useSearchParams } from "react-router";
 import { ContextPanel } from "../components/ContextPanel";
 import { GraphView } from "../components/GraphView";
 import { NavigationSidebar, type NavigationSidebarHandle } from "../components/NavigationSidebar";
+import { NoteCreationDialog } from "../components/NoteCreationDialog";
 import { NoteEditorPanel } from "../components/NoteEditorPanel";
+import { VersionHistoryOverlay } from "../components/VersionHistoryOverlay";
+import { useInbox } from "../hooks/useInbox";
 
 type ViewMode = "editor" | "graph";
 type LayoutMode = "three-panel" | "focus";
@@ -56,11 +59,14 @@ export default function KnowledgeBasePage() {
     [],
   );
   const { data: notes, refetch: refetchNotes } = useQuery<Note[]>("note_list", undefined, []);
+  const { items: inboxItems, deleteItem: deleteInboxItem } = useInbox();
 
   // ── Core state ────────────────────────────────────────────────────────
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("editor");
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("three-panel");
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
 
   // ── Sidebar widths (imperatively managed for perf) ────────────────────
@@ -112,6 +118,14 @@ export default function KnowledgeBasePage() {
         notebookId,
       });
       if (result) setSelectedNoteId(result.id);
+    },
+    [createNote],
+  );
+
+  const handleCreateNoteWithTitle = useCallback(
+    async (title: string) => {
+      const result = await createNote({ title });
+      return result ? { id: result.id } : undefined;
     },
     [createNote],
   );
@@ -173,6 +187,21 @@ export default function KnowledgeBasePage() {
       await updateNotebook({ id, parentId });
     },
     [updateNotebook],
+  );
+
+  const handleInboxCreateAsNote = useCallback(
+    async (content: string) => {
+      const result = await createNote({ title: content.slice(0, 60), body: content });
+      if (result) setSelectedNoteId(result.id);
+    },
+    [createNote],
+  );
+
+  const handleInboxDiscard = useCallback(
+    async (id: string) => {
+      await deleteInboxItem({ id });
+    },
+    [deleteInboxItem],
   );
 
   // ── Resize logic (left sidebar) ───────────────────────────────────────
@@ -247,7 +276,15 @@ export default function KnowledgeBasePage() {
 
       if (e.key === "n" && !e.shiftKey) {
         e.preventDefault();
+        setShowCreateDialog(true);
+      } else if (e.key === "n" && e.shiftKey) {
+        // Cmd+Shift+N: create blank note immediately
+        e.preventDefault();
         handleCreateNoteRef.current();
+      } else if ((e.key === "h" || e.key === "H") && e.shiftKey && selectedNoteIdRef.current) {
+        // Cmd+Shift+H: toggle version history
+        e.preventDefault();
+        setShowVersionHistory((prev) => !prev);
       } else if (e.key === "Backspace" && selectedNoteIdRef.current) {
         e.preventDefault();
         handleDeleteRef.current(selectedNoteIdRef.current);
@@ -309,6 +346,9 @@ export default function KnowledgeBasePage() {
               onRenameNote={handleRenameNote}
               onMoveNote={handleMoveNote}
               onMoveNotebook={handleMoveNotebook}
+              inboxItems={inboxItems}
+              onInboxCreateAsNote={handleInboxCreateAsNote}
+              onInboxDiscard={handleInboxDiscard}
             />
           </div>
 
@@ -408,6 +448,27 @@ export default function KnowledgeBasePage() {
             onExpandGraph={() => setViewMode("graph")}
           />
         </div>
+      )}
+
+      {/* Note Creation Dialog */}
+      <NoteCreationDialog
+        isOpen={showCreateDialog}
+        onClose={() => setShowCreateDialog(false)}
+        onCreate={handleCreateNoteWithTitle}
+        onNavigateNote={setSelectedNoteId}
+      />
+
+      {/* Version History Overlay */}
+      {showVersionHistory && selectedNote && (
+        <VersionHistoryOverlay
+          noteId={selectedNote.id}
+          currentBody={selectedNote.body}
+          onClose={() => setShowVersionHistory(false)}
+          onRestore={() => {
+            refetchNotes();
+            setShowVersionHistory(false);
+          }}
+        />
       )}
     </div>
   );
