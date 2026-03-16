@@ -16,7 +16,6 @@ import { ArrowDownRight, ArrowLeftRight, ArrowUpRight, Plus, Wallet } from "luci
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card, CardHeader } from "../components/Card";
 import { CashFlowStats } from "../components/CashFlowStats";
-import { CategoryRanking } from "../components/CategoryRanking";
 import { DaySummary } from "../components/DaySummary";
 import { FinanceLayout } from "../components/FinanceLayout";
 import { FormField, fieldClass } from "../components/FormModal";
@@ -27,7 +26,7 @@ import { useFinanceCurrency } from "../hooks/useFinanceCurrency";
 import { usePeriodState } from "../hooks/usePeriodState";
 import { usePrivacyMode } from "../hooks/usePrivacyMode";
 import { displayAmount } from "../lib/displayAmount";
-import { ACCT_ICONS, pct } from "../lib/finance";
+import { ACCT_ICONS, COLORS, fmtCompact, pct } from "../lib/finance";
 import { computeHeatmapLevels } from "../lib/heatmapColors";
 
 export function CashFlowPage() {
@@ -139,11 +138,42 @@ export function CashFlowPage() {
     };
   }, [period.selectedDay, dailySpendingResp, transactions]);
 
-  // ── Category ranking data (map amount → total) ───────────────
-  const categoryBreakdown = useMemo(
-    () => spendingReport.breakdown.map((b) => ({ category: b.category, total: b.amount })),
-    [spendingReport],
-  );
+  // ── Merged spending + budget data ────────────────────────────
+  const spendingWithBudgets = useMemo(() => {
+    const activeBudgets = budgets.filter((b) => b.isActive);
+    const budgetByCategory = new Map(
+      activeBudgets.filter((b) => b.category).map((b) => [b.category!, b]),
+    );
+
+    // Start with spending categories
+    const merged: {
+      category: string;
+      spent: number;
+      budget: FinanceBudgetUsage | null;
+      pct: number;
+    }[] = spendingReport.breakdown.map((item) => {
+      const bud = budgetByCategory.get(item.category);
+      if (bud) budgetByCategory.delete(item.category);
+      return {
+        category: item.category,
+        spent: item.amount,
+        budget: bud ?? null,
+        pct: item.pct,
+      };
+    });
+
+    // Add budgets with no spending this period
+    for (const [, bud] of budgetByCategory) {
+      merged.push({
+        category: bud.category ?? bud.name,
+        spent: 0,
+        budget: bud,
+        pct: 0,
+      });
+    }
+
+    return merged;
+  }, [spendingReport, budgets]);
 
   // ── Add Transaction panel ─────────────────────────────────────
   const [panelOpen, setPanelOpen] = useState(false);
@@ -214,17 +244,6 @@ export function CashFlowPage() {
       <div className="flex gap-4 mt-4">
         {/* Left column — scrollable main content */}
         <div className="flex-1 min-w-0 space-y-4">
-          {/* Category ranking */}
-          <Card className="p-4">
-            <CardHeader title="Spending by Category" />
-            <CategoryRanking
-              breakdown={categoryBreakdown}
-              displayCur={displayCur}
-              convertTotal={convertTotal}
-              hidden={hidden}
-            />
-          </Card>
-
           {/* Day summary (shown when a day is selected) */}
           {period.selectedDay && selectedDayData && (
             <DaySummary
@@ -404,27 +423,71 @@ export function CashFlowPage() {
             })}
           </Card>
 
-          {/* Budget status sidebar */}
-          <Card className="p-3">
-            <p className="text-[10px] text-muted uppercase tracking-widest mb-2">Budget Status</p>
-            {budgets.filter((b) => b.isActive).map((b) => {
-              const p = pct(b.spent, b.amount);
-              const color = p >= 80 ? "#f43f5e" : p >= 50 ? "#f97316" : "#34d399";
+          {/* Spending & Budgets (merged) */}
+          <Card className="overflow-hidden">
+            <div className="px-3 pt-3 pb-1">
+              <p className="text-[10px] text-muted uppercase tracking-widest">Spending & Budgets</p>
+            </div>
+            {spendingWithBudgets.map((item, i) => {
+              const budgetAmt = item.budget?.amount ?? 0;
+              const budgetPct = budgetAmt > 0 ? pct(item.spent, budgetAmt) : 0;
+              const barColor =
+                budgetAmt > 0
+                  ? budgetPct >= 80
+                    ? "#f43f5e"
+                    : budgetPct >= 50
+                      ? "#f97316"
+                      : "#34d399"
+                  : COLORS[i % COLORS.length];
+              const barWidth = budgetAmt > 0 ? Math.min(budgetPct, 100) : item.pct;
+
               return (
-                <div key={b.id} className="mb-2 last:mb-0">
-                  <div className="flex justify-between text-[10px] mb-1">
-                    <span className="text-secondary">{b.name}</span>
-                    <span style={{ color }}>{p}%</span>
+                <div
+                  key={item.category}
+                  className="px-3 py-2 border-b border-white/[0.04] last:border-b-0"
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-1.5">
+                      <div
+                        className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: COLORS[i % COLORS.length] }}
+                      />
+                      <span className="text-[10px] text-secondary capitalize">{item.category}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-primary tabular-nums">
+                        {fmtCompact(convertTotal(item.spent), displayCur, hidden)}
+                      </span>
+                      {item.budget && (
+                        <span className="text-[9px] text-dim tabular-nums">
+                          / {fmtCompact(convertTotal(item.budget.amount), displayCur, hidden)}
+                        </span>
+                      )}
+                      <span
+                        className="text-[9px] font-light tabular-nums min-w-[28px] text-right"
+                        style={{ color: barColor }}
+                      >
+                        {budgetAmt > 0 ? `${budgetPct}%` : `${item.pct}%`}
+                      </span>
+                    </div>
                   </div>
                   <div className="h-1 bg-white/[0.06] rounded-full">
                     <div
                       className="h-full rounded-full"
-                      style={{ width: `${Math.min(p, 100)}%`, background: color }}
+                      style={{ width: `${barWidth}%`, background: barColor }}
                     />
                   </div>
+                  {item.budget && budgetPct >= 80 && (
+                    <p className="text-[8px] text-destructive mt-0.5">
+                      ⚠ {budgetPct >= 100 ? "Over budget" : `${100 - budgetPct}% left`}
+                    </p>
+                  )}
                 </div>
               );
             })}
+            {spendingWithBudgets.length === 0 && (
+              <p className="px-3 py-4 text-[10px] text-dim text-center">No spending this period</p>
+            )}
           </Card>
         </div>
       </div>
