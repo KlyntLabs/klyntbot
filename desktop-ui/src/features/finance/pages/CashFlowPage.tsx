@@ -467,7 +467,7 @@ export function CashFlowPage() {
                         className="text-[9px] font-light tabular-nums min-w-[28px] text-right"
                         style={{ color: barColor }}
                       >
-                        {budgetAmt > 0 ? `${budgetPct}%` : `${item.pct}%`}
+                        {budgetAmt > 0 ? `${budgetPct}%` : `${Math.round(item.pct)}%`}
                       </span>
                     </div>
                   </div>
