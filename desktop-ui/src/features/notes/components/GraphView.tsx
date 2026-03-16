@@ -1,5 +1,5 @@
-import { useQuery } from "@shared/hooks/useQuery";
-import type { Note, NoteLink } from "@shared/types";
+import { tagColor } from "@shared/lib/tagColor";
+import type { Note } from "@shared/types";
 import {
   forceCenter,
   forceCollide,
@@ -7,23 +7,20 @@ import {
   forceManyBody,
   forceSimulation,
   type Simulation,
-  type SimulationNodeDatum,
 } from "d3-force";
 import { Maximize2, Minus, Plus } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import {
+  type GraphLink,
+  type GraphNode,
+  type SmartView,
+  useGraphData,
+} from "../hooks/useGraphData";
+import { GraphNodeTooltip } from "./GraphNodeTooltip";
+import { GraphToolbar } from "./GraphToolbar";
 
 // ── Types ────────────────────────────────────────────────────────────────
-
-interface GraphNode extends SimulationNodeDatum {
-  id: string;
-  title: string;
-  linkCount: number;
-}
-
-interface GraphLink {
-  source: string | GraphNode;
-  target: string | GraphNode;
-}
 
 interface Transform {
   x: number;
@@ -35,6 +32,7 @@ interface GraphViewProps {
   notes: Note[];
   activeNoteId: string | null;
   onSelectNote: (id: string) => void;
+  onOpenInEditor?: (id: string) => void;
 }
 
 // ── Constants ────────────────────────────────────────────────────────────
@@ -46,35 +44,110 @@ const NODE_BASE_RADIUS = 4;
 const NODE_SCALE_FACTOR = 1.5;
 const LABEL_FONT_SIZE = 10;
 
-// Node color palette — hardcoded rgba values required for SVG canvas rendering.
-// CSS variables cannot be directly used in SVG attributes; extracting them via
-// getComputedStyle would add significant complexity for minimal theming benefit.
-const NODE_COLORS = [
-  "rgba(96, 165, 250, 0.85)", // blue
-  "rgba(167, 139, 250, 0.85)", // purple
-  "rgba(52, 211, 153, 0.7)", // emerald
-  "rgba(251, 146, 60, 0.7)", // orange
-  "rgba(248, 113, 113, 0.6)", // red
-  "rgba(56, 189, 248, 0.75)", // sky
-  "rgba(192, 132, 252, 0.7)", // violet
-];
+// Fallback color for notes without tags — hardcoded rgba required for SVG canvas rendering.
+const DEFAULT_NODE_COLOR = "rgba(96, 165, 250, 0.85)";
 
-function getNodeColor(id: string): string {
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) {
-    hash = (hash * 31 + id.charCodeAt(i)) | 0;
+function getNodeColor(node: GraphNode): string {
+  if (node.primaryTag) {
+    return tagColor(node.primaryTag);
   }
-  return NODE_COLORS[Math.abs(hash) % NODE_COLORS.length];
+  return DEFAULT_NODE_COLOR;
 }
 
 function getNodeRadius(linkCount: number): number {
   return NODE_BASE_RADIUS + Math.min(linkCount, 8) * NODE_SCALE_FACTOR;
 }
 
+// ── Context Menu ─────────────────────────────────────────────────────────
+
+interface ContextMenuState {
+  nodeId: string;
+  x: number;
+  y: number;
+}
+
+function GraphContextMenu({
+  state,
+  onClose,
+  onOpenInEditor,
+  onShowNeighborhood,
+  onDelete,
+}: {
+  state: ContextMenuState;
+  onClose: () => void;
+  onOpenInEditor: (id: string) => void;
+  onShowNeighborhood: (id: string) => void;
+  onDelete: (id: string) => void;
+}) {
+  useEffect(() => {
+    const handler = () => onClose();
+    document.addEventListener("click", handler);
+    return () => document.removeEventListener("click", handler);
+  }, [onClose]);
+
+  const items = [
+    { label: "Open in editor", action: () => onOpenInEditor(state.nodeId) },
+    { label: "Show neighborhood", action: () => onShowNeighborhood(state.nodeId) },
+    { label: "Delete", action: () => onDelete(state.nodeId), danger: true },
+  ];
+
+  return createPortal(
+    <div
+      className="fixed z-[100] glass-panel rounded-xl py-1 min-w-[160px] shadow-lg"
+      style={{ left: state.x, top: state.y }}
+    >
+      {items.map((item) => (
+        <button
+          key={item.label}
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            item.action();
+            onClose();
+          }}
+          className={`w-full px-3 py-1.5 text-xs text-left transition-colors ${
+            item.danger
+              ? "text-red-400 hover:bg-red-500/10"
+              : "text-secondary hover:bg-white/[0.06]"
+          }`}
+        >
+          {item.label}
+        </button>
+      ))}
+    </div>,
+    document.body,
+  );
+}
+
 // ── Component ────────────────────────────────────────────────────────────
 
-export function GraphView({ notes, activeNoteId, onSelectNote }: GraphViewProps) {
-  const { data: links } = useQuery<NoteLink[]>("note_links_all", undefined, []);
+export function GraphView({ notes, activeNoteId, onSelectNote, onOpenInEditor }: GraphViewProps) {
+  // Smart view state
+  const [smartView, setSmartView] = useState<SmartView>("full");
+  const [hopRadius, setHopRadius] = useState(2);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Graph data from hook
+  const { nodes: graphDataNodes, links: graphDataLinks } = useGraphData(
+    smartView,
+    notes,
+    activeNoteId,
+    hopRadius,
+  );
+
+  // Filter nodes by search query
+  const filteredNodes = searchQuery
+    ? graphDataNodes.filter((n) => n.title.toLowerCase().includes(searchQuery.toLowerCase()))
+    : graphDataNodes;
+  const filteredNodeIds = new Set(filteredNodes.map((n) => n.id));
+  const filteredLinks = searchQuery
+    ? graphDataLinks.filter((l) => {
+        const sId = typeof l.source === "string" ? l.source : l.source.id;
+        const tId = typeof l.target === "string" ? l.target : l.target.id;
+        return filteredNodeIds.has(sId) && filteredNodeIds.has(tId);
+      })
+    : graphDataLinks;
+
   const svgRef = useRef<SVGSVGElement>(null);
   const simRef = useRef<Simulation<GraphNode, GraphLink> | null>(null);
   const nodesRef = useRef<GraphNode[]>([]);
@@ -82,6 +155,16 @@ export function GraphView({ notes, activeNoteId, onSelectNote }: GraphViewProps)
   const nodeMapRef = useRef<Map<string, GraphNode>>(new Map());
   const rafRef = useRef(0);
   const [, setRenderKey] = useState(0);
+
+  // Hover state
+  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+
+  // Neighbor set for dimming
+  const neighborSet = useRef<Set<string>>(new Set());
 
   // Transform state for zoom/pan — initialized to center once SVG mounts
   const [transform, setTransform] = useState<Transform>({ x: 0, y: 0, k: 1 });
@@ -113,27 +196,25 @@ export function GraphView({ notes, activeNoteId, onSelectNote }: GraphViewProps)
     lastY: number;
   } | null>(null);
 
-  // Build and run simulation when notes/links change
+  // Build and run simulation when data changes
   useEffect(() => {
-    // Count links per node inline to avoid extra memo + dep
-    const linkCountMap = new Map<string, number>();
-    for (const l of links) {
-      linkCountMap.set(l.sourceId, (linkCountMap.get(l.sourceId) || 0) + 1);
-      linkCountMap.set(l.targetId, (linkCountMap.get(l.targetId) || 0) + 1);
-    }
-
     const nodeMap = new Map<string, GraphNode>();
-    for (const note of notes) {
-      nodeMap.set(note.id, {
-        id: note.id,
-        title: note.title,
-        linkCount: linkCountMap.get(note.id) || 0,
-      });
+    // Clone nodes so d3 can mutate x/y
+    for (const node of filteredNodes) {
+      nodeMap.set(node.id, { ...node });
     }
 
-    const graphLinks: GraphLink[] = links
-      .filter((l) => nodeMap.has(l.sourceId) && nodeMap.has(l.targetId))
-      .map((l) => ({ source: l.sourceId, target: l.targetId }));
+    const graphLinks: GraphLink[] = filteredLinks
+      .filter((l) => {
+        const sId = typeof l.source === "string" ? l.source : l.source.id;
+        const tId = typeof l.target === "string" ? l.target : l.target.id;
+        return nodeMap.has(sId) && nodeMap.has(tId);
+      })
+      .map((l) => {
+        const sId = typeof l.source === "string" ? l.source : l.source.id;
+        const tId = typeof l.target === "string" ? l.target : l.target.id;
+        return { source: sId, target: tId };
+      });
 
     const graphNodes = Array.from(nodeMap.values());
     nodesRef.current = graphNodes;
@@ -180,7 +261,22 @@ export function GraphView({ notes, activeNoteId, onSelectNote }: GraphViewProps)
         rafRef.current = 0;
       }
     };
-  }, [notes, links]);
+  }, [filteredNodes, filteredLinks]);
+
+  // Update neighbor set when hovered node changes
+  useEffect(() => {
+    const set = new Set<string>();
+    if (hoveredNodeId) {
+      set.add(hoveredNodeId);
+      for (const link of linksRef.current) {
+        const s = typeof link.source === "string" ? link.source : (link.source as GraphNode).id;
+        const t = typeof link.target === "string" ? link.target : (link.target as GraphNode).id;
+        if (s === hoveredNodeId) set.add(t);
+        if (t === hoveredNodeId) set.add(s);
+      }
+    }
+    neighborSet.current = set;
+  }, [hoveredNodeId]);
 
   // ── Zoom (wheel) ────────────────────────────────────────────────────────
   const handleWheel = useCallback((e: React.WheelEvent) => {
@@ -189,7 +285,6 @@ export function GraphView({ notes, activeNoteId, onSelectNote }: GraphViewProps)
     if (!svg) return;
 
     const rect = svg.getBoundingClientRect();
-    // Cursor position relative to SVG element
     const cx = e.clientX - rect.left;
     const cy = e.clientY - rect.top;
 
@@ -197,7 +292,6 @@ export function GraphView({ notes, activeNoteId, onSelectNote }: GraphViewProps)
       const delta = -e.deltaY * ZOOM_SENSITIVITY;
       const newK = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, prev.k * (1 + delta)));
       const ratio = newK / prev.k;
-      // Zoom toward cursor: adjust translate so cursor stays over same point
       return {
         k: newK,
         x: cx - (cx - prev.x) * ratio,
@@ -208,7 +302,6 @@ export function GraphView({ notes, activeNoteId, onSelectNote }: GraphViewProps)
 
   // ── Pan (background drag) ──────────────────────────────────────────────
   const handleBgPointerDown = useCallback((e: React.PointerEvent) => {
-    // Only start pan if clicking background (not a node)
     if ((e.target as Element).closest("[data-graph-node]")) return;
     e.preventDefault();
     (e.target as Element).setPointerCapture(e.pointerId);
@@ -221,7 +314,6 @@ export function GraphView({ notes, activeNoteId, onSelectNote }: GraphViewProps)
   }, []);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
-    // Handle pan
     if (panRef.current) {
       const pan = panRef.current;
       const dx = e.clientX - pan.startX;
@@ -234,7 +326,6 @@ export function GraphView({ notes, activeNoteId, onSelectNote }: GraphViewProps)
       return;
     }
 
-    // Handle node drag
     if (!dragRef.current || !svgRef.current) return;
     const node = nodeMapRef.current.get(dragRef.current.nodeId);
     if (!node) return;
@@ -300,15 +391,71 @@ export function GraphView({ notes, activeNoteId, onSelectNote }: GraphViewProps)
     setTransform({ x: rect.width / 2, y: rect.height / 2, k: 1 });
   }, []);
 
+  // ── Event handlers ─────────────────────────────────────────────────────
+  const handleNodeHover = useCallback((nodeId: string | null, e?: React.MouseEvent) => {
+    setHoveredNodeId(nodeId);
+    if (e) setTooltipPos({ x: e.clientX, y: e.clientY });
+  }, []);
+
+  const handleNodeClick = useCallback(
+    (nodeId: string) => {
+      onSelectNote(nodeId);
+    },
+    [onSelectNote],
+  );
+
+  const handleNodeDoubleClick = useCallback(
+    (nodeId: string) => {
+      onOpenInEditor?.(nodeId);
+    },
+    [onOpenInEditor],
+  );
+
+  const handleContextMenu = useCallback((e: React.MouseEvent, nodeId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({ nodeId, x: e.clientX, y: e.clientY });
+  }, []);
+
+  const handleShowNeighborhood = useCallback(
+    (nodeId: string) => {
+      onSelectNote(nodeId);
+      setSmartView("local");
+    },
+    [onSelectNote],
+  );
+
+  const handleDeleteNode = useCallback(
+    (nodeId: string) => {
+      // Delete is handled by the parent — just select for now
+      onSelectNote(nodeId);
+    },
+    [onSelectNote],
+  );
+
   const nodes = nodesRef.current;
   const graphLinks = linksRef.current;
+  const isHovering = hoveredNodeId !== null;
+  const hoveredNode = hoveredNodeId ? nodeMapRef.current.get(hoveredNodeId) : null;
 
   return (
-    <div className="flex-1 flex items-center justify-center overflow-hidden relative">
+    <div className="flex-1 flex flex-col overflow-hidden relative">
+      {/* Toolbar */}
+      <GraphToolbar
+        view={smartView}
+        onViewChange={setSmartView}
+        hopRadius={hopRadius}
+        onHopRadiusChange={setHopRadius}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+      />
+
       {notes.length === 0 ? (
-        <div className="text-muted text-sm">No notes to graph</div>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-muted text-sm">No notes to graph</div>
+        </div>
       ) : (
-        <>
+        <div className="flex-1 relative overflow-hidden">
           {/* SVG rendering — hardcoded rgba/hex color values below are required because
               CSS variables cannot be directly used in SVG attributes; extracting them via
               getComputedStyle would add significant complexity for minimal theming benefit. */}
@@ -373,6 +520,8 @@ export function GraphView({ notes, activeNoteId, onSelectNote }: GraphViewProps)
                 const t = link.target as GraphNode;
                 if (s.x == null || t.x == null) return null;
                 const isActiveEdge = s.id === activeNoteId || t.id === activeNoteId;
+                const isDimmed =
+                  isHovering && !neighborSet.current.has(s.id) && !neighborSet.current.has(t.id);
                 return (
                   <line
                     key={`${s.id}-${t.id}`}
@@ -382,7 +531,8 @@ export function GraphView({ notes, activeNoteId, onSelectNote }: GraphViewProps)
                     y2={t.y}
                     stroke={isActiveEdge ? "var(--brand-glow)" : "rgba(255,255,255,0.06)"}
                     strokeWidth={isActiveEdge ? 1.5 : 0.75}
-                    className="transition-colors duration-300"
+                    opacity={isDimmed ? 0.2 : 1}
+                    className="transition-opacity duration-200"
                   />
                 );
               })}
@@ -392,7 +542,8 @@ export function GraphView({ notes, activeNoteId, onSelectNote }: GraphViewProps)
                 if (node.x == null || node.y == null) return null;
                 const isActive = node.id === activeNoteId;
                 const r = getNodeRadius(node.linkCount);
-                const color = isActive ? "var(--color-brand)" : getNodeColor(node.id);
+                const color = isActive ? "var(--color-brand)" : getNodeColor(node);
+                const isDimmed = isHovering && !neighborSet.current.has(node.id);
 
                 return (
                   <g
@@ -400,9 +551,15 @@ export function GraphView({ notes, activeNoteId, onSelectNote }: GraphViewProps)
                     data-graph-node
                     transform={`translate(${node.x},${node.y})`}
                     onPointerDown={(e) => handleNodePointerDown(e, node.id)}
-                    onClick={() => onSelectNote(node.id)}
+                    onClick={() => handleNodeClick(node.id)}
+                    onDoubleClick={() => handleNodeDoubleClick(node.id)}
+                    onContextMenu={(e) => handleContextMenu(e, node.id)}
+                    onMouseEnter={(e) => handleNodeHover(node.id, e)}
+                    onMouseMove={(e) => setTooltipPos({ x: e.clientX, y: e.clientY })}
+                    onMouseLeave={() => handleNodeHover(null)}
                     className="cursor-pointer"
                     style={{ transition: "opacity 0.2s" }}
+                    opacity={isDimmed ? 0.2 : 1}
                   >
                     {/* Active glow ring */}
                     {isActive && <circle r={r * 4} fill="url(#graph-active-glow)" />}
@@ -442,6 +599,20 @@ export function GraphView({ notes, activeNoteId, onSelectNote }: GraphViewProps)
             </g>
           </svg>
 
+          {/* Tooltip */}
+          {hoveredNode && <GraphNodeTooltip node={hoveredNode} x={tooltipPos.x} y={tooltipPos.y} />}
+
+          {/* Context menu */}
+          {contextMenu && (
+            <GraphContextMenu
+              state={contextMenu}
+              onClose={() => setContextMenu(null)}
+              onOpenInEditor={(id) => onOpenInEditor?.(id)}
+              onShowNeighborhood={handleShowNeighborhood}
+              onDelete={handleDeleteNode}
+            />
+          )}
+
           {/* Zoom controls */}
           <div className="absolute bottom-3 right-3 flex flex-col gap-1">
             <button
@@ -474,7 +645,7 @@ export function GraphView({ notes, activeNoteId, onSelectNote }: GraphViewProps)
           <div className="absolute bottom-3 left-3 text-[10px] text-dim font-mono tabular-nums">
             {Math.round(transform.k * 100)}%
           </div>
-        </>
+        </div>
       )}
     </div>
   );

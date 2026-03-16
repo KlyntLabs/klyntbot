@@ -333,6 +333,10 @@ export default function KnowledgeBasePage() {
               notes={notes}
               activeNoteId={selectedNoteId}
               onSelectNote={setSelectedNoteId}
+              onOpenInEditor={(id) => {
+                setSelectedNoteId(id);
+                setViewMode("editor");
+              }}
             />
           </>
         ) : selectedNote ? (
@@ -351,6 +355,10 @@ export default function KnowledgeBasePage() {
               onRenameNote={handleRenameNote}
               viewMode={viewMode}
               onViewModeChange={setViewMode}
+              onToggleFocusMode={() =>
+                setLayoutMode((prev) => (prev === "three-panel" ? "focus" : "three-panel"))
+              }
+              focusModeActive={isFocusMode}
             />
           </div>
         ) : (
