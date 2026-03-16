@@ -14,7 +14,6 @@ import {
   Pin,
   PinOff,
   Plus,
-  Smile,
   Trash2,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -539,15 +538,16 @@ function TreeContextMenu({
           Rename
         </ContextMenuItem>
 
-        {/* Icon picker */}
+        {/* Appearance picker (icons + colors in one panel) */}
         <ContextMenuSubmenu
-          icon={<Smile className="w-4 h-4" />}
-          label="Change Icon"
-          open={openSubmenu === "icon"}
-          onToggle={() => toggleSubmenu("icon")}
+          icon={<Palette className="w-4 h-4" />}
+          label="Appearance"
+          open={openSubmenu === "appearance"}
+          onToggle={() => toggleSubmenu("appearance")}
           panelClassName="context-menu absolute left-full top-0 ml-1 py-1 w-[280px] animate-[menu-appear_100ms_ease-out]"
         >
-          <div className="grid grid-cols-8 gap-1 p-2 max-h-56 overflow-y-auto">
+          {/* Emoji icons */}
+          <div className="grid grid-cols-8 gap-1 p-2 max-h-44 overflow-y-auto">
             {ITEM_ICONS.map((icon) => (
               <button
                 key={icon}
@@ -564,41 +564,26 @@ function TreeContextMenu({
               </button>
             ))}
           </div>
-          {target.notebook.icon && (
-            <ContextMenuItem
-              onClick={() => {
-                onUpdateNotebook(target.notebook.id, { icon: null });
-                onClose();
-              }}
-            >
-              <span className="text-dim text-xs">Remove icon</span>
-            </ContextMenuItem>
-          )}
-        </ContextMenuSubmenu>
-
-        {/* Color picker */}
-        <ContextMenuSubmenu
-          icon={<Palette className="w-4 h-4" />}
-          label="Change Color"
-          open={openSubmenu === "color"}
-          onToggle={() => toggleSubmenu("color")}
-        >
-          <div className="flex gap-1 p-2">
+          {/* Divider + color row */}
+          <div className="h-px bg-white/[0.08] mx-2" />
+          <div className="flex items-center gap-1.5 px-2 py-2">
             {ITEM_COLORS.map((color) => (
               <button
                 key={color ?? "none"}
                 type="button"
                 onClick={() => {
-                  onUpdateNotebook(target.notebook.id, color ? { color, icon: null } : { color: null });
+                  onUpdateNotebook(target.notebook.id, color ? { color, icon: null } : { color: null, icon: null });
                   onClose();
                 }}
                 className={`w-5 h-5 rounded-full border transition-transform hover:scale-125 ${
-                  target.notebook.color === color ? "ring-2 ring-white/60 ring-offset-1 ring-offset-black" : ""
+                  (color === null && !target.notebook.icon && !target.notebook.color) || target.notebook.color === color
+                    ? "ring-2 ring-white/60 ring-offset-1 ring-offset-black"
+                    : ""
                 } ${!color ? "border-white/20 bg-transparent" : "border-transparent"}`}
                 style={color ? { backgroundColor: color } : undefined}
-                title={color ?? "No color"}
+                title={color ?? "Default"}
               >
-                {!color && <span className="text-[8px] text-dim">&times;</span>}
+                {!color && <span className="text-[8px] text-dim">×</span>}
               </button>
             ))}
           </div>
@@ -642,15 +627,15 @@ function TreeContextMenu({
         {note.pinned ? "Unpin" : "Pin"}
       </ContextMenuItem>
 
-      {/* Icon picker for notes */}
+      {/* Appearance picker for notes (icons + reset) */}
       <ContextMenuSubmenu
-        icon={<Smile className="w-4 h-4" />}
-        label="Change Icon"
-        open={openSubmenu === "icon"}
-        onToggle={() => toggleSubmenu("icon")}
+        icon={<Palette className="w-4 h-4" />}
+        label="Appearance"
+        open={openSubmenu === "appearance"}
+        onToggle={() => toggleSubmenu("appearance")}
         panelClassName="context-menu absolute left-full top-0 ml-1 py-1 w-[280px] animate-[menu-appear_100ms_ease-out]"
       >
-        <div className="grid grid-cols-8 gap-1 p-2 max-h-56 overflow-y-auto">
+        <div className="grid grid-cols-8 gap-1 p-2 max-h-44 overflow-y-auto">
           {ITEM_ICONS.map((icon) => (
             <button
               key={icon}
@@ -667,16 +652,18 @@ function TreeContextMenu({
             </button>
           ))}
         </div>
-        {note.icon && (
-          <ContextMenuItem
-            onClick={() => {
-              onUpdateNote(note.id, { icon: null });
-              onClose();
-            }}
-          >
-            <span className="text-dim text-xs">Remove icon</span>
-          </ContextMenuItem>
-        )}
+        {/* Reset button */}
+        <div className="h-px bg-white/[0.08] mx-2" />
+        <button
+          type="button"
+          onClick={() => {
+            onUpdateNote(note.id, { icon: null });
+            onClose();
+          }}
+          className="w-full px-3 py-1.5 text-xs text-dim hover:text-muted hover:bg-white/[0.06] text-left transition-colors"
+        >
+          Reset to default
+        </button>
       </ContextMenuSubmenu>
 
       {folders.length > 0 && (
