@@ -356,6 +356,10 @@ fn run_desktop_app() {
             commands::notes::inbox_create,
             commands::notes::inbox_list,
             commands::notes::inbox_delete,
+            commands::notes::note_insight_review,
+            commands::notes::note_insight_cache_get,
+            commands::notes::note_insight_save_flashcards,
+            commands::notes::note_insight_regenerate_tab,
             // Areas
             commands::areas::area_list,
             commands::areas::area_create,

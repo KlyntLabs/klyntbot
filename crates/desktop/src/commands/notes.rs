@@ -1,9 +1,10 @@
 use std::sync::Arc;
 
 use desktop_shared::commands::{
-    BacklinkResponse, HybridSearchResponse, InboxCreateParams, InboxItemResponse, NoteCreateParams,
-    NoteLinkResponse, NoteResponse, NoteSuggestionsResponse, NoteUpdateParams, NoteVersionResponse,
-    NotebookCreateParams, NotebookResponse, NotebookUpdateParams,
+    BacklinkResponse, FlashcardResponse, HybridSearchResponse, InboxCreateParams,
+    InboxItemResponse, InsightReviewResponse, InsightReviewStarted, InsightSaveFlashcardsParams,
+    NoteCreateParams, NoteLinkResponse, NoteResponse, NoteSuggestionsResponse, NoteUpdateParams,
+    NoteVersionResponse, NotebookCreateParams, NotebookResponse, NotebookUpdateParams, TabContent,
 };
 use desktop_shared::errors::ApiError;
 use tauri::State;
@@ -278,6 +279,41 @@ pub async fn inbox_delete(state: State<'_, Arc<AppCore>>, id: String) -> Result<
     state.inbox_delete(&id).await
 }
 
+// ── Insight Review commands ─────────────────────────────────────────
+
+#[tauri::command]
+pub async fn note_insight_review(
+    state: State<'_, Arc<AppCore>>,
+    note_id: String,
+) -> Result<InsightReviewStarted, ApiError> {
+    state.note_insight_review(&note_id).await
+}
+
+#[tauri::command]
+pub async fn note_insight_cache_get(
+    state: State<'_, Arc<AppCore>>,
+    note_id: String,
+) -> Result<Option<InsightReviewResponse>, ApiError> {
+    state.note_insight_cache_get(&note_id).await
+}
+
+#[tauri::command]
+pub async fn note_insight_save_flashcards(
+    state: State<'_, Arc<AppCore>>,
+    params: InsightSaveFlashcardsParams,
+) -> Result<Vec<FlashcardResponse>, ApiError> {
+    state.insight_save_flashcards(params).await
+}
+
+#[tauri::command]
+pub async fn note_insight_regenerate_tab(
+    state: State<'_, Arc<AppCore>>,
+    note_id: String,
+    tab: String,
+) -> Result<TabContent, ApiError> {
+    state.note_insight_regenerate_tab(&note_id, &tab).await
+}
+
 // ── Dev server dispatch ─────────────────────────────────────────────
 
 #[cfg(test)]
@@ -310,6 +346,10 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "inbox_create",
     "inbox_list",
     "inbox_delete",
+    "note_insight_review",
+    "note_insight_cache_get",
+    "note_insight_save_flashcards",
+    "note_insight_regenerate_tab",
 ];
 
 #[cfg(debug_assertions)]
@@ -420,6 +460,27 @@ pub(crate) async fn dispatch_dev(
         "inbox_delete" => {
             let id = try_field!(dev::get_str(body, "id"));
             dev::val(core.inbox_delete(&id).await)
+        }
+        "note_insight_review" => {
+            let id = try_field!(dev::get_str(body, "noteId"));
+            dev::val(core.note_insight_review(&id).await)
+        }
+        "note_insight_cache_get" => {
+            let id = try_field!(dev::get_str(body, "noteId"));
+            dev::val(core.note_insight_cache_get(&id).await)
+        }
+        "note_insight_save_flashcards" => {
+            dev::val(
+                core.insight_save_flashcards(
+                    try_field!(dev::parse_params::<desktop_shared::commands::InsightSaveFlashcardsParams>(body)),
+                )
+                .await,
+            )
+        }
+        "note_insight_regenerate_tab" => {
+            let id = try_field!(dev::get_str(body, "noteId"));
+            let tab = try_field!(dev::get_str(body, "tab"));
+            dev::val(core.note_insight_regenerate_tab(&id, &tab).await)
         }
         _ => return None,
     })
