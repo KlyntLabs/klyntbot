@@ -281,7 +281,7 @@ export default function KnowledgeBasePage() {
   const isFocusMode = layoutMode === "focus";
   const isGraphMode = viewMode === "graph";
   const showLeftSidebar = !isFocusMode;
-  const showRightPanel = !isFocusMode && !isGraphMode;
+  const showRightPanel = !isFocusMode;
 
   // ── Render ────────────────────────────────────────────────────────────
   return (
@@ -390,7 +390,15 @@ export default function KnowledgeBasePage() {
       {/* Right panel — ContextPanel */}
       {showRightPanel && (
         <div ref={rightRef}>
-          <ContextPanel width={rightWidth} noteId={selectedNoteId} />
+          <ContextPanel
+            width={rightWidth}
+            noteId={selectedNoteId}
+            isGraphMode={isGraphMode}
+            note={selectedNote ?? null}
+            notes={notes}
+            onSelectNote={setSelectedNoteId}
+            onExpandGraph={() => setViewMode("graph")}
+          />
         </div>
       )}
     </div>
