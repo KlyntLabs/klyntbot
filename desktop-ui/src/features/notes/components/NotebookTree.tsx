@@ -543,6 +543,30 @@ function TreeContextMenu({
   const [openSubmenu, setOpenSubmenu] = useState<string | null>(null);
   const toggleSubmenu = (name: string) => setOpenSubmenu((prev) => (prev === name ? null : name));
 
+  // Local preview state for appearance picker (updates instantly before backend responds)
+  const [previewColor, setPreviewColor] = useState<string | null | undefined>(undefined);
+  const [previewIcon, setPreviewIcon] = useState<string | null | undefined>(undefined);
+
+  // Resolve current appearance: local preview overrides target data
+  const currentColor = (kind: string) => {
+    if (kind === "folder" && target.kind === "folder") {
+      return previewColor !== undefined ? previewColor : target.notebook.color;
+    }
+    if (kind === "note" && target.kind === "note") {
+      return previewColor !== undefined ? previewColor : target.note.color;
+    }
+    return null;
+  };
+  const currentIcon = (kind: string) => {
+    if (kind === "folder" && target.kind === "folder") {
+      return previewIcon !== undefined ? previewIcon : target.notebook.icon;
+    }
+    if (kind === "note" && target.kind === "note") {
+      return previewIcon !== undefined ? previewIcon : target.note.icon;
+    }
+    return null;
+  };
+
   if (target.kind === "blank") {
     return (
       <ContextMenu ref={ref} x={target.x} y={target.y} onClose={onClose}>
@@ -608,16 +632,19 @@ function TreeContextMenu({
           onToggle={() => toggleSubmenu("appearance")}
           panelClassName="context-menu absolute left-full top-0 ml-1 py-1 w-[280px] animate-[menu-appear_100ms_ease-out]"
         >
-          {/* Icon grid — colored by current notebook color */}
+          {/* Icon grid — colored by live preview color */}
           <div className="grid grid-cols-6 gap-1 p-2.5">
             {ICON_NAMES.map((name) => {
               const Icon = ICON_MAP[name];
-              const isActive = target.notebook.icon === name;
+              const activeIcon = currentIcon("folder");
+              const activeColor = currentColor("folder");
+              const isActive = activeIcon === name;
               return (
                 <button
                   key={name}
                   type="button"
                   onClick={() => {
+                    setPreviewIcon(name);
                     onUpdateNotebook(target.notebook.id, { icon: name });
                   }}
                   className={`w-8 h-8 rounded-md flex items-center justify-center hover:bg-white/[0.1] transition-colors ${
@@ -625,7 +652,7 @@ function TreeContextMenu({
                   }`}
                   title={name}
                 >
-                  <Icon className="w-4 h-4" style={target.notebook.color ? { color: target.notebook.color } : undefined} />
+                  <Icon className="w-4 h-4" style={activeColor ? { color: activeColor } : undefined} />
                 </button>
               );
             })}
@@ -638,14 +665,16 @@ function TreeContextMenu({
                 key={color ?? "none"}
                 type="button"
                 onClick={() => {
+                  setPreviewColor(color);
                   if (!color) {
+                    setPreviewIcon(null);
                     onUpdateNotebook(target.notebook.id, { color: null, icon: null });
                   } else {
                     onUpdateNotebook(target.notebook.id, { color });
                   }
                 }}
                 className={`w-5 h-5 rounded-full border transition-transform hover:scale-125 ${
-                  target.notebook.color === color && color !== null
+                  currentColor("folder") === color && color !== null
                     ? "ring-2 ring-white/60 ring-offset-1 ring-offset-black"
                     : ""
                 } ${!color ? "border-white/20 bg-transparent" : "border-transparent"}`}
@@ -704,16 +733,19 @@ function TreeContextMenu({
         onToggle={() => toggleSubmenu("appearance")}
         panelClassName="context-menu absolute left-full top-0 ml-1 py-1 w-[280px] animate-[menu-appear_100ms_ease-out]"
       >
-        {/* Icon grid — colored by current note color */}
+        {/* Icon grid — colored by live preview color */}
         <div className="grid grid-cols-6 gap-1 p-2.5">
           {ICON_NAMES.map((name) => {
             const Icon = ICON_MAP[name];
-            const isActive = note.icon === name;
+            const activeIcon = currentIcon("note");
+            const activeColor = currentColor("note");
+            const isActive = activeIcon === name;
             return (
               <button
                 key={name}
                 type="button"
                 onClick={() => {
+                  setPreviewIcon(name);
                   onUpdateNote(note.id, { icon: name });
                 }}
                 className={`w-8 h-8 rounded-md flex items-center justify-center hover:bg-white/[0.1] transition-colors ${
@@ -721,7 +753,7 @@ function TreeContextMenu({
                 }`}
                 title={name}
               >
-                <Icon className="w-4 h-4" style={note.color ? { color: note.color } : undefined} />
+                <Icon className="w-4 h-4" style={activeColor ? { color: activeColor } : undefined} />
               </button>
             );
           })}
@@ -734,14 +766,16 @@ function TreeContextMenu({
               key={color ?? "none"}
               type="button"
               onClick={() => {
+                setPreviewColor(color);
                 if (!color) {
+                  setPreviewIcon(null);
                   onUpdateNote(note.id, { color: null, icon: null });
                 } else {
                   onUpdateNote(note.id, { color });
                 }
               }}
               className={`w-5 h-5 rounded-full border transition-transform hover:scale-125 ${
-                note.color === color && color !== null
+                currentColor("note") === color && color !== null
                   ? "ring-2 ring-white/60 ring-offset-1 ring-offset-black"
                   : ""
               } ${!color ? "border-white/20 bg-transparent" : "border-transparent"}`}
