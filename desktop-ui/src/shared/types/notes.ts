@@ -22,6 +22,15 @@ export interface NoteVersion {
   createdAt: string;
 }
 
+// ── Inbox Items ───────────────────────────────────────────
+
+export interface InboxItem {
+  id: string;
+  content: string;
+  status: string;
+  createdAt: string;
+}
+
 // ── Note Links ─────────────────────────────────────────────
 
 export interface NoteLink {

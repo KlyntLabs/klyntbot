@@ -162,6 +162,7 @@ export type {
   AgentFileContent,
   AgentFileSummary,
   AgentProfileSummary,
+  InboxItem,
   Note,
   Notebook,
   NotebookCreateParams,

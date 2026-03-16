@@ -1,10 +1,11 @@
 import { ipc } from "@shared/hooks/useIpc";
 import { tagBgColor, tagColor } from "@shared/lib/tagColor";
-import type { Note, Notebook } from "@shared/types";
+import type { InboxItem, Note, Notebook } from "@shared/types";
 import { ChevronRight, Search, X } from "lucide-react";
 import type { Ref } from "react";
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { FileTree } from "./FileTree";
+import { InboxSection } from "./InboxSection";
 import { QuickAccessList } from "./QuickAccessList";
 import { TagsExplorer } from "./TagsExplorer";
 
@@ -31,6 +32,9 @@ interface NavigationSidebarProps {
   onRenameNote: (id: string, title: string) => void;
   onMoveNote: (id: string, notebookId: string | null) => void;
   onMoveNotebook: (id: string, parentId: string | null) => void;
+  inboxItems: InboxItem[];
+  onInboxCreateAsNote: (content: string) => void;
+  onInboxDiscard: (id: string) => void;
 }
 
 export function NavigationSidebar({
@@ -48,6 +52,9 @@ export function NavigationSidebar({
   onRenameNote,
   onMoveNote,
   onMoveNotebook,
+  inboxItems,
+  onInboxCreateAsNote,
+  onInboxDiscard,
 }: NavigationSidebarProps) {
   // ── Search state ──────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState("");
@@ -218,7 +225,14 @@ export function NavigationSidebar({
             )}
           </div>
 
-          {/* 5. Footer */}
+          {/* 5. Inbox */}
+          <InboxSection
+            items={inboxItems}
+            onCreateAsNote={onInboxCreateAsNote}
+            onDiscard={onInboxDiscard}
+          />
+
+          {/* 6. Footer */}
           <div className="mt-auto shrink-0 px-2 py-1.5 text-[10px] text-dim flex items-center gap-2">
             <span>
               {noteCount} note{noteCount !== 1 ? "s" : ""}
@@ -227,6 +241,12 @@ export function NavigationSidebar({
             <span>
               {notebookCount} notebook{notebookCount !== 1 ? "s" : ""}
             </span>
+            {inboxItems.length > 0 && (
+              <>
+                <span className="opacity-40">·</span>
+                <span>Inbox ({inboxItems.length})</span>
+              </>
+            )}
           </div>
         </div>
       )}
