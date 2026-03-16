@@ -1,10 +1,16 @@
-import { Brain, RefreshCw, X } from "lucide-react";
+import { ipc } from "@shared/hooks/useIpc";
+import { BookOpen, Brain, Copy, FileInput, FilePlus, RefreshCw, X } from "lucide-react";
+import { useCallback, useState } from "react";
 import type {
   InsightReviewActions,
   InsightReviewState,
   TabId,
   TabStatus,
 } from "../hooks/useInsightReview";
+import { ConceptMapTab } from "./insight/ConceptMapTab";
+import { GapAnalysisTab } from "./insight/GapAnalysisTab";
+import { SelfAssessmentTab } from "./insight/SelfAssessmentTab";
+import { SynthesisTab } from "./insight/SynthesisTab";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -58,24 +64,71 @@ function tabStatus(state: InsightReviewState, tabId: TabId): TabStatus {
 }
 
 // ---------------------------------------------------------------------------
-// SkeletonLoader
-// ---------------------------------------------------------------------------
-
-function SkeletonLoader() {
-  return (
-    <div className="space-y-3 animate-pulse">
-      <div className="h-3 bg-white/[0.04] rounded w-3/4" />
-      <div className="h-3 bg-white/[0.04] rounded w-full" />
-      <div className="h-3 bg-white/[0.04] rounded w-5/6" />
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // InsightReviewPanel
 // ---------------------------------------------------------------------------
 
 export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCreateDeepDiveNote = useCallback(async (title: string, body: string) => {
+    try {
+      await ipc("note_create", { params: { title, body } });
+    } catch {
+      // Silently fail — user can create the note manually
+    }
+  }, []);
+
+  // Get active tab content as text
+  const getActiveContent = useCallback((): string => {
+    switch (state.activeTab) {
+      case "synthesis":
+        return state.tabs.synthesis.content;
+      case "gaps":
+        return state.tabs.gaps.content;
+      case "assessment":
+        return state.tabs.assessment.questions
+          .map((q, i) => `${i + 1}. ${q.question}\n   Answer: ${q.correctAnswer}`)
+          .join("\n\n");
+      case "concept-map":
+        return state.tabs.conceptMap.mermaid || state.tabs.conceptMap.fallbackText;
+    }
+  }, [state]);
+
+  const hasActiveContent = getActiveContent().length > 0;
+
+  const handleCopy = useCallback(async () => {
+    const content = getActiveContent();
+    if (!content) return;
+    await navigator.clipboard.writeText(content);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }, [getActiveContent]);
+
+  const handleInsertIntoNote = useCallback(async () => {
+    const content = getActiveContent();
+    if (!content || !state.noteId) return;
+    const date = new Date().toLocaleDateString();
+    const section = `\n\n## Insight Review — ${date}\n\n${content}`;
+    // Dispatch a custom event that the editor can listen for
+    window.dispatchEvent(
+      new CustomEvent("insight:insert-into-note", {
+        detail: { noteId: state.noteId, content: section },
+      }),
+    );
+  }, [getActiveContent, state.noteId]);
+
+  const handleCreateInsightNote = useCallback(async () => {
+    const content = getActiveContent();
+    if (!content) return;
+    try {
+      await ipc("note_create", {
+        params: { title: `Insight: ${state.activeTab}`, body: content },
+      });
+    } catch {
+      // Silently fail
+    }
+  }, [getActiveContent, state.activeTab]);
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -125,76 +178,86 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
       </div>
 
       {/* Content area */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto p-4 min-h-0">
         {state.activeTab === "synthesis" && (
-          <div className="text-[11px] text-muted">
-            {state.tabs.synthesis.status === "loading" && <SkeletonLoader />}
-            {state.tabs.synthesis.status === "streaming" && (
-              <p className="leading-relaxed whitespace-pre-wrap">{state.tabs.synthesis.content}</p>
-            )}
-            {state.tabs.synthesis.status === "done" && (
-              <p className="leading-relaxed whitespace-pre-wrap">{state.tabs.synthesis.content}</p>
-            )}
-            {state.tabs.synthesis.status === "idle" && (
-              <p className="text-dim italic">Click to start analysis</p>
-            )}
-            {state.tabs.synthesis.status === "error" && (
-              <p className="text-red-400/70 italic">Failed to generate synthesis.</p>
-            )}
-          </div>
+          <SynthesisTab
+            status={state.tabs.synthesis.status}
+            content={state.tabs.synthesis.content}
+          />
         )}
         {state.activeTab === "gaps" && (
-          <div className="text-[11px] text-muted">
-            {state.tabs.gaps.status === "loading" && <SkeletonLoader />}
-            {state.tabs.gaps.status === "done" ? (
-              <p className="leading-relaxed whitespace-pre-wrap">{state.tabs.gaps.content}</p>
-            ) : state.tabs.gaps.status === "idle" ? (
-              <p className="text-dim italic">Loading gap analysis...</p>
-            ) : state.tabs.gaps.status === "error" ? (
-              <p className="text-red-400/70 italic">Failed to generate gap analysis.</p>
-            ) : null}
-          </div>
+          <GapAnalysisTab
+            status={state.tabs.gaps.status}
+            content={state.tabs.gaps.content}
+            onCreateNote={handleCreateDeepDiveNote}
+          />
         )}
         {state.activeTab === "assessment" && (
-          <div className="text-[11px] text-muted">
-            {state.tabs.assessment.status === "loading" && <SkeletonLoader />}
-            {state.tabs.assessment.status === "done" &&
-              (state.tabs.assessment.questions.length > 0 ? (
-                <p>{state.tabs.assessment.questions.length} questions</p>
-              ) : (
-                <p className="text-dim italic">No questions generated.</p>
-              ))}
-            {(state.tabs.assessment.status === "idle" ||
-              state.tabs.assessment.status === "streaming") && (
-              <p className="text-dim italic">Loading quiz...</p>
-            )}
-            {state.tabs.assessment.status === "error" && (
-              <p className="text-red-400/70 italic">Failed to generate quiz.</p>
-            )}
-          </div>
+          <SelfAssessmentTab
+            status={state.tabs.assessment.status}
+            questions={state.tabs.assessment.questions}
+            quizState={state.quizState}
+            onAnswer={actions.answerQuestion}
+            onReveal={actions.revealAnswer}
+            onRevealAll={actions.revealAll}
+            onSaveFlashcards={actions.saveFlashcards}
+          />
         )}
         {state.activeTab === "concept-map" && (
-          <div className="text-[11px] text-muted">
-            {state.tabs.conceptMap.status === "loading" && <SkeletonLoader />}
-            {state.tabs.conceptMap.status === "done" &&
-              (state.tabs.conceptMap.mermaid ? (
-                <p>Concept map ready</p>
-              ) : state.tabs.conceptMap.fallbackText ? (
-                <p className="leading-relaxed whitespace-pre-wrap">
-                  {state.tabs.conceptMap.fallbackText}
-                </p>
-              ) : (
-                <p className="text-dim italic">No concept map data.</p>
-              ))}
-            {(state.tabs.conceptMap.status === "idle" ||
-              state.tabs.conceptMap.status === "streaming") && (
-              <p className="text-dim italic">Loading concept map...</p>
-            )}
-            {state.tabs.conceptMap.status === "error" && (
-              <p className="text-red-400/70 italic">Failed to generate concept map.</p>
-            )}
-          </div>
+          <ConceptMapTab
+            status={state.tabs.conceptMap.status}
+            mermaid={state.tabs.conceptMap.mermaid}
+            fallbackText={state.tabs.conceptMap.fallbackText}
+          />
         )}
+      </div>
+
+      {/* Footer actions */}
+      <div className="flex items-center gap-1.5 px-3 py-2 border-t border-border shrink-0">
+        <button
+          type="button"
+          onClick={handleInsertIntoNote}
+          disabled={!hasActiveContent}
+          className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-white/[0.04] text-muted hover:text-secondary hover:bg-white/[0.06] transition-colors disabled:text-dim disabled:cursor-not-allowed"
+          title="Insert into note"
+        >
+          <FileInput size={10} />
+          Insert
+        </button>
+        <button
+          type="button"
+          onClick={handleCreateInsightNote}
+          disabled={!hasActiveContent}
+          className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-white/[0.04] text-muted hover:text-secondary hover:bg-white/[0.06] transition-colors disabled:text-dim disabled:cursor-not-allowed"
+          title="Create note from insight"
+        >
+          <FilePlus size={10} />
+          Create note
+        </button>
+        {state.activeTab === "assessment" &&
+          state.tabs.assessment.questions.length > 0 &&
+          Object.keys(state.quizState.answers).length >=
+            state.tabs.assessment.questions.length * 0.5 && (
+            <button
+              type="button"
+              onClick={() => actions.saveFlashcards(`insight-${Date.now()}`)}
+              className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-brand/20 text-brand hover:bg-brand/30 transition-colors"
+              title="Save as flashcard deck"
+            >
+              <BookOpen size={10} />
+              Save as Deck
+            </button>
+          )}
+        <button
+          type="button"
+          onClick={handleCopy}
+          disabled={!hasActiveContent}
+          className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-white/[0.04] text-muted hover:text-secondary hover:bg-white/[0.06] transition-colors disabled:text-dim disabled:cursor-not-allowed ml-auto"
+          title="Copy to clipboard"
+        >
+          <Copy size={10} />
+          {copied ? "Copied!" : "Copy"}
+        </button>
       </div>
     </div>
   );
