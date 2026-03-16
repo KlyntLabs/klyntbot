@@ -1,5 +1,6 @@
 use desktop_shared::commands::{
-    NoteCreateParams, NoteLinkResponse, NoteResponse, NoteUpdateParams, NoteVersionResponse,
+    BacklinkResponse, NoteCreateParams, NoteLinkResponse, NoteResponse, NoteUpdateParams,
+    NoteVersionResponse,
 };
 use desktop_shared::errors::ApiError;
 use desktop_shared::types::EntityKind;
@@ -287,6 +288,66 @@ impl AppCore {
         }];
         Ok((response, updates))
     }
+
+    // ── Archive handlers ─────────────────────────────────────────────
+
+    pub async fn note_archive(&self, id: &str) -> HandlerResult<()> {
+        self.note_repo
+            .archive_note(id)
+            .await
+            .map_err(map_storage_err)?;
+
+        let updates = vec![EntityUpdate {
+            kind: EntityKind::Note,
+            id: id.to_string(),
+        }];
+        Ok(((), updates))
+    }
+
+    pub async fn note_unarchive(&self, id: &str) -> HandlerResult<()> {
+        self.note_repo
+            .unarchive_note(id)
+            .await
+            .map_err(map_storage_err)?;
+
+        let updates = vec![EntityUpdate {
+            kind: EntityKind::Note,
+            id: id.to_string(),
+        }];
+        Ok(((), updates))
+    }
+
+    pub async fn note_list_archived(&self) -> Result<Vec<NoteResponse>, ApiError> {
+        let rows = self
+            .note_repo
+            .list_archived_notes()
+            .await
+            .map_err(map_storage_err)?;
+
+        notes_with_tags_batch(self, &rows).await
+    }
+
+    // ── Backlinks handler ───────────────────────────────────────────
+
+    pub async fn note_backlinks(&self, note_id: &str) -> Result<Vec<BacklinkResponse>, ApiError> {
+        let rows = self
+            .note_repo
+            .get_backlinks_with_context(note_id)
+            .await
+            .map_err(map_storage_err)?;
+
+        let mut results = Vec::with_capacity(rows.len());
+        for (row, context) in &rows {
+            let note = note_with_tags(self, row).await?;
+            results.push(BacklinkResponse {
+                note,
+                context: context.clone(),
+            });
+        }
+        Ok(results)
+    }
+
+    // ── Attachment handler ──────────────────────────────────────────
 
     pub async fn note_save_attachment(
         &self,

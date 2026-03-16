@@ -95,3 +95,29 @@ pub struct NotebookCreateParams {
     pub parent_id: Option<String>,
     pub icon: Option<String>,
 }
+
+// ── Inbox ─────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InboxCreateParams {
+    pub content: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InboxItemResponse {
+    pub id: String,
+    pub content: String,
+    pub status: String,
+    pub created_at: String,
+}
+
+// ── Backlinks ─────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BacklinkResponse {
+    pub note: NoteResponse,
+    pub context: Option<String>,
+}

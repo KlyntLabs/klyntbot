@@ -168,6 +168,42 @@ impl NoteRepo {
         Ok(rows)
     }
 
+    /// Set `archived = 1` and update `updated_at`.
+    pub async fn archive_note(&self, id: &str) -> Result<NoteRow, StorageError> {
+        let row = sqlx::query_as::<_, NoteRow>(
+            "UPDATE notes SET archived = 1, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+             WHERE id = ?1
+             RETURNING *",
+        )
+        .bind(id)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(row)
+    }
+
+    /// Set `archived = 0` and update `updated_at`.
+    pub async fn unarchive_note(&self, id: &str) -> Result<NoteRow, StorageError> {
+        let row = sqlx::query_as::<_, NoteRow>(
+            "UPDATE notes SET archived = 0, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+             WHERE id = ?1
+             RETURNING *",
+        )
+        .bind(id)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(row)
+    }
+
+    /// List all archived notes, most recently updated first.
+    pub async fn list_archived_notes(&self) -> Result<Vec<NoteRow>, StorageError> {
+        let rows = sqlx::query_as::<_, NoteRow>(
+            "SELECT * FROM notes WHERE archived = 1 ORDER BY updated_at DESC",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
+    }
+
     /// Quick liveness check — verifies the notes table is accessible.
     pub async fn check_health(&self) -> Result<(), StorageError> {
         sqlx::query("SELECT 1 FROM notes LIMIT 1")

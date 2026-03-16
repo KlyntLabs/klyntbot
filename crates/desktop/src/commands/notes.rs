@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
 use desktop_shared::commands::{
-    NoteCreateParams, NoteLinkResponse, NoteResponse, NoteUpdateParams, NoteVersionResponse,
-    NotebookCreateParams, NotebookResponse, NotebookUpdateParams,
+    BacklinkResponse, InboxCreateParams, InboxItemResponse, NoteCreateParams, NoteLinkResponse,
+    NoteResponse, NoteUpdateParams, NoteVersionResponse, NotebookCreateParams, NotebookResponse,
+    NotebookUpdateParams,
 };
 use desktop_shared::errors::ApiError;
 use tauri::State;
@@ -167,6 +168,96 @@ pub async fn notebook_delete(
     Ok(result)
 }
 
+// ── Archive commands ───────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn note_archive(
+    state: State<'_, Arc<AppCore>>,
+    app: tauri::AppHandle,
+    id: String,
+) -> Result<(), ApiError> {
+    let (_, updates) = state.note_archive(&id).await?;
+    super::emit_updates(&app, &updates);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn note_unarchive(
+    state: State<'_, Arc<AppCore>>,
+    app: tauri::AppHandle,
+    id: String,
+) -> Result<(), ApiError> {
+    let (_, updates) = state.note_unarchive(&id).await?;
+    super::emit_updates(&app, &updates);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn note_list_archived(
+    state: State<'_, Arc<AppCore>>,
+) -> Result<Vec<NoteResponse>, ApiError> {
+    state.note_list_archived().await
+}
+
+// ── Backlink commands ─────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn note_backlinks(
+    state: State<'_, Arc<AppCore>>,
+    id: String,
+) -> Result<Vec<BacklinkResponse>, ApiError> {
+    state.note_backlinks(&id).await
+}
+
+// ── Tag commands ──────────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn note_tags_all(
+    state: State<'_, Arc<AppCore>>,
+) -> Result<Vec<(String, i64)>, ApiError> {
+    state
+        .note_repo
+        .get_all_tags()
+        .await
+        .map_err(|e| ApiError::new("STORAGE", e.to_string()))
+}
+
+// ── Unlinked mentions (stub) ──────────────────────────────────────────
+
+#[tauri::command]
+pub async fn note_unlinked_mentions(
+    state: State<'_, Arc<AppCore>>,
+    id: String,
+) -> Result<Vec<NoteResponse>, ApiError> {
+    let _ = (&state, &id);
+    Ok(vec![])
+}
+
+// ── Inbox commands ────────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn inbox_create(
+    state: State<'_, Arc<AppCore>>,
+    params: InboxCreateParams,
+) -> Result<InboxItemResponse, ApiError> {
+    state.inbox_create(&params.content).await
+}
+
+#[tauri::command]
+pub async fn inbox_list(
+    state: State<'_, Arc<AppCore>>,
+) -> Result<Vec<InboxItemResponse>, ApiError> {
+    state.inbox_list().await
+}
+
+#[tauri::command]
+pub async fn inbox_delete(
+    state: State<'_, Arc<AppCore>>,
+    id: String,
+) -> Result<(), ApiError> {
+    state.inbox_delete(&id).await
+}
+
 // ── Dev server dispatch ─────────────────────────────────────────────
 
 #[cfg(test)]
@@ -187,6 +278,15 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "notebook_create",
     "notebook_update",
     "notebook_delete",
+    "note_archive",
+    "note_unarchive",
+    "note_list_archived",
+    "note_backlinks",
+    "note_tags_all",
+    "note_unlinked_mentions",
+    "inbox_create",
+    "inbox_list",
+    "inbox_delete",
 ];
 
 #[cfg(debug_assertions)]
@@ -248,6 +348,39 @@ pub(crate) async fn dispatch_dev(
         "notebook_delete" => {
             let id = try_field!(dev::get_str(body, "id"));
             dev::val_rh(core.notebook_delete(id).await)
+        }
+        "note_archive" => {
+            let id = try_field!(dev::get_str(body, "id"));
+            dev::val_rh(core.note_archive(&id).await)
+        }
+        "note_unarchive" => {
+            let id = try_field!(dev::get_str(body, "id"));
+            dev::val_rh(core.note_unarchive(&id).await)
+        }
+        "note_list_archived" => dev::val(core.note_list_archived().await),
+        "note_backlinks" => {
+            let id = try_field!(dev::get_str(body, "id"));
+            dev::val(core.note_backlinks(&id).await)
+        }
+        "note_tags_all" => {
+            dev::val(
+                core.note_repo
+                    .get_all_tags()
+                    .await
+                    .map_err(|e| ApiError::new("STORAGE", e.to_string())),
+            )
+        }
+        "note_unlinked_mentions" => {
+            let _id = try_field!(dev::get_str(body, "id"));
+            dev::val(Ok::<Vec<NoteResponse>, ApiError>(vec![]))
+        }
+        "inbox_create" => dev::val(core.inbox_create(
+            &try_field!(dev::parse_params::<desktop_shared::commands::InboxCreateParams>(body)).content,
+        ).await),
+        "inbox_list" => dev::val(core.inbox_list().await),
+        "inbox_delete" => {
+            let id = try_field!(dev::get_str(body, "id"));
+            dev::val(core.inbox_delete(&id).await)
         }
         _ => return None,
     })
