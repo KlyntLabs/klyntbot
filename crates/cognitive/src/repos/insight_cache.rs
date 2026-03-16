@@ -192,7 +192,10 @@ mod tests {
         // get() should return the same row
         let fetched = repo.get(note_id).await.unwrap();
         assert!(fetched.is_some());
-        assert_eq!(fetched.unwrap().synthesis.as_deref(), Some("synthesis text"));
+        assert_eq!(
+            fetched.unwrap().synthesis.as_deref(),
+            Some("synthesis text")
+        );
 
         // get_if_fresh with matching hash returns the row
         let fresh = repo.get_if_fresh(note_id, hash).await.unwrap();

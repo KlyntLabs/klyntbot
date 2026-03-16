@@ -18,7 +18,9 @@ pub use entity::{
 pub use episodic_memory::EpisodicMemoryRepo;
 pub use event_log::EventLogRepo;
 pub use failed_observation::FailedObservationRepo;
-pub use flashcard::{CardType, DeckSummary, FlashcardRepo, FlashcardRow, NewFlashcard, ReviewQuality};
+pub use flashcard::{
+    CardType, DeckSummary, FlashcardRepo, FlashcardRow, NewFlashcard, ReviewQuality,
+};
 pub use insight_cache::{InsightCacheRepo, InsightCacheRow};
 pub use persona::{NewPersona, PersonaRepo, PersonaRow};
 pub use procedural_rule::ProceduralRuleRepo;

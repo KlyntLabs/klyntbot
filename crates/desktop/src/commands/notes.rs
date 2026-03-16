@@ -469,14 +469,12 @@ pub(crate) async fn dispatch_dev(
             let id = try_field!(dev::get_str(body, "noteId"));
             dev::val(core.note_insight_cache_get(&id).await)
         }
-        "note_insight_save_flashcards" => {
-            dev::val(
-                core.insight_save_flashcards(
-                    try_field!(dev::parse_params::<desktop_shared::commands::InsightSaveFlashcardsParams>(body)),
-                )
+        "note_insight_save_flashcards" => dev::val(
+            core.insight_save_flashcards(try_field!(dev::parse_params::<
+                desktop_shared::commands::InsightSaveFlashcardsParams,
+            >(body)))
                 .await,
-            )
-        }
+        ),
         "note_insight_regenerate_tab" => {
             let id = try_field!(dev::get_str(body, "noteId"));
             let tab = try_field!(dev::get_str(body, "tab"));

@@ -147,7 +147,10 @@ impl AppCore {
                 question: r.question,
                 answer: r.answer,
                 card_type: r.card_type,
-                choices: r.choices.as_deref().and_then(|s| serde_json::from_str(s).ok()),
+                choices: r
+                    .choices
+                    .as_deref()
+                    .and_then(|s| serde_json::from_str(s).ok()),
                 stability: r.stability,
                 difficulty: r.difficulty,
                 due_at: r.due_at,

@@ -235,8 +235,12 @@ impl AppCore {
             event_emitter: event_emitter.unwrap_or_else(|| Arc::new(NoopEmitter)),
             note_embedding_handler,
             launcher_engine,
-            insight_cache_repo: Some(::cognitive::InsightCacheRepo::new(storage_pool.inner().clone())),
-            flashcard_repo: Some(::cognitive::FlashcardRepo::new(storage_pool.inner().clone())),
+            insight_cache_repo: Some(::cognitive::InsightCacheRepo::new(
+                storage_pool.inner().clone(),
+            )),
+            flashcard_repo: Some(::cognitive::FlashcardRepo::new(
+                storage_pool.inner().clone(),
+            )),
         };
 
         // ── Background note embedding catch-up ────────────────────────────

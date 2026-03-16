@@ -90,17 +90,17 @@ impl FlashcardRepo {
     }
 
     /// Insert a batch of new flashcards. All cards are immediately due (`due_at = now`).
-    pub async fn create_batch(&self, cards: Vec<NewFlashcard>) -> Result<Vec<FlashcardRow>, sqlx::Error> {
+    pub async fn create_batch(
+        &self,
+        cards: Vec<NewFlashcard>,
+    ) -> Result<Vec<FlashcardRow>, sqlx::Error> {
         let now = Utc::now().to_rfc3339();
         let mut rows = Vec::with_capacity(cards.len());
 
         for card in cards {
             let id = Uuid::new_v4().to_string();
             let card_type_str = card.card_type.to_string();
-            let choices_str = card
-                .choices
-                .as_ref()
-                .map(|v| v.to_string());
+            let choices_str = card.choices.as_ref().map(|v| v.to_string());
 
             sqlx::query(
                 r#"
@@ -131,12 +131,10 @@ impl FlashcardRepo {
             .execute(&self.pool)
             .await?;
 
-            let row = sqlx::query_as::<_, FlashcardRow>(
-                "SELECT * FROM flashcards WHERE id = ?1",
-            )
-            .bind(&id)
-            .fetch_one(&self.pool)
-            .await?;
+            let row = sqlx::query_as::<_, FlashcardRow>("SELECT * FROM flashcards WHERE id = ?1")
+                .bind(&id)
+                .fetch_one(&self.pool)
+                .await?;
 
             rows.push(row);
         }
@@ -145,7 +143,11 @@ impl FlashcardRepo {
     }
 
     /// Fetch cards in `deck` that are due for review (due_at <= now or NULL).
-    pub async fn get_due_cards(&self, deck: &str, limit: i64) -> Result<Vec<FlashcardRow>, sqlx::Error> {
+    pub async fn get_due_cards(
+        &self,
+        deck: &str,
+        limit: i64,
+    ) -> Result<Vec<FlashcardRow>, sqlx::Error> {
         let now = Utc::now().to_rfc3339();
         let rows = sqlx::query_as::<_, FlashcardRow>(
             r#"
@@ -164,7 +166,11 @@ impl FlashcardRepo {
     }
 
     /// Record a review for a card and update FSRS scheduling fields.
-    pub async fn record_review(&self, id: &str, quality: ReviewQuality) -> Result<FlashcardRow, sqlx::Error> {
+    pub async fn record_review(
+        &self,
+        id: &str,
+        quality: ReviewQuality,
+    ) -> Result<FlashcardRow, sqlx::Error> {
         let card = sqlx::query_as::<_, FlashcardRow>("SELECT * FROM flashcards WHERE id = ?1")
             .bind(id)
             .fetch_one(&self.pool)
@@ -178,16 +184,13 @@ impl FlashcardRepo {
                 let s = (current_stability / 2.0).max(0.1);
                 (s, "relearning".to_string(), current_lapses + 1)
             }
-            ReviewQuality::Hard => {
-                (current_stability, "review".to_string(), current_lapses)
-            }
+            ReviewQuality::Hard => (current_stability, "review".to_string(), current_lapses),
             ReviewQuality::Good => {
                 let s = crate::services::decay::update_stability(current_stability, true, 90.0);
                 (s, "review".to_string(), current_lapses)
             }
             ReviewQuality::Easy => {
-                let grown =
-                    crate::services::decay::update_stability(current_stability, true, 90.0);
+                let grown = crate::services::decay::update_stability(current_stability, true, 90.0);
                 let s = current_stability + (grown - current_stability) * 1.3;
                 (s, "review".to_string(), current_lapses)
             }
@@ -347,7 +350,10 @@ mod tests {
         let card_id = &created[0].id;
         let original_stability = created[0].stability;
 
-        let updated = repo.record_review(card_id, ReviewQuality::Good).await.unwrap();
+        let updated = repo
+            .record_review(card_id, ReviewQuality::Good)
+            .await
+            .unwrap();
 
         assert!(
             updated.stability > original_stability,
