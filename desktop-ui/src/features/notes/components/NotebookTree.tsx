@@ -619,7 +619,6 @@ function TreeContextMenu({
                   type="button"
                   onClick={() => {
                     onUpdateNotebook(target.notebook.id, { icon: name });
-                    onClose();
                   }}
                   className={`w-8 h-8 rounded-md flex items-center justify-center hover:bg-white/[0.1] transition-colors ${
                     isActive ? "bg-white/[0.12] ring-1 ring-brand/40" : ""
@@ -644,7 +643,6 @@ function TreeContextMenu({
                   } else {
                     onUpdateNotebook(target.notebook.id, { color });
                   }
-                  onClose();
                 }}
                 className={`w-5 h-5 rounded-full border transition-transform hover:scale-125 ${
                   target.notebook.color === color && color !== null
@@ -717,7 +715,6 @@ function TreeContextMenu({
                 type="button"
                 onClick={() => {
                   onUpdateNote(note.id, { icon: name });
-                  onClose();
                 }}
                 className={`w-8 h-8 rounded-md flex items-center justify-center hover:bg-white/[0.1] transition-colors ${
                   isActive ? "bg-white/[0.12] ring-1 ring-brand/40" : ""
@@ -742,7 +739,6 @@ function TreeContextMenu({
                 } else {
                   onUpdateNote(note.id, { color });
                 }
-                onClose();
               }}
               className={`w-5 h-5 rounded-full border transition-transform hover:scale-125 ${
                 note.color === color && color !== null
