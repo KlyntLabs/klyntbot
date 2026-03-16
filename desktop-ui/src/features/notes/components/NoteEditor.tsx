@@ -1,6 +1,6 @@
 import { ipc } from "@shared/hooks/useIpc";
 import type { Note, NoteUpdateParams } from "@shared/types";
-import { GitGraph, History, PenLine, Plus } from "lucide-react";
+import { GitGraph, History, PenLine } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { EditorContentWrapper, useEntityResolution, useNoteEditor } from "./editor/EditorCore";
@@ -11,7 +11,6 @@ import { VimCommandLine } from "./editor/VimCommandLine";
 import type { VimMode } from "./editor/vim";
 import { getVimPlugin, VIM_SAVE_EVENT } from "./editor/vim";
 import { WikiLinkMenu } from "./editor/WikiLinkNode";
-import { NoteTags, type NoteTagsHandle } from "./NoteTags";
 import { NoteVersionHistory } from "./NoteVersionHistory";
 
 const VERSION_INTERVAL_MS = 5 * 60 * 1000; // Minimum interval between auto-saving version snapshots
@@ -27,7 +26,6 @@ interface NoteEditorProps {
 
 export function NoteEditor({ note, onSave, viewMode, onViewModeChange }: NoteEditorProps) {
   const navigate = useNavigate();
-  const tagsRef = useRef<NoteTagsHandle>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastNoteIdRef = useRef(note.id);
   const pendingRef = useRef<{ html: string; markdown: string } | null>(null);
@@ -142,13 +140,6 @@ export function NoteEditor({ note, onSave, viewMode, onViewModeChange }: NoteEdi
     }
   }, [note.id, editor, flushSave]);
 
-  const handleTagsChange = useCallback(
-    (tags: string[]) => {
-      onSaveRef.current({ id: note.id, tags });
-    },
-    [note.id],
-  );
-
   const handleRestore = useCallback(
     (restored: Note) => {
       if (editor) {
@@ -233,62 +224,44 @@ export function NoteEditor({ note, onSave, viewMode, onViewModeChange }: NoteEdi
             onToggleVim={toggleVim}
           />
 
-          {/* Row 2: Title + tags + toggles */}
-          <div className="flex items-center gap-2.5">
-            <div className="flex items-center gap-2 flex-1 min-w-0">
-              <span className="text-sm font-semibold text-primary truncate shrink-0 max-w-[240px]">
-                {note.title}
-              </span>
-              <div className="w-px h-3.5 bg-white/[0.08] shrink-0" />
-              <NoteTags ref={tagsRef} tags={note.tags} onChange={handleTagsChange} />
-            </div>
-            <div className="flex items-center gap-0.5 shrink-0">
-              <button
-                type="button"
-                onClick={() => tagsRef.current?.startAdding()}
-                className="p-1.5 rounded-lg transition-all text-dim hover:text-secondary hover:bg-white/[0.04]"
-                aria-label="Add tag"
-              >
-                <Plus className="w-3.5 h-3.5" />
-              </button>
-              <div className="w-px h-4 bg-white/[0.08] mx-0.5" />
-              <button
-                type="button"
-                onClick={() => setShowHistory(!showHistory)}
-                className={`p-1.5 rounded-lg transition-all ${
-                  showHistory
-                    ? "bg-white/[0.1] text-primary"
-                    : "text-dim hover:text-secondary hover:bg-white/[0.04]"
-                }`}
-                aria-label="Toggle version history"
-              >
-                <History className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => onViewModeChange("editor")}
-                className={`p-1.5 rounded-lg transition-all ${
-                  viewMode === "editor"
-                    ? "bg-white/[0.1] text-primary"
-                    : "text-dim hover:text-secondary hover:bg-white/[0.04]"
-                }`}
-                aria-label="Editor view"
-              >
-                <PenLine className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => onViewModeChange("graph")}
-                className={`p-1.5 rounded-lg transition-all ${
-                  viewMode === "graph"
-                    ? "bg-white/[0.1] text-primary"
-                    : "text-dim hover:text-secondary hover:bg-white/[0.04]"
-                }`}
-                aria-label="Graph view"
-              >
-                <GitGraph className="w-4 h-4" />
-              </button>
-            </div>
+          {/* Row 2: Toggle buttons */}
+          <div className="flex items-center justify-end gap-0.5">
+            <button
+              type="button"
+              onClick={() => setShowHistory(!showHistory)}
+              className={`p-1.5 rounded-lg transition-all ${
+                showHistory
+                  ? "bg-white/[0.1] text-primary"
+                  : "text-dim hover:text-secondary hover:bg-white/[0.04]"
+              }`}
+              aria-label="Toggle version history"
+            >
+              <History className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onViewModeChange("editor")}
+              className={`p-1.5 rounded-lg transition-all ${
+                viewMode === "editor"
+                  ? "bg-white/[0.1] text-primary"
+                  : "text-dim hover:text-secondary hover:bg-white/[0.04]"
+              }`}
+              aria-label="Editor view"
+            >
+              <PenLine className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onViewModeChange("graph")}
+              className={`p-1.5 rounded-lg transition-all ${
+                viewMode === "graph"
+                  ? "bg-white/[0.1] text-primary"
+                  : "text-dim hover:text-secondary hover:bg-white/[0.04]"
+              }`}
+              aria-label="Graph view"
+            >
+              <GitGraph className="w-4 h-4" />
+            </button>
           </div>
         </div>
 

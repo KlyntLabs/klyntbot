@@ -14,7 +14,7 @@ import { useSearchParams } from "react-router";
 import { ContextPanel } from "../components/ContextPanel";
 import { GraphView } from "../components/GraphView";
 import { NavigationSidebar, type NavigationSidebarHandle } from "../components/NavigationSidebar";
-import { NoteEditor } from "../components/NoteEditor";
+import { NoteEditorPanel } from "../components/NoteEditorPanel";
 
 type ViewMode = "editor" | "graph";
 type LayoutMode = "three-panel" | "focus";
@@ -343,10 +343,12 @@ export default function KnowledgeBasePage() {
                 : "h-full flex flex-col"
             }
           >
-            <NoteEditor
+            <NoteEditorPanel
               key={selectedNote.id}
               note={selectedNote}
+              notebooks={notebooks}
               onSave={updateNote}
+              onRenameNote={handleRenameNote}
               viewMode={viewMode}
               onViewModeChange={setViewMode}
             />
