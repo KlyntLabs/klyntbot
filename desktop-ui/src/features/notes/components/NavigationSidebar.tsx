@@ -1,11 +1,11 @@
 import { ipc } from "@shared/hooks/useIpc";
 import { tagBgColor, tagColor } from "@shared/lib/tagColor";
 import type { InboxItem, Note, Notebook } from "@shared/types";
-import { ChevronRight, Search, X } from "lucide-react";
+import { Search, X } from "lucide-react";
 import type { Ref } from "react";
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
-import { FileTree } from "./FileTree";
 import { InboxSection } from "./InboxSection";
+import { NotebookTree } from "./NotebookTree";
 import { QuickAccessList } from "./QuickAccessList";
 import { TagsExplorer } from "./TagsExplorer";
 
@@ -120,9 +120,6 @@ export function NavigationSidebar({
 
   const handleClearTags = useCallback(() => setActiveTags([]), []);
 
-  // ── Notebooks state ───────────────────────────────────────────────
-  const [notebooksOpen, setNotebooksOpen] = useState(false);
-
   // ── Footer stats ──────────────────────────────────────────────────
   const noteCount = notes.length;
   const notebookCount = notebooks.length;
@@ -193,37 +190,22 @@ export function NavigationSidebar({
             onSelectNote={onSelectNote}
           />
 
-          {/* 4. Notebooks (collapsible) */}
-          <div className="flex flex-col gap-0.5">
-            <button
-              type="button"
-              onClick={() => setNotebooksOpen((prev) => !prev)}
-              className="flex items-center gap-1 px-2 py-1 text-[10px] uppercase tracking-wider text-dim hover:text-muted transition-colors"
-            >
-              <ChevronRight
-                className={`w-3 h-3 transition-transform ${notebooksOpen ? "rotate-90" : ""}`}
-              />
-              <span>Notebooks</span>
-            </button>
-
-            {notebooksOpen && (
-              <FileTree
-                notebooks={notebooks}
-                notes={notes}
-                selectedNoteId={selectedNoteId}
-                onSelectNote={onSelectNote}
-                onCreateNote={onCreateNote}
-                onCreateNotebook={onCreateNotebook}
-                onDeleteNote={onDeleteNote}
-                onPinNote={onPinNote}
-                onDeleteNotebook={onDeleteNotebook}
-                onRenameNotebook={onRenameNotebook}
-                onRenameNote={onRenameNote}
-                onMoveNote={onMoveNote}
-                onMoveNotebook={onMoveNotebook}
-              />
-            )}
-          </div>
+          {/* 4. Notebook Tree */}
+          <NotebookTree
+            notebooks={notebooks}
+            notes={notes}
+            selectedNoteId={selectedNoteId}
+            onSelectNote={onSelectNote}
+            onCreateNote={onCreateNote}
+            onCreateNotebook={onCreateNotebook}
+            onDeleteNote={onDeleteNote}
+            onPinNote={onPinNote}
+            onDeleteNotebook={onDeleteNotebook}
+            onRenameNotebook={onRenameNotebook}
+            onRenameNote={onRenameNote}
+            onMoveNote={onMoveNote}
+            onMoveNotebook={onMoveNotebook}
+          />
 
           {/* 5. Inbox */}
           <InboxSection
