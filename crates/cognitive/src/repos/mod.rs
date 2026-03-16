@@ -4,6 +4,7 @@ pub mod entity;
 pub mod episodic_memory;
 pub mod event_log;
 pub mod failed_observation;
+pub mod flashcard;
 pub mod persona;
 pub mod procedural_rule;
 pub mod semantic_fact;
@@ -16,6 +17,7 @@ pub use entity::{
 pub use episodic_memory::EpisodicMemoryRepo;
 pub use event_log::EventLogRepo;
 pub use failed_observation::FailedObservationRepo;
+pub use flashcard::{CardType, DeckSummary, FlashcardRepo, FlashcardRow, NewFlashcard, ReviewQuality};
 pub use persona::{NewPersona, PersonaRepo, PersonaRow};
 pub use procedural_rule::ProceduralRuleRepo;
 pub use semantic_fact::SemanticFactRepo;
