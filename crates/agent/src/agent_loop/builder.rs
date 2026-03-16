@@ -604,7 +604,7 @@ impl AgentLoopBuilder {
                 None
             };
 
-        // ── Wire automatic memory retrieval (UnifiedMemoryService) ───
+        // ── Wire memory retrieval + InsightForge ─────────────────────
         let context_engine = if let Some(fact_repo) = cognitive_fact_repo {
             let mut retriever = cognitive::UnifiedMemoryService::new(fact_repo)
                 .with_recall_opt(recall_service.clone())
@@ -615,7 +615,18 @@ impl AgentLoopBuilder {
             if let Some(ref sit) = self.user_situation {
                 retriever = retriever.with_situation(Arc::clone(sit));
             }
-            context_engine.with_memory_retriever(Arc::new(retriever))
+            let retriever: Arc<dyn context_engine::MemoryRetriever> = Arc::new(retriever);
+
+            // Create InsightForge with the same retriever
+            let forge = context_engine::InsightForge::new(
+                context_engine::InsightForgeConfig::default(),
+                Arc::new(context_engine::HeuristicDecomposer),
+                Arc::clone(&retriever),
+            );
+
+            context_engine
+                .with_memory_retriever(retriever)
+                .with_insight_forge(forge)
         } else {
             context_engine
         };
