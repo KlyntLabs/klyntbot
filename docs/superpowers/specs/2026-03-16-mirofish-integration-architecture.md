@@ -133,16 +133,27 @@ On every co-occurrence (same entities mentioned together):
 ```rust
 new_strength = (current_strength + 0.1).min(1.0);
 ```
-Gives natural weighting in graph queries — frequently co-occurring entities have stronger edges.
+
+**Decay:** On app startup (or weekly cron), apply time-based decay to all relationship strengths:
+```rust
+// Decay relationships not seen recently (half-life: 60 days)
+let days_since_update = (now - relationship.updated_at).num_days() as f64;
+let decay = 0.5_f64.powf(days_since_update / 60.0);
+new_strength = (relationship.strength * decay).max(0.05);  // Floor at 0.05 (never fully forget)
+```
+
+This prevents stale relationships from permanently dominating graph queries. Frequently reinforced edges stay strong; abandoned ones fade.
 
 ### Backfill (One-Time Phase 0 Migration)
+
+**Step 1: Entities from SPO facts.** Extract unique subjects (excluding "user") and infer type from predicate patterns. Case-normalize names to prevent duplicates:
 
 ```sql
 -- Convert existing SPO facts where subject looks like an entity
 INSERT INTO entities (id, name, entity_type, source, first_seen_at, last_seen_at, created_at, updated_at)
   SELECT
     lower(hex(randomblob(16))),
-    subject,
+    TRIM(subject),
     CASE
       WHEN predicate LIKE '%works_on%' OR predicate LIKE '%project%' THEN 'project'
       WHEN predicate LIKE '%uses%' OR predicate LIKE '%tool%' THEN 'technology'
@@ -154,14 +165,46 @@ INSERT INTO entities (id, name, entity_type, source, first_seen_at, last_seen_at
     MIN(created_at), MIN(created_at)
   FROM semantic_facts
   WHERE subject != 'user'
-  GROUP BY subject;
+  GROUP BY LOWER(TRIM(subject));
+```
 
--- Convert note_entity_mentions into graph edges
+**Step 2: Entities from note_entity_mentions.** `entity_id` in this table is an opaque ID (task UUID, project slug), not a human-readable name. We must JOIN against the source tables to resolve names:
+
+```sql
+-- Create entities from task references
+INSERT OR IGNORE INTO entities (id, name, entity_type, source, source_id, first_seen_at, last_seen_at, created_at, updated_at)
+  SELECT
+    lower(hex(randomblob(16))),
+    t.title,
+    'task',
+    'backfill',
+    nem.entity_id,
+    t.created_at, t.created_at,
+    t.created_at, t.created_at
+  FROM note_entity_mentions nem
+  JOIN tasks t ON nem.entity_id = t.id
+  WHERE nem.entity_type = 'task';
+
+-- Create entities from project references
+INSERT OR IGNORE INTO entities (id, name, entity_type, source, source_id, first_seen_at, last_seen_at, created_at, updated_at)
+  SELECT
+    lower(hex(randomblob(16))),
+    p.title,
+    'project',
+    'backfill',
+    nem.entity_id,
+    p.created_at, p.created_at,
+    p.created_at, p.created_at
+  FROM note_entity_mentions nem
+  JOIN projects p ON nem.entity_id = p.id
+  WHERE nem.entity_type = 'project';
+
+-- Create "references" relationships (note → entity)
 INSERT INTO entity_relationships (id, source_entity_id, target_entity_id, relationship_type, strength, source, valid_from, created_at, updated_at)
   SELECT
     lower(hex(randomblob(16))),
-    (SELECT id FROM entities WHERE name = n.title LIMIT 1),
-    (SELECT id FROM entities WHERE name = nem.entity_id LIMIT 1),
+    note_ent.id,
+    target_ent.id,
     'references',
     0.5,
     'backfill',
@@ -169,11 +212,13 @@ INSERT INTO entity_relationships (id, source_entity_id, target_entity_id, relati
     n.created_at, n.created_at
   FROM note_entity_mentions nem
   JOIN notes n ON nem.note_id = n.id
-  WHERE EXISTS (SELECT 1 FROM entities WHERE name = n.title)
-    AND EXISTS (SELECT 1 FROM entities WHERE name = nem.entity_id);
+  JOIN entities note_ent ON note_ent.source_id = n.id AND note_ent.entity_type = 'concept'
+  JOIN entities target_ent ON target_ent.source_id = nem.entity_id;
 ```
 
 Also links `project_id` where possible (from `semantic_facts.project_id` or `notes.project_id`).
+
+**Note:** The backfill script runs once during Phase 0 migration. For entities where source tables don't exist (e.g., area references), they are created as `concept` type with the raw `entity_id` as `source_id` for later manual review.
 
 ### EntityRepo API
 
@@ -315,13 +360,24 @@ Items found by 3/5 sub-queries rank dramatically higher. After merge: deduplicat
 ### Integration Point
 
 ```rust
-// In ContextEngine builder:
+// In ContextEngine builder — add alongside existing with_memory_retriever():
 pub fn with_insight_forge(mut self, forge: InsightForge) -> Self {
     self.insight_forge = Some(forge);
     self
 }
 
-// In assemble_uncached() — replaces lines 343-379:
+// Also add domain searcher registration:
+pub fn with_domain_searchers(mut self, searchers: Vec<Box<dyn DomainSearcher>>) -> Self {
+    if let Some(ref mut forge) = self.insight_forge {
+        for s in searchers {
+            forge.add_searcher(s);
+        }
+    }
+    self
+}
+
+// In assemble_uncached() — replaces the memory retrieval block
+// (the self.retrieve_memories() call inside the method, NOT by line number):
 let memories = match &self.insight_forge {
     Some(forge) if forge.should_activate(&strategy, &message_text) => {
         forge.retrieve(&message_text, self.memory_retrieval_limit).await
@@ -332,6 +388,8 @@ let memories = match &self.insight_forge {
     }
 };
 ```
+
+**Plumbing path:** `app-core` creates the `DomainSearcher` instances from feature crates (L4) and passes them into `ContextEngine::builder().with_domain_searchers(vec![...])` during app initialization. This follows the same dependency inversion pattern used for `MemoryRetriever` (trait in L3, impl in L5, injected from L7).
 
 ### Latency & Cost
 
@@ -351,16 +409,19 @@ let memories = match &self.insight_forge {
     "insightForge": {
       "enabled": true,
       "model": "gemini-2.0-flash",
-      "timeout_ms": 2000,
-      "max_sub_queries": 5,
-      "per_source_limit": 5,
-      "per_source_timeout_ms": 800,
-      "circuit_breaker_threshold": 3,
-      "circuit_breaker_cooldown_secs": 300
-    }
+      "timeoutMs": 2000,
+      "maxSubQueries": 5,
+      "perSourceLimit": 5,
+      "perSourceTimeoutMs": 800,
+      "circuitBreakerThreshold": 3,
+      "circuitBreakerCooldownSecs": 300
+    },
+    "temporalWeight": 0.05
   }
 }
 ```
+
+All config keys use camelCase per project convention (`#[serde(rename_all = "camelCase")]`).
 
 ### Where It Lives
 
@@ -389,11 +450,12 @@ let memories = match &self.insight_forge {
 
 ```rust
 pub struct TemporalService {
-    fact_repo: SemanticFactRepo,
-    archive_repo: ArchiveRepo,
+    fact_repo: SemanticFactRepo,  // Also handles archive ops (archive_superseded, search_archived, reinstate_archived)
     entity_repo: EntityRepo,
 }
 ```
+
+**Note:** There is no separate `ArchiveRepo` — archive operations are methods on `SemanticFactRepo` itself (`archive_superseded`, `search_archived`, `reinstate_archived`). `TemporalService` uses these existing methods to query both active facts and archived facts.
 
 #### Capability 1: Fact History Queries
 
@@ -409,23 +471,29 @@ Queries both `semantic_facts` AND `semantic_facts_archive` for matching `subject
 
 #### Capability 2: Contradiction Detection (In-Pipeline)
 
-Integrated into existing `ConsolidationHandler::decide_batch()` — not a separate step:
+Integrated into `BackgroundConsolidationService` **after** `execute_memory_ops()` completes — not inside `decide_batch()` (which is a trait method with no bus access):
 
 ```rust
-// When decide_batch returns Update:
-if new_fact.object != existing_fact.object
-    && existing_fact.confidence >= 0.7
-    && existing_fact.source == "user_stated"
-    && !is_same_session(existing_fact, current_session)  // same-session guard
-{
-    bus.publish(DomainEvent::ContradictionDetected {
-        existing: existing_fact.clone(),
-        new: new_fact.clone(),
-    });
+// In BackgroundConsolidationService, after execute_memory_ops():
+for op in &ops {
+    if let MemoryOp::Update { old, new } = op {
+        if old.object != new.object
+            && old.confidence >= 0.7
+            && old.source == "user_stated"
+            && !is_same_session(&old.recorded_at, &current_session_start)
+        {
+            self.bus.publish(DomainEvent::ContradictionDetected {
+                existing: old.clone(),
+                new: new.clone(),
+            });
+        }
+    }
 }
 ```
 
-**When NOT to surface:** Low-confidence facts (< 0.7), non-user-stated facts, same-session updates, trivial predicates (timestamps, counts).
+**Prerequisites:** Add `ContradictionDetected { existing: SemanticFactRow, new: ExtractedFact }` variant to the `DomainEvent` enum in `crates/bus/src/domain_events.rs`. The agent runtime subscribes to this event and surfaces it conversationally.
+
+**When NOT to surface:** Low-confidence facts (< 0.7), non-user-stated facts, same-session updates (compare `recorded_at` vs session start), trivial predicates (timestamps, counts).
 
 #### Capability 3: Change Summaries
 
@@ -449,18 +517,9 @@ No LLM call needed — structured data that the agent or report skill can narrat
 
 ### Temporal Backfill Migration (Phase 0)
 
-```sql
--- Idempotent backfill: set valid_from = created_at for facts missing it
-UPDATE semantic_facts
-SET valid_from = created_at
-WHERE valid_from IS NULL;
+**No SQL backfill needed.** The existing `semantic_facts` and `semantic_facts_archive` schemas already declare `valid_from TEXT NOT NULL` — the column is fully populated for all rows. The temporal scoring weight (Phase 3) will work immediately with existing data.
 
-UPDATE semantic_facts_archive
-SET valid_from = COALESCE(valid_from, created_at)
-WHERE valid_from IS NULL;
-```
-
-Safe, idempotent. Logs count of facts touched. Future facts automatically get `valid_from = Utc::now()` during extraction.
+The only Phase 0 action for temporal: ensure the new `entity_relationships` table has `valid_from` populated during extraction (already included in the schema above).
 
 ### Temporal Scoring in Retrieval
 
@@ -526,7 +585,7 @@ Synthesize into a balanced approach, then create your step-by-step plan."
 
 One line change. No new calls, no new module, no cost. The LLM naturally produces more balanced plans.
 
-**Gate:** Only for decision-oriented requests. "Should I migrate?" → yes. "Migrate this database" → no. Distinguished by intent analyzer's existing action keyword detection + `has_sequential_deps` flag.
+**Gate:** Only for decision-oriented requests. "Should I migrate?" → yes. "Migrate this database" → no. Distinguished by: (1) absence of imperative action keywords in the heuristic layer, and (2) the `ComplexitySignals.estimated_tool_calls` field — if tool calls ≥ 2 and no explicit action keywords, it's likely a decision/analysis request. If the intent analyzer's `has_sequential_deps` flag is available (from `ComplexitySignals`), use it as an additional signal — sequential deps suggest action-oriented execution, not decision-making.
 
 ### Mode 2: Explicit (On Request) — Phase 4
 
@@ -569,11 +628,13 @@ Schema and full API defined in `2026-03-16-insight-review-design.md` §3.
 ```json
 {
   "perspectives": {
-    "internal_enabled": true,
-    "default_personas": ["skeptical", "pragmatic", "analytical"]
+    "internalEnabled": true,
+    "defaultPersonaIds": ["builtin-skeptic", "builtin-practitioner", "builtin-strategist"]
   }
 }
 ```
+
+The `defaultPersonaIds` array references persona `id` values (not tone strings). These are the IDs seeded during migration for the 6 builtin personas. When `PersonaRepo::select_for_note()` has no pinned personas and no domain matches, it falls back to these IDs.
 
 ---
 

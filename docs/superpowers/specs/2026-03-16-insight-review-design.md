@@ -206,6 +206,7 @@ CREATE TABLE IF NOT EXISTS insight_review_cache (
     concept_map TEXT,
     perspectives TEXT,
     persona_ids JSON,
+    created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
 
     UNIQUE(note_id, content_hash)
@@ -253,7 +254,8 @@ CREATE TABLE IF NOT EXISTS insight_persona_pins (
 ```
 
 ### Cache Invalidation Strategy
-The `content_hash` is computed from: `SHA-256(note.body + sorted(related_note_ids))`. This means the cache invalidates when:
+The `content_hash` is computed from: `SHA-256(note.title + note.body + sorted(related_note_ids))`. This means the cache invalidates when:
+- The current note's title changes (synthesis references the title)
 - The current note's body changes
 - The set of related notes changes (e.g., new notes become semantically similar)
 
@@ -310,44 +312,34 @@ impl PersonaRepo {
 
 ---
 
-## 5. InsightForge Context Assembly (Upgraded)
+## 5. InsightForge Context Assembly (Shared Platform Component)
 
-Before calling the LLM, the handler assembles context using a **multi-dimensional retrieval strategy** inspired by MiroFish's InsightForge search pattern.
+The Insight Review handler uses the **shared `InsightForge`** module from `context_engine` (L3), as defined in `2026-03-16-mirofish-integration-architecture.md` §3. This is the same multi-dimensional retrieval system that powers all agent conversations — the Insight Review is one consumer, not a separate implementation.
 
-### Step 1: Query Decomposition (NEW)
+### How the Handler Uses InsightForge
 
-A fast LLM call (~0.5s, structured JSON, small model) decomposes the note's topic into 3-5 sub-queries:
+The `note_insight_review` handler in `app-core` calls `InsightForge::retrieve()` directly (not via `ContextEngine::assemble()`), because the Insight Review needs a custom context block format, not the standard agent message list:
 
+```rust
+// In crates/app-core/src/handlers/notes/insight.rs:
+let insight_forge = self.insight_forge.clone(); // Shared instance from app initialization
+let memory_entries = insight_forge.retrieve(&note.title, InsightForgeConfig {
+    max_sub_queries: 5,
+    per_source_limit: 5,
+    total_limit: 15,
+    enable_decomposition: true, // Always decompose for Insight Review
+}).await;
 ```
-Given this note title and first 300 chars, generate 3-5 semantic search queries
-that would retrieve different dimensions of relevant knowledge.
 
-Note: "{title}" — "{body_preview}"
+The handler then assembles the final context block by combining InsightForge results with note-specific data:
 
-Return JSON: { "queries": ["query1", "query2", ...] }
-```
+1. **Current note:** title + full body (always included, up to 4,000 tokens)
+2. **InsightForge results:** semantic facts, related notes, tasks, graph neighborhoods (from multi-dimensional retrieval)
+3. **Direct related notes:** top 8 from `note_suggestions` scoring (title + first 500 chars each)
+4. **Link graph:** backlinks + outlinks for the current note
+5. **Tags:** all tags across the note cluster
 
-### Step 2: Parallel Multi-Source Retrieval
-
-For EACH sub-query (in parallel):
-1. **Cognitive memory:** top 5 semantic facts via `MemoryRetriever` (scored by FSRS retrievability + relevance)
-2. **Note search:** top 3 related notes via embedding similarity
-
-Plus the base retrieval (always runs):
-3. **Current note:** title + full body
-4. **Direct related notes:** top 8 from `note_suggestions` scoring (title + first 500 chars each)
-5. **Link graph:** backlinks + outlinks for the current note
-6. **Tags:** all tags across the note cluster
-
-### Step 3: Merge & Deduplicate
-
-- Deduplicate notes/facts by ID
-- Rank by frequency across sub-queries (a fact found by 3/5 sub-queries ranks higher)
-- Apply token budget: ~12,000 total. Current note: up to 4,000. Related notes + facts split remaining budget (truncate longest first).
-
-### Step 4: Context Block Assembly
-
-The final context block is injected into each tab's prompt with clear sections:
+### Context Block Format
 
 ```
 --- BEGIN KNOWLEDGE CONTEXT ---
@@ -367,6 +359,10 @@ Tags: {tags}
 - {fact_2} (relevance: 0.87)
 ...
 
+## Connected Entities (from Knowledge Graph)
+- {entity_name} ({type}) — {relationship} — {connected_entities}
+...
+
 ## Link Graph
 Backlinks: {note_titles}
 Outlinks: {note_titles}
@@ -374,8 +370,11 @@ Outlinks: {note_titles}
 --- END KNOWLEDGE CONTEXT ---
 ```
 
-### Performance Note
-The query decomposition adds ~0.5-1s latency but significantly enriches context — sub-queries catch connections that single-query search misses. For a note about "distributed systems", the decomposition might generate: "consensus algorithms", "CAP theorem tradeoffs", "real-world distributed failure modes", "microservice patterns" — each pulling different related notes.
+Token budget: ~12,000 total. Current note: up to 4,000. Related notes + facts + entities split the remaining budget (truncate longest first).
+
+### Why Direct InsightForge, Not ContextEngine
+
+`ContextEngine::assemble()` builds a full agent message list (system prompt + history + tool definitions). The Insight Review doesn't need history, tools, or a system prompt — it just needs the enriched context block injected into its own tab-specific prompts. Using `InsightForge::retrieve()` directly avoids unnecessary overhead while sharing the same decomposition + multi-source retrieval logic.
 
 ---
 
