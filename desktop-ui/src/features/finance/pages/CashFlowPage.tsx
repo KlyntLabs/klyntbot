@@ -429,17 +429,18 @@ export function CashFlowPage() {
               <p className="text-[10px] text-muted uppercase tracking-widest">Spending & Budgets</p>
             </div>
             {spendingWithBudgets.map((item, i) => {
-              const budgetAmt = item.budget?.amount ?? 0;
-              const budgetPct = budgetAmt > 0 ? pct(item.spent, budgetAmt) : 0;
-              const barColor =
-                budgetAmt > 0
-                  ? budgetPct >= 80
-                    ? "#f43f5e"
-                    : budgetPct >= 50
-                      ? "#f97316"
-                      : "#34d399"
-                  : COLORS[i % COLORS.length];
-              const barWidth = budgetAmt > 0 ? Math.min(budgetPct, 100) : item.pct;
+              // Use baseAmount for budget comparison (same currency as spending report)
+              const budgetBase = item.budget?.baseAmount ?? 0;
+              const budgetPct = budgetBase > 0 ? pct(item.spent, budgetBase) : 0;
+              const hasBudget = budgetBase > 0;
+              const barColor = hasBudget
+                ? budgetPct >= 80
+                  ? "#f43f5e"
+                  : budgetPct >= 50
+                    ? "#f97316"
+                    : "#34d399"
+                : COLORS[i % COLORS.length];
+              const barWidth = hasBudget ? Math.min(budgetPct, 100) : item.pct;
 
               return (
                 <div
@@ -458,16 +459,16 @@ export function CashFlowPage() {
                       <span className="text-[10px] text-primary tabular-nums">
                         {fmtCompact(convertTotal(item.spent), displayCur, hidden)}
                       </span>
-                      {item.budget && (
+                      {hasBudget && (
                         <span className="text-[9px] text-dim tabular-nums">
-                          / {fmtCompact(convertTotal(item.budget.amount), displayCur, hidden)}
+                          / {fmtCompact(convertTotal(budgetBase), displayCur, hidden)}
                         </span>
                       )}
                       <span
                         className="text-[9px] font-light tabular-nums min-w-[28px] text-right"
                         style={{ color: barColor }}
                       >
-                        {budgetAmt > 0 ? `${budgetPct}%` : `${Math.round(item.pct)}%`}
+                        {hasBudget ? `${budgetPct}%` : `${Math.round(item.pct)}%`}
                       </span>
                     </div>
                   </div>
@@ -477,7 +478,7 @@ export function CashFlowPage() {
                       style={{ width: `${barWidth}%`, background: barColor }}
                     />
                   </div>
-                  {item.budget && budgetPct >= 80 && (
+                  {hasBudget && budgetPct >= 80 && (
                     <p className="text-[8px] text-destructive mt-0.5">
                       ⚠ {budgetPct >= 100 ? "Over budget" : `${100 - budgetPct}% left`}
                     </p>
