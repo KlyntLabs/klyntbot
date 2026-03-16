@@ -4,6 +4,7 @@ mod inbox;
 mod links;
 mod notebooks;
 mod notes;
+mod suggestions;
 mod tags;
 
 use sqlx::SqlitePool;
@@ -370,5 +371,72 @@ mod tests {
 
         let all = repo.list_notes(None).await.unwrap();
         assert_eq!(all.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_find_structural_holes() {
+        let repo = setup().await;
+
+        // Create A -> B, A -> C, B -> D, C -> D
+        // D shares 2 neighbors (B,C) with A but no direct link A->D
+        let a = repo.create_note(&sample_note("a", "Note A")).await.unwrap();
+        let b = repo.create_note(&sample_note("b", "Note B")).await.unwrap();
+        let c = repo.create_note(&sample_note("c", "Note C")).await.unwrap();
+        let d = repo.create_note(&sample_note("d", "Note D")).await.unwrap();
+
+        repo.set_links(&a.id, &[b.id.clone(), c.id.clone()]).await.unwrap();
+        repo.set_links(&b.id, std::slice::from_ref(&d.id)).await.unwrap();
+        repo.set_links(&c.id, std::slice::from_ref(&d.id)).await.unwrap();
+
+        let holes = repo.find_structural_holes(&a.id).await.unwrap();
+        assert!(holes.iter().any(|(id, count)| id == &d.id && *count >= 2));
+    }
+
+    #[tokio::test]
+    async fn test_find_entity_cooccurrences() {
+        let repo = setup().await;
+        let a = repo.create_note(&sample_note("a", "Note A")).await.unwrap();
+        let b = repo.create_note(&sample_note("b", "Note B")).await.unwrap();
+
+        repo.set_entity_mentions(&a.id, &[
+            ("task".to_string(), "t1".to_string()),
+            ("project".to_string(), "p1".to_string()),
+        ]).await.unwrap();
+        repo.set_entity_mentions(&b.id, &[
+            ("task".to_string(), "t1".to_string()),
+            ("project".to_string(), "p1".to_string()),
+        ]).await.unwrap();
+
+        let cooccurrences = repo.find_entity_cooccurrences(&a.id).await.unwrap();
+        assert!(cooccurrences.iter().any(|(id, count)| id == &b.id && *count == 2));
+    }
+
+    #[tokio::test]
+    async fn test_find_tag_overlaps() {
+        let repo = setup().await;
+        let a = repo.create_note(&sample_note("a", "Note A")).await.unwrap();
+        let b = repo.create_note(&sample_note("b", "Note B")).await.unwrap();
+
+        repo.set_tags(&a.id, &["rust".to_string(), "async".to_string()]).await.unwrap();
+        repo.set_tags(&b.id, &["rust".to_string(), "async".to_string()]).await.unwrap();
+
+        let overlaps = repo.find_tag_overlaps(&a.id).await.unwrap();
+        assert!(overlaps.iter().any(|(id, count)| id == &b.id && *count == 2));
+    }
+
+    #[tokio::test]
+    async fn test_get_all_tags() {
+        let repo = setup().await;
+        let a = repo.create_note(&sample_note("a", "Note A")).await.unwrap();
+        let b = repo.create_note(&sample_note("b", "Note B")).await.unwrap();
+
+        repo.set_tags(&a.id, &["rust".to_string(), "async".to_string()]).await.unwrap();
+        repo.set_tags(&b.id, &["rust".to_string()]).await.unwrap();
+
+        let tags = repo.get_all_tags().await.unwrap();
+        assert_eq!(tags[0].0, "rust");
+        assert_eq!(tags[0].1, 2);
+        assert_eq!(tags[1].0, "async");
+        assert_eq!(tags[1].1, 1);
     }
 }
