@@ -24,7 +24,7 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -141,9 +141,7 @@ export function NotebookTree({
       const nb2 = notebookMap.get(b);
       return (na?.title ?? "").localeCompare(nb2?.title ?? "");
     });
-    // Append unfiled notes directly at root, below notebooks
-    const sortedUnfiled = [...unfiledNotes].sort((a, b) => a.title.localeCompare(b.title));
-    for (const n of sortedUnfiled) rootChildren.push(`note:${n.id}`);
+    // Unfiled notes are rendered manually below the tree (not managed by headless-tree)
     m[ROOT_ID] = rootChildren;
 
     // Notebook children: sub-notebooks + notes in this notebook
@@ -206,7 +204,13 @@ export function NotebookTree({
     [onRenameNotebook, onRenameNote],
   );
 
+  const [treeState, setTreeState] = useState<Record<string, unknown>>({
+    expandedItems: [ROOT_ID],
+  });
+
   const tree = useTree<TreeNodeData>({
+    state: treeState,
+    setState: setTreeState,
     rootItemId: ROOT_ID,
     getItemName: (item) => item.getItemData().title,
     isItemFolder: (item) =>
@@ -241,6 +245,11 @@ export function NotebookTree({
       renamingFeature,
     ],
   });
+
+  // Rebuild tree when data changes (notes/notebooks added/removed/renamed)
+  useEffect(() => {
+    tree.rebuildTree();
+  }, [dataMap, childrenMap]);
 
   const handleContextMenu = useCallback(
     (e: React.MouseEvent, itemId: string) => {
@@ -389,9 +398,44 @@ export function NotebookTree({
           );
         })}
 
-        {items.length === 0 && (
+        {items.length === 0 && unfiledNotes.length === 0 && (
           <div className="text-xs text-dim text-center py-6">No notes yet</div>
         )}
+
+        {/* Unfiled notes (outside headless-tree, rendered manually) */}
+        {unfiledNotes.map((note) => (
+          <div
+            key={`unfiled-${note.id}`}
+            onClick={() => onSelectNote(note.id)}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setContextMenu({ kind: "note", note, x: e.clientX, y: e.clientY });
+            }}
+            onKeyDown={(e) => { if (e.key === "Enter") onSelectNote(note.id); }}
+            role="button"
+            tabIndex={0}
+            className={`flex items-center gap-1 py-1 px-1 rounded text-sm cursor-default select-none transition-colors ${
+              note.id === selectedNoteId
+                ? "bg-white/[0.08] text-primary"
+                : "text-secondary hover:bg-white/[0.04]"
+            }`}
+            style={{ paddingLeft: "4px" }}
+          >
+            {note.pinned ? (
+              <Pin className="w-3 h-3 shrink-0 text-brand" />
+            ) : (
+              <FileText className={`w-3.5 h-3.5 shrink-0 ${note.id === selectedNoteId ? "text-brand/70" : "text-dim"}`} />
+            )}
+            <span className={`truncate flex-1 ${note.title === "Untitled" ? "text-dim italic" : ""}`}>
+              {note.title}
+            </span>
+            {note.updatedAt && (
+              <span className="text-[10px] text-dim shrink-0 mr-1">
+                {formatDate(note.updatedAt.slice(0, 10))}
+              </span>
+            )}
+          </div>
+        ))}
 
         {/* Drag line */}
         {tree.getDragLineData() && (
