@@ -18,6 +18,7 @@ use super::integrations::IntegrationsConfig;
 use super::launcher::LauncherConfig;
 use super::learning::LearningConfig;
 use super::mcp::McpConfig;
+use super::notes::NotesConfig;
 use super::orchestrator::OrchestratorConfig;
 use super::packs::PacksConfig;
 use super::plugins::PluginsConfig;
@@ -120,6 +121,9 @@ pub struct Config {
 
     #[serde(default)]
     pub finance: FinanceConfig,
+
+    #[serde(default)]
+    pub notes: NotesConfig,
 
     #[serde(default)]
     pub productivity: ProductivityConfig,

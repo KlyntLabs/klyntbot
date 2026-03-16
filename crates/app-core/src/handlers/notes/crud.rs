@@ -232,8 +232,12 @@ impl AppCore {
             .await
             .map_err(map_storage_err)?;
 
-        // Prune old versions (keep max 50)
-        if let Err(e) = self.note_repo.prune_versions(&note_id, 50).await {
+        // Prune old versions
+        let max_versions = {
+            let config = self.config.read().await;
+            config.notes.max_versions_per_note as i64
+        };
+        if let Err(e) = self.note_repo.prune_versions(&note_id, max_versions).await {
             tracing::warn!(note_id = %note_id, error = %e, "failed to prune old versions");
         }
 
