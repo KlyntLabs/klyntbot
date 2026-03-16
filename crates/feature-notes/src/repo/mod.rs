@@ -1,5 +1,6 @@
 //! Repository for notes, notebooks, tags, links, and version history.
 
+mod inbox;
 mod links;
 mod notebooks;
 mod notes;
@@ -302,6 +303,43 @@ mod tests {
         // Search for something that doesn't exist
         let results = repo.search_fts("Python").await.unwrap();
         assert!(results.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_inbox_create_and_list() {
+        let repo = setup().await;
+
+        let item = repo
+            .create_inbox_item("Quick thought about architecture")
+            .await
+            .unwrap();
+        assert_eq!(item.content, "Quick thought about architecture");
+        assert_eq!(item.status, "pending");
+
+        let items = repo.list_inbox_items().await.unwrap();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].id, item.id);
+    }
+
+    #[tokio::test]
+    async fn test_inbox_delete() {
+        let repo = setup().await;
+
+        let item = repo.create_inbox_item("Temporary thought").await.unwrap();
+        repo.delete_inbox_item(&item.id).await.unwrap();
+
+        let items = repo.list_inbox_items().await.unwrap();
+        assert!(items.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_inbox_count() {
+        let repo = setup().await;
+
+        assert_eq!(repo.count_inbox_items().await.unwrap(), 0);
+        repo.create_inbox_item("Item 1").await.unwrap();
+        repo.create_inbox_item("Item 2").await.unwrap();
+        assert_eq!(repo.count_inbox_items().await.unwrap(), 2);
     }
 
     #[tokio::test]
