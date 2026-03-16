@@ -646,8 +646,8 @@ function TreeContextMenu({
       <ContextMenuSubmenu
         icon={<Smile className="w-4 h-4" />}
         label="Change Icon"
-        open={showIconPicker}
-        onToggle={() => setShowIconPicker(!showIconPicker)}
+        open={openSubmenu === "icon"}
+        onToggle={() => toggleSubmenu("icon")}
         panelClassName="context-menu absolute left-full top-0 ml-1 py-1 w-[280px] animate-[menu-appear_100ms_ease-out]"
       >
         <div className="grid grid-cols-8 gap-1 p-2 max-h-56 overflow-y-auto">
