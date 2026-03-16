@@ -208,9 +208,7 @@ fn normalize_domain_event(e: cognitive::DomainEventRow) -> Option<TimelineEntry>
 
     // DomainEvent uses serde's externally-tagged format: {"TaskStatusChanged": {..}}
     // Extract the inner object for field access.
-    let inner = payload
-        .get(e.event_type.as_str())
-        .unwrap_or(&payload);
+    let inner = payload.get(e.event_type.as_str()).unwrap_or(&payload);
 
     /// Extract a string field from a JSON payload.
     fn field<'a>(payload: &'a serde_json::Value, key: &str) -> Option<&'a str> {

@@ -321,7 +321,16 @@ impl AppCore {
         // Restore the version body
         let updated = self
             .note_repo
-            .update_note(&note_id, None, Some(&version.body), None, None, None, None, None)
+            .update_note(
+                &note_id,
+                None,
+                Some(&version.body),
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
             .await
             .map_err(map_storage_err)?;
 
@@ -336,10 +345,7 @@ impl AppCore {
     // ── Hybrid search (FTS5 + semantic) ────────────────────────────
 
     /// Hybrid search: FTS5 keyword search + semantic vector search, merged by RRF-like scoring.
-    pub async fn note_search_hybrid(
-        &self,
-        query: &str,
-    ) -> Result<HybridSearchResponse, ApiError> {
+    pub async fn note_search_hybrid(&self, query: &str) -> Result<HybridSearchResponse, ApiError> {
         // 1. FTS5 keyword search (always available)
         let keyword_results = self.note_repo.search_notes(query).await.unwrap_or_default();
         let keyword_notes = notes_with_tags_batch(self, &keyword_results).await?;
@@ -359,11 +365,8 @@ impl AppCore {
                                     continue;
                                 }
                                 if let Ok(Some(row)) = self.note_repo.get_note(&note_id).await {
-                                    let tags = self
-                                        .note_repo
-                                        .get_tags(&note_id)
-                                        .await
-                                        .unwrap_or_default();
+                                    let tags =
+                                        self.note_repo.get_tags(&note_id).await.unwrap_or_default();
                                     notes.push(note_row_to_response(&row, tags));
                                 }
                             }
@@ -386,10 +389,7 @@ impl AppCore {
 
     // ── Semantic search ─────────────────────────────────────────────
 
-    pub async fn note_search_semantic(
-        &self,
-        query: &str,
-    ) -> Result<Vec<NoteResponse>, ApiError> {
+    pub async fn note_search_semantic(&self, query: &str) -> Result<Vec<NoteResponse>, ApiError> {
         let handler = self
             .note_embedding_handler
             .as_ref()

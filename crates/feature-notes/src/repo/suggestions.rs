@@ -5,7 +5,10 @@ use super::NoteRepo;
 impl NoteRepo {
     /// Find notes that share graph neighbors with the given note but aren't directly linked.
     /// Returns (note_id, shared_neighbor_count) sorted by count descending.
-    pub async fn find_structural_holes(&self, note_id: &str) -> Result<Vec<(String, i64)>, StorageError> {
+    pub async fn find_structural_holes(
+        &self,
+        note_id: &str,
+    ) -> Result<Vec<(String, i64)>, StorageError> {
         let rows = sqlx::query_as::<_, (String, i64)>(
             "SELECT nl2.target_id, COUNT(*) AS shared
              FROM note_links nl1
@@ -28,7 +31,10 @@ impl NoteRepo {
 
     /// Find notes that mention the same entities as the given note.
     /// Returns (note_id, shared_entity_count) sorted by count descending.
-    pub async fn find_entity_cooccurrences(&self, note_id: &str) -> Result<Vec<(String, i64)>, StorageError> {
+    pub async fn find_entity_cooccurrences(
+        &self,
+        note_id: &str,
+    ) -> Result<Vec<(String, i64)>, StorageError> {
         let rows = sqlx::query_as::<_, (String, i64)>(
             "SELECT nem2.note_id, COUNT(*) AS shared
              FROM note_entity_mentions nem1
@@ -49,7 +55,10 @@ impl NoteRepo {
 
     /// Find notes that share tags but aren't linked to the given note.
     /// Returns (note_id, shared_tag_count) sorted by count descending.
-    pub async fn find_tag_overlaps(&self, note_id: &str) -> Result<Vec<(String, i64)>, StorageError> {
+    pub async fn find_tag_overlaps(
+        &self,
+        note_id: &str,
+    ) -> Result<Vec<(String, i64)>, StorageError> {
         let rows = sqlx::query_as::<_, (String, i64)>(
             "SELECT nt2.note_id, COUNT(*) AS shared
              FROM note_tags nt1

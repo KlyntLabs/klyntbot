@@ -126,11 +126,8 @@ impl AppCore {
         }
         let mut suggested_tags: Vec<(String, usize)> = tag_counts.into_iter().collect();
         suggested_tags.sort_by(|a, b| b.1.cmp(&a.1));
-        let suggested_tags: Vec<String> = suggested_tags
-            .into_iter()
-            .take(5)
-            .map(|(t, _)| t)
-            .collect();
+        let suggested_tags: Vec<String> =
+            suggested_tags.into_iter().take(5).map(|(t, _)| t).collect();
 
         Ok(NoteSuggestionsResponse {
             related_notes,
