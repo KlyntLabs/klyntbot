@@ -57,6 +57,7 @@ pub struct NotebookUpdateParams {
     pub id: String,
     pub title: Option<String>,
     pub icon: Option<String>,
+    pub color: Option<String>,
     #[serde(default, deserialize_with = "deserialize_nullable_field")]
     pub parent_id: Option<Option<String>>,
 }
@@ -68,6 +69,7 @@ pub struct NotebookResponse {
     pub parent_id: Option<String>,
     pub title: String,
     pub icon: Option<String>,
+    pub color: Option<String>,
     pub sort_order: i32,
     pub note_count: i64,
 }
@@ -94,6 +96,7 @@ pub struct NotebookCreateParams {
     pub title: String,
     pub parent_id: Option<String>,
     pub icon: Option<String>,
+    pub color: Option<String>,
 }
 
 // ── Inbox ─────────────────────────────────────────────────────────────

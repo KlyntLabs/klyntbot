@@ -48,6 +48,7 @@ impl AppCore {
             parent_id: params.parent_id,
             title: params.title,
             icon: params.icon,
+            color: params.color,
             sort_order: 0,
             created_at: now.clone(),
             updated_at: now,
@@ -92,6 +93,7 @@ impl AppCore {
                 &params.id,
                 params.title.as_deref(),
                 params.icon.as_deref(),
+                params.color.as_deref(),
                 parent_id_ref,
             )
             .await

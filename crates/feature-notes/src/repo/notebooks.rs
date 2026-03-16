@@ -10,14 +10,15 @@ impl NoteRepo {
 
     pub async fn create_notebook(&self, row: &NotebookRow) -> Result<NotebookRow, StorageError> {
         let result = sqlx::query_as::<_, NotebookRow>(
-            "INSERT INTO notebooks (id, parent_id, title, icon, sort_order, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+            "INSERT INTO notebooks (id, parent_id, title, icon, color, sort_order, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
              RETURNING *",
         )
         .bind(&row.id)
         .bind(&row.parent_id)
         .bind(&row.title)
         .bind(&row.icon)
+        .bind(&row.color)
         .bind(row.sort_order)
         .bind(&row.created_at)
         .bind(&row.updated_at)
@@ -39,6 +40,7 @@ impl NoteRepo {
         id: &str,
         title: Option<&str>,
         icon: Option<&str>,
+        color: Option<&str>,
         parent_id: Option<Option<&str>>,
     ) -> Result<NotebookRow, StorageError> {
         let pid_sentinel = nullable_to_sentinel(parent_id);
@@ -46,10 +48,11 @@ impl NoteRepo {
             "UPDATE notebooks SET
                 title = COALESCE(?2, title),
                 icon = COALESCE(?3, icon),
+                color = COALESCE(?4, color),
                 parent_id = CASE
-                    WHEN ?4 IS NULL THEN parent_id
-                    WHEN ?4 = '' THEN NULL
-                    ELSE ?4
+                    WHEN ?5 IS NULL THEN parent_id
+                    WHEN ?5 = '' THEN NULL
+                    ELSE ?5
                 END,
                 updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
              WHERE id = ?1
@@ -58,6 +61,7 @@ impl NoteRepo {
         .bind(id)
         .bind(title)
         .bind(icon)
+        .bind(color)
         .bind(pid_sentinel)
         .fetch_one(&self.pool)
         .await?;

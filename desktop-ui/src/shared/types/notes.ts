@@ -45,6 +45,7 @@ export interface Notebook {
   parentId: string | null;
   title: string;
   icon: string | null;
+  color: string | null;
   sortOrder: number;
   noteCount: number;
 }

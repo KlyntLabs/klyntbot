@@ -10,6 +10,7 @@ pub struct Notebook {
     pub parent_id: Option<String>,
     pub title: String,
     pub icon: Option<String>,
+    pub color: Option<String>,
     pub sort_order: i32,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -53,6 +54,7 @@ pub struct NotebookRow {
     pub parent_id: Option<String>,
     pub title: String,
     pub icon: Option<String>,
+    pub color: Option<String>,
     pub sort_order: i32,
     pub created_at: String,
     pub updated_at: String,
@@ -130,6 +132,7 @@ impl From<NotebookRow> for Notebook {
             parent_id: r.parent_id,
             title: r.title,
             icon: r.icon,
+            color: r.color,
             sort_order: r.sort_order,
             created_at: r.created_at.parse().unwrap_or_else(|e| {
                 tracing::warn!(raw = %r.created_at, error = %e, "failed to parse notebook created_at");

@@ -168,6 +168,7 @@ mod tests {
             parent_id: None,
             title: "My Notebook".to_string(),
             icon: Some("\u{1f4d3}".to_string()),
+            color: None,
             sort_order: 0,
             created_at: now.clone(),
             updated_at: now,
@@ -179,7 +180,7 @@ mod tests {
         assert_eq!(notebooks[0].title, "My Notebook");
 
         let updated = repo
-            .update_notebook("nb1", Some("Renamed"), None, None)
+            .update_notebook("nb1", Some("Renamed"), None, None, None)
             .await
             .unwrap();
         assert_eq!(updated.title, "Renamed");
@@ -352,6 +353,7 @@ mod tests {
             parent_id: None,
             title: "Work".to_string(),
             icon: None,
+            color: None,
             sort_order: 0,
             created_at: now.clone(),
             updated_at: now,

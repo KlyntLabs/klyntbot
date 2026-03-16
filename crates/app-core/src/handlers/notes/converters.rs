@@ -41,6 +41,7 @@ pub(crate) fn notebook_row_to_response(row: &NotebookRow, note_count: i64) -> No
         parent_id: row.parent_id.clone(),
         title: row.title.clone(),
         icon: row.icon.clone(),
+        color: row.color.clone(),
         sort_order: row.sort_order,
         note_count,
     }

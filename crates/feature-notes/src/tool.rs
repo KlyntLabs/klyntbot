@@ -279,6 +279,7 @@ impl NotesTool {
             parent_id: None,
             title: title.to_string(),
             icon: icon.map(String::from),
+            color: None,
             sort_order: 0,
             created_at: now.clone(),
             updated_at: now,
@@ -358,7 +359,8 @@ impl NotesTool {
         let title = p.optional_str("title")?;
         let icon = p.optional_str("icon")?;
         let parent_id = p.optional_str("parent_id")?.map(Some);
-        let row = self.repo.update_notebook(id, title, icon, parent_id).await?;
+        let color = p.optional_str("color")?;
+        let row = self.repo.update_notebook(id, title, icon, color, parent_id).await?;
         Ok(format!(
             "Updated notebook \"{}\" (id: {})",
             row.title, row.id
