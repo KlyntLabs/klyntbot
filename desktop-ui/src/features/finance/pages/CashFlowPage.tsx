@@ -370,7 +370,7 @@ export function CashFlowPage() {
         {/* Right sidebar — sticky */}
         <div className="w-72 flex-shrink-0 sticky top-0 self-start space-y-4">
           {/* Spending heatmap */}
-          <Card className="p-3">
+          <Card compact className="p-3">
             <SpendingHeatmap
               year={heatmapYear}
               month={heatmapMonth}
@@ -383,7 +383,7 @@ export function CashFlowPage() {
           </Card>
 
           {/* Accounts sidebar */}
-          <Card className="p-3">
+          <Card compact className="p-3">
             <p className="text-[10px] text-muted uppercase tracking-widest mb-2">Accounts</p>
             {activeAccounts.map((acct) => {
               const Icon = ACCT_ICONS[acct.accountType] ?? Wallet;
@@ -424,7 +424,7 @@ export function CashFlowPage() {
           </Card>
 
           {/* Spending & Budgets (merged) */}
-          <Card className="overflow-hidden">
+          <Card compact className="overflow-hidden">
             <div className="px-3 pt-3 pb-1">
               <p className="text-[10px] text-muted uppercase tracking-widest">Spending & Budgets</p>
             </div>

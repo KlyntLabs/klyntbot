@@ -9,7 +9,7 @@ interface StatCardProps {
 
 function StatCard({ label, value, accentColor }: StatCardProps) {
   return (
-    <Card className="relative overflow-hidden pl-4">
+    <Card compact className="relative overflow-hidden pl-4">
       <div
         className="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-xl"
         style={{ backgroundColor: accentColor }}
