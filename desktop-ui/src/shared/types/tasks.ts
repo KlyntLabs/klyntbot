@@ -29,6 +29,8 @@ export interface Task {
   complexityScore?: number;
   totalTrackedSecs?: number;
   focusedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface TodayTask {

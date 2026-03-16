@@ -31,6 +31,8 @@ pub struct TaskResponse {
     pub complexity_score: Option<i32>,
     pub total_tracked_secs: Option<i64>,
     pub focused_at: Option<String>,
+    pub created_at: Option<String>,
+    pub updated_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

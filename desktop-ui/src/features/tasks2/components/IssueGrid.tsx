@@ -2,7 +2,7 @@ import { useDraggable } from "@dnd-kit/core";
 import { format } from "date-fns";
 import { motion } from "motion/react";
 import { useRef } from "react";
-import type { Issue } from "../mock-data/issues";
+import type { Issue } from "../lib/mappers";
 import { useTabStore } from "../store/tab-store";
 import { AssigneeUser } from "./AssigneeUser";
 import { IssueContextMenu } from "./IssueContextMenu";

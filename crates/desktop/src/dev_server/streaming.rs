@@ -198,7 +198,10 @@ fn domain_for_event(event: &bus::DomainEvent) -> &'static str {
         | bus::DomainEvent::TaskFocusStarted { .. }
         | bus::DomainEvent::TaskFocusEnded { .. }
         | bus::DomainEvent::EstimationRecorded { .. }
-        | bus::DomainEvent::TaskExecutionProgress { .. } => "work",
+        | bus::DomainEvent::TaskExecutionProgress { .. }
+        | bus::DomainEvent::TaskStatusChanged { .. }
+        | bus::DomainEvent::TaskPriorityChanged { .. }
+        | bus::DomainEvent::TaskFieldUpdated { .. } => "work",
         bus::DomainEvent::ActivitySessionCompleted { .. }
         | bus::DomainEvent::FocusSessionStarted { .. }
         | bus::DomainEvent::FocusSessionEnded { .. }

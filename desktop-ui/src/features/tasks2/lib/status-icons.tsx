@@ -1,10 +1,14 @@
+import type { StatusGroup } from "@shared/types/common";
 import type React from "react";
 
 export interface Status {
   id: string;
   name: string;
   color: string;
-  icon: React.FC;
+  icon: React.FC<{ className?: string }>;
+  /** The raw value stored in task.status — used for backend mutations */
+  backendStatus: string;
+  statusGroup?: StatusGroup;
 }
 
 export const BacklogIcon: React.FC = () => (
@@ -115,20 +119,56 @@ export const CompletedIcon: React.FC = () => (
   </svg>
 );
 
-export const status: Status[] = [
-  { id: "in-progress", name: "In Progress", color: "#facc15", icon: InProgressIcon },
-  { id: "technical-review", name: "Technical Review", color: "#22c55e", icon: TechnicalReviewIcon },
-  { id: "completed", name: "Completed", color: "#8b5cf6", icon: CompletedIcon },
-  { id: "paused", name: "Paused", color: "#0ea5e9", icon: PausedIcon },
-  { id: "to-do", name: "Todo", color: "#f97316", icon: ToDoIcon },
-  { id: "backlog", name: "Backlog", color: "#ec4899", icon: BacklogIcon },
-];
+// ── Icon matching ────────────────────────────────────────
 
-const statusById: Record<string, Status> = Object.fromEntries(status.map((s) => [s.id, s]));
+const ICON_NAME_MAP: Record<string, React.FC<{ className?: string }>> = {
+  backlog: BacklogIcon,
+  todo: ToDoIcon,
+  "to do": ToDoIcon,
+  "in progress": InProgressIcon,
+  inprogress: InProgressIcon,
+  "in review": TechnicalReviewIcon,
+  inreview: TechnicalReviewIcon,
+  "technical review": TechnicalReviewIcon,
+  review: TechnicalReviewIcon,
+  done: CompletedIcon,
+  completed: CompletedIcon,
+  complete: CompletedIcon,
+  blocked: PausedIcon,
+  paused: PausedIcon,
+  "on hold": PausedIcon,
+};
 
-export const StatusIcon: React.FC<{ statusId: string }> = ({ statusId }) => {
-  const currentStatus = statusById[statusId];
-  if (!currentStatus) return null;
-  const IconComponent = currentStatus.icon;
-  return <IconComponent />;
+function normalizeName(name: string): string {
+  return name.toLowerCase().trim();
+}
+
+/**
+ * Match a status name to a known icon component.
+ * Returns undefined if no match is found.
+ */
+export function matchIcon(name: string): React.FC<{ className?: string }> | undefined {
+  return ICON_NAME_MAP[normalizeName(name)];
+}
+
+/**
+ * Create a colored circle icon component for statuses without a known icon.
+ */
+export function makeColoredCircle(color: string): React.FC<{ className?: string }> {
+  return ({ className }) => (
+    <svg className={className} width="14" height="14" viewBox="0 0 14 14" fill="none">
+      <circle cx="7" cy="7" r="5" stroke={color} strokeWidth="1.5" fill="none" />
+      <circle cx="7" cy="7" r="2" fill={color} />
+    </svg>
+  );
+}
+
+// ── StatusIcon component ─────────────────────────────────
+
+export const StatusIcon: React.FC<{ status: Status; className?: string }> = ({
+  status,
+  className,
+}) => {
+  const IconComponent = status.icon;
+  return <IconComponent className={className} />;
 };

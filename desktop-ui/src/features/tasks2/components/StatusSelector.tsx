@@ -1,10 +1,13 @@
+import { useMutation } from "@shared/hooks/useMutation";
+import type { Task, TaskUpdateParams } from "@shared/types/tasks";
 import { Check } from "lucide-react";
 import { useState } from "react";
+import { useStatusWorkflow } from "../contexts/StatusWorkflowContext";
+import { useRefetchTasks } from "../hooks/useTasksContext";
+import { statusToMutationParams } from "../lib/mappers";
+import type { Status } from "../lib/status-icons";
 import { renderStatusIcon } from "../lib/status-utils";
 import { cn } from "../lib/utils";
-import type { Status } from "../mock-data/status";
-import { status as allStatus } from "../mock-data/status";
-import { useIssuesStore } from "../store/issues-store";
 import {
   Command,
   CommandEmpty,
@@ -18,11 +21,14 @@ import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 interface StatusSelectorProps {
   issueId: string;
   status: Status;
+  onChanged?: () => void;
 }
 
-export function StatusSelector({ issueId, status }: StatusSelectorProps) {
+export function StatusSelector({ issueId, status, onChanged }: StatusSelectorProps) {
   const [open, setOpen] = useState(false);
-  const updateIssueStatus = useIssuesStore((s) => s.updateIssueStatus);
+  const { statuses } = useStatusWorkflow();
+  const updateTask = useMutation<Task, TaskUpdateParams>("task_update", "params");
+  const refetch = useRefetchTasks();
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -32,7 +38,7 @@ export function StatusSelector({ issueId, status }: StatusSelectorProps) {
           className="flex items-center justify-center size-5 rounded hover:bg-[hsl(var(--accent))] transition-colors"
           aria-label={`Status: ${status.name}`}
         >
-          {renderStatusIcon(status.id)}
+          {renderStatusIcon(status)}
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-[200px] p-0" align="start">
@@ -41,16 +47,19 @@ export function StatusSelector({ issueId, status }: StatusSelectorProps) {
           <CommandList>
             <CommandEmpty>No status found.</CommandEmpty>
             <CommandGroup>
-              {allStatus.map((s) => (
+              {statuses.map((s) => (
                 <CommandItem
                   key={s.id}
                   value={s.name}
-                  onSelect={() => {
-                    updateIssueStatus(issueId, s);
+                  onSelect={async () => {
+                    const { status: backendStatus, statusLabelId } = statusToMutationParams(s);
+                    await updateTask.mutate({ id: issueId, status: backendStatus, statusLabelId });
+                    refetch();
+                    onChanged?.();
                     setOpen(false);
                   }}
                 >
-                  <span className="mr-2 flex items-center">{renderStatusIcon(s.id)}</span>
+                  <span className="mr-2 flex items-center">{renderStatusIcon(s)}</span>
                   {s.name}
                   <Check
                     className={cn(

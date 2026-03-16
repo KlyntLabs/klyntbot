@@ -1,6 +1,8 @@
+import type { Area } from "@shared/types/tasks";
 import { PanelRight } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useIssueDetail } from "../../hooks/useIssueDetail";
+import type { DisplayProject } from "../../lib/mappers";
 import { IssueDetailBreadcrumb } from "./IssueDetailBreadcrumb";
 import { IssueDetailSidebar } from "./IssueDetailSidebar";
 import { IssueDetailTabs } from "./IssueDetailTabs";
@@ -8,10 +10,12 @@ import { IssueDetailTitle } from "./IssueDetailTitle";
 
 interface IssueDetailViewProps {
   issueId: string;
+  projectMap: Map<string, DisplayProject>;
+  areaMap: Map<string, Area>;
 }
 
-export function IssueDetailView({ issueId }: IssueDetailViewProps) {
-  const detail = useIssueDetail(issueId);
+export function IssueDetailView({ issueId, projectMap, areaMap }: IssueDetailViewProps) {
+  const detail = useIssueDetail(issueId, projectMap, areaMap);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const manualOverrideRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);

@@ -1,32 +1,31 @@
+import { Folder } from "lucide-react";
 import { useMemo } from "react";
-import { getAreaById } from "../mock-data/areas";
-import { projects } from "../mock-data/projects";
-import { useIssuesStore } from "../store/issues-store";
+import type { UseTasksResult } from "../hooks/useTasks";
 import { useTabStore } from "../store/tab-store";
 
 interface AreaViewProps {
   areaId: string;
+  tasksData: UseTasksResult;
 }
 
-export function AreaView({ areaId }: AreaViewProps) {
-  const area = getAreaById(areaId);
+export function AreaView({ areaId, tasksData }: AreaViewProps) {
+  const area = tasksData.areaMap.get(areaId);
   const navigateInPlace = useTabStore((s) => s.navigateInPlace);
-  const issues = useIssuesStore((s) => s.issues);
 
   const areaProjects = useMemo(() => {
     if (!area) return [];
-    return projects.filter((p) => area.projectIds.includes(p.id));
-  }, [area]);
+    return tasksData.projects.filter((p) => p.areaId === areaId);
+  }, [area, tasksData.projects, areaId]);
 
   const projectIssueCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    for (const issue of issues) {
+    for (const issue of tasksData.issues) {
       if (issue.project) {
         counts[issue.project.id] = (counts[issue.project.id] ?? 0) + 1;
       }
     }
     return counts;
-  }, [issues]);
+  }, [tasksData.issues]);
 
   if (!area) {
     return (
@@ -39,7 +38,6 @@ export function AreaView({ areaId }: AreaViewProps) {
   return (
     <div className="flex flex-col">
       {areaProjects.map((project) => {
-        const Icon = project.icon;
         const count = projectIssueCounts[project.id] ?? 0;
         return (
           <button
@@ -54,7 +52,7 @@ export function AreaView({ areaId }: AreaViewProps) {
             }}
             className="flex items-center gap-3 px-4 py-3 text-left hover:bg-[hsl(var(--accent))] transition-colors border-b border-[hsl(var(--border))]"
           >
-            <Icon className="h-4 w-4 text-[hsl(var(--muted-foreground))]" />
+            <Folder className="h-4 w-4 text-[hsl(var(--muted-foreground))]" />
             <span className="text-sm text-[hsl(var(--foreground))] flex-1">{project.name}</span>
             <span className="text-xs text-[hsl(var(--muted-foreground))]">{count} issues</span>
           </button>

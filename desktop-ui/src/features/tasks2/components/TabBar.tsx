@@ -8,6 +8,7 @@ import {
 } from "@dnd-kit/core";
 import { horizontalListSortingStrategy, SortableContext, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import type { Area, Project } from "@shared/types/tasks";
 import type React from "react";
 import { useTabStore } from "../store/tab-store";
 import { AddTabMenu } from "./AddTabMenu";
@@ -29,7 +30,12 @@ function SortableTab({ tabId, children }: { tabId: string; children: React.React
   );
 }
 
-export function TabBar() {
+interface TabBarProps {
+  areas: Area[];
+  projects: Project[];
+}
+
+export function TabBar({ areas, projects }: TabBarProps) {
   const tabs = useTabStore((s) => s.tabs);
   const activeTabId = useTabStore((s) => s.activeTabId);
   const reorderTabs = useTabStore((s) => s.reorderTabs);
@@ -60,7 +66,7 @@ export function TabBar() {
           ))}
         </SortableContext>
       </DndContext>
-      <AddTabMenu />
+      <AddTabMenu areas={areas} projects={projects} />
     </div>
   );
 }

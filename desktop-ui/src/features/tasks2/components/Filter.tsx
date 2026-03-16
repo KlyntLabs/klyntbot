@@ -1,14 +1,10 @@
 import { Check, ChevronLeft, ChevronRight, ListFilter, X } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useStatusWorkflow } from "../contexts/StatusWorkflowContext";
+import type { DisplayProject, Issue } from "../lib/mappers";
+import { priorities } from "../lib/priority-icons";
 import { renderStatusIcon } from "../lib/status-utils";
-import { labels } from "../mock-data/labels";
-import { priorities } from "../mock-data/priorities";
-import { projects } from "../mock-data/projects";
-import { status as allStatus } from "../mock-data/status";
-import { users } from "../mock-data/users";
 import { useFilterStore } from "../store/filter-store";
-import { useIssuesStore } from "../store/issues-store";
-import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Button } from "./ui/button";
 import {
   Command,
@@ -21,17 +17,22 @@ import {
 } from "./ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 
-type FilterCategory = "status" | "assignee" | "priority" | "labels" | "project";
+type FilterCategory = "status" | "priority" | "labels" | "project";
 
 const categories: { key: FilterCategory; label: string }[] = [
   { key: "status", label: "Status" },
-  { key: "assignee", label: "Assignee" },
   { key: "priority", label: "Priority" },
   { key: "labels", label: "Labels" },
   { key: "project", label: "Project" },
 ];
 
-export function Filter() {
+interface FilterProps {
+  issues: Issue[];
+  projects: DisplayProject[];
+}
+
+export function Filter({ issues, projects }: FilterProps) {
+  const { statuses } = useStatusWorkflow();
   const [open, setOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState<FilterCategory | null>(null);
 
@@ -40,20 +41,29 @@ export function Filter() {
   const activeCount = useFilterStore((s) =>
     Object.values(s.filters).reduce((sum, a) => sum + a.length, 0),
   );
-  const issues = useIssuesStore((s) => s.issues);
 
-  // Single-pass count maps instead of N*K filterBy* calls
+  // Derive unique labels from issues
+  const uniqueLabels = useMemo(() => {
+    const labelMap = new Map<string, { id: string; name: string; color: string }>();
+    for (const issue of issues) {
+      for (const l of issue.labels) {
+        if (!labelMap.has(l.id)) {
+          labelMap.set(l.id, l);
+        }
+      }
+    }
+    return Array.from(labelMap.values());
+  }, [issues]);
+
+  // Single-pass count maps
   const counts = useMemo(() => {
     const status: Record<string, number> = {};
     const priority: Record<string, number> = {};
-    const assignee: Record<string, number> = {};
     const label: Record<string, number> = {};
     const project: Record<string, number> = {};
     for (const issue of issues) {
       status[issue.status.id] = (status[issue.status.id] ?? 0) + 1;
       priority[issue.priority.id] = (priority[issue.priority.id] ?? 0) + 1;
-      assignee[issue.assignee?.id ?? "unassigned"] =
-        (assignee[issue.assignee?.id ?? "unassigned"] ?? 0) + 1;
       for (const l of issue.labels) {
         label[l.id] = (label[l.id] ?? 0) + 1;
       }
@@ -61,7 +71,7 @@ export function Filter() {
         project[issue.project.id] = (project[issue.project.id] ?? 0) + 1;
       }
     }
-    return { status, priority, assignee, label, project };
+    return { status, priority, label, project };
   }, [issues]);
 
   function getCountForCategory(category: FilterCategory): number {
@@ -124,7 +134,7 @@ export function Filter() {
         <CommandList>
           <CommandEmpty>No status found.</CommandEmpty>
           <CommandGroup>
-            {allStatus.map((s) => {
+            {statuses.map((s) => {
               const isSelected = filters.status.includes(s.id);
               const count = counts.status[s.id] ?? 0;
               return (
@@ -136,47 +146,8 @@ export function Filter() {
                   <div className="flex items-center justify-center size-4">
                     {isSelected ? <Check className="size-4" /> : <span className="size-4" />}
                   </div>
-                  <span className="flex items-center">{renderStatusIcon(s.id)}</span>
+                  <span className="flex items-center">{renderStatusIcon(s)}</span>
                   <span className="flex-1">{s.name}</span>
-                  <span className="text-xs text-[hsl(var(--muted-foreground))]">{count}</span>
-                </CommandItem>
-              );
-            })}
-          </CommandGroup>
-        </CommandList>
-      </Command>
-    );
-  }
-
-  function renderAssigneeItems() {
-    return (
-      <Command>
-        <CommandInput placeholder="Search assignee..." />
-        <CommandList>
-          <CommandEmpty>No assignee found.</CommandEmpty>
-          <CommandGroup>
-            {users.map((user) => {
-              const isSelected = filters.assignee.includes(user.id);
-              const count = counts.assignee[user.id] ?? 0;
-              return (
-                <CommandItem
-                  key={user.id}
-                  onSelect={() => toggleFilter("assignee", user.id)}
-                  className="flex items-center gap-2"
-                >
-                  <div className="flex items-center justify-center size-4">
-                    {isSelected ? <Check className="size-4" /> : <span className="size-4" />}
-                  </div>
-                  <Avatar className="size-5">
-                    <AvatarImage src={user.avatarUrl} alt={user.name} />
-                    <AvatarFallback className="text-[10px]">
-                      {user.name
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="flex-1">{user.name}</span>
                   <span className="text-xs text-[hsl(var(--muted-foreground))]">{count}</span>
                 </CommandItem>
               );
@@ -226,7 +197,7 @@ export function Filter() {
         <CommandList>
           <CommandEmpty>No labels found.</CommandEmpty>
           <CommandGroup>
-            {labels.map((label) => {
+            {uniqueLabels.map((label) => {
               const isSelected = filters.labels.includes(label.id);
               const count = counts.label[label.id] ?? 0;
               return (
@@ -286,8 +257,6 @@ export function Filter() {
     switch (activeCategory) {
       case "status":
         return renderStatusItems();
-      case "assignee":
-        return renderAssigneeItems();
       case "priority":
         return renderPriorityItems();
       case "labels":

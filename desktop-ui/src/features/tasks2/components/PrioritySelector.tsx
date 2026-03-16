@@ -1,9 +1,12 @@
+import { useMutation } from "@shared/hooks/useMutation";
+import type { Task, TaskUpdateParams } from "@shared/types/tasks";
 import { Check } from "lucide-react";
 import { useState } from "react";
+import { useRefetchTasks } from "../hooks/useTasksContext";
+import type { Priority } from "../lib/mappers";
+import { priorityToNumber } from "../lib/mappers";
+import { priorities } from "../lib/priority-icons";
 import { cn } from "../lib/utils";
-import type { Priority } from "../mock-data/priorities";
-import { priorities } from "../mock-data/priorities";
-import { useIssuesStore } from "../store/issues-store";
 import {
   Command,
   CommandEmpty,
@@ -17,11 +20,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 interface PrioritySelectorProps {
   issueId: string;
   priority: Priority;
+  onChanged?: () => void;
 }
 
-export function PrioritySelector({ issueId, priority }: PrioritySelectorProps) {
+export function PrioritySelector({ issueId, priority, onChanged }: PrioritySelectorProps) {
   const [open, setOpen] = useState(false);
-  const updateIssuePriority = useIssuesStore((s) => s.updateIssuePriority);
+  const updateTask = useMutation<Task, TaskUpdateParams>("task_update", "params");
+  const refetch = useRefetchTasks();
 
   const PriorityIcon = priority.icon;
 
@@ -48,8 +53,10 @@ export function PrioritySelector({ issueId, priority }: PrioritySelectorProps) {
                   <CommandItem
                     key={p.id}
                     value={p.name}
-                    onSelect={() => {
-                      updateIssuePriority(issueId, p);
+                    onSelect={async () => {
+                      await updateTask.mutate({ id: issueId, priority: priorityToNumber(p.id) });
+                      refetch();
+                      onChanged?.();
                       setOpen(false);
                     }}
                   >

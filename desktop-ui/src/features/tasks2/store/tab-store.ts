@@ -1,6 +1,5 @@
 import { arrayMove } from "@dnd-kit/sortable";
 import { create } from "zustand";
-import { areas, type MockArea } from "../mock-data/areas";
 
 export interface NavEntry {
   type: "my-issues" | "all-issues" | "area" | "project" | "issue";
@@ -16,7 +15,9 @@ export interface Tab {
 interface TabState {
   tabs: Tab[];
   activeTabId: string;
+  initialized: boolean;
 
+  initFromAreas: (areas: { id: string; name: string }[]) => void;
   openTab: (type: NavEntry["type"], targetId: string, label: string) => void;
   closeTab: (tabId: string) => void;
   closeOthers: (tabId: string) => void;
@@ -32,25 +33,32 @@ function nextId() {
   return `tab-${++idCounter}`;
 }
 
-function buildDefaultTabs(areas: MockArea[]): Tab[] {
-  const myIssuesTab: Tab = {
-    id: nextId(),
-    navStack: [{ type: "my-issues", targetId: "my-issues", label: "My Issues" }],
-  };
-
-  const areaTabs: Tab[] = areas.map((area) => ({
-    id: nextId(),
-    navStack: [{ type: "area" as const, targetId: area.id, label: area.name }],
-  }));
-
-  return [myIssuesTab, ...areaTabs];
-}
-
-const defaultTabs = buildDefaultTabs(areas);
+const defaultMyIssuesTab: Tab = {
+  id: nextId(),
+  navStack: [{ type: "my-issues", targetId: "my-issues", label: "My Issues" }],
+};
 
 export const useTabStore = create<TabState>((set, get) => ({
-  tabs: defaultTabs,
-  activeTabId: defaultTabs[0]?.id ?? "",
+  tabs: [defaultMyIssuesTab],
+  activeTabId: defaultMyIssuesTab.id,
+  initialized: false,
+
+  initFromAreas: (areas) => {
+    if (get().initialized) return;
+
+    const myIssuesTab: Tab = {
+      id: nextId(),
+      navStack: [{ type: "my-issues", targetId: "my-issues", label: "My Issues" }],
+    };
+
+    const areaTabs: Tab[] = areas.map((area) => ({
+      id: nextId(),
+      navStack: [{ type: "area" as const, targetId: area.id, label: area.name }],
+    }));
+
+    const tabs = [myIssuesTab, ...areaTabs];
+    set({ tabs, activeTabId: tabs[0].id, initialized: true });
+  },
 
   openTab: (type, targetId, label) => {
     const { tabs, activeTabId } = get();

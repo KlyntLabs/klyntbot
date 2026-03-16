@@ -163,7 +163,20 @@ impl AppCore {
         Ok((task, updates))
     }
 
-    pub async fn task_update(&self, params: TaskUpdateParams) -> HandlerResult<TaskResponse> {
+    pub async fn task_update(
+        &self,
+        params: TaskUpdateParams,
+        actor: Option<String>,
+    ) -> HandlerResult<TaskResponse> {
+        // Fetch old task before applying the patch so we can diff
+        let old_task = self.repos.tasks.get(&params.id).await.map_err(map_storage_err)?;
+
+        // Capture fields needed for diffing before they move into the patch
+        let task_id = params.id.clone();
+        let new_status = params.status.clone();
+        let new_priority = params.priority;
+        let new_title = params.title.clone();
+
         let patch = TaskPatch {
             id: params.id.clone(),
             title: params.title,
@@ -194,8 +207,49 @@ impl AppCore {
 
         let updates = vec![EntityUpdate {
             kind: EntityKind::Task,
-            id: params.id,
+            id: task_id.clone(),
         }];
+
+        // Diff old vs new and emit domain events
+        if let Some(ref old) = old_task {
+            if let Ok(bus) = self.domain_event_bus() {
+                if let Some(ref status) = new_status {
+                    if old.status != *status {
+                        bus.publish(bus::DomainEvent::TaskStatusChanged {
+                            task_id: task_id.clone(),
+                            from: old.status.clone(),
+                            to: status.clone(),
+                            actor: actor.clone(),
+                        });
+                    }
+                }
+
+                if let Some(ref priority_opt) = new_priority {
+                    let old_str = old.priority.map(|p| p.to_string()).unwrap_or_default();
+                    let new_str = priority_opt.map(|p| p.to_string()).unwrap_or_default();
+                    if old_str != new_str {
+                        bus.publish(bus::DomainEvent::TaskPriorityChanged {
+                            task_id: task_id.clone(),
+                            from: old_str,
+                            to: new_str,
+                            actor: actor.clone(),
+                        });
+                    }
+                }
+
+                if let Some(ref title) = new_title {
+                    if old.title != *title {
+                        bus.publish(bus::DomainEvent::TaskFieldUpdated {
+                            task_id: task_id.clone(),
+                            field: "title".to_string(),
+                            from: old.title.clone(),
+                            to: title.clone(),
+                            actor,
+                        });
+                    }
+                }
+            }
+        }
 
         let response = row_to_task(&self.repos, &updated).await?;
         Ok((response, updates))

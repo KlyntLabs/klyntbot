@@ -1,22 +1,17 @@
 import { useMemo } from "react";
-import { useIssuesStore } from "../store/issues-store";
+import type { Issue } from "../lib/mappers";
+import { searchIssues } from "../lib/mappers";
 import { useSearchStore } from "../store/search-store";
 import { IssueLine } from "./IssueLine";
 
-export function SearchIssues() {
-  const issues = useIssuesStore((s) => s.issues);
+interface SearchIssuesProps {
+  issues: Issue[];
+}
+
+export function SearchIssues({ issues }: SearchIssuesProps) {
   const searchQuery = useSearchStore((s) => s.searchQuery);
 
-  const searchResults = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return [];
-    return issues.filter(
-      (issue) =>
-        issue.title.toLowerCase().includes(q) ||
-        issue.description.toLowerCase().includes(q) ||
-        issue.identifier.toLowerCase().includes(q),
-    );
-  }, [issues, searchQuery]);
+  const searchResults = useMemo(() => searchIssues(issues, searchQuery), [issues, searchQuery]);
 
   return (
     <div className="w-full">

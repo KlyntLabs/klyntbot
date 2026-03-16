@@ -1,4 +1,8 @@
+import type { Project } from "@shared/types/tasks";
 import { Columns3, List } from "lucide-react";
+import { useMemo } from "react";
+import type { Issue } from "../lib/mappers";
+import { projectToDisplayProject } from "../lib/mappers";
 import { useViewStore } from "../store/view-store";
 import { Filter } from "./Filter";
 import { Button } from "./ui/button";
@@ -9,14 +13,21 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 
-export default function HeaderOptions() {
+interface HeaderOptionsProps {
+  issues: Issue[];
+  projects: Project[];
+}
+
+export default function HeaderOptions({ issues, projects }: HeaderOptionsProps) {
   const { viewType, setViewType } = useViewStore();
+
+  const displayProjects = useMemo(() => projects.map(projectToDisplayProject), [projects]);
 
   return (
     <div className="flex items-center justify-between px-4 py-1.5 border-b border-[hsl(var(--border))]">
       {/* Left */}
       <div className="flex items-center gap-2">
-        <Filter />
+        <Filter issues={issues} projects={displayProjects} />
       </div>
 
       {/* Right */}

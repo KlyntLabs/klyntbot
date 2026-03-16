@@ -893,6 +893,9 @@ fn event_type_key(event: &DomainEvent) -> String {
         DomainEvent::TaskFocusEnded { .. } => "TaskFocusEnded".into(),
         DomainEvent::EstimationRecorded { .. } => "EstimationRecorded".into(),
         DomainEvent::TaskExecutionProgress { .. } => "TaskExecutionProgress".into(),
+        DomainEvent::TaskStatusChanged { .. } => "TaskStatusChanged".into(),
+        DomainEvent::TaskPriorityChanged { .. } => "TaskPriorityChanged".into(),
+        DomainEvent::TaskFieldUpdated { .. } => "TaskFieldUpdated".into(),
     }
 }
 

@@ -92,6 +92,9 @@ pub fn evaluate_salience(event: &DomainEvent) -> SalienceVerdict {
         DomainEvent::TaskUnblocked { .. } => SalienceVerdict::Accumulate,
         DomainEvent::DayPlanGenerated { .. } => SalienceVerdict::Accumulate,
         DomainEvent::ProactiveSuggestionCreated { .. } => SalienceVerdict::Accumulate,
+        DomainEvent::TaskStatusChanged { .. } => SalienceVerdict::Accumulate,
+        DomainEvent::TaskPriorityChanged { .. } => SalienceVerdict::Accumulate,
+        DomainEvent::TaskFieldUpdated { .. } => SalienceVerdict::Accumulate,
     }
 }
 

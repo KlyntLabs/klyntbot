@@ -1,23 +1,27 @@
+import type { Area, Project } from "@shared/types/tasks";
 import { Plus } from "lucide-react";
 import { useState } from "react";
-import { areas } from "../mock-data/areas";
-import { projects } from "../mock-data/projects";
 import { useTabStore } from "../store/tab-store";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 
 const menuItemCls =
   "w-full text-left px-2 py-1.5 text-[13px] rounded-sm hover:bg-[hsl(var(--accent))] text-[hsl(var(--foreground))] transition-colors";
 
-export function AddTabMenu() {
+interface AddTabMenuProps {
+  areas: Area[];
+  projects: Project[];
+}
+
+export function AddTabMenu({ areas, projects }: AddTabMenuProps) {
   const openTab = useTabStore((s) => s.openTab);
   const [open, setOpen] = useState(false);
 
-  const handleOpenArea = (area: (typeof areas)[number]) => {
+  const handleOpenArea = (area: Area) => {
     openTab("area", area.id, area.name);
     setOpen(false);
   };
 
-  const handleOpenProject = (project: (typeof projects)[number]) => {
+  const handleOpenProject = (project: Project) => {
     openTab("project", project.id, project.name);
     setOpen(false);
   };

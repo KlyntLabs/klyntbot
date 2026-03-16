@@ -69,7 +69,7 @@ pub async fn task_update(
     app: tauri::AppHandle,
     params: TaskUpdateParams,
 ) -> Result<TaskResponse, ApiError> {
-    let (result, updates) = state.task_update(params).await?;
+    let (result, updates) = state.task_update(params, Some("user".into())).await?;
     super::emit_updates(&app, &updates);
     Ok(result)
 }
@@ -166,7 +166,7 @@ pub(crate) async fn dispatch_dev(
             dev::val(core.task_get(id).await)
         }
         "task_create" => dev::val_rh(core.task_create(try_field!(dev::parse_params(body))).await),
-        "task_update" => dev::val_rh(core.task_update(try_field!(dev::parse_params(body))).await),
+        "task_update" => dev::val_rh(core.task_update(try_field!(dev::parse_params(body)), Some("user".into())).await),
         "task_delete" => {
             let id = try_field!(dev::get_str(body, "id"));
             dev::val_rh(core.task_delete(id).await)

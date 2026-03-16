@@ -1,11 +1,11 @@
 import { formatDate, formatHumanDuration } from "@shared/lib/dates";
 import { Check } from "lucide-react";
 import { useState } from "react";
+import { useStatusWorkflow } from "../../contexts/StatusWorkflowContext";
+import type { DetailTask } from "../../lib/mappers";
+import { priorities } from "../../lib/priority-icons";
 import { renderStatusIcon } from "../../lib/status-utils";
 import { cn } from "../../lib/utils";
-import type { EnergyLevel, MockDetailTask, TaskType } from "../../mock-data/issue-detail";
-import { priorities } from "../../mock-data/priorities";
-import { status as allStatus } from "../../mock-data/status";
 import {
   Command,
   CommandEmpty,
@@ -16,10 +16,13 @@ import {
 } from "../ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 
+type EnergyLevel = "low" | "medium" | "high" | "deep";
+type TaskType = "manual" | "agentic" | "hybrid";
+
 interface SidebarPropertiesProps {
-  task: MockDetailTask;
+  task: DetailTask;
   compact: boolean;
-  onUpdate: <K extends keyof MockDetailTask>(field: K, value: MockDetailTask[K]) => void;
+  onUpdate: <K extends keyof DetailTask>(field: K, value: DetailTask[K]) => void;
 }
 
 const ENERGY_LEVELS: EnergyLevel[] = ["low", "medium", "high", "deep"];
@@ -65,6 +68,7 @@ function ValueButton({ children, onClick, className }: ValueButtonProps) {
 }
 
 export function SidebarProperties({ task, compact, onUpdate }: SidebarPropertiesProps) {
+  const { statuses } = useStatusWorkflow();
   const [statusOpen, setStatusOpen] = useState(false);
   const [priorityOpen, setPriorityOpen] = useState(false);
   const [energyOpen, setEnergyOpen] = useState(false);
@@ -86,7 +90,7 @@ export function SidebarProperties({ task, compact, onUpdate }: SidebarProperties
         <Popover open={statusOpen} onOpenChange={setStatusOpen}>
           <PopoverTrigger asChild>
             <ValueButton>
-              <span className="flex items-center shrink-0">{renderStatusIcon(task.status.id)}</span>
+              <span className="flex items-center shrink-0">{renderStatusIcon(task.status)}</span>
               <span className="truncate">{task.status.name}</span>
             </ValueButton>
           </PopoverTrigger>
@@ -96,7 +100,7 @@ export function SidebarProperties({ task, compact, onUpdate }: SidebarProperties
               <CommandList>
                 <CommandEmpty>No status found.</CommandEmpty>
                 <CommandGroup>
-                  {allStatus.map((s) => (
+                  {statuses.map((s) => (
                     <CommandItem
                       key={s.id}
                       value={s.name}
@@ -105,7 +109,7 @@ export function SidebarProperties({ task, compact, onUpdate }: SidebarProperties
                         setStatusOpen(false);
                       }}
                     >
-                      <span className="mr-2 flex items-center">{renderStatusIcon(s.id)}</span>
+                      <span className="mr-2 flex items-center">{renderStatusIcon(s)}</span>
                       {s.name}
                       <Check
                         className={cn(
@@ -278,7 +282,7 @@ export function SidebarProperties({ task, compact, onUpdate }: SidebarProperties
           {/* Area */}
           <PropertyRow label="Area">
             <span className="px-1.5 py-0.5 text-xs text-[hsl(var(--foreground))]">
-              {task.area.name}
+              {task.area?.name ?? "No area"}
             </span>
           </PropertyRow>
 

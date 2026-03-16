@@ -1,4 +1,4 @@
-import type { Issue } from "../mock-data/issues";
+import type { Issue } from "../lib/mappers";
 import { useTabStore } from "../store/tab-store";
 import { AssigneeUser } from "./AssigneeUser";
 import { IssueContextMenu } from "./IssueContextMenu";

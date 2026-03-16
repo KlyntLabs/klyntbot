@@ -1,36 +1,34 @@
+import type { useMutation } from "@shared/hooks/useMutation";
+import type { Area, Task, TaskCreateParams } from "@shared/types/tasks";
 import { useState } from "react";
+import { useStatusWorkflow } from "../contexts/StatusWorkflowContext";
+import type { Priority, Status } from "../lib/mappers";
+import { priorityToNumber } from "../lib/mappers";
+import { priorities } from "../lib/priority-icons";
 import { renderStatusIcon } from "../lib/status-utils";
-import type { LabelInterface } from "../mock-data/labels";
-import { labels } from "../mock-data/labels";
-import type { Priority } from "../mock-data/priorities";
-import { priorities } from "../mock-data/priorities";
-import type { Status } from "../mock-data/status";
-import { status as allStatus } from "../mock-data/status";
-import type { User } from "../mock-data/users";
-import { users } from "../mock-data/users";
 import { useCreateIssueStore } from "../store/create-issue-store";
-import { useIssuesStore } from "../store/issues-store";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "./ui/dialog";
 
-export function CreateIssueModal() {
+interface CreateIssueModalProps {
+  onCreateTask: ReturnType<typeof useMutation<Task, TaskCreateParams>>;
+  areas: Area[];
+}
+
+export function CreateIssueModal({ onCreateTask, areas }: CreateIssueModalProps) {
+  const { statuses } = useStatusWorkflow();
   const { isOpen, defaultStatus, closeModal } = useCreateIssueStore();
-  const addIssue = useIssuesStore((s) => s.addIssue);
 
   const [title, setTitle] = useState("");
-  const [selectedStatus, setSelectedStatus] = useState<Status | null>(allStatus[0] ?? null);
+  const [selectedStatus, setSelectedStatus] = useState<Status | null>(statuses[0] ?? null);
   const [selectedPriority, setSelectedPriority] = useState<Priority | null>(priorities[0] ?? null);
-  const [selectedAssignee, setSelectedAssignee] = useState<User | null>(null);
-  const [selectedLabels, setSelectedLabels] = useState<LabelInterface[]>([]);
 
   const handleOpenChange = (open: boolean) => {
     if (open) {
       // Sync form status from store when opening
-      setSelectedStatus(defaultStatus ?? allStatus[0] ?? null);
+      setSelectedStatus(defaultStatus ?? statuses[0] ?? null);
       setTitle("");
       setSelectedPriority(priorities[0] ?? null);
-      setSelectedAssignee(null);
-      setSelectedLabels([]);
     } else {
       closeModal();
     }
@@ -39,30 +37,14 @@ export function CreateIssueModal() {
   const handleSubmit = () => {
     if (!title.trim() || !selectedStatus || !selectedPriority) return;
 
-    const newIssue = {
-      id: `new-${Date.now()}`,
-      identifier: `LNUI-${Math.floor(Math.random() * 900) + 100}`,
+    const params: TaskCreateParams = {
       title: title.trim(),
-      description: "",
-      status: selectedStatus,
-      assignee: selectedAssignee,
-      priority: selectedPriority,
-      labels: selectedLabels,
-      createdAt: new Date().toISOString(),
-      cycleId: "cycle-1",
-      rank: `0|new-${Date.now()}:`,
+      priority: priorityToNumber(selectedPriority.id) ?? undefined,
+      areaId: areas[0]?.id,
     };
 
-    addIssue(newIssue);
+    onCreateTask.mutate(params);
     handleOpenChange(false);
-  };
-
-  const toggleLabel = (label: LabelInterface) => {
-    setSelectedLabels((prev) =>
-      prev.some((l) => l.id === label.id)
-        ? prev.filter((l) => l.id !== label.id)
-        : [...prev, label],
-    );
   };
 
   return (
@@ -96,7 +78,7 @@ export function CreateIssueModal() {
           <div className="space-y-2">
             <span className="text-sm font-medium text-[hsl(var(--foreground))]">Status</span>
             <div className="flex flex-wrap gap-1.5">
-              {allStatus.map((s) => (
+              {statuses.map((s) => (
                 <button
                   key={s.id}
                   type="button"
@@ -107,7 +89,7 @@ export function CreateIssueModal() {
                       : "border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))]"
                   }`}
                 >
-                  <span className="flex items-center">{renderStatusIcon(s.id)}</span>
+                  <span className="flex items-center">{renderStatusIcon(s)}</span>
                   {s.name}
                 </button>
               ))}
@@ -133,66 +115,6 @@ export function CreateIssueModal() {
                   >
                     <Icon className="size-3.5" />
                     {p.name}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Assignee */}
-          <div className="space-y-2">
-            <span className="text-sm font-medium text-[hsl(var(--foreground))]">Assignee</span>
-            <div className="flex flex-wrap gap-1.5">
-              <button
-                type="button"
-                onClick={() => setSelectedAssignee(null)}
-                className={`px-2.5 py-1 rounded-md text-xs border transition-colors ${
-                  selectedAssignee === null
-                    ? "border-[hsl(var(--primary))] bg-[hsl(var(--primary))]/10 text-[hsl(var(--foreground))]"
-                    : "border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))]"
-                }`}
-              >
-                Unassigned
-              </button>
-              {users.map((user) => (
-                <button
-                  key={user.id}
-                  type="button"
-                  onClick={() => setSelectedAssignee(user)}
-                  className={`px-2.5 py-1 rounded-md text-xs border transition-colors ${
-                    selectedAssignee?.id === user.id
-                      ? "border-[hsl(var(--primary))] bg-[hsl(var(--primary))]/10 text-[hsl(var(--foreground))]"
-                      : "border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))]"
-                  }`}
-                >
-                  {user.name}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Labels */}
-          <div className="space-y-2">
-            <span className="text-sm font-medium text-[hsl(var(--foreground))]">Labels</span>
-            <div className="flex flex-wrap gap-1.5">
-              {labels.map((label) => {
-                const isSelected = selectedLabels.some((l) => l.id === label.id);
-                return (
-                  <button
-                    key={label.id}
-                    type="button"
-                    onClick={() => toggleLabel(label)}
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs border transition-colors ${
-                      isSelected
-                        ? "border-[hsl(var(--primary))] bg-[hsl(var(--primary))]/10 text-[hsl(var(--foreground))]"
-                        : "border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))]"
-                    }`}
-                  >
-                    <span
-                      className="size-2 rounded-full"
-                      style={{ backgroundColor: label.color }}
-                    />
-                    {label.name}
                   </button>
                 );
               })}

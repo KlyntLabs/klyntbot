@@ -1,17 +1,23 @@
 import { formatElapsed } from "@shared/lib/dates";
 import { Pause, Square } from "lucide-react";
 import { useEffect, useState } from "react";
+import type { DetailTask, FocusSession, TaskState } from "../../lib/mappers";
 import { cn } from "../../lib/utils";
-import type { MockDetailTask, MockFocusSession, TaskState } from "../../mock-data/issue-detail";
 import { SectionLabel } from "./SectionLabel";
 
 interface SidebarWorkStateProps {
-  task: MockDetailTask;
+  task: DetailTask;
   taskState: TaskState;
-  focusSession: MockFocusSession | null;
+  focusSession: FocusSession | null;
+  onStopFocus?: () => void;
 }
 
-export function SidebarWorkState({ task, taskState, focusSession }: SidebarWorkStateProps) {
+export function SidebarWorkState({
+  task,
+  taskState,
+  focusSession,
+  onStopFocus,
+}: SidebarWorkStateProps) {
   if (taskState === "completed") {
     return (
       <div className="px-4 py-3">
@@ -29,42 +35,45 @@ export function SidebarWorkState({ task, taskState, focusSession }: SidebarWorkS
     <div className="px-4 py-3 space-y-3">
       <SectionLabel>Work State</SectionLabel>
       <FocusTimer focusedAt={task.focusedAt} />
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-[hsl(var(--muted-foreground))]">Mode</span>
-        <span className="text-xs px-1.5 py-0.5 rounded bg-[hsl(var(--accent))] text-[hsl(var(--foreground))] capitalize">
-          {focusSession.focusMode.replaceAll("-", " ")}
-        </span>
-      </div>
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-[hsl(var(--muted-foreground))]">Quality</span>
-        <span
-          className={cn(
-            "text-sm font-mono tabular-nums",
-            focusSession.qualityScore > 0.7
-              ? "text-green-400"
-              : focusSession.qualityScore > 0.4
-                ? "text-amber-400"
-                : "text-red-400",
-          )}
-        >
-          {focusSession.qualityScore.toFixed(2)}
-        </span>
-      </div>
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-[hsl(var(--muted-foreground))]">Distractions</span>
-        <span className="text-sm text-[hsl(var(--foreground))]">
-          {focusSession.distractionCount}
-        </span>
-      </div>
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-[hsl(var(--muted-foreground))]">Flow</span>
-        <FlowBadge state={focusSession.flowState} />
-      </div>
-      <QualitySparkline values={focusSession.qualityHistory} />
+      {focusSession.qualityScore != null && (
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-[hsl(var(--muted-foreground))]">Quality</span>
+          <span
+            className={cn(
+              "text-sm font-mono tabular-nums",
+              focusSession.qualityScore > 0.7
+                ? "text-green-400"
+                : focusSession.qualityScore > 0.4
+                  ? "text-amber-400"
+                  : "text-red-400",
+            )}
+          >
+            {focusSession.qualityScore.toFixed(2)}
+          </span>
+        </div>
+      )}
+      {focusSession.distractionCount != null && (
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-[hsl(var(--muted-foreground))]">Distractions</span>
+          <span className="text-sm text-[hsl(var(--foreground))]">
+            {focusSession.distractionCount}
+          </span>
+        </div>
+      )}
+      {focusSession.flowState != null && (
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-[hsl(var(--muted-foreground))]">Flow</span>
+          <FlowBadge state={focusSession.flowState} />
+        </div>
+      )}
+      {focusSession.qualityHistory != null && (
+        <QualitySparkline values={focusSession.qualityHistory} />
+      )}
       <div className="flex gap-2">
         <button
           type="button"
           disabled
+          title="Coming soon"
           className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs rounded border border-[hsl(var(--border))] text-[hsl(var(--foreground))] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           <Pause className="size-3" />
@@ -72,8 +81,8 @@ export function SidebarWorkState({ task, taskState, focusSession }: SidebarWorkS
         </button>
         <button
           type="button"
-          disabled
-          className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs rounded border border-[hsl(var(--border))] text-red-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          onClick={onStopFocus}
+          className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs rounded border border-[hsl(var(--border))] text-red-400 hover:bg-red-400/10 transition-colors"
         >
           <Square className="size-3" />
           Stop

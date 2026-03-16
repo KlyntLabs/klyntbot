@@ -2,8 +2,8 @@ import { EditorContentWrapper, useNoteEditor } from "@features/notes/components/
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import type { useIssueDetail } from "../../hooks/useIssueDetail";
+import type { SubIssue } from "../../lib/mappers";
 import { renderStatusIcon } from "../../lib/status-utils";
-import type { MockSubIssue } from "../../mock-data/issue-detail";
 import { useTabStore } from "../../store/tab-store";
 
 interface IssueContentTabProps {
@@ -74,7 +74,7 @@ function AcceptanceCriteria({ text }: { text: string }) {
   );
 }
 
-function SubIssuesList({ issues }: { issues: MockSubIssue[] }) {
+function SubIssuesList({ issues }: { issues: SubIssue[] }) {
   const navigateInPlace = useTabStore((s) => s.navigateInPlace);
   const completedCount = issues.filter((i) => i.completed).length;
 
@@ -94,7 +94,7 @@ function SubIssuesList({ issues }: { issues: MockSubIssue[] }) {
               className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-[hsl(var(--accent))]/50 transition-colors text-left"
             >
               <span className="flex items-center justify-center size-4">
-                {renderStatusIcon(issue.status.id)}
+                {renderStatusIcon(issue.status)}
               </span>
               <PriorityIcon className="size-3.5 text-[hsl(var(--muted-foreground))] shrink-0" />
               <span className="text-xs text-[hsl(var(--muted-foreground))] shrink-0">

@@ -1,12 +1,12 @@
 import { Bot, ChevronDown, Sparkles, Zap } from "lucide-react";
 import { useState } from "react";
-import type { MockSuggestion, MockTaskMemory, TaskState } from "../../mock-data/issue-detail";
+import type { Suggestion, TaskMemory, TaskState } from "../../lib/mappers";
 import { SectionLabel } from "./SectionLabel";
 
 interface SidebarAiInsightsProps {
   taskState: TaskState;
-  suggestions: MockSuggestion[];
-  taskMemory: MockTaskMemory;
+  suggestions: Suggestion[];
+  taskMemory: TaskMemory | null;
   onApply: (id: string) => void;
   onDismiss: (id: string) => void;
 }
@@ -22,7 +22,7 @@ export function SidebarAiInsights({
     <div className="px-4 py-3 space-y-4">
       <SectionLabel>AI Insights</SectionLabel>
 
-      {taskState === "completed" ? (
+      {taskState === "completed" && taskMemory ? (
         <WhatAiLearned memory={taskMemory} />
       ) : taskState === "new" && suggestions.filter((s) => s.status === "pending").length === 0 ? (
         <WhyThisTaskNow />
@@ -30,7 +30,7 @@ export function SidebarAiInsights({
         <SuggestionsList suggestions={suggestions} onApply={onApply} onDismiss={onDismiss} />
       )}
 
-      {taskState !== "completed" && taskState !== "new" && (
+      {taskState !== "completed" && taskState !== "new" && taskMemory && (
         <TaskMemorySection memory={taskMemory} />
       )}
     </div>
@@ -42,7 +42,7 @@ function SuggestionsList({
   onApply,
   onDismiss,
 }: {
-  suggestions: MockSuggestion[];
+  suggestions: Suggestion[];
   onApply: (id: string) => void;
   onDismiss: (id: string) => void;
 }) {
@@ -81,7 +81,7 @@ function SuggestionCard({
   onApply,
   onDismiss,
 }: {
-  suggestion: MockSuggestion;
+  suggestion: Suggestion;
   onApply: (id: string) => void;
   onDismiss: (id: string) => void;
 }) {
@@ -151,7 +151,7 @@ function WhyThisTaskNow() {
   );
 }
 
-function WhatAiLearned({ memory }: { memory: MockTaskMemory }) {
+function WhatAiLearned({ memory }: { memory: TaskMemory }) {
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-1.5 text-sm font-medium text-[hsl(var(--foreground))]">
@@ -172,7 +172,7 @@ function WhatAiLearned({ memory }: { memory: MockTaskMemory }) {
   );
 }
 
-function TaskMemorySection({ memory }: { memory: MockTaskMemory }) {
+function TaskMemorySection({ memory }: { memory: TaskMemory }) {
   return (
     <div className="space-y-2 pt-2 border-t border-[hsl(var(--border))]/50">
       <span className="text-[10px] font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wider">

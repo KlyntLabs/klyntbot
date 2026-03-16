@@ -1,12 +1,12 @@
+import { useMutation } from "@shared/hooks/useMutation";
+import type { Task, TaskUpdateParams } from "@shared/types/tasks";
 import type React from "react";
+import { useStatusWorkflow } from "../contexts/StatusWorkflowContext";
+import { useRefetchTasks } from "../hooks/useTasksContext";
+import type { Issue } from "../lib/mappers";
+import { priorityToNumber, statusToMutationParams } from "../lib/mappers";
+import { priorities } from "../lib/priority-icons";
 import { renderStatusIcon } from "../lib/status-utils";
-import type { Issue } from "../mock-data/issues";
-import { labels } from "../mock-data/labels";
-import { priorities } from "../mock-data/priorities";
-import { projects } from "../mock-data/projects";
-import { status as allStatus } from "../mock-data/status";
-import { users } from "../mock-data/users";
-import { useIssuesStore } from "../store/issues-store";
 import { useTabStore } from "../store/tab-store";
 import {
   ContextMenu,
@@ -26,15 +26,10 @@ interface IssueContextMenuProps {
 }
 
 export function IssueContextMenu({ issue, children }: IssueContextMenuProps) {
-  const {
-    updateIssueStatus,
-    updateIssuePriority,
-    updateIssueAssignee,
-    updateIssue,
-    deleteIssue,
-    addIssueLabel,
-    removeIssueLabel,
-  } = useIssuesStore();
+  const { statuses } = useStatusWorkflow();
+  const updateTask = useMutation<Task, TaskUpdateParams>("task_update", "params");
+  const deleteTask = useMutation<boolean, { id: string }>("task_delete");
+  const refetch = useRefetchTasks();
 
   return (
     <ContextMenu>
@@ -69,13 +64,20 @@ export function IssueContextMenu({ issue, children }: IssueContextMenuProps) {
         {/* Status submenu */}
         <ContextMenuSub>
           <ContextMenuSubTrigger>
-            <span className="mr-2 flex items-center">{renderStatusIcon(issue.status.id)}</span>
+            <span className="mr-2 flex items-center">{renderStatusIcon(issue.status)}</span>
             Status
           </ContextMenuSubTrigger>
           <ContextMenuSubContent className="w-48">
-            {allStatus.map((s) => (
-              <ContextMenuItem key={s.id} onSelect={() => updateIssueStatus(issue.id, s)}>
-                <span className="mr-2 flex items-center">{renderStatusIcon(s.id)}</span>
+            {statuses.map((s) => (
+              <ContextMenuItem
+                key={s.id}
+                onSelect={async () => {
+                  const { status: backendStatus, statusLabelId } = statusToMutationParams(s);
+                  await updateTask.mutate({ id: issue.id, status: backendStatus, statusLabelId });
+                  refetch();
+                }}
+              >
+                <span className="mr-2 flex items-center">{renderStatusIcon(s)}</span>
                 {s.name}
                 {issue.status.id === s.id && (
                   <span className="ml-auto text-xs text-[hsl(var(--muted-foreground))]">
@@ -97,88 +99,16 @@ export function IssueContextMenu({ issue, children }: IssueContextMenuProps) {
             {priorities.map((p) => {
               const Icon = p.icon;
               return (
-                <ContextMenuItem key={p.id} onSelect={() => updateIssuePriority(issue.id, p)}>
+                <ContextMenuItem
+                  key={p.id}
+                  onSelect={async () => {
+                    await updateTask.mutate({ id: issue.id, priority: priorityToNumber(p.id) });
+                    refetch();
+                  }}
+                >
                   <Icon className="mr-2 h-4 w-4 text-[hsl(var(--muted-foreground))]" />
                   {p.name}
                   {issue.priority.id === p.id && (
-                    <span className="ml-auto text-xs text-[hsl(var(--muted-foreground))]">
-                      Current
-                    </span>
-                  )}
-                </ContextMenuItem>
-              );
-            })}
-          </ContextMenuSubContent>
-        </ContextMenuSub>
-
-        {/* Assignee submenu */}
-        <ContextMenuSub>
-          <ContextMenuSubTrigger>Assignee</ContextMenuSubTrigger>
-          <ContextMenuSubContent className="w-48">
-            <ContextMenuItem onSelect={() => updateIssueAssignee(issue.id, null)}>
-              <span className="text-[hsl(var(--muted-foreground))]">Unassigned</span>
-              {issue.assignee === null && (
-                <span className="ml-auto text-xs text-[hsl(var(--muted-foreground))]">Current</span>
-              )}
-            </ContextMenuItem>
-            {users.map((user) => (
-              <ContextMenuItem key={user.id} onSelect={() => updateIssueAssignee(issue.id, user)}>
-                {user.name}
-                {issue.assignee?.id === user.id && (
-                  <span className="ml-auto text-xs text-[hsl(var(--muted-foreground))]">
-                    Current
-                  </span>
-                )}
-              </ContextMenuItem>
-            ))}
-          </ContextMenuSubContent>
-        </ContextMenuSub>
-
-        {/* Label submenu */}
-        <ContextMenuSub>
-          <ContextMenuSubTrigger>Label</ContextMenuSubTrigger>
-          <ContextMenuSubContent className="w-48">
-            {labels.map((label) => (
-              <ContextMenuItem
-                key={label.id}
-                onSelect={() => {
-                  const hasLabel = issue.labels.some((l) => l.id === label.id);
-                  if (hasLabel) {
-                    removeIssueLabel(issue.id, label.id);
-                  } else {
-                    addIssueLabel(issue.id, label);
-                  }
-                }}
-              >
-                <span
-                  className="mr-2 size-2 rounded-full"
-                  style={{ backgroundColor: label.color }}
-                />
-                {label.name}
-                {issue.labels.some((l) => l.id === label.id) && (
-                  <span className="ml-auto text-xs text-[hsl(var(--muted-foreground))]">
-                    Active
-                  </span>
-                )}
-              </ContextMenuItem>
-            ))}
-          </ContextMenuSubContent>
-        </ContextMenuSub>
-
-        {/* Project submenu */}
-        <ContextMenuSub>
-          <ContextMenuSubTrigger>Project</ContextMenuSubTrigger>
-          <ContextMenuSubContent className="w-48">
-            {projects.map((project) => {
-              const Icon = project.icon;
-              return (
-                <ContextMenuItem
-                  key={project.id}
-                  onSelect={() => updateIssue(issue.id, { project })}
-                >
-                  <Icon className="mr-2 h-4 w-4" />
-                  {project.name}
-                  {issue.project?.id === project.id && (
                     <span className="ml-auto text-xs text-[hsl(var(--muted-foreground))]">
                       Current
                     </span>
@@ -193,7 +123,10 @@ export function IssueContextMenu({ issue, children }: IssueContextMenuProps) {
 
         <ContextMenuItem
           className="text-[hsl(var(--destructive))]"
-          onSelect={() => deleteIssue(issue.id)}
+          onSelect={async () => {
+            await deleteTask.mutate({ id: issue.id });
+            refetch();
+          }}
         >
           Delete
         </ContextMenuItem>
