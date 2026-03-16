@@ -899,7 +899,10 @@ impl tools::DelegationHandler for AgentRuntime {
 fn build_planning_prompt(user_message: &str, tools: &[serde_json::Value]) -> String {
     let tool_names: Vec<&str> = tools.iter().filter_map(tool_def_name).collect();
     format!(
-        "This is a complex request. Before executing, create a step-by-step plan.\n\
+        "This is a complex request. Before executing:\n\
+         1. Briefly consider the optimistic, skeptical, and practical angles.\n\
+         2. Synthesize into a balanced approach.\n\
+         3. Then create a step-by-step plan.\n\
          \n\
          User request: {user_message}\n\
          Available tools: [{}]\n\
