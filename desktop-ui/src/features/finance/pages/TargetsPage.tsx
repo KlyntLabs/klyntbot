@@ -207,19 +207,19 @@ export function FinanceTargets() {
     >
       {/* ── Stats row ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-4 gap-3 mb-4">
-        <Card className="p-4">
+        <Card compact className="p-4">
           <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">
             Active Goals
           </p>
           <p className="text-[24px] font-light text-primary">{activeGoals.length}</p>
         </Card>
-        <Card className="p-4">
+        <Card compact className="p-4">
           <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">
             Goal Progress
           </p>
           <p className="text-[24px] font-light text-brand tabular-nums">{overallGoalPct}%</p>
         </Card>
-        <Card className="p-4">
+        <Card compact className="p-4">
           <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">
             Total Debt
           </p>
@@ -227,7 +227,7 @@ export function FinanceTargets() {
             {fmtCompact(convertTotal(totalRemaining), displayCur, hidden)}
           </p>
         </Card>
-        <Card className="p-4">
+        <Card compact className="p-4">
           <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">
             Debt Paid
           </p>
@@ -276,114 +276,49 @@ export function FinanceTargets() {
                 No {goalTab} goals
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="divide-y divide-border-subtle">
                 {filteredGoals.map((g, i) => {
                   const p = pct(g.currentAmount, g.targetAmount);
                   const Icon = GOAL_ICONS[g.goalType] ?? Target;
-                  const remaining = g.targetAmount - g.currentAmount;
-                  const monthsLeft =
-                    g.monthlyContribution && g.monthlyContribution > 0
-                      ? Math.ceil(remaining / g.monthlyContribution)
-                      : null;
                   return (
-                    <div key={g.id} className="glass-card p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                            style={{ backgroundColor: `${COLORS[i % COLORS.length]}20` }}
+                    <div key={g.id} className="py-2.5 first:pt-0 last:pb-0">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Icon
+                            className="w-3.5 h-3.5 flex-shrink-0"
+                            style={{ color: COLORS[i % COLORS.length] }}
+                            strokeWidth={1.5}
+                          />
+                          <span className="text-[12px] font-medium text-secondary truncate">{g.name}</span>
+                          <span
+                            className="text-[8px] font-light px-1.5 py-0.5 rounded-full flex-shrink-0"
+                            style={{
+                              backgroundColor: `${COLORS[i % COLORS.length]}18`,
+                              color: COLORS[i % COLORS.length],
+                            }}
                           >
-                            <Icon
-                              className="w-4 h-4"
-                              style={{ color: COLORS[i % COLORS.length] }}
-                              strokeWidth={1.5}
-                            />
-                          </div>
-                          <div>
-                            <p className="text-[13px] font-medium text-secondary">{g.name}</p>
-                            <span
-                              className="inline-block text-[9px] font-light px-1.5 py-0.5 rounded-full"
-                              style={{
-                                backgroundColor: `${COLORS[i % COLORS.length]}18`,
-                                color: COLORS[i % COLORS.length],
-                              }}
-                            >
-                              {g.goalType}
-                            </span>
-                          </div>
+                            {g.goalType}
+                          </span>
                         </div>
-                        <div className="text-right">
-                          <p className="text-[14px] font-light text-primary tabular-nums">
-                            {displayAmount({
-                              amount: g.currentAmount,
-                              currency: g.currency,
-                              baseAmount: g.baseCurrentAmount,
-                              baseCurrency,
-                              mode,
-                              rates,
-                              hidden,
-                            })}{" "}
-                            <span className="text-dim text-[10px]">
-                              /{" "}
-                              {displayAmount({
-                                amount: g.targetAmount,
-                                currency: g.currency,
-                                baseAmount: g.baseTargetAmount,
-                                baseCurrency,
-                                mode,
-                                rates,
-                              })}
-                            </span>
-                          </p>
-                          <p className="text-[11px] font-light text-brand tabular-nums">{p}%</p>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <span className="text-[11px] text-dim tabular-nums">
+                            {displayAmount({ amount: g.currentAmount, currency: g.currency, baseAmount: g.baseCurrentAmount, baseCurrency, mode, rates, hidden, compact: true })}
+                            {" / "}
+                            {displayAmount({ amount: g.targetAmount, currency: g.currency, baseAmount: g.baseTargetAmount, baseCurrency, mode, rates, compact: true })}
+                          </span>
+                          <span className="text-[10px] text-brand tabular-nums w-8 text-right">{p}%</span>
                         </div>
                       </div>
-                      <Progress value={p} />
-                      <div className="flex items-center gap-4 mt-2 flex-wrap">
-                        {g.deadline && (
-                          <span className="text-[10px] text-dim font-light">
-                            Deadline: {g.deadline}
+                      <div className="h-1 bg-white/[0.06] rounded-full">
+                        <div className="h-full rounded-full" style={{ width: `${p}%`, background: COLORS[i % COLORS.length], transition: "width 0.5s ease" }} />
+                      </div>
+                      <div className="flex items-center gap-3 mt-1">
+                        {g.deadline && <span className="text-[9px] text-dim">Due {g.deadline}</span>}
+                        {g.monthlyContribution != null && g.monthlyContribution > 0 && (
+                          <span className="text-[9px] text-dim">
+                            {displayAmount({ amount: g.monthlyContribution, currency: g.currency, baseAmount: g.baseTargetAmount != null && g.targetAmount !== 0 ? Math.round(g.monthlyContribution * (g.baseTargetAmount / g.targetAmount)) : undefined, baseCurrency, mode, rates, hidden, compact: true })}/mo
                           </span>
                         )}
-                        {g.monthlyContribution && (
-                          <span className="text-[10px] text-dim font-light">
-                            Contributing:{" "}
-                            {displayAmount({
-                              amount: g.monthlyContribution,
-                              currency: g.currency,
-                              baseAmount:
-                                g.baseTargetAmount != null && g.targetAmount !== 0
-                                  ? Math.round(
-                                      g.monthlyContribution * (g.baseTargetAmount / g.targetAmount),
-                                    )
-                                  : undefined,
-                              baseCurrency,
-                              mode,
-                              rates,
-                              hidden,
-                            })}
-                            /mo
-                          </span>
-                        )}
-                        {monthsLeft != null && (
-                          <span className="text-[10px] text-muted font-light">
-                            ~{monthsLeft} months to go
-                          </span>
-                        )}
-                        <span className="text-[10px] text-dim font-light">
-                          {displayAmount({
-                            amount: remaining,
-                            currency: g.currency,
-                            baseAmount:
-                              g.baseTargetAmount != null && g.baseCurrentAmount != null
-                                ? g.baseTargetAmount - g.baseCurrentAmount
-                                : undefined,
-                            baseCurrency,
-                            mode,
-                            rates,
-                          })}{" "}
-                          remaining
-                        </span>
                       </div>
                     </div>
                   );
@@ -411,144 +346,56 @@ export function FinanceTargets() {
                 No debts tracked
               </div>
             ) : (
-              <div className="space-y-3">
+              <>
+              <div className="divide-y divide-border-subtle">
                 {liabilities.map((l, i) => {
                   const Icon = LIAB_ICONS[l.liabilityType] ?? Wallet;
                   const paid = pct(l.principal - l.remaining, l.principal);
-                  const paidAmt = l.principal - l.remaining;
-                  const monthsLeft =
-                    l.monthlyPayment && l.monthlyPayment > 0
-                      ? Math.ceil(l.remaining / l.monthlyPayment)
-                      : null;
                   return (
-                    <div key={l.id} className="glass-card p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                            style={{ backgroundColor: `${COLORS[i % COLORS.length]}20` }}
-                          >
-                            <Icon
-                              className="w-4 h-4"
-                              style={{ color: COLORS[i % COLORS.length] }}
-                              strokeWidth={1.5}
-                            />
-                          </div>
-                          <div>
-                            <p className="text-[13px] font-medium text-secondary">{l.name}</p>
-                            <span
-                              className="inline-block text-[9px] font-light px-1.5 py-0.5 rounded-full"
-                              style={{
-                                backgroundColor: `${COLORS[i % COLORS.length]}18`,
-                                color: COLORS[i % COLORS.length],
-                              }}
-                            >
-                              {l.liabilityType.replaceAll("_", " ")}
-                            </span>
-                          </div>
+                    <div key={l.id} className="py-2.5 first:pt-0 last:pb-0">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Icon
+                            className="w-3.5 h-3.5 flex-shrink-0 text-destructive/60"
+                            strokeWidth={1.5}
+                          />
+                          <span className="text-[12px] font-medium text-secondary truncate">{l.name}</span>
+                          <span className="text-[8px] font-light px-1.5 py-0.5 rounded-full bg-white/[0.06] text-dim flex-shrink-0">
+                            {l.liabilityType.replaceAll("_", " ")}
+                          </span>
                         </div>
-                        <div className="text-right">
-                          <p className="text-[14px] font-light text-destructive tabular-nums">
-                            {displayAmount({
-                              amount: l.remaining,
-                              currency: l.currency,
-                              baseAmount: l.baseRemaining,
-                              baseCurrency,
-                              mode,
-                              rates,
-                              hidden,
-                            })}
-                          </p>
-                          <p className="text-[10px] text-dim font-light">
-                            of{" "}
-                            {displayAmount({
-                              amount: l.principal,
-                              currency: l.currency,
-                              baseAmount: l.basePrincipal,
-                              baseCurrency,
-                              mode,
-                              rates,
-                              hidden,
-                            })}
-                          </p>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <span className="text-[11px] text-destructive tabular-nums">
+                            {displayAmount({ amount: l.remaining, currency: l.currency, baseAmount: l.baseRemaining, baseCurrency, mode, rates, hidden, compact: true })}
+                          </span>
+                          <span className="text-[10px] text-success tabular-nums w-8 text-right">{paid}%</span>
                         </div>
                       </div>
-
-                      <Progress value={paid} />
-
-                      <div className="grid grid-cols-4 gap-3 mt-2">
-                        <div>
-                          <p className="text-[9px] text-dim font-light">Paid</p>
-                          <p className="text-[11px] text-success font-light tabular-nums">
-                            {displayAmount({
-                              amount: paidAmt,
-                              currency: l.currency,
-                              baseAmount:
-                                l.basePrincipal != null && l.baseRemaining != null
-                                  ? l.basePrincipal - l.baseRemaining
-                                  : undefined,
-                              baseCurrency,
-                              mode,
-                              rates,
-                              hidden,
-                            })}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-[9px] text-dim font-light">Progress</p>
-                          <p className="text-[11px] text-primary font-light tabular-nums">{paid}%</p>
-                        </div>
-                        {l.interestRate != null && (
-                          <div>
-                            <p className="text-[9px] text-dim font-light">APR</p>
-                            <p className="text-[11px] text-muted font-light">{l.interestRate}%</p>
-                          </div>
-                        )}
-                        {l.monthlyPayment && (
-                          <div>
-                            <p className="text-[9px] text-dim font-light">Monthly</p>
-                            <p className="text-[11px] text-muted font-light tabular-nums">
-                              {displayAmount({
-                                amount: l.monthlyPayment,
-                                currency: l.currency,
-                                baseAmount:
-                                  l.basePrincipal != null && l.principal !== 0
-                                    ? Math.round(
-                                        l.monthlyPayment * (l.basePrincipal / l.principal),
-                                      )
-                                    : undefined,
-                                baseCurrency,
-                                mode,
-                                rates,
-                                hidden,
-                              })}
-                            </p>
-                          </div>
-                        )}
+                      <div className="h-1 bg-white/[0.06] rounded-full">
+                        <div className="h-full bg-success rounded-full" style={{ width: `${paid}%`, transition: "width 0.5s ease" }} />
                       </div>
-
-                      <div className="flex items-center gap-4 mt-2 pt-2 border-t border-white/[0.04]">
-                        {l.dueDate && (
-                          <span className="text-[9px] text-dim font-light">Due: {l.dueDate}</span>
-                        )}
-                        {monthsLeft != null && (
-                          <span className="text-[9px] text-muted font-light">
-                            ~{monthsLeft} months remaining
+                      <div className="flex items-center gap-3 mt-1">
+                        {l.interestRate != null && <span className="text-[9px] text-dim">{l.interestRate}% APR</span>}
+                        {l.monthlyPayment != null && l.monthlyPayment > 0 && (
+                          <span className="text-[9px] text-dim">
+                            {displayAmount({ amount: l.monthlyPayment, currency: l.currency, baseAmount: l.basePrincipal != null && l.principal !== 0 ? Math.round(l.monthlyPayment * (l.basePrincipal / l.principal)) : undefined, baseCurrency, mode, rates, hidden, compact: true })}/mo
                           </span>
                         )}
+                        {l.dueDate && <span className="text-[9px] text-dim">Due {l.dueDate}</span>}
                       </div>
                     </div>
                   );
                 })}
-
-                {/* Total outstanding summary */}
-                <div className="glass-card px-4 py-3 flex justify-between items-center">
-                  <span className="text-[11px] font-light text-muted">Total Outstanding Debt</span>
-                  <span className="text-[14px] font-light text-destructive tabular-nums">
+              </div>
+              {liabilities.length > 0 && (
+                <div className="mt-3 pt-2.5 border-t border-white/[0.08] flex justify-between">
+                  <span className="text-[10px] text-muted">Total Debt</span>
+                  <span className="text-[11px] text-destructive tabular-nums">
                     {fmtCompact(convertTotal(totalRemaining), displayCur, hidden)}
                   </span>
                 </div>
-              </div>
+              )}
+              </>
             )}
           </Card>
         </div>
@@ -556,7 +403,7 @@ export function FinanceTargets() {
         {/* ── Right sidebar ────────────────────────────────────────── */}
         <div className="w-72 flex-shrink-0 sticky top-0 self-start space-y-4">
           {/* Goal Progress overview */}
-          <Card className="p-4">
+          <Card compact className="p-4">
             <p className="text-[10px] text-muted uppercase tracking-widest mb-3">Goal Progress</p>
             <div className="flex items-center justify-center mb-3">
               <Donut
@@ -600,7 +447,7 @@ export function FinanceTargets() {
           </Card>
 
           {/* Debt Breakdown */}
-          <Card className="p-4">
+          <Card compact className="p-4">
             <p className="text-[10px] text-muted uppercase tracking-widest mb-3">Debt Breakdown</p>
             <div className="flex items-center justify-center mb-3">
               <Donut
