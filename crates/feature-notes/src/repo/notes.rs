@@ -1,15 +1,15 @@
 use storage::StorageError;
 
 use super::{nullable_to_sentinel, NoteRepo};
-use crate::models::NoteRow;
+use crate::models::{NoteRow, NoteSearchResult};
 
 impl NoteRepo {
     // ── Notes ────────────────────────────────────────
 
     pub async fn create_note(&self, row: &NoteRow) -> Result<NoteRow, StorageError> {
         let result = sqlx::query_as::<_, NoteRow>(
-            "INSERT INTO notes (id, notebook_id, title, body, body_html, pinned, archived, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+            "INSERT INTO notes (id, notebook_id, title, body, body_html, pinned, archived, embedding_updated_at, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
              RETURNING *",
         )
         .bind(&row.id)
@@ -19,6 +19,7 @@ impl NoteRepo {
         .bind(&row.body_html)
         .bind(row.pinned)
         .bind(row.archived)
+        .bind(&row.embedding_updated_at)
         .bind(&row.created_at)
         .bind(&row.updated_at)
         .fetch_one(&self.pool)
@@ -136,7 +137,8 @@ impl NoteRepo {
         let rows = sqlx::query_as::<_, NoteRow>(
             "WITH scored AS (
                SELECT n.id, n.notebook_id, n.title, n.body, n.body_html,
-                      n.pinned, n.archived, n.created_at, n.updated_at,
+                      n.pinned, n.archived, n.embedding_updated_at,
+                      n.created_at, n.updated_at,
                       (CASE WHEN n.title LIKE ?1 ESCAPE '\\' THEN 3 ELSE 0 END
                        + CASE WHEN n.body LIKE ?1 ESCAPE '\\' THEN 1 ELSE 0 END
                        + CASE WHEN EXISTS (
@@ -147,12 +149,32 @@ impl NoteRepo {
                WHERE n.archived = 0
              )
              SELECT id, notebook_id, title, body, body_html,
-                    pinned, archived, created_at, updated_at
+                    pinned, archived, embedding_updated_at, created_at, updated_at
              FROM scored
              WHERE score > 0
              ORDER BY score DESC, updated_at DESC",
         )
         .bind(&pattern)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
+    }
+
+    /// Full-text search using FTS5 with BM25 ranking.
+    /// Title matches are weighted 5x, body matches 1x.
+    /// Returns results sorted by relevance (highest first).
+    pub async fn search_fts(&self, query: &str) -> Result<Vec<NoteSearchResult>, StorageError> {
+        let rows = sqlx::query_as::<_, NoteSearchResult>(
+            "SELECT n.id, n.notebook_id, n.title, n.body, n.body_html,
+                    n.pinned, n.archived, n.embedding_updated_at,
+                    n.created_at, n.updated_at,
+                    -bm25(notes_fts, 5.0, 1.0) AS rank
+             FROM notes_fts fts
+             JOIN notes n ON n.rowid = fts.rowid
+             WHERE notes_fts MATCH ?1 AND n.archived = 0
+             ORDER BY rank DESC",
+        )
+        .bind(query)
         .fetch_all(&self.pool)
         .await?;
         Ok(rows)

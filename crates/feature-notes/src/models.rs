@@ -68,8 +68,34 @@ pub struct NoteRow {
     pub body_html: Option<String>,
     pub pinned: i32,
     pub archived: i32,
+    pub embedding_updated_at: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+}
+
+/// FTS5 search result with BM25 relevance rank.
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct NoteSearchResult {
+    pub id: String,
+    pub notebook_id: Option<String>,
+    pub title: String,
+    pub body: Option<String>,
+    pub body_html: Option<String>,
+    pub pinned: i32,
+    pub archived: i32,
+    pub embedding_updated_at: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+    pub rank: f64,
+}
+
+/// SQLite row for inbox items.
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct InboxItemRow {
+    pub id: String,
+    pub content: String,
+    pub status: String,
+    pub created_at: String,
 }
 
 /// SQLite row for note versions.

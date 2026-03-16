@@ -57,6 +57,7 @@ mod tests {
             body_html: None,
             pinned: 0,
             archived: 0,
+            embedding_updated_at: None,
             created_at: now.clone(),
             updated_at: now,
         }
@@ -267,6 +268,40 @@ mod tests {
         // No notes for unknown entity
         let empty = repo.list_notes_by_entity("task", "t99").await.unwrap();
         assert!(empty.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_search_fts() {
+        let repo = setup().await;
+        let mut note1 = sample_note("n1", "Rust Programming Guide");
+        note1.body = "A comprehensive guide to systems programming with Rust".to_string();
+        repo.create_note(&note1).await.unwrap();
+
+        let mut note2 = sample_note("n2", "Go Concurrency Patterns");
+        note2.body = "Goroutines and channels in Go".to_string();
+        repo.create_note(&note2).await.unwrap();
+
+        let mut note3 = sample_note("n3", "Learning Rust Async");
+        note3.body = "Understanding async/await in Rust programming".to_string();
+        repo.create_note(&note3).await.unwrap();
+
+        // Search for "Rust" — should find notes 1 and 3
+        let results = repo.search_fts("Rust").await.unwrap();
+        assert_eq!(results.len(), 2);
+        // Both results should have positive rank
+        assert!(results[0].rank > 0.0);
+        assert!(results[1].rank > 0.0);
+        // Higher rank first
+        assert!(results[0].rank >= results[1].rank);
+
+        // Search for "Go" — should find only note 2
+        let results = repo.search_fts("Go").await.unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, "n2");
+
+        // Search for something that doesn't exist
+        let results = repo.search_fts("Python").await.unwrap();
+        assert!(results.is_empty());
     }
 
     #[tokio::test]

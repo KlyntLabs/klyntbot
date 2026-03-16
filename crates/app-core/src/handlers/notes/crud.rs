@@ -110,6 +110,7 @@ impl AppCore {
             body_html: None,
             pinned: 0,
             archived: 0,
+            embedding_updated_at: None,
             created_at: now.clone(),
             updated_at: now,
         };
