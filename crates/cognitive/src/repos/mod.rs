@@ -1,16 +1,22 @@
 pub mod accumulated_observation;
 pub mod annotation;
+pub mod entity;
 pub mod episodic_memory;
 pub mod event_log;
 pub mod failed_observation;
+pub mod persona;
 pub mod procedural_rule;
 pub mod semantic_fact;
 
 pub use accumulated_observation::AccumulatedObservationRepo;
 pub use annotation::AnnotationRepo;
+pub use entity::{
+    EntityRepo, EntityRow, GraphNeighborhood, NewEntity, NewRelationship, RelationshipRow,
+};
 pub use episodic_memory::EpisodicMemoryRepo;
 pub use event_log::EventLogRepo;
 pub use failed_observation::FailedObservationRepo;
+pub use persona::{NewPersona, PersonaRepo, PersonaRow};
 pub use procedural_rule::ProceduralRuleRepo;
 pub use semantic_fact::SemanticFactRepo;
 
@@ -40,7 +46,7 @@ pub const RULE_DOMAINS: &[&str] = &["productivity", "tasks", "finance", "coachin
 pub fn cognitive_migrations() -> Vec<FeatureMigration> {
     vec![FeatureMigration {
         feature_name: "cognitive".to_string(),
-        version: 1,
+        version: 2,
         description: "Cognitive memory system tables".to_string(),
         sql: include_str!("../../migrations/001_cognitive_tables.sql").to_string(),
     }]
