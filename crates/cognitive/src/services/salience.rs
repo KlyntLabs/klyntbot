@@ -95,6 +95,9 @@ pub fn evaluate_salience(event: &DomainEvent) -> SalienceVerdict {
         DomainEvent::TaskStatusChanged { .. } => SalienceVerdict::Accumulate,
         DomainEvent::TaskPriorityChanged { .. } => SalienceVerdict::Accumulate,
         DomainEvent::TaskFieldUpdated { .. } => SalienceVerdict::Accumulate,
+
+        // Contradiction detection — always extract for cognitive processing
+        DomainEvent::ContradictionDetected { .. } => SalienceVerdict::Extract,
     }
 }
 

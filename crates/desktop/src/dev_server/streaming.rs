@@ -224,5 +224,6 @@ fn domain_for_event(event: &bus::DomainEvent) -> &'static str {
         bus::DomainEvent::NoteCreated { .. } | bus::DomainEvent::NoteUpdated { .. } => "notes",
         bus::DomainEvent::ToolCallExecuted { .. } => "general",
         bus::DomainEvent::BehavioralPatternDetected { .. } => "learning",
+        bus::DomainEvent::ContradictionDetected { .. } => "learning",
     }
 }

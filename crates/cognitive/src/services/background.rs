@@ -896,6 +896,7 @@ fn event_type_key(event: &DomainEvent) -> String {
         DomainEvent::TaskStatusChanged { .. } => "TaskStatusChanged".into(),
         DomainEvent::TaskPriorityChanged { .. } => "TaskPriorityChanged".into(),
         DomainEvent::TaskFieldUpdated { .. } => "TaskFieldUpdated".into(),
+        DomainEvent::ContradictionDetected { .. } => "ContradictionDetected".into(),
     }
 }
 

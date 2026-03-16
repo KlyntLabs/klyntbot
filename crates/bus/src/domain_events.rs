@@ -251,6 +251,15 @@ pub enum DomainEvent {
         sample_count: i32,
         detail: String,
     },
+
+    // -- Contradiction detection (Phase 3 prep) --
+    ContradictionDetected {
+        existing_subject: String,
+        existing_predicate: String,
+        existing_object: String,
+        new_object: String,
+        confidence: f64,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

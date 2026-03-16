@@ -262,6 +262,7 @@ fn wire_event_channels(core: &AppCore, channels: EventChannels, app_handle: &tau
                             | bus::DomainEvent::NoteUpdated { .. } => "notes",
                             bus::DomainEvent::ToolCallExecuted { .. } => "general",
                             bus::DomainEvent::BehavioralPatternDetected { .. } => "learning",
+                            bus::DomainEvent::ContradictionDetected { .. } => "learning",
                         };
                         let salience_str = match salience {
                             cognitive::types::SalienceVerdict::Extract => "extract",
