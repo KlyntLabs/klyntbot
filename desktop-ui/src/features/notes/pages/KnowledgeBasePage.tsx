@@ -19,6 +19,7 @@ import { NoteEditorPanel } from "../components/NoteEditorPanel";
 import { NoteFinder } from "../components/NoteFinder";
 import { VersionHistoryOverlay } from "../components/VersionHistoryOverlay";
 import { useInbox } from "../hooks/useInbox";
+import { useInsightReview } from "../hooks/useInsightReview";
 
 type ViewMode = "editor" | "graph";
 type LayoutMode = "three-panel" | "focus";
@@ -71,6 +72,13 @@ export default function KnowledgeBasePage() {
   const [showNoteFinder, setShowNoteFinder] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
 
+  // ── Insight Review ────────────────────────────────────────────────────
+  const [insightState, insightActions] = useInsightReview();
+  const insightStateRef = useRef(insightState);
+  insightStateRef.current = insightState;
+  const insightActionsRef = useRef(insightActions);
+  insightActionsRef.current = insightActions;
+
   // ── Sidebar widths (imperatively managed for perf) ────────────────────
   const [leftWidth, setLeftWidth] = useState(220);
   const [rightWidth, setRightWidth] = useState(260);
@@ -97,6 +105,10 @@ export default function KnowledgeBasePage() {
   }, [notes]);
 
   const selectedNote = selectedNoteId ? noteMap.get(selectedNoteId) : undefined;
+
+  // ── Insight derived state ─────────────────────────────────────────────
+  const insightOpen = insightState.isOpen;
+  const effectiveRightWidth = insightOpen ? 640 : rightWidth;
 
   // ── Mutations ─────────────────────────────────────────────────────────
   const { mutate: createNote } = useMutation<Note, NoteCreateParams>("note_create", "params");
@@ -293,6 +305,13 @@ export default function KnowledgeBasePage() {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // Escape: close Insight Review (no mod key needed)
+      if (e.key === "Escape" && insightStateRef.current.isOpen) {
+        e.preventDefault();
+        insightActionsRef.current.close();
+        return;
+      }
+
       const mod = e.metaKey || e.ctrlKey;
       if (!mod) return;
 
@@ -318,6 +337,14 @@ export default function KnowledgeBasePage() {
         // Cmd+Shift+G → toggle view mode
         e.preventDefault();
         setViewMode((prev) => (prev === "editor" ? "graph" : "editor"));
+      } else if ((e.key === "i" || e.key === "I") && e.shiftKey) {
+        // Cmd+Shift+I → toggle Insight Review
+        e.preventDefault();
+        if (insightStateRef.current.isOpen) {
+          insightActionsRef.current.close();
+        } else if (selectedNoteIdRef.current) {
+          void insightActionsRef.current.open(selectedNoteIdRef.current);
+        }
       } else if (e.key === "l" && !e.shiftKey) {
         // Cmd+L → insert top AI-suggested link at cursor
         e.preventDefault();
@@ -457,8 +484,8 @@ export default function KnowledgeBasePage() {
         )}
       </div>
 
-      {/* Right resize handle */}
-      {showRightPanel && (
+      {/* Right resize handle — hidden when insight panel is open */}
+      {showRightPanel && !insightOpen && (
         <div
           onPointerDown={onRightResizeStart}
           className="w-1 shrink-0 cursor-col-resize group flex items-center justify-center"
@@ -469,15 +496,25 @@ export default function KnowledgeBasePage() {
 
       {/* Right panel — ContextPanel */}
       {showRightPanel && (
-        <div ref={rightRef} className="h-full">
+        <div
+          ref={rightRef}
+          className="h-full transition-[width] duration-300 ease-in-out"
+          style={{ width: effectiveRightWidth }}
+        >
           <ContextPanel
-            width={rightWidth}
+            width={effectiveRightWidth}
             noteId={selectedNoteId}
             isGraphMode={isGraphMode}
             note={selectedNote ?? null}
             notes={notes}
             onSelectNote={setSelectedNoteId}
             onExpandGraph={() => setViewMode("graph")}
+            insightOpen={insightOpen}
+            insightState={insightState}
+            insightActions={insightActions}
+            onOpenInsight={() => {
+              if (selectedNoteId) void insightActions.open(selectedNoteId);
+            }}
           />
         </div>
       )}

@@ -1,11 +1,12 @@
 import { tagBgColor, tagColor } from "@shared/lib/tagColor";
-import { ChevronDown, ChevronRight, Link2, MessageSquare, Zap } from "lucide-react";
+import { Brain, ChevronDown, ChevronRight, Link2, MessageSquare } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNoteSuggestions } from "../hooks/useNoteSuggestions";
 
 interface AISuggestionsPanelProps {
   noteId: string | null;
   onSelectNote: (id: string) => void;
+  onOpenInsight?: () => void;
 }
 
 const ACCENT = "rgba(167, 139, 250, 0.85)";
@@ -15,7 +16,11 @@ function insertWikiLink(noteId: string, title: string) {
   window.dispatchEvent(new CustomEvent("insert-wiki-link", { detail: { noteId, title } }));
 }
 
-export function AISuggestionsPanel({ noteId, onSelectNote }: AISuggestionsPanelProps) {
+export function AISuggestionsPanel({
+  noteId,
+  onSelectNote,
+  onOpenInsight,
+}: AISuggestionsPanelProps) {
   const { suggestions } = useNoteSuggestions(noteId);
   const [collapsed, setCollapsed] = useState(false);
   const [showLinkPicker, setShowLinkPicker] = useState(false);
@@ -136,11 +141,12 @@ export function AISuggestionsPanel({ noteId, onSelectNote }: AISuggestionsPanelP
           <div className="flex gap-1.5 mt-2 pt-2 border-t border-white/[0.04] relative">
             <button
               type="button"
-              disabled
-              className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-white/[0.04] text-dim cursor-not-allowed"
+              onClick={() => onOpenInsight?.()}
+              disabled={!noteId}
+              className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-white/[0.04] text-secondary hover:bg-white/[0.08] hover:text-primary transition-colors disabled:text-dim disabled:cursor-not-allowed"
             >
-              <Zap size={10} />
-              Synthesize
+              <Brain size={10} />
+              Insight Review
             </button>
             <button
               type="button"

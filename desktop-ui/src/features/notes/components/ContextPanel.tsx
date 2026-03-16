@@ -3,10 +3,12 @@ import { tagBgColor, tagColor } from "@shared/lib/tagColor";
 import type { Note } from "@shared/types";
 import { ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
 import { useMemo, useState } from "react";
+import type { InsightReviewActions, InsightReviewState } from "../hooks/useInsightReview";
 import { AISuggestionsPanel } from "./AISuggestionsPanel";
 import { BacklinksPanel } from "./BacklinksPanel";
 import { EntityReferencesPanel } from "./EntityReferencesPanel";
 import { GraphMinimap } from "./GraphMinimap";
+import { InsightReviewPanel } from "./InsightReviewPanel";
 
 interface ContextPanelProps {
   width: number;
@@ -16,6 +18,11 @@ interface ContextPanelProps {
   notes: Note[];
   onSelectNote: (id: string) => void;
   onExpandGraph: () => void;
+  // Insight Review
+  insightOpen?: boolean;
+  insightState?: InsightReviewState;
+  insightActions?: InsightReviewActions;
+  onOpenInsight?: () => void;
 }
 
 // ── More section (collapsed by default) ──────────────────────────────────
@@ -127,6 +134,10 @@ export function ContextPanel({
   notes,
   onSelectNote,
   onExpandGraph,
+  insightOpen,
+  insightState,
+  insightActions,
+  onOpenInsight,
 }: ContextPanelProps) {
   if (!noteId || !note) {
     return (
@@ -149,13 +160,29 @@ export function ContextPanel({
     );
   }
 
+  // Editor mode: insight panel takes over when open
+  if (insightOpen && insightState && insightActions) {
+    return (
+      <div
+        style={{ width }}
+        className="border-l border-border flex flex-col flex-shrink-0 h-full bg-white/[0.02]"
+      >
+        <InsightReviewPanel state={insightState} actions={insightActions} />
+      </div>
+    );
+  }
+
   // Editor mode: show all context sections
   return (
     <div
       style={{ width }}
       className="border-l border-border flex flex-col flex-shrink-0 h-full overflow-y-auto bg-white/[0.02]"
     >
-      <AISuggestionsPanel noteId={noteId} onSelectNote={onSelectNote} />
+      <AISuggestionsPanel
+        noteId={noteId}
+        onSelectNote={onSelectNote}
+        onOpenInsight={onOpenInsight}
+      />
       <BacklinksPanel noteId={noteId} onSelectNote={onSelectNote} />
       <EntityReferencesPanel noteBody={note.body} />
       <GraphMinimap
