@@ -13,9 +13,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import { ContextPanel } from "../components/ContextPanel";
 import { GraphView } from "../components/GraphView";
-import { NavigationSidebar } from "../components/NavigationSidebar";
+import { NavigationSidebar, type NavigationSidebarHandle } from "../components/NavigationSidebar";
 import { NoteEditor } from "../components/NoteEditor";
-import type { NoteSearchBarHandle } from "../components/NoteSearchBar";
 
 type ViewMode = "editor" | "graph";
 type LayoutMode = "three-panel" | "focus";
@@ -62,7 +61,6 @@ export default function KnowledgeBasePage() {
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("editor");
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("three-panel");
-  const [searchResults, setSearchResults] = useState<Note[] | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
 
   // ── Sidebar widths (imperatively managed for perf) ────────────────────
@@ -73,7 +71,7 @@ export default function KnowledgeBasePage() {
   const leftWidthRef = useRef(leftWidth);
   const rightWidthRef = useRef(rightWidth);
   const containerRef = useRef<HTMLDivElement>(null);
-  const searchRef = useRef<NoteSearchBarHandle>(null);
+  const searchRef = useRef<NavigationSidebarHandle>(null);
 
   // Pre-select note from URL search params (e.g. /notes?noteId=xxx)
   useEffect(() => {
@@ -299,10 +297,8 @@ export default function KnowledgeBasePage() {
             <NavigationSidebar
               notebooks={notebooks}
               notes={notes}
-              searchResults={searchResults}
               selectedNoteId={selectedNoteId}
               searchRef={searchRef}
-              onSearchResults={setSearchResults}
               onSelectNote={setSelectedNoteId}
               onCreateNote={handleCreateNote}
               onCreateNotebook={handleCreateNotebook}
