@@ -35,6 +35,8 @@ pub struct ContextEngine {
     cache: Arc<Mutex<ContextCache>>,
     /// Pluggable context sources for system prompt assembly, sorted by priority (descending).
     sources: Vec<Box<dyn ContextSource>>,
+    /// Optional InsightForge for multi-dimensional retrieval.
+    insight_forge: Option<Arc<crate::insight_forge::InsightForge>>,
 }
 
 impl Default for ContextEngine {
@@ -48,6 +50,7 @@ impl Default for ContextEngine {
             memory_retrieval_limit: DEFAULT_MEMORY_RETRIEVAL_LIMIT,
             cache: Arc::new(Mutex::new(ContextCache::new(DEFAULT_CACHE_CAPACITY))),
             sources: Vec::new(),
+            insight_forge: None,
         }
     }
 }
@@ -68,6 +71,7 @@ impl ContextEngine {
             memory_retrieval_limit: self.memory_retrieval_limit,
             cache: self.cache,
             sources: self.sources,
+            insight_forge: self.insight_forge,
         }
     }
 
@@ -114,6 +118,16 @@ impl ContextEngine {
         sources.sort_by_key(|s| std::cmp::Reverse(s.priority()));
         self.sources = sources;
         self
+    }
+
+    /// Wire InsightForge for multi-dimensional context retrieval.
+    /// All DomainSearchers must be added to the forge BEFORE calling this,
+    /// since it wraps in Arc internally.
+    pub fn with_insight_forge(self, forge: crate::insight_forge::InsightForge) -> Self {
+        Self {
+            insight_forge: Some(Arc::new(forge)),
+            ..self
+        }
     }
 
     /// Build the system prompt by iterating registered context sources.
@@ -342,16 +356,33 @@ impl ContextEngine {
     /// Retrieve relevant memories for the request via embedding-based retrieval.
     async fn retrieve_memory(&self, request: &ContextRequest) -> Option<String> {
         let retriever = self.memory_retriever.as_ref()?;
-        let entries = retriever
-            .retrieve(&request.message_text, self.memory_retrieval_limit)
-            .await;
+
+        // Use InsightForge if available and appropriate
+        let entries = if let Some(ref forge) = self.insight_forge {
+            if forge.should_activate(&request.strategy, &request.message_text) {
+                forge
+                    .retrieve(&request.message_text, self.memory_retrieval_limit, None)
+                    .await
+            } else {
+                retriever
+                    .retrieve(&request.message_text, self.memory_retrieval_limit)
+                    .await
+            }
+        } else {
+            retriever
+                .retrieve(&request.message_text, self.memory_retrieval_limit)
+                .await
+        };
         if entries.is_empty() {
             return None;
         }
 
-        let (facts, recalls): (Vec<_>, Vec<_>) = entries
+        let (facts, rest): (Vec<_>, Vec<_>) = entries
             .into_iter()
-            .partition(|e| e.source == MemorySource::CognitiveFact);
+            .partition(|e| matches!(e.source, MemorySource::CognitiveFact));
+        let (recalls, domain): (Vec<_>, Vec<_>) = rest
+            .into_iter()
+            .partition(|e| matches!(e.source, MemorySource::ConversationRecall));
 
         let mut text = "[Relevant Context]\n".to_string();
 
@@ -368,6 +399,16 @@ impl ContextEngine {
         if !recalls.is_empty() {
             text.push_str("\n## Related Conversations\n");
             for entry in &recalls {
+                text.push_str(&format!(
+                    "- {} (relevance: {:.2})\n",
+                    entry.content, entry.score
+                ));
+            }
+        }
+
+        if !domain.is_empty() {
+            text.push_str("\n## Related Information\n");
+            for entry in &domain {
                 text.push_str(&format!(
                     "- {} (relevance: {:.2})\n",
                     entry.content, entry.score
