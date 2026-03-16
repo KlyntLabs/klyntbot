@@ -12,6 +12,8 @@ interface NoteEditorPanelProps {
   onRenameNote: (id: string, title: string) => void;
   viewMode: NotesViewMode;
   onViewModeChange: (mode: NotesViewMode) => void;
+  onToggleFocusMode?: () => void;
+  focusModeActive?: boolean;
 }
 
 export function NoteEditorPanel({
@@ -21,6 +23,8 @@ export function NoteEditorPanel({
   onRenameNote,
   viewMode,
   onViewModeChange,
+  onToggleFocusMode,
+  focusModeActive,
 }: NoteEditorPanelProps) {
   const titleRef = useRef<HTMLDivElement>(null);
   const tagsRef = useRef<NoteTagsHandle>(null);
@@ -121,6 +125,8 @@ export function NoteEditorPanel({
         onSave={onSave}
         viewMode={viewMode}
         onViewModeChange={onViewModeChange}
+        onToggleFocusMode={onToggleFocusMode}
+        focusModeActive={focusModeActive}
       />
     </div>
   );
