@@ -8,9 +8,7 @@ export const HEATMAP_COLORS = [
 
 export type HeatmapLevel = 0 | 1 | 2 | 3 | 4;
 
-export function computeHeatmapLevels(
-  dailyValues: Map<string, number>,
-): Map<string, HeatmapLevel> {
+export function computeHeatmapLevels(dailyValues: Map<string, number>): Map<string, HeatmapLevel> {
   const result = new Map<string, HeatmapLevel>();
   const nonZero = [...dailyValues.values()].filter((v) => v > 0).sort((a, b) => a - b);
 

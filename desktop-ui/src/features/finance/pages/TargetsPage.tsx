@@ -19,7 +19,7 @@ import { FormField, FormModal, fieldClass } from "../components/FormModal";
 import { useFinanceCurrency } from "../hooks/useFinanceCurrency";
 import { usePrivacyMode } from "../hooks/usePrivacyMode";
 import { displayAmount } from "../lib/displayAmount";
-import { COLORS, GOAL_ICONS, LIAB_ICONS, fmtCompact, pct } from "../lib/finance";
+import { COLORS, fmtCompact, GOAL_ICONS, LIAB_ICONS, pct } from "../lib/finance";
 
 type GoalTab = "active" | "achieved" | "abandoned";
 
@@ -28,16 +28,16 @@ export function FinanceTargets() {
     useFinanceCurrency();
   const { hidden, toggle } = usePrivacyMode();
 
-  const { data: goals, loading: goalsLoading, refetch: rG } = useQuery<FinanceGoal[]>(
-    "finance_goals",
-    undefined,
-    [],
-  );
-  const { data: liabilities, loading: liabLoading, refetch: rL } = useQuery<FinanceLiability[]>(
-    "finance_liabilities",
-    undefined,
-    [],
-  );
+  const {
+    data: goals,
+    loading: goalsLoading,
+    refetch: rG,
+  } = useQuery<FinanceGoal[]>("finance_goals", undefined, []);
+  const {
+    data: liabilities,
+    loading: liabLoading,
+    refetch: rL,
+  } = useQuery<FinanceLiability[]>("finance_liabilities", undefined, []);
 
   useEvent<{ entityKind: string }>("entity:updated", () => {
     rG();
@@ -289,7 +289,9 @@ export function FinanceTargets() {
                             style={{ color: COLORS[i % COLORS.length] }}
                             strokeWidth={1.5}
                           />
-                          <span className="text-[12px] font-medium text-secondary truncate">{g.name}</span>
+                          <span className="text-[12px] font-medium text-secondary truncate">
+                            {g.name}
+                          </span>
                           <span
                             className="text-[8px] font-light px-1.5 py-0.5 rounded-full flex-shrink-0"
                             style={{
@@ -302,21 +304,64 @@ export function FinanceTargets() {
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
                           <span className="text-[11px] text-dim tabular-nums">
-                            {displayAmount({ amount: g.currentAmount, currency: g.currency, baseAmount: g.baseCurrentAmount, baseCurrency, mode, rates, hidden, compact: true })}
+                            {displayAmount({
+                              amount: g.currentAmount,
+                              currency: g.currency,
+                              baseAmount: g.baseCurrentAmount,
+                              baseCurrency,
+                              mode,
+                              rates,
+                              hidden,
+                              compact: true,
+                            })}
                             {" / "}
-                            {displayAmount({ amount: g.targetAmount, currency: g.currency, baseAmount: g.baseTargetAmount, baseCurrency, mode, rates, compact: true })}
+                            {displayAmount({
+                              amount: g.targetAmount,
+                              currency: g.currency,
+                              baseAmount: g.baseTargetAmount,
+                              baseCurrency,
+                              mode,
+                              rates,
+                              compact: true,
+                            })}
                           </span>
-                          <span className="text-[10px] text-brand tabular-nums w-8 text-right">{p}%</span>
+                          <span className="text-[10px] text-brand tabular-nums w-8 text-right">
+                            {p}%
+                          </span>
                         </div>
                       </div>
                       <div className="h-1 bg-white/[0.06] rounded-full">
-                        <div className="h-full rounded-full" style={{ width: `${p}%`, background: COLORS[i % COLORS.length], transition: "width 0.5s ease" }} />
+                        <div
+                          className="h-full rounded-full"
+                          style={{
+                            width: `${p}%`,
+                            background: COLORS[i % COLORS.length],
+                            transition: "width 0.5s ease",
+                          }}
+                        />
                       </div>
                       <div className="flex items-center gap-3 mt-1">
-                        {g.deadline && <span className="text-[9px] text-dim">Due {g.deadline}</span>}
+                        {g.deadline && (
+                          <span className="text-[9px] text-dim">Due {g.deadline}</span>
+                        )}
                         {g.monthlyContribution != null && g.monthlyContribution > 0 && (
                           <span className="text-[9px] text-dim">
-                            {displayAmount({ amount: g.monthlyContribution, currency: g.currency, baseAmount: g.baseTargetAmount != null && g.targetAmount !== 0 ? Math.round(g.monthlyContribution * (g.baseTargetAmount / g.targetAmount)) : undefined, baseCurrency, mode, rates, hidden, compact: true })}/mo
+                            {displayAmount({
+                              amount: g.monthlyContribution,
+                              currency: g.currency,
+                              baseAmount:
+                                g.baseTargetAmount != null && g.targetAmount !== 0
+                                  ? Math.round(
+                                      g.monthlyContribution * (g.baseTargetAmount / g.targetAmount),
+                                    )
+                                  : undefined,
+                              baseCurrency,
+                              mode,
+                              rates,
+                              hidden,
+                              compact: true,
+                            })}
+                            /mo
                           </span>
                         )}
                       </div>
@@ -347,54 +392,87 @@ export function FinanceTargets() {
               </div>
             ) : (
               <>
-              <div className="divide-y divide-border-subtle">
-                {liabilities.map((l, i) => {
-                  const Icon = LIAB_ICONS[l.liabilityType] ?? Wallet;
-                  const paid = pct(l.principal - l.remaining, l.principal);
-                  return (
-                    <div key={l.id} className="py-2.5 first:pt-0 last:pb-0">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <Icon
-                            className="w-3.5 h-3.5 flex-shrink-0 text-destructive/60"
-                            strokeWidth={1.5}
+                <div className="divide-y divide-border-subtle">
+                  {liabilities.map((l, i) => {
+                    const Icon = LIAB_ICONS[l.liabilityType] ?? Wallet;
+                    const paid = pct(l.principal - l.remaining, l.principal);
+                    return (
+                      <div key={l.id} className="py-2.5 first:pt-0 last:pb-0">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Icon
+                              className="w-3.5 h-3.5 flex-shrink-0 text-destructive/60"
+                              strokeWidth={1.5}
+                            />
+                            <span className="text-[12px] font-medium text-secondary truncate">
+                              {l.name}
+                            </span>
+                            <span className="text-[8px] font-light px-1.5 py-0.5 rounded-full bg-white/[0.06] text-dim flex-shrink-0">
+                              {l.liabilityType.replaceAll("_", " ")}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <span className="text-[11px] text-destructive tabular-nums">
+                              {displayAmount({
+                                amount: l.remaining,
+                                currency: l.currency,
+                                baseAmount: l.baseRemaining,
+                                baseCurrency,
+                                mode,
+                                rates,
+                                hidden,
+                                compact: true,
+                              })}
+                            </span>
+                            <span className="text-[10px] text-success tabular-nums w-8 text-right">
+                              {paid}%
+                            </span>
+                          </div>
+                        </div>
+                        <div className="h-1 bg-white/[0.06] rounded-full">
+                          <div
+                            className="h-full bg-success rounded-full"
+                            style={{ width: `${paid}%`, transition: "width 0.5s ease" }}
                           />
-                          <span className="text-[12px] font-medium text-secondary truncate">{l.name}</span>
-                          <span className="text-[8px] font-light px-1.5 py-0.5 rounded-full bg-white/[0.06] text-dim flex-shrink-0">
-                            {l.liabilityType.replaceAll("_", " ")}
-                          </span>
                         </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <span className="text-[11px] text-destructive tabular-nums">
-                            {displayAmount({ amount: l.remaining, currency: l.currency, baseAmount: l.baseRemaining, baseCurrency, mode, rates, hidden, compact: true })}
-                          </span>
-                          <span className="text-[10px] text-success tabular-nums w-8 text-right">{paid}%</span>
+                        <div className="flex items-center gap-3 mt-1">
+                          {l.interestRate != null && (
+                            <span className="text-[9px] text-dim">{l.interestRate}% APR</span>
+                          )}
+                          {l.monthlyPayment != null && l.monthlyPayment > 0 && (
+                            <span className="text-[9px] text-dim">
+                              {displayAmount({
+                                amount: l.monthlyPayment,
+                                currency: l.currency,
+                                baseAmount:
+                                  l.basePrincipal != null && l.principal !== 0
+                                    ? Math.round(l.monthlyPayment * (l.basePrincipal / l.principal))
+                                    : undefined,
+                                baseCurrency,
+                                mode,
+                                rates,
+                                hidden,
+                                compact: true,
+                              })}
+                              /mo
+                            </span>
+                          )}
+                          {l.dueDate && (
+                            <span className="text-[9px] text-dim">Due {l.dueDate}</span>
+                          )}
                         </div>
                       </div>
-                      <div className="h-1 bg-white/[0.06] rounded-full">
-                        <div className="h-full bg-success rounded-full" style={{ width: `${paid}%`, transition: "width 0.5s ease" }} />
-                      </div>
-                      <div className="flex items-center gap-3 mt-1">
-                        {l.interestRate != null && <span className="text-[9px] text-dim">{l.interestRate}% APR</span>}
-                        {l.monthlyPayment != null && l.monthlyPayment > 0 && (
-                          <span className="text-[9px] text-dim">
-                            {displayAmount({ amount: l.monthlyPayment, currency: l.currency, baseAmount: l.basePrincipal != null && l.principal !== 0 ? Math.round(l.monthlyPayment * (l.basePrincipal / l.principal)) : undefined, baseCurrency, mode, rates, hidden, compact: true })}/mo
-                          </span>
-                        )}
-                        {l.dueDate && <span className="text-[9px] text-dim">Due {l.dueDate}</span>}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              {liabilities.length > 0 && (
-                <div className="mt-3 pt-2.5 border-t border-white/[0.08] flex justify-between">
-                  <span className="text-[10px] text-muted">Total Debt</span>
-                  <span className="text-[11px] text-destructive tabular-nums">
-                    {fmtCompact(convertTotal(totalRemaining), displayCur, hidden)}
-                  </span>
+                    );
+                  })}
                 </div>
-              )}
+                {liabilities.length > 0 && (
+                  <div className="mt-3 pt-2.5 border-t border-white/[0.08] flex justify-between">
+                    <span className="text-[10px] text-muted">Total Debt</span>
+                    <span className="text-[11px] text-destructive tabular-nums">
+                      {fmtCompact(convertTotal(totalRemaining), displayCur, hidden)}
+                    </span>
+                  </div>
+                )}
               </>
             )}
           </Card>

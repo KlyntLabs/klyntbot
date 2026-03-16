@@ -9,10 +9,12 @@ import {
   FolderInput,
   FolderOpen,
   FolderPlus,
+  Palette,
   Pencil,
   Pin,
   PinOff,
   Plus,
+  Smile,
   Trash2,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -46,7 +48,21 @@ interface NotebookTreeProps {
   onRenameNote: (id: string, title: string) => void;
   onMoveNote: (id: string, notebookId: string | null) => void;
   onMoveNotebook: (id: string, parentId: string | null) => void;
+  onUpdateNotebook: (id: string, updates: { icon?: string | null; color?: string | null }) => void;
 }
+
+const FOLDER_ICONS = ["📁", "📂", "🗂️", "📚", "💼", "🏠", "🔬", "🎨", "💡", "🚀", "⭐", "❤️", "🔥", "🌍", "🎯", "📌"];
+const FOLDER_COLORS = [
+  null, // no color (reset)
+  "#a78bfa", // violet
+  "#93c5fd", // blue
+  "#6ee7b7", // green
+  "#fcd34d", // amber
+  "#fca5a5", // red
+  "#f9a8d4", // pink
+  "#67e8f9", // cyan
+  "#fdba74", // orange
+];
 
 type ContextTarget =
   | { kind: "folder"; notebook: Notebook; x: number; y: number }
@@ -72,6 +88,7 @@ export function NotebookTree({
   onRenameNote,
   onMoveNote,
   onMoveNotebook: _onMoveNotebook,
+  onUpdateNotebook,
 }: NotebookTreeProps) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(
     () => new Set(notebooks.map((n) => n.id)),
@@ -396,6 +413,7 @@ export function NotebookTree({
           onPinNote={onPinNote}
           onDeleteNotebook={onDeleteNotebook}
           onMoveNote={onMoveNote}
+          onUpdateNotebook={onUpdateNotebook}
           onClose={() => setContextMenu(null)}
         />
       )}
@@ -415,6 +433,7 @@ interface TreeContextMenuProps {
   onPinNote: (id: string, pinned: boolean) => void;
   onDeleteNotebook: (id: string) => void;
   onMoveNote: (id: string, notebookId: string | null) => void;
+  onUpdateNotebook: (id: string, updates: { icon?: string | null; color?: string | null }) => void;
   onClose: () => void;
 }
 
@@ -428,10 +447,13 @@ function TreeContextMenu({
   onPinNote,
   onDeleteNotebook,
   onMoveNote,
+  onUpdateNotebook,
   onClose,
   ref,
 }: TreeContextMenuProps & { ref: React.Ref<HTMLDivElement> }) {
   const [showMoveSubmenu, setShowMoveSubmenu] = useState(false);
+  const [showIconPicker, setShowIconPicker] = useState(false);
+  const [showColorPicker, setShowColorPicker] = useState(false);
 
   if (target.kind === "blank") {
     return (
@@ -489,6 +511,72 @@ function TreeContextMenu({
         >
           Rename
         </ContextMenuItem>
+
+        {/* Icon picker */}
+        <ContextMenuSubmenu
+          icon={<Smile className="w-4 h-4" />}
+          label="Change Icon"
+          open={showIconPicker}
+          onToggle={() => setShowIconPicker(!showIconPicker)}
+        >
+          <div className="grid grid-cols-8 gap-0.5 p-1.5">
+            {FOLDER_ICONS.map((icon) => (
+              <button
+                key={icon}
+                type="button"
+                onClick={() => {
+                  onUpdateNotebook(target.notebook.id, { icon });
+                  onClose();
+                }}
+                className={`w-7 h-7 rounded flex items-center justify-center text-sm hover:bg-white/[0.1] transition-colors ${
+                  target.notebook.icon === icon ? "bg-white/[0.12] ring-1 ring-brand/40" : ""
+                }`}
+              >
+                {icon}
+              </button>
+            ))}
+          </div>
+          {target.notebook.icon && (
+            <ContextMenuItem
+              onClick={() => {
+                onUpdateNotebook(target.notebook.id, { icon: null });
+                onClose();
+              }}
+            >
+              <span className="text-dim text-xs">Remove icon</span>
+            </ContextMenuItem>
+          )}
+        </ContextMenuSubmenu>
+
+        {/* Color picker */}
+        <ContextMenuSubmenu
+          icon={<Palette className="w-4 h-4" />}
+          label="Change Color"
+          open={showColorPicker}
+          onToggle={() => setShowColorPicker(!showColorPicker)}
+        >
+          <div className="flex gap-1 p-2">
+            {FOLDER_COLORS.map((color) => (
+              <button
+                key={color ?? "none"}
+                type="button"
+                onClick={() => {
+                  onUpdateNotebook(target.notebook.id, { color });
+                  onClose();
+                }}
+                className={`w-5 h-5 rounded-full border transition-transform hover:scale-125 ${
+                  target.notebook.color === color ? "ring-2 ring-white/60 ring-offset-1 ring-offset-black" : ""
+                } ${!color ? "border-white/20 bg-transparent" : "border-transparent"}`}
+                style={color ? { backgroundColor: color } : undefined}
+                title={color ?? "No color"}
+              >
+                {!color && <span className="text-[8px] text-dim">×</span>}
+              </button>
+            ))}
+          </div>
+        </ContextMenuSubmenu>
+
+        <ContextMenuSeparator />
         <ContextMenuItem
           icon={<Trash2 className="w-4 h-4" />}
           onClick={() => {

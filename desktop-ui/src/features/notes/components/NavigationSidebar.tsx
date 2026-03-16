@@ -32,6 +32,7 @@ interface NavigationSidebarProps {
   onRenameNote: (id: string, title: string) => void;
   onMoveNote: (id: string, notebookId: string | null) => void;
   onMoveNotebook: (id: string, parentId: string | null) => void;
+  onUpdateNotebook: (id: string, updates: { icon?: string | null; color?: string | null }) => void;
   inboxItems: InboxItem[];
   onInboxCreateAsNote: (content: string) => void;
   onInboxDiscard: (id: string) => void;
@@ -52,6 +53,7 @@ export function NavigationSidebar({
   onRenameNote,
   onMoveNote,
   onMoveNotebook,
+  onUpdateNotebook,
   inboxItems,
   onInboxCreateAsNote,
   onInboxDiscard,
@@ -197,6 +199,7 @@ export function NavigationSidebar({
             onRenameNote={onRenameNote}
             onMoveNote={onMoveNote}
             onMoveNotebook={onMoveNotebook}
+            onUpdateNotebook={onUpdateNotebook}
           />
 
           {/* 5. Inbox */}

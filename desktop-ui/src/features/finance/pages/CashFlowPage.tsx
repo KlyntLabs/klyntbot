@@ -42,12 +42,11 @@ export function CashFlowPage() {
     { income: 0, spending: 0 },
   );
 
-  const { data: dailySpendingResp, refetch: rDS } =
-    useQuery<FinanceDailySpendingResponse>(
-      "finance_daily_spending",
-      { dateFrom: period.dateFrom, dateTo: period.dateTo },
-      { days: [] },
-    );
+  const { data: dailySpendingResp, refetch: rDS } = useQuery<FinanceDailySpendingResponse>(
+    "finance_daily_spending",
+    { dateFrom: period.dateFrom, dateTo: period.dateTo },
+    { days: [] },
+  );
 
   const { data: spendingReport, refetch: rSR } = useQuery<FinanceCategoryReport>(
     "finance_report_spending",
@@ -324,8 +323,7 @@ export function CashFlowPage() {
                     : tx.txType === "expense"
                       ? "text-destructive"
                       : "text-info";
-                const pre =
-                  tx.txType === "income" ? "+" : tx.txType === "expense" ? "-" : "";
+                const pre = tx.txType === "income" ? "+" : tx.txType === "expense" ? "-" : "";
                 return (
                   <div
                     key={tx.id}

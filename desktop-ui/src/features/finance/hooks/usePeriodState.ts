@@ -62,10 +62,7 @@ function parseDateISO(iso: string): Date {
   return new Date(y, m - 1, day);
 }
 
-function computeRange(
-  mode: PeriodMode,
-  period: string,
-): { dateFrom: string; dateTo: string } {
+function computeRange(mode: PeriodMode, period: string): { dateFrom: string; dateTo: string } {
   switch (mode) {
     case "year": {
       const y = period; // "2026"
@@ -160,7 +157,11 @@ function shiftPeriod(mode: PeriodMode, period: string, delta: number): string {
   }
 }
 
-function adaptPeriodToMode(currentPeriod: string, currentMode: PeriodMode, newMode: PeriodMode): string {
+function adaptPeriodToMode(
+  currentPeriod: string,
+  currentMode: PeriodMode,
+  newMode: PeriodMode,
+): string {
   // Try to keep the user in the same approximate time when switching modes
   let refDate: Date;
   switch (currentMode) {
@@ -240,10 +241,7 @@ export function usePeriodState(): PeriodState {
     setSelectedDay(date);
   }, []);
 
-  const { dateFrom, dateTo } = useMemo(
-    () => computeRange(mode, period),
-    [mode, period],
-  );
+  const { dateFrom, dateTo } = useMemo(() => computeRange(mode, period), [mode, period]);
 
   const label = useMemo(() => computeLabel(mode, period), [mode, period]);
 

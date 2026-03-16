@@ -1,5 +1,5 @@
-import type { PeriodMode } from "../hooks/usePeriodState";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import type { PeriodMode } from "../hooks/usePeriodState";
 
 const MODES: PeriodMode[] = ["day", "week", "month", "year"];
 
@@ -51,9 +51,7 @@ export function PeriodSelector({
             aria-selected={m === mode}
             onClick={() => onSetMode(m)}
             className={`px-3 py-1.5 rounded-lg text-[11px] font-light transition-all capitalize ${
-              m === mode
-                ? "glass-button-active text-primary"
-                : "text-muted hover:text-secondary"
+              m === mode ? "glass-button-active text-primary" : "text-muted hover:text-secondary"
             }`}
           >
             {m}

@@ -41,8 +41,7 @@ export function DaySummary({
         <p className="text-[13px] font-medium text-primary mb-1.5">
           {dateLabel} &mdash;{" "}
           <span className="font-light text-secondary">
-            {txCount} {txCount === 1 ? "transaction" : "transactions"}, spent{" "}
-            {spendingDisplay}
+            {txCount} {txCount === 1 ? "transaction" : "transactions"}, spent {spendingDisplay}
           </span>
         </p>
 

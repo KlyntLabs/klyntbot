@@ -18,9 +18,7 @@ export function CategoryRanking({
 
   const totalSpending = breakdown.reduce((sum, row) => sum + row.total, 0);
   const visible =
-    showAll || breakdown.length <= MAX_VISIBLE
-      ? breakdown
-      : breakdown.slice(0, MAX_VISIBLE);
+    showAll || breakdown.length <= MAX_VISIBLE ? breakdown : breakdown.slice(0, MAX_VISIBLE);
 
   if (breakdown.length === 0) {
     return (
@@ -38,10 +36,7 @@ export function CategoryRanking({
         return (
           <div key={row.category} className="flex items-center gap-3">
             {/* Color dot */}
-            <div
-              className="w-2 h-2 rounded-full shrink-0"
-              style={{ backgroundColor: colorHex }}
-            />
+            <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: colorHex }} />
             {/* Category name */}
             <span className="flex-1 text-[12px] font-light text-secondary truncate capitalize">
               {row.category}
@@ -64,9 +59,7 @@ export function CategoryRanking({
           onClick={() => setShowAll((v) => !v)}
           className="text-[11px] font-light text-muted hover:text-secondary transition-colors mt-1"
         >
-          {showAll
-            ? "Show less"
-            : `Show ${breakdown.length - MAX_VISIBLE} more`}
+          {showAll ? "Show less" : `Show ${breakdown.length - MAX_VISIBLE} more`}
         </button>
       )}
     </div>

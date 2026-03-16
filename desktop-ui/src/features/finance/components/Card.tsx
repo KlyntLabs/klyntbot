@@ -15,11 +15,7 @@ export function Card({
   const base = compact ? "glass-card-sm" : "glass-card";
   if (onClick) {
     return (
-      <button
-        type="button"
-        className={cn(base, "text-left w-full", className)}
-        onClick={onClick}
-      >
+      <button type="button" className={cn(base, "text-left w-full", className)} onClick={onClick}>
         {children}
       </button>
     );

@@ -168,6 +168,13 @@ export default function KnowledgeBasePage() {
     [updateNotebook],
   );
 
+  const handleUpdateNotebook = useCallback(
+    async (id: string, updates: { icon?: string | null; color?: string | null }) => {
+      await updateNotebook({ id, ...updates });
+    },
+    [updateNotebook],
+  );
+
   const handleRenameNote = useCallback(
     async (id: string, title: string) => {
       await updateNote({ id, title });
@@ -353,6 +360,7 @@ export default function KnowledgeBasePage() {
               onRenameNote={handleRenameNote}
               onMoveNote={handleMoveNote}
               onMoveNotebook={handleMoveNotebook}
+              onUpdateNotebook={handleUpdateNotebook}
               inboxItems={inboxItems}
               onInboxCreateAsNote={handleInboxCreateAsNote}
               onInboxDiscard={handleInboxDiscard}
