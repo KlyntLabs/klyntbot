@@ -76,12 +76,13 @@ impl FinanceTool {
                 } else {
                     0
                 };
+                let inv_qty: f64 = inv.quantity_f64();
                 json!({
                     "id": inv.id,
                     "name": inv.name,
                     "symbol": inv.symbol,
                     "asset_type": inv.asset_type,
-                    "quantity": inv.quantity,
+                    "quantity": inv_qty,
                     "cost_basis": inv.cost_basis,
                     "current_value": value,
                     "return": ret,

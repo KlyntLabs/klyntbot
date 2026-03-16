@@ -118,13 +118,11 @@ impl ProviderManager {
     async fn record_failure(&self) {
         let count = self.failure_count.fetch_add(1, Ordering::SeqCst) + 1;
         if count >= self.circuit_config.failure_threshold {
-            let reset_dur =
-                std::time::Duration::from_secs(self.circuit_config.reset_timeout_secs);
+            let reset_dur = std::time::Duration::from_secs(self.circuit_config.reset_timeout_secs);
             let open_until_utc = Utc::now()
                 + chrono::Duration::from_std(reset_dur).unwrap_or(chrono::Duration::seconds(60));
 
-            *self.circuit_open_until.write().await =
-                Some(tokio::time::Instant::now() + reset_dur);
+            *self.circuit_open_until.write().await = Some(tokio::time::Instant::now() + reset_dur);
             *self.circuit_open_until_utc.write().await = Some(open_until_utc);
             self.failure_count.store(0, Ordering::SeqCst);
 

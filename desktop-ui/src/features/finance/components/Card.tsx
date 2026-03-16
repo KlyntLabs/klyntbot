@@ -3,24 +3,28 @@ import { cn } from "@shared/lib/utils";
 export function Card({
   children,
   className,
+  compact,
   onClick,
 }: {
   children: React.ReactNode;
   className?: string;
+  /** Use tighter radius for sidebar / small cards */
+  compact?: boolean;
   onClick?: () => void;
 }) {
+  const base = compact ? "glass-card-sm" : "glass-card";
   if (onClick) {
     return (
       <button
         type="button"
-        className={cn("glass-card text-left w-full", className)}
+        className={cn(base, "text-left w-full", className)}
         onClick={onClick}
       >
         {children}
       </button>
     );
   }
-  return <div className={cn("glass-card", className)}>{children}</div>;
+  return <div className={cn(base, className)}>{children}</div>;
 }
 
 export function CardHeader({

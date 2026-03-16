@@ -39,6 +39,9 @@ impl From<&FinanceAccount> for FinanceAccountRow {
             is_archived: account.is_archived,
             created_at: account.created_at,
             updated_at: account.updated_at,
+            base_balance: 0,
+            base_currency: "USD".to_string(),
+            exchange_rate: 1.0,
         }
     }
 }
@@ -85,6 +88,9 @@ impl From<&FinanceTransaction> for FinanceTransactionRow {
             recurring_rule: tx.recurring_rule.clone(),
             created_at: tx.created_at,
             updated_at: tx.updated_at,
+            base_amount: 0,
+            base_currency: "USD".to_string(),
+            exchange_rate: 1.0,
         }
     }
 }
@@ -129,6 +135,9 @@ impl From<&FinanceBudget> for FinanceBudgetRow {
             alert_threshold: budget.alert_threshold,
             created_at: budget.created_at,
             updated_at: budget.updated_at,
+            base_amount: 0,
+            base_currency: "USD".to_string(),
+            exchange_rate: 1.0,
         }
     }
 }
@@ -171,12 +180,13 @@ impl From<FinanceInvestmentRow> for FinanceInvestment {
             asset_type: AssetType::from_str_loose(&row.asset_type).unwrap_or_default(),
             symbol: row.symbol,
             name: row.name,
-            quantity: row.quantity,
+            quantity: row.quantity.parse::<f64>().unwrap_or(0.0),
             cost_basis: row.cost_basis,
             currency: row.currency,
             current_price: row.current_price,
             current_value: row.current_value,
             purchase_date: row.purchase_date,
+            asset_class: row.asset_class,
             notes: row.notes,
             created_at: row.created_at,
             updated_at: row.updated_at,
@@ -192,15 +202,22 @@ impl From<&FinanceInvestment> for FinanceInvestmentRow {
             asset_type: inv.asset_type.as_str().to_string(),
             symbol: inv.symbol.clone(),
             name: inv.name.clone(),
-            quantity: inv.quantity,
+            quantity: inv.quantity.to_string(),
             cost_basis: inv.cost_basis,
             currency: inv.currency.clone(),
             current_price: inv.current_price,
             current_value: inv.current_value,
             purchase_date: inv.purchase_date,
+            asset_class: inv.asset_class.clone(),
             notes: inv.notes.clone(),
             created_at: inv.created_at,
             updated_at: inv.updated_at,
+            market_currency: None,
+            base_cost_basis: 0,
+            base_current_value: 0,
+            base_currency: "USD".to_string(),
+            purchase_rate: 1.0,
+            market_rate: 1.0,
         }
     }
 }
@@ -239,6 +256,9 @@ impl From<&FinanceInvestmentTx> for FinanceInvestmentTxRow {
             tx_date: tx.tx_date,
             notes: tx.notes.clone(),
             created_at: tx.created_at,
+            base_total_amount: 0,
+            base_currency: "USD".to_string(),
+            exchange_rate: 1.0,
         }
     }
 }
@@ -283,6 +303,10 @@ impl From<&FinanceGoal> for FinanceGoalRow {
             notes: goal.notes.clone(),
             created_at: goal.created_at,
             updated_at: goal.updated_at,
+            base_target_amount: 0,
+            base_current_amount: 0,
+            base_currency: "USD".to_string(),
+            exchange_rate: 1.0,
         }
     }
 }
@@ -323,6 +347,10 @@ impl From<&FinanceLiability> for FinanceLiabilityRow {
             notes: liability.notes.clone(),
             created_at: liability.created_at,
             updated_at: liability.updated_at,
+            base_principal: 0,
+            base_remaining: 0,
+            base_currency: "USD".to_string(),
+            exchange_rate: 1.0,
         }
     }
 }

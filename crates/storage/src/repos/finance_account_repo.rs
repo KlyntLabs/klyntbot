@@ -23,10 +23,12 @@ impl FinanceAccountRepo {
             r#"
             INSERT INTO finance_accounts (
                 id, name, account_type, currency, balance,
-                institution, notes, is_archived, created_at, updated_at
+                institution, notes, is_archived, created_at, updated_at,
+                base_balance, base_currency, exchange_rate
             ) VALUES (
                 ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?
+                ?, ?, ?, ?, ?,
+                ?, ?, ?
             )
             RETURNING *
             "#,
@@ -41,6 +43,9 @@ impl FinanceAccountRepo {
         .bind(row.is_archived)
         .bind(row.created_at)
         .bind(row.updated_at)
+        .bind(row.base_balance)
+        .bind(&row.base_currency)
+        .bind(row.exchange_rate)
         .fetch_one(&self.pool)
         .await?;
 
@@ -56,12 +61,15 @@ impl FinanceAccountRepo {
         let row = sqlx::query_as::<_, FinanceAccountRow>(
             r#"
             UPDATE finance_accounts SET
-                name        = COALESCE(?, name),
-                balance     = COALESCE(?, balance),
-                institution = CASE WHEN ? THEN ? ELSE institution END,
-                notes       = CASE WHEN ? THEN ? ELSE notes END,
-                is_archived = COALESCE(?, is_archived),
-                updated_at  = ?
+                name          = COALESCE(?, name),
+                balance       = COALESCE(?, balance),
+                institution   = CASE WHEN ? THEN ? ELSE institution END,
+                notes         = CASE WHEN ? THEN ? ELSE notes END,
+                is_archived   = COALESCE(?, is_archived),
+                base_balance  = COALESCE(?, base_balance),
+                base_currency = COALESCE(?, base_currency),
+                exchange_rate = COALESCE(?, exchange_rate),
+                updated_at    = ?
             WHERE id = ?
             RETURNING *
             "#,
@@ -73,6 +81,9 @@ impl FinanceAccountRepo {
         .bind(patch.notes.is_some())
         .bind(patch.notes.as_ref().and_then(|v| v.as_deref()))
         .bind(patch.is_archived)
+        .bind(patch.base_balance)
+        .bind(patch.base_currency.as_deref())
+        .bind(patch.exchange_rate)
         .bind(now)
         .bind(&patch.id)
         .fetch_optional(&self.pool)
@@ -150,6 +161,22 @@ impl FinanceAccountRepo {
         Ok(rows)
     }
 
+    /// Sum `base_balance` of all non-archived accounts whose `base_currency` matches.
+    ///
+    /// This gives a single consolidated total in the user's home currency.
+    pub async fn total_base_balance(
+        &self,
+        base_currency: &str,
+    ) -> Result<i64, crate::error::StorageError> {
+        let row = sqlx::query_as::<_, (i64,)>(
+            "SELECT COALESCE(SUM(base_balance), 0) FROM finance_accounts WHERE is_archived = FALSE AND base_currency = ?",
+        )
+        .bind(base_currency)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(row.0)
+    }
+
     // -----------------------------------------------------------------------
     // Balance Operations
     // -----------------------------------------------------------------------
@@ -164,11 +191,14 @@ impl FinanceAccountRepo {
         let row = sqlx::query_as::<_, FinanceAccountRow>(
             r#"
             UPDATE finance_accounts
-            SET balance = balance + ?, updated_at = ?
+            SET balance = balance + ?,
+                base_balance = CAST(ROUND((balance + ?) * exchange_rate) AS INTEGER),
+                updated_at = ?
             WHERE id = ?
             RETURNING *
             "#,
         )
+        .bind(delta)
         .bind(delta)
         .bind(now)
         .bind(id)

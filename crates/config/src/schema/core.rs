@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::path::PathBuf;
 
-use super::agents::AgentsConfig;
+use super::agents::{AgentsConfig, SkillConfig};
 
 use super::capture::CaptureConfig;
 use super::channels::ChannelsConfig;
@@ -14,6 +14,8 @@ use super::content::ContentConfig;
 use super::conversation::ConversationConfig;
 use super::finance::FinanceConfig;
 use super::gateway::GatewayConfig;
+use super::integrations::IntegrationsConfig;
+use super::launcher::LauncherConfig;
 use super::learning::LearningConfig;
 use super::mcp::McpConfig;
 use super::orchestrator::OrchestratorConfig;
@@ -167,6 +169,23 @@ pub struct Config {
     /// MCP (Model Context Protocol) server connections and server settings.
     #[serde(default)]
     pub mcp: McpConfig,
+
+    /// Skill discovery system configuration.
+    #[serde(default)]
+    pub skills: SkillConfig,
+
+    /// AI coding tool integrations (Claude Code, Cursor, Codex, etc.).
+    #[serde(default)]
+    pub integrations: IntegrationsConfig,
+
+    /// Project root for .agents/skills/ scanning. Falls back to CWD.
+    /// Set by the desktop app on launch. Distinct from agents.defaults.workspace.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project_root: Option<String>,
+
+    /// Launcher search sources configuration.
+    #[serde(default)]
+    pub launcher: LauncherConfig,
 
     /// Whether the first-run setup wizard has been completed.
     #[serde(default)]

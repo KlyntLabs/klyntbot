@@ -17,7 +17,10 @@ impl TaskTool {
         ctx: &RoutingContext,
     ) -> Result<String> {
         let title = p.required_str("title")?;
-        let area_id = p.required_str("area_id")?;
+        let area_id = match p.optional_str("area_id")? {
+            Some(id) => id.to_string(),
+            None => self.resolve_area_id().await?,
+        };
 
         let mut task = Task::default_instance();
         task.title = title.to_string();
@@ -169,5 +172,39 @@ impl TaskTool {
             "Task created: {} (ID: {}, type: {}){}",
             created.title, created.id, created.task_type, enriched_info
         ))
+    }
+
+    /// Auto-resolve area_id when not provided.
+    /// If 1 active area → use it. If multiple → return error listing choices.
+    pub(crate) async fn resolve_area_id(&self) -> Result<String> {
+        let Some(ref area_repo) = self.area_repo else {
+            return Err(
+                ToolError::InvalidParams("missing required 'area_id' parameter".into()).into(),
+            );
+        };
+
+        let areas = area_repo
+            .list(Some("active"))
+            .await
+            .map_err(|e| ToolError::ExecutionFailed(format!("Failed to list areas: {e}")))?;
+
+        match areas.len() {
+            0 => Err(ToolError::InvalidParams(
+                "No active areas found. Create an area first with the area tool.".into(),
+            )
+            .into()),
+            1 => Ok(areas[0].id.clone()),
+            _ => {
+                let choices: Vec<String> = areas
+                    .iter()
+                    .map(|a| format!("- {} (ID: {})", a.name, a.id))
+                    .collect();
+                Err(ToolError::InvalidParams(format!(
+                    "Multiple areas available. Please specify area_id:\n{}",
+                    choices.join("\n")
+                ))
+                .into())
+            }
+        }
     }
 }

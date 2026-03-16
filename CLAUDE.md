@@ -54,7 +54,7 @@ Rust personal AI agent — single binary connecting 6+ chat platforms to LLMs wi
 L0: common                — KlyntbotError, MessageRole, ChannelName, ChatId, SessionKey
 L1: config, bus, tools-core, tools-core-macros — Config (camelCase JSON), message bus, Tool/FeaturePackage traits, derive macros
 L2: storage               — SqlitePool, migrations, *Repo structs, *Row types
-L3: providers, session, scheduling, context_engine — LLM clients, session persistence, cron, token budgets
+L3: providers, session, scheduling, context_engine, skill-system — LLM clients, session persistence, cron, token budgets, skill discovery/routing
 L4: tools, feature-tasks, feature-finance, feature-notes, feature-productivity, feature-coaching, activity-log, plugin-runtime — 20+ tools, feature packages, WASM plugins
 L5: channels, agent, cognitive — Platform integrations (Telegram/Discord/Slack/Email), agent runtime, cognitive memory system
 L6: mcp                   — MCP server/client
@@ -77,9 +77,11 @@ Dependencies flow strictly upward. `plugin-sdk` and `tests/fixtures/hello_plugin
 - **Config:** `#[serde(rename_all = "camelCase")]`. File at `~/.klyntbot/config.json`. API keys in `Secret<String>` (access via `.expose()`). Env override: `KLYNTBOT_AGENTS__DEFAULTS__MODEL=gpt-4o`.
 - **Re-export facade:** `src/lib.rs` re-exports all public types. Use `klyntbot::AgentLoop`, `klyntbot::Config`, etc.
 
-### Agent profiles & MCP
+### Skill system & MCP
 
-Five built-in agents in `agents/`: general, task, finance, automation, communication. Each has `AGENT.md` (YAML frontmatter) + `skills/` folder. Compiled via `include_str!`. MCP tool names: `mcp_{server}_{tool}` (see `mcp::sanitize`). MCP access controlled per-agent via `mcp_tools` field (`["*"]` = all, `[]` = none). Task agent has `mcp_tools: ["google-calendar"]` for calendar operations via Google Calendar MCP.
+Five built-in orchestrator skills in `skills/`: general, task-management, finance-management, automation, communication. Each has `SKILL.md` (Agent Skills spec YAML frontmatter) + `references/` folder. Compiled via `include_str!` in `skill-system` crate. `SkillRouter` selects orchestrator per-message via keyword + semantic scoring. MCP tool names: `mcp_{server}_{tool}` (see `mcp::sanitize`). MCP access controlled per-skill via `mcp_tools` field (`["*"]` = all, `[]` = none). Task-management skill has `mcp_tools: ["google-calendar"]`.
+
+Claude Code skills (`.claude/skills/klyntbot-*/SKILL.md`) are a separate layer that teaches Claude Code how to call klyntbot MCP tools. They follow Agent Skills format with `references/` for on-demand detail loading. These are NOT the same as internal skills in `skills/`.
 
 ### MCP server — exposing tools to Claude Code
 
@@ -110,9 +112,13 @@ Klyntbot exposes tools to external AI clients (Claude Code, Cursor, etc.) via MC
 }
 ```
 
+### Tray countdown
+
+`tray_countdown.rs` shows the next upcoming calendar event or task deadline in the macOS menu bar with a live countdown (e.g. "« 24:57 · Standup"). Only shows items due today (local timezone). Polls the DB every 30s, ticks every 1s. Coordinates with the focus timer via `FOCUS_ACTIVE` atomic flag — when a focus session is running, the focus timer owns the tray title and the countdown yields. On focus end, `notify_focus_ended()` clears the flag and the countdown resumes. Uses `tauri::async_runtime::spawn` (not `tokio::spawn`) because it starts during Tauri's `setup` hook before the tokio runtime is available.
+
 ### Agent runtime
 
-`AgentRuntime` → `AgentManager` → `IntentAnalyzer` → `ContextEngine` → `ExecutionRouter` → `CostTracker`. Two execution modes: **Direct** (single LLM call, no tools) and **Reactive** (ReAct loop with tool calls, synthesizes at max_iterations). Code in `crates/agent/src/agent_runtime/` and `crates/agent/src/intent_pipeline/`.
+`AgentRuntime` → `SkillCatalog` + `SkillRouter` → `IntentAnalyzer` → `ContextEngine` → `ExecutionRouter` → `CostTracker`. Two execution modes: **Direct** (single LLM call, no tools) and **Reactive** (ReAct loop with tool calls, synthesizes at max_iterations). Code in `crates/agent/src/agent_runtime/` and `crates/agent/src/intent_pipeline/`. Skill types in `crates/skill-system/`.
 
 ## Conventions
 
@@ -128,11 +134,13 @@ Klyntbot exposes tools to external AI clients (Claude Code, Cursor, etc.) via MC
 
 ## Gotchas
 
+- **MSRV 1.75** — don't use APIs stabilized after 1.75 (e.g., `Option::is_none_or` requires 1.82). Use `map_or`/`map_or_else` instead. Clippy catches this.
+- **New Tauri command modules need `DEV_COMMANDS`** — every `crates/desktop/src/commands/*.rs` module with `#[tauri::command]` functions must export `pub const DEV_COMMANDS: &[&str]` and be added to `dev_server/mod.rs` test coverage list. The `dev_server_covers_all_tauri_commands` test enforces this.
 - **`StoragePool::from_existing()` skips migrations** — only for already-migrated pools. Tests must use `connect_in_memory()`.
 
 - **Config changes require restart** of the desktop app.
 - **Dependency inversion** — new tools needing agent context must inject via `Arc<dyn Trait>` to avoid circular deps.
 - **`email` feature** (on by default) gates IMAP/SMTP deps in `channels` crate.
 - **`tauri.conf.json` uses `bun`** in `beforeBuildCommand`. Ensure `bun` is installed globally.
-- **Timestamps are UTC** — Rust emits `chrono::Utc::now().to_rfc3339()`. Never `.slice()` ISO strings for display — always parse via `new Date(iso)` and use `toLocaleTimeString()`. Shared helper: `formatTime()` in `desktop-ui/src/shared/lib/dates.ts`.
+- **Timestamps are UTC, display in local time** — Rust stores `chrono::Utc::now().to_rfc3339()`. For user-facing display strings formatted in Rust (e.g. `due_display` in `TodayTaskResponse`), convert to local first via `d.with_timezone(&chrono::Local)`. In the frontend, never `.slice()` ISO strings — parse via `new Date(iso)` and use `toLocaleTimeString()`. Shared helper: `formatTime()` in `desktop-ui/src/shared/lib/dates.ts`.
 - **Pre-release — no user data to migrate.** All schema changes can be made directly (alter tables, drop and recreate) without writing migration scripts. No need for backwards-compatible migrations until first release. When a migration is consolidated, update the `FeatureMigration` version and SQL in-place rather than adding incremental migration files. After first release, all schema changes require proper versioned migrations with `INSERT OR IGNORE` for idempotency.

@@ -1,0 +1,33 @@
+[package]
+name = "feature-launcher"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+common.workspace = true
+storage.workspace = true
+tools-core.workspace = true
+platform-macos.workspace = true
+serde = { workspace = true }
+serde_json.workspace = true
+sqlx.workspace = true
+chrono = { workspace = true }
+tokio.workspace = true
+tokio-util = { workspace = true }
+async-trait.workspace = true
+tracing.workspace = true
+meval = "0.2"
+regex.workspace = true
+nucleo-matcher = "0.3"
+parking_lot = "0.12"
+base64.workspace = true
+futures-util.workspace = true
+which.workspace = true
+shellexpand.workspace = true
+dashmap.workspace = true
+notify.workspace = true
+notify-debouncer-mini.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "test-util"] }
+tempfile.workspace = true

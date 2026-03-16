@@ -36,6 +36,10 @@ mod tests {
             notes: None,
             created_at: now,
             updated_at: now,
+            base_target_amount: 0,
+            base_current_amount: 0,
+            base_currency: "USD".to_string(),
+            exchange_rate: 1.0,
         }
     }
 

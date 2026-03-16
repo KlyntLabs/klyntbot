@@ -46,6 +46,9 @@ impl AppCore {
             alert_threshold: params.alert_threshold.unwrap_or(80),
             created_at: now,
             updated_at: now,
+            base_amount: 0,
+            base_currency: "USD".to_string(),
+            exchange_rate: 1.0,
         };
 
         self.repos
@@ -67,6 +70,9 @@ impl AppCore {
             amount: params.amount,
             category: params.category,
             is_active: params.is_active,
+            base_amount: None,
+            base_currency: None,
+            exchange_rate: None,
         };
         let row = self
             .repos

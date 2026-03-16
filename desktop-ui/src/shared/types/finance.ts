@@ -9,6 +9,9 @@ export interface FinanceAccount {
   institution: string | null;
   notes: string | null;
   isArchived: boolean;
+  baseBalance?: number;
+  baseCurrency?: string;
+  exchangeRate?: number;
 }
 
 // ── Finance Transaction ────────────────────────────────────
@@ -25,6 +28,9 @@ export interface FinanceTransaction {
   notes: string | null;
   txDate: string;
   transferId: string | null;
+  baseAmount?: number;
+  baseCurrency?: string;
+  exchangeRate?: number;
 }
 
 // ── Finance Budget ─────────────────────────────────────────
@@ -41,6 +47,8 @@ export interface FinanceBudgetUsage {
   isActive: boolean;
   alertThreshold: number;
   spent: number;
+  baseAmount?: number;
+  baseCurrency?: string;
 }
 
 // ── Finance Portfolio & Investments ────────────────────────
@@ -66,6 +74,12 @@ export interface FinanceInvestment {
   currency: string;
   currentPrice: number | null;
   currentValue: number | null;
+  marketCurrency?: string;
+  baseCostBasis?: number;
+  baseCurrentValue?: number;
+  baseCurrency?: string;
+  purchaseRate?: number;
+  marketRate?: number;
 }
 
 // ── Finance Goals & Liabilities ────────────────────────────
@@ -80,6 +94,9 @@ export interface FinanceGoal {
   status: string;
   deadline: string | null;
   monthlyContribution: number | null;
+  baseTargetAmount?: number;
+  baseCurrentAmount?: number;
+  baseCurrency?: string;
 }
 
 export interface FinanceLiability {
@@ -92,6 +109,9 @@ export interface FinanceLiability {
   interestRate: number | null;
   monthlyPayment: number | null;
   dueDate: string | null;
+  basePrincipal?: number;
+  baseRemaining?: number;
+  baseCurrency?: string;
 }
 
 // ── Finance Net Worth ───────────────────────────────────────
@@ -108,6 +128,13 @@ export interface FinanceNetWorth {
 
 // ── Finance Reports ────────────────────────────────────────
 
+export interface FinanceMonthlySummary {
+  currentIncome: number;
+  currentSpending: number;
+  previousIncome: number;
+  previousSpending: number;
+}
+
 export interface FinanceCategoryReport {
   total: number;
   breakdown: { category: string; amount: number; pct: number }[];
@@ -117,6 +144,23 @@ export interface FinanceTrendPoint {
   period: string;
   value: number;
   changePct: number | null;
+}
+
+// ── Finance Daily Spending ────────────────────────────────
+
+export interface DailySpending {
+  date: string;
+  totalSpending: number;
+  txCount: number;
+}
+
+export interface FinanceDailySpendingResponse {
+  days: DailySpending[];
+}
+
+export interface FinancePeriodSummary {
+  income: number;
+  spending: number;
 }
 
 // ── Finance Mutation Parameters ────────────────────────────
@@ -188,4 +232,5 @@ export interface FinanceInvestmentCreateParams {
   symbol?: string;
   name?: string;
   currency?: string;
+  marketCurrency?: string;
 }

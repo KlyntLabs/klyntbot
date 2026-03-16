@@ -572,5 +572,5 @@ pub struct DistractionDetectedPayload {
     pub session_id: String,
     pub previous_app: String,
     pub previous_context: String,
-    pub elapsed_secs: u64,
+    pub reason: String,
 }

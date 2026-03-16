@@ -16,6 +16,7 @@ import {
 // ── Formatting ──────────────────────────────────────────────────────────
 
 // Zero-decimal currencies — stored amount IS the major unit (no subunits).
+// KEEP IN SYNC with `crates/feature-finance/src/currency.rs` ZERO_DECIMAL list.
 const ZERO_DECIMAL: ReadonlySet<string> = new Set([
   "VND",
   "JPY",
@@ -34,7 +35,8 @@ function toMajor(amount: number, currency: string): number {
   return ZERO_DECIMAL.has(currency) ? amount : amount / 100;
 }
 
-export function fmtMoney(amount: number, currency: string): string {
+export function fmtMoney(amount: number, currency: string, hidden?: boolean): string {
+  if (hidden) return "•••••••";
   const value = toMajor(amount, currency);
   if (currency === "VND") return `${new Intl.NumberFormat("vi-VN").format(Math.round(value))}đ`;
   if (currency === "USDT")
@@ -52,20 +54,27 @@ export function fmtMoney(amount: number, currency: string): string {
   }).format(value);
 }
 
-export function toVnd(amount: number, currency: string, rates: Record<string, number>): number {
-  return Math.round(amount * (rates[currency] ?? 1));
-}
-
-export function fmtVnd(amount: number): string {
-  return `${new Intl.NumberFormat("vi-VN").format(Math.round(amount))}đ`;
-}
-
-export function fmtCompact(amount: number, currency = "VND"): string {
+export function fmtCompact(amount: number, currency = "USD", hidden?: boolean): string {
+  if (hidden) return "•••••••";
   const v = toMajor(amount, currency);
-  if (Math.abs(v) >= 1e9) return `${(v / 1e9).toFixed(1)}B`;
-  if (Math.abs(v) >= 1e6) return `${(v / 1e6).toFixed(1)}M`;
-  if (Math.abs(v) >= 1e3) return `${(v / 1e3).toFixed(0)}K`;
-  return new Intl.NumberFormat("vi-VN").format(Math.round(v));
+  const symbol =
+    currency === "VND"
+      ? "đ"
+      : currency === "USD" || currency === "USDT"
+        ? "$"
+        : currency === "EUR"
+          ? "€"
+          : currency === "GBP"
+            ? "£"
+            : currency === "THB"
+              ? "฿"
+              : `${currency} `;
+  const prefix = currency === "VND" ? "" : symbol;
+  const suffix = currency === "VND" ? "đ" : "";
+  if (Math.abs(v) >= 1e9) return `${prefix}${(v / 1e9).toFixed(1)}B${suffix}`;
+  if (Math.abs(v) >= 1e6) return `${prefix}${(v / 1e6).toFixed(1)}M${suffix}`;
+  if (Math.abs(v) >= 1e3) return `${prefix}${(v / 1e3).toFixed(0)}K${suffix}`;
+  return `${prefix}${new Intl.NumberFormat("en-US").format(Math.round(v))}${suffix}`;
 }
 
 export function pct(cur: number, tot: number): number {

@@ -3,13 +3,43 @@ import { useNavigate } from "react-router";
 import { useConversationRunner } from "../hooks/useConversationRunner";
 import type { ConversationNode, NodeValue } from "../schema";
 import { FinancePanel } from "./FinancePanel";
+import { InlineCheckboxList } from "./InlineCheckboxList";
 import { InlineInput } from "./InlineInput";
 import { InlineMasked } from "./InlineMasked";
 import { InlineSelect } from "./InlineSelect";
 import { InlineTags } from "./InlineTags";
 import { TypewriterText } from "./TypewriterText";
 
-// ── Completed node (locked text, click to edit) ──────────────
+// ── Step indicator dots ─────────────────────────────────────
+
+function StepDots({
+  total,
+  current,
+  completed,
+}: {
+  total: number;
+  current: number;
+  completed: number;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      {Array.from({ length: total }, (_, i) => {
+        const isDone = i < completed;
+        const isActive = i === current;
+        return (
+          <div
+            key={i}
+            className={`rounded-full transition-all duration-300 ${
+              isActive ? "w-6 h-2 bg-brand" : isDone ? "w-2 h-2 bg-brand/60" : "w-2 h-2 bg-white/10"
+            }`}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Completed node (compact summary, click to edit) ─────────
 
 function CompletedNode({
   node,
@@ -30,30 +60,29 @@ function CompletedNode({
 
   if (isEditing) {
     return (
-      <div className="text-foreground text-base leading-relaxed">
-        <span>{before}</span>
-        {renderInput(node, value, onResubmit, true)}
-        <span>{after}</span>
+      <div className="py-3 px-4 rounded-xl bg-white/[0.06] border border-white/[0.08]">
+        <div className="text-lg text-primary leading-relaxed">
+          <span className="text-secondary">{before}</span>
+          {renderInput(node, value, onResubmit, true)}
+          <span className="text-secondary">{after}</span>
+        </div>
       </div>
     );
   }
 
-  // Display completed value
   const displayValue = formatValue(node, value);
   return (
-    <div
-      className="text-foreground text-base leading-relaxed cursor-pointer group"
+    <button
+      type="button"
       onClick={onClickEdit}
-      onKeyDown={(e) => e.key === "Enter" && onClickEdit()}
-      role="button"
-      tabIndex={0}
+      className="w-full text-left py-2 px-4 rounded-xl hover:bg-white/[0.04] transition-colors group"
     >
-      <span>{before}</span>
-      <span className="font-semibold group-hover:text-accent transition-colors">
+      <span className="text-[15px] text-muted">{before}</span>
+      <span className="text-[15px] font-semibold text-primary group-hover:text-brand transition-colors">
         {displayValue}
       </span>
-      <span>{after}</span>
-    </div>
+      <span className="text-[15px] text-muted">{after}</span>
+    </button>
   );
 }
 
@@ -65,6 +94,12 @@ function formatValue(node: ConversationNode, value: NodeValue): string {
   }
   if (node.inputType === "masked" && typeof value === "string") {
     return value.length > 8 ? `${"•".repeat(8)}${value.slice(-4)}` : "•".repeat(value.length);
+  }
+  if (node.inputType === "checkbox-list" && Array.isArray(value)) {
+    if (value.length === 0) return "None";
+    return value
+      .map((v) => node.checkboxOptions?.find((o) => o.value === v)?.label ?? v)
+      .join(", ");
   }
   if (Array.isArray(value)) return value.join(", ");
   return String(value);
@@ -130,6 +165,15 @@ function renderInput(
           autoFocus={autoFocus}
         />
       );
+    case "checkbox-list":
+      return (
+        <InlineCheckboxList
+          options={node.checkboxOptions ?? []}
+          defaultValue={Array.isArray(defaultValue) ? defaultValue : []}
+          onSubmit={(values) => onSubmit(values)}
+          autoFocus={autoFocus}
+        />
+      );
     default:
       return null;
   }
@@ -148,7 +192,6 @@ export function ConversationRunner() {
     error,
     isSaving,
     isLoading,
-    progress,
     schema,
     submit,
     resubmit,
@@ -159,10 +202,12 @@ export function ConversationRunner() {
 
   const isAnyEditing = Object.values(transcript).some((e) => e.status === "editing");
 
+  const visibleNodes = schema.filter((n) => n.id !== "complete" && n.id !== "finance_setup");
+  const completedCount = Object.values(transcript).filter((e) => e.status === "completed").length;
+
   const handleSubmit = useCallback(
     async (value: NodeValue) => {
       await submit(value);
-      // Scroll to bottom after new node appears
       requestAnimationFrame(() => {
         containerRef.current?.scrollTo({
           top: containerRef.current.scrollHeight,
@@ -174,8 +219,6 @@ export function ConversationRunner() {
   );
 
   const handleComplete = useCallback(async () => {
-    // Must call config_mark_setup_completed before navigating,
-    // otherwise app_info().setupCompleted is still false → redirect loop
     const completeNode = schema.find((n) => n.id === "complete");
     if (completeNode?.save) await completeNode.save(true, {});
     navigate("/");
@@ -183,8 +226,8 @@ export function ConversationRunner() {
 
   if (isLoading) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center bg-surface-base">
-        <div className="text-muted text-sm">Loading...</div>
+      <div className="fixed inset-0 flex items-center justify-center">
+        <div className="w-5 h-5 border-2 border-brand/30 border-t-brand rounded-full animate-spin" />
       </div>
     );
   }
@@ -192,29 +235,40 @@ export function ConversationRunner() {
   const isComplete = activeNode?.id === "complete" || activeIndex >= schema.length;
 
   return (
-    <div className="fixed inset-0 flex flex-col bg-surface-base">
-      {/* Progress bar */}
-      <div className="h-1 bg-border">
-        <div
-          className="h-full bg-accent transition-all duration-500 ease-out"
-          style={{ width: `${progress * 100}%` }}
-        />
-      </div>
+    <div className="fixed inset-0 flex flex-col items-center overflow-y-auto py-12">
+      {/* Central card */}
+      <div className="relative w-full max-w-[580px] mx-auto px-4 my-auto">
+        {/* Logo + title */}
+        <div className="text-center mb-8">
+          <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-brand/10 border border-brand/20 flex items-center justify-center">
+            <span className="text-2xl font-bold text-brand">K</span>
+          </div>
+          {!isComplete && (
+            <h1 className="text-2xl font-semibold text-primary tracking-tight">
+              {activeIndex === 0 && !Object.keys(transcript).length
+                ? "Welcome to Klynt"
+                : "Setting up"}
+            </h1>
+          )}
+        </div>
 
-      {/* Conversation area */}
-      <div ref={containerRef} className="flex-1 overflow-y-auto flex justify-center">
-        <div className="w-full max-w-[640px] px-6 py-12 space-y-4">
-          {/* Completed & editing nodes */}
+        {/* Glass card container */}
+        <div
+          ref={containerRef}
+          className="glass-card rounded-2xl border border-white/[0.08] p-8"
+          style={{ animation: "glass-appear 0.3s ease-out" }}
+        >
+          {/* Completed nodes (compact list) */}
           {schema.slice(0, activeIndex).map((node) => {
             const entry = transcript[node.id];
-            if (!entry) return null; // Skipped by condition
-            if (node.inputType === "complex") return null; // Finance panel handled separately
+            if (!entry) return null;
+            if (node.inputType === "complex") return null;
 
             return (
               <div
                 key={node.id}
                 className={`transition-opacity duration-200 ${
-                  isAnyEditing && entry.status !== "editing" ? "opacity-40" : ""
+                  isAnyEditing && entry.status !== "editing" ? "opacity-30" : ""
                 }`}
               >
                 <CompletedNode
@@ -228,48 +282,91 @@ export function ConversationRunner() {
             );
           })}
 
-          {/* Active node */}
+          {/* Divider between completed and active */}
+          {activeIndex > 0 && !isComplete && activeNode?.inputType !== "complex" && (
+            <div className="my-4 border-t border-white/[0.06]" />
+          )}
+
+          {/* Active node — larger, prominent */}
           {activeNode && !isComplete && activeNode.inputType !== "complex" && (
-            <div className="text-foreground text-base leading-relaxed">
-              <TypewriterText
-                text={activeNode.prompt}
-                onComplete={setAnimationComplete}
-                showInput={!isAnimating}
-                input={renderInput(activeNode, activeNode.default, handleSubmit)}
-              />
+            <div className="py-2" style={{ animation: "fade-in-up 0.3s ease-out" }}>
+              <div className="text-xl text-primary leading-relaxed">
+                <TypewriterText
+                  text={activeNode.prompt}
+                  onComplete={setAnimationComplete}
+                  showInput={!isAnimating}
+                  input={renderInput(activeNode, activeNode.default, handleSubmit)}
+                />
+              </div>
             </div>
           )}
 
-          {/* Finance panel (complex node) */}
+          {/* Finance panel */}
           {activeNode?.id === "finance_setup" && <FinancePanel onComplete={completeFinancePanel} />}
 
-          {/* Error message */}
+          {/* Error */}
           {error && (
-            <p className="text-[12px] text-destructive animate-in fade-in duration-200">{error}</p>
+            <div className="mt-3 px-3 py-2 rounded-lg bg-destructive/10 border border-destructive/20">
+              <p className="text-sm text-destructive">{error}</p>
+            </div>
           )}
 
-          {/* Saving indicator */}
+          {/* Saving */}
           {isSaving && (
-            <p className="text-[12px] text-muted animate-in fade-in duration-200">Saving...</p>
+            <div className="mt-3 flex items-center gap-2 text-muted">
+              <div className="w-3 h-3 border-2 border-muted/30 border-t-muted rounded-full animate-spin" />
+              <span className="text-sm">Saving...</span>
+            </div>
           )}
 
           {/* Complete state */}
           {isComplete && (
-            <div className="space-y-6">
-              <TypewriterText
-                text="Great, we're all set. Let's get started!"
-                onComplete={() => {}}
-              />
+            <div className="text-center py-6" style={{ animation: "fade-in-up 0.4s ease-out" }}>
+              <div className="w-16 h-16 mx-auto mb-5 rounded-full bg-success/10 border border-success/20 flex items-center justify-center">
+                <svg
+                  className="w-8 h-8 text-success"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  role="img"
+                  aria-label="Setup complete"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-semibold text-primary mb-2">You're all set!</h2>
+              <p className="text-secondary text-base mb-6">
+                Klynt is ready to help you stay productive.
+              </p>
               <button
                 type="button"
                 onClick={handleComplete}
-                className="px-6 py-2.5 text-[14px] font-medium text-white bg-brand hover:bg-brand-hover rounded-xl transition-colors"
+                className="px-8 py-3 text-base font-medium text-white bg-brand hover:bg-brand-hover rounded-xl transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
               >
                 Launch Klynt
               </button>
             </div>
           )}
         </div>
+
+        {/* Step dots — below card */}
+        {!isComplete && (
+          <div className="flex justify-center mt-6">
+            <StepDots
+              total={visibleNodes.length}
+              current={activeIndex}
+              completed={completedCount}
+            />
+          </div>
+        )}
+
+        {/* Progress percentage */}
+        {!isComplete && (
+          <p className="text-center text-xs text-dim mt-3">
+            Step {Math.min(activeIndex + 1, visibleNodes.length)} of {visibleNodes.length}
+          </p>
+        )}
       </div>
     </div>
   );

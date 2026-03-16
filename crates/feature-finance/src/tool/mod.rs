@@ -4,12 +4,16 @@
 //! a group of `handle_*` methods implemented on `FinanceTool`.
 
 mod accounts;
+mod allocations;
+mod analyze_handlers;
 mod budgets;
+mod fire_handlers;
 mod goals;
 mod health;
 mod investments;
 mod reports;
 mod settings;
+mod snapshots;
 mod transactions;
 
 use async_trait::async_trait;
@@ -39,6 +43,7 @@ pub struct FinanceTool {
     pub(crate) default_currency: String,
     pub(crate) config_persistence: Option<Arc<dyn ConfigPersistence>>,
     pub(crate) domain_bus: Option<Arc<DomainEventBus>>,
+    pub(crate) rate_cache: Option<crate::rate_cache::RateCache>,
 }
 
 impl FinanceTool {
@@ -55,6 +60,7 @@ impl FinanceTool {
             default_currency,
             config_persistence: None,
             domain_bus: None,
+            rate_cache: None,
         }
     }
 
@@ -76,16 +82,30 @@ impl FinanceTool {
         self
     }
 
+    /// Attach a `RateCache` for two-layer exchange rate caching. Returns `self` for chaining.
+    pub fn with_rate_cache(mut self, cache: crate::rate_cache::RateCache) -> Self {
+        self.rate_cache = Some(cache);
+        self
+    }
+
     /// Convenience constructor: build a `FinanceTool` from a `StoragePool`.
+    ///
+    /// Creates a `RateCache` backed by the pool and wires it into the `PriceService`.
     pub fn from_storage_pool(
         pool: &storage::StoragePool,
         default_currency: impl Into<String>,
     ) -> Self {
-        Self::new(
+        let exchange_rates = storage::repos::FinanceExchangeRateRepo::new(pool.inner().clone());
+        let rate_cache = crate::rate_cache::RateCache::new(exchange_rates, 15);
+        let price_service =
+            crate::price_service::PriceService::with_rate_cache(15, rate_cache.clone());
+        let mut tool = Self::new(
             storage::FinanceStorage::from_pool(pool.inner()),
-            crate::price_service::PriceService::new(15),
+            price_service,
             default_currency.into(),
-        )
+        );
+        tool.rate_cache = Some(rate_cache);
+        tool
     }
 }
 
@@ -97,16 +117,23 @@ impl Tool for FinanceTool {
 
     fn description(&self) -> &str {
         "Manage personal finances: accounts, transactions, budgets, investments, portfolios, \
-         goals, liabilities, net worth, FIRE planning, spending reports, and settings. \
+         goals, liabilities, net worth, FIRE planning, spending analytics, portfolio analytics, \
+         allocation targets, snapshots, and settings. \
          Actions: account_add, account_list, account_update, account_delete, \
          tx_add, tx_list, tx_update, tx_delete, tx_search, tx_recurring_add, \
          budget_create, budget_list, budget_status, budget_update, budget_delete, \
          portfolio_create, portfolio_list, investment_add, investment_update, \
          investment_tx, investment_summary, price_fetch, price_refresh, \
+         portfolio_drift, portfolio_rebalance, portfolio_returns, portfolio_correlation, \
          liability_add, liability_list, liability_update, net_worth, \
          goal_create, goal_list, goal_update, goal_fire, goal_whatif, \
          report_spending, report_income, report_trends, report_net_worth_history, \
-         daily_review, settings_get, settings_update."
+         daily_review, analyze_spending_anomalies, analyze_spending_trends, \
+         analyze_recurring_charges, analyze_category_correlation, \
+         fire_traditional, fire_coast, fire_lean, fire_fat, \
+         fire_withdrawal_sim, fire_backtest, fire_sensitivity, \
+         allocation_target_set, allocation_target_list, \
+         snapshot_record, snapshot_history, settings_get, settings_update."
     }
 
     fn parameters(&self) -> Value {
@@ -122,11 +149,18 @@ impl Tool for FinanceTool {
                         "portfolio_create", "portfolio_list",
                         "investment_add", "investment_update", "investment_tx", "investment_summary",
                         "price_fetch", "price_refresh",
+                        "portfolio_drift", "portfolio_rebalance", "portfolio_returns", "portfolio_correlation",
                         "liability_add", "liability_list", "liability_update", "net_worth",
                         "goal_create", "goal_list", "goal_update", "goal_fire", "goal_whatif",
                         "report_spending", "report_income", "report_trends", "report_net_worth_history",
                         "daily_review",
                         "finance_health_check",
+                        "analyze_spending_anomalies", "analyze_spending_trends",
+                        "analyze_recurring_charges", "analyze_category_correlation",
+                        "fire_traditional", "fire_coast", "fire_lean", "fire_fat",
+                        "fire_withdrawal_sim", "fire_backtest", "fire_sensitivity",
+                        "allocation_target_set", "allocation_target_list",
+                        "snapshot_record", "snapshot_history",
                         "settings_get", "settings_update"
                     ],
                     "description": "Finance action to perform"
@@ -193,7 +227,36 @@ impl Tool for FinanceTool {
                 "is_archived": { "type": "boolean" },
                 "proactivity_level": { "type": "string" },
                 "confidence_threshold": { "type": "number" },
-                "default_currency": { "type": "string" }
+                "default_currency": { "type": "string" },
+                // Analytics params
+                "current_portfolio": { "type": "integer" },
+                "monthly_savings": { "type": "integer" },
+                "expected_return": { "type": "number" },
+                "annual_withdrawal": { "type": "integer" },
+                "years": { "type": "integer" },
+                "monte_carlo_runs": { "type": "integer" },
+                "std_dev": { "type": "number" },
+                "seed": { "type": "integer" },
+                "strategy": { "type": "string" },
+                "runs_per_point": { "type": "integer" },
+                "current_age": { "type": "integer" },
+                "target_age": { "type": "integer" },
+                "annual_expenses_at_retirement": { "type": "integer" },
+                "essential_expenses": { "type": "integer" },
+                "desired_annual_spending": { "type": "integer" },
+                "withdrawal_rates": { "type": "string" },
+                "lookback_months": { "type": "integer" },
+                "z_threshold": { "type": "number" },
+                "window_months": { "type": "integer" },
+                "min_occurrences": { "type": "integer" },
+                "min_months": { "type": "integer" },
+                "asset_class": { "type": "string" },
+                "target_weight": { "type": "number" },
+                "tolerance_band": { "type": "number" },
+                "contribution": { "type": "integer" },
+                "min_trade_amount": { "type": "integer" },
+                "rebalance_strategy": { "type": "string" },
+                "market_currency": { "type": "string", "description": "Currency the asset is quoted in on exchanges (e.g., USD for BTC). Defaults to purchase currency." }
             },
             "required": ["action"]
         })
@@ -215,10 +278,18 @@ impl Tool for FinanceTool {
             "budget_create" | "budget_list" | "budget_status" | "budget_update"
             | "budget_delete" => self.handle_budget(action, &p, ctx).await,
 
-            "portfolio_create" | "portfolio_list" | "investment_add" | "investment_update"
-            | "investment_tx" | "investment_summary" | "price_fetch" | "price_refresh" => {
-                self.handle_investment(action, &p, ctx).await
-            }
+            "portfolio_create"
+            | "portfolio_list"
+            | "investment_add"
+            | "investment_update"
+            | "investment_tx"
+            | "investment_summary"
+            | "price_fetch"
+            | "price_refresh"
+            | "portfolio_drift"
+            | "portfolio_rebalance"
+            | "portfolio_returns"
+            | "portfolio_correlation" => self.handle_investment(action, &p, ctx).await,
 
             "goal_create" | "goal_list" | "goal_update" | "goal_fire" | "goal_whatif"
             | "liability_add" | "liability_list" | "liability_update" | "net_worth" => {
@@ -232,6 +303,29 @@ impl Tool for FinanceTool {
             | "daily_review" => self.handle_report(action, &p, ctx).await,
 
             "finance_health_check" => self.finance_health_check(ctx).await,
+
+            // Spending analytics
+            "analyze_spending_anomalies"
+            | "analyze_spending_trends"
+            | "analyze_recurring_charges"
+            | "analyze_category_correlation" => self.handle_analyze(action, &p, ctx).await,
+
+            // FIRE planning
+            "fire_traditional"
+            | "fire_coast"
+            | "fire_lean"
+            | "fire_fat"
+            | "fire_withdrawal_sim"
+            | "fire_backtest"
+            | "fire_sensitivity" => self.handle_fire(action, &p, ctx).await,
+
+            // Allocation targets
+            "allocation_target_set" | "allocation_target_list" => {
+                self.handle_allocation(action, &p, ctx).await
+            }
+
+            // Net worth snapshots
+            "snapshot_record" | "snapshot_history" => self.handle_snapshot(action, &p, ctx).await,
 
             "settings_get" | "settings_update" => self.handle_settings(action, &p, ctx).await,
 

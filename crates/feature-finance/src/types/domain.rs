@@ -256,6 +256,7 @@ pub struct FinanceInvestment {
     pub current_price: Option<i64>,
     pub current_value: Option<i64>,
     pub purchase_date: Option<NaiveDate>,
+    pub asset_class: Option<String>,
     pub notes: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,

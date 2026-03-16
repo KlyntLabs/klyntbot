@@ -15,9 +15,15 @@ import { Donut } from "../components/Donut";
 import { FinanceLayout } from "../components/FinanceLayout";
 import { FinanceSkeleton } from "../components/FinanceSkeleton";
 import { FormField, FormModal, fieldClass } from "../components/FormModal";
-import { COLORS, fmtCompact, fmtMoney, retPct, toVnd } from "../lib/finance";
+import { useFinanceCurrency } from "../hooks/useFinanceCurrency";
+import { usePrivacyMode } from "../hooks/usePrivacyMode";
+import { displayAmount } from "../lib/displayAmount";
+import { COLORS, fmtCompact, fmtMoney, retPct } from "../lib/finance";
 
 export function FinanceInvestments() {
+  const { mode, setMode, baseCurrency, rates, currencies, displayCur, convertTotal } =
+    useFinanceCurrency();
+  const { hidden, toggle } = usePrivacyMode();
   const {
     data: portfolios,
     loading,
@@ -29,7 +35,6 @@ export function FinanceInvestments() {
     undefined,
     [],
   );
-  const { data: rates } = useQuery<Record<string, number>>("finance_exchange_rates", undefined, {});
 
   const refetchAll = () => {
     rP();
@@ -40,37 +45,36 @@ export function FinanceInvestments() {
   const [selectedPortfolio, setSelectedPortfolio] = useState<string | null>(null);
 
   const totalValue = useMemo(
-    () => portfolios.reduce((s, p) => s + toVnd(p.totalValue, p.currency, rates), 0),
-    [portfolios, rates],
+    () => investments.reduce((s, i) => s + (i.baseCurrentValue ?? 0), 0),
+    [investments],
   );
   const totalCost = useMemo(
-    () => portfolios.reduce((s, p) => s + toVnd(p.totalCostBasis, p.currency, rates), 0),
-    [portfolios, rates],
+    () => investments.reduce((s, i) => s + (i.baseCostBasis ?? 0), 0),
+    [investments],
   );
   const totalReturn = retPct(totalValue, totalCost);
 
   const assetSegs = useMemo(() => {
     const m = new Map<string, number>();
     for (const inv of investments) {
-      m.set(
-        inv.assetType,
-        (m.get(inv.assetType) ?? 0) + toVnd(inv.currentValue ?? 0, inv.currency, rates),
-      );
+      m.set(inv.assetType, (m.get(inv.assetType) ?? 0) + (inv.baseCurrentValue ?? 0));
     }
     return Array.from(m.entries())
       .sort((a, b) => b[1] - a[1])
       .map(([name, value], i) => ({ name, value, color: COLORS[i % COLORS.length] }));
-  }, [investments, rates]);
+  }, [investments]);
 
-  const portfolioSegs = useMemo(
-    () =>
-      portfolios.map((p, i) => ({
-        name: p.name,
-        value: toVnd(p.totalValue, p.currency, rates),
-        color: COLORS[i % COLORS.length],
-      })),
-    [portfolios, rates],
-  );
+  const portfolioSegs = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const inv of investments) {
+      m.set(inv.portfolioId, (m.get(inv.portfolioId) ?? 0) + (inv.baseCurrentValue ?? 0));
+    }
+    return portfolios.map((p, i) => ({
+      name: p.name,
+      value: m.get(p.id) ?? 0,
+      color: COLORS[i % COLORS.length],
+    }));
+  }, [portfolios, investments]);
 
   const filteredInvestments = selectedPortfolio
     ? investments.filter((i) => i.portfolioId === selectedPortfolio)
@@ -132,7 +136,13 @@ export function FinanceInvestments() {
 
   if (loading && portfolios.length === 0) {
     return (
-      <FinanceLayout onRefresh={refetchAll}>
+      <FinanceLayout
+        hidden={hidden}
+        onTogglePrivacy={toggle}
+        currencyMode={mode}
+        currencies={currencies}
+        onSelectCurrency={setMode}
+      >
         <FinanceSkeleton />
       </FinanceLayout>
     );
@@ -140,7 +150,13 @@ export function FinanceInvestments() {
 
   if (error && portfolios.length === 0) {
     return (
-      <FinanceLayout onRefresh={refetchAll}>
+      <FinanceLayout
+        hidden={hidden}
+        onTogglePrivacy={toggle}
+        currencyMode={mode}
+        currencies={currencies}
+        onSelectCurrency={setMode}
+      >
         <Card className="p-6 text-center">
           <p className="text-[12px] text-destructive mb-2">{error.message}</p>
           <button
@@ -156,50 +172,49 @@ export function FinanceInvestments() {
   }
 
   return (
-    <FinanceLayout onRefresh={refetchAll}>
-      <div className="grid grid-cols-12 gap-4 auto-rows-min">
-        {/* ── Stats row ─────────────────────────────────── */}
-        <div className="col-span-12 grid grid-cols-4 gap-4">
-          <Card className="p-4">
-            <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">
-              Total Value
-            </p>
-            <p className="text-[20px] font-light text-primary tabular-nums">
-              {fmtCompact(totalValue)}đ
-            </p>
-          </Card>
-          <Card className="p-4">
-            <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">
-              Cost Basis
-            </p>
-            <p className="text-[20px] font-light text-muted tabular-nums">
-              {fmtCompact(totalCost)}đ
-            </p>
-          </Card>
-          <Card className="p-4">
-            <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">
-              Total Return
-            </p>
-            <p
-              className={cn(
-                "text-[20px] font-light tabular-nums",
-                totalReturn >= 0 ? "text-success" : "text-destructive",
-              )}
-            >
-              {totalReturn >= 0 ? "+" : ""}
-              {totalReturn}%
-            </p>
-          </Card>
-          <Card className="p-4">
-            <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">
-              Holdings
-            </p>
-            <p className="text-[20px] font-light text-primary">{investments.length}</p>
-          </Card>
-        </div>
+    <FinanceLayout
+      hidden={hidden}
+      onTogglePrivacy={toggle}
+      currencyMode={mode}
+      currencies={currencies}
+      onSelectCurrency={setMode}
+    >
+      {/* ── Stats row ─────────────────────────────────── */}
+      <div className="grid grid-cols-4 gap-4 mb-4">
+        <Card compact className="p-4">
+          <p className="text-[10px] text-muted uppercase tracking-widest mb-1">Total Value</p>
+          <p className="text-[24px] font-light text-primary tabular-nums">
+            {fmtCompact(convertTotal(totalValue), displayCur, hidden)}
+          </p>
+        </Card>
+        <Card compact className="p-4">
+          <p className="text-[10px] text-muted uppercase tracking-widest mb-1">Cost Basis</p>
+          <p className="text-[24px] font-light text-muted tabular-nums">
+            {fmtCompact(convertTotal(totalCost), displayCur, hidden)}
+          </p>
+        </Card>
+        <Card compact className="p-4">
+          <p className="text-[10px] text-muted uppercase tracking-widest mb-1">Total Return</p>
+          <p
+            className={cn(
+              "text-[24px] font-light tabular-nums",
+              totalReturn >= 0 ? "text-success" : "text-destructive",
+            )}
+          >
+            {totalReturn >= 0 ? "+" : ""}
+            {totalReturn}%
+          </p>
+        </Card>
+        <Card compact className="p-4">
+          <p className="text-[10px] text-muted uppercase tracking-widest mb-1">Holdings</p>
+          <p className="text-[24px] font-light text-primary">{investments.length}</p>
+        </Card>
+      </div>
 
-        {/* ── Portfolio cards ─────────────────────────── */}
-        <div className="col-span-12">
+      <div className="flex gap-4">
+        {/* Left column — Portfolio grid + Holdings table */}
+        <div className="flex-1 min-w-0 space-y-4">
+          {/* ── Portfolio cards ─────────────────────────── */}
           <Card className="p-4">
             <CardHeader
               title="Portfolios"
@@ -257,11 +272,11 @@ export function FinanceInvestments() {
                       </div>
                     </div>
                     <p className="text-[18px] font-light text-primary tabular-nums">
-                      {fmtMoney(p.totalValue, p.currency)}
+                      {fmtMoney(p.totalValue, p.currency, hidden)}
                     </p>
                     <div className="flex items-center gap-2 mt-1">
                       <span className="text-[9px] text-dim font-light">
-                        Cost: {fmtMoney(p.totalCostBasis, p.currency)}
+                        Cost: {fmtMoney(p.totalCostBasis, p.currency, hidden)}
                       </span>
                       <span className="text-[9px] text-dim font-light">
                         {p.holdingCount} holdings
@@ -275,10 +290,8 @@ export function FinanceInvestments() {
               })}
             </div>
           </Card>
-        </div>
 
-        {/* ── Holdings table (9col) + Allocation (3col) ── */}
-        <div className="col-span-9">
+          {/* ── Holdings table ───────────────────────────── */}
           <Card className="overflow-hidden">
             <div className="px-4 pt-4">
               <CardHeader
@@ -298,7 +311,7 @@ export function FinanceInvestments() {
                 }
               />
             </div>
-            <div className="grid grid-cols-[1fr_80px_80px_90px_80px_80px] gap-2 border-b border-white/[0.08] text-[10px] text-dim font-light px-4 py-2">
+            <div className="grid grid-cols-[1fr_80px_80px_90px_80px_80px] gap-2 border-b border-white/[0.08] text-[10px] text-muted uppercase tracking-widest font-light px-4 py-2">
               <div>Asset</div>
               <div className="text-right">Qty</div>
               <div className="text-right">Price</div>
@@ -328,13 +341,34 @@ export function FinanceInvestments() {
                     {inv.quantity}
                   </span>
                   <span className="text-right text-[11px] text-muted font-light tabular-nums">
-                    {inv.currentPrice != null ? fmtMoney(inv.currentPrice, inv.currency) : "—"}
+                    {inv.currentPrice != null
+                      ? fmtMoney(inv.currentPrice, inv.marketCurrency ?? inv.currency, hidden)
+                      : "—"}
                   </span>
-                  <span className="text-right text-[12px] text-primary font-light tabular-nums">
-                    {inv.currentValue != null ? fmtMoney(inv.currentValue, inv.currency) : "—"}
-                  </span>
+                  <div className="text-right">
+                    <span className="text-[12px] text-primary font-light tabular-nums">
+                      {inv.currentValue != null
+                        ? fmtMoney(inv.currentValue, inv.marketCurrency ?? inv.currency, hidden)
+                        : "—"}
+                    </span>
+                    {mode === "multi" &&
+                      (inv.marketCurrency ?? inv.currency) !== baseCurrency &&
+                      inv.baseCurrentValue != null && (
+                        <p className="text-[9px] text-dim font-light">
+                          {fmtCompact(inv.baseCurrentValue, baseCurrency, hidden)}
+                        </p>
+                      )}
+                  </div>
                   <span className="text-right text-[11px] text-dim font-light tabular-nums">
-                    {fmtMoney(inv.costBasis, inv.currency)}
+                    {displayAmount({
+                      amount: inv.costBasis,
+                      currency: inv.currency,
+                      baseAmount: inv.baseCostBasis,
+                      baseCurrency,
+                      mode,
+                      rates,
+                      hidden,
+                    })}
                   </span>
                   <span
                     className={cn(
@@ -351,25 +385,26 @@ export function FinanceInvestments() {
           </Card>
         </div>
 
-        <div className="col-span-3 space-y-4">
-          <Card className="p-4">
+        {/* Right sidebar — sticky */}
+        <div className="w-72 flex-shrink-0 sticky top-0 self-start space-y-4">
+          <Card compact className="p-4">
             <CardHeader title="Asset Allocation" />
             <div className="flex items-center justify-center">
               <Donut
                 segments={assetSegs}
                 label="By type"
-                value={`${fmtCompact(totalValue)}đ`}
+                value={fmtCompact(convertTotal(totalValue), displayCur, hidden)}
                 size={140}
               />
             </div>
           </Card>
-          <Card className="p-4">
+          <Card compact className="p-4">
             <CardHeader title="By Portfolio" />
             <div className="flex items-center justify-center">
               <Donut
                 segments={portfolioSegs}
                 label="Portfolios"
-                value={`${fmtCompact(totalValue)}đ`}
+                value={fmtCompact(convertTotal(totalValue), displayCur, hidden)}
                 size={140}
               />
             </div>

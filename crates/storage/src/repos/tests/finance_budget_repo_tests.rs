@@ -73,6 +73,9 @@ mod tests {
             alert_threshold: 80,
             created_at: now,
             updated_at: now,
+            base_amount: 0,
+            base_currency: "USD".to_string(),
+            exchange_rate: 1.0,
         }
     }
 
@@ -89,6 +92,9 @@ mod tests {
             is_archived: false,
             created_at: now,
             updated_at: now,
+            base_balance: 0,
+            base_currency: "USD".to_string(),
+            exchange_rate: 1.0,
         }
     }
 
@@ -117,6 +123,9 @@ mod tests {
             recurring_rule: None,
             created_at: now,
             updated_at: now,
+            base_amount: amount,
+            base_currency: "USD".to_string(),
+            exchange_rate: 1.0,
         }
     }
 

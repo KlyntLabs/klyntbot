@@ -104,6 +104,42 @@ impl BucketRepo {
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         Ok(row.map(|r| (r.productive, r.neutral, r.distracting, r.idle, r.switches)))
     }
+
+    pub async fn aggregate_by_hour(
+        &self,
+        start_date: &str,
+        end_date: &str,
+    ) -> common::Result<Vec<HourlyRow>> {
+        let rows = sqlx::query_as::<_, HourlyRow>(
+            r#"SELECT
+                   CAST(strftime('%H', bucket_start) AS INTEGER) as hour,
+                   COALESCE(SUM(productive_secs), 0) as productive_secs,
+                   COALESCE(SUM(neutral_secs), 0) as neutral_secs,
+                   COALESCE(SUM(distracting_secs), 0) as distracting_secs,
+                   COALESCE(SUM(idle_secs), 0) as idle_secs,
+                   COALESCE(SUM(productive_secs) + SUM(neutral_secs) + SUM(distracting_secs) + SUM(idle_secs), 0) as total_secs
+               FROM activity_buckets
+               WHERE date >= ?1 AND date <= ?2
+               GROUP BY hour
+               ORDER BY hour"#,
+        )
+        .bind(start_date)
+        .bind(end_date)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        Ok(rows)
+    }
+}
+
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct HourlyRow {
+    pub hour: i32,
+    pub productive_secs: i64,
+    pub neutral_secs: i64,
+    pub distracting_secs: i64,
+    pub idle_secs: i64,
+    pub total_secs: i64,
 }
 
 #[cfg(test)]
@@ -219,6 +255,42 @@ mod tests {
         assert_eq!(agg.2, 75); // distracting
         assert_eq!(agg.3, 75); // idle
         assert_eq!(agg.4, 6); // switches
+    }
+
+    #[tokio::test]
+    async fn test_aggregate_by_hour() {
+        let pool = setup_pool().await;
+        let repo = BucketRepo::new(pool);
+
+        for (time, productive) in &[("10:00:00", 200), ("10:05:00", 100), ("14:00:00", 250)] {
+            let bucket = ActivityBucket {
+                bucket_start: format!("2026-03-06T{}+00:00", time),
+                date: "2026-03-06".to_string(),
+                dominant_app: None,
+                dominant_site: None,
+                dominant_category: None,
+                productive_secs: *productive,
+                neutral_secs: 30,
+                distracting_secs: 20,
+                idle_secs: 50,
+                context_switches: 1,
+                focus_depth: None,
+                tick_count: 60,
+                dominant_project: None,
+            };
+            repo.upsert(&bucket).await.unwrap();
+        }
+
+        let rows = repo
+            .aggregate_by_hour("2026-03-06", "2026-03-06")
+            .await
+            .unwrap();
+        assert_eq!(rows.len(), 2); // hours 10 and 14
+        assert_eq!(rows[0].hour, 10);
+        assert_eq!(rows[0].productive_secs, 300);
+        assert_eq!(rows[1].hour, 14);
+        assert_eq!(rows[1].productive_secs, 250);
+        assert_eq!(rows[0].total_secs, 300 + 60 + 40 + 100);
     }
 
     #[tokio::test]

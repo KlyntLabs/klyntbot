@@ -5,6 +5,13 @@ use desktop_shared::commands::{WorkspaceFile, WorkspaceFileContent};
 use desktop_shared::errors::ApiError;
 use tauri::State;
 
+#[cfg(test)]
+pub(crate) const DEV_COMMANDS: &[&str] = &[
+    "workspace_list_files",
+    "workspace_read_file",
+    "workspace_write_file",
+];
+
 #[tauri::command]
 pub async fn workspace_list_files(
     state: State<'_, Arc<AppCore>>,

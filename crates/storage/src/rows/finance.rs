@@ -25,6 +25,9 @@ pub struct FinanceAccountRow {
     pub is_archived: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub base_balance: i64,
+    pub base_currency: String,
+    pub exchange_rate: f64,
 }
 
 /// Row struct for the `finance_transactions` table.
@@ -46,6 +49,9 @@ pub struct FinanceTransactionRow {
     pub recurring_rule: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub base_amount: i64,
+    pub base_currency: String,
+    pub exchange_rate: f64,
 }
 
 /// Row struct for the `finance_budgets` table.
@@ -66,6 +72,9 @@ pub struct FinanceBudgetRow {
     pub alert_threshold: i32,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub base_amount: i64,
+    pub base_currency: String,
+    pub exchange_rate: f64,
 }
 
 /// Row struct for the `finance_portfolios` table.
@@ -89,15 +98,29 @@ pub struct FinanceInvestmentRow {
     pub asset_type: String,
     pub symbol: Option<String>,
     pub name: String,
-    pub quantity: f64,
+    pub quantity: String,
     pub cost_basis: i64,
     pub currency: String,
     pub current_price: Option<i64>,
     pub current_value: Option<i64>,
     pub purchase_date: Option<NaiveDate>,
+    pub asset_class: Option<String>,
     pub notes: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub market_currency: Option<String>,
+    pub base_cost_basis: i64,
+    pub base_current_value: i64,
+    pub base_currency: String,
+    pub purchase_rate: f64,
+    pub market_rate: f64,
+}
+
+impl FinanceInvestmentRow {
+    /// Parse the string `quantity` to `f64`, returning `0.0` on parse failure.
+    pub fn quantity_f64(&self) -> f64 {
+        self.quantity.parse().unwrap_or(0.0)
+    }
 }
 
 /// Row struct for the `finance_investment_transactions` table.
@@ -115,6 +138,9 @@ pub struct FinanceInvestmentTxRow {
     pub tx_date: NaiveDate,
     pub notes: Option<String>,
     pub created_at: DateTime<Utc>,
+    pub base_total_amount: i64,
+    pub base_currency: String,
+    pub exchange_rate: f64,
 }
 
 /// Row struct for the `finance_goals` table.
@@ -135,6 +161,10 @@ pub struct FinanceGoalRow {
     pub notes: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub base_target_amount: i64,
+    pub base_current_amount: i64,
+    pub base_currency: String,
+    pub exchange_rate: f64,
 }
 
 /// Row struct for the `finance_liabilities` table.
@@ -153,6 +183,48 @@ pub struct FinanceLiabilityRow {
     pub notes: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub base_principal: i64,
+    pub base_remaining: i64,
+    pub base_currency: String,
+    pub exchange_rate: f64,
+}
+
+/// Row struct for the `finance_exchange_rates` table.
+#[derive(Debug, Clone, FromRow, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FinanceExchangeRateRow {
+    pub from_currency: String,
+    pub to_currency: String,
+    pub rate: f64,
+    pub fetched_at: String,
+}
+
+/// Row struct for the `finance_allocation_targets` table.
+#[derive(Debug, Clone, FromRow, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FinanceAllocationTargetRow {
+    pub id: String,
+    pub portfolio_id: String,
+    pub asset_class: String,
+    pub target_weight: String,
+    pub tolerance_band: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// Row struct for the `finance_net_worth_snapshots` table.
+#[derive(Debug, Clone, FromRow, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FinanceNetWorthSnapshotRow {
+    pub id: String,
+    pub snapshot_date: String,
+    pub currency: String,
+    pub accounts_total: i64,
+    pub investments_total: i64,
+    pub liabilities_total: i64,
+    pub net_worth: i64,
+    pub breakdown: String,
+    pub created_at: DateTime<Utc>,
 }
 
 // ============================================================
@@ -172,6 +244,9 @@ pub struct FinanceAccountPatch {
     /// `None` = don't change, `Some(None)` = set NULL, `Some(Some(v))` = set value.
     pub notes: Option<Option<String>>,
     pub is_archived: Option<bool>,
+    pub base_balance: Option<i64>,
+    pub base_currency: Option<String>,
+    pub exchange_rate: Option<f64>,
 }
 
 /// Partial update for `finance_transactions`.
@@ -184,6 +259,9 @@ pub struct FinanceTransactionPatch {
     pub counterparty: Option<Option<String>>,
     pub notes: Option<Option<String>>,
     pub tx_date: Option<NaiveDate>,
+    pub base_amount: Option<i64>,
+    pub base_currency: Option<String>,
+    pub exchange_rate: Option<f64>,
 }
 
 /// Partial update for `finance_budgets`.
@@ -194,6 +272,9 @@ pub struct FinanceBudgetPatch {
     pub amount: Option<i64>,
     pub category: Option<Option<String>>,
     pub is_active: Option<bool>,
+    pub base_amount: Option<i64>,
+    pub base_currency: Option<String>,
+    pub exchange_rate: Option<f64>,
 }
 
 /// Partial update for `finance_investments`.
@@ -202,10 +283,16 @@ pub struct FinanceInvestmentPatch {
     pub id: String,
     pub current_price: Option<Option<i64>>,
     pub current_value: Option<Option<i64>>,
-    pub quantity: Option<f64>,
+    pub quantity: Option<String>,
     /// Set a new total cost basis. `None` leaves it unchanged.
     pub cost_basis: Option<i64>,
     pub notes: Option<Option<String>>,
+    pub market_currency: Option<Option<String>>,
+    pub base_cost_basis: Option<i64>,
+    pub base_current_value: Option<i64>,
+    pub base_currency: Option<String>,
+    pub purchase_rate: Option<f64>,
+    pub market_rate: Option<f64>,
 }
 
 /// Partial update for `finance_goals`.
@@ -220,6 +307,10 @@ pub struct FinanceGoalPatch {
     pub inflation_rate: Option<Option<f64>>,
     pub deadline: Option<Option<NaiveDate>>,
     pub status: Option<String>,
+    pub base_target_amount: Option<i64>,
+    pub base_current_amount: Option<i64>,
+    pub base_currency: Option<String>,
+    pub exchange_rate: Option<f64>,
 }
 
 /// Partial update for `finance_liabilities`.
@@ -230,6 +321,10 @@ pub struct FinanceLiabilityPatch {
     pub monthly_payment: Option<Option<i64>>,
     pub interest_rate: Option<Option<f64>>,
     pub notes: Option<Option<String>>,
+    pub base_principal: Option<i64>,
+    pub base_remaining: Option<i64>,
+    pub base_currency: Option<String>,
+    pub exchange_rate: Option<f64>,
 }
 
 // ============================================================
@@ -284,6 +379,9 @@ pub struct BudgetUsageRow {
     pub alert_threshold: i32,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub base_amount: i64,
+    pub base_currency: String,
+    pub exchange_rate: f64,
     /// Sum of expense amounts matching this budget's category in the current period.
     pub spent: i64,
 }

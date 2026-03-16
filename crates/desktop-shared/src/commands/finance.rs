@@ -178,7 +178,7 @@ pub struct FinanceInvestmentCreateParams {
     pub portfolio_id: String,
     pub asset_type: String,
     pub cost_basis: i64,
-    pub quantity: f64,
+    pub quantity: String,
     pub symbol: Option<String>,
     pub name: Option<String>,
     pub currency: Option<String>,
@@ -192,8 +192,17 @@ pub struct FinanceInvestmentUpdateParams {
     pub id: String,
     pub current_price: Option<Option<i64>>,
     pub current_value: Option<Option<i64>>,
-    pub quantity: Option<f64>,
+    pub quantity: Option<String>,
     pub notes: Option<Option<String>>,
+}
+
+// ── Date Range Params ────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FinanceDateRangeParams {
+    pub date_from: String,
+    pub date_to: String,
 }
 
 // ── Finance Filter Params ────────────────────────────────────────────
@@ -233,4 +242,34 @@ pub struct FinanceTrendPoint {
     pub period: String,
     pub value: i64,
     pub change_pct: Option<f64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FinanceMonthlySummaryResponse {
+    pub current_income: i64,
+    pub current_spending: i64,
+    pub previous_income: i64,
+    pub previous_spending: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DailySpending {
+    pub date: String,
+    pub total_spending: i64,
+    pub tx_count: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FinanceDailySpendingResponse {
+    pub days: Vec<DailySpending>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FinancePeriodSummaryResponse {
+    pub income: i64,
+    pub spending: i64,
 }

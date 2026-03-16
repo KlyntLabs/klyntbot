@@ -144,6 +144,7 @@ CREATE TABLE IF NOT EXISTS daily_summaries (
     context_switches     INTEGER NOT NULL DEFAULT 0,
     top_apps             TEXT,
     top_categories       TEXT,
+    top_projects         TEXT,
     productivity_score   REAL,
     ai_summary           TEXT,
     computed_at          TEXT NOT NULL DEFAULT (datetime('now')),

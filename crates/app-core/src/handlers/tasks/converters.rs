@@ -51,11 +51,12 @@ pub fn row_to_task_response(
 }
 
 pub fn action_to_today_task(row: &TaskRow, now: DateTime<Utc>) -> TodayTaskResponse {
+    let local_today = now.with_timezone(&chrono::Local).date_naive();
     let is_overdue = row.due_date.is_some_and(|d| d < now) && !row.completed;
     let is_due_today = !is_overdue
         && row
             .due_date
-            .is_some_and(|d| d.date_naive() == now.date_naive());
+            .is_some_and(|d| d.with_timezone(&chrono::Local).date_naive() == local_today);
 
     let due_display = if is_overdue {
         row.due_date.map(|d| {
@@ -69,8 +70,12 @@ pub fn action_to_today_task(row: &TaskRow, now: DateTime<Utc>) -> TodayTaskRespo
             }
         })
     } else if is_due_today {
-        row.due_date
-            .map(|d| format!("Due {}", d.format("%-I:%M %p")))
+        row.due_date.map(|d| {
+            format!(
+                "Due {}",
+                d.with_timezone(&chrono::Local).format("%-I:%M %p")
+            )
+        })
     } else {
         row.due_date.map(|d| d.format("%b %-d").to_string())
     };

@@ -49,6 +49,9 @@ mod tests {
             is_archived: false,
             created_at: now,
             updated_at: now,
+            base_balance: 0,
+            base_currency: "USD".to_string(),
+            exchange_rate: 1.0,
         }
     }
 
@@ -70,6 +73,9 @@ mod tests {
             recurring_rule: None,
             created_at: now,
             updated_at: now,
+            base_amount: amount,
+            base_currency: "USD".to_string(),
+            exchange_rate: 1.0,
         }
     }
 
@@ -428,7 +434,7 @@ mod tests {
         repos.transactions.add(&tx_inc).await.unwrap();
         let sums = repos
             .transactions
-            .sum_by_category(feb1, feb28, "expense")
+            .sum_by_category(feb1, feb28, "expense", "USD")
             .await
             .unwrap();
         let food_sum = sums.iter().find(|(c, _)| c == &cat_food).map(|(_, t)| *t);
@@ -466,7 +472,7 @@ mod tests {
         }
         let result = repos
             .transactions
-            .sum_by_period("expense", 6, "month")
+            .sum_by_period("expense", 6, "month", "USD")
             .await
             .unwrap();
         assert!(!result.is_empty());

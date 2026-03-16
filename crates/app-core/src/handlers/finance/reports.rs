@@ -2,9 +2,10 @@ use std::collections::HashMap;
 
 use chrono::Datelike;
 use desktop_shared::commands::{
-    CurrencyNetWorth, FinanceCategoryBreakdown, FinanceCategoryReportResponse,
-    FinanceGoalCreateParams, FinanceGoalUpdateParams, FinanceLiabilityCreateParams,
-    FinanceLiabilityUpdateParams, FinanceNetWorthResponse, FinanceTrendPoint,
+    CurrencyNetWorth, DailySpending, FinanceCategoryBreakdown, FinanceCategoryReportResponse,
+    FinanceDailySpendingResponse, FinanceGoalCreateParams, FinanceGoalUpdateParams,
+    FinanceLiabilityCreateParams, FinanceLiabilityUpdateParams, FinanceMonthlySummaryResponse,
+    FinanceNetWorthResponse, FinancePeriodSummaryResponse, FinanceTrendPoint,
 };
 use desktop_shared::errors::ApiError;
 use storage::rows::finance::{
@@ -105,6 +106,10 @@ impl AppCore {
             notes: params.notes,
             created_at: now,
             updated_at: now,
+            base_target_amount: 0,
+            base_current_amount: 0,
+            base_currency: "USD".to_string(),
+            exchange_rate: 1.0,
         };
 
         self.repos
@@ -177,6 +182,10 @@ impl AppCore {
             notes: params.notes,
             created_at: now,
             updated_at: now,
+            base_principal: 0,
+            base_remaining: 0,
+            base_currency: "USD".to_string(),
+            exchange_rate: 1.0,
         };
 
         self.repos
@@ -198,6 +207,10 @@ impl AppCore {
             monthly_payment: params.monthly_payment,
             interest_rate: params.interest_rate,
             notes: params.notes,
+            base_principal: None,
+            base_remaining: None,
+            base_currency: None,
+            exchange_rate: None,
         };
         let row = self
             .repos
@@ -253,7 +266,7 @@ impl AppCore {
             .repos
             .finance
             .transactions
-            .sum_by_category(from, to, tx_type)
+            .sum_by_category(from, to, tx_type, &self.default_currency().await)
             .await
             .map_err(map_storage_err)?;
 
@@ -288,7 +301,7 @@ impl AppCore {
             .repos
             .finance
             .transactions
-            .sum_by_period(tx_type, n as i32, "monthly")
+            .sum_by_period(tx_type, n as i32, "monthly", &self.default_currency().await)
             .await
             .map_err(map_storage_err)?;
 
@@ -315,5 +328,100 @@ impl AppCore {
             .collect();
 
         Ok(points)
+    }
+
+    pub async fn finance_daily_spending(
+        &self,
+        date_from: String,
+        date_to: String,
+    ) -> Result<FinanceDailySpendingResponse, ApiError> {
+        let from = parse_naive_date(&date_from).ok_or_else(|| {
+            ApiError::new("INVALID_PARAMS", format!("invalid date_from: {date_from}"))
+        })?;
+        let to = parse_naive_date(&date_to).ok_or_else(|| {
+            ApiError::new("INVALID_PARAMS", format!("invalid date_to: {date_to}"))
+        })?;
+
+        let rows = self
+            .repos
+            .finance
+            .transactions
+            .daily_spending(from, to, &self.default_currency().await)
+            .await
+            .map_err(map_storage_err)?;
+
+        let days = rows
+            .into_iter()
+            .map(|(date, total_spending, tx_count)| DailySpending {
+                date,
+                total_spending,
+                tx_count,
+            })
+            .collect();
+
+        Ok(FinanceDailySpendingResponse { days })
+    }
+
+    pub async fn finance_period_summary(
+        &self,
+        date_from: String,
+        date_to: String,
+    ) -> Result<FinancePeriodSummaryResponse, ApiError> {
+        let from = parse_naive_date(&date_from).ok_or_else(|| {
+            ApiError::new("INVALID_PARAMS", format!("invalid date_from: {date_from}"))
+        })?;
+        let to = parse_naive_date(&date_to).ok_or_else(|| {
+            ApiError::new("INVALID_PARAMS", format!("invalid date_to: {date_to}"))
+        })?;
+
+        let currency = self.default_currency().await;
+
+        let (income, spending) = tokio::try_join!(
+            self.repos
+                .finance
+                .transactions
+                .sum_by_type_in_range("income", from, to, &currency),
+            self.repos
+                .finance
+                .transactions
+                .sum_by_type_in_range("expense", from, to, &currency),
+        )
+        .map_err(map_storage_err)?;
+
+        Ok(FinancePeriodSummaryResponse { income, spending })
+    }
+
+    pub async fn finance_monthly_summary(&self) -> Result<FinanceMonthlySummaryResponse, ApiError> {
+        let currency = self.default_currency().await;
+        let now = chrono::Local::now();
+        let current_month_label = now.format("%Y-%m").to_string();
+        let previous_month = now
+            .with_day(1)
+            .unwrap_or(now)
+            .checked_sub_months(chrono::Months::new(1))
+            .unwrap_or(now);
+        let previous_month_label = previous_month.format("%Y-%m").to_string();
+
+        let (income_rows, expense_rows) = tokio::try_join!(
+            self.repos
+                .finance
+                .transactions
+                .sum_by_period("income", 3, "monthly", &currency),
+            self.repos
+                .finance
+                .transactions
+                .sum_by_period("expense", 3, "monthly", &currency),
+        )
+        .map_err(map_storage_err)?;
+
+        let income_map: HashMap<String, i64> = income_rows.into_iter().collect();
+        let expense_map: HashMap<String, i64> = expense_rows.into_iter().collect();
+
+        Ok(FinanceMonthlySummaryResponse {
+            current_income: *income_map.get(&current_month_label).unwrap_or(&0),
+            current_spending: *expense_map.get(&current_month_label).unwrap_or(&0),
+            previous_income: *income_map.get(&previous_month_label).unwrap_or(&0),
+            previous_spending: *expense_map.get(&previous_month_label).unwrap_or(&0),
+        })
     }
 }

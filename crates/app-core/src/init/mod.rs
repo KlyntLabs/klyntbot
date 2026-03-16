@@ -3,6 +3,7 @@ mod channels;
 mod coaching;
 mod cognitive;
 mod cron;
+mod launcher;
 mod productivity;
 mod storage;
 
@@ -16,6 +17,7 @@ use tokio::sync::{mpsc, Mutex, RwLock};
 use tokio_util::sync::CancellationToken;
 use tracing::info;
 
+use crate::events::{AppEventEmitter, NoopEmitter};
 use crate::state::AppCore;
 
 /// Bundle of receiver channels that callers wire to their transport (Tauri, SSE, etc.).
@@ -28,6 +30,8 @@ pub struct EventChannels {
     pub dashboard_tick_rx:
         Option<tokio::sync::broadcast::Receiver<feature_productivity::ActivityTick>>,
     pub dashboard_poll_interval_secs: u64,
+    pub distraction_alert_rx:
+        Option<tokio::sync::mpsc::Receiver<feature_productivity::distraction::DistractionAlert>>,
 }
 
 impl AppCore {
@@ -42,18 +46,23 @@ impl AppCore {
         mode: common::AppMode,
         config_override: Option<config::Config>,
     ) -> Result<(Self, EventChannels), String> {
-        Self::init_with_sender(mode, config_override, None).await
+        Self::init_with_sender(mode, config_override, None, None).await
     }
 
-    /// Initialize with an optional custom notification sender.
+    /// Initialize with an optional custom notification sender and event emitter.
     ///
     /// When `sender` is `Some`, OS-native notifications are routed through it
     /// (e.g. Tauri's notification plugin, which shows the app icon). When
     /// `None`, the default platform command (`osascript` / `notify-send`) is used.
+    ///
+    /// When `event_emitter` is `Some`, entity update events from MCP tool
+    /// mutations are forwarded to the frontend. When `None`, a no-op emitter
+    /// is used (CLI / standalone MCP server).
     pub async fn init_with_sender(
         mode: common::AppMode,
         config_override: Option<config::Config>,
         notification_sender: Option<Arc<dyn common::NotificationSender>>,
+        event_emitter: Option<Arc<dyn AppEventEmitter>>,
     ) -> Result<(Self, EventChannels), String> {
         // ── Phase 1: Storage ─────────────────────────────────────────────
         let storage::StorageResult {
@@ -135,6 +144,7 @@ impl AppCore {
             aggregator,
             nudge_service,
             distraction_interceptor,
+            distraction_alert_rx,
             auto_focus_rx,
             nudge_rx,
             dashboard_tick_rx,
@@ -172,6 +182,10 @@ impl AppCore {
         // ── Phase 7: Cognitive (capture, file watcher, work context) ─────
         cognitive::init_cognitive(&mut config, &storage_pool, &activity_svc, &shutdown_token).await;
 
+        // ── Phase 8: Launcher ─────────────────────────────────────────────
+        let launcher::LauncherResult { launcher_engine } =
+            launcher::init_launcher(&config, &storage_pool, &shutdown_token).await;
+
         // ── Assemble AppCore ─────────────────────────────────────────────
         let core = AppCore {
             mode,
@@ -206,6 +220,8 @@ impl AppCore {
             consecutive_coaching_ignores: Arc::new(std::sync::atomic::AtomicI32::new(0)),
             activity_ingestion_service: Some(Arc::clone(&activity_svc)),
             active_task_focus: Arc::new(std::sync::Mutex::new(None)),
+            event_emitter: event_emitter.unwrap_or_else(|| Arc::new(NoopEmitter)),
+            launcher_engine,
         };
 
         // ── Post-core background services ────────────────────────────────
@@ -242,6 +258,7 @@ impl AppCore {
             nudge_rx,
             dashboard_tick_rx,
             dashboard_poll_interval_secs,
+            distraction_alert_rx,
         };
 
         Ok((core, channels))

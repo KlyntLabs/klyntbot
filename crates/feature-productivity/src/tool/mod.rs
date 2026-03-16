@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use chrono::{Duration, Utc};
+use chrono::{Datelike, Duration, Utc};
 use serde_json::Value;
 
 use std::fmt::Write;
@@ -106,6 +106,8 @@ impl ProductivityTool {
     async fn handle_activity_summary(&self, p: &ParamExtractor<'_>) -> Result<String> {
         let start_date = p.required_str("start_date")?;
         let end_date = p.required_str("end_date")?;
+        let group_by = p.optional_str("group_by")?;
+
         let summaries = self
             .repos
             .summaries
@@ -116,21 +118,78 @@ impl ProductivityTool {
             return Ok(format!("No data for {start_date} to {end_date}."));
         }
 
-        let total_active: i64 = summaries.iter().map(|s| s.total_active_secs).sum();
-        let total_productive: i64 = summaries.iter().map(|s| s.productive_secs).sum();
-        let total_distracting: i64 = summaries.iter().map(|s| s.distracting_secs).sum();
-        let total_focus: i64 = summaries.iter().map(|s| s.focus_sessions_count).sum();
-
-        Ok(format!(
-            "Activity summary ({} to {}):\n- Days tracked: {}\n- Total active: {}\n- Productive: {}\n- Distracting: {}\n- Focus sessions: {}",
-            start_date,
-            end_date,
-            summaries.len(),
-            format_duration(total_active),
-            format_duration(total_productive),
-            format_duration(total_distracting),
-            total_focus,
-        ))
+        match group_by {
+            Some("day") => {
+                let mut lines = vec![format!("Daily breakdown ({start_date} to {end_date}):")];
+                for s in &summaries {
+                    let score = s
+                        .productivity_score
+                        .map(|v| format!("{:.0}", v))
+                        .unwrap_or_else(|| "N/A".into());
+                    lines.push(format!(
+                        "- {}: active {} | productive {} | score {}",
+                        s.date,
+                        format_duration(s.total_active_secs),
+                        format_duration(s.productive_secs),
+                        score,
+                    ));
+                }
+                Ok(lines.join("\n"))
+            }
+            Some("week") => Ok(format_grouped_breakdown(
+                "Weekly",
+                start_date,
+                end_date,
+                &summaries,
+                |s| {
+                    chrono::NaiveDate::parse_from_str(&s.date, "%Y-%m-%d")
+                        .map(|d| format!("{}-W{:02}", d.iso_week().year(), d.iso_week().week()))
+                        .unwrap_or_else(|_| "unknown".into())
+                },
+            )),
+            Some("month") => Ok(format_grouped_breakdown(
+                "Monthly",
+                start_date,
+                end_date,
+                &summaries,
+                |s| s.date.get(..7).unwrap_or("unknown").to_string(),
+            )),
+            Some("project") => {
+                let results = self
+                    .repos
+                    .events
+                    .aggregate_by_project(start_date, end_date)
+                    .await?;
+                let mut lines = vec![format!("By project ({start_date} to {end_date}):")];
+                for (pid, secs) in &results {
+                    lines.push(format!("- {pid}: {}", format_duration(*secs)));
+                }
+                if results.is_empty() {
+                    lines.push("  No project data found.".into());
+                }
+                Ok(lines.join("\n"))
+            }
+            Some(other) => Err(ToolError::InvalidParams(format!(
+                "group_by must be 'day', 'week', 'month', or 'project', got '{other}'"
+            ))
+            .into()),
+            None => {
+                let total_active: i64 = summaries.iter().map(|s| s.total_active_secs).sum();
+                let total_productive: i64 = summaries.iter().map(|s| s.productive_secs).sum();
+                let total_distracting: i64 = summaries.iter().map(|s| s.distracting_secs).sum();
+                let total_focus: i64 = summaries.iter().map(|s| s.focus_sessions_count).sum();
+                Ok(format!(
+                    "Activity summary ({} to {}):\n- Days tracked: {}\n- Total active: {}\n- Productive: {}\n- Distracting: {}\n- Focus sessions: {}",
+                    start_date,
+                    end_date,
+                    summaries.len(),
+                    format_duration(total_active),
+                    format_duration(total_productive),
+                    format_duration(total_distracting),
+                    total_focus,
+                ))
+            }
+        }
     }
 
     async fn handle_activity_week(&self) -> Result<String> {
@@ -541,6 +600,11 @@ impl Tool for ProductivityTool {
                 "notes": { "type": "string", "description": "Notes when ending a focus session" },
                 "start_date": { "type": "string", "description": "Start date (YYYY-MM-DD) for activity_summary" },
                 "end_date": { "type": "string", "description": "End date (YYYY-MM-DD) for activity_summary" },
+                "group_by": {
+                    "type": "string",
+                    "enum": ["day", "week", "month", "project"],
+                    "description": "Group results by time period or project (optional, for activity_summary)"
+                },
                 "id": { "type": "string", "description": "Category ID for set_category" },
                 "name": { "type": "string", "description": "Category name for set_category" },
                 "category_type": {
@@ -622,6 +686,47 @@ fn avg_scores(iter: impl Iterator<Item = f64>) -> Option<f64> {
     } else {
         Some(sum / count as f64)
     }
+}
+
+fn format_grouped_breakdown(
+    label: &str,
+    start_date: &str,
+    end_date: &str,
+    summaries: &[crate::types::DailySummary],
+    key_fn: impl Fn(&crate::types::DailySummary) -> String,
+) -> String {
+    struct Accum {
+        active: i64,
+        productive: i64,
+        distracting: i64,
+        scores: Vec<Option<f64>>,
+    }
+    let mut groups: std::collections::BTreeMap<String, Accum> = std::collections::BTreeMap::new();
+    for s in summaries {
+        let entry = groups.entry(key_fn(s)).or_insert(Accum {
+            active: 0,
+            productive: 0,
+            distracting: 0,
+            scores: vec![],
+        });
+        entry.active += s.total_active_secs;
+        entry.productive += s.productive_secs;
+        entry.distracting += s.distracting_secs;
+        entry.scores.push(s.productivity_score);
+    }
+    let mut lines = vec![format!("{label} breakdown ({start_date} to {end_date}):")];
+    for (key, acc) in &groups {
+        let score_str = avg_scores(acc.scores.iter().filter_map(|s| *s))
+            .map(|v| format!("{v:.0}"))
+            .unwrap_or_else(|| "N/A".into());
+        lines.push(format!(
+            "- {key}: active {} | productive {} | distracting {} | avg score {score_str}",
+            format_duration(acc.active),
+            format_duration(acc.productive),
+            format_duration(acc.distracting),
+        ));
+    }
+    lines.join("\n")
 }
 
 fn escape_csv(field: &str) -> std::borrow::Cow<'_, str> {

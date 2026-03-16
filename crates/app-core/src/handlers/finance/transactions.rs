@@ -58,6 +58,9 @@ impl AppCore {
             recurring_rule: None,
             created_at: now,
             updated_at: now,
+            base_amount: 0,
+            base_currency: "USD".to_string(),
+            exchange_rate: 1.0,
         };
 
         self.repos

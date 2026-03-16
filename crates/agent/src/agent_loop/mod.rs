@@ -79,8 +79,10 @@ pub struct AgentLoop {
     pub(crate) _inference_loop_token: Option<CancellationToken>,
     /// Activity ingestion service for chat message logging.
     pub(crate) activity_svc: Option<Arc<activity_log::ActivityIngestionService>>,
-    /// Shared agent manager — used for hot-reload of agent profiles.
-    pub(crate) agent_manager: Arc<RwLock<crate::agent_profile::AgentManager>>,
+    /// Shared skill catalog — used for hot-reload of skill packages.
+    pub(crate) skill_catalog: Arc<RwLock<skill_system::types::SkillCatalog>>,
+    /// Shared skill router — rebuilt after reload.
+    pub(crate) skill_router: Arc<RwLock<skill_system::router::SkillRouter>>,
 }
 
 impl AgentLoop {
@@ -90,11 +92,31 @@ impl AgentLoop {
         Arc::clone(&self.tool_registry)
     }
 
-    /// Reload agent profiles from workspace (hot-reload after UI edits).
+    /// Reload skill packages from workspace (hot-reload after UI edits).
     pub async fn reload_agents(&self) -> common::Result<()> {
-        let workspace_path = self.config.workspace_path();
-        let mut mgr = self.agent_manager.write().await;
-        mgr.reload(&workspace_path).await
+        // Re-discover skills from all sources
+        let data_dir_path = self.config.data_dir_path();
+        let mut sources = vec![skill_system::discovery::SkillSource::BuiltIn(
+            skill_system::discovery::BUILTIN_SKILLS
+                .iter()
+                .map(|(n, c)| (n.to_string(), c.to_string()))
+                .collect(),
+        )];
+        let user_skills_dir = data_dir_path.join("skills");
+        if user_skills_dir.exists() {
+            sources.push(skill_system::discovery::SkillSource::Directory(
+                user_skills_dir,
+                skill_system::types::SkillScope::User,
+            ));
+        }
+        let new_catalog = skill_system::types::SkillCatalog::discover(&sources).await?;
+        let new_router = skill_system::router::SkillRouter::new(&new_catalog);
+
+        let mut catalog = self.skill_catalog.write().await;
+        *catalog = new_catalog;
+        let mut router = self.skill_router.write().await;
+        *router = new_router;
+        Ok(())
     }
 
     /// Handle emoji reactions by mapping to satisfaction scores.

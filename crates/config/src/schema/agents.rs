@@ -86,3 +86,34 @@ fn default_max_iterations() -> u32 {
 fn default_max_concurrent_subagents() -> usize {
     3
 }
+
+/// Configuration for the skill discovery system.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillConfig {
+    /// Additional directories to scan for skills (beyond data_dir/skills/).
+    #[serde(default)]
+    pub extra_skill_dirs: Vec<String>,
+
+    /// Orchestrator selection threshold (semantic score >= this to consider).
+    #[serde(default = "default_orchestrator_threshold")]
+    pub orchestrator_semantic_threshold: f64,
+
+    /// Per-message skill activation threshold.
+    #[serde(default = "default_activation_threshold")]
+    pub activation_threshold: f64,
+
+    /// Max non-orchestrator skills activated per message.
+    #[serde(default = "default_max_activated_skills")]
+    pub max_activated_skills: usize,
+}
+
+fn default_orchestrator_threshold() -> f64 {
+    0.5
+}
+fn default_activation_threshold() -> f64 {
+    0.4
+}
+fn default_max_activated_skills() -> usize {
+    3
+}

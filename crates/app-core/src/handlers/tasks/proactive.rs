@@ -5,10 +5,10 @@ use tracing::{info, warn};
 use uuid::Uuid;
 
 use bus::{DomainEvent, DomainEventBus};
+use feature_tasks::types::SuggestionScope;
 use feature_tasks::{
     handlers::suggestion_applier::SuggestionApplier, ProactiveHandler, TasksConfig,
 };
-use feature_tasks::types::SuggestionScope;
 use storage::{Repos, TaskSuggestionRow};
 
 /// Run a full proactive suggestion scan: call `suggest()`, persist each candidate,
@@ -55,9 +55,7 @@ pub async fn run_proactive_scan(
 
                 // Auto-apply if confidence meets threshold
                 if candidate.confidence >= tasks_config.suggestion_auto_apply_threshold {
-                    if let (Some(applier), Some(action)) =
-                        (suggestion_applier, &candidate.action)
-                    {
+                    if let (Some(applier), Some(action)) = (suggestion_applier, &candidate.action) {
                         match applier
                             .apply(&created.id, created.task_id.as_deref(), action)
                             .await

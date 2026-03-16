@@ -472,7 +472,10 @@ mod tests {
     fn test_keyword_scores_owned_task() {
         let mgr = make_test_manager();
         let scores = mgr.keyword_scores_owned("create a task for me");
-        assert!(scores.contains_key("task"), "task agent should have a score");
+        assert!(
+            scores.contains_key("task"),
+            "task agent should have a score"
+        );
         assert!(*scores.get("task").unwrap() > 0.0);
         assert!(!scores.contains_key("general"), "general has no triggers");
     }
@@ -481,7 +484,10 @@ mod tests {
     fn test_keyword_scores_owned_no_match() {
         let mgr = make_test_manager();
         let scores = mgr.keyword_scores_owned("hello, how are you today?");
-        assert!(scores.is_empty(), "no agent should score for a generic greeting");
+        assert!(
+            scores.is_empty(),
+            "no agent should score for a generic greeting"
+        );
     }
 
     #[test]
@@ -496,7 +502,10 @@ mod tests {
         // No keyword hit, but query points straight at task (cosine = 1.0 ≥ 0.5)
         let kw: HashMap<String, f64> = HashMap::new();
         let selected = mgr.blend_scores(&kw, &task_vec);
-        assert_eq!(selected.name, "task", "semantic should rescue when no keyword match");
+        assert_eq!(
+            selected.name, "task",
+            "semantic should rescue when no keyword match"
+        );
     }
 
     #[test]
@@ -512,6 +521,9 @@ mod tests {
         // Query is slightly tilted toward finance but not enough (sem < 0.5 with no kw)
         let query = vec![0.3_f32, 0.4, 0.0]; // closer to finance but not by a lot
         let selected = mgr.blend_scores(&kw, &query);
-        assert_eq!(selected.name, "task", "keyword match should dominate over weak semantic");
+        assert_eq!(
+            selected.name, "task",
+            "keyword match should dominate over weak semantic"
+        );
     }
 }

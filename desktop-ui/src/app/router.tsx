@@ -39,21 +39,14 @@ const NotesPage = lazy(() => import("../features/notes").then((m) => ({ default:
 const FinanceOverviewPage = lazy(() =>
   import("../features/finance").then((m) => ({ default: m.FinanceOverviewPage })),
 );
-const AccountsPage = lazy(() =>
-  import("../features/finance").then((m) => ({ default: m.AccountsPage })),
-);
-const TransactionsPage = lazy(() =>
-  import("../features/finance").then((m) => ({ default: m.TransactionsPage })),
-);
-const BudgetsPage = lazy(() =>
-  import("../features/finance").then((m) => ({ default: m.BudgetsPage })),
+const CashFlowPage = lazy(() =>
+  import("../features/finance").then((m) => ({ default: m.CashFlowPage })),
 );
 const InvestmentsPage = lazy(() =>
   import("../features/finance").then((m) => ({ default: m.InvestmentsPage })),
 );
-const GoalsPage = lazy(() => import("../features/finance").then((m) => ({ default: m.GoalsPage })));
-const LiabilitiesPage = lazy(() =>
-  import("../features/finance").then((m) => ({ default: m.LiabilitiesPage })),
+const TargetsPage = lazy(() =>
+  import("../features/finance").then((m) => ({ default: m.TargetsPage })),
 );
 
 // ── System Feature ───────────────────────────────────────────────
@@ -202,12 +195,14 @@ export const router = createHashRouter([
       { path: "/productivity/categories", element: <Navigate to="/system/categories" replace /> },
       { path: "/categories", element: <Navigate to="/system/categories" replace /> },
       { path: "/finance", element: <FinanceOverviewPage /> },
-      { path: "/finance/accounts", element: <AccountsPage /> },
-      { path: "/finance/transactions", element: <TransactionsPage /> },
-      { path: "/finance/budgets", element: <BudgetsPage /> },
+      { path: "/finance/cashflow", element: <CashFlowPage /> },
+      { path: "/finance/accounts", element: <Navigate to="/finance/cashflow" replace /> },
+      { path: "/finance/transactions", element: <Navigate to="/finance/cashflow" replace /> },
+      { path: "/finance/budgets", element: <Navigate to="/finance/cashflow" replace /> },
       { path: "/finance/investments", element: <InvestmentsPage /> },
-      { path: "/finance/goals", element: <GoalsPage /> },
-      { path: "/finance/liabilities", element: <LiabilitiesPage /> },
+      { path: "/finance/targets", element: <TargetsPage /> },
+      { path: "/finance/goals", element: <Navigate to="/finance/targets" replace /> },
+      { path: "/finance/liabilities", element: <Navigate to="/finance/targets" replace /> },
       { path: "/debug", element: <Navigate to="/system/events" replace /> },
       { path: "/settings", element: <Navigate to="/settings/general" replace /> },
       {

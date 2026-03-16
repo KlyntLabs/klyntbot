@@ -47,4 +47,11 @@ pub trait ContextSource: Send + Sync {
     fn estimated_tokens(&self) -> usize {
         500
     }
+
+    /// Whether this source's content should be protected from context compaction.
+    /// Protected content is never pruned when the context window fills up.
+    /// Default: false (content can be pruned if needed).
+    fn protected(&self) -> bool {
+        false
+    }
 }

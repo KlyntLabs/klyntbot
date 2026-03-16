@@ -372,6 +372,14 @@
     border-radius: var(--radius-xl);
   }
 
+  /* Compact variant — tighter radius for sidebar/small cards */
+  .glass-card-sm {
+    @apply backdrop-blur-[50px] backdrop-saturate-150;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: var(--radius-lg);
+  }
+
   /* Message bubble glass — chat bubbles */
   .glass-bubble {
     @apply backdrop-blur-[40px] backdrop-saturate-[1.4];
@@ -579,6 +587,17 @@
   to {
     opacity: 1;
     transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes result-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 

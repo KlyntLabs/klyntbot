@@ -19,7 +19,6 @@ pub struct ChannelsConfig {
 
     #[serde(default)]
     pub email: EmailConfig,
-
 }
 
 /// Telegram channel configuration

@@ -1,6 +1,7 @@
 use std::sync::atomic::AtomicI32;
 use std::sync::Arc;
 
+use crate::handlers::launcher::LauncherSearchEngine;
 use agent::{AgentLoop, PersonaManager};
 use bus::{DomainEventBus, MessageBus};
 use channels::ChannelManager;
@@ -18,6 +19,8 @@ use storage::{Repos, StoragePool};
 use tokio::sync::{broadcast, oneshot, Mutex, RwLock};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info};
+
+use crate::events::AppEventEmitter;
 
 /// An entity that was mutated by a handler — callers use this to emit update events.
 pub struct EntityUpdate {
@@ -82,6 +85,12 @@ pub struct AppCore {
     /// Active task focus session (None when no focus session is active).
     /// Uses std::sync::Mutex because the lock is never held across await points.
     pub active_task_focus: Arc<std::sync::Mutex<Option<ActiveTaskFocus>>>,
+    /// Transport-agnostic event emitter — set by the desktop adapter (Tauri events)
+    /// or left as `NoopEmitter` for CLI / tests. Used by the MCP server to push
+    /// entity updates to the frontend after tool mutations.
+    pub event_emitter: Arc<dyn AppEventEmitter>,
+    /// Launcher search engine (None when launcher feature is disabled).
+    pub launcher_engine: Option<Arc<LauncherSearchEngine>>,
 }
 
 impl AppCore {
@@ -150,6 +159,21 @@ impl AppCore {
         self.domain_event_bus
             .as_ref()
             .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "domain event bus is not available"))
+    }
+
+    /// Return launcher search engine or a "feature disabled" error.
+    pub fn launcher_engine(&self) -> Result<&Arc<LauncherSearchEngine>, ApiError> {
+        self.launcher_engine
+            .as_ref()
+            .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "launcher feature is not enabled"))
+    }
+
+    /// Return launcher clipboard repo or a "feature disabled" error.
+    pub fn launcher_clipboard_repo(&self) -> Result<&feature_launcher::ClipboardRepo, ApiError> {
+        self.launcher_engine
+            .as_ref()
+            .map(|e| &e.clipboard_repo)
+            .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "launcher feature is not enabled"))
     }
 
     /// Graceful shutdown.

@@ -5,7 +5,9 @@
 
 use std::sync::Arc;
 
+use app_core::events::AppEventEmitter;
 use app_core::AppCore;
+use desktop_shared::types::EntityKind;
 use rmcp::handler::server::ServerHandler;
 use rmcp::model::*;
 use rmcp::service::{RequestContext, RoleServer};
@@ -134,8 +136,20 @@ impl ServerHandler for KlyntbotServerHandler {
 
         match name {
             "get_status" => self.handle_get_status().await,
-            "agent" if self.agent_tool.is_some() => self.agent_bridge.execute(params).await,
-            _ => self.bridge.execute(name, params).await,
+            "agent" if self.agent_tool.is_some() => {
+                let result = self.agent_bridge.execute(params).await?;
+                // Agent calls may mutate any entity — broadcast a broad invalidation.
+                // The FE listeners filter by entityKind so this is safe.
+                for kind in [EntityKind::Task, EntityKind::Project, EntityKind::Note] {
+                    self.app.event_emitter.emit_entity_updated(kind, "*");
+                }
+                Ok(result)
+            }
+            _ => {
+                let result = self.bridge.execute(name, params.clone()).await?;
+                emit_entity_update_for_tool(&self.app.event_emitter, name, &params);
+                Ok(result)
+            }
         }
     }
 
@@ -145,5 +159,43 @@ impl ServerHandler for KlyntbotServerHandler {
             "agent" => self.agent_tool.clone(),
             _ => None,
         }
+    }
+}
+
+/// Read-only actions that should not trigger entity update events.
+const READ_ONLY_ACTIONS: &[&str] = &["list", "show", "get", "search", "status", "stats", "query"];
+
+/// Emit an `entity:updated` event after a successful MCP tool call,
+/// but only for mutating actions (create, update, delete, etc.).
+fn emit_entity_update_for_tool(
+    emitter: &Arc<dyn AppEventEmitter>,
+    tool_name: &str,
+    params: &serde_json::Value,
+) {
+    let action = params.get("action").and_then(|v| v.as_str()).unwrap_or("");
+
+    if READ_ONLY_ACTIONS.contains(&action) {
+        return;
+    }
+
+    let entity_kind = match tool_name {
+        "tasks" => EntityKind::Task,
+        "project" => EntityKind::Project,
+        "area" => EntityKind::Area,
+        "notes" => EntityKind::Note,
+        "okr" => EntityKind::Objective,
+        "finance" => EntityKind::Finance,
+        "productivity" => EntityKind::Productivity,
+        "work_context" => EntityKind::Productivity,
+        _ => return,
+    };
+
+    let id = params.get("id").and_then(|v| v.as_str()).unwrap_or("*");
+
+    emitter.emit_entity_updated(entity_kind.clone(), id);
+
+    // OKR tool can mutate both objectives and key results.
+    if tool_name == "okr" {
+        emitter.emit_entity_updated(EntityKind::KeyResult, id);
     }
 }

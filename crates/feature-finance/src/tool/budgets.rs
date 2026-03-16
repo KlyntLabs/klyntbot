@@ -6,6 +6,7 @@ use chrono::{Local, Utc};
 use serde_json::json;
 use uuid::Uuid;
 
+use crate::currency::ensure_base_amount;
 use crate::types::{BudgetMethod, BudgetPeriod, JarType};
 use common::{Result, ToolError};
 use storage::rows::finance::{FinanceBudgetPatch, FinanceBudgetRow, FinanceTransactionFilter};
@@ -88,6 +89,14 @@ impl FinanceTool {
         let now = Utc::now();
         let id = Uuid::new_v4().to_string();
 
+        let conv = ensure_base_amount(
+            amount,
+            currency,
+            &self.default_currency,
+            &self.price_service,
+        )
+        .await?;
+
         let row = FinanceBudgetRow {
             id,
             name: name.to_string(),
@@ -103,6 +112,9 @@ impl FinanceTool {
             alert_threshold,
             created_at: now,
             updated_at: now,
+            base_amount: conv.base_amount,
+            base_currency: conv.base_currency,
+            exchange_rate: conv.exchange_rate,
         };
 
         let inserted = self.storage.budgets.add(&row).await?;
@@ -287,6 +299,9 @@ impl FinanceTool {
             amount,
             category: category.map(|s| Some(s.to_string())),
             is_active,
+            base_amount: None,
+            base_currency: None,
+            exchange_rate: None,
         };
 
         let updated = self.storage.budgets.update(&patch).await?;

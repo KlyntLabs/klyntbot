@@ -107,7 +107,7 @@ impl FinanceTool {
         let mut rows = self
             .storage
             .transactions
-            .sum_by_category(date_from, date_to, "expense")
+            .sum_by_category(date_from, date_to, "expense", &self.default_currency)
             .await?;
 
         if let Some(cat) = category {
@@ -126,6 +126,7 @@ impl FinanceTool {
 
         let result = json!({
             "period_label": period_label,
+            "base_currency": &self.default_currency,
             "total": total,
             "breakdown": breakdown,
         });
@@ -142,7 +143,7 @@ impl FinanceTool {
         let mut rows = self
             .storage
             .transactions
-            .sum_by_category(date_from, date_to, "income")
+            .sum_by_category(date_from, date_to, "income", &self.default_currency)
             .await?;
 
         if let Some(cat) = category {
@@ -161,6 +162,7 @@ impl FinanceTool {
 
         let result = json!({
             "period_label": period_label,
+            "base_currency": &self.default_currency,
             "total": total,
             "breakdown": breakdown,
         });
@@ -177,12 +179,18 @@ impl FinanceTool {
         let data: Vec<serde_json::Value> = if metric == "savings_rate" {
             // Fetch both income and spending time series concurrently.
             let (income_data, spend_data) = tokio::try_join!(
-                self.storage
-                    .transactions
-                    .sum_by_period("income", periods, "month"),
-                self.storage
-                    .transactions
-                    .sum_by_period("expense", periods, "month"),
+                self.storage.transactions.sum_by_period(
+                    "income",
+                    periods,
+                    "month",
+                    &self.default_currency
+                ),
+                self.storage.transactions.sum_by_period(
+                    "expense",
+                    periods,
+                    "month",
+                    &self.default_currency
+                ),
             )?;
 
             let income_map: std::collections::HashMap<String, i64> =
@@ -233,7 +241,7 @@ impl FinanceTool {
             let period_data = self
                 .storage
                 .transactions
-                .sum_by_period(tx_type, periods, "month")
+                .sum_by_period(tx_type, periods, "month", &self.default_currency)
                 .await?;
 
             let values: Vec<i64> = period_data.iter().map(|(_, v)| *v).collect();
@@ -260,38 +268,24 @@ impl FinanceTool {
 
     async fn report_net_worth_history(&self, _p: &ParamExtractor<'_>) -> Result<String> {
         let today = Local::now().date_naive();
+        let base = &self.default_currency;
 
-        let (account_balances, investment_values, liability_totals) = tokio::try_join!(
-            self.storage.accounts.total_balance_by_currency(),
-            self.storage.investments.total_value_by_currency(),
-            self.storage.liabilities.total_remaining_by_currency(),
+        let (accounts_total, investments_total, liabilities_total) = tokio::try_join!(
+            self.storage.accounts.total_base_balance(base),
+            self.storage.investments.total_base_value(base),
+            self.storage.liabilities.total_base_remaining(base),
         )?;
 
-        let accounts_total: i64 = account_balances.iter().map(|(_, v)| v).sum();
-        let investments_total: i64 = investment_values.iter().map(|(_, v)| v).sum();
-        let liabilities_total: i64 = liability_totals.iter().map(|(_, v)| v).sum();
         let net_worth = accounts_total + investments_total - liabilities_total;
 
-        let accounts_map: serde_json::Map<String, serde_json::Value> = account_balances
-            .into_iter()
-            .map(|(cur, val)| (cur, json!(val)))
-            .collect();
-        let investments_map: serde_json::Map<String, serde_json::Value> = investment_values
-            .into_iter()
-            .map(|(cur, val)| (cur, json!(val)))
-            .collect();
-        let liabilities_map: serde_json::Map<String, serde_json::Value> = liability_totals
-            .into_iter()
-            .map(|(cur, val)| (cur, json!(val)))
-            .collect();
-
         let result = json!({
+            "base_currency": base,
             "data": [{
                 "date": today.to_string(),
                 "net_worth": net_worth,
-                "accounts": serde_json::Value::Object(accounts_map),
-                "investments": serde_json::Value::Object(investments_map),
-                "liabilities": serde_json::Value::Object(liabilities_map),
+                "accounts": accounts_total,
+                "investments": investments_total,
+                "liabilities": liabilities_total,
             }],
             "note": "Current snapshot only. Historical snapshots are not yet available.",
         });

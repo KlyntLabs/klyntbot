@@ -1,46 +1,15 @@
-/// Known browser app names (lowercased for comparison).
-pub(super) const BROWSER_APPS: &[&str] = &[
-    "google chrome",
-    "safari",
-    "firefox",
-    "arc",
-    "brave browser",
-    "orion",
-    "vivaldi",
-    "microsoft edge",
-    "opera",
-    "chromium",
-    "zen browser",
-];
-
-/// Known browser bundle ID prefixes.
-pub(super) const BROWSER_BUNDLE_PREFIXES: &[&str] = &[
-    "com.google.chrome",
-    "com.apple.safari",
-    "org.mozilla.firefox",
-    "company.thebrowser.browser", // Arc
-    "com.brave.browser",
-    "com.microsoft.edgemac",
-    "com.operasoftware.opera",
-    "com.vivaldi.vivaldi",
-];
-
-/// Browser name suffixes typically appended to window titles (pre-lowercased
-/// to avoid allocating on every call to `extract_site_name`).
-pub(super) const BROWSER_SUFFIXES: &[&str] = &[
-    " - google chrome",
-    " - mozilla firefox",
-    " - safari",
-    " - arc",
-    " - brave",
-    " - vivaldi",
-    " - microsoft edge",
-    " - opera",
-    " - chromium",
-    " — mozilla firefox",
-    " — safari",
-    " - zen browser",
-];
+/// Build browser suffixes from the shared platform-macos registry.
+/// Returns lowercase suffixes for case-insensitive matching.
+fn browser_suffixes() -> Vec<String> {
+    let mut suffixes: Vec<String> = platform_macos::browser::BROWSERS
+        .iter()
+        .map(|b| b.title_suffix.to_ascii_lowercase())
+        .collect();
+    // Add em-dash variants for browsers that commonly use them
+    suffixes.push(" \u{2014} mozilla firefox".to_string());
+    suffixes.push(" \u{2014} safari".to_string());
+    suffixes
+}
 
 /// Known site keywords -> domain display name.
 /// Checked against the lowercased title. Order matters: first match wins.
@@ -164,21 +133,10 @@ pub(super) fn lookup_known_site(title: &str) -> Option<&'static str> {
 }
 
 /// Check whether an app is a known browser by name or bundle ID.
+///
+/// Delegates to the shared `platform-macos` browser registry.
 pub fn is_browser(app_name: &str, bundle_id: Option<&str>) -> bool {
-    let name_lower = app_name.to_lowercase();
-    if BROWSER_APPS.iter().any(|b| name_lower == *b) {
-        return true;
-    }
-    if let Some(bid) = bundle_id {
-        let bid_lower = bid.to_lowercase();
-        if BROWSER_BUNDLE_PREFIXES
-            .iter()
-            .any(|p| bid_lower.starts_with(p))
-        {
-            return true;
-        }
-    }
-    false
+    platform_macos::browser::is_browser(app_name, bundle_id)
 }
 
 /// Extract a human-readable site name from a browser window title.
@@ -198,10 +156,11 @@ pub fn is_browser(app_name: &str, bundle_id: Option<&str>) -> bool {
 pub fn extract_site_name(window_title: &str) -> String {
     let mut title = window_title;
 
-    // Strip browser suffix (case-insensitive check using pre-lowercased suffixes)
+    // Strip browser suffix (case-insensitive check against shared registry)
     let title_lower = title.to_lowercase();
-    for suffix in BROWSER_SUFFIXES {
-        if let Some(pos) = title_lower.rfind(suffix) {
+    let suffixes = browser_suffixes();
+    for suffix in &suffixes {
+        if let Some(pos) = title_lower.rfind(suffix.as_str()) {
             title = &title[..pos];
             break;
         }

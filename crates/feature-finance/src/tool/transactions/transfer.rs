@@ -3,6 +3,7 @@
 use chrono::{NaiveDate, Utc};
 use serde_json::json;
 
+use crate::currency::ensure_base_amount;
 use crate::types::TransactionType;
 use common::{Result, ToolError};
 use storage::rows::finance::FinanceTransactionRow;
@@ -61,6 +62,14 @@ impl FinanceTool {
         let transfer_id = uuid::Uuid::new_v4().to_string();
         let now = Utc::now();
 
+        let conv = ensure_base_amount(
+            amount,
+            &currency,
+            &self.default_currency,
+            &self.price_service,
+        )
+        .await?;
+
         let from_row = FinanceTransactionRow {
             id: uuid::Uuid::new_v4().to_string(),
             account_id: account_id.to_string(),
@@ -77,6 +86,9 @@ impl FinanceTool {
             recurring_rule: None,
             created_at: now,
             updated_at: now,
+            base_amount: conv.base_amount,
+            base_currency: conv.base_currency.clone(),
+            exchange_rate: conv.exchange_rate,
         };
 
         let to_row = FinanceTransactionRow {
@@ -95,6 +107,9 @@ impl FinanceTool {
             recurring_rule: None,
             created_at: now,
             updated_at: now,
+            base_amount: conv.base_amount,
+            base_currency: conv.base_currency,
+            exchange_rate: conv.exchange_rate,
         };
 
         let from_inserted = self.storage.transactions.add(&from_row).await?;

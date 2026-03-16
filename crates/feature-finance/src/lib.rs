@@ -1,4 +1,4 @@
-#![recursion_limit = "256"]
+#![recursion_limit = "512"]
 //! feature-finance: Self-contained personal finance feature package for klyntbot.
 //!
 //! Provides:
@@ -9,8 +9,11 @@
 //! - Services: `PriceService` (live market data), `FinanceHandler` (proactive analysis)
 
 pub mod config;
+pub mod currency;
 pub mod handler;
 pub mod price_service;
+pub mod rate_cache;
+pub mod rebase;
 pub mod tool;
 pub mod types;
 

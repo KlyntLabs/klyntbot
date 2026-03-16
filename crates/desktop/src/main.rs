@@ -7,14 +7,42 @@ mod dev_server;
 mod focus_timer;
 mod notify;
 mod oauth;
+mod tray_countdown;
 
 use std::sync::Arc;
 
+use clap::{Parser, Subcommand};
 use commands::window::{WINDOW_LAUNCHER, WINDOW_TRAY};
 use tauri::image::Image;
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::Manager;
 use tauri_plugin_global_shortcut::{Code, Modifiers, ShortcutState};
+
+#[derive(Parser)]
+#[command(name = "Klynt", about = "Klynt personal AI agent")]
+struct Cli {
+    #[command(subcommand)]
+    command: Option<Commands>,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// Run the MCP server
+    Mcp {
+        #[command(subcommand)]
+        command: McpCommands,
+    },
+}
+
+#[derive(Subcommand)]
+enum McpCommands {
+    /// Serve MCP over stdin/stdout
+    Serve {
+        /// Use stdio transport
+        #[arg(long)]
+        stdio: bool,
+    },
+}
 
 /// Register a dismiss-on-blur handler that hides the window when it loses focus.
 fn dismiss_on_blur(window: &tauri::WebviewWindow) {
@@ -27,6 +55,97 @@ fn dismiss_on_blur(window: &tauri::WebviewWindow) {
 }
 
 fn main() {
+    let cli = Cli::parse();
+
+    match cli.command {
+        Some(Commands::Mcp { command }) => match command {
+            McpCommands::Serve { stdio } => {
+                if stdio {
+                    run_mcp_stdio();
+                } else {
+                    eprintln!("Only --stdio transport is currently supported");
+                    std::process::exit(1);
+                }
+            }
+        },
+        None => {
+            run_desktop_app();
+        }
+    }
+}
+
+fn run_mcp_stdio() {
+    use klyntbot_server::handler::KlyntbotServerHandler;
+    use rmcp::service::ServiceExt;
+    use tracing_subscriber::EnvFilter;
+
+    // Init tracing to stderr (stdout is reserved for MCP transport)
+    tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::from_default_env())
+        .with_writer(std::io::stderr)
+        .init();
+
+    let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
+    rt.block_on(async {
+        // Load config
+        let config = config::load_with_env_overrides()
+            .await
+            .expect("config load failed");
+
+        // Init AppCore in Server mode
+        let (app, events) = app_core::AppCore::init(common::AppMode::Server, Some(config.clone()))
+            .await
+            .expect("init failed");
+        let app = Arc::new(app);
+
+        // Drain unused EventChannels — both receivers must close before task exits.
+        tokio::spawn(async move {
+            let mut intervention_rx = events.intervention_rx;
+            let mut pipeline_rx = events.pipeline_rx;
+            let mut intervention_closed = false;
+            let mut pipeline_closed = false;
+            while !intervention_closed || !pipeline_closed {
+                tokio::select! {
+                    msg = intervention_rx.recv(), if !intervention_closed => {
+                        if msg.is_none() { intervention_closed = true; }
+                    }
+                    result = pipeline_rx.recv(), if !pipeline_closed => {
+                        if result.is_err() { pipeline_closed = true; }
+                    }
+                }
+            }
+        });
+
+        // Build MCP handler
+        let whitelist = config.mcp.server.exposed_tools.clone();
+        let handler = KlyntbotServerHandler::new(app.clone(), whitelist);
+
+        // Serve over stdio
+        tracing::info!("Starting MCP server (stdio)");
+        let transport = rmcp::transport::io::stdio();
+        let service = match handler.serve(transport).await {
+            Ok(s) => s,
+            Err(e) => {
+                tracing::error!("Failed to serve MCP: {e}");
+                app.shutdown().await;
+                return;
+            }
+        };
+
+        tokio::select! {
+            result = service.waiting() => {
+                if let Err(e) = result { eprintln!("Server error: {e}"); }
+            }
+            _ = tokio::signal::ctrl_c() => {
+                tracing::info!("Shutting down...");
+            }
+        }
+
+        app.shutdown().await;
+    });
+}
+
+fn run_desktop_app() {
     tauri::Builder::default()
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
@@ -64,6 +183,8 @@ fn main() {
                 .build(),
         )
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .setup(|app| {
             let handle = app.handle().clone();
             let core = Arc::new(
@@ -166,6 +287,9 @@ fn main() {
             if let Some(launcher_window) = app.get_webview_window(WINDOW_LAUNCHER) {
                 dismiss_on_blur(&launcher_window);
             }
+
+            // Start the tray countdown (next upcoming event in menu bar)
+            tray_countdown::spawn(app.handle());
 
             Ok(())
         })
@@ -282,6 +406,9 @@ fn main() {
             commands::finance::finance_report_spending,
             commands::finance::finance_report_income,
             commands::finance::finance_report_trends,
+            commands::finance::finance_monthly_summary,
+            commands::finance::finance_daily_spending,
+            commands::finance::finance_period_summary,
             // Productivity
             commands::productivity::productivity_today,
             commands::productivity::productivity_timeline,
@@ -317,6 +444,8 @@ fn main() {
             commands::productivity::productivity_weekly_assessment,
             commands::productivity::productivity_calendar_events,
             commands::productivity::calendar_sync_events,
+            commands::productivity::productivity_patterns,
+            commands::productivity::productivity_hourly_breakdown,
             // Focus Timer
             commands::productivity::focus_timer_start,
             commands::productivity::focus_timer_stop,
@@ -435,6 +564,9 @@ fn main() {
             commands::workspace::workspace_list_files,
             commands::workspace::workspace_read_file,
             commands::workspace::workspace_write_file,
+            // AI Tool Integrations
+            commands::integrations::ai_tools_detect,
+            commands::integrations::ai_tools_install,
             // Agent Profiles
             commands::agents::agent_list_profiles,
             commands::agents::agent_read_file,
@@ -442,6 +574,17 @@ fn main() {
             commands::agents::agent_create_profile,
             commands::agents::agent_create_skill,
             commands::agents::agent_delete_file,
+            // Launcher
+            commands::launcher::launcher_search,
+            commands::launcher::launcher_execute,
+            commands::launcher::launcher_dashboard,
+            commands::launcher::launcher_clipboard_paste,
+            commands::launcher::launcher_clipboard_delete,
+            commands::launcher::launcher_clipboard_pin,
+            commands::launcher::launcher_window_action,
+            commands::launcher::launcher_run_script,
+            commands::launcher::launcher_system_command,
+            commands::launcher::launcher_open_app,
             commands::window::resize_window,
             commands::window::open_url,
             commands::window::show_dashboard,

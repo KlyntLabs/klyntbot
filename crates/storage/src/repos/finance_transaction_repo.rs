@@ -25,12 +25,14 @@ impl FinanceTransactionRepo {
                 id, account_id, tx_type, amount, currency,
                 category, subcategory, counterparty, notes,
                 tx_date, transfer_id, is_recurring, recurring_rule,
-                created_at, updated_at
+                created_at, updated_at,
+                base_amount, base_currency, exchange_rate
             ) VALUES (
                 ?, ?, ?, ?, ?,
                 ?, ?, ?, ?,
                 ?, ?, ?, ?,
-                ?, ?
+                ?, ?,
+                ?, ?, ?
             )
             RETURNING *
             "#,
@@ -50,6 +52,9 @@ impl FinanceTransactionRepo {
         .bind(&row.recurring_rule)
         .bind(row.created_at)
         .bind(row.updated_at)
+        .bind(row.base_amount)
+        .bind(&row.base_currency)
+        .bind(row.exchange_rate)
         .fetch_one(&self.pool)
         .await?;
 
@@ -65,13 +70,16 @@ impl FinanceTransactionRepo {
         let row = sqlx::query_as::<_, FinanceTransactionRow>(
             r#"
             UPDATE finance_transactions SET
-                amount       = COALESCE(?, amount),
-                category     = CASE WHEN ? THEN ? ELSE category END,
-                subcategory  = CASE WHEN ? THEN ? ELSE subcategory END,
-                counterparty = CASE WHEN ? THEN ? ELSE counterparty END,
-                notes        = CASE WHEN ? THEN ? ELSE notes END,
-                tx_date      = COALESCE(?, tx_date),
-                updated_at   = datetime('now')
+                amount        = COALESCE(?, amount),
+                category      = CASE WHEN ? THEN ? ELSE category END,
+                subcategory   = CASE WHEN ? THEN ? ELSE subcategory END,
+                counterparty  = CASE WHEN ? THEN ? ELSE counterparty END,
+                notes         = CASE WHEN ? THEN ? ELSE notes END,
+                tx_date       = COALESCE(?, tx_date),
+                base_amount   = COALESCE(?, base_amount),
+                base_currency = COALESCE(?, base_currency),
+                exchange_rate = COALESCE(?, exchange_rate),
+                updated_at    = datetime('now')
             WHERE id = ?
             RETURNING *
             "#,
@@ -86,6 +94,9 @@ impl FinanceTransactionRepo {
         .bind(patch.notes.is_some())
         .bind(patch.notes.as_ref().and_then(|v| v.as_deref()))
         .bind(patch.tx_date)
+        .bind(patch.base_amount)
+        .bind(patch.base_currency.as_deref())
+        .bind(patch.exchange_rate)
         .bind(&patch.id)
         .fetch_optional(&self.pool)
         .await?
@@ -208,21 +219,23 @@ impl FinanceTransactionRepo {
     // Aggregation
     // -----------------------------------------------------------------------
 
-    /// Sum transaction amounts grouped by category for a given date range and type.
-    /// Returns `(category, total)` pairs, sorted by total descending.
+    /// Sum transaction base amounts grouped by category for a given date range and type.
+    /// Returns `(category, total)` pairs in the user's base currency, sorted by total descending.
     pub async fn sum_by_category(
         &self,
         date_from: NaiveDate,
         date_to: NaiveDate,
         tx_type: &str,
+        base_currency: &str,
     ) -> Result<Vec<(String, i64)>, crate::error::StorageError> {
         let rows: Vec<(String, i64)> = sqlx::query_as(
             r#"
-            SELECT COALESCE(category, 'uncategorized') AS cat, COALESCE(SUM(amount), 0) AS total
+            SELECT COALESCE(category, 'uncategorized') AS cat, COALESCE(SUM(base_amount), 0) AS total
             FROM finance_transactions
             WHERE tx_date >= ?
               AND tx_date <= ?
               AND tx_type = ?
+              AND base_currency = ?
             GROUP BY cat
             ORDER BY total DESC
             "#,
@@ -230,37 +243,100 @@ impl FinanceTransactionRepo {
         .bind(date_from)
         .bind(date_to)
         .bind(tx_type)
+        .bind(base_currency)
         .fetch_all(&self.pool)
         .await?;
         Ok(rows)
     }
 
-    /// Sum transaction amounts grouped by calendar month for the last `n_periods` months.
-    /// Returns `(period_label, total)` pairs in descending order (most recent first).
-    /// `period_type` is currently always `"month"`.
+    /// Sum transaction base amounts grouped by calendar month for the last `n_periods` months.
+    /// Returns `(period_label, total)` pairs in the user's base currency, in descending order
+    /// (most recent first). `period_type` is currently always `"month"`.
     pub async fn sum_by_period(
         &self,
         tx_type: &str,
         n_periods: i32,
         _period_type: &str,
+        base_currency: &str,
     ) -> Result<Vec<(String, i64)>, crate::error::StorageError> {
         let rows: Vec<(String, i64)> = sqlx::query_as(
             r#"
             SELECT
                 strftime('%Y-%m', tx_date) AS period_label,
-                COALESCE(SUM(amount), 0)   AS total
+                COALESCE(SUM(base_amount), 0)   AS total
             FROM finance_transactions
             WHERE tx_type = ?
+              AND base_currency = ?
               AND tx_date >= date('now', 'localtime', 'start of month', '-' || (? - 1) || ' months')
             GROUP BY period_label
             ORDER BY period_label DESC
             "#,
         )
         .bind(tx_type)
+        .bind(base_currency)
         .bind(n_periods)
         .fetch_all(&self.pool)
         .await?;
         Ok(rows)
+    }
+
+    /// Sum daily spending (expenses) for a date range in the user's base currency.
+    /// Returns `(date_str, total_spending, tx_count)` triples ordered by date ascending.
+    pub async fn daily_spending(
+        &self,
+        date_from: NaiveDate,
+        date_to: NaiveDate,
+        base_currency: &str,
+    ) -> Result<Vec<(String, i64, i32)>, crate::error::StorageError> {
+        let rows: Vec<(String, i64, i32)> = sqlx::query_as(
+            r#"
+            SELECT
+                tx_date AS date,
+                COALESCE(SUM(base_amount), 0) AS total_spending,
+                CAST(COUNT(*) AS INTEGER) AS tx_count
+            FROM finance_transactions
+            WHERE tx_type = 'expense'
+              AND tx_date >= ?
+              AND tx_date <= ?
+              AND base_currency = ?
+            GROUP BY tx_date
+            ORDER BY tx_date
+            "#,
+        )
+        .bind(date_from)
+        .bind(date_to)
+        .bind(base_currency)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
+    }
+
+    /// Sum transaction base amounts for a given type and date range in the user's base currency.
+    /// Returns the total or 0 if no matching transactions exist.
+    pub async fn sum_by_type_in_range(
+        &self,
+        tx_type: &str,
+        date_from: NaiveDate,
+        date_to: NaiveDate,
+        base_currency: &str,
+    ) -> Result<i64, crate::error::StorageError> {
+        let (total,): (i64,) = sqlx::query_as(
+            r#"
+            SELECT COALESCE(SUM(base_amount), 0)
+            FROM finance_transactions
+            WHERE tx_type = ?
+              AND tx_date >= ?
+              AND tx_date <= ?
+              AND base_currency = ?
+            "#,
+        )
+        .bind(tx_type)
+        .bind(date_from)
+        .bind(date_to)
+        .bind(base_currency)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(total)
     }
 
     /// Return the most frequent counterparty→category pairings for auto-categorisation.

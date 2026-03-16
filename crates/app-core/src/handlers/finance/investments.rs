@@ -21,11 +21,13 @@ impl AppCore {
             .await
             .map_err(map_storage_err)?;
 
-        let summaries = try_join_all(
-            portfolios
-                .iter()
-                .map(|p| self.repos.finance.investments.portfolio_summary(&p.id)),
-        )
+        let default_currency = self.default_currency().await;
+        let summaries = try_join_all(portfolios.iter().map(|p| {
+            self.repos
+                .finance
+                .investments
+                .portfolio_summary(&p.id, &default_currency)
+        }))
         .await
         .map_err(map_storage_err)?;
 
@@ -104,9 +106,16 @@ impl AppCore {
             current_price: None,
             current_value: None,
             purchase_date,
+            asset_class: None,
             notes: params.notes,
             created_at: now,
             updated_at: now,
+            market_currency: None,
+            base_cost_basis: 0,
+            base_current_value: 0,
+            base_currency: "USD".to_string(),
+            purchase_rate: 1.0,
+            market_rate: 1.0,
         };
         self.repos
             .finance

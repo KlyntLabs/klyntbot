@@ -70,8 +70,31 @@ impl FinanceTool {
 
         let mut updated = serde_json::Map::new();
 
+        let mut rebase_result_msg = None;
         if let Some(currency) = default_currency {
             let upper = currency.to_uppercase();
+            if upper != self.default_currency {
+                // Trigger rebase if we have a rate cache available
+                if let Some(rate_cache) = self.price_service.rate_cache() {
+                    let result = crate::rebase::rebase_all_tables(
+                        self.storage.pool(),
+                        rate_cache,
+                        &self.price_service,
+                        &upper,
+                    )
+                    .await?;
+                    rebase_result_msg = Some(format!(
+                        "Rebased {} table(s), {} row(s) updated.{}",
+                        result.tables_updated,
+                        result.rows_updated,
+                        if result.failures.is_empty() {
+                            String::new()
+                        } else {
+                            format!(" Failures: {}", result.failures.join(", "))
+                        }
+                    ));
+                }
+            }
             obj.insert("defaultCurrency".to_string(), json!(upper.clone()));
             updated.insert("default_currency".to_string(), json!(upper));
         }
@@ -134,9 +157,15 @@ impl FinanceTool {
             cp.save_section("finance", finance_json).await?;
         }
 
+        let message = if let Some(ref rebase_msg) = rebase_result_msg {
+            format!("Settings saved. {rebase_msg} Changes take effect on next restart.")
+        } else {
+            "Settings saved. Changes take effect on next restart.".to_string()
+        };
+
         let result = json!({
             "status": "saved",
-            "message": "Settings saved. Changes take effect on next restart.",
+            "message": message,
             "updated": serde_json::Value::Object(updated),
         });
 

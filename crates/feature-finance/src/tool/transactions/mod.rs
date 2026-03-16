@@ -10,6 +10,7 @@ use serde_json::json;
 
 use bus::DomainEvent;
 
+use crate::currency::ensure_base_amount;
 use crate::types::{FinanceTransaction, TransactionType};
 use common::{Result, ToolError};
 use storage::rows::finance::{
@@ -119,6 +120,14 @@ impl FinanceTool {
             .unwrap_or(&account_row.currency)
             .to_string();
 
+        let conv = ensure_base_amount(
+            amount,
+            &currency,
+            &self.default_currency,
+            &self.price_service,
+        )
+        .await?;
+
         let now = Utc::now();
         let row = FinanceTransactionRow {
             id: uuid::Uuid::new_v4().to_string(),
@@ -136,6 +145,9 @@ impl FinanceTool {
             recurring_rule: None,
             created_at: now,
             updated_at: now,
+            base_amount: conv.base_amount,
+            base_currency: conv.base_currency,
+            exchange_rate: conv.exchange_rate,
         };
 
         let inserted = self.storage.transactions.add(&row).await?;
@@ -335,6 +347,9 @@ impl FinanceTool {
             counterparty: counterparty.map(|s| Some(s.to_string())),
             notes: notes.map(|s| Some(s.to_string())),
             tx_date,
+            base_amount: None,
+            base_currency: None,
+            exchange_rate: None,
         };
 
         let updated_tx = self

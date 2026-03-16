@@ -2,7 +2,14 @@ import { ipc } from "@shared/hooks/useIpc";
 
 // ── Types ─────────────────────────────────────────────────────────
 
-export type InputType = "text" | "select" | "masked" | "confirm" | "tags" | "complex";
+export type InputType =
+  | "text"
+  | "select"
+  | "masked"
+  | "confirm"
+  | "tags"
+  | "checkbox-list"
+  | "complex";
 
 export type NodeValue = string | boolean | string[];
 
@@ -14,6 +21,7 @@ export interface ConversationNode {
   inputType: InputType;
   default?: NodeValue;
   options?: { label: string; value: string }[];
+  checkboxOptions?: { label: string; value: string; detected?: boolean; hint?: string }[];
   validate?: (value: string) => string | null;
   condition?: (values: TranscriptValues) => boolean;
   save?: (value: NodeValue, values: TranscriptValues) => Promise<void>;
@@ -120,8 +128,10 @@ export const CONVERSATION_SCHEMA: ConversationNode[] = [
       await Promise.all(
         newNames.map((name, i) =>
           ipc("area_create", {
-            name: name.trim(),
-            color: AREA_COLORS[(existingNames.size + i) % AREA_COLORS.length],
+            params: {
+              name: name.trim(),
+              color: AREA_COLORS[(existingNames.size + i) % AREA_COLORS.length],
+            },
           }),
         ),
       );
@@ -158,6 +168,24 @@ export const CONVERSATION_SCHEMA: ConversationNode[] = [
     prompt: "",
     inputType: "complex",
     condition: (values) => values.finance_gate === true,
+  },
+  {
+    id: "ai_tools",
+    prompt: "Connect me with your AI coding tools: {input}",
+    inputType: "checkbox-list",
+    checkboxOptions: [], // Populated dynamically from ai_tools_detect
+    save: async (value) => {
+      const tools = value as string[];
+      if (tools.length > 0) {
+        await ipc("ai_tools_install", { params: { tools } });
+      }
+    },
+    load: async () => {
+      const config = await ipc<{ aiTools?: string[] }>("config_get_section", {
+        section: "integrations",
+      }).catch(() => null);
+      return config?.aiTools?.length ? config.aiTools : null;
+    },
   },
   {
     id: "complete",

@@ -11,7 +11,10 @@ impl TaskTool {
     pub(crate) async fn handle_recur(&self, p: &ParamExtractor<'_>) -> Result<String> {
         let title = p.required_str("title")?;
         let rule_str = p.required_str("rule")?;
-        let area_id = p.required_str("area_id")?;
+        let area_id = match p.optional_str("area_id")? {
+            Some(id) => id.to_string(),
+            None => self.resolve_area_id().await?,
+        };
 
         // Validate the RRULE
         crate::rrule_utils::validate_rrule(rule_str)?;

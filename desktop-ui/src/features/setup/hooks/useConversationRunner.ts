@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { ipc } from "@shared/hooks/useIpc";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ConversationNode, NodeValue, TranscriptValues } from "../schema";
 import { CONVERSATION_SCHEMA } from "../schema";
 
@@ -17,6 +18,14 @@ interface RunnerState {
   isLoading: boolean;
 }
 
+interface AiToolInfo {
+  id: string;
+  name: string;
+  detected: boolean;
+  detectionHint: string;
+  icon: string;
+}
+
 export function useConversationRunner() {
   const [state, setState] = useState<RunnerState>({
     transcript: {},
@@ -27,7 +36,33 @@ export function useConversationRunner() {
     isLoading: true,
   });
 
-  const schema = CONVERSATION_SCHEMA;
+  const [aiTools, setAiTools] = useState<AiToolInfo[]>([]);
+
+  // Fetch AI tools detection on mount
+  useEffect(() => {
+    ipc<AiToolInfo[]>("ai_tools_detect")
+      .then(setAiTools)
+      .catch(() => {});
+  }, []);
+
+  // Build schema with dynamic AI tool options
+  const schema = useMemo(() => {
+    if (aiTools.length === 0) return CONVERSATION_SCHEMA;
+
+    return CONVERSATION_SCHEMA.map((node) => {
+      if (node.id !== "ai_tools") return node;
+      return {
+        ...node,
+        checkboxOptions: aiTools.map((t) => ({
+          label: t.name,
+          value: t.id,
+          detected: t.detected,
+          hint: t.detectionHint,
+        })),
+        default: aiTools.filter((t) => t.detected).map((t) => t.id),
+      };
+    });
+  }, [aiTools]);
   const stateRef = useRef(state);
   stateRef.current = state;
 
@@ -48,16 +83,20 @@ export function useConversationRunner() {
   const progress = totalNodes > 0 ? completedCount / totalNodes : 0;
 
   // ── Resume: load existing values ────────────────────────────
+  // Use a ref to avoid re-running when schema changes (aiTools detection updates it).
+  const schemaRef = useRef(schema);
+  schemaRef.current = schema;
 
   useEffect(() => {
     let cancelled = false;
+    const currentSchema = schemaRef.current;
 
     async function loadExisting() {
       const loaded: Record<string, TranscriptEntry> = {};
       let firstEmpty = 0;
 
-      for (let i = 0; i < schema.length; i++) {
-        const node = schema[i];
+      for (let i = 0; i < currentSchema.length; i++) {
+        const node = currentSchema[i];
 
         // Skip nodes with conditions that depend on not-yet-loaded values
         if (node.condition && !node.condition({})) continue;
@@ -95,25 +134,28 @@ export function useConversationRunner() {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- schema is a module constant, runs once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once on mount; schema accessed via ref
   }, []);
 
   // ── Find next valid index (skipping conditions) ─────────────
 
-  const findNextIndex = useCallback((fromIndex: number, values: TranscriptValues): number => {
-    for (let i = fromIndex + 1; i < schema.length; i++) {
-      const node = schema[i];
-      if (!node.condition || node.condition(values)) return i;
-    }
-    return schema.length; // past the end — all done
-  }, []);
+  const findNextIndex = useCallback(
+    (fromIndex: number, values: TranscriptValues): number => {
+      for (let i = fromIndex + 1; i < schema.length; i++) {
+        const node = schema[i];
+        if (!node.condition || node.condition(values)) return i;
+      }
+      return schema.length; // past the end — all done
+    },
+    [schema],
+  );
 
   // ── Submit current node ─────────────────────────────────────
 
   const submit = useCallback(
     async (value: NodeValue) => {
-      const { activeIndex, transcript } = stateRef.current;
-      const node = schema[activeIndex];
+      const { activeIndex: idx, transcript } = stateRef.current;
+      const node = schema[idx];
       if (!node) return;
 
       // Validate
@@ -148,7 +190,7 @@ export function useConversationRunner() {
         return;
       }
 
-      const nextIndex = findNextIndex(activeIndex, currentValues);
+      const nextIndex = findNextIndex(idx, currentValues);
       setState((prev) => ({
         ...prev,
         transcript: {
@@ -161,7 +203,7 @@ export function useConversationRunner() {
         error: null,
       }));
     },
-    [findNextIndex],
+    [findNextIndex, schema],
   );
 
   // ── Re-submit after edit ────────────────────────────────────
@@ -251,7 +293,7 @@ export function useConversationRunner() {
         isAnimating: true,
       }));
     }
-  }, [findNextIndex]);
+  }, [findNextIndex, schema]);
 
   return {
     // State

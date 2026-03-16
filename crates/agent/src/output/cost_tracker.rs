@@ -67,9 +67,7 @@ fn model_pricing(model: &str) -> ModelPricing {
     // against provider pricing pages. Update on each pricing change.
     match m.as_str() {
         // ── Anthropic Claude 4.x ── prices last verified: 2026-03-13
-        "claude-opus-4-6"
-        | "claude-opus-4"
-        | "claude-opus-4-20250514" => ModelPricing {
+        "claude-opus-4-6" | "claude-opus-4" | "claude-opus-4-20250514" => ModelPricing {
             input: 15.0,
             output: 75.0,
             cache_read: 1.50,
@@ -427,8 +425,14 @@ mod tests {
         // All Claude 4.x Sonnet aliases should have the same pricing
         for id in &["claude-sonnet-4-6", "claude-sonnet-4-5", "claude-sonnet-4"] {
             let pricing = model_pricing(id);
-            assert!((pricing.input - 3.0).abs() < 0.001, "{id}: unexpected input price");
-            assert!((pricing.output - 15.0).abs() < 0.001, "{id}: unexpected output price");
+            assert!(
+                (pricing.input - 3.0).abs() < 0.001,
+                "{id}: unexpected input price"
+            );
+            assert!(
+                (pricing.output - 15.0).abs() < 0.001,
+                "{id}: unexpected output price"
+            );
         }
         // Haiku 4.5
         let h = model_pricing("claude-haiku-4-5-20251001");

@@ -24,10 +24,12 @@ impl FinanceBudgetRepo {
             INSERT INTO finance_budgets (
                 id, name, amount, currency, period, category,
                 method, jar_type, start_date, end_date, is_active,
-                alert_threshold, created_at, updated_at
+                alert_threshold, created_at, updated_at,
+                base_amount, base_currency, exchange_rate
             ) VALUES (
                 ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?,
+                ?, ?, ?,
                 ?, ?, ?
             )
             RETURNING *
@@ -47,6 +49,9 @@ impl FinanceBudgetRepo {
         .bind(row.alert_threshold)
         .bind(row.created_at)
         .bind(row.updated_at)
+        .bind(row.base_amount)
+        .bind(&row.base_currency)
+        .bind(row.exchange_rate)
         .fetch_one(&self.pool)
         .await?;
 
@@ -61,11 +66,14 @@ impl FinanceBudgetRepo {
         let row = sqlx::query_as::<_, FinanceBudgetRow>(
             r#"
             UPDATE finance_budgets SET
-                name      = COALESCE(?, name),
-                amount    = COALESCE(?, amount),
-                category  = CASE WHEN ? THEN ? ELSE category END,
-                is_active = COALESCE(?, is_active),
-                updated_at = datetime('now')
+                name          = COALESCE(?, name),
+                amount        = COALESCE(?, amount),
+                category      = CASE WHEN ? THEN ? ELSE category END,
+                is_active     = COALESCE(?, is_active),
+                base_amount   = COALESCE(?, base_amount),
+                base_currency = COALESCE(?, base_currency),
+                exchange_rate = COALESCE(?, exchange_rate),
+                updated_at    = datetime('now')
             WHERE id = ?
             RETURNING *
             "#,
@@ -75,6 +83,9 @@ impl FinanceBudgetRepo {
         .bind(patch.category.is_some())
         .bind(patch.category.as_ref().and_then(|v| v.as_deref()))
         .bind(patch.is_active)
+        .bind(patch.base_amount)
+        .bind(patch.base_currency.as_deref())
+        .bind(patch.exchange_rate)
         .bind(&patch.id)
         .fetch_optional(&self.pool)
         .await?
@@ -118,7 +129,7 @@ impl FinanceBudgetRepo {
     // -----------------------------------------------------------------------
 
     /// Return the budget row for `budget_id` with the `spent` amount calculated
-    /// by summing matching expense transactions in the budget's current period.
+    /// by summing matching expense transactions (in base currency) in the budget's current period.
     pub async fn budget_usage(
         &self,
         budget_id: &str,
@@ -140,10 +151,14 @@ impl FinanceBudgetRepo {
                 b.alert_threshold,
                 b.created_at,
                 b.updated_at,
-                COALESCE(SUM(ft.amount), 0) AS spent
+                b.base_amount,
+                b.base_currency,
+                b.exchange_rate,
+                COALESCE(SUM(ft.base_amount), 0) AS spent
             FROM finance_budgets b
             LEFT JOIN finance_transactions ft ON
                 ft.tx_type = 'expense'
+                AND ft.base_currency = b.base_currency
                 AND (b.category IS NULL OR ft.category = b.category)
                 AND ft.tx_date >= CASE
                     WHEN b.period = 'monthly' THEN date('now', 'localtime', 'start of month')
@@ -170,6 +185,7 @@ impl FinanceBudgetRepo {
     }
 
     /// Return `BudgetUsageRow` for every active budget, ordered by creation date.
+    /// `spent` is computed using `base_amount` so cross-currency transactions are summed correctly.
     pub async fn all_budget_usage(
         &self,
     ) -> Result<Vec<BudgetUsageRow>, crate::error::StorageError> {
@@ -190,10 +206,14 @@ impl FinanceBudgetRepo {
                 b.alert_threshold,
                 b.created_at,
                 b.updated_at,
-                COALESCE(SUM(ft.amount), 0) AS spent
+                b.base_amount,
+                b.base_currency,
+                b.exchange_rate,
+                COALESCE(SUM(ft.base_amount), 0) AS spent
             FROM finance_budgets b
             LEFT JOIN finance_transactions ft ON
                 ft.tx_type = 'expense'
+                AND ft.base_currency = b.base_currency
                 AND (b.category IS NULL OR ft.category = b.category)
                 AND ft.tx_date >= CASE
                     WHEN b.period = 'monthly' THEN date('now', 'localtime', 'start of month')

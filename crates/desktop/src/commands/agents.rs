@@ -3,6 +3,16 @@ use std::sync::Arc;
 use app_core::AppCore;
 use desktop_shared::commands::{AgentFileContent, AgentFileSummary, AgentProfileSummary};
 use desktop_shared::errors::ApiError;
+
+#[cfg(test)]
+pub(crate) const DEV_COMMANDS: &[&str] = &[
+    "agent_list_profiles",
+    "agent_read_file",
+    "agent_write_file",
+    "agent_create_profile",
+    "agent_create_skill",
+    "agent_delete_file",
+];
 use tauri::State;
 
 #[tauri::command]

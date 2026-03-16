@@ -21,6 +21,9 @@ export interface ProductivitySummary {
   scoreTrend?: number | null;
   focusTimeTrend?: number | null;
   activeTimeTrend?: number | null;
+  deepWorkBlocks: number;
+  deepWorkSecs: number;
+  avgRecoverySecs: number | null;
 }
 
 // ── Project & App Usage ─────────────────────────────────────
@@ -254,6 +257,29 @@ export interface WeeklyAssessment {
 }
 
 // ── Utility Types ───────────────────────────────────────────
+
+// ── Productivity Patterns ──────────────────────────────────
+
+export interface ProductivityPatterns {
+  peakFocusHours: number[];
+  avgSessionMins: number;
+  productiveRatio: number;
+  avgContextSwitches: number;
+  bestDayOfWeek: string | null;
+  daysAnalyzed: number;
+}
+
+// ── Hourly Breakdown ───────────────────────────────────────
+
+export interface HourlyBreakdown {
+  hour: number;
+  productiveSecs: number;
+  neutralSecs: number;
+  distractingSecs: number;
+  idleSecs: number;
+  totalSecs: number;
+  productiveRatio: number;
+}
 
 export type ProductivityPeriod = "day" | "week" | "month";
 

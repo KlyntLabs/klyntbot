@@ -75,6 +75,9 @@ pub fn summary_to_response(s: DailySummary) -> ProductivitySummaryResponse {
         score_trend: None,
         focus_time_trend: None,
         active_time_trend: None,
+        deep_work_blocks: s.deep_work_blocks,
+        deep_work_secs: s.deep_work_secs,
+        avg_recovery_secs: s.avg_recovery_secs,
     }
 }
 

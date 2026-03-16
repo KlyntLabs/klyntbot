@@ -5,6 +5,7 @@ pub use ::app_core::AppCore;
 
 use std::sync::Arc;
 
+use ::app_core::events::AppEventEmitter;
 use ::app_core::EventChannels;
 use desktop_shared::events;
 use feature_productivity::auto_focus::AutoFocusEvent;
@@ -14,13 +15,30 @@ use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 use tracing::warn;
 
+/// Bridges `AppEventEmitter` to Tauri's native event system.
+struct TauriEventEmitter {
+    app_handle: tauri::AppHandle,
+}
+
+impl AppEventEmitter for TauriEventEmitter {
+    fn emit_event(&self, event_name: &str, payload: serde_json::Value) {
+        if let Err(e) = self.app_handle.emit(event_name, payload) {
+            warn!("TauriEventEmitter: failed to emit {event_name}: {e}");
+        }
+    }
+}
+
 /// Initialize `AppCore` and wire event channels to Tauri emitters.
 pub async fn init(app_handle: tauri::AppHandle) -> Result<AppCore, String> {
     let sender = Arc::new(crate::notify::TauriNotificationSender::new(
         app_handle.clone(),
     ));
+    let emitter: Arc<dyn AppEventEmitter> = Arc::new(TauriEventEmitter {
+        app_handle: app_handle.clone(),
+    });
     let (core, channels) =
-        AppCore::init_with_sender(common::AppMode::Desktop, None, Some(sender)).await?;
+        AppCore::init_with_sender(common::AppMode::Desktop, None, Some(sender), Some(emitter))
+            .await?;
     wire_event_channels(&core, channels, &app_handle);
     Ok(core)
 }
@@ -130,6 +148,39 @@ fn wire_event_channels(core: &AppCore, channels: EventChannels, app_handle: &tau
                 },
             ) {
                 warn!("failed to emit nudge event: {e}");
+            }
+        });
+    }
+
+    // Distraction alerts → Tauri events (intervention overlay + detected banner)
+    if let Some(distraction_rx) = channels.distraction_alert_rx {
+        spawn_channel_forwarder(distraction_rx, app_handle, shutdown, |handle, alert| {
+            // Emit intervention event (for DistractionOverlay.tsx)
+            let intervention = events::InterventionPayload {
+                app_name: alert.app_name.clone(),
+                window_title: alert.window_title, // moved — not needed by detected payload
+                session_id: alert.session_id.clone(),
+                needs_llm: alert.needs_llm,
+                heuristic_verdict: if alert.needs_llm {
+                    "ambiguous".to_string()
+                } else {
+                    "confident_distracting".to_string()
+                },
+            };
+            if let Err(e) = handle.emit(events::DISTRACTION_INTERVENTION, intervention) {
+                warn!("failed to emit distraction intervention: {e}");
+            }
+
+            // Emit detected event (for DistractionInterventionBanner.tsx)
+            let detected = events::DistractionDetectedPayload {
+                app_name: alert.app_name,
+                session_id: alert.session_id,
+                previous_app: alert.previous_app,
+                previous_context: alert.previous_context,
+                reason: "Distracting app detected during focus session".to_string(),
+            };
+            if let Err(e) = handle.emit(events::DISTRACTION_DETECTED, detected) {
+                warn!("failed to emit distraction detected: {e}");
             }
         });
     }

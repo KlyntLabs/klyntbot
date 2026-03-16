@@ -1,22 +1,32 @@
-import { RefreshCw } from "lucide-react";
 import { useLocation, useNavigate } from "react-router";
+import type { CurrencyDisplayMode } from "../hooks/useCurrencyDisplayMode";
+import { CurrencyToggle } from "./CurrencyToggle";
+import { PrivacyToggle } from "./PrivacyToggle";
 
 interface FinanceLayoutProps {
   children: React.ReactNode;
-  onRefresh?: () => void;
+  hidden?: boolean;
+  onTogglePrivacy?: () => void;
+  currencyMode?: CurrencyDisplayMode;
+  currencies?: string[];
+  onSelectCurrency?: (mode: CurrencyDisplayMode) => void;
 }
 
 const subNav = [
   { label: "Dashboard", path: "/finance" },
-  { label: "Accounts", path: "/finance/accounts" },
-  { label: "Transactions", path: "/finance/transactions" },
-  { label: "Budgets", path: "/finance/budgets" },
+  { label: "Cash Flow", path: "/finance/cashflow" },
   { label: "Investments", path: "/finance/investments" },
-  { label: "Goals", path: "/finance/goals" },
-  { label: "Liabilities", path: "/finance/liabilities" },
+  { label: "Targets", path: "/finance/targets" },
 ];
 
-export function FinanceLayout({ children, onRefresh }: FinanceLayoutProps) {
+export function FinanceLayout({
+  children,
+  hidden,
+  onTogglePrivacy,
+  currencyMode,
+  currencies,
+  onSelectCurrency,
+}: FinanceLayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -47,14 +57,11 @@ export function FinanceLayout({ children, onRefresh }: FinanceLayoutProps) {
             );
           })}
         </div>
-        {onRefresh && (
-          <button
-            type="button"
-            onClick={onRefresh}
-            className="ml-2 p-2 rounded-lg text-muted hover:text-secondary hover:bg-white/[0.06] transition-colors"
-          >
-            <RefreshCw className="w-3.5 h-3.5" strokeWidth={1.5} />
-          </button>
+        {onTogglePrivacy != null && hidden != null && (
+          <PrivacyToggle hidden={hidden} onToggle={onTogglePrivacy} />
+        )}
+        {currencyMode && currencies && onSelectCurrency && (
+          <CurrencyToggle mode={currencyMode} currencies={currencies} onSelect={onSelectCurrency} />
         )}
       </div>
 

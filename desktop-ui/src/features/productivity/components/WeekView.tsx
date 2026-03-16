@@ -6,7 +6,9 @@ import { buildBreakdownSegments } from "../lib/constants";
 import { BreakdownDonuts } from "./BreakdownDonuts";
 import { CategoriesList } from "./CategoriesList";
 import { GoalsProgress } from "./GoalsProgress";
+import { ScoreTrendChart } from "./ScoreTrendChart";
 import { TopApps } from "./TopApps";
+import { WeeklyAssessmentCard } from "./WeeklyAssessmentCard";
 import { WeeklyChart } from "./WeeklyChart";
 import { WeeklyStats } from "./WeeklyStats";
 
@@ -79,9 +81,11 @@ export function WeekView({ weekStart }: WeekViewProps) {
     <div className="grid grid-cols-3 gap-4 auto-rows-min">
       <WeeklyChart summaries={summaries} />
       <WeeklyStats summaries={summaries} />
+      <ScoreTrendChart summaries={summaries} />
       <BreakdownDonuts segments={breakdownSegments} totalSecs={totalActive} />
       <CategoriesList categories={topCats} totalSecs={totalActive} />
       <TopApps apps={topApps} />
+      <WeeklyAssessmentCard weekStart={weekStart} />
       <div className="col-span-2">
         <GoalsProgress />
       </div>

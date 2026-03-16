@@ -25,12 +25,14 @@ impl FinanceGoalRepo {
                 id, name, goal_type, target_amount, current_amount,
                 currency, status, deadline, monthly_contribution,
                 expected_return_rate, inflation_rate, notes,
-                created_at, updated_at
+                created_at, updated_at,
+                base_target_amount, base_current_amount, base_currency, exchange_rate
             ) VALUES (
                 ?, ?, ?, ?, ?,
                 ?, ?, ?, ?,
                 ?, ?, ?,
-                ?, ?
+                ?, ?,
+                ?, ?, ?, ?
             )
             RETURNING *
             "#,
@@ -49,6 +51,10 @@ impl FinanceGoalRepo {
         .bind(&row.notes)
         .bind(row.created_at)
         .bind(row.updated_at)
+        .bind(row.base_target_amount)
+        .bind(row.base_current_amount)
+        .bind(&row.base_currency)
+        .bind(row.exchange_rate)
         .fetch_one(&self.pool)
         .await?;
 
@@ -71,6 +77,10 @@ impl FinanceGoalRepo {
                 inflation_rate       = CASE WHEN ? THEN ? ELSE inflation_rate END,
                 deadline             = CASE WHEN ? THEN ? ELSE deadline END,
                 status               = COALESCE(?, status),
+                base_target_amount   = COALESCE(?, base_target_amount),
+                base_current_amount  = COALESCE(?, base_current_amount),
+                base_currency        = COALESCE(?, base_currency),
+                exchange_rate        = COALESCE(?, exchange_rate),
                 updated_at           = datetime('now')
             WHERE id = ?
             RETURNING *
@@ -88,6 +98,10 @@ impl FinanceGoalRepo {
         .bind(patch.deadline.is_some())
         .bind(patch.deadline.as_ref().and_then(|v| *v))
         .bind(&patch.status)
+        .bind(patch.base_target_amount)
+        .bind(patch.base_current_amount)
+        .bind(patch.base_currency.as_deref())
+        .bind(patch.exchange_rate)
         .bind(&patch.id)
         .fetch_optional(&self.pool)
         .await?

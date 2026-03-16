@@ -1,4 +1,6 @@
 import { GoalsProgress } from "@features/productivity/components/GoalsProgress";
+import { HourlyHeatmap } from "@features/productivity/components/HourlyHeatmap";
+import { PatternsCard } from "@features/productivity/components/PatternsCard";
 import {
   ProductivityScoreRing,
   ScoreBar,
@@ -126,7 +128,15 @@ function DaySummary({
                 <span className="text-sm font-semibold text-primary tabular-nums">
                   {formatHumanDuration(ps.totalActiveSecs)}
                 </span>
-                <TrendArrow value={ps.activeTimeTrend} />
+                <TrendArrow
+                  value={
+                    ps.activeTimeTrend != null
+                      ? (ps.activeTimeTrend /
+                          Math.max(ps.totalActiveSecs - ps.activeTimeTrend, 1)) *
+                        100
+                      : null
+                  }
+                />
                 <span className="text-[9px] text-dim">active</span>
               </div>
               <div className="flex h-1 rounded-full overflow-hidden bg-white/[0.06] mt-1">
@@ -177,6 +187,22 @@ function DaySummary({
                 />
               </div>
             )}
+            {/* Deep Work */}
+            {ps.deepWorkBlocks > 0 && (
+              <div className="flex items-center justify-between text-xs text-muted px-1 mt-2">
+                <span>
+                  {ps.deepWorkBlocks} deep work block{ps.deepWorkBlocks !== 1 ? "s" : ""}
+                </span>
+                <span>{formatHumanDuration(ps.deepWorkSecs)}</span>
+              </div>
+            )}
+
+            {/* Recovery Time */}
+            {ps.avgRecoverySecs != null && (
+              <div className="text-xs text-muted px-1 mt-1">
+                Avg recovery: {Math.round(ps.avgRecoverySecs)}s
+              </div>
+            )}
           </div>
         </section>
       )}
@@ -195,6 +221,12 @@ function DaySummary({
 
       {/* ── 4. Weekly sparkline ── */}
       {weeklyData && weeklyData.length >= 2 && <WeeklySparkline data={weeklyData} />}
+
+      {/* ── 4b. Patterns ── */}
+      {hasProductivity && <PatternsCard />}
+
+      {/* ── 4c. Hourly Heatmap ── */}
+      {hasProductivity && <HourlyHeatmap startDate={date} endDate={date} />}
 
       {/* ── 5. Top Apps — visual bar chart ── */}
       {hasProductivity && ps.topApps.length > 0 && (

@@ -1,0 +1,27 @@
+[package]
+name = "analytics"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+common.workspace = true
+rust_decimal = { workspace = true }
+rand = { workspace = true }
+rand_chacha = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }
+rust_decimal_macros = { workspace = true }
+
+[[test]]
+name = "cfiresim_validation"
+path = "tests/benchmarks/cfiresim_validation.rs"
+
+[[test]]
+name = "trinity_validation"
+path = "tests/benchmarks/trinity_validation.rs"

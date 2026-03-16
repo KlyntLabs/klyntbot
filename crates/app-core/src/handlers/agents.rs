@@ -3,79 +3,73 @@ use desktop_shared::errors::ApiError;
 
 use crate::state::AppCore;
 
-/// Template for a new AGENT.md file.
-const NEW_AGENT_TEMPLATE: &str = r#"---
+/// Template for a new SKILL.md file.
+const NEW_SKILL_MD_TEMPLATE: &str = r#"---
 name: {name}
-description: Custom agent
-tools: []
-mcp_tools: []
-triggers: []
-max_iterations: 10
-can_delegate_to: []
-always_skills: []
+description: Custom skill
+metadata:
+  klyntbot:
+    type: orchestrator
+    max_iterations: 10
 ---
 
 You are the {name} agent. Describe your behavior here.
 "#;
 
-/// Template for a new skill file.
-const NEW_SKILL_TEMPLATE: &str = r#"---
+/// Template for a new reference file.
+const NEW_REFERENCE_TEMPLATE: &str = r#"---
 name: {name}
-description: Describe this skill
+description: Describe this reference
 metadata:
   author: user
   version: "1.0.0"
   updated-on: "{date}"
   source: custom
-  tags: ""
-  always: false
-  triggers: ""
-  agent: {agent}
 ---
 
-Skill instructions here.
+Reference instructions here.
 "#;
 
 impl AppCore {
-    /// List all agent profiles (built-in + workspace) with their files.
+    /// List all skill profiles (built-in + workspace) with their files.
     pub async fn agent_list_profiles(&self) -> Result<Vec<AgentProfileSummary>, ApiError> {
         let workspace = self.config.read().await.workspace_path();
-        let agents_dir = workspace.join("agents");
+        let skills_dir = workspace.join("skills");
 
-        // Start with built-in agents
-        let builtins = agent::agent_profile::builtin_agents();
+        // Start with built-in skills
+        let builtins = skill_system::discovery::builtin_skills_info();
         let mut profiles: Vec<AgentProfileSummary> = Vec::new();
 
         for bi in &builtins {
-            let has_override = agents_dir.join(bi.name).join("AGENT.md").exists();
+            let has_override = skills_dir.join(bi.name).join("SKILL.md").exists();
 
             let mut files = vec![AgentFileSummary {
-                filename: "AGENT.md".to_string(),
-                display_name: "AGENT.md".to_string(),
-                description: "Agent profile and configuration".to_string(),
+                filename: "SKILL.md".to_string(),
+                display_name: "SKILL.md".to_string(),
+                description: "Skill profile and configuration".to_string(),
                 is_builtin: true,
                 has_override,
             }];
 
-            for skill in &bi.skills {
-                let skill_override = agents_dir
+            for reference in &bi.references {
+                let ref_override = skills_dir
                     .join(bi.name)
-                    .join("skills")
-                    .join(format!("{}.md", skill.name))
+                    .join("references")
+                    .join(format!("{}.md", reference.name))
                     .exists();
                 files.push(AgentFileSummary {
-                    filename: format!("skills/{}.md", skill.name),
-                    display_name: skill.name.to_string(),
-                    description: extract_description(skill.content),
+                    filename: format!("references/{}.md", reference.name),
+                    display_name: reference.name.to_string(),
+                    description: extract_description(reference.content),
                     is_builtin: true,
-                    has_override: skill_override,
+                    has_override: ref_override,
                 });
             }
 
-            // Check for additional workspace-only skills
-            let ws_skills_dir = agents_dir.join(bi.name).join("skills");
-            if ws_skills_dir.exists() {
-                if let Ok(mut entries) = tokio::fs::read_dir(&ws_skills_dir).await {
+            // Check for additional workspace-only references
+            let ws_refs_dir = skills_dir.join(bi.name).join("references");
+            if ws_refs_dir.exists() {
+                if let Ok(mut entries) = tokio::fs::read_dir(&ws_refs_dir).await {
                     while let Ok(Some(entry)) = entries.next_entry().await {
                         let path = entry.path();
                         if path.extension().and_then(|e| e.to_str()) != Some("md") {
@@ -86,12 +80,12 @@ impl AppCore {
                             .and_then(|s| s.to_str())
                             .unwrap_or("unknown");
                         // Skip if already in built-in list
-                        if bi.skills.iter().any(|s| s.name == stem) {
+                        if bi.references.iter().any(|r| r.name == stem) {
                             continue;
                         }
                         let content = tokio::fs::read_to_string(&path).await.unwrap_or_default();
                         files.push(AgentFileSummary {
-                            filename: format!("skills/{}.md", stem),
+                            filename: format!("references/{}.md", stem),
                             display_name: stem.to_string(),
                             description: extract_description(&content),
                             is_builtin: false,
@@ -101,7 +95,7 @@ impl AppCore {
                 }
             }
 
-            // Parse description from built-in AGENT.md frontmatter
+            // Parse description from built-in SKILL.md frontmatter
             let description = extract_description(bi.content);
 
             profiles.push(AgentProfileSummary {
@@ -113,9 +107,9 @@ impl AppCore {
             });
         }
 
-        // Scan workspace for custom agents not in builtins
-        if agents_dir.exists() {
-            if let Ok(mut entries) = tokio::fs::read_dir(&agents_dir).await {
+        // Scan workspace for custom skills not in builtins
+        if skills_dir.exists() {
+            if let Ok(mut entries) = tokio::fs::read_dir(&skills_dir).await {
                 while let Ok(Some(entry)) = entries.next_entry().await {
                     let path = entry.path();
                     if !path.is_dir() {
@@ -130,39 +124,38 @@ impl AppCore {
                     if builtins.iter().any(|b| b.name == name) {
                         continue;
                     }
-                    let agent_md = path.join("AGENT.md");
-                    if !agent_md.exists() {
+                    let skill_md = path.join("SKILL.md");
+                    if !skill_md.exists() {
                         continue;
                     }
 
-                    let content = tokio::fs::read_to_string(&agent_md).await.unwrap_or_default();
+                    let content = tokio::fs::read_to_string(&skill_md)
+                        .await
+                        .unwrap_or_default();
 
                     let mut files = vec![AgentFileSummary {
-                        filename: "AGENT.md".to_string(),
-                        display_name: "AGENT.md".to_string(),
-                        description: "Agent profile and configuration".to_string(),
+                        filename: "SKILL.md".to_string(),
+                        display_name: "SKILL.md".to_string(),
+                        description: "Skill profile and configuration".to_string(),
                         is_builtin: false,
                         has_override: false,
                     }];
 
-                    let skills_dir = path.join("skills");
-                    if skills_dir.exists() {
-                        if let Ok(mut skill_entries) = tokio::fs::read_dir(&skills_dir).await {
-                            while let Ok(Some(se)) = skill_entries.next_entry().await {
-                                let sp = se.path();
-                                if sp.extension().and_then(|e| e.to_str()) != Some("md") {
+                    let refs_dir = path.join("references");
+                    if refs_dir.exists() {
+                        if let Ok(mut ref_entries) = tokio::fs::read_dir(&refs_dir).await {
+                            while let Ok(Some(re)) = ref_entries.next_entry().await {
+                                let rp = re.path();
+                                if rp.extension().and_then(|e| e.to_str()) != Some("md") {
                                     continue;
                                 }
-                                let stem = sp
-                                    .file_stem()
-                                    .and_then(|s| s.to_str())
-                                    .unwrap_or("unknown");
-                                let sc =
-                                    tokio::fs::read_to_string(&sp).await.unwrap_or_default();
+                                let stem =
+                                    rp.file_stem().and_then(|s| s.to_str()).unwrap_or("unknown");
+                                let rc = tokio::fs::read_to_string(&rp).await.unwrap_or_default();
                                 files.push(AgentFileSummary {
-                                    filename: format!("skills/{}.md", stem),
+                                    filename: format!("references/{}.md", stem),
                                     display_name: stem.to_string(),
-                                    description: extract_description(&sc),
+                                    description: extract_description(&rc),
                                     is_builtin: false,
                                     has_override: false,
                                 });
@@ -185,17 +178,17 @@ impl AppCore {
         Ok(profiles)
     }
 
-    /// Read an agent file (AGENT.md or skills/foo.md).
+    /// Read a skill file (SKILL.md or references/foo.md).
     /// Returns workspace override if present, falls back to built-in.
     pub async fn agent_read_file(
         &self,
         agent_name: &str,
         filename: &str,
     ) -> Result<AgentFileContent, ApiError> {
-        validate_agent_filename(filename)?;
+        validate_skill_filename(filename)?;
 
         let workspace = self.config.read().await.workspace_path();
-        let ws_path = workspace.join("agents").join(agent_name).join(filename);
+        let ws_path = workspace.join("skills").join(agent_name).join(filename);
 
         // Try workspace override first
         if ws_path.exists() {
@@ -211,11 +204,11 @@ impl AppCore {
         }
 
         // Fall back to built-in
-        let builtins = agent::agent_profile::builtin_agents();
+        let builtins = skill_system::discovery::builtin_skills_info();
         let bi = builtins.iter().find(|b| b.name == agent_name);
 
         if let Some(bi) = bi {
-            if filename == "AGENT.md" {
+            if filename == "SKILL.md" {
                 return Ok(AgentFileContent {
                     agent_name: agent_name.to_string(),
                     filename: filename.to_string(),
@@ -223,14 +216,14 @@ impl AppCore {
                     is_builtin: true,
                 });
             }
-            // skills/foo.md
-            if let Some(stripped) = filename.strip_prefix("skills/") {
-                let skill_name = stripped.strip_suffix(".md").unwrap_or(stripped);
-                if let Some(skill) = bi.skills.iter().find(|s| s.name == skill_name) {
+            // references/foo.md
+            if let Some(stripped) = filename.strip_prefix("references/") {
+                let ref_name = stripped.strip_suffix(".md").unwrap_or(stripped);
+                if let Some(reference) = bi.references.iter().find(|r| r.name == ref_name) {
                     return Ok(AgentFileContent {
                         agent_name: agent_name.to_string(),
                         filename: filename.to_string(),
-                        content: skill.content.to_string(),
+                        content: reference.content.to_string(),
                         is_builtin: true,
                     });
                 }
@@ -239,21 +232,21 @@ impl AppCore {
 
         Err(ApiError::new(
             "NOT_FOUND",
-            format!("Agent file not found: {agent_name}/{filename}"),
+            format!("Skill file not found: {agent_name}/{filename}"),
         ))
     }
 
-    /// Write an agent file to the workspace directory and trigger hot-reload.
+    /// Write a skill file to the workspace directory and trigger hot-reload.
     pub async fn agent_write_file(
         &self,
         agent_name: &str,
         filename: &str,
         content: &str,
     ) -> Result<AgentFileContent, ApiError> {
-        validate_agent_filename(filename)?;
+        validate_skill_filename(filename)?;
 
         let workspace = self.config.read().await.workspace_path();
-        let ws_path = workspace.join("agents").join(agent_name).join(filename);
+        let ws_path = workspace.join("skills").join(agent_name).join(filename);
 
         if let Some(parent) = ws_path.parent() {
             tokio::fs::create_dir_all(parent)
@@ -265,9 +258,9 @@ impl AppCore {
             .await
             .map_err(|e| ApiError::new("IO_ERROR", e.to_string()))?;
 
-        // Hot-reload agent profiles
+        // Hot-reload skill packages
         if let Err(e) = self.agent.reload_agents().await {
-            tracing::warn!("Agent hot-reload failed: {e}");
+            tracing::warn!("Skill hot-reload failed: {e}");
         }
 
         Ok(AgentFileContent {
@@ -278,113 +271,108 @@ impl AppCore {
         })
     }
 
-    /// Create a new custom agent profile.
-    pub async fn agent_create_profile(
-        &self,
-        name: &str,
-    ) -> Result<AgentProfileSummary, ApiError> {
+    /// Create a new custom skill profile.
+    pub async fn agent_create_profile(&self, name: &str) -> Result<AgentProfileSummary, ApiError> {
         let workspace = self.config.read().await.workspace_path();
-        let agent_dir = workspace.join("agents").join(name);
+        let skill_dir = workspace.join("skills").join(name);
 
-        if agent_dir.join("AGENT.md").exists() {
+        if skill_dir.join("SKILL.md").exists() {
             return Err(ApiError::new(
                 "CONFLICT",
-                format!("Agent '{name}' already exists"),
+                format!("Skill '{name}' already exists"),
             ));
         }
 
-        tokio::fs::create_dir_all(&agent_dir)
+        tokio::fs::create_dir_all(&skill_dir)
             .await
             .map_err(|e| ApiError::new("IO_ERROR", e.to_string()))?;
-        tokio::fs::create_dir_all(agent_dir.join("skills"))
+        tokio::fs::create_dir_all(skill_dir.join("references"))
             .await
             .map_err(|e| ApiError::new("IO_ERROR", e.to_string()))?;
 
-        let content = NEW_AGENT_TEMPLATE
-            .replace("{name}", name);
-        tokio::fs::write(agent_dir.join("AGENT.md"), &content)
+        let content = NEW_SKILL_MD_TEMPLATE.replace("{name}", name);
+        tokio::fs::write(skill_dir.join("SKILL.md"), &content)
             .await
             .map_err(|e| ApiError::new("IO_ERROR", e.to_string()))?;
 
         // Hot-reload
         if let Err(e) = self.agent.reload_agents().await {
-            tracing::warn!("Agent hot-reload failed: {e}");
+            tracing::warn!("Skill hot-reload failed: {e}");
         }
 
         Ok(AgentProfileSummary {
             name: name.to_string(),
-            description: "Custom agent".to_string(),
+            description: "Custom skill".to_string(),
             is_builtin: false,
             has_override: false,
             files: vec![AgentFileSummary {
-                filename: "AGENT.md".to_string(),
-                display_name: "AGENT.md".to_string(),
-                description: "Agent profile and configuration".to_string(),
+                filename: "SKILL.md".to_string(),
+                display_name: "SKILL.md".to_string(),
+                description: "Skill profile and configuration".to_string(),
                 is_builtin: false,
                 has_override: false,
             }],
         })
     }
 
-    /// Create a new skill file for an agent.
+    /// Create a new reference file for a skill.
     pub async fn agent_create_skill(
         &self,
         agent_name: &str,
         skill_name: &str,
     ) -> Result<AgentFileSummary, ApiError> {
         let workspace = self.config.read().await.workspace_path();
-        let skill_path = workspace
-            .join("agents")
-            .join(agent_name)
+        let ref_path = workspace
             .join("skills")
+            .join(agent_name)
+            .join("references")
             .join(format!("{skill_name}.md"));
 
-        if skill_path.exists() {
+        if ref_path.exists() {
             return Err(ApiError::new(
                 "CONFLICT",
-                format!("Skill '{skill_name}' already exists for agent '{agent_name}'"),
+                format!("Reference '{skill_name}' already exists for skill '{agent_name}'"),
             ));
         }
 
-        if let Some(parent) = skill_path.parent() {
+        if let Some(parent) = ref_path.parent() {
             tokio::fs::create_dir_all(parent)
                 .await
                 .map_err(|e| ApiError::new("IO_ERROR", e.to_string()))?;
         }
 
         let date = chrono::Utc::now().format("%Y-%m-%d").to_string();
-        let content = NEW_SKILL_TEMPLATE
+        let content = NEW_REFERENCE_TEMPLATE
             .replace("{name}", skill_name)
-            .replace("{agent}", agent_name)
             .replace("{date}", &date);
-        tokio::fs::write(&skill_path, &content)
+        tokio::fs::write(&ref_path, &content)
             .await
             .map_err(|e| ApiError::new("IO_ERROR", e.to_string()))?;
 
         // Hot-reload
         if let Err(e) = self.agent.reload_agents().await {
-            tracing::warn!("Agent hot-reload failed: {e}");
+            tracing::warn!("Skill hot-reload failed: {e}");
         }
 
         Ok(AgentFileSummary {
-            filename: format!("skills/{skill_name}.md"),
+            filename: format!("references/{skill_name}.md"),
             display_name: skill_name.to_string(),
-            description: "Describe this skill".to_string(),
+            description: "Describe this reference".to_string(),
             is_builtin: false,
             has_override: false,
         })
     }
 
-    /// Delete a workspace agent file (skill only — cannot delete AGENT.md of built-in agents).
+    /// Delete a workspace skill file (reference only — cannot delete SKILL.md of built-in skills).
     pub async fn agent_delete_file(
         &self,
         agent_name: &str,
         filename: &str,
     ) -> Result<bool, ApiError> {
-        validate_agent_filename(filename)?;
+        validate_skill_filename(filename)?;
 
         let workspace = self.config.read().await.workspace_path();
-        let ws_path = workspace.join("agents").join(agent_name).join(filename);
+        let ws_path = workspace.join("skills").join(agent_name).join(filename);
 
         if !ws_path.exists() {
             return Ok(false);
@@ -396,7 +384,7 @@ impl AppCore {
 
         // Hot-reload
         if let Err(e) = self.agent.reload_agents().await {
-            tracing::warn!("Agent hot-reload failed: {e}");
+            tracing::warn!("Skill hot-reload failed: {e}");
         }
 
         Ok(true)
@@ -404,20 +392,23 @@ impl AppCore {
 }
 
 /// Validate that a filename is safe (no path traversal).
-fn validate_agent_filename(filename: &str) -> Result<(), ApiError> {
+fn validate_skill_filename(filename: &str) -> Result<(), ApiError> {
     if filename.contains("..") || filename.starts_with('/') || filename.starts_with('\\') {
         return Err(ApiError::new(
             "INVALID_PARAMS",
             "Invalid filename: path traversal not allowed".to_string(),
         ));
     }
-    // Must be AGENT.md or skills/*.md
-    if filename == "AGENT.md" || (filename.starts_with("skills/") && filename.ends_with(".md")) {
+    // Must be SKILL.md or references/*.md
+    if filename == "SKILL.md" || (filename.starts_with("references/") && filename.ends_with(".md"))
+    {
         Ok(())
     } else {
         Err(ApiError::new(
             "INVALID_PARAMS",
-            format!("Invalid agent filename: '{filename}'. Must be 'AGENT.md' or 'skills/*.md'"),
+            format!(
+                "Invalid skill filename: '{filename}'. Must be 'SKILL.md' or 'references/*.md'"
+            ),
         ))
     }
 }

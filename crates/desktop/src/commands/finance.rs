@@ -3,9 +3,11 @@ use std::sync::Arc;
 
 use desktop_shared::commands::{
     FinanceAccountCreateParams, FinanceAccountUpdateParams, FinanceBudgetCreateParams,
-    FinanceBudgetUpdateParams, FinanceCategoryReportResponse, FinanceGoalCreateParams,
-    FinanceGoalUpdateParams, FinanceInvestmentCreateParams, FinanceInvestmentUpdateParams,
-    FinanceLiabilityCreateParams, FinanceLiabilityUpdateParams, FinanceNetWorthResponse,
+    FinanceBudgetUpdateParams, FinanceCategoryReportResponse, FinanceDailySpendingResponse,
+    FinanceGoalCreateParams, FinanceGoalUpdateParams, FinanceInvestmentCreateParams,
+    FinanceInvestmentUpdateParams, FinanceLiabilityCreateParams, FinanceLiabilityUpdateParams,
+    FinanceDateRangeParams, FinanceMonthlySummaryResponse, FinanceNetWorthResponse,
+    FinancePeriodSummaryResponse,
     FinancePortfolioCreateParams, FinancePortfolioResponse, FinanceTransactionCreateParams,
     FinanceTransactionFilterParams, FinanceTrendPoint,
 };
@@ -291,7 +293,7 @@ pub async fn finance_investment_update(
 
 // ── Reports ─────────────────────────────────────────────────────────────
 
-#[tauri::command]
+#[tauri::command(rename_all = "camelCase")]
 pub async fn finance_report_spending(
     state: State<'_, Arc<AppCore>>,
     date_from: Option<String>,
@@ -316,6 +318,31 @@ pub async fn finance_report_trends(
     periods: Option<i64>,
 ) -> Result<Vec<FinanceTrendPoint>, ApiError> {
     state.finance_report_trends(metric, periods).await
+}
+
+#[tauri::command]
+pub async fn finance_monthly_summary(
+    state: State<'_, Arc<AppCore>>,
+) -> Result<FinanceMonthlySummaryResponse, ApiError> {
+    state.finance_monthly_summary().await
+}
+
+#[tauri::command(rename_all = "camelCase")]
+pub async fn finance_daily_spending(
+    state: State<'_, Arc<AppCore>>,
+    date_from: String,
+    date_to: String,
+) -> Result<FinanceDailySpendingResponse, ApiError> {
+    state.finance_daily_spending(date_from, date_to).await
+}
+
+#[tauri::command(rename_all = "camelCase")]
+pub async fn finance_period_summary(
+    state: State<'_, Arc<AppCore>>,
+    date_from: String,
+    date_to: String,
+) -> Result<FinancePeriodSummaryResponse, ApiError> {
+    state.finance_period_summary(date_from, date_to).await
 }
 
 // ── Dev server dispatch ─────────────────────────────────────────────
@@ -353,6 +380,9 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "finance_report_spending",
     "finance_report_income",
     "finance_report_trends",
+    "finance_monthly_summary",
+    "finance_daily_spending",
+    "finance_period_summary",
 ];
 
 #[cfg(debug_assertions)]
@@ -454,7 +484,7 @@ pub(crate) async fn dispatch_dev(
         ),
         // Reports
         "finance_report_spending" => dev::val(
-            core.finance_report_spending(dev::get(body, "date_from"), dev::get(body, "date_to"))
+            core.finance_report_spending(dev::get(body, "dateFrom"), dev::get(body, "dateTo"))
                 .await,
         ),
         "finance_report_income" => dev::val(
@@ -467,6 +497,17 @@ pub(crate) async fn dispatch_dev(
                 core.finance_report_trends(metric, dev::get(body, "periods"))
                     .await,
             )
+        }
+        "finance_monthly_summary" => dev::val(core.finance_monthly_summary().await),
+        "finance_daily_spending" => {
+            let date_from = try_field!(dev::get_str(body, "dateFrom"));
+            let date_to = try_field!(dev::get_str(body, "dateTo"));
+            dev::val(core.finance_daily_spending(date_from, date_to).await)
+        }
+        "finance_period_summary" => {
+            let date_from = try_field!(dev::get_str(body, "dateFrom"));
+            let date_to = try_field!(dev::get_str(body, "dateTo"));
+            dev::val(core.finance_period_summary(date_from, date_to).await)
         }
         _ => return None,
     })

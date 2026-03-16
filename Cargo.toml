@@ -8,6 +8,7 @@ members = [
     "crates/providers",
     "crates/session",
     "crates/scheduling",
+    "crates/skill-system",
     "crates/tools",
     "crates/channels",
     "crates/agent",
@@ -16,6 +17,7 @@ members = [
     "crates/tools-core",
     "crates/tools-core-macros",
     "crates/feature-finance",
+    "crates/analytics",
     "crates/plugin-runtime",
     "crates/mcp",
     "crates/desktop-shared",
@@ -27,7 +29,9 @@ members = [
     "crates/app-core",
     "crates/activity-log",
     "crates/feature-tasks",
+    "crates/feature-launcher",
     "crates/klyntbot-server",
+    "crates/platform-macos",
 ]
 
 [workspace.package]
@@ -44,6 +48,7 @@ bus = { path = "crates/bus" }
 providers = { path = "crates/providers" }
 session = { path = "crates/session" }
 scheduling = { path = "crates/scheduling" }
+skill-system = { path = "crates/skill-system" }
 tools = { path = "crates/tools" }
 channels = { path = "crates/channels" }
 agent = { path = "crates/agent" }
@@ -62,7 +67,9 @@ desktop = { path = "crates/desktop" }
 app-core = { path = "crates/app-core" }
 activity-log = { path = "crates/activity-log" }
 feature-tasks = { path = "crates/feature-tasks" }
+feature-launcher = { path = "crates/feature-launcher" }
 klyntbot-server = { path = "crates/klyntbot-server" }
+platform-macos = { path = "crates/platform-macos" }
 extism = "1"
 mcp = { path = "crates/mcp" }
 rmcp = { version = "0.17", default-features = false }
@@ -122,6 +129,11 @@ arrow-schema = "57"
 dashmap = "6"
 open = "5"
 rand = "0.9"
+rust_decimal = { version = "1.36", features = ["serde-with-str", "maths"] }
+rust_decimal_macros = "1.36"
+rand_chacha = "0.9"
+proptest = "1.5"
+analytics = { path = "crates/analytics" }
 notify = "7"
 notify-debouncer-mini = "0.5"
 dotenvy = "0.15"
@@ -181,6 +193,7 @@ extism.workspace = true
 
 [profile.release]
 opt-level = 3
-lto = true
+lto = "fat"
 codegen-units = 1
+panic = "abort"
 strip = true

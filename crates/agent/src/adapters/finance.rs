@@ -67,7 +67,12 @@ impl FinanceHandler for FinanceHandlerImpl {
             .repos
             .finance
             .transactions
-            .sum_by_category(yesterday, yesterday, "expense")
+            .sum_by_category(
+                yesterday,
+                yesterday,
+                "expense",
+                &self.config.default_currency,
+            )
             .await
             .unwrap_or_default();
         if !spending.is_empty() {
@@ -161,12 +166,38 @@ impl FinanceHandler for FinanceHandlerImpl {
                 match self.price_service.fetch_price(symbol, asset_type).await {
                     Ok(result) => {
                         let price_cents = (result.price * 100.0).round() as i64;
-                        let value_cents = (result.price * inv.quantity * 100.0).round() as i64;
+                        let inv_qty: f64 = inv.quantity.parse().unwrap_or(0.0);
+                        let value_cents = (result.price * inv_qty * 100.0).round() as i64;
+                        // Compute base_current_value using market_rate
+                        let mkt_currency = inv.market_currency.as_deref().unwrap_or(&inv.currency);
+                        let (base_val, mkt_rate) =
+                            if mkt_currency.eq_ignore_ascii_case(&self.config.default_currency) {
+                                (value_cents, 1.0)
+                            } else {
+                                match self
+                                    .price_service
+                                    .get_rate(mkt_currency, &self.config.default_currency)
+                                    .await
+                                {
+                                    Ok(api_rate) => {
+                                        let eff = feature_finance::currency::effective_rate(
+                                            api_rate,
+                                            mkt_currency,
+                                            &self.config.default_currency,
+                                        );
+                                        (((value_cents as f64) * eff).round() as i64, eff)
+                                    }
+                                    Err(_) => (
+                                        ((value_cents as f64) * inv.market_rate).round() as i64,
+                                        inv.market_rate,
+                                    ),
+                                }
+                            };
                         let _ = self
                             .repos
                             .finance
                             .investments
-                            .update_price(&inv.id, price_cents, value_cents)
+                            .update_price(&inv.id, price_cents, value_cents, base_val, mkt_rate)
                             .await;
                         details.push(format!(
                             "{}: {:.4} {}",

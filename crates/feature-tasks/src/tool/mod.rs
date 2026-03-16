@@ -21,6 +21,7 @@ use tools_core::{ParamExtractor, ProgressHandler, RoutingContext, Tool};
 /// TaskTool: agentic task management with enrichment, embedding, and planning.
 pub struct TaskTool {
     pub(crate) repo: TaskRepo,
+    pub(crate) area_repo: Option<storage::AreaRepo>,
     pub(crate) max_focus_slots: usize,
     pub(crate) focus_deadline_hours: u64,
     pub(crate) timezone: String,
@@ -62,6 +63,7 @@ impl TaskTool {
     ) -> Self {
         Self {
             repo,
+            area_repo: None,
             max_focus_slots,
             focus_deadline_hours,
             timezone,
@@ -81,6 +83,12 @@ impl TaskTool {
             suggestion_applier: None,
             forecast_handler: None,
         }
+    }
+
+    /// Attach an area repo for auto-resolving area_id on create.
+    pub fn with_area_repo(mut self, repo: storage::AreaRepo) -> Self {
+        self.area_repo = Some(repo);
+        self
     }
 
     /// Attach an enrichment handler.

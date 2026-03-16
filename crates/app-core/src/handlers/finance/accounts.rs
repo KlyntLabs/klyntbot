@@ -37,6 +37,9 @@ impl AppCore {
             is_archived: false,
             created_at: now,
             updated_at: now,
+            base_balance: 0,
+            base_currency: "USD".to_string(),
+            exchange_rate: 1.0,
         };
 
         self.repos
@@ -59,6 +62,9 @@ impl AppCore {
             institution: params.institution,
             notes: params.notes,
             is_archived: params.is_archived,
+            base_balance: None,
+            base_currency: None,
+            exchange_rate: None,
         };
         let row = self
             .repos

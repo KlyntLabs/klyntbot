@@ -8,41 +8,42 @@ import type {
   FinanceGoal,
   FinanceInvestment,
   FinanceLiability,
+  FinanceMonthlySummary,
   FinanceNetWorth,
   FinancePortfolio,
   FinanceTransaction,
 } from "@shared/types";
 import { Progress } from "@shared/ui";
-import {
-  ArrowDownRight,
-  ArrowLeftRight,
-  ArrowUpRight,
-  Target,
-  TrendingDown,
-  TrendingUp,
-  Wallet,
-} from "lucide-react";
+import { ArrowDownRight, ArrowLeftRight, ArrowUpRight, Target, Wallet } from "lucide-react";
 import { useCallback, useMemo } from "react";
-import { useNavigate } from "react-router";
-import { Card, CardHeader } from "../components/Card";
-import { Donut } from "../components/Donut";
+import { Link } from "react-router";
+import { BudgetStrip } from "../components/BudgetStrip";
+import { Card } from "../components/Card";
 import { FinanceLayout } from "../components/FinanceLayout";
 import { FinanceSkeleton } from "../components/FinanceSkeleton";
+import { HealthScoreRing } from "../components/HealthScoreRing";
+import { MonthlyPulse } from "../components/MonthlyPulse";
+import { NetWorthCard } from "../components/NetWorthCard";
+import { SensitiveDivider } from "../components/SensitiveDivider";
+import { useFinanceCurrency } from "../hooks/useFinanceCurrency";
+import { usePrivacyMode } from "../hooks/usePrivacyMode";
+import { displayAmount, displayHint } from "../lib/displayAmount";
 import {
   ACCT_ICONS,
   COLORS,
   fmtCompact,
-  fmtMoney,
-  fmtVnd,
   GOAL_ICONS,
   LIAB_ICONS,
   pct,
   retPct,
-  toVnd,
 } from "../lib/finance";
+import { computeHealthScore } from "../lib/healthScore";
+import { computeMonthlyPulse } from "../lib/monthlyPulse";
 
 export function Finance() {
-  const navigate = useNavigate();
+  const { mode, setMode, baseCurrency, rates, currencies, displayCur, convertTotal } =
+    useFinanceCurrency();
+  const { hidden, toggle } = usePrivacyMode();
 
   const {
     data: accounts,
@@ -81,11 +82,15 @@ export function Finance() {
     undefined,
     { totalsByCurrency: [] },
   );
-  const { data: rates } = useQuery<Record<string, number>>("finance_exchange_rates", undefined, {});
-  const { data: spendingReport } = useQuery<FinanceCategoryReport>(
+  const { data: _spendingReport } = useQuery<FinanceCategoryReport>(
     "finance_report_spending",
     undefined,
     { total: 0, breakdown: [] },
+  );
+  const { data: monthlySummary } = useQuery<FinanceMonthlySummary>(
+    "finance_monthly_summary",
+    undefined,
+    { currentIncome: 0, currentSpending: 0, previousIncome: 0, previousSpending: 0 },
   );
 
   const refetchAll = useCallback(() => {
@@ -101,59 +106,57 @@ export function Finance() {
   useEvent<{ entityKind: string }>("entity:updated", refetchAll);
 
   const totalNet = useMemo(
-    () => netWorth.totalsByCurrency.reduce((s, c) => s + toVnd(c.net, c.currency, rates), 0),
-    [netWorth, rates],
+    () =>
+      accounts.reduce((s, a) => s + (a.baseBalance ?? 0), 0) +
+      investments.reduce((s, i) => s + (i.baseCurrentValue ?? 0), 0) -
+      liabilities.reduce((s, l) => s + (l.baseRemaining ?? 0), 0),
+    [accounts, investments, liabilities],
   );
   const totalAssets = useMemo(
     () =>
-      netWorth.totalsByCurrency.reduce(
-        (s, c) => s + toVnd(c.accounts + c.investments, c.currency, rates),
-        0,
-      ),
-    [netWorth, rates],
+      accounts.reduce((s, a) => s + (a.baseBalance ?? 0), 0) +
+      investments.reduce((s, i) => s + (i.baseCurrentValue ?? 0), 0),
+    [accounts, investments],
   );
   const totalDebt = useMemo(
-    () =>
-      netWorth.totalsByCurrency.reduce((s, c) => s + toVnd(c.liabilities, c.currency, rates), 0),
-    [netWorth, rates],
+    () => liabilities.reduce((s, l) => s + (l.baseRemaining ?? 0), 0),
+    [liabilities],
   );
 
-  const spendingSegs = useMemo(
-    () =>
-      spendingReport.breakdown.map((b, i) => ({
-        name: b.category,
-        value: b.amount,
-        color: COLORS[i % COLORS.length],
-      })),
-    [spendingReport],
+  const totalInvest = useMemo(
+    () => investments.reduce((s, i) => s + (i.baseCurrentValue ?? 0), 0),
+    [investments],
   );
-
-  const totalSpend = spendingReport.total;
-  const totalIncome = useMemo(
-    () =>
-      transactions
-        .filter((t) => t.txType === "income")
-        .reduce((s, t) => s + toVnd(t.amount, t.currency, rates), 0),
-    [transactions, rates],
-  );
-
-  const investSegs = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const i of investments) {
-      m.set(i.assetType, (m.get(i.assetType) ?? 0) + toVnd(i.currentValue ?? 0, i.currency, rates));
-    }
-    return Array.from(m.entries())
-      .sort((a, b) => b[1] - a[1])
-      .map(([name, value], i) => ({ name, value, color: COLORS[i % COLORS.length] }));
-  }, [investments, rates]);
-  const totalInvest = useMemo(() => investSegs.reduce((s, a) => s + a.value, 0), [investSegs]);
 
   const accountMap = useMemo(() => new Map(accounts.map((a) => [a.id, a])), [accounts]);
   const active = useMemo(() => accounts.filter((a) => !a.isArchived), [accounts]);
 
+  const healthScore = useMemo(
+    () =>
+      computeHealthScore({
+        totalIncome: monthlySummary.currentIncome,
+        totalSpending: monthlySummary.currentSpending,
+        totalAssets,
+        totalDebt,
+        budgets: budgets
+          .filter((b) => b.isActive)
+          .map((b) => ({ spent: b.spent, amount: b.amount })),
+        goals: goals.map((g) => ({ currentAmount: g.currentAmount, targetAmount: g.targetAmount })),
+      }),
+    [monthlySummary, accounts, investments, liabilities, budgets, goals],
+  );
+
+  const pulseRows = useMemo(() => computeMonthlyPulse(monthlySummary), [monthlySummary]);
+
   if (loading && accounts.length === 0) {
     return (
-      <FinanceLayout onRefresh={refetchAll}>
+      <FinanceLayout
+        hidden={hidden}
+        onTogglePrivacy={toggle}
+        currencyMode={mode}
+        currencies={currencies}
+        onSelectCurrency={setMode}
+      >
         <FinanceSkeleton rows={6} />
       </FinanceLayout>
     );
@@ -161,7 +164,13 @@ export function Finance() {
 
   if (error && accounts.length === 0) {
     return (
-      <FinanceLayout onRefresh={refetchAll}>
+      <FinanceLayout
+        hidden={hidden}
+        onTogglePrivacy={toggle}
+        currencyMode={mode}
+        currencies={currencies}
+        onSelectCurrency={setMode}
+      >
         <Card className="p-6 text-center">
           <p className="text-[12px] text-destructive mb-2">{error.message}</p>
           <button
@@ -177,281 +186,135 @@ export function Finance() {
   }
 
   return (
-    <FinanceLayout onRefresh={refetchAll}>
-      <div className="grid grid-cols-12 gap-4 auto-rows-min">
-        {/* ── ROW 1: Net Worth (3col) + Accounts (9col) ────── */}
-        <div className="col-span-3">
-          <Card className="p-4">
-            <CardHeader title="Net Worth" />
-            <p className="text-[28px] font-light text-primary tracking-tight leading-none mb-3 tabular-nums">
-              {fmtCompact(totalNet)}đ
-            </p>
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <TrendingUp className="w-3 h-3 text-success" strokeWidth={1.5} />
-                  <span className="text-[10px] text-muted font-light">Assets</span>
-                </div>
-                <span className="text-[10px] text-success font-light tabular-nums">
-                  {fmtCompact(totalAssets)}đ
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <TrendingDown className="w-3 h-3 text-destructive" strokeWidth={1.5} />
-                  <span className="text-[10px] text-muted font-light">Debt</span>
-                </div>
-                <span className="text-[10px] text-destructive font-light tabular-nums">
-                  {fmtCompact(totalDebt)}đ
-                </span>
-              </div>
-            </div>
-            <div className="flex gap-3 mt-3 pt-2.5 border-t border-white/[0.04]">
-              {netWorth.totalsByCurrency.map((c) => (
-                <span key={c.currency} className="text-[9px] font-light">
-                  <span className="text-dim">{c.currency}</span>{" "}
-                  <span className="text-secondary">{fmtMoney(c.net, c.currency)}</span>
-                </span>
-              ))}
-            </div>
-          </Card>
-        </div>
+    <FinanceLayout
+      hidden={hidden}
+      onTogglePrivacy={toggle}
+      currencyMode={mode}
+      currencies={currencies}
+      onSelectCurrency={setMode}
+    >
+      {/* ── SAFE ZONE ─────────────────────────────────────── */}
 
-        <div className="col-span-9">
-          <Card className="p-4">
-            <CardHeader title="Accounts" />
-            <div className="grid grid-cols-5 gap-3">
-              {active.slice(0, 5).map((acct) => {
+      {/* Hero row: Health Score + Monthly Pulse */}
+      <div className="grid grid-cols-2 gap-4 mb-4">
+        <Card className="p-5">
+          <HealthScoreRing health={healthScore} />
+        </Card>
+        <Card className="p-5">
+          <MonthlyPulse rows={pulseRows} />
+        </Card>
+      </div>
+
+      {/* Budget Strip */}
+      <div className="mb-2">
+        <BudgetStrip budgets={budgets} />
+      </div>
+
+      {/* ── SENSITIVE DIVIDER ─────────────────────────────── */}
+      <SensitiveDivider />
+
+      {/* ── SENSITIVE ZONE ────────────────────────────────── */}
+
+      {/* Net Worth — full width */}
+      <div className="mb-4">
+        <NetWorthCard
+          totalNet={totalNet}
+          totalAssets={totalAssets}
+          totalInvest={totalInvest}
+          totalDebt={totalDebt}
+          displayCur={displayCur}
+          convertTotal={convertTotal}
+          hidden={hidden}
+        />
+        {mode === "multi" && netWorth.totalsByCurrency.length > 0 && (
+          <div className="flex gap-3 mt-2 px-1">
+            {netWorth.totalsByCurrency.map((c) => (
+              <span key={c.currency} className="text-[9px] font-light">
+                <span className="text-dim">{c.currency}</span>{" "}
+                <span className="text-secondary">
+                  {hidden ? "•••••" : fmtCompact(c.net, c.currency)}
+                </span>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Two-zone grid */}
+      <div className="grid grid-cols-2 gap-4 mb-4">
+        {/* Left: Accounts + Goals */}
+        <div className="space-y-4">
+          {/* Accounts */}
+          <Card className="overflow-hidden">
+            <div className="px-4 pt-4 pb-1">
+              <div className="flex items-center justify-between mb-2.5 px-1">
+                <span className="text-[10px] text-muted uppercase tracking-widest">Accounts</span>
+                <Link
+                  to="/finance/cashflow"
+                  className="text-[10px] text-brand normal-case tracking-normal"
+                >
+                  View all →
+                </Link>
+              </div>
+            </div>
+            <div className="divide-y divide-border-subtle">
+              {active.slice(0, 6).map((acct) => {
                 const Icon = ACCT_ICONS[acct.accountType] ?? Wallet;
-                const vnd = toVnd(acct.balance, acct.currency, rates);
+                const hint = displayHint({
+                  amount: acct.balance,
+                  currency: acct.currency,
+                  baseAmount: acct.baseBalance,
+                  baseCurrency,
+                  mode,
+                  rates,
+                  hidden,
+                });
                 return (
                   <div
                     key={acct.id}
-                    className="glass-card p-3.5 cursor-pointer hover:bg-white/[0.06] transition-colors"
-                    onClick={() => navigate(`/finance/accounts?id=${acct.id}`)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") navigate(`/finance/accounts?id=${acct.id}`);
-                    }}
-                    role="button"
-                    tabIndex={0}
+                    className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.06] transition-colors"
                   >
-                    <div className="flex items-center gap-2 mb-2.5">
-                      <div className="w-7 h-7 rounded-lg bg-white/[0.08] flex items-center justify-center flex-shrink-0">
-                        <Icon className="w-3.5 h-3.5 text-muted" strokeWidth={1.5} />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-[11px] font-medium text-secondary truncate">
-                          {acct.name}
-                        </p>
-                        <p className="text-[9px] text-dim font-light">
-                          {acct.accountType.replaceAll("_", " ")}
-                        </p>
-                      </div>
+                    <div className="w-7 h-7 rounded-lg bg-white/[0.08] flex items-center justify-center flex-shrink-0">
+                      <Icon className="w-3.5 h-3.5 text-muted" strokeWidth={1.5} />
                     </div>
-                    <p className="text-[14px] font-light text-primary tabular-nums">
-                      {fmtMoney(acct.balance, acct.currency)}
-                    </p>
-                    {acct.currency !== "VND" && (
-                      <p className="text-[9px] text-dim font-light mt-0.5">≈ {fmtVnd(vnd)}</p>
-                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] font-medium text-secondary truncate">{acct.name}</p>
+                      <p className="text-[9px] text-dim font-light">
+                        {acct.accountType.replaceAll("_", " ")}
+                      </p>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-[12px] font-light text-primary tabular-nums">
+                        {displayAmount({
+                          amount: acct.balance,
+                          currency: acct.currency,
+                          baseAmount: acct.baseBalance,
+                          baseCurrency,
+                          mode,
+                          rates,
+                          hidden,
+                        })}
+                      </p>
+                      {hint && <p className="text-[9px] text-dim font-light mt-0.5">≈ {hint}</p>}
+                    </div>
                   </div>
                 );
               })}
             </div>
           </Card>
-        </div>
 
-        {/* ── ROW 2: Spending table (9col) + Donut (3col) ──── */}
-        <div className="col-span-9 flex flex-col">
-          <Card className="overflow-hidden flex-1">
-            <div className="px-4 pt-4">
-              <CardHeader title="Spending by Category" />
-            </div>
-            <div className="grid grid-cols-[1fr_100px_100px_100px_50px] gap-3 border-b border-white/[0.08] text-[10px] text-dim font-light px-4 py-2">
-              <div>Category</div>
-              <div className="text-right">Budget</div>
-              <div className="text-right">Spent</div>
-              <div className="text-right">Remaining</div>
-              <div className="text-right">%</div>
-            </div>
-            {budgets
-              .filter((b) => b.isActive)
-              .map((b, i) => {
-                const p = pct(b.spent, b.amount);
-                const rem = b.amount - b.spent;
-                return (
-                  <div
-                    key={b.id}
-                    className="grid grid-cols-[1fr_100px_100px_100px_50px] gap-3 px-4 py-2.5 hover:bg-white/[0.06] transition-colors border-b border-white/[0.04] last:border-b-0"
-                  >
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="w-2 h-2 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: COLORS[i % COLORS.length] }}
-                      />
-                      <span className="text-[12px] font-medium text-secondary">{b.name}</span>
-                    </div>
-                    <div className="text-right text-[12px] font-light text-muted tabular-nums">
-                      {fmtMoney(b.amount, b.currency)}
-                    </div>
-                    <div className="text-right text-[12px] font-light text-primary tabular-nums">
-                      {fmtMoney(b.spent, b.currency)}
-                    </div>
-                    <div
-                      className={cn(
-                        "text-right text-[12px] font-light tabular-nums",
-                        rem < 0 ? "text-destructive" : "text-success",
-                      )}
-                    >
-                      {rem < 0 ? "-" : ""}
-                      {fmtMoney(Math.abs(rem), b.currency)}
-                    </div>
-                    <div
-                      className={cn(
-                        "text-right text-[11px] font-light tabular-nums",
-                        p >= b.alertThreshold
-                          ? "text-destructive"
-                          : p >= 60
-                            ? "text-brand"
-                            : "text-success",
-                      )}
-                    >
-                      {p}%
-                    </div>
-                  </div>
-                );
-              })}
-          </Card>
-        </div>
-
-        <div className="col-span-3">
-          <Card className="p-4 flex items-center justify-center h-full">
-            <Donut
-              segments={spendingSegs}
-              label="Total spending"
-              value={`${fmtCompact(totalSpend)}đ`}
-            />
-          </Card>
-        </div>
-
-        {/* ── ROW 3: Transactions (9col) + Summary+Invest (3col) */}
-        <div className="col-span-9 flex flex-col">
-          <Card className="overflow-hidden flex-1">
-            <div className="px-4 pt-4">
-              <CardHeader title="Transactions" />
-            </div>
-            {transactions.map((tx) => {
-              const acct = accountMap.get(tx.accountId);
-              const TxI =
-                tx.txType === "income"
-                  ? ArrowDownRight
-                  : tx.txType === "expense"
-                    ? ArrowUpRight
-                    : ArrowLeftRight;
-              const col =
-                tx.txType === "income"
-                  ? "text-success"
-                  : tx.txType === "expense"
-                    ? "text-destructive"
-                    : "text-info";
-              const pre = tx.txType === "income" ? "+" : tx.txType === "expense" ? "-" : "";
-              return (
-                <div
-                  key={tx.id}
-                  className="flex items-center gap-3 px-4 py-2 hover:bg-white/[0.06] transition-colors border-b border-white/[0.04] last:border-b-0"
-                >
-                  <span className="text-[10px] text-dim font-light w-10 flex-shrink-0 tabular-nums">
-                    {tx.txDate.slice(5)}
-                  </span>
-                  <TxI className={cn("w-3 h-3 flex-shrink-0", col)} strokeWidth={1.5} />
-                  <span className="text-[12px] font-light text-secondary truncate flex-1">
-                    {tx.counterparty ?? tx.notes ?? tx.txType}
-                  </span>
-                  {tx.category && (
-                    <span className="px-1.5 py-0.5 text-[9px] font-light rounded bg-white/[0.06] text-dim">
-                      {tx.category}
-                    </span>
-                  )}
-                  {acct && <span className="text-[10px] text-dim font-light">{acct.name}</span>}
-                  <span
-                    className={cn(
-                      "text-[12px] font-light w-24 text-right flex-shrink-0 tabular-nums",
-                      col,
-                    )}
-                  >
-                    {pre}
-                    {fmtMoney(tx.amount, tx.currency)}
-                  </span>
-                </div>
-              );
-            })}
-          </Card>
-        </div>
-
-        <div className="col-span-3 space-y-4">
-          <Card className="p-4">
-            <CardHeader title="Summary" />
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-[10px] text-muted font-light">Transactions</span>
-                <span className="text-[10px] text-primary font-light">{transactions.length}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-[10px] text-muted font-light">Income</span>
-                <span className="text-[10px] text-success font-light">
-                  {fmtCompact(totalIncome)}đ
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-[10px] text-muted font-light">Spending</span>
-                <span className="text-[10px] text-destructive font-light">
-                  {fmtCompact(totalSpend)}đ
-                </span>
-              </div>
-              <div className="border-t border-white/[0.04] pt-2 flex justify-between">
-                <span className="text-[10px] text-muted font-light">Savings rate</span>
-                <span className="text-[10px] text-brand font-light tabular-nums">
-                  {totalIncome > 0 ? pct(totalIncome - totalSpend, totalIncome) : 0}%
-                </span>
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-4">
-            <CardHeader title="Investments" />
-            <Donut
-              segments={investSegs}
-              label="Portfolio"
-              value={`${fmtCompact(totalInvest)}đ`}
-              size={130}
-            />
-            <div className="mt-3 pt-2.5 border-t border-white/[0.04] space-y-1.5">
-              {portfolios.map((p) => {
-                const r = retPct(p.totalValue, p.totalCostBasis);
-                return (
-                  <div key={p.id} className="flex justify-between">
-                    <span className="text-[10px] text-muted font-light truncate">{p.name}</span>
-                    <span
-                      className={cn(
-                        "text-[10px] font-light",
-                        r >= 0 ? "text-success" : "text-destructive",
-                      )}
-                    >
-                      {r >= 0 ? "+" : ""}
-                      {r}%
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </Card>
-        </div>
-
-        {/* ── ROW 4: Goals (6col) + Liabilities (6col) ─────── */}
-        <div className="col-span-6">
+          {/* Goals */}
           <Card className="overflow-hidden">
-            <div className="px-4 pt-4">
-              <CardHeader title="Goals" />
+            <div className="px-4 pt-4 pb-1">
+              <div className="flex items-center justify-between mb-2.5 px-1">
+                <span className="text-[10px] text-muted uppercase tracking-widest">Goals</span>
+                <Link
+                  to="/finance/targets"
+                  className="text-[10px] text-brand normal-case tracking-normal"
+                >
+                  View all →
+                </Link>
+              </div>
             </div>
             <div className="divide-y divide-border-subtle">
               {goals.map((g) => {
@@ -459,36 +322,49 @@ export function Finance() {
                 const Icon = GOAL_ICONS[g.goalType] ?? Target;
                 return (
                   <div key={g.id} className="px-4 py-3 hover:bg-white/[0.06] transition-colors">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center gap-2">
-                        <Icon
-                          className={cn(
-                            "w-3.5 h-3.5",
-                            g.goalType === "fire" ? "text-brand" : "text-muted",
-                          )}
-                          strokeWidth={1.5}
-                        />
-                        <span className="text-[12px] font-medium text-secondary">{g.name}</span>
-                        <span className="px-1.5 py-0.5 text-[9px] font-light rounded bg-white/[0.06] text-dim">
-                          {g.goalType}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] text-dim font-light">
-                          {fmtCompact(g.currentAmount)} / {fmtCompact(g.targetAmount)}đ
-                        </span>
-                        <span className="text-[10px] text-brand font-light">{p}%</span>
-                      </div>
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <Icon
+                        className={cn(
+                          "w-3.5 h-3.5 flex-shrink-0",
+                          g.goalType === "fire" ? "text-brand" : "text-muted",
+                        )}
+                        strokeWidth={1.5}
+                      />
+                      <span className="text-[11px] font-medium text-secondary truncate flex-1">
+                        {g.name}
+                      </span>
+                      <span className="px-1.5 py-0.5 text-[9px] font-light rounded bg-white/[0.06] text-dim flex-shrink-0">
+                        {g.goalType}
+                      </span>
+                      <span className="text-[10px] text-brand font-light flex-shrink-0">{p}%</span>
                     </div>
                     <Progress value={p} />
-                    <div className="flex gap-3 mt-1">
+                    <div className="flex gap-2 mt-1">
+                      <span className="text-[9px] text-dim font-light">
+                        {displayAmount({
+                          amount: g.currentAmount,
+                          currency: g.currency,
+                          baseAmount: g.baseCurrentAmount,
+                          baseCurrency,
+                          mode,
+                          rates,
+                          compact: true,
+                          hidden,
+                        })}{" "}
+                        /{" "}
+                        {displayAmount({
+                          amount: g.targetAmount,
+                          currency: g.currency,
+                          baseAmount: g.baseTargetAmount,
+                          baseCurrency,
+                          mode,
+                          rates,
+                          compact: true,
+                          hidden,
+                        })}
+                      </span>
                       {g.deadline && (
-                        <span className="text-[9px] text-dim font-light">Due {g.deadline}</span>
-                      )}
-                      {g.monthlyContribution && (
-                        <span className="text-[9px] text-dim font-light">
-                          {fmtCompact(g.monthlyContribution)}đ/mo
-                        </span>
+                        <span className="text-[9px] text-dim font-light">· Due {g.deadline}</span>
                       )}
                     </div>
                   </div>
@@ -498,57 +374,216 @@ export function Finance() {
           </Card>
         </div>
 
-        <div className="col-span-6">
+        {/* Right: Investments + Liabilities */}
+        <div className="space-y-4">
+          {/* Investments */}
           <Card className="overflow-hidden">
-            <div className="px-4 pt-4">
-              <CardHeader title="Liabilities" />
-            </div>
-            {liabilities.map((l) => {
-              const Icon = LIAB_ICONS[l.liabilityType] ?? Wallet;
-              const paid = pct(l.principal - l.remaining, l.principal);
-              return (
-                <div
-                  key={l.id}
-                  className="px-4 py-3 hover:bg-white/[0.06] transition-colors border-b border-white/[0.04] last:border-b-0"
+            <div className="px-4 pt-4 pb-1">
+              <div className="flex items-center justify-between mb-2.5 px-1">
+                <span className="text-[10px] text-muted uppercase tracking-widest">
+                  Investments
+                </span>
+                <Link
+                  to="/finance/investments"
+                  className="text-[10px] text-brand normal-case tracking-normal"
                 >
-                  <div className="flex items-center justify-between mb-1.5">
-                    <div className="flex items-center gap-2">
-                      <Icon className="w-3.5 h-3.5 text-destructive/60" strokeWidth={1.5} />
-                      <span className="text-[12px] font-medium text-secondary">{l.name}</span>
-                      <span className="px-1.5 py-0.5 text-[9px] font-light rounded bg-white/[0.06] text-dim">
-                        {l.liabilityType.replaceAll("_", " ")}
+                  View all →
+                </Link>
+              </div>
+            </div>
+            <div className="px-4 pb-3">
+              <p className="text-[28px] font-light text-primary tracking-tight leading-none tabular-nums mb-0.5">
+                {fmtCompact(convertTotal(totalInvest), displayCur, hidden)}
+              </p>
+              <p className="text-[9px] text-dim font-light">Total portfolio value</p>
+            </div>
+            {portfolios.length > 0 && (
+              <div className="divide-y divide-border-subtle">
+                {portfolios.map((p) => {
+                  const r = retPct(p.totalValue, p.totalCostBasis);
+                  return (
+                    <div
+                      key={p.id}
+                      className="flex items-center justify-between px-4 py-2.5 hover:bg-white/[0.06] transition-colors"
+                    >
+                      <span className="text-[11px] text-secondary truncate">{p.name}</span>
+                      <span
+                        className={cn(
+                          "text-[11px] font-light flex-shrink-0 ml-2",
+                          r >= 0 ? "text-success" : "text-destructive",
+                        )}
+                      >
+                        {r >= 0 ? "+" : ""}
+                        {r}%
                       </span>
                     </div>
+                  );
+                })}
+              </div>
+            )}
+          </Card>
+
+          {/* Liabilities */}
+          <Card className="overflow-hidden">
+            <div className="px-4 pt-4 pb-1">
+              <div className="flex items-center justify-between mb-2.5 px-1">
+                <span className="text-[10px] text-muted uppercase tracking-widest">
+                  Liabilities
+                </span>
+                <Link
+                  to="/finance/targets"
+                  className="text-[10px] text-brand normal-case tracking-normal"
+                >
+                  View all →
+                </Link>
+              </div>
+            </div>
+            <div className="divide-y divide-border-subtle">
+              {liabilities.map((l) => {
+                const Icon = LIAB_ICONS[l.liabilityType] ?? Wallet;
+                const paid = pct(l.principal - l.remaining, l.principal);
+                return (
+                  <div key={l.id} className="px-4 py-3 hover:bg-white/[0.06] transition-colors">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <Icon
+                        className="w-3.5 h-3.5 text-destructive/60 flex-shrink-0"
+                        strokeWidth={1.5}
+                      />
+                      <span className="text-[11px] font-medium text-secondary truncate flex-1">
+                        {l.name}
+                      </span>
+                      <span className="px-1.5 py-0.5 text-[9px] font-light rounded bg-white/[0.06] text-dim flex-shrink-0">
+                        {l.liabilityType.replaceAll("_", " ")}
+                      </span>
+                      {l.interestRate != null && (
+                        <span className="text-[9px] text-dim font-light flex-shrink-0">
+                          {l.interestRate}% APR
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <div className="flex-1 h-1.5 bg-white/[0.08] rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-success rounded-full"
+                          style={{ width: `${paid}%` }}
+                        />
+                      </div>
+                      <span className="text-[9px] text-dim font-light flex-shrink-0">{paid}%</span>
+                    </div>
                     <span className="text-[12px] font-light text-destructive tabular-nums">
-                      {fmtMoney(l.remaining, l.currency)}
+                      {displayAmount({
+                        amount: l.remaining,
+                        currency: l.currency,
+                        baseAmount: l.baseRemaining,
+                        baseCurrency,
+                        mode,
+                        rates,
+                        hidden,
+                      })}
                     </span>
                   </div>
-                  <div className="h-1.5 w-full bg-white/[0.08] rounded-full overflow-hidden">
-                    <div className="h-full bg-success rounded-full" style={{ width: `${paid}%` }} />
-                  </div>
-                  <div className="flex gap-3 mt-1">
-                    <span className="text-[9px] text-dim font-light">{paid}% paid</span>
-                    {l.interestRate != null && (
-                      <span className="text-[9px] text-dim font-light">{l.interestRate}% APR</span>
-                    )}
-                    {l.monthlyPayment && (
-                      <span className="text-[9px] text-dim font-light">
-                        {fmtMoney(l.monthlyPayment, l.currency)}/mo
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-            <div className="px-4 py-2.5 border-t border-white/[0.08] bg-white/[0.02] flex justify-between">
-              <span className="text-[10px] font-light text-muted">Total Debt</span>
-              <span className="text-[10px] font-light text-destructive">
-                {fmtVnd(liabilities.reduce((s, l) => s + toVnd(l.remaining, l.currency, rates), 0))}
-              </span>
+                );
+              })}
             </div>
+            {liabilities.length > 0 && (
+              <div className="px-4 py-2.5 border-t border-white/[0.08] bg-white/[0.02] flex justify-between">
+                <span className="text-[10px] font-light text-muted">Total Debt</span>
+                <span className="text-[10px] font-light text-destructive">
+                  {fmtCompact(convertTotal(totalDebt), displayCur, hidden)}
+                </span>
+              </div>
+            )}
           </Card>
         </div>
       </div>
+
+      {/* Transactions — full width */}
+      <Card className="overflow-hidden mb-3">
+        <div className="px-4 pt-4 pb-1">
+          <div className="flex items-center justify-between mb-2.5 px-1">
+            <span className="text-[10px] text-muted uppercase tracking-widest">
+              Recent Transactions
+            </span>
+            <Link
+              to="/finance/cashflow"
+              className="text-[10px] text-brand normal-case tracking-normal"
+            >
+              View all →
+            </Link>
+          </div>
+        </div>
+        {transactions.map((tx) => {
+          const acct = accountMap.get(tx.accountId);
+          const TxI =
+            tx.txType === "income"
+              ? ArrowDownRight
+              : tx.txType === "expense"
+                ? ArrowUpRight
+                : ArrowLeftRight;
+          const col =
+            tx.txType === "income"
+              ? "text-success"
+              : tx.txType === "expense"
+                ? "text-destructive"
+                : "text-info";
+          const bgCol =
+            tx.txType === "income"
+              ? "bg-success/10"
+              : tx.txType === "expense"
+                ? "bg-destructive/10"
+                : "bg-info/10";
+          const pre = tx.txType === "income" ? "+" : tx.txType === "expense" ? "-" : "";
+          return (
+            <div
+              key={tx.id}
+              className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.06] transition-colors border-b border-white/[0.04] last:border-b-0"
+            >
+              <span className="text-[10px] text-dim font-light w-10 flex-shrink-0 tabular-nums">
+                {tx.txDate.slice(5)}
+              </span>
+              <div
+                className={cn(
+                  "w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0",
+                  bgCol,
+                )}
+              >
+                <TxI className={cn("w-3.5 h-3.5", col)} strokeWidth={1.5} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[12px] font-light text-secondary truncate">
+                  {tx.counterparty ?? tx.notes ?? tx.txType}
+                </p>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  {tx.category && (
+                    <span className="px-1.5 py-0.5 text-[9px] font-light rounded bg-white/[0.06] text-dim">
+                      {tx.category}
+                    </span>
+                  )}
+                  {acct && <span className="text-[9px] text-dim font-light">{acct.name}</span>}
+                </div>
+              </div>
+              <span
+                className={cn(
+                  "text-[12px] font-light w-24 text-right flex-shrink-0 tabular-nums",
+                  col,
+                )}
+              >
+                {pre}
+                {displayAmount({
+                  amount: tx.amount,
+                  currency: tx.currency,
+                  baseAmount: tx.baseAmount,
+                  baseCurrency,
+                  mode,
+                  rates,
+                  hidden,
+                })}
+              </span>
+            </div>
+          );
+        })}
+      </Card>
+
       <div className="h-3" />
     </FinanceLayout>
   );

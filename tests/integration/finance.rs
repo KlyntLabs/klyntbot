@@ -537,13 +537,13 @@ async fn net_worth_calculation() {
         .expect("net_worth");
 
     let v: serde_json::Value = serde_json::from_str(&nw_result).unwrap();
-    // net_worth should include the account balance minus the liability
-    // Note: there may be other data in the test DB, so we check breakdown
-    let vnd_breakdown = &v["breakdown"]["VND"];
+    // net_worth now returns a flat structure with base_currency aggregation
+    assert_eq!(v["base_currency"], "VND", "base_currency should be VND");
+    // accounts = 100000, liabilities = 200000, net = -100000
+    let nw = v["net_worth"].as_i64().unwrap();
     assert!(
-        vnd_breakdown.is_object(),
-        "should have VND breakdown: {}",
-        nw_result
+        nw < 0,
+        "net worth should be negative (more liabilities): {nw}"
     );
 
     // Cleanup
