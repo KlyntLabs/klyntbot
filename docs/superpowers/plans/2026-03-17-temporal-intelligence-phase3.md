@@ -432,11 +432,18 @@ pub fn relevance_score(
 /// Returns a value between 0.1 and 1.0 — recent facts score higher.
 /// Uses an inverse decay: 1 / (1 + age_days / 30).
 pub fn temporal_recency_score(valid_from: &str) -> f64 {
-    let now = chrono::Utc::now().naive_utc();
-    let age_days = valid_from
-        .parse::<chrono::NaiveDateTime>()
-        .or_else(|_| chrono::NaiveDate::parse_from_str(valid_from, "%Y-%m-%d").map(|d| d.and_hms_opt(0, 0, 0).unwrap()))
-        .map(|vf| (now - vf).num_days().max(0) as f64)
+    let now = chrono::Utc::now();
+    let age_days = chrono::DateTime::parse_from_rfc3339(valid_from)
+        .map(|dt| (now - dt).num_days().max(0) as f64)
+        .or_else(|_| {
+            valid_from
+                .parse::<chrono::NaiveDateTime>()
+                .map(|ndt| (now.naive_utc() - ndt).num_days().max(0) as f64)
+        })
+        .or_else(|_| {
+            chrono::NaiveDate::parse_from_str(valid_from, "%Y-%m-%d")
+                .map(|d| (now.naive_utc() - d.and_hms_opt(0, 0, 0).unwrap()).num_days().max(0) as f64)
+        })
         .unwrap_or(30.0);
     (1.0 / (1.0 + age_days / 30.0)).max(0.1)
 }
@@ -444,10 +451,22 @@ pub fn temporal_recency_score(valid_from: &str) -> f64 {
 
 - [ ] **Step 2: Update all relevance_score call sites in decay.rs tests**
 
-Update the test constants and calls to pass the new `temporal_recency` parameter (use `0.5` as a neutral value in existing tests):
-- `test_relevance_score_combines_factors`: add `0.5` argument
-- `test_relevance_score_clamps`: add `1.0` and `0.0` respectively
-- `test_relevance_score_custom_weights`: add `temporal: 0.0` to custom weights, add `0.0` argument
+**IMPORTANT:** The `const W` at the top of the test module MUST be updated or it won't compile:
+```rust
+const W: RelevanceWeights = RelevanceWeights {
+    semantic: 0.3,
+    retrievability: 0.2,
+    importance: 0.15,
+    frequency: 0.1,
+    situation: 0.25,
+    temporal: 0.05,  // NEW — add this field
+};
+```
+
+Then update all `relevance_score` calls to pass the new `temporal_recency` parameter (use `0.5` as a neutral value):
+- `test_relevance_score_combines_factors`: add `0.5` argument after `0.6`
+- `test_relevance_score_clamps`: add `1.0` and `0.0` respectively after the last numeric arg
+- `test_relevance_score_custom_weights`: add `temporal: 0.0` to the custom weights struct, add `0.0` argument to the call
 
 - [ ] **Step 3: Update retrieval.rs**
 
@@ -549,31 +568,80 @@ git commit -m "feat(cognitive): add temporal recency to 6-factor retrieval scori
 **Files:**
 - Modify: `crates/cognitive/src/services/background.rs`
 
-The `ContradictionDetected` domain event already exists (added in Phase 0). The consolidation service already calls `execute_memory_ops()` and has access to the domain event bus. We need to add contradiction detection logic AFTER `execute_memory_ops()` completes.
+The `ContradictionDetected` domain event already exists (added in Phase 0). However, the `BackgroundConsolidationService` currently has NO access to the `DomainEventBus` for publishing events — it only receives events via `broadcast::Receiver`. We need to:
+1. Add `domain_bus` to `BackgroundServiceConfig`
+2. Wire it through to the processing loop
+3. Add contradiction detection after `execute_memory_ops()`
 
-- [ ] **Step 1: Add contradiction detection after execute_memory_ops**
+- [ ] **Step 1: Add `domain_bus` to BackgroundServiceConfig**
 
-In `crates/cognitive/src/services/background.rs`, find the block after `execute_memory_ops()` call (around line 423-429). After line 429 (after the `.await;`), add:
+In `crates/cognitive/src/services/background.rs`, add a new field to `BackgroundServiceConfig`:
+
+```rust
+pub struct BackgroundServiceConfig {
+    pub event_rx: broadcast::Receiver<DomainEvent>,
+    pub extraction: Arc<dyn ExtractionHandler>,
+    pub consolidation: Arc<dyn ConsolidationHandler>,
+    pub repo: SemanticFactRepo,
+    pub episodic_repo: Option<EpisodicMemoryRepo>,
+    pub embedder: Option<Arc<dyn SemanticFactEmbedder>>,
+    pub cancel: CancellationToken,
+    pub pipeline_tx: Option<tokio::sync::broadcast::Sender<PipelineEvent>>,
+    pub accum_repo: Option<AccumulatedObservationRepo>,
+    pub failed_obs_repo: Option<FailedObservationRepo>,
+    pub promote_threshold: usize,
+    pub min_days: usize,
+    pub domain_bus: Option<Arc<bus::DomainEventBus>>,  // NEW: for publishing ContradictionDetected
+}
+```
+
+Add `use std::sync::Arc;` to the imports if not already present (it is — line 8).
+
+- [ ] **Step 2: Destructure domain_bus in start()**
+
+In the `start()` method, add `domain_bus` to the destructuring:
+
+```rust
+let BackgroundServiceConfig {
+    mut event_rx,
+    extraction,
+    consolidation,
+    repo,
+    episodic_repo,
+    embedder,
+    cancel,
+    pipeline_tx,
+    accum_repo,
+    failed_obs_repo,
+    promote_threshold,
+    min_days,
+    domain_bus,  // NEW
+} = config;
+```
+
+- [ ] **Step 3: Add session_start capture and contradiction detection**
+
+Inside the `tokio::spawn` block, right before the `loop {` (after the accumulator restoration), add:
+
+```rust
+let session_start = chrono::Utc::now().to_rfc3339();
+```
+
+Then, AFTER the `execute_memory_ops()` call (find `crate::consolidation::execute_memory_ops(` and the `.await;` that follows it), add:
 
 ```rust
                         // ── Contradiction detection ──────────────────────────
-                        // Surface when a user-stated, high-confidence fact is
-                        // updated to a different value in a different session.
                         if let Some(ref bus) = domain_bus {
                             for (candidate, op) in candidates.iter().zip(ops.iter()) {
                                 if let crate::types::MemoryOp::Update { id: _, old_id } = op {
                                     let new = &candidate.candidate;
-                                    // Only surface contradictions for user-stated, high-confidence facts
                                     if new.confidence < 0.7 || new.source != "user_stated" {
                                         continue;
                                     }
-                                    // Look up the old fact to compare objects
                                     if let Ok(Some(old_fact)) = repo.get(old_id).await {
-                                        if old_fact.object != new.object {
-                                            // Skip same-session updates (compare recorded_at)
-                                            if is_same_session(&old_fact.recorded_at, &session_start) {
-                                                continue;
-                                            }
+                                        if old_fact.object != new.object
+                                            && !is_same_session(&old_fact.recorded_at, &session_start)
+                                        {
                                             let _ = bus.publish(bus::DomainEvent::ContradictionDetected {
                                                 existing_subject: old_fact.subject.clone(),
                                                 existing_predicate: old_fact.predicate.clone(),
@@ -588,43 +656,46 @@ In `crates/cognitive/src/services/background.rs`, find the block after `execute_
                         }
 ```
 
-- [ ] **Step 2: Add the `is_same_session` helper and `session_start` capture**
+- [ ] **Step 4: Add the `is_same_session` helper**
 
-Add at the bottom of `background.rs` (before the last closing brace of the module, or alongside other helpers):
+Add at the bottom of `background.rs` (alongside other helper functions like `event_type_key`, `op_to_string`):
 
 ```rust
-/// Check if a fact was recorded in the current session (within last 5 minutes of session start).
+/// Check if a fact was recorded in the current session.
+/// Uses RFC 3339 parsing since timestamps are stored as `Utc::now().to_rfc3339()`.
 fn is_same_session(recorded_at: &str, session_start: &str) -> bool {
-    let recorded = recorded_at
-        .parse::<chrono::NaiveDateTime>()
+    let recorded = chrono::DateTime::parse_from_rfc3339(recorded_at)
+        .or_else(|_| {
+            recorded_at
+                .parse::<chrono::NaiveDateTime>()
+                .map(|ndt| ndt.and_utc().fixed_offset())
+        })
         .unwrap_or_default();
-    let start = session_start
-        .parse::<chrono::NaiveDateTime>()
+    let start = chrono::DateTime::parse_from_rfc3339(session_start)
         .unwrap_or_default();
-    // If recorded is within 5 minutes before session start, it's same session
     (recorded - start).num_seconds().abs() < 300
 }
 ```
 
-The `session_start` variable needs to be captured at the start of the background service. Look for where `BackgroundConsolidationService` initializes or where the main loop starts. Capture it as:
-```rust
-let session_start = chrono::Utc::now().to_rfc3339();
-```
-Place this at the top of the background task spawn block (before the loop that processes batches). If the service already has a session concept, use that instead.
+- [ ] **Step 5: Update all callers of BackgroundServiceConfig**
 
-- [ ] **Step 3: Verify `domain_bus` is accessible**
-
-Check that `domain_bus` (or `bus`) is available in the scope where `execute_memory_ops` is called. The background service should already have it — it's passed during construction. If it's named differently (e.g., `event_bus`), use that name instead.
-
-- [ ] **Step 4: Build**
-
-Run: `cargo build -p cognitive`
-Expected: compiles.
-
-- [ ] **Step 5: Commit**
+Search for where `BackgroundServiceConfig` is constructed. It's typically in `crates/agent/src/agent_loop/builder.rs` or `crates/app-core/src/init/`. Add `domain_bus: None` (or pass the actual bus if available) to the struct literal. Search with:
 
 ```bash
-git add crates/cognitive/src/services/background.rs
+grep -rn "BackgroundServiceConfig" crates/ --include="*.rs"
+```
+
+For each call site, add `domain_bus: Some(Arc::clone(&domain_event_bus))` if the bus is available in that scope, or `domain_bus: None` if not.
+
+- [ ] **Step 6: Build**
+
+Run: `cargo build --workspace`
+Expected: compiles.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add crates/cognitive/src/services/background.rs crates/agent/ crates/app-core/
 git commit -m "feat(cognitive): add contradiction detection after consolidation"
 ```
 
