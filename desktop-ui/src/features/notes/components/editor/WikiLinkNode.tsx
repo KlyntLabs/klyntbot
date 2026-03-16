@@ -167,9 +167,10 @@ export const WikiLinkAutocomplete = Mark.create({
 
 interface WikiLinkMenuProps {
   editor: ReturnType<typeof import("@tiptap/react").useEditor>;
+  currentNoteTitle?: string;
 }
 
-export function WikiLinkMenu({ editor }: WikiLinkMenuProps) {
+export function WikiLinkMenu({ editor, currentNoteTitle }: WikiLinkMenuProps) {
   const [state, setState] = useState<WikiLinkMenuState>(null);
   const [coords, setCoords] = useState({ x: 0, y: 0 });
   const [results, setResults] = useState<Note[]>([]);
@@ -234,25 +235,68 @@ export function WikiLinkMenu({ editor }: WikiLinkMenuProps) {
     [editor, state],
   );
 
+  // Create a new note and insert as wiki-link
+  const handleCreateAndLink = useCallback(
+    async (title: string) => {
+      if (!editor || !state) return;
+      try {
+        const body = currentNoteTitle ? `Linked from [[${currentNoteTitle}]]` : "";
+        const newNote = await ipc<Note>("note_create", { params: { title, body } });
+        if (newNote) {
+          const cursorPos = editor.state.selection.from;
+          editor
+            .chain()
+            .focus()
+            .deleteRange({ from: state.from, to: cursorPos })
+            .insertContent({
+              type: "text",
+              text: newNote.title,
+              marks: [{ type: "wikiLink", attrs: { noteId: newNote.id, title: newNote.title } }],
+            })
+            .run();
+          resetWikiLinkMenu();
+          setState(null);
+        }
+      } catch (e) {
+        console.warn("Failed to create note from wiki-link:", e);
+      }
+    },
+    [editor, state, currentNoteTitle],
+  );
+
   // Keyboard navigation — use refs to keep the listener stable
+  // Index 0 is the "Create" option when query is present, results follow at index 1+
   const resultsRef = useRef<Note[]>([]);
   resultsRef.current = results;
   const insertRef = useRef(insertWikiLink);
   insertRef.current = insertWikiLink;
+  const createRef = useRef(handleCreateAndLink);
+  createRef.current = handleCreateAndLink;
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       const r = resultsRef.current;
-      if (r.length === 0) return;
+      const q = stateRef.current?.query || "";
+      const hasCreate = q.length > 0;
+      const totalItems = (hasCreate ? 1 : 0) + r.length;
+      if (totalItems === 0) return;
       if (e.key === "ArrowDown") {
         e.preventDefault();
-        setSelectedIndex((i) => (i + 1) % r.length);
+        setSelectedIndex((i) => (i + 1) % totalItems);
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
-        setSelectedIndex((i) => (i - 1 + r.length) % r.length);
+        setSelectedIndex((i) => (i - 1 + totalItems) % totalItems);
       } else if (e.key === "Enter" || e.key === "Tab") {
         e.preventDefault();
-        insertRef.current(r[selectedIndexRef.current]);
+        const idx = selectedIndexRef.current;
+        if (hasCreate && idx === 0) {
+          createRef.current(q);
+        } else {
+          const resultIdx = hasCreate ? idx - 1 : idx;
+          if (r[resultIdx]) insertRef.current(r[resultIdx]);
+        }
       } else if (e.key === "Escape") {
         e.preventDefault();
         setState(null);
@@ -269,31 +313,49 @@ export function WikiLinkMenu({ editor }: WikiLinkMenuProps) {
 
   if (!state) return null;
 
+  const hasCreateOption = (state.query?.length ?? 0) > 0;
+
   return createPortal(
     <div
       ref={menuRef}
       className="fixed z-50 glass-dropdown rounded-xl py-1 min-w-[200px] max-w-[300px]"
       style={{ left: coords.x, top: coords.y + 4 }}
     >
-      {results.length === 0 && (
-        <div className="px-3 py-2 text-xs text-dim">
-          {state.query ? "No matching notes" : "Type to search notes..."}
-        </div>
-      )}
-      {results.map((note, i) => (
+      {/* Create new note option */}
+      {hasCreateOption && (
         <button
-          key={note.id}
           type="button"
-          onClick={() => insertWikiLink(note)}
+          onClick={() => handleCreateAndLink(state.query)}
           className={`w-full px-3 py-1.5 text-sm text-left flex items-center gap-2 transition-colors ${
-            i === selectedIndex
-              ? "bg-white/[0.08] text-primary"
-              : "text-secondary hover:bg-white/[0.04]"
+            selectedIndex === 0
+              ? "bg-white/[0.08] text-brand"
+              : "text-brand/80 hover:bg-white/[0.04]"
           }`}
         >
-          <span className="truncate">{note.title}</span>
+          <span className="text-xs">&#10024;</span>
+          <span className="truncate">Create &ldquo;{state.query}&rdquo;</span>
         </button>
-      ))}
+      )}
+      {!hasCreateOption && results.length === 0 && (
+        <div className="px-3 py-2 text-xs text-dim">Type to search notes...</div>
+      )}
+      {results.map((note, i) => {
+        const itemIndex = hasCreateOption ? i + 1 : i;
+        return (
+          <button
+            key={note.id}
+            type="button"
+            onClick={() => insertWikiLink(note)}
+            className={`w-full px-3 py-1.5 text-sm text-left flex items-center gap-2 transition-colors ${
+              itemIndex === selectedIndex
+                ? "bg-white/[0.08] text-primary"
+                : "text-secondary hover:bg-white/[0.04]"
+            }`}
+          >
+            <span className="truncate">{note.title}</span>
+          </button>
+        );
+      })}
     </div>,
     document.body,
   );
