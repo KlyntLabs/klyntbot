@@ -39,16 +39,26 @@ impl NoteRepo {
         &self,
         id: &str,
         title: Option<&str>,
-        icon: Option<&str>,
-        color: Option<&str>,
+        icon: Option<Option<&str>>,
+        color: Option<Option<&str>>,
         parent_id: Option<Option<&str>>,
     ) -> Result<NotebookRow, StorageError> {
         let pid_sentinel = nullable_to_sentinel(parent_id);
+        let icon_sentinel = nullable_to_sentinel(icon);
+        let color_sentinel = nullable_to_sentinel(color);
         let row = sqlx::query_as::<_, NotebookRow>(
             "UPDATE notebooks SET
                 title = COALESCE(?2, title),
-                icon = COALESCE(?3, icon),
-                color = COALESCE(?4, color),
+                icon = CASE
+                    WHEN ?3 IS NULL THEN icon
+                    WHEN ?3 = '' THEN NULL
+                    ELSE ?3
+                END,
+                color = CASE
+                    WHEN ?4 IS NULL THEN color
+                    WHEN ?4 = '' THEN NULL
+                    ELSE ?4
+                END,
                 parent_id = CASE
                     WHEN ?5 IS NULL THEN parent_id
                     WHEN ?5 = '' THEN NULL
@@ -60,8 +70,8 @@ impl NoteRepo {
         )
         .bind(id)
         .bind(title)
-        .bind(icon)
-        .bind(color)
+        .bind(icon_sentinel)
+        .bind(color_sentinel)
         .bind(pid_sentinel)
         .fetch_one(&self.pool)
         .await?;

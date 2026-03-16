@@ -359,9 +359,9 @@ impl NotesTool {
     async fn handle_update_notebook(&self, p: &ParamExtractor<'_>) -> Result<String> {
         let id = p.required_str("id")?;
         let title = p.optional_str("title")?;
-        let icon = p.optional_str("icon")?;
+        let icon = p.optional_str("icon")?.map(Some);
         let parent_id = p.optional_str("parent_id")?.map(Some);
-        let color = p.optional_str("color")?;
+        let color = p.optional_str("color")?.map(Some);
         let row = self.repo.update_notebook(id, title, icon, color, parent_id).await?;
         Ok(format!(
             "Updated notebook \"{}\" (id: {})",

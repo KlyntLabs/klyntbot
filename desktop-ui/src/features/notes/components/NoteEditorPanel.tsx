@@ -1,4 +1,4 @@
-import type { Note, Notebook, NoteUpdateParams } from "@shared/types";
+import type { Note, NoteUpdateParams } from "@shared/types";
 import { useCallback, useRef } from "react";
 import { NoteEditor } from "./NoteEditor";
 import { NoteTags, type NoteTagsHandle } from "./NoteTags";
@@ -7,7 +7,6 @@ type NotesViewMode = "editor" | "graph";
 
 interface NoteEditorPanelProps {
   note: Note;
-  notebooks: Notebook[];
   onSave: (params: NoteUpdateParams) => void;
   onRenameNote: (id: string, title: string) => void;
   viewMode: NotesViewMode;
@@ -18,7 +17,6 @@ interface NoteEditorPanelProps {
 
 export function NoteEditorPanel({
   note,
-  notebooks,
   onSave,
   onRenameNote,
   viewMode,
@@ -62,23 +60,10 @@ export function NoteEditorPanel({
     [note.id, onSave],
   );
 
-  // Find notebook name
-  const notebook = note.notebookId ? notebooks.find((nb) => nb.id === note.notebookId) : undefined;
-
-  // Word count
-  const wordCount = (note.body || "").split(/\s+/).filter(Boolean).length;
-
-  // Format created date
-  const createdDate = new Date(note.createdAt).toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-
   return (
     <div className="flex-1 flex flex-col min-w-0 min-h-0">
-      {/* Header: title + tags + metadata */}
-      <div className="px-8 pt-5 pb-2 shrink-0">
+      {/* Header: title + tags */}
+      <div className="px-3 shrink-0">
         {/* Editable title */}
         {/* biome-ignore lint/a11y/useSemanticElements: contentEditable div used as inline title editor */}
         <div
@@ -98,23 +83,6 @@ export function NoteEditorPanel({
         {/* Tags */}
         <div className="mt-2 flex items-center gap-2">
           <NoteTags ref={tagsRef} tags={note.tags} onChange={handleTagsChange} />
-        </div>
-
-        {/* Metadata line */}
-        <div className="text-xs text-muted flex items-center gap-2 mt-1">
-          {notebook && (
-            <>
-              <span>
-                {notebook.icon || ""} {notebook.title}
-              </span>
-              <span className="text-dim">·</span>
-            </>
-          )}
-          <span>{createdDate}</span>
-          <span className="text-dim">·</span>
-          <span>
-            {wordCount} {wordCount === 1 ? "word" : "words"}
-          </span>
         </div>
       </div>
 

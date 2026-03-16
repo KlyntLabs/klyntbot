@@ -129,7 +129,7 @@ export function ContextPanel({
   onExpandGraph,
 }: ContextPanelProps) {
   if (!noteId || !note) {
-    return <div style={{ width }} className="border-l border-border flex flex-col flex-shrink-0" />;
+    return <div style={{ width }} className="border-l border-border flex flex-col flex-shrink-0 h-full bg-white/[0.02]" />;
   }
 
   // Graph mode: show note preview instead of context sections
@@ -137,7 +137,7 @@ export function ContextPanel({
     return (
       <div
         style={{ width }}
-        className="border-l border-border flex flex-col flex-shrink-0 overflow-y-auto"
+        className="border-l border-border flex flex-col flex-shrink-0 h-full overflow-y-auto bg-white/[0.02]"
       >
         <NotePreview note={note} onSelectNote={onSelectNote} />
       </div>
@@ -148,7 +148,7 @@ export function ContextPanel({
   return (
     <div
       style={{ width }}
-      className="border-l border-border flex flex-col flex-shrink-0 overflow-y-auto"
+      className="border-l border-border flex flex-col flex-shrink-0 h-full overflow-y-auto bg-white/[0.02]"
     >
       <AISuggestionsPanel noteId={noteId} />
       <BacklinksPanel noteId={noteId} onSelectNote={onSelectNote} />

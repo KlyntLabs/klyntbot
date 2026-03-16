@@ -111,13 +111,18 @@ export default function KnowledgeBasePage() {
   >("notebook_update", "params");
 
   // ── Handlers ──────────────────────────────────────────────────────────
+  const [autoRenameId, setAutoRenameId] = useState<string | null>(null);
+
   const handleCreateNote = useCallback(
     async (notebookId?: string) => {
       const result = await createNote({
         title: "Untitled",
         notebookId,
       });
-      if (result) setSelectedNoteId(result.id);
+      if (result) {
+        setSelectedNoteId(result.id);
+        setAutoRenameId(result.id);
+      }
     },
     [createNote],
   );
@@ -132,7 +137,8 @@ export default function KnowledgeBasePage() {
 
   const handleCreateNotebook = useCallback(
     async (parentId?: string) => {
-      await createNotebook({ title: "New Folder", parentId });
+      const result = await createNotebook({ title: "New Folder", parentId });
+      if (result) setAutoRenameId(result.id);
     },
     [createNotebook],
   );
@@ -357,6 +363,8 @@ export default function KnowledgeBasePage() {
               notes={notes}
               selectedNoteId={selectedNoteId}
               searchRef={searchRef}
+              autoRenameId={autoRenameId}
+              onAutoRenameDone={() => setAutoRenameId(null)}
               onSelectNote={setSelectedNoteId}
               onCreateNote={handleCreateNote}
               onCreateNotebook={handleCreateNotebook}
@@ -404,16 +412,11 @@ export default function KnowledgeBasePage() {
           </>
         ) : selectedNote ? (
           <div
-            className={
-              isFocusMode
-                ? "max-w-[720px] mx-auto w-full h-full flex flex-col"
-                : "h-full flex flex-col"
-            }
+            className="w-full h-full flex flex-col"
           >
             <NoteEditorPanel
               key={selectedNote.id}
               note={selectedNote}
-              notebooks={notebooks}
               onSave={updateNote}
               onRenameNote={handleRenameNote}
               viewMode={viewMode}
@@ -460,7 +463,7 @@ export default function KnowledgeBasePage() {
 
       {/* Right panel — ContextPanel */}
       {showRightPanel && (
-        <div ref={rightRef}>
+        <div ref={rightRef} className="h-full">
           <ContextPanel
             width={rightWidth}
             noteId={selectedNoteId}

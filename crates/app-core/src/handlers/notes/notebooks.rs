@@ -87,13 +87,15 @@ impl AppCore {
             }
         }
         let parent_id_ref = params.parent_id.as_ref().map(|o| o.as_deref());
+        let icon_ref = params.icon.as_ref().map(|o| o.as_deref());
+        let color_ref = params.color.as_ref().map(|o| o.as_deref());
         let updated = self
             .note_repo
             .update_notebook(
                 &params.id,
                 params.title.as_deref(),
-                params.icon.as_deref(),
-                params.color.as_deref(),
+                icon_ref,
+                color_ref,
                 parent_id_ref,
             )
             .await

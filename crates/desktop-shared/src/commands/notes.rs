@@ -64,8 +64,12 @@ where
 pub struct NotebookUpdateParams {
     pub id: String,
     pub title: Option<String>,
-    pub icon: Option<String>,
-    pub color: Option<String>,
+    /// `None` = don't change, `Some(None)` = clear icon, `Some(Some(name))` = set icon
+    #[serde(default, deserialize_with = "deserialize_nullable_field")]
+    pub icon: Option<Option<String>>,
+    /// `None` = don't change, `Some(None)` = clear color, `Some(Some(hex))` = set color
+    #[serde(default, deserialize_with = "deserialize_nullable_field")]
+    pub color: Option<Option<String>>,
     #[serde(default, deserialize_with = "deserialize_nullable_field")]
     pub parent_id: Option<Option<String>>,
 }

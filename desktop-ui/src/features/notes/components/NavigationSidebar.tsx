@@ -22,6 +22,8 @@ interface NavigationSidebarProps {
   notes: Note[];
   selectedNoteId: string | null;
   searchRef: Ref<NavigationSidebarHandle | null>;
+  autoRenameId: string | null;
+  onAutoRenameDone: () => void;
   onSelectNote: (id: string) => void;
   onCreateNote: (notebookId?: string) => void;
   onCreateNotebook: (parentId?: string) => void;
@@ -44,6 +46,8 @@ export function NavigationSidebar({
   notes,
   selectedNoteId,
   searchRef,
+  autoRenameId,
+  onAutoRenameDone,
   onSelectNote,
   onCreateNote,
   onCreateNotebook,
@@ -132,7 +136,10 @@ export function NavigationSidebar({
   const isSearching = searchResults !== null;
 
   return (
-    <div className="flex flex-col gap-1 min-h-0 h-full">
+    <div
+      className="flex flex-col gap-1 min-h-0 h-full bg-white/[0.02]"
+      onContextMenu={(e) => e.preventDefault()}
+    >
       {/* 1. Search Bar */}
       <div className="relative glass-sidebar shrink-0">
         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-dim" />
@@ -175,7 +182,7 @@ export function NavigationSidebar({
           </div>
         </div>
       ) : (
-        <div className="flex-1 overflow-y-auto min-h-0 flex flex-col gap-2">
+        <div className="flex-1 overflow-y-auto min-h-0 flex flex-col">
           {/* Tags Explorer */}
           <TagsExplorer
             notes={notes}
@@ -191,6 +198,8 @@ export function NavigationSidebar({
             notebooks={notebooks}
             notes={notes}
             selectedNoteId={selectedNoteId}
+            autoRenameId={autoRenameId}
+            onAutoRenameDone={onAutoRenameDone}
             onSelectNote={onSelectNote}
             onCreateNote={onCreateNote}
             onCreateNotebook={onCreateNotebook}
