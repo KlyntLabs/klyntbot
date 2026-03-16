@@ -111,6 +111,8 @@ interface ContextMenuSubmenuProps {
   children: ReactNode;
   open: boolean;
   onToggle: () => void;
+  /** Override default submenu panel classes (min-w, max-h, etc.) */
+  panelClassName?: string;
 }
 
 export function ContextMenuSubmenu({
@@ -119,6 +121,7 @@ export function ContextMenuSubmenu({
   children,
   open,
   onToggle,
+  panelClassName,
 }: ContextMenuSubmenuProps) {
   return (
     <div className="relative">
@@ -138,7 +141,7 @@ export function ContextMenuSubmenu({
         <ChevronRight className="w-3 h-3 opacity-40" />
       </button>
       {open && (
-        <div className="context-menu absolute left-full top-0 ml-1 py-[5px] min-w-[180px] max-h-52 overflow-y-auto animate-[menu-appear_100ms_ease-out]">
+        <div className={panelClassName ?? "context-menu absolute left-full top-0 ml-1 py-[5px] min-w-[180px] max-h-52 overflow-y-auto animate-[menu-appear_100ms_ease-out]"}>
           {children}
         </div>
       )}

@@ -546,8 +546,9 @@ function TreeContextMenu({
           label="Change Icon"
           open={showIconPicker}
           onToggle={() => setShowIconPicker(!showIconPicker)}
+          panelClassName="context-menu absolute left-full top-0 ml-1 py-1 w-[280px] animate-[menu-appear_100ms_ease-out]"
         >
-          <div className="grid grid-cols-8 gap-0.5 p-1.5 max-h-40 overflow-y-auto">
+          <div className="grid grid-cols-8 gap-1 p-2 max-h-56 overflow-y-auto">
             {ITEM_ICONS.map((icon) => (
               <button
                 key={icon}
@@ -556,7 +557,7 @@ function TreeContextMenu({
                   onUpdateNotebook(target.notebook.id, { icon, color: null });
                   onClose();
                 }}
-                className={`w-7 h-7 rounded flex items-center justify-center text-sm hover:bg-white/[0.1] transition-colors ${
+                className={`w-7 h-7 rounded-md flex items-center justify-center text-base hover:bg-white/[0.1] hover:scale-110 transition-all ${
                   target.notebook.icon === icon ? "bg-white/[0.12] ring-1 ring-brand/40" : ""
                 }`}
               >
@@ -648,8 +649,9 @@ function TreeContextMenu({
         label="Change Icon"
         open={showIconPicker}
         onToggle={() => setShowIconPicker(!showIconPicker)}
+        panelClassName="context-menu absolute left-full top-0 ml-1 py-1 w-[280px] animate-[menu-appear_100ms_ease-out]"
       >
-        <div className="grid grid-cols-8 gap-0.5 p-1.5 max-h-40 overflow-y-auto">
+        <div className="grid grid-cols-8 gap-1 p-2 max-h-56 overflow-y-auto">
           {ITEM_ICONS.map((icon) => (
             <button
               key={icon}
@@ -658,7 +660,7 @@ function TreeContextMenu({
                 onUpdateNote(note.id, { icon });
                 onClose();
               }}
-              className={`w-7 h-7 rounded flex items-center justify-center text-sm hover:bg-white/[0.1] transition-colors ${
+              className={`w-7 h-7 rounded-md flex items-center justify-center text-base hover:bg-white/[0.1] hover:scale-110 transition-all ${
                 note.icon === icon ? "bg-white/[0.12] ring-1 ring-brand/40" : ""
               }`}
             >
