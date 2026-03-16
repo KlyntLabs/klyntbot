@@ -3,18 +3,55 @@ import { formatDate } from "@shared/lib/dates";
 import type { Note, Notebook } from "@shared/types";
 import { ContextMenu, ContextMenuItem, ContextMenuSeparator, ContextMenuSubmenu } from "@shared/ui";
 import {
+  Archive,
+  Beaker,
+  BookOpen,
+  Bookmark,
+  Box,
+  Brain,
+  Briefcase,
+  Bug,
+  Calendar,
   ChevronRight,
+  CircleDot,
+  Code,
+  Coffee,
+  Cpu,
+  Database,
+  FileCode,
   FileText,
+  Flame,
   FolderClosed,
   FolderInput,
   FolderOpen,
   FolderPlus,
+  Gamepad2,
+  Globe,
+  GraduationCap,
+  Heart,
+  Home,
+  type LucideIcon,
+  Lightbulb,
+  Lock,
+  Map as MapIcon,
+  MessageCircle,
+  Music,
   Palette,
   Pencil,
   Pin,
   PinOff,
   Plus,
+  Rocket,
+  Shield,
+  ShoppingCart,
+  Sparkles,
+  Star,
+  Target,
   Trash2,
+  Trophy,
+  Users,
+  Wrench,
+  Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -51,26 +88,38 @@ interface NotebookTreeProps {
   onUpdateNote: (id: string, updates: { icon?: string | null }) => void;
 }
 
-const ITEM_ICONS = [
-  // Documents
-  "\u{1F4C4}", "\u{1F4DD}", "\u{1F4CB}", "\u{1F4D1}", "\u{1F4DC}",
-  // Folders/Organization
-  "\u{1F4C1}", "\u{1F4C2}", "\u{1F5C2}\uFE0F", "\u{1F4DA}", "\u{1F5C3}\uFE0F",
-  // Work
-  "\u{1F4BC}", "\u{1F3E2}", "\u{1F4CA}", "\u{1F4C8}", "\u{1F4BB}",
-  // Creative
-  "\u{1F3A8}", "\u270F\uFE0F", "\u{1F58A}\uFE0F", "\u{1F4D0}", "\u{1F3AD}",
-  // Science/Tech
-  "\u{1F52C}", "\u2697\uFE0F", "\u{1F9EA}", "\u{1F527}", "\u2699\uFE0F",
-  // Ideas/Goals
-  "\u{1F4A1}", "\u{1F3AF}", "\u{1F680}", "\u2B50", "\u{1F3C6}",
-  // Nature/Life
-  "\u{1F30D}", "\u{1F331}", "\u{1F30A}", "\u2600\uFE0F", "\u{1F319}",
-  // Symbols
-  "\u2764\uFE0F", "\u{1F525}", "\u26A1", "\u{1F511}", "\u{1F512}",
-  // People
-  "\u{1F464}", "\u{1F465}", "\u{1F9E0}", "\u{1F4AC}", "\u{1F4DE}",
-];
+// Icon registry: name → Lucide component. Stored as string in DB.
+const ICON_MAP: Record<string, LucideIcon> = {
+  // Documents & Files
+  "file-text": FileText, "file-code": FileCode, "book-open": BookOpen,
+  "bookmark": Bookmark, "archive": Archive, "database": Database,
+  // Work & Organization
+  "briefcase": Briefcase, "calendar": Calendar, "users": Users,
+  "shopping-cart": ShoppingCart, "box": Box, "map": MapIcon,
+  // Creative & Ideas
+  "palette": Palette, "pencil": Pencil, "lightbulb": Lightbulb,
+  "sparkles": Sparkles, "music": Music, "gamepad": Gamepad2,
+  // Science & Tech
+  "code": Code, "cpu": Cpu, "beaker": Beaker,
+  "bug": Bug, "wrench": Wrench, "globe": Globe,
+  // Goals & Symbols
+  "star": Star, "target": Target, "rocket": Rocket,
+  "trophy": Trophy, "zap": Zap, "flame": Flame,
+  // Life & Misc
+  "heart": Heart, "home": Home, "shield": Shield,
+  "lock": Lock, "brain": Brain, "coffee": Coffee,
+  "graduation-cap": GraduationCap, "message-circle": MessageCircle,
+  "circle-dot": CircleDot, "pin": Pin,
+};
+
+const ICON_NAMES = Object.keys(ICON_MAP);
+
+/** Render a stored icon name as a Lucide component */
+export function ItemIcon({ name, className }: { name: string; className?: string }) {
+  const Icon = ICON_MAP[name];
+  if (!Icon) return <FileText className={className} />;
+  return <Icon className={className} />;
+}
 
 const ITEM_COLORS = [
   null, // reset
@@ -355,8 +404,8 @@ export function NotebookTree({
               )}
 
               {/* Icon */}
-              {item.icon ? (
-                <span className="text-sm shrink-0 w-4 text-center">{item.icon}</span>
+              {item.icon && ICON_MAP[item.icon] ? (
+                <ItemIcon name={item.icon} className={`w-3.5 h-3.5 shrink-0 ${isSelected ? "text-brand" : "text-secondary"}`} />
               ) : isFolder ? (
                 item.isExpanded ? (
                   <FolderOpen
@@ -546,23 +595,27 @@ function TreeContextMenu({
           onToggle={() => toggleSubmenu("appearance")}
           panelClassName="context-menu absolute left-full top-0 ml-1 py-1 w-[280px] animate-[menu-appear_100ms_ease-out]"
         >
-          {/* Emoji icons */}
-          <div className="grid grid-cols-8 gap-1 p-2 max-h-44 overflow-y-auto">
-            {ITEM_ICONS.map((icon) => (
-              <button
-                key={icon}
-                type="button"
-                onClick={() => {
-                  onUpdateNotebook(target.notebook.id, { icon, color: null });
-                  onClose();
-                }}
-                className={`w-7 h-7 rounded-md flex items-center justify-center text-base hover:bg-white/[0.1] hover:scale-110 transition-all ${
-                  target.notebook.icon === icon ? "bg-white/[0.12] ring-1 ring-brand/40" : ""
-                }`}
-              >
-                {icon}
-              </button>
-            ))}
+          {/* Lucide icons */}
+          <div className="grid grid-cols-6 gap-0.5 p-2 max-h-48 overflow-y-auto">
+            {ICON_NAMES.map((name) => {
+              const Icon = ICON_MAP[name];
+              return (
+                <button
+                  key={name}
+                  type="button"
+                  onClick={() => {
+                    onUpdateNotebook(target.notebook.id, { icon: name, color: null });
+                    onClose();
+                  }}
+                  className={`w-8 h-8 rounded-md flex items-center justify-center hover:bg-white/[0.1] transition-colors ${
+                    target.notebook.icon === name ? "bg-white/[0.12] ring-1 ring-brand/40" : ""
+                  }`}
+                  title={name}
+                >
+                  <Icon className="w-4 h-4 text-secondary" />
+                </button>
+              );
+            })}
           </div>
           {/* Divider + color row */}
           <div className="h-px bg-white/[0.08] mx-2" />
@@ -635,22 +688,26 @@ function TreeContextMenu({
         onToggle={() => toggleSubmenu("appearance")}
         panelClassName="context-menu absolute left-full top-0 ml-1 py-1 w-[280px] animate-[menu-appear_100ms_ease-out]"
       >
-        <div className="grid grid-cols-8 gap-1 p-2 max-h-44 overflow-y-auto">
-          {ITEM_ICONS.map((icon) => (
-            <button
-              key={icon}
-              type="button"
-              onClick={() => {
-                onUpdateNote(note.id, { icon });
-                onClose();
-              }}
-              className={`w-7 h-7 rounded-md flex items-center justify-center text-base hover:bg-white/[0.1] hover:scale-110 transition-all ${
-                note.icon === icon ? "bg-white/[0.12] ring-1 ring-brand/40" : ""
-              }`}
-            >
-              {icon}
-            </button>
-          ))}
+        <div className="grid grid-cols-6 gap-0.5 p-2 max-h-48 overflow-y-auto">
+          {ICON_NAMES.map((name) => {
+            const Icon = ICON_MAP[name];
+            return (
+              <button
+                key={name}
+                type="button"
+                onClick={() => {
+                  onUpdateNote(note.id, { icon: name });
+                  onClose();
+                }}
+                className={`w-8 h-8 rounded-md flex items-center justify-center hover:bg-white/[0.1] transition-colors ${
+                  note.icon === name ? "bg-white/[0.12] ring-1 ring-brand/40" : ""
+                }`}
+                title={name}
+              >
+                <Icon className="w-4 h-4 text-secondary" />
+              </button>
+            );
+          })}
         </div>
         {/* Reset button */}
         <div className="h-px bg-white/[0.08] mx-2" />
