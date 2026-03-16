@@ -1,6 +1,5 @@
 import { ipc } from "@shared/hooks/useIpc";
 import type { Note, NoteUpdateParams } from "@shared/types";
-import { GitGraph, History, PenLine } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { EditorContentWrapper, useEntityResolution, useNoteEditor } from "./editor/EditorCore";
@@ -11,6 +10,7 @@ import { VimCommandLine } from "./editor/VimCommandLine";
 import type { VimMode } from "./editor/vim";
 import { getVimPlugin, VIM_SAVE_EVENT } from "./editor/vim";
 import { WikiLinkMenu } from "./editor/WikiLinkNode";
+import { LinkInsertDialog } from "./LinkInsertDialog";
 import { NoteVersionHistory } from "./NoteVersionHistory";
 
 const VERSION_INTERVAL_MS = 5 * 60 * 1000; // Minimum interval between auto-saving version snapshots
@@ -22,9 +22,18 @@ interface NoteEditorProps {
   onSave: (params: NoteUpdateParams) => void;
   viewMode: NotesViewMode;
   onViewModeChange: (mode: NotesViewMode) => void;
+  onToggleFocusMode?: () => void;
+  focusModeActive?: boolean;
 }
 
-export function NoteEditor({ note, onSave, viewMode, onViewModeChange }: NoteEditorProps) {
+export function NoteEditor({
+  note,
+  onSave,
+  viewMode,
+  onViewModeChange,
+  onToggleFocusMode,
+  focusModeActive,
+}: NoteEditorProps) {
   const navigate = useNavigate();
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastNoteIdRef = useRef(note.id);
@@ -35,6 +44,12 @@ export function NoteEditor({ note, onSave, viewMode, onViewModeChange }: NoteEdi
   noteContentRef.current = note.bodyHtml || note.body || "";
   const lastVersionTimeRef = useRef(0);
   const [showHistory, setShowHistory] = useState(false);
+
+  // Link/image insert dialog state
+  const [linkDialog, setLinkDialog] = useState<{ type: "link" | "image"; isOpen: boolean }>({
+    type: "link",
+    isOpen: false,
+  });
 
   // Vim state
   const [vimEnabled, setVimEnabled] = useState(
@@ -215,54 +230,21 @@ export function NoteEditor({ note, onSave, viewMode, onViewModeChange }: NoteEdi
     <div className="flex-1 flex gap-2 min-w-0 min-h-0">
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
         {/* Controls bar */}
-        <div className="px-2 pb-0 shrink-0 flex flex-col gap-2">
-          {/* Row 1: Formatting toolbar */}
+        <div className="px-2 pb-0 shrink-0">
           <EditorToolbar
             editor={editor}
             vimEnabled={vimEnabled}
             vimMode={vimMode}
             onToggleVim={toggleVim}
+            onOpenLinkDialog={() => setLinkDialog({ type: "link", isOpen: true })}
+            onOpenImageDialog={() => setLinkDialog({ type: "image", isOpen: true })}
+            onToggleFocusMode={onToggleFocusMode}
+            onToggleGraphMode={() => onViewModeChange(viewMode === "graph" ? "editor" : "graph")}
+            onToggleVersionHistory={() => setShowHistory(!showHistory)}
+            focusModeActive={focusModeActive}
+            graphModeActive={viewMode === "graph"}
+            versionHistoryActive={showHistory}
           />
-
-          {/* Row 2: Toggle buttons */}
-          <div className="flex items-center justify-end gap-0.5">
-            <button
-              type="button"
-              onClick={() => setShowHistory(!showHistory)}
-              className={`p-1.5 rounded-lg transition-all ${
-                showHistory
-                  ? "bg-white/[0.1] text-primary"
-                  : "text-dim hover:text-secondary hover:bg-white/[0.04]"
-              }`}
-              aria-label="Toggle version history"
-            >
-              <History className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => onViewModeChange("editor")}
-              className={`p-1.5 rounded-lg transition-all ${
-                viewMode === "editor"
-                  ? "bg-white/[0.1] text-primary"
-                  : "text-dim hover:text-secondary hover:bg-white/[0.04]"
-              }`}
-              aria-label="Editor view"
-            >
-              <PenLine className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => onViewModeChange("graph")}
-              className={`p-1.5 rounded-lg transition-all ${
-                viewMode === "graph"
-                  ? "bg-white/[0.1] text-primary"
-                  : "text-dim hover:text-secondary hover:bg-white/[0.04]"
-              }`}
-              aria-label="Graph view"
-            >
-              <GitGraph className="w-4 h-4" />
-            </button>
-          </div>
         </div>
 
         {/* Gradient separator */}
@@ -289,11 +271,26 @@ export function NoteEditor({ note, onSave, viewMode, onViewModeChange }: NoteEdi
           )}
         </div>
         {editor && <SlashMenu editor={editor} />}
-        {editor && <WikiLinkMenu editor={editor} />}
+        {editor && <WikiLinkMenu editor={editor} currentNoteTitle={note.title} />}
         {editor && <EntityMentionMenu editor={editor} />}
       </div>
 
       {showHistory && <NoteVersionHistory noteId={note.id} onRestore={handleRestore} />}
+
+      {/* Link/Image insert dialog */}
+      <LinkInsertDialog
+        type={linkDialog.type}
+        isOpen={linkDialog.isOpen}
+        onClose={() => setLinkDialog((prev) => ({ ...prev, isOpen: false }))}
+        onInsert={(url) => {
+          if (!editor) return;
+          if (linkDialog.type === "link") {
+            editor.chain().focus().setLink({ href: url }).run();
+          } else {
+            editor.chain().focus().setImage({ src: url }).run();
+          }
+        }}
+      />
     </div>
   );
 }

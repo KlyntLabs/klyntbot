@@ -5,10 +5,13 @@ import {
   AlignRight,
   Bold,
   Code,
+  Expand,
+  GitGraph,
   Heading1,
   Heading2,
   Heading3,
   Highlighter,
+  History,
   ImageIcon,
   Italic,
   Link,
@@ -29,6 +32,14 @@ interface EditorToolbarProps {
   vimEnabled: boolean;
   vimMode: VimMode;
   onToggleVim: () => void;
+  onOpenLinkDialog?: () => void;
+  onOpenImageDialog?: () => void;
+  onToggleFocusMode?: () => void;
+  onToggleGraphMode?: () => void;
+  onToggleVersionHistory?: () => void;
+  focusModeActive?: boolean;
+  graphModeActive?: boolean;
+  versionHistoryActive?: boolean;
 }
 
 interface ToolbarButton {
@@ -38,145 +49,149 @@ interface ToolbarButton {
   isActive?: (editor: Editor) => boolean;
 }
 
-const groups: ToolbarButton[][] = [
-  [
-    {
-      icon: Bold,
-      label: "Bold",
-      action: (e) => e.chain().focus().toggleBold().run(),
-      isActive: (e) => e.isActive("bold"),
-    },
-    {
-      icon: Italic,
-      label: "Italic",
-      action: (e) => e.chain().focus().toggleItalic().run(),
-      isActive: (e) => e.isActive("italic"),
-    },
-    {
-      icon: UnderlineIcon,
-      label: "Underline",
-      action: (e) => e.chain().focus().toggleUnderline().run(),
-      isActive: (e) => e.isActive("underline"),
-    },
-    {
-      icon: Strikethrough,
-      label: "Strikethrough",
-      action: (e) => e.chain().focus().toggleStrike().run(),
-      isActive: (e) => e.isActive("strike"),
-    },
-    {
-      icon: Code,
-      label: "Inline code",
-      action: (e) => e.chain().focus().toggleCode().run(),
-      isActive: (e) => e.isActive("code"),
-    },
-    {
-      icon: Highlighter,
-      label: "Highlight",
-      action: (e) => e.chain().focus().toggleHighlight().run(),
-      isActive: (e) => e.isActive("highlight"),
-    },
-  ],
-  [
-    {
-      icon: Heading1,
-      label: "Heading 1",
-      action: (e) => e.chain().focus().toggleHeading({ level: 1 }).run(),
-      isActive: (e) => e.isActive("heading", { level: 1 }),
-    },
-    {
-      icon: Heading2,
-      label: "Heading 2",
-      action: (e) => e.chain().focus().toggleHeading({ level: 2 }).run(),
-      isActive: (e) => e.isActive("heading", { level: 2 }),
-    },
-    {
-      icon: Heading3,
-      label: "Heading 3",
-      action: (e) => e.chain().focus().toggleHeading({ level: 3 }).run(),
-      isActive: (e) => e.isActive("heading", { level: 3 }),
-    },
-  ],
-  [
-    {
-      icon: List,
-      label: "Bullet list",
-      action: (e) => e.chain().focus().toggleBulletList().run(),
-      isActive: (e) => e.isActive("bulletList"),
-    },
-    {
-      icon: ListOrdered,
-      label: "Ordered list",
-      action: (e) => e.chain().focus().toggleOrderedList().run(),
-      isActive: (e) => e.isActive("orderedList"),
-    },
-    {
-      icon: ListChecks,
-      label: "Task list",
-      action: (e) => e.chain().focus().toggleTaskList().run(),
-      isActive: (e) => e.isActive("taskList"),
-    },
-    {
-      icon: Quote,
-      label: "Blockquote",
-      action: (e) => e.chain().focus().toggleBlockquote().run(),
-      isActive: (e) => e.isActive("blockquote"),
-    },
-    {
-      icon: Minus,
-      label: "Horizontal rule",
-      action: (e) => e.chain().focus().setHorizontalRule().run(),
-    },
-  ],
-  [
-    {
-      icon: Table,
-      label: "Insert table",
-      action: (e) => e.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
-    },
-    {
-      icon: Link,
-      label: "Link",
-      action: (e) => {
-        if (e.isActive("link")) {
-          e.chain().focus().unsetLink().run();
-          return;
-        }
-        const url = window.prompt("URL:");
-        if (url) e.chain().focus().setLink({ href: url }).run();
+function buildGroups(callbacks?: {
+  onOpenLinkDialog?: () => void;
+  onOpenImageDialog?: () => void;
+}): ToolbarButton[][] {
+  return [
+    [
+      {
+        icon: Bold,
+        label: "Bold",
+        action: (e) => e.chain().focus().toggleBold().run(),
+        isActive: (e) => e.isActive("bold"),
       },
-      isActive: (e) => e.isActive("link"),
-    },
-    {
-      icon: ImageIcon,
-      label: "Image",
-      action: (e) => {
-        const url = window.prompt("Image URL:");
-        if (url) e.chain().focus().setImage({ src: url }).run();
+      {
+        icon: Italic,
+        label: "Italic",
+        action: (e) => e.chain().focus().toggleItalic().run(),
+        isActive: (e) => e.isActive("italic"),
       },
-    },
-  ],
-  [
-    {
-      icon: AlignLeft,
-      label: "Align left",
-      action: (e) => e.chain().focus().setTextAlign("left").run(),
-      isActive: (e) => e.isActive({ textAlign: "left" }),
-    },
-    {
-      icon: AlignCenter,
-      label: "Align center",
-      action: (e) => e.chain().focus().setTextAlign("center").run(),
-      isActive: (e) => e.isActive({ textAlign: "center" }),
-    },
-    {
-      icon: AlignRight,
-      label: "Align right",
-      action: (e) => e.chain().focus().setTextAlign("right").run(),
-      isActive: (e) => e.isActive({ textAlign: "right" }),
-    },
-  ],
-];
+      {
+        icon: UnderlineIcon,
+        label: "Underline",
+        action: (e) => e.chain().focus().toggleUnderline().run(),
+        isActive: (e) => e.isActive("underline"),
+      },
+      {
+        icon: Strikethrough,
+        label: "Strikethrough",
+        action: (e) => e.chain().focus().toggleStrike().run(),
+        isActive: (e) => e.isActive("strike"),
+      },
+      {
+        icon: Code,
+        label: "Inline code",
+        action: (e) => e.chain().focus().toggleCode().run(),
+        isActive: (e) => e.isActive("code"),
+      },
+      {
+        icon: Highlighter,
+        label: "Highlight",
+        action: (e) => e.chain().focus().toggleHighlight().run(),
+        isActive: (e) => e.isActive("highlight"),
+      },
+    ],
+    [
+      {
+        icon: Heading1,
+        label: "Heading 1",
+        action: (e) => e.chain().focus().toggleHeading({ level: 1 }).run(),
+        isActive: (e) => e.isActive("heading", { level: 1 }),
+      },
+      {
+        icon: Heading2,
+        label: "Heading 2",
+        action: (e) => e.chain().focus().toggleHeading({ level: 2 }).run(),
+        isActive: (e) => e.isActive("heading", { level: 2 }),
+      },
+      {
+        icon: Heading3,
+        label: "Heading 3",
+        action: (e) => e.chain().focus().toggleHeading({ level: 3 }).run(),
+        isActive: (e) => e.isActive("heading", { level: 3 }),
+      },
+    ],
+    [
+      {
+        icon: List,
+        label: "Bullet list",
+        action: (e) => e.chain().focus().toggleBulletList().run(),
+        isActive: (e) => e.isActive("bulletList"),
+      },
+      {
+        icon: ListOrdered,
+        label: "Ordered list",
+        action: (e) => e.chain().focus().toggleOrderedList().run(),
+        isActive: (e) => e.isActive("orderedList"),
+      },
+      {
+        icon: ListChecks,
+        label: "Task list",
+        action: (e) => e.chain().focus().toggleTaskList().run(),
+        isActive: (e) => e.isActive("taskList"),
+      },
+      {
+        icon: Quote,
+        label: "Blockquote",
+        action: (e) => e.chain().focus().toggleBlockquote().run(),
+        isActive: (e) => e.isActive("blockquote"),
+      },
+      {
+        icon: Minus,
+        label: "Horizontal rule",
+        action: (e) => e.chain().focus().setHorizontalRule().run(),
+      },
+    ],
+    [
+      {
+        icon: Table,
+        label: "Insert table",
+        action: (e) =>
+          e.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
+      },
+      {
+        icon: Link,
+        label: "Link",
+        action: (e) => {
+          if (e.isActive("link")) {
+            e.chain().focus().unsetLink().run();
+            return;
+          }
+          callbacks?.onOpenLinkDialog?.();
+        },
+        isActive: (e) => e.isActive("link"),
+      },
+      {
+        icon: ImageIcon,
+        label: "Image",
+        action: () => {
+          callbacks?.onOpenImageDialog?.();
+        },
+      },
+    ],
+    [
+      {
+        icon: AlignLeft,
+        label: "Align left",
+        action: (e) => e.chain().focus().setTextAlign("left").run(),
+        isActive: (e) => e.isActive({ textAlign: "left" }),
+      },
+      {
+        icon: AlignCenter,
+        label: "Align center",
+        action: (e) => e.chain().focus().setTextAlign("center").run(),
+        isActive: (e) => e.isActive({ textAlign: "center" }),
+      },
+      {
+        icon: AlignRight,
+        label: "Align right",
+        action: (e) => e.chain().focus().setTextAlign("right").run(),
+        isActive: (e) => e.isActive({ textAlign: "right" }),
+      },
+    ],
+  ];
+}
 
 function VimToggleButton({
   vimEnabled,
@@ -201,17 +216,82 @@ function VimToggleButton({
   );
 }
 
-export function EditorToolbar({ editor, vimEnabled, vimMode, onToggleVim }: EditorToolbarProps) {
+export function EditorToolbar({
+  editor,
+  vimEnabled,
+  vimMode,
+  onToggleVim,
+  onOpenLinkDialog,
+  onOpenImageDialog,
+  onToggleFocusMode,
+  onToggleGraphMode,
+  onToggleVersionHistory,
+  focusModeActive,
+  graphModeActive,
+  versionHistoryActive,
+}: EditorToolbarProps) {
   if (!editor) return null;
+
+  const modeButtons = (
+    <div className="flex items-center gap-0.5 ml-auto">
+      {onToggleFocusMode && (
+        <button
+          type="button"
+          onClick={onToggleFocusMode}
+          title="Focus mode"
+          className={`p-1.5 rounded-lg transition-all ${
+            focusModeActive
+              ? "bg-white/[0.1] text-primary"
+              : "text-dim hover:text-secondary hover:bg-white/[0.04]"
+          }`}
+        >
+          <Expand className="w-3.5 h-3.5" strokeWidth={1.5} />
+        </button>
+      )}
+      {onToggleGraphMode && (
+        <button
+          type="button"
+          onClick={onToggleGraphMode}
+          title="Graph mode"
+          className={`p-1.5 rounded-lg transition-all ${
+            graphModeActive
+              ? "bg-white/[0.1] text-primary"
+              : "text-dim hover:text-secondary hover:bg-white/[0.04]"
+          }`}
+        >
+          <GitGraph className="w-3.5 h-3.5" strokeWidth={1.5} />
+        </button>
+      )}
+      {onToggleVersionHistory && (
+        <button
+          type="button"
+          onClick={onToggleVersionHistory}
+          title="Version history"
+          className={`p-1.5 rounded-lg transition-all ${
+            versionHistoryActive
+              ? "bg-white/[0.1] text-primary"
+              : "text-dim hover:text-secondary hover:bg-white/[0.04]"
+          }`}
+        >
+          <History className="w-3.5 h-3.5" strokeWidth={1.5} />
+        </button>
+      )}
+    </div>
+  );
 
   if (vimEnabled) {
     return (
       <div className="glass-toolbar rounded-lg px-2 py-1 flex items-center justify-between">
         <VimStatusLine mode={vimMode} />
-        <VimToggleButton vimEnabled={vimEnabled} onToggleVim={onToggleVim} />
+        <div className="flex items-center gap-1">
+          <VimToggleButton vimEnabled={vimEnabled} onToggleVim={onToggleVim} />
+          {modeButtons}
+        </div>
       </div>
     );
   }
+
+  const groups = buildGroups({ onOpenLinkDialog, onOpenImageDialog });
 
   return (
     <div className="glass-toolbar rounded-lg px-2 py-1 flex items-center gap-0.5 flex-wrap">
@@ -241,6 +321,7 @@ export function EditorToolbar({ editor, vimEnabled, vimMode, onToggleVim }: Edit
       ))}
       <div className="w-px h-4 bg-white/[0.08] mx-1.5" />
       <VimToggleButton vimEnabled={vimEnabled} onToggleVim={onToggleVim} />
+      {modeButtons}
     </div>
   );
 }
