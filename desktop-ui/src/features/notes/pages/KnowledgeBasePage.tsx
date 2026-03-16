@@ -108,7 +108,14 @@ export default function KnowledgeBasePage() {
 
   // ── Insight derived state ─────────────────────────────────────────────
   const insightOpen = insightState.isOpen;
-  const effectiveRightWidth = insightOpen ? 640 : rightWidth;
+  const insightPanelWidth = useMemo(() => {
+    const container = containerRef.current;
+    if (!container) return 480;
+    // Leave at least 300px for the editor + left sidebar space
+    const available = container.clientWidth - leftWidth - 20;
+    return Math.max(360, Math.min(640, available * 0.65));
+  }, [leftWidth, insightOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+  const effectiveRightWidth = insightOpen ? insightPanelWidth : rightWidth;
 
   // ── Mutations ─────────────────────────────────────────────────────────
   const { mutate: createNote } = useMutation<Note, NoteCreateParams>("note_create", "params");
