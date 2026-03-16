@@ -425,6 +425,67 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_get_backlinks_with_context() {
+        let repo = setup().await;
+        let target = sample_note("target", "Target Note");
+        repo.create_note(&target).await.unwrap();
+
+        let mut source = sample_note("source", "Source Note");
+        source.body = "This links to [[Target Note]] in context".to_string();
+        repo.create_note(&source).await.unwrap();
+
+        repo.set_links("source", &["target".to_string()])
+            .await
+            .unwrap();
+
+        let backlinks = repo.get_backlinks_with_context("target").await.unwrap();
+        assert_eq!(backlinks.len(), 1);
+        assert_eq!(backlinks[0].0.id, "source");
+        assert!(backlinks[0].1.as_ref().unwrap().contains("[[Target Note]]"));
+    }
+
+    #[tokio::test]
+    async fn test_list_notes_paginated() {
+        let repo = setup().await;
+
+        for i in 0..10 {
+            let note = sample_note(&format!("n{i}"), &format!("Note {i}"));
+            repo.create_note(&note).await.unwrap();
+        }
+
+        let page1 = repo.list_notes_paginated(None, None, 5, 0).await.unwrap();
+        assert_eq!(page1.len(), 5);
+
+        let page2 = repo.list_notes_paginated(None, None, 5, 5).await.unwrap();
+        assert_eq!(page2.len(), 5);
+
+        let all = repo.list_notes_paginated(None, None, 50, 0).await.unwrap();
+        assert_eq!(all.len(), 10);
+    }
+
+    #[tokio::test]
+    async fn test_list_notes_with_tag_filter() {
+        let repo = setup().await;
+
+        let a = sample_note("a", "Rust Note");
+        repo.create_note(&a).await.unwrap();
+        let b = sample_note("b", "Python Note");
+        repo.create_note(&b).await.unwrap();
+        let c = sample_note("c", "Untagged Note");
+        repo.create_note(&c).await.unwrap();
+
+        repo.set_tags("a", &["rust".to_string()]).await.unwrap();
+        repo.set_tags("b", &["python".to_string()]).await.unwrap();
+
+        let results = repo
+            .list_notes_paginated(None, Some(&["rust".to_string()]), 50, 0)
+            .await
+            .unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].title, "Rust Note");
+    }
+
+    #[tokio::test]
     async fn test_get_all_tags() {
         let repo = setup().await;
         let a = repo.create_note(&sample_note("a", "Note A")).await.unwrap();

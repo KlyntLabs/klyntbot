@@ -117,6 +117,57 @@ impl NoteRepo {
         Ok(result.rows_affected() > 0)
     }
 
+    /// List notes with optional filters and pagination.
+    ///
+    /// When `tags` is `Some`, only notes matching **all** given tags are returned (AND logic).
+    pub async fn list_notes_paginated(
+        &self,
+        notebook_id: Option<&str>,
+        tags: Option<&[String]>,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<NoteRow>, StorageError> {
+        let mut sql = String::from("SELECT * FROM notes WHERE archived = 0");
+        let mut bind_index: usize = 1;
+
+        if notebook_id.is_some() {
+            sql.push_str(&format!(" AND notebook_id = ?{bind_index}"));
+            bind_index += 1;
+        }
+
+        if let Some(tags) = tags {
+            for _ in tags {
+                sql.push_str(&format!(
+                    " AND id IN (SELECT note_id FROM note_tags WHERE tag = ?{bind_index})"
+                ));
+                bind_index += 1;
+            }
+        }
+
+        sql.push_str(&format!(
+            " ORDER BY pinned DESC, updated_at DESC LIMIT ?{} OFFSET ?{}",
+            bind_index,
+            bind_index + 1
+        ));
+
+        let mut query = sqlx::query_as::<_, NoteRow>(&sql);
+
+        if let Some(nb) = notebook_id {
+            query = query.bind(nb.to_string());
+        }
+
+        if let Some(tags) = tags {
+            for tag in tags {
+                query = query.bind(tag.clone());
+            }
+        }
+
+        query = query.bind(limit).bind(offset);
+
+        let rows = query.fetch_all(&self.pool).await?;
+        Ok(rows)
+    }
+
     /// Quick liveness check — verifies the notes table is accessible.
     pub async fn check_health(&self) -> Result<(), StorageError> {
         sqlx::query("SELECT 1 FROM notes LIMIT 1")

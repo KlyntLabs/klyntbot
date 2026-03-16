@@ -90,6 +90,35 @@ impl NoteRepo {
         Ok(rows)
     }
 
+    /// Get notes that link TO the given note, returning the source note row
+    /// and an optional context snippet (the line containing `[[`).
+    pub async fn get_backlinks_with_context(
+        &self,
+        note_id: &str,
+    ) -> Result<Vec<(NoteRow, Option<String>)>, StorageError> {
+        let rows: Vec<NoteRow> = sqlx::query_as(
+            r#"SELECT n.* FROM note_links nl
+               JOIN notes n ON n.id = nl.source_id
+               WHERE nl.target_id = ?1 AND n.archived = 0
+               ORDER BY n.updated_at DESC"#,
+        )
+        .bind(note_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|row| {
+                let context = row
+                    .body
+                    .lines()
+                    .find(|line| line.contains("[["))
+                    .map(|line| line.trim().to_string());
+                (row, context)
+            })
+            .collect())
+    }
+
     pub async fn get_all_links(&self) -> Result<Vec<NoteLinkRow>, StorageError> {
         let rows = sqlx::query_as::<_, NoteLinkRow>("SELECT * FROM note_links")
             .fetch_all(&self.pool)
