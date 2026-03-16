@@ -232,6 +232,7 @@ use common::Result;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use sqlx::SqlitePool;
+use uuid::Uuid;
 
 use crate::services::decay::update_stability;
 
@@ -271,13 +272,21 @@ pub enum ReviewQuality {
 }
 
 impl ReviewQuality {
-    /// Stability multiplier for each grade.
-    fn stability_factor(&self) -> f64 {
+    /// Compute new stability based on review quality.
+    /// Again: halve current stability (lapse).
+    /// Hard: keep current (no growth, but not a lapse).
+    /// Good: standard FSRS log-curve growth via update_stability.
+    /// Easy: 1.3x the FSRS growth.
+    fn compute_new_stability(&self, current: f64, max: f64) -> f64 {
         match self {
-            Self::Again => 0.5,  // halve stability on lapse
-            Self::Hard => 0.8,
-            Self::Good => 1.0,   // normal update_stability growth
-            Self::Easy => 1.3,
+            Self::Again => (current * 0.5).max(0.1),
+            Self::Hard => current,
+            Self::Good => update_stability(current, true, max),
+            Self::Easy => {
+                let grown = update_stability(current, true, max);
+                let delta = grown - current;
+                (current + delta * 1.3).min(max)
+            }
         }
     }
     fn is_success(&self) -> bool {
@@ -344,7 +353,7 @@ impl FlashcardRepo {
         let mut results = Vec::with_capacity(cards.len());
 
         for card in cards {
-            let id = nanoid::nanoid!();
+            let id = uuid::Uuid::new_v4().to_string();
             let card_type_str = card.card_type.as_str();
             let choices_str = card.choices.map(|v| v.to_string());
 
@@ -411,9 +420,8 @@ impl FlashcardRepo {
         let now = Utc::now();
         let now_str = now.to_rfc3339();
 
-        // Update stability using existing FSRS decay function
-        let base_new_stability = update_stability(row.stability, quality.is_success(), MAX_STABILITY);
-        let new_stability = (base_new_stability * quality.stability_factor()).max(0.1);
+        // Update stability using FSRS-inspired scheduling
+        let new_stability = quality.compute_new_stability(row.stability, MAX_STABILITY);
 
         // Compute next due date: now + stability days
         let interval_secs = (new_stability * 86400.0) as i64;
@@ -583,7 +591,7 @@ impl InsightCacheRepo {
         concept_map: Option<&str>,
     ) -> Result<InsightCacheRow> {
         let now = Utc::now().to_rfc3339();
-        let id = nanoid::nanoid!();
+        let id = uuid::Uuid::new_v4().to_string();
         sqlx::query(
             "INSERT INTO insight_review_cache (id, note_id, content_hash, synthesis, gap_analysis, self_assessment, concept_map, created_at, updated_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8)
@@ -625,15 +633,14 @@ impl InsightCacheRepo {
         content: &str,
     ) -> Result<()> {
         let now = Utc::now().to_rfc3339();
-        let col = match tab {
-            "synthesis" => "synthesis",
-            "gaps" => "gap_analysis",
-            "assessment" => "self_assessment",
-            "concept-map" => "concept_map",
+        let query = match tab {
+            "synthesis" => "UPDATE insight_review_cache SET synthesis = ?1, updated_at = ?2 WHERE note_id = ?3 AND content_hash = ?4",
+            "gaps" => "UPDATE insight_review_cache SET gap_analysis = ?1, updated_at = ?2 WHERE note_id = ?3 AND content_hash = ?4",
+            "assessment" => "UPDATE insight_review_cache SET self_assessment = ?1, updated_at = ?2 WHERE note_id = ?3 AND content_hash = ?4",
+            "concept-map" => "UPDATE insight_review_cache SET concept_map = ?1, updated_at = ?2 WHERE note_id = ?3 AND content_hash = ?4",
             _ => return Err(common::KlyntbotError::internal(format!("Unknown tab: {tab}"))),
         };
-        let sql = format!("UPDATE insight_review_cache SET {col} = ?1, updated_at = ?2 WHERE note_id = ?3 AND content_hash = ?4");
-        sqlx::query(&sql)
+        sqlx::query(query)
             .bind(content)
             .bind(&now)
             .bind(note_id)
@@ -813,15 +820,23 @@ This task creates stub handlers. The actual LLM integration comes in Task 7.
 Create `crates/app-core/src/handlers/notes/insight.rs`:
 
 ```rust
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
+use sha2::{Sha256, Digest};
 
 use desktop_shared::commands::{
     FlashcardResponse, InsightReviewResponse, InsightReviewStarted, QuizQuestion, TabContent,
 };
 use desktop_shared::errors::ApiError;
+use feature_notes::models::NoteRow;
 
 use crate::state::AppCore;
+
+/// Assembled context for LLM prompts.
+pub struct InsightContext {
+    pub note: NoteRow,
+    pub related: Vec<(String, String)>, // (title, body_preview)
+    pub facts: Vec<String>,
+    pub backlinks: Vec<String>,
+}
 
 impl AppCore {
     /// Start insight review: check cache, return initial response.
@@ -836,7 +851,7 @@ impl AppCore {
             .ok_or_else(|| ApiError::new("NOT_FOUND", "Note not found"))?;
 
         let content_hash = self.compute_insight_hash(note_id, &note.body).await;
-        let insight_review_id = nanoid::nanoid!();
+        let insight_review_id = uuid::Uuid::new_v4().to_string();
 
         // Check cache
         if let Some(cached) = self
@@ -948,7 +963,7 @@ impl AppCore {
         Ok(rows.into_iter().map(flashcard_row_to_response).collect())
     }
 
-    /// Compute content hash for cache key.
+    /// Compute SHA-256 content hash for cache key (deterministic across restarts).
     async fn compute_insight_hash(&self, note_id: &str, body: &str) -> String {
         // Get related note IDs from suggestions scoring
         let mut related_ids = Vec::new();
@@ -959,10 +974,10 @@ impl AppCore {
         }
         related_ids.sort();
 
-        let mut hasher = DefaultHasher::new();
-        body.hash(&mut hasher);
-        related_ids.join(",").hash(&mut hasher);
-        format!("{:x}", hasher.finish())
+        let mut hasher = Sha256::new();
+        hasher.update(body.as_bytes());
+        hasher.update(related_ids.join(",").as_bytes());
+        format!("{:x}", hasher.finalize())
     }
 }
 
@@ -1001,15 +1016,20 @@ pub insight_cache_repo: cognitive::repos::InsightCacheRepo,
 
 And initialize them in `crates/app-core/src/init/mod.rs` where other repos are created (using `pool.clone()` from the storage pool).
 
-- [ ] **Step 4: Verify it compiles**
+- [ ] **Step 4: Add sha2 dependency to app-core**
+
+Run: `cd crates/app-core && cargo add sha2`
+(Or add to workspace deps if not already there.)
+
+- [ ] **Step 5: Verify it compiles**
 
 Run: `cargo build -p app-core`
 Expected: success.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add crates/app-core/src/handlers/notes/insight.rs crates/app-core/src/handlers/notes/mod.rs crates/app-core/src/state.rs crates/app-core/src/init/mod.rs
+git add crates/app-core/src/handlers/notes/insight.rs crates/app-core/src/handlers/notes/mod.rs crates/app-core/src/state.rs crates/app-core/src/init/mod.rs crates/app-core/Cargo.toml
 git commit -m "feat(app-core): add Insight Review handler stubs and flashcard save"
 ```
 
@@ -1227,7 +1247,7 @@ export function useInsightReview(noteId: string | null) {
       noteId,
       activeTab: "synthesis",
       tabs: {
-        synthesis: { status: "loading", content: "" },
+        synthesis: { status: "streaming", content: "" },
         gaps: { status: "loading", content: "" },
         assessment: { status: "loading", content: [] },
         conceptMap: { status: "loading", content: { mermaid: "", fallbackText: "" } },
@@ -1397,10 +1417,12 @@ export function useInsightReview(noteId: string | null) {
   useEffect(() => {
     if (!state.isOpen) return;
 
+    let cancelled = false;
     const unlisteners: (() => void)[] = [];
 
     // Synthesis streaming chunks
     listen<{ insightReviewId: string; chunk: string }>("insight:synthesis-chunk", (event) => {
+      if (cancelled) return;
       setState((s) => ({
         ...s,
         tabs: {
@@ -1408,10 +1430,11 @@ export function useInsightReview(noteId: string | null) {
           synthesis: { status: "streaming", content: s.tabs.synthesis.content + event.payload.chunk },
         },
       }));
-    }).then((unlisten) => unlisteners.push(unlisten));
+    }).then((unlisten) => { if (!cancelled) unlisteners.push(unlisten); else unlisten(); });
 
     // Synthesis done
     listen<{ insightReviewId: string; content: string }>("insight:synthesis-done", (event) => {
+      if (cancelled) return;
       setState((s) => ({
         ...s,
         tabs: {
@@ -1419,10 +1442,11 @@ export function useInsightReview(noteId: string | null) {
           synthesis: { status: "done", content: event.payload.content },
         },
       }));
-    }).then((unlisten) => unlisteners.push(unlisten));
+    }).then((unlisten) => { if (!cancelled) unlisteners.push(unlisten); else unlisten(); });
 
     // Tab done (for gaps, assessment, concept-map)
     listen<{ insightReviewId: string; tab: string; content: string }>("insight:tab-done", (event) => {
+      if (cancelled) return;
       const { tab, content } = event.payload;
       setState((s) => {
         if (tab === "gaps") {
@@ -1443,10 +1467,11 @@ export function useInsightReview(noteId: string | null) {
         }
         return s;
       });
-    }).then((unlisten) => unlisteners.push(unlisten));
+    }).then((unlisten) => { if (!cancelled) unlisteners.push(unlisten); else unlisten(); });
 
     // Error
     listen<{ insightReviewId: string; tab: string; error: string }>("insight:error", (event) => {
+      if (cancelled) return;
       const { tab, error } = event.payload;
       setState((s) => {
         const tabKey = tab === "concept-map" ? "conceptMap" : tab;
@@ -1458,9 +1483,10 @@ export function useInsightReview(noteId: string | null) {
           },
         };
       });
-    }).then((unlisten) => unlisteners.push(unlisten));
+    }).then((unlisten) => { if (!cancelled) unlisteners.push(unlisten); else unlisten(); });
 
     return () => {
+      cancelled = true;
       for (const unlisten of unlisteners) unlisten();
     };
   }, [state.isOpen]);
@@ -1572,10 +1598,8 @@ export function InsightReviewPanel({
     if (!content) return;
     try {
       const newNote = await ipc<Note>("note_create", {
-        params: {
-          title: `Insight: ${note.title}`,
-          body: `${content}\n\n---\nSource: [[${note.title}]]`,
-        },
+        title: `Insight: ${note.title}`,
+        body: `${content}\n\n---\nSource: [[${note.title}]]`,
       });
       window.dispatchEvent(
         new CustomEvent("entity:updated", { detail: { entityKind: "note" } }),
@@ -1592,12 +1616,10 @@ export function InsightReviewPanel({
     if (answeredCount < Math.ceil(tabs.assessment.content.length * 0.5)) return;
     try {
       await ipc("note_insight_save_flashcards", {
-        params: {
-          noteId: note.id,
-          insightReviewId: state.insightReviewId || "",
-          deckName: `Review: ${note.title}`,
-          questions: tabs.assessment.content,
-        },
+        noteId: note.id,
+        insightReviewId: state.insightReviewId || "",
+        deckName: `Review: ${note.title}`,
+        questions: tabs.assessment.content,
       });
     } catch (e) {
       console.error("Failed to save flashcards:", e);
@@ -2505,9 +2527,48 @@ pub async fn note_insight_review(
 
         tauri::async_runtime::spawn(async move {
             // Assemble context, call LLM, emit events
-            // This is where the 4 parallel LLM calls happen
-            // Implementation depends on your LLM provider integration
-            let _ = generate_insight_tabs(&core, &app_handle, &nid, &review_id, &hash).await;
+            // This is where the 4 parallel LLM calls happen.
+            // The full LLM integration is provider-specific.
+            // For now, emit placeholder events so the frontend pipeline works end-to-end.
+            // Replace with actual LLM calls once the pipeline is verified.
+            use tauri::Emitter;
+            let context = match core.assemble_insight_context(&nid).await {
+                Ok(ctx) => ctx,
+                Err(e) => {
+                    let _ = app_handle.emit("insight:error", serde_json::json!({
+                        "insightReviewId": review_id, "tab": "synthesis", "error": e.to_string()
+                    }));
+                    return;
+                }
+            };
+
+            // TODO: Replace placeholders with actual LLM streaming calls
+            let placeholder = format!("## Synthesis\n\nAnalysis of **{}** and {} related notes.\n\n*LLM integration pending — this is the pipeline verification stub.*", context.note.title, context.related.len());
+
+            let _ = app_handle.emit("insight:synthesis-chunk", serde_json::json!({
+                "insightReviewId": review_id, "chunk": &placeholder
+            }));
+            let _ = app_handle.emit("insight:synthesis-done", serde_json::json!({
+                "insightReviewId": review_id, "content": &placeholder
+            }));
+
+            // Emit placeholder tab-done events for other tabs
+            for tab in &["gaps", "assessment", "concept-map"] {
+                let content = match *tab {
+                    "assessment" => "[]".to_string(),
+                    "concept-map" => format!("mindmap\n  root(({}))    \n    Related Notes\n    Knowledge Gaps", context.note.title),
+                    _ => format!("## {}\n\n*LLM integration pending.*", tab),
+                };
+                let _ = app_handle.emit("insight:tab-done", serde_json::json!({
+                    "insightReviewId": review_id, "tab": tab, "content": content
+                }));
+            }
+
+            // Cache results
+            let _ = core.insight_cache_repo.upsert(
+                &nid, &hash,
+                Some(&placeholder), Some(""), Some("[]"), Some(""),
+            ).await;
         });
     }
 
