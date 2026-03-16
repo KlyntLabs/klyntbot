@@ -171,3 +171,72 @@ pub struct BacklinkResponse {
     pub note: NoteResponse,
     pub context: Option<String>,
 }
+
+// ── Insight Review ───────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InsightReviewStarted {
+    pub insight_review_id: String,
+    pub content_hash: String,
+    pub cached: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InsightReviewResponse {
+    pub insight_review_id: String,
+    pub note_id: String,
+    pub synthesis: Option<String>,
+    pub gap_analysis: Option<String>,
+    pub self_assessment: Option<Vec<QuizQuestion>>,
+    pub concept_map: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QuizQuestion {
+    pub id: String,
+    #[serde(rename = "type")]
+    pub question_type: String,
+    pub question: String,
+    pub choices: Option<Vec<String>>,
+    pub correct_answer: String,
+    pub explanation: String,
+    pub source_notes: Vec<String>,
+    pub difficulty: String,
+    pub difficulty_score: f64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TabContent {
+    pub tab: String,
+    pub content: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FlashcardResponse {
+    pub id: String,
+    pub deck: String,
+    pub question: String,
+    pub answer: String,
+    pub card_type: String,
+    pub choices: Option<serde_json::Value>,
+    pub stability: f64,
+    pub difficulty: f64,
+    pub due_at: Option<String>,
+    pub state: String,
+    pub review_count: i64,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InsightSaveFlashcardsParams {
+    pub note_id: String,
+    pub insight_review_id: String,
+    pub deck_name: String,
+    pub questions: Vec<QuizQuestion>,
+}
