@@ -179,49 +179,42 @@ export function FinanceInvestments() {
       currencies={currencies}
       onSelectCurrency={setMode}
     >
-      <div className="grid grid-cols-12 gap-4 auto-rows-min">
-        {/* ── Stats row ─────────────────────────────────── */}
-        <div className="col-span-12 grid grid-cols-4 gap-4">
-          <Card className="p-4">
-            <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">
-              Total Value
-            </p>
-            <p className="text-[24px] font-light text-primary tabular-nums">
-              {fmtCompact(convertTotal(totalValue), displayCur, hidden)}
-            </p>
-          </Card>
-          <Card className="p-4">
-            <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">
-              Cost Basis
-            </p>
-            <p className="text-[24px] font-light text-muted tabular-nums">
-              {fmtCompact(convertTotal(totalCost), displayCur, hidden)}
-            </p>
-          </Card>
-          <Card className="p-4">
-            <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">
-              Total Return
-            </p>
-            <p
-              className={cn(
-                "text-[24px] font-light tabular-nums",
-                totalReturn >= 0 ? "text-success" : "text-destructive",
-              )}
-            >
-              {totalReturn >= 0 ? "+" : ""}
-              {totalReturn}%
-            </p>
-          </Card>
-          <Card className="p-4">
-            <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">
-              Holdings
-            </p>
-            <p className="text-[24px] font-light text-primary">{investments.length}</p>
-          </Card>
-        </div>
+      {/* ── Stats row ─────────────────────────────────── */}
+      <div className="grid grid-cols-4 gap-4 mb-4">
+        <Card compact className="p-4">
+          <p className="text-[10px] text-muted uppercase tracking-widest mb-1">Total Value</p>
+          <p className="text-[24px] font-light text-primary tabular-nums">
+            {fmtCompact(convertTotal(totalValue), displayCur, hidden)}
+          </p>
+        </Card>
+        <Card compact className="p-4">
+          <p className="text-[10px] text-muted uppercase tracking-widest mb-1">Cost Basis</p>
+          <p className="text-[24px] font-light text-muted tabular-nums">
+            {fmtCompact(convertTotal(totalCost), displayCur, hidden)}
+          </p>
+        </Card>
+        <Card compact className="p-4">
+          <p className="text-[10px] text-muted uppercase tracking-widest mb-1">Total Return</p>
+          <p
+            className={cn(
+              "text-[24px] font-light tabular-nums",
+              totalReturn >= 0 ? "text-success" : "text-destructive",
+            )}
+          >
+            {totalReturn >= 0 ? "+" : ""}
+            {totalReturn}%
+          </p>
+        </Card>
+        <Card compact className="p-4">
+          <p className="text-[10px] text-muted uppercase tracking-widest mb-1">Holdings</p>
+          <p className="text-[24px] font-light text-primary">{investments.length}</p>
+        </Card>
+      </div>
 
-        {/* ── Portfolio cards ─────────────────────────── */}
-        <div className="col-span-12">
+      <div className="flex gap-4">
+        {/* Left column — Portfolio grid + Holdings table */}
+        <div className="flex-1 min-w-0 space-y-4">
+          {/* ── Portfolio cards ─────────────────────────── */}
           <Card className="p-4">
             <CardHeader
               title="Portfolios"
@@ -297,10 +290,8 @@ export function FinanceInvestments() {
               })}
             </div>
           </Card>
-        </div>
 
-        {/* ── Holdings table (9col) + Allocation (3col) ── */}
-        <div className="col-span-9">
+          {/* ── Holdings table ───────────────────────────── */}
           <Card className="overflow-hidden">
             <div className="px-4 pt-4">
               <CardHeader
@@ -320,7 +311,7 @@ export function FinanceInvestments() {
                 }
               />
             </div>
-            <div className="grid grid-cols-[1fr_80px_80px_90px_80px_80px] gap-2 border-b border-white/[0.08] text-[10px] text-dim font-light px-4 py-2">
+            <div className="grid grid-cols-[1fr_80px_80px_90px_80px_80px] gap-2 border-b border-white/[0.08] text-[10px] text-muted uppercase tracking-widest font-light px-4 py-2">
               <div>Asset</div>
               <div className="text-right">Qty</div>
               <div className="text-right">Price</div>
@@ -394,8 +385,9 @@ export function FinanceInvestments() {
           </Card>
         </div>
 
-        <div className="col-span-3 space-y-4">
-          <Card className="p-4">
+        {/* Right sidebar — sticky */}
+        <div className="w-72 flex-shrink-0 sticky top-0 self-start space-y-4">
+          <Card compact className="p-4">
             <CardHeader title="Asset Allocation" />
             <div className="flex items-center justify-center">
               <Donut
@@ -406,7 +398,7 @@ export function FinanceInvestments() {
               />
             </div>
           </Card>
-          <Card className="p-4">
+          <Card compact className="p-4">
             <CardHeader title="By Portfolio" />
             <div className="flex items-center justify-center">
               <Donut
