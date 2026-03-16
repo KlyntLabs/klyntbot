@@ -1,12 +1,3 @@
-import {
-  type DragTarget,
-  dragAndDropFeature,
-  hotkeysCoreFeature,
-  renamingFeature,
-  selectionFeature,
-  syncDataLoaderFeature,
-} from "@headless-tree/core";
-import { useTree } from "@headless-tree/react";
 import { useClickOutside } from "@shared/hooks/useClickOutside";
 import { formatDate } from "@shared/lib/dates";
 import type { Note, Notebook } from "@shared/types";
@@ -28,12 +19,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 // ── Types ─────────────────────────────────────────────────────────────
 
-interface TreeNodeData {
-  type: "notebook" | "note" | "root";
+interface TreeItem {
+  type: "notebook" | "note";
   id: string;
   title: string;
+  depth: number;
   icon?: string;
   color?: string;
+  hasChildren?: boolean;
+  isExpanded?: boolean;
   pinned?: boolean;
   updatedAt?: string;
 }
@@ -61,7 +55,6 @@ type ContextTarget =
   | null;
 
 const INDENT = 16;
-const ROOT_ID = "root";
 
 // ── Main Component ───────────────────────────────────────────────────
 
@@ -78,13 +71,34 @@ export function NotebookTree({
   onRenameNotebook,
   onRenameNote,
   onMoveNote,
-  onMoveNotebook,
+  onMoveNotebook: _onMoveNotebook,
 }: NotebookTreeProps) {
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(
+    () => new Set(notebooks.map((n) => n.id)),
+  );
+  const [renamingId, setRenamingId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextTarget>(null);
+  const clickTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const menuRef = useRef<HTMLDivElement>(null);
+
   useClickOutside(menuRef, () => setContextMenu(null), contextMenu !== null);
 
-  // Build lookup maps
+  // Expand newly added notebooks automatically
+  useEffect(() => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      let changed = false;
+      for (const nb of notebooks) {
+        if (!next.has(nb.id)) {
+          next.add(nb.id);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [notebooks]);
+
+  // Lookup maps
   const notebookMap = useMemo(() => {
     const m = new Map<string, Notebook>();
     for (const nb of notebooks) m.set(nb.id, nb);
@@ -97,180 +111,128 @@ export function NotebookTree({
     return m;
   }, [notes]);
 
-  const unfiledNotes = useMemo(() => notes.filter((n) => !n.notebookId && !n.archived), [notes]);
-
-  // Data map for tree items
-  const dataMap = useMemo(() => {
-    const m: Record<string, TreeNodeData> = {
-      [ROOT_ID]: { type: "root", id: ROOT_ID, title: "Root" },
-    };
-    for (const nb of notebooks) {
-      m[nb.id] = {
-        type: "notebook",
-        id: nb.id,
-        title: nb.title,
-        icon: nb.icon ?? undefined,
-        color: nb.color ?? undefined,
-      };
-    }
-    for (const n of notes) {
-      if (!n.archived) {
-        m[`note:${n.id}`] = {
-          type: "note",
-          id: n.id,
-          title: n.title,
-          pinned: n.pinned,
-          updatedAt: n.updatedAt,
-        };
-      }
-    }
-    return m;
-  }, [notebooks, notes]);
-
-  // Children map for tree structure
-  const childrenMap = useMemo(() => {
-    const m: Record<string, string[]> = {};
-
-    // Root children: top-level notebooks + unfiled notes at root level
-    const rootChildren: string[] = [];
-    for (const nb of notebooks) {
-      if (!nb.parentId) rootChildren.push(nb.id);
-    }
-    rootChildren.sort((a, b) => {
-      const na = notebookMap.get(a);
-      const nb2 = notebookMap.get(b);
-      return (na?.title ?? "").localeCompare(nb2?.title ?? "");
-    });
-    // Unfiled notes are rendered manually below the tree (not managed by headless-tree)
-    m[ROOT_ID] = rootChildren;
-
-    // Notebook children: sub-notebooks + notes in this notebook
-    for (const nb of notebooks) {
-      const children: string[] = [];
-      // Sub-notebooks
-      for (const child of notebooks) {
-        if (child.parentId === nb.id) children.push(child.id);
-      }
-      children.sort((a, b) => {
-        const na = notebookMap.get(a);
-        const nb2 = notebookMap.get(b);
-        return (na?.title ?? "").localeCompare(nb2?.title ?? "");
-      });
-      // Notes in this notebook
-      const notesInNb = notes
-        .filter((n) => n.notebookId === nb.id && !n.archived)
-        .sort((a, b) => a.title.localeCompare(b.title));
-      for (const n of notesInNb) children.push(`note:${n.id}`);
-      m[nb.id] = children;
-    }
-
-    return m;
-  }, [notebooks, notes, notebookMap, unfiledNotes]);
-
   const allFolders = useMemo(
     () => notebooks.map((nb) => ({ id: nb.id, title: nb.title })),
     [notebooks],
   );
 
-  const handleDrop = useCallback(
-    (droppedItems: { getItemData: () => TreeNodeData }[], target: DragTarget<TreeNodeData>) => {
-      const targetData = target.item.getItemData();
+  // Build flat item list
+  const items = useMemo(() => {
+    const result: TreeItem[] = [];
 
-      for (const item of droppedItems) {
-        const data = item.getItemData();
-        if (data.type === "note") {
-          const newNotebookId = targetData.type === "notebook" ? targetData.id : null;
-          onMoveNote(data.id, newNotebookId);
-        } else if (data.type === "notebook") {
-          const newParentId = targetData.type === "notebook" ? targetData.id : null;
-          onMoveNotebook(data.id, newParentId);
-        }
+    const rootNotebooks = notebooks
+      .filter((n) => !n.parentId)
+      .sort((a, b) => a.title.localeCompare(b.title));
+
+    const addNotebook = (nb: Notebook, depth: number) => {
+      const childNotes = notes.filter((n) => n.notebookId === nb.id && !n.archived);
+      const childNotebooks = notebooks.filter((n) => n.parentId === nb.id);
+      result.push({
+        type: "notebook",
+        id: nb.id,
+        title: nb.title,
+        depth,
+        icon: nb.icon ?? undefined,
+        color: nb.color ?? undefined,
+        hasChildren: childNotes.length > 0 || childNotebooks.length > 0,
+        isExpanded: expandedIds.has(nb.id),
+      });
+      if (expandedIds.has(nb.id)) {
+        childNotebooks
+          .sort((a, b) => a.title.localeCompare(b.title))
+          .forEach((child) => {
+            addNotebook(child, depth + 1);
+          });
+        childNotes
+          .sort((a, b) => a.title.localeCompare(b.title))
+          .forEach((n) => {
+            result.push({
+              type: "note",
+              id: n.id,
+              title: n.title,
+              depth: depth + 1,
+              pinned: n.pinned,
+              updatedAt: n.updatedAt,
+            });
+          });
       }
+    };
+
+    for (const nb of rootNotebooks) addNotebook(nb, 0);
+
+    // Unfiled notes at root level
+    const unfiled = notes
+      .filter((n) => !n.notebookId && !n.archived)
+      .sort((a, b) => a.title.localeCompare(b.title));
+    for (const n of unfiled) {
+      result.push({
+        type: "note",
+        id: n.id,
+        title: n.title,
+        depth: 0,
+        pinned: n.pinned,
+        updatedAt: n.updatedAt,
+      });
+    }
+
+    return result;
+  }, [notebooks, notes, expandedIds]);
+
+  // Toggle expand/collapse
+  const toggleExpand = useCallback((id: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  // Click handling with timer to distinguish single vs double click
+  const handleClick = useCallback(
+    (item: TreeItem) => {
+      if (renamingId === item.id) return;
+      if (clickTimerRef.current) clearTimeout(clickTimerRef.current);
+      clickTimerRef.current = setTimeout(() => {
+        if (item.type === "note") onSelectNote(item.id);
+        else toggleExpand(item.id);
+      }, 250);
     },
-    [onMoveNote, onMoveNotebook],
+    [renamingId, onSelectNote, toggleExpand],
   );
 
-  const handleRename = useCallback(
-    (item: { getItemData: () => TreeNodeData }, value: string) => {
-      const data = item.getItemData();
+  const handleDoubleClick = useCallback((item: TreeItem) => {
+    if (clickTimerRef.current) clearTimeout(clickTimerRef.current);
+    setRenamingId(item.id);
+  }, []);
+
+  // Rename commit
+  const commitRename = useCallback(
+    (item: TreeItem, value: string) => {
       const trimmed = value.trim();
-      if (!trimmed) return;
-      if (data.type === "notebook") {
-        onRenameNotebook(data.id, trimmed);
-      } else if (data.type === "note") {
-        onRenameNote(data.id, trimmed);
+      if (trimmed && trimmed !== item.title) {
+        if (item.type === "notebook") onRenameNotebook(item.id, trimmed);
+        else onRenameNote(item.id, trimmed);
       }
+      setRenamingId(null);
     },
     [onRenameNotebook, onRenameNote],
   );
 
-  const [treeState, setTreeState] = useState<Record<string, unknown>>({
-    expandedItems: [ROOT_ID],
-  });
-
-  const tree = useTree<TreeNodeData>({
-    state: treeState,
-    setState: setTreeState,
-    rootItemId: ROOT_ID,
-    getItemName: (item) => item.getItemData().title,
-    isItemFolder: (item) =>
-      item.getItemData().type === "notebook" || item.getItemData().type === "root",
-    canReorder: true,
-    indent: INDENT,
-    dataLoader: {
-      getItem: (itemId) => dataMap[itemId] ?? { type: "root", id: itemId, title: "" },
-      getChildren: (itemId) => childrenMap[itemId] ?? [],
-    },
-    onPrimaryAction: (item) => {
-      const data = item.getItemData();
-      if (data.type === "note") onSelectNote(data.id);
-    },
-    onDrop: handleDrop,
-    canDrag: (items) => {
-      return items.every((item) => {
-        const data = item.getItemData();
-        return data.id !== ROOT_ID;
-      });
-    },
-    onRename: handleRename,
-    canRename: (item) => {
-      const data = item.getItemData();
-      return data.id !== ROOT_ID;
-    },
-    features: [
-      syncDataLoaderFeature,
-      selectionFeature,
-      hotkeysCoreFeature,
-      dragAndDropFeature,
-      renamingFeature,
-    ],
-  });
-
-  // Rebuild tree when data changes (notes/notebooks added/removed/renamed)
-  useEffect(() => {
-    tree.rebuildTree();
-  }, [dataMap, childrenMap]);
-
+  // Context menu handlers
   const handleContextMenu = useCallback(
-    (e: React.MouseEvent, itemId: string) => {
+    (e: React.MouseEvent, item: TreeItem) => {
       e.preventDefault();
       e.stopPropagation();
-      const data = dataMap[itemId];
-      if (!data) return;
-
-      if (data.type === "notebook") {
-        const nb = notebookMap.get(data.id);
-        if (nb) {
-          setContextMenu({ kind: "folder", notebook: nb, x: e.clientX, y: e.clientY });
-        }
-      } else if (data.type === "note") {
-        const note = noteMap.get(data.id);
-        if (note) {
-          setContextMenu({ kind: "note", note, x: e.clientX, y: e.clientY });
-        }
+      if (item.type === "notebook") {
+        const nb = notebookMap.get(item.id);
+        if (nb) setContextMenu({ kind: "folder", notebook: nb, x: e.clientX, y: e.clientY });
+      } else {
+        const note = noteMap.get(item.id);
+        if (note) setContextMenu({ kind: "note", note, x: e.clientX, y: e.clientY });
       }
     },
-    [dataMap, notebookMap, noteMap],
+    [notebookMap, noteMap],
   );
 
   const handleContainerContextMenu = useCallback((e: React.MouseEvent) => {
@@ -280,7 +242,13 @@ export function NotebookTree({
     }
   }, []);
 
-  const items = tree.getItems();
+  // F2 to rename
+  const handleKeyDown = useCallback((e: React.KeyboardEvent, item: TreeItem) => {
+    if (e.key === "F2") {
+      e.preventDefault();
+      setRenamingId(item.id);
+    }
+  }, []);
 
   return (
     <div className="flex flex-col min-h-0">
@@ -309,52 +277,50 @@ export function NotebookTree({
 
       {/* Tree */}
       <div
-        {...tree.getContainerProps("Notebook tree")}
+        role="tree"
+        aria-label="Notebook tree"
         onContextMenu={handleContainerContextMenu}
         className="flex-1 overflow-y-auto flex flex-col min-h-0"
       >
         {items.map((item) => {
-          const data = item.getItemData();
-          const isFolder = item.isFolder();
-          const isNote = data.type === "note";
-          const level = item.getItemMeta().level;
-          const isSelected = isNote && data.id === selectedNoteId;
-          const isRenaming = item.isRenaming();
+          const isFolder = item.type === "notebook";
+          const isNote = item.type === "note";
+          const isSelected = isNote && item.id === selectedNoteId;
+          const isRenaming = renamingId === item.id;
 
           return (
             <div
-              key={item.getId()}
-              {...item.getProps()}
-              ref={item.registerElement}
-              onContextMenu={(e) => handleContextMenu(e, item.getId())}
+              key={`${item.type}:${item.id}`}
+              role="treeitem"
+              tabIndex={0}
+              onClick={() => handleClick(item)}
+              onDoubleClick={() => handleDoubleClick(item)}
+              onContextMenu={(e) => handleContextMenu(e, item)}
+              onKeyDown={(e) => handleKeyDown(e, item)}
               className={`flex items-center gap-1 py-1 px-1 rounded text-sm cursor-default select-none outline-none transition-colors ${
-                item.isDragTarget()
-                  ? "bg-white/[0.08] ring-1 ring-white/[0.15]"
-                  : isSelected
-                    ? "bg-white/[0.08] text-primary"
-                    : "text-secondary hover:bg-white/[0.04]"
-              } ${item.isFocused() ? "ring-1 ring-brand/30" : ""}`}
-              style={{ paddingLeft: `${level * INDENT + 4}px` }}
+                isSelected ? "bg-white/[0.08] text-primary" : "text-secondary hover:bg-white/[0.04]"
+              }`}
+              style={{ paddingLeft: `${item.depth * INDENT + 4}px` }}
             >
               {/* Chevron for folders */}
               {isFolder && (
                 <ChevronRight
                   className={`w-3 h-3 shrink-0 text-dim transition-transform ${
-                    item.isExpanded() ? "rotate-90" : ""
+                    item.isExpanded ? "rotate-90" : ""
                   }`}
                 />
               )}
 
               {/* Icon */}
-              {isFolder && data.icon ? (
-                <span className="text-sm shrink-0 w-4 text-center">{data.icon}</span>
+              {isFolder && item.icon ? (
+                <span className="text-sm shrink-0 w-4 text-center">{item.icon}</span>
               ) : isFolder ? (
-                item.isExpanded() ? (
+                item.isExpanded ? (
                   <FolderOpen className="w-3.5 h-3.5 shrink-0 text-brand/60" />
                 ) : (
                   <FolderClosed className="w-3.5 h-3.5 shrink-0 text-brand/60" />
                 )
-              ) : isNote && data.pinned ? (
+              ) : isNote && item.pinned ? (
                 <Pin className="w-3 h-3 shrink-0 text-brand" />
               ) : (
                 <FileText
@@ -363,86 +329,57 @@ export function NotebookTree({
               )}
 
               {/* Color bar for notebooks */}
-              {isFolder && data.color && (
+              {isFolder && item.color && (
                 <div
                   className="w-0.5 h-4 rounded-full shrink-0"
-                  style={{ backgroundColor: data.color }}
+                  style={{ backgroundColor: item.color }}
                 />
               )}
 
               {/* Title / rename input */}
               {isRenaming ? (
                 <input
-                  {...item.getRenameInputProps()}
+                  ref={(el) => {
+                    if (el) {
+                      el.focus();
+                      el.select();
+                    }
+                  }}
+                  defaultValue={item.title}
                   className="flex-1 min-w-0 text-sm bg-white/[0.06] border border-brand/40 rounded-md px-1.5 py-0.5 text-primary focus:outline-none"
+                  onBlur={(e) => commitRename(item, e.currentTarget.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") e.currentTarget.blur();
+                    if (e.key === "Escape") setRenamingId(null);
+                    e.stopPropagation();
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  onDoubleClick={(e) => e.stopPropagation()}
                 />
               ) : (
                 <span
                   className={`truncate flex-1 ${
-                    data.title === "Untitled" || data.title === "New Folder"
+                    item.title === "Untitled" || item.title === "New Folder"
                       ? "text-dim italic"
                       : ""
                   }`}
                 >
-                  {data.title}
+                  {item.title}
                 </span>
               )}
 
               {/* Date badge for notes */}
-              {isNote && data.updatedAt && !isRenaming && (
+              {isNote && item.updatedAt && !isRenaming && (
                 <span className="text-[10px] text-dim shrink-0 mr-1">
-                  {formatDate(data.updatedAt.slice(0, 10))}
+                  {formatDate(item.updatedAt.slice(0, 10))}
                 </span>
               )}
             </div>
           );
         })}
 
-        {items.length === 0 && unfiledNotes.length === 0 && (
+        {items.length === 0 && (
           <div className="text-xs text-dim text-center py-6">No notes yet</div>
-        )}
-
-        {/* Unfiled notes (outside headless-tree, rendered manually) */}
-        {unfiledNotes.map((note) => (
-          <div
-            key={`unfiled-${note.id}`}
-            onClick={() => onSelectNote(note.id)}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              setContextMenu({ kind: "note", note, x: e.clientX, y: e.clientY });
-            }}
-            onKeyDown={(e) => { if (e.key === "Enter") onSelectNote(note.id); }}
-            role="button"
-            tabIndex={0}
-            className={`flex items-center gap-1 py-1 px-1 rounded text-sm cursor-default select-none transition-colors ${
-              note.id === selectedNoteId
-                ? "bg-white/[0.08] text-primary"
-                : "text-secondary hover:bg-white/[0.04]"
-            }`}
-            style={{ paddingLeft: "4px" }}
-          >
-            {note.pinned ? (
-              <Pin className="w-3 h-3 shrink-0 text-brand" />
-            ) : (
-              <FileText className={`w-3.5 h-3.5 shrink-0 ${note.id === selectedNoteId ? "text-brand/70" : "text-dim"}`} />
-            )}
-            <span className={`truncate flex-1 ${note.title === "Untitled" ? "text-dim italic" : ""}`}>
-              {note.title}
-            </span>
-            {note.updatedAt && (
-              <span className="text-[10px] text-dim shrink-0 mr-1">
-                {formatDate(note.updatedAt.slice(0, 10))}
-              </span>
-            )}
-          </div>
-        ))}
-
-        {/* Drag line */}
-        {tree.getDragLineData() && (
-          <div
-            className="h-0.5 bg-brand rounded-full absolute pointer-events-none"
-            style={tree.getDragLineStyle()}
-          />
         )}
       </div>
 
@@ -452,7 +389,7 @@ export function NotebookTree({
           ref={menuRef}
           target={contextMenu}
           folders={allFolders}
-          tree={tree}
+          onStartRename={setRenamingId}
           onCreateNote={onCreateNote}
           onCreateNotebook={onCreateNotebook}
           onDeleteNote={onDeleteNote}
@@ -471,7 +408,7 @@ export function NotebookTree({
 interface TreeContextMenuProps {
   target: NonNullable<ContextTarget>;
   folders: { id: string; title: string }[];
-  tree: ReturnType<typeof useTree<TreeNodeData>>;
+  onStartRename: (id: string) => void;
   onCreateNote: (notebookId?: string) => void;
   onCreateNotebook: (parentId?: string) => void;
   onDeleteNote: (id: string) => void;
@@ -484,7 +421,7 @@ interface TreeContextMenuProps {
 function TreeContextMenu({
   target,
   folders,
-  tree,
+  onStartRename,
   onCreateNote,
   onCreateNotebook,
   onDeleteNote,
@@ -546,8 +483,7 @@ function TreeContextMenu({
         <ContextMenuItem
           icon={<Pencil className="w-4 h-4" />}
           onClick={() => {
-            const item = tree.getItemInstance(target.notebook.id);
-            item?.startRenaming();
+            onStartRename(target.notebook.id);
             onClose();
           }}
         >
@@ -574,8 +510,7 @@ function TreeContextMenu({
       <ContextMenuItem
         icon={<Pencil className="w-4 h-4" />}
         onClick={() => {
-          const item = tree.getItemInstance(`note:${note.id}`);
-          item?.startRenaming();
+          onStartRename(note.id);
           onClose();
         }}
       >

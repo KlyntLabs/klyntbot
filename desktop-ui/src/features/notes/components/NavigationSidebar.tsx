@@ -6,7 +6,7 @@ import type { Ref } from "react";
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { InboxSection } from "./InboxSection";
 import { NotebookTree } from "./NotebookTree";
-import { QuickAccessList } from "./QuickAccessList";
+
 import { TagsExplorer } from "./TagsExplorer";
 
 // ── Handle for parent to focus search ─────────────────────────────────
@@ -172,16 +172,7 @@ export function NavigationSidebar({
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto min-h-0 flex flex-col gap-2">
-          {/* 2. Quick Access */}
-          <QuickAccessList
-            notes={notes}
-            selectedNoteId={selectedNoteId}
-            onSelectNote={onSelectNote}
-            onPinNote={onPinNote}
-            onDeleteNote={onDeleteNote}
-          />
-
-          {/* 3. Tags Explorer */}
+          {/* Tags Explorer */}
           <TagsExplorer
             notes={notes}
             activeTags={activeTags}
