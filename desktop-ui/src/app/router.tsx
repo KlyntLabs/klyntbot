@@ -33,7 +33,9 @@ const ObjectiveDetailPage = lazy(() =>
 const ChatPage = lazy(() => import("../features/chat").then((m) => ({ default: m.ChatPage })));
 
 // ── Notes Feature ────────────────────────────────────────────────
-const NotesPage = lazy(() => import("../features/notes").then((m) => ({ default: m.NotesPage })));
+const KnowledgeBasePage = lazy(() =>
+  import("../features/notes").then((m) => ({ default: m.KnowledgeBasePage })),
+);
 
 // ── Finance Feature ──────────────────────────────────────────────
 const FinanceOverviewPage = lazy(() =>
@@ -182,7 +184,7 @@ export const router = createHashRouter([
       { path: "/tasks", element: <TasksPage /> },
       { path: "/tasks2", element: <Tasks2Page /> },
       { path: "/chat", element: <ChatPage /> },
-      { path: "/notes", element: <NotesPage /> },
+      { path: "/notes", element: <KnowledgeBasePage /> },
       { path: "/automations", element: <AutomationsPage /> },
       { path: "/project/:id", element: <ProjectDetailPage /> },
       { path: "/task/:id", element: <TaskDetailPage /> },

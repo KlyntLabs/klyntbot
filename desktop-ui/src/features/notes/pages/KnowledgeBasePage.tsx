@@ -1,0 +1,400 @@
+import { useEvent } from "@shared/hooks/useEvent";
+import { useMutation } from "@shared/hooks/useMutation";
+import { useQuery } from "@shared/hooks/useQuery";
+import type {
+  Note,
+  Notebook,
+  NotebookCreateParams,
+  NoteCreateParams,
+  NoteUpdateParams,
+} from "@shared/types";
+import { FileText, GitGraph, PenLine } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router";
+import { ContextPanel } from "../components/ContextPanel";
+import { GraphView } from "../components/GraphView";
+import { NavigationSidebar } from "../components/NavigationSidebar";
+import { NoteEditor } from "../components/NoteEditor";
+import type { NoteSearchBarHandle } from "../components/NoteSearchBar";
+
+type ViewMode = "editor" | "graph";
+type LayoutMode = "three-panel" | "focus";
+
+function ViewModeToggle({
+  viewMode,
+  onChange,
+}: {
+  viewMode: ViewMode;
+  onChange: (mode: ViewMode) => void;
+}) {
+  return (
+    <div className="flex items-center gap-1">
+      <button
+        type="button"
+        aria-label="Editor view"
+        onClick={() => onChange("editor")}
+        className={`p-1.5 rounded-md transition-colors ${viewMode === "editor" ? "bg-white/10 text-primary" : "text-muted hover:text-secondary"}`}
+      >
+        <PenLine size={16} />
+      </button>
+      <button
+        type="button"
+        aria-label="Graph view"
+        onClick={() => onChange("graph")}
+        className={`p-1.5 rounded-md transition-colors ${viewMode === "graph" ? "bg-white/10 text-primary" : "text-muted hover:text-secondary"}`}
+      >
+        <GitGraph size={16} />
+      </button>
+    </div>
+  );
+}
+
+export default function KnowledgeBasePage() {
+  // ── Data fetching ─────────────────────────────────────────────────────
+  const { data: notebooks, refetch: refetchNotebooks } = useQuery<Notebook[]>(
+    "notebook_list",
+    undefined,
+    [],
+  );
+  const { data: notes, refetch: refetchNotes } = useQuery<Note[]>("note_list", undefined, []);
+
+  // ── Core state ────────────────────────────────────────────────────────
+  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>("editor");
+  const [layoutMode, setLayoutMode] = useState<LayoutMode>("three-panel");
+  const [searchResults, setSearchResults] = useState<Note[] | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // ── Sidebar widths (imperatively managed for perf) ────────────────────
+  const [leftWidth, setLeftWidth] = useState(220);
+  const [rightWidth, setRightWidth] = useState(260);
+  const leftRef = useRef<HTMLDivElement>(null);
+  const rightRef = useRef<HTMLDivElement>(null);
+  const leftWidthRef = useRef(leftWidth);
+  const rightWidthRef = useRef(rightWidth);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<NoteSearchBarHandle>(null);
+
+  // Pre-select note from URL search params (e.g. /notes?noteId=xxx)
+  useEffect(() => {
+    const noteId = searchParams.get("noteId");
+    if (noteId) {
+      setSelectedNoteId(noteId);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
+  const noteMap = useMemo(() => {
+    const map = new Map<string, Note>();
+    for (const n of notes) map.set(n.id, n);
+    return map;
+  }, [notes]);
+
+  const selectedNote = selectedNoteId ? noteMap.get(selectedNoteId) : undefined;
+
+  // ── Mutations ─────────────────────────────────────────────────────────
+  const { mutate: createNote } = useMutation<Note, NoteCreateParams>("note_create", "params");
+  const { mutate: updateNote } = useMutation<Note, NoteUpdateParams>("note_update", "params");
+  const { mutate: deleteNote } = useMutation<boolean, { id: string }>("note_delete");
+  const { mutate: createNotebook } = useMutation<Notebook, NotebookCreateParams>(
+    "notebook_create",
+    "params",
+  );
+  const { mutate: deleteNotebook } = useMutation<boolean, { id: string }>("notebook_delete");
+  const { mutate: updateNotebook } = useMutation<
+    Notebook,
+    { id: string; title?: string; parentId?: string | null }
+  >("notebook_update", "params");
+
+  // ── Handlers ──────────────────────────────────────────────────────────
+  const handleCreateNote = useCallback(
+    async (notebookId?: string) => {
+      const result = await createNote({
+        title: "Untitled",
+        notebookId,
+      });
+      if (result) setSelectedNoteId(result.id);
+    },
+    [createNote],
+  );
+
+  const handleCreateNotebook = useCallback(
+    async (parentId?: string) => {
+      await createNotebook({ title: "New Folder", parentId });
+    },
+    [createNotebook],
+  );
+
+  const handlePin = useCallback(
+    (id: string, pinned: boolean) => {
+      updateNote({ id, pinned });
+    },
+    [updateNote],
+  );
+
+  const handleDelete = useCallback(
+    async (id: string) => {
+      const deleted = await deleteNote({ id });
+      if (deleted && selectedNoteId === id) {
+        setSelectedNoteId(null);
+      }
+    },
+    [deleteNote, selectedNoteId],
+  );
+
+  const handleDeleteNotebook = useCallback(
+    async (id: string) => {
+      await deleteNotebook({ id });
+    },
+    [deleteNotebook],
+  );
+
+  const handleRenameNotebook = useCallback(
+    async (id: string, title: string) => {
+      await updateNotebook({ id, title });
+    },
+    [updateNotebook],
+  );
+
+  const handleRenameNote = useCallback(
+    async (id: string, title: string) => {
+      await updateNote({ id, title });
+    },
+    [updateNote],
+  );
+
+  const handleMoveNote = useCallback(
+    async (id: string, notebookId: string | null) => {
+      await updateNote({ id, notebookId });
+    },
+    [updateNote],
+  );
+
+  const handleMoveNotebook = useCallback(
+    async (id: string, parentId: string | null) => {
+      await updateNotebook({ id, parentId });
+    },
+    [updateNotebook],
+  );
+
+  // ── Resize logic (left sidebar) ───────────────────────────────────────
+  const onLeftResizeStart = useCallback((e: React.PointerEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = leftWidthRef.current;
+    let raf = 0;
+
+    containerRef.current?.classList.add("resizing");
+
+    const onMove = (ev: globalThis.PointerEvent) => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const newW = Math.min(320, Math.max(180, startW + ev.clientX - startX));
+        leftWidthRef.current = newW;
+        if (leftRef.current) leftRef.current.style.width = `${newW}px`;
+      });
+    };
+    const onUp = () => {
+      cancelAnimationFrame(raf);
+      setLeftWidth(leftWidthRef.current);
+      containerRef.current?.classList.remove("resizing");
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
+    };
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp);
+  }, []);
+
+  // ── Resize logic (right panel) ────────────────────────────────────────
+  const onRightResizeStart = useCallback((e: React.PointerEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = rightWidthRef.current;
+    let raf = 0;
+
+    containerRef.current?.classList.add("resizing");
+
+    const onMove = (ev: globalThis.PointerEvent) => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        // Right panel resize is inverted — dragging left increases width
+        const newW = Math.min(360, Math.max(200, startW - (ev.clientX - startX)));
+        rightWidthRef.current = newW;
+        if (rightRef.current) rightRef.current.style.width = `${newW}px`;
+      });
+    };
+    const onUp = () => {
+      cancelAnimationFrame(raf);
+      setRightWidth(rightWidthRef.current);
+      containerRef.current?.classList.remove("resizing");
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
+    };
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp);
+  }, []);
+
+  // ── Keyboard shortcuts ────────────────────────────────────────────────
+  const handleCreateNoteRef = useRef(handleCreateNote);
+  handleCreateNoteRef.current = handleCreateNote;
+  const handleDeleteRef = useRef(handleDelete);
+  handleDeleteRef.current = handleDelete;
+  const selectedNoteIdRef = useRef(selectedNoteId);
+  selectedNoteIdRef.current = selectedNoteId;
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const mod = e.metaKey || e.ctrlKey;
+      if (!mod) return;
+
+      if (e.key === "n" && !e.shiftKey) {
+        e.preventDefault();
+        handleCreateNoteRef.current();
+      } else if (e.key === "Backspace" && selectedNoteIdRef.current) {
+        e.preventDefault();
+        handleDeleteRef.current(selectedNoteIdRef.current);
+      } else if (e.key === "Enter" && e.shiftKey) {
+        // Cmd+Shift+Enter → toggle layout mode
+        e.preventDefault();
+        setLayoutMode((prev) => (prev === "three-panel" ? "focus" : "three-panel"));
+      } else if ((e.key === "g" || e.key === "G") && e.shiftKey) {
+        // Cmd+Shift+G → toggle view mode
+        e.preventDefault();
+        setViewMode((prev) => (prev === "editor" ? "graph" : "editor"));
+      } else if (e.key === "f" && e.shiftKey) {
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, []);
+
+  // ── Event refresh ─────────────────────────────────────────────────────
+  useEvent<{ entityKind: string }>("entity:updated", (payload) => {
+    if (payload.entityKind === "note") refetchNotes();
+    if (payload.entityKind === "notebook") {
+      refetchNotebooks();
+      refetchNotes();
+    }
+  });
+
+  // ── Derived layout flags ──────────────────────────────────────────────
+  const isFocusMode = layoutMode === "focus";
+  const isGraphMode = viewMode === "graph";
+  const showLeftSidebar = !isFocusMode;
+  const showRightPanel = !isFocusMode && !isGraphMode;
+
+  // ── Render ────────────────────────────────────────────────────────────
+  return (
+    <div ref={containerRef} className="flex-1 flex min-w-0">
+      {/* Left sidebar — NavigationSidebar */}
+      {showLeftSidebar && (
+        <>
+          <div
+            ref={leftRef}
+            className="flex flex-col shrink-0 min-h-0"
+            style={{ width: leftWidth }}
+          >
+            <NavigationSidebar
+              notebooks={notebooks}
+              notes={notes}
+              searchResults={searchResults}
+              selectedNoteId={selectedNoteId}
+              searchRef={searchRef}
+              onSearchResults={setSearchResults}
+              onSelectNote={setSelectedNoteId}
+              onCreateNote={handleCreateNote}
+              onCreateNotebook={handleCreateNotebook}
+              onDeleteNote={handleDelete}
+              onPinNote={handlePin}
+              onDeleteNotebook={handleDeleteNotebook}
+              onRenameNotebook={handleRenameNotebook}
+              onRenameNote={handleRenameNote}
+              onMoveNote={handleMoveNote}
+              onMoveNotebook={handleMoveNotebook}
+            />
+          </div>
+
+          {/* Left resize handle */}
+          <div
+            onPointerDown={onLeftResizeStart}
+            className="w-1 shrink-0 cursor-col-resize group flex items-center justify-center"
+          >
+            <div className="w-px h-full group-hover:bg-brand/40 transition-colors" />
+          </div>
+        </>
+      )}
+
+      {/* Center panel */}
+      <div className={`flex-1 flex flex-col min-w-0 min-h-0 ${showLeftSidebar ? "pl-1" : ""}`}>
+        {isGraphMode ? (
+          <>
+            <div className="flex justify-end shrink-0 px-3 pt-3">
+              <ViewModeToggle viewMode={viewMode} onChange={setViewMode} />
+            </div>
+            <GraphView
+              notes={notes}
+              activeNoteId={selectedNoteId}
+              onSelectNote={setSelectedNoteId}
+            />
+          </>
+        ) : selectedNote ? (
+          <div
+            className={
+              isFocusMode
+                ? "max-w-[720px] mx-auto w-full h-full flex flex-col"
+                : "h-full flex flex-col"
+            }
+          >
+            <NoteEditor
+              key={selectedNote.id}
+              note={selectedNote}
+              onSave={updateNote}
+              viewMode={viewMode}
+              onViewModeChange={setViewMode}
+            />
+          </div>
+        ) : (
+          <>
+            <div className="flex justify-end shrink-0 px-3 pt-3">
+              <ViewModeToggle viewMode={viewMode} onChange={setViewMode} />
+            </div>
+            <div className="flex-1 flex flex-col items-center justify-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-white/[0.04] flex items-center justify-center">
+                <FileText className="w-6 h-6 text-dim" strokeWidth={1.5} />
+              </div>
+              <div className="text-center">
+                <div className="text-muted text-sm">Select a note to view</div>
+                <div className="text-dim text-xs mt-1">
+                  or press{" "}
+                  <kbd className="px-1.5 py-0.5 rounded bg-white/[0.06] text-[10px] font-mono">
+                    Cmd+N
+                  </kbd>{" "}
+                  to create one
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Right resize handle */}
+      {showRightPanel && (
+        <div
+          onPointerDown={onRightResizeStart}
+          className="w-1 shrink-0 cursor-col-resize group flex items-center justify-center"
+        >
+          <div className="w-px h-full group-hover:bg-brand/40 transition-colors" />
+        </div>
+      )}
+
+      {/* Right panel — ContextPanel */}
+      {showRightPanel && (
+        <div ref={rightRef}>
+          <ContextPanel width={rightWidth} noteId={selectedNoteId} />
+        </div>
+      )}
+    </div>
+  );
+}

@@ -13,4 +13,5 @@ export { NoteSearchBar } from "./components/NoteSearchBar";
 export { NoteTags } from "./components/NoteTags";
 export { NoteVersionHistory } from "./components/NoteVersionHistory";
 // Pages
+export { default as KnowledgeBasePage } from "./pages/KnowledgeBasePage";
 export { default as NotesPage } from "./pages/NotesPage";
