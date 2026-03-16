@@ -27,10 +27,12 @@ pub use crud::sanitize_predicate_value;
 
 /// LanceDB-backed vector store for embedding similarity search.
 ///
-/// Manages five tables (all share the convention: `id` first, `vector` second,
+/// Manages seven tables (all share the convention: `id` first, `vector` second,
 /// extra string fields, timestamp last):
 ///
 /// - `todo_embeddings`              — id, vector(384), model, updated_at
+/// - `task_embeddings`              — id, vector(384), model, updated_at
+/// - `note_embeddings`              — id, vector(384), model, updated_at
 /// - `conv_embeddings`              — id, vector(384), session_key, role, content_preview, full_content, created_at
 /// - `cognitive_fact_embeddings`    — id, vector(384), domain, text, importance, stability, confidence, updated_at
 /// - `activity_embeddings`          — id, vector(384), source, work_context_id, timestamp, updated_at
@@ -80,6 +82,12 @@ impl VectorStore {
                 "work_context_embeddings",
                 schemas::work_context_embedding_schema(),
             )
+            .await?;
+        store
+            .ensure_table("task_embeddings", schemas::task_embedding_schema())
+            .await?;
+        store
+            .ensure_table("note_embeddings", schemas::note_embedding_schema())
             .await?;
         Ok(store)
     }

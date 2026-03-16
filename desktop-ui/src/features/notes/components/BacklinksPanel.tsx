@@ -3,6 +3,7 @@ import { tagBgColor, tagColor } from "@shared/lib/tagColor";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { useBacklinks } from "../hooks/useBacklinks";
+import { useUnlinkedMentions } from "../hooks/useUnlinkedMentions";
 
 interface BacklinksPanelProps {
   noteId: string | null;
@@ -11,6 +12,7 @@ interface BacklinksPanelProps {
 
 export function BacklinksPanel({ noteId, onSelectNote }: BacklinksPanelProps) {
   const { data: backlinks } = useBacklinks(noteId);
+  const { data: unlinkedMentions } = useUnlinkedMentions(noteId);
   const [collapsed, setCollapsed] = useState(false);
 
   return (
@@ -69,12 +71,27 @@ export function BacklinksPanel({ noteId, onSelectNote }: BacklinksPanelProps) {
             </div>
           )}
 
-          {/* Phase 2 placeholder */}
+          {/* Unlinked Mentions */}
           <div className="mt-3 pt-2 border-t border-white/[0.04]">
-            <div className="text-[10px] font-medium uppercase tracking-wider text-dim">
-              Unlinked mentions{" "}
-              <span className="text-[9px] normal-case tracking-normal">(coming soon)</span>
+            <div className="text-[10px] font-medium text-dim uppercase tracking-wider mb-1">
+              Unlinked Mentions ({unlinkedMentions.length})
             </div>
+            {unlinkedMentions.length > 0 ? (
+              <div className="flex flex-col gap-0.5">
+                {unlinkedMentions.map((note) => (
+                  <button
+                    key={note.id}
+                    type="button"
+                    onClick={() => onSelectNote(note.id)}
+                    className="text-[11px] text-secondary hover:text-primary text-left px-1 py-0.5 rounded hover:bg-white/[0.04] truncate transition-colors"
+                  >
+                    {note.title}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="text-[10px] text-dim italic">No unlinked mentions</div>
+            )}
           </div>
         </div>
       )}

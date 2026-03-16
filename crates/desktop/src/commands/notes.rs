@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
 use desktop_shared::commands::{
-    BacklinkResponse, InboxCreateParams, InboxItemResponse, NoteCreateParams, NoteLinkResponse,
-    NoteResponse, NoteUpdateParams, NoteVersionResponse, NotebookCreateParams, NotebookResponse,
-    NotebookUpdateParams,
+    BacklinkResponse, HybridSearchResponse, InboxCreateParams, InboxItemResponse,
+    NoteCreateParams, NoteLinkResponse, NoteResponse, NoteSuggestionsResponse, NoteUpdateParams,
+    NoteVersionResponse, NotebookCreateParams, NotebookResponse, NotebookUpdateParams,
 };
 use desktop_shared::errors::ApiError;
 use tauri::State;
@@ -67,6 +67,22 @@ pub async fn note_search(
     query: String,
 ) -> Result<Vec<NoteResponse>, ApiError> {
     state.note_search(query).await
+}
+
+#[tauri::command]
+pub async fn note_search_semantic(
+    state: State<'_, Arc<AppCore>>,
+    query: String,
+) -> Result<Vec<NoteResponse>, ApiError> {
+    state.note_search_semantic(&query).await
+}
+
+#[tauri::command]
+pub async fn note_search_hybrid(
+    state: State<'_, Arc<AppCore>>,
+    query: String,
+) -> Result<HybridSearchResponse, ApiError> {
+    state.note_search_hybrid(&query).await
 }
 
 #[tauri::command]
@@ -209,6 +225,16 @@ pub async fn note_backlinks(
     state.note_backlinks(&id).await
 }
 
+// ── Suggestion commands ───────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn note_suggestions(
+    state: State<'_, Arc<AppCore>>,
+    id: String,
+) -> Result<NoteSuggestionsResponse, ApiError> {
+    state.note_suggestions(&id).await
+}
+
 // ── Tag commands ──────────────────────────────────────────────────────
 
 #[tauri::command]
@@ -222,15 +248,14 @@ pub async fn note_tags_all(
         .map_err(|e| ApiError::new("STORAGE", e.to_string()))
 }
 
-// ── Unlinked mentions (stub) ──────────────────────────────────────────
+// ── Unlinked mentions ─────────────────────────────────────────────────
 
 #[tauri::command]
 pub async fn note_unlinked_mentions(
     state: State<'_, Arc<AppCore>>,
     id: String,
 ) -> Result<Vec<NoteResponse>, ApiError> {
-    let _ = (&state, &id);
-    Ok(vec![])
+    state.note_unlinked_mentions(&id).await
 }
 
 // ── Inbox commands ────────────────────────────────────────────────────
@@ -268,6 +293,8 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "note_update",
     "note_delete",
     "note_search",
+    "note_search_semantic",
+    "note_search_hybrid",
     "note_links_all",
     "note_list_by_entity",
     "note_version_list",
@@ -282,6 +309,7 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "note_unarchive",
     "note_list_archived",
     "note_backlinks",
+    "note_suggestions",
     "note_tags_all",
     "note_unlinked_mentions",
     "inbox_create",
@@ -311,6 +339,14 @@ pub(crate) async fn dispatch_dev(
         "note_search" => {
             let query = try_field!(dev::get_str(body, "query"));
             dev::val(core.note_search(query).await)
+        }
+        "note_search_semantic" => {
+            let query = try_field!(dev::get_str(body, "query"));
+            dev::val(core.note_search_semantic(&query).await)
+        }
+        "note_search_hybrid" => {
+            let query = try_field!(dev::get_str(body, "query"));
+            dev::val(core.note_search_hybrid(&query).await)
         }
         "note_links_all" => dev::val(core.note_links_all().await),
         "note_list_by_entity" => {
@@ -362,6 +398,10 @@ pub(crate) async fn dispatch_dev(
             let id = try_field!(dev::get_str(body, "id"));
             dev::val(core.note_backlinks(&id).await)
         }
+        "note_suggestions" => {
+            let id = try_field!(dev::get_str(body, "id"));
+            dev::val(core.note_suggestions(&id).await)
+        }
         "note_tags_all" => {
             dev::val(
                 core.note_repo
@@ -371,8 +411,8 @@ pub(crate) async fn dispatch_dev(
             )
         }
         "note_unlinked_mentions" => {
-            let _id = try_field!(dev::get_str(body, "id"));
-            dev::val(Ok::<Vec<NoteResponse>, ApiError>(vec![]))
+            let id = try_field!(dev::get_str(body, "id"));
+            dev::val(core.note_unlinked_mentions(&id).await)
         }
         "inbox_create" => dev::val(core.inbox_create(
             &try_field!(dev::parse_params::<desktop_shared::commands::InboxCreateParams>(body)).content,

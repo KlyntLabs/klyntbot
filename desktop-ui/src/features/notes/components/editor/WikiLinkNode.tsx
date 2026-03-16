@@ -284,10 +284,10 @@ export function WikiLinkMenu({ editor, currentNoteTitle }: WikiLinkMenuProps) {
       const hasCreate = q.length > 0;
       const totalItems = (hasCreate ? 1 : 0) + r.length;
       if (totalItems === 0) return;
-      if (e.key === "ArrowDown") {
+      if (e.key === "ArrowDown" || (e.ctrlKey && e.key === "j")) {
         e.preventDefault();
         setSelectedIndex((i) => (i + 1) % totalItems);
-      } else if (e.key === "ArrowUp") {
+      } else if (e.key === "ArrowUp" || (e.ctrlKey && e.key === "k")) {
         e.preventDefault();
         setSelectedIndex((i) => (i - 1 + totalItems) % totalItems);
       } else if (e.key === "Enter" || e.key === "Tab") {

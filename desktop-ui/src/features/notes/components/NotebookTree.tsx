@@ -5,8 +5,8 @@ import { ContextMenu, ContextMenuItem, ContextMenuSeparator, ContextMenuSubmenu 
 import {
   Archive,
   Beaker,
-  BookOpen,
   Bookmark,
+  BookOpen,
   Box,
   Brain,
   Briefcase,
@@ -32,9 +32,9 @@ import {
   GraduationCap,
   Heart,
   Home,
-  type LucideIcon,
   Lightbulb,
   Lock,
+  type LucideIcon,
   Map as MapIcon,
   MessageCircle,
   Music,
@@ -72,6 +72,7 @@ interface TreeItem {
   pinned?: boolean;
   updatedAt?: string;
   notebookId?: string;
+  noteCount?: number;
 }
 
 interface NotebookTreeProps {
@@ -97,31 +98,65 @@ interface NotebookTreeProps {
 // Icon registry: name → Lucide component. Stored as string in DB.
 const ICON_MAP: Record<string, LucideIcon> = {
   // Documents & Files
-  "file-text": FileText, "file-code": FileCode, "book-open": BookOpen,
-  "bookmark": Bookmark, "archive": Archive, "database": Database,
+  "file-text": FileText,
+  "file-code": FileCode,
+  "book-open": BookOpen,
+  bookmark: Bookmark,
+  archive: Archive,
+  database: Database,
   // Work & Organization
-  "briefcase": Briefcase, "calendar": Calendar, "users": Users,
-  "shopping-cart": ShoppingCart, "box": Box, "map": MapIcon,
+  briefcase: Briefcase,
+  calendar: Calendar,
+  users: Users,
+  "shopping-cart": ShoppingCart,
+  box: Box,
+  map: MapIcon,
   // Creative & Ideas
-  "palette": Palette, "pencil": Pencil, "lightbulb": Lightbulb,
-  "sparkles": Sparkles, "music": Music, "gamepad": Gamepad2,
+  palette: Palette,
+  pencil: Pencil,
+  lightbulb: Lightbulb,
+  sparkles: Sparkles,
+  music: Music,
+  gamepad: Gamepad2,
   // Science & Tech
-  "code": Code, "cpu": Cpu, "beaker": Beaker,
-  "bug": Bug, "wrench": Wrench, "globe": Globe,
+  code: Code,
+  cpu: Cpu,
+  beaker: Beaker,
+  bug: Bug,
+  wrench: Wrench,
+  globe: Globe,
   // Goals & Symbols
-  "star": Star, "target": Target, "rocket": Rocket,
-  "trophy": Trophy, "zap": Zap, "flame": Flame,
+  star: Star,
+  target: Target,
+  rocket: Rocket,
+  trophy: Trophy,
+  zap: Zap,
+  flame: Flame,
   // Life & Misc
-  "heart": Heart, "home": Home, "shield": Shield,
-  "lock": Lock, "brain": Brain, "coffee": Coffee,
-  "graduation-cap": GraduationCap, "message-circle": MessageCircle,
-  "circle-dot": CircleDot, "pin": Pin,
+  heart: Heart,
+  home: Home,
+  shield: Shield,
+  lock: Lock,
+  brain: Brain,
+  coffee: Coffee,
+  "graduation-cap": GraduationCap,
+  "message-circle": MessageCircle,
+  "circle-dot": CircleDot,
+  pin: Pin,
 };
 
 const ICON_NAMES = Object.keys(ICON_MAP);
 
 /** Render a stored icon name as a Lucide component */
-export function ItemIcon({ name, className, style }: { name: string; className?: string; style?: React.CSSProperties }) {
+export function ItemIcon({
+  name,
+  className,
+  style,
+}: {
+  name: string;
+  className?: string;
+  style?: React.CSSProperties;
+}) {
   const Icon = ICON_MAP[name];
   if (!Icon) return <FileText className={className} style={style} />;
   return <Icon className={className} style={style} />;
@@ -293,13 +328,16 @@ const TreeRow = memo(function TreeRow({
       ) : (
         <span
           className={`truncate flex-1 ${
-            item.title === "Untitled" || item.title === "New Folder"
-              ? "text-dim italic"
-              : ""
+            item.title === "Untitled" || item.title === "New Folder" ? "text-dim italic" : ""
           }`}
         >
           {item.title}
         </span>
+      )}
+
+      {/* Note count for folders */}
+      {isFolder && !isRenaming && item.noteCount != null && item.noteCount > 0 && (
+        <span className="text-[10px] text-dim shrink-0 mr-1">{item.noteCount}</span>
       )}
 
       {/* Date badge for notes */}
@@ -420,6 +458,7 @@ export function NotebookTree({
         color: nb.color ?? undefined,
         hasChildren: childNotes.length > 0 || childNotebooks.length > 0,
         isExpanded: expandedIds.has(nb.id),
+        noteCount: childNotes.length,
       });
       if (expandedIds.has(nb.id)) {
         childNotebooks
@@ -708,10 +747,7 @@ export function NotebookTree({
   }, []);
 
   return (
-    <div
-      className="flex flex-col min-h-0 flex-1"
-      onContextMenu={handleBlankContextMenu}
-    >
+    <div className="flex flex-col min-h-0 flex-1" onContextMenu={handleBlankContextMenu}>
       {/* Header */}
       <div className="flex items-center justify-between px-2 pb-1">
         <span className="text-[10px] uppercase tracking-wider text-dim">Notebooks</span>
@@ -949,7 +985,10 @@ function TreeContextMenu({
                 }`}
                 title={isActive ? `Remove ${name} icon` : name}
               >
-                <Icon className="w-4 h-4" style={activeColor ? { color: activeColor } : undefined} />
+                <Icon
+                  className="w-4 h-4"
+                  style={activeColor ? { color: activeColor } : undefined}
+                />
               </button>
             );
           })}

@@ -141,7 +141,12 @@ export function ContextMenuSubmenu({
         <ChevronRight className="w-3 h-3 opacity-40" />
       </button>
       {open && (
-        <div className={panelClassName ?? "context-menu absolute left-full top-0 ml-1 py-[5px] min-w-[180px] max-h-52 overflow-y-auto animate-[menu-appear_100ms_ease-out]"}>
+        <div
+          className={
+            panelClassName ??
+            "context-menu absolute left-full top-0 ml-1 py-[5px] min-w-[180px] max-h-52 overflow-y-auto animate-[menu-appear_100ms_ease-out]"
+          }
+        >
           {children}
         </div>
       )}

@@ -155,6 +155,26 @@ export function NoteEditor({
     }
   }, [note.id, editor, flushSave]);
 
+  // Listen for insert-wiki-link events from AI suggestions panel
+  useEffect(() => {
+    if (!editor) return;
+    const handler = (e: Event) => {
+      const { title, noteId: targetId } = (e as CustomEvent<{ title: string; noteId: string }>).detail;
+      if (!title) return;
+      editor
+        .chain()
+        .focus()
+        .insertContent({
+          type: "text",
+          text: title,
+          marks: [{ type: "wikiLink", attrs: { noteId: targetId, title } }],
+        })
+        .run();
+    };
+    window.addEventListener("insert-wiki-link", handler);
+    return () => window.removeEventListener("insert-wiki-link", handler);
+  }, [editor]);
+
   const handleRestore = useCallback(
     (restored: Note) => {
       if (editor) {

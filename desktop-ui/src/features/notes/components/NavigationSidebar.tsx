@@ -65,8 +65,12 @@ export function NavigationSidebar({
   onInboxDiscard,
 }: NavigationSidebarProps) {
   // ── Search state ──────────────────────────────────────────────────
+  interface HybridSearchResult {
+    exact: Note[];
+    related: Note[];
+  }
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<Note[] | null>(null);
+  const [searchResults, setSearchResults] = useState<HybridSearchResult | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -84,7 +88,7 @@ export function NavigationSidebar({
     }
     debounceRef.current = setTimeout(async () => {
       try {
-        const results = await ipc<Note[]>("note_search", { query: q });
+        const results = await ipc<HybridSearchResult>("note_search_hybrid", { query: q });
         setSearchResults(results);
       } catch {
         setSearchResults(null);
@@ -167,19 +171,46 @@ export function NavigationSidebar({
       {/* Search results or normal sections */}
       {isSearching ? (
         <div className="flex-1 overflow-y-auto min-h-0 px-1">
-          <div className="text-[10px] uppercase tracking-wider text-dim px-2 py-1">
-            {searchResults.length} result{searchResults.length !== 1 ? "s" : ""}
-          </div>
-          <div className="flex flex-col gap-0.5">
-            {searchResults.map((note) => (
-              <SearchResultItem
-                key={note.id}
-                note={note}
-                isSelected={note.id === selectedNoteId}
-                onSelect={onSelectNote}
-              />
-            ))}
-          </div>
+          {/* Exact matches */}
+          {searchResults.exact.length > 0 && (
+            <>
+              <div className="text-[10px] uppercase tracking-wider text-dim px-2 py-1">
+                {searchResults.exact.length} exact match
+                {searchResults.exact.length !== 1 ? "es" : ""}
+              </div>
+              <div className="flex flex-col gap-0.5">
+                {searchResults.exact.map((note) => (
+                  <SearchResultItem
+                    key={note.id}
+                    note={note}
+                    isSelected={note.id === selectedNoteId}
+                    onSelect={onSelectNote}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+          {/* Related (semantic) matches */}
+          {searchResults.related.length > 0 && (
+            <>
+              <div className="text-[10px] uppercase tracking-wider text-dim px-2 py-1 mt-2">
+                {searchResults.related.length} related
+              </div>
+              <div className="flex flex-col gap-0.5">
+                {searchResults.related.map((note) => (
+                  <SearchResultItem
+                    key={note.id}
+                    note={note}
+                    isSelected={note.id === selectedNoteId}
+                    onSelect={onSelectNote}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+          {searchResults.exact.length === 0 && searchResults.related.length === 0 && (
+            <div className="text-xs text-dim text-center py-4">No results</div>
+          )}
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto min-h-0 flex flex-col">

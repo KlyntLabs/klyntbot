@@ -58,6 +58,19 @@ pub(crate) fn work_context_embedding_schema() -> Schema {
     ])
 }
 
+pub(crate) fn task_embedding_schema() -> Schema {
+    todo_schema() // Structurally identical to todo_embeddings
+}
+
+pub(crate) fn note_embedding_schema() -> Schema {
+    Schema::new(vec![
+        Field::new("id", DataType::Utf8, false),
+        vector_field(),
+        Field::new("model", DataType::Utf8, false),
+        Field::new("updated_at", DataType::Utf8, false),
+    ])
+}
+
 pub(crate) fn cognitive_fact_schema() -> Schema {
     Schema::new(vec![
         Field::new("id", DataType::Utf8, false),

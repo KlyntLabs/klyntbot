@@ -265,6 +265,81 @@ impl NoteRepo {
         Ok(rows)
     }
 
+    /// Update the `embedding_updated_at` timestamp for a note after successful embedding.
+    pub async fn update_embedding_timestamp(&self, note_id: &str) -> Result<(), StorageError> {
+        sqlx::query(
+            "UPDATE notes SET embedding_updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE id = ?1",
+        )
+        .bind(note_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// List notes that have no embedding yet (for background catch-up).
+    pub async fn list_notes_needing_embedding(
+        &self,
+        limit: i64,
+    ) -> Result<Vec<NoteRow>, StorageError> {
+        let rows = sqlx::query_as::<_, NoteRow>(
+            "SELECT * FROM notes WHERE embedding_updated_at IS NULL AND archived = 0 ORDER BY updated_at DESC LIMIT ?1",
+        )
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
+    }
+
+    /// Find notes whose body contains the title of the given note as a phrase,
+    /// but which don't have an explicit `[[wiki-link]]` to it.
+    /// Skips titles shorter than 3 words AND shorter than 8 chars to avoid false positives.
+    pub async fn get_unlinked_mentions(&self, note_id: &str) -> Result<Vec<NoteRow>, StorageError> {
+        let note = sqlx::query_as::<_, NoteRow>("SELECT * FROM notes WHERE id = ?1")
+            .bind(note_id)
+            .fetch_optional(&self.pool)
+            .await?;
+
+        let note = match note {
+            Some(n) => n,
+            None => return Ok(vec![]),
+        };
+
+        let title = note.title.trim().to_string();
+
+        // Skip short titles to avoid false positives
+        let word_count = title.split_whitespace().count();
+        if word_count < 3 && title.len() < 8 {
+            return Ok(vec![]);
+        }
+
+        // FTS5 phrase matching: wrap title in double quotes for exact phrase match.
+        // Escape any embedded double quotes by doubling them.
+        let escaped = title.replace('"', "\"\"");
+        let fts_query = format!("\"{escaped}\"");
+
+        let rows = sqlx::query_as::<_, NoteRow>(
+            r#"
+            SELECT n.*
+            FROM notes_fts fts
+            JOIN notes n ON n.rowid = fts.rowid
+            WHERE notes_fts MATCH ?1
+              AND n.id != ?2
+              AND n.archived = 0
+              AND n.id NOT IN (
+                SELECT source_id FROM note_links WHERE target_id = ?2
+              )
+            ORDER BY n.updated_at DESC
+            LIMIT 20
+            "#,
+        )
+        .bind(&fts_query)
+        .bind(note_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows)
+    }
+
     /// Full-text search using FTS5 with BM25 ranking.
     /// Title matches are weighted 5x, body matches 1x.
     /// Returns results sorted by relevance (highest first).

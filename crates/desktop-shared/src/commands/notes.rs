@@ -111,6 +111,15 @@ pub struct NotebookCreateParams {
     pub color: Option<String>,
 }
 
+// ── Hybrid search ────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HybridSearchResponse {
+    pub exact: Vec<NoteResponse>,
+    pub related: Vec<NoteResponse>,
+}
+
 // ── Inbox ─────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Deserialize)]
@@ -126,6 +135,32 @@ pub struct InboxItemResponse {
     pub content: String,
     pub status: String,
     pub created_at: String,
+}
+
+// ── Suggestions ──────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NoteSuggestionsResponse {
+    pub related_notes: Vec<ScoredNoteResponse>,
+    pub link_suggestions: Vec<LinkSuggestionResponse>,
+    pub suggested_tags: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScoredNoteResponse {
+    pub note: NoteResponse,
+    pub score: f64,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LinkSuggestionResponse {
+    pub note: NoteResponse,
+    pub score: f64,
+    pub reason: String,
 }
 
 // ── Backlinks ─────────────────────────────────────────────────────────

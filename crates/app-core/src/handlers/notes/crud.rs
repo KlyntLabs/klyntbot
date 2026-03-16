@@ -1,6 +1,8 @@
+use std::sync::Arc;
+
 use desktop_shared::commands::{
-    BacklinkResponse, NoteCreateParams, NoteLinkResponse, NoteResponse, NoteUpdateParams,
-    NoteVersionResponse,
+    BacklinkResponse, HybridSearchResponse, NoteCreateParams, NoteLinkResponse, NoteResponse,
+    NoteUpdateParams, NoteVersionResponse,
 };
 use desktop_shared::errors::ApiError;
 use desktop_shared::types::EntityKind;
@@ -8,7 +10,8 @@ use feature_notes::models::{NoteRow, NoteVersionRow};
 use feature_notes::repo::utc_now_str;
 
 use super::converters::{
-    extract_links_and_mentions, note_with_tags, notes_with_tags_batch, version_row_to_response,
+    extract_links_and_mentions, note_row_to_response, note_with_tags, notes_with_tags_batch,
+    version_row_to_response,
 };
 use crate::errors::map_storage_err;
 use crate::state::{AppCore, EntityUpdate, HandlerResult};
@@ -144,6 +147,20 @@ impl AppCore {
             });
         }
 
+        // Fire-and-forget embedding for the new note
+        if let Some(ref handler) = self.note_embedding_handler {
+            let handler = Arc::clone(handler);
+            let note_row = created.clone();
+            let repo = self.note_repo.clone();
+            tokio::spawn(async move {
+                if let Err(e) = handler.embed_note(&note_row).await {
+                    tracing::warn!("note embedding failed (non-fatal): {e}");
+                } else {
+                    let _ = repo.update_embedding_timestamp(&note_row.id).await;
+                }
+            });
+        }
+
         let response = note_with_tags(self, &created).await?;
         let updates = vec![EntityUpdate {
             kind: EntityKind::Note,
@@ -185,6 +202,20 @@ impl AppCore {
             bus.publish(bus::DomainEvent::NoteUpdated {
                 note_id: params.id.clone(),
                 title: updated.title.clone(),
+            });
+        }
+
+        // Fire-and-forget embedding for the updated note
+        if let Some(ref handler) = self.note_embedding_handler {
+            let handler = Arc::clone(handler);
+            let note_row = updated.clone();
+            let repo = self.note_repo.clone();
+            tokio::spawn(async move {
+                if let Err(e) = handler.embed_note(&note_row).await {
+                    tracing::warn!("note embedding failed (non-fatal): {e}");
+                } else {
+                    let _ = repo.update_embedding_timestamp(&note_row.id).await;
+                }
             });
         }
 
@@ -302,6 +333,88 @@ impl AppCore {
         Ok((response, updates))
     }
 
+    // ── Hybrid search (FTS5 + semantic) ────────────────────────────
+
+    /// Hybrid search: FTS5 keyword search + semantic vector search, merged by RRF-like scoring.
+    pub async fn note_search_hybrid(
+        &self,
+        query: &str,
+    ) -> Result<HybridSearchResponse, ApiError> {
+        // 1. FTS5 keyword search (always available)
+        let keyword_results = self.note_repo.search_notes(query).await.unwrap_or_default();
+        let keyword_notes = notes_with_tags_batch(self, &keyword_results).await?;
+
+        // 2. Semantic search (only if embedding handler available)
+        let semantic_notes = if let Some(ref handler) = self.note_embedding_handler {
+            match handler.embed_query(query).await {
+                Ok(query_vec) => {
+                    match handler.search_similar(&query_vec, 10, 0.35).await {
+                        Ok(results) => {
+                            let keyword_ids: std::collections::HashSet<&str> =
+                                keyword_notes.iter().map(|n| n.id.as_str()).collect();
+                            let mut notes = Vec::new();
+                            for (note_id, _score) in results {
+                                // Skip notes already in keyword results
+                                if keyword_ids.contains(note_id.as_str()) {
+                                    continue;
+                                }
+                                if let Ok(Some(row)) = self.note_repo.get_note(&note_id).await {
+                                    let tags = self
+                                        .note_repo
+                                        .get_tags(&note_id)
+                                        .await
+                                        .unwrap_or_default();
+                                    notes.push(note_row_to_response(&row, tags));
+                                }
+                            }
+                            notes
+                        }
+                        Err(_) => Vec::new(),
+                    }
+                }
+                Err(_) => Vec::new(),
+            }
+        } else {
+            Vec::new()
+        };
+
+        Ok(HybridSearchResponse {
+            exact: keyword_notes,
+            related: semantic_notes,
+        })
+    }
+
+    // ── Semantic search ─────────────────────────────────────────────
+
+    pub async fn note_search_semantic(
+        &self,
+        query: &str,
+    ) -> Result<Vec<NoteResponse>, ApiError> {
+        let handler = self
+            .note_embedding_handler
+            .as_ref()
+            .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "semantic search not available"))?;
+
+        let query_vec = handler
+            .embed_query(query)
+            .await
+            .map_err(|e| ApiError::new("EMBEDDING_ERROR", e.to_string()))?;
+
+        let results = handler
+            .search_similar(&query_vec, 20, 0.3)
+            .await
+            .map_err(|e| ApiError::new("SEARCH_ERROR", e.to_string()))?;
+
+        let mut notes = Vec::new();
+        for (note_id, _score) in results {
+            if let Ok(Some(row)) = self.note_repo.get_note(&note_id).await {
+                let tags = self.note_repo.get_tags(&note_id).await.unwrap_or_default();
+                notes.push(note_row_to_response(&row, tags));
+            }
+        }
+        Ok(notes)
+    }
+
     // ── Archive handlers ─────────────────────────────────────────────
 
     pub async fn note_archive(&self, id: &str) -> HandlerResult<()> {
@@ -334,6 +447,21 @@ impl AppCore {
         let rows = self
             .note_repo
             .list_archived_notes()
+            .await
+            .map_err(map_storage_err)?;
+
+        notes_with_tags_batch(self, &rows).await
+    }
+
+    // ── Unlinked mentions handler ────────────────────────────────────
+
+    pub async fn note_unlinked_mentions(
+        &self,
+        note_id: &str,
+    ) -> Result<Vec<NoteResponse>, ApiError> {
+        let rows = self
+            .note_repo
+            .get_unlinked_mentions(note_id)
             .await
             .map_err(map_storage_err)?;
 

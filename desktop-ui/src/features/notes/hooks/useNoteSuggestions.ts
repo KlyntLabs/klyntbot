@@ -1,17 +1,39 @@
+import { useQuery } from "@shared/hooks/useQuery";
+import type { Note } from "@shared/types";
+
+export interface ScoredNote {
+  note: Note;
+  score: number;
+  reason: string;
+}
+
+export interface LinkSuggestion {
+  note: Note;
+  score: number;
+  reason: string;
+}
+
 export interface NoteSuggestions {
-  relatedNotes: string[];
-  linkSuggestions: string[];
+  relatedNotes: ScoredNote[];
+  linkSuggestions: LinkSuggestion[];
   suggestedTags: string[];
 }
 
-export function useNoteSuggestions(_noteId: string | null) {
-  // Phase 1: return empty data — backend not ready yet
+const EMPTY: NoteSuggestions = {
+  relatedNotes: [],
+  linkSuggestions: [],
+  suggestedTags: [],
+};
+
+export function useNoteSuggestions(noteId: string | null) {
+  const { data, refetch } = useQuery<NoteSuggestions>(
+    "note_suggestions",
+    noteId ? { id: noteId } : null,
+    EMPTY,
+  );
+
   return {
-    suggestions: {
-      relatedNotes: [] as string[],
-      linkSuggestions: [] as string[],
-      suggestedTags: [] as string[],
-    } satisfies NoteSuggestions,
-    refetchSuggestions: () => {},
+    suggestions: data,
+    refetchSuggestions: refetch,
   };
 }

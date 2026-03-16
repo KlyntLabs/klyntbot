@@ -1,7 +1,7 @@
 {
   "identifier": "default",
   "description": "Default capabilities for Klynt desktop",
-  "windows": ["main", "tray", "launcher", "distraction-overlay"],
+  "windows": ["main", "tray", "launcher", "distraction-overlay", "quick-capture"],
   "permissions": [
     "core:default",
     "core:window:allow-set-size",

@@ -89,6 +89,9 @@ pub struct AppCore {
     /// or left as `NoopEmitter` for CLI / tests. Used by the MCP server to push
     /// entity updates to the frontend after tool mutations.
     pub event_emitter: Arc<dyn AppEventEmitter>,
+    /// Note embedding handler for semantic search (None when vector store unavailable).
+    pub note_embedding_handler:
+        Option<Arc<dyn feature_notes::handlers::embedding::NoteEmbeddingHandler>>,
     /// Launcher search engine (None when launcher feature is disabled).
     pub launcher_engine: Option<Arc<LauncherSearchEngine>>,
 }

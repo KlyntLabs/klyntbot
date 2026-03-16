@@ -12,7 +12,7 @@ mod tray_countdown;
 use std::sync::Arc;
 
 use clap::{Parser, Subcommand};
-use commands::window::{WINDOW_LAUNCHER, WINDOW_TRAY};
+use commands::window::{WINDOW_LAUNCHER, WINDOW_QUICK_CAPTURE, WINDOW_TRAY};
 use tauri::image::Image;
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::Manager;
@@ -149,7 +149,7 @@ fn run_desktop_app() {
     tauri::Builder::default()
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
-                .with_shortcuts(["alt+space", "alt+shift+space"])
+                .with_shortcuts(["alt+space", "alt+shift+space", "super+shift+c"])
                 .expect("failed to parse shortcut")
                 .with_handler(|app, shortcut, event| {
                     if event.state != ShortcutState::Pressed {
@@ -176,6 +176,19 @@ fn run_desktop_app() {
                                 let _ = window.hide();
                             } else {
                                 focus_timer::open_tray_window(app);
+                            }
+                        }
+                    }
+
+                    // Cmd+Shift+C → toggle quick capture
+                    if shortcut.matches(Modifiers::SUPER | Modifiers::SHIFT, Code::KeyC) {
+                        if let Some(window) = app.get_webview_window(WINDOW_QUICK_CAPTURE) {
+                            if window.is_visible().unwrap_or(false) {
+                                let _ = window.hide();
+                            } else {
+                                let _ = window.center();
+                                let _ = window.show();
+                                let _ = window.set_focus();
                             }
                         }
                     }
@@ -288,6 +301,11 @@ fn run_desktop_app() {
                 dismiss_on_blur(&launcher_window);
             }
 
+            // Quick capture window — dismiss-on-blur
+            if let Some(capture_window) = app.get_webview_window(WINDOW_QUICK_CAPTURE) {
+                dismiss_on_blur(&capture_window);
+            }
+
             // Start the tray countdown (next upcoming event in menu bar)
             tray_countdown::spawn(app.handle());
 
@@ -316,6 +334,8 @@ fn run_desktop_app() {
             commands::notes::note_update,
             commands::notes::note_delete,
             commands::notes::note_search,
+            commands::notes::note_search_semantic,
+            commands::notes::note_search_hybrid,
             commands::notes::note_links_all,
             commands::notes::note_list_by_entity,
             commands::notes::note_version_list,
@@ -330,6 +350,7 @@ fn run_desktop_app() {
             commands::notes::note_unarchive,
             commands::notes::note_list_archived,
             commands::notes::note_backlinks,
+            commands::notes::note_suggestions,
             commands::notes::note_tags_all,
             commands::notes::note_unlinked_mentions,
             commands::notes::inbox_create,

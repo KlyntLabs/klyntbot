@@ -9,3 +9,4 @@ export { LinkedNotes } from "./components/LinkedNotes";
 export { NoteEditor } from "./components/NoteEditor";
 // Pages
 export { default as KnowledgeBasePage } from "./pages/KnowledgeBasePage";
+export { QuickCapturePage } from "./pages/QuickCapturePage";

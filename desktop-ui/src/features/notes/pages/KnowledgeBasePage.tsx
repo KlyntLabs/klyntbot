@@ -16,6 +16,7 @@ import { GraphView } from "../components/GraphView";
 import { NavigationSidebar, type NavigationSidebarHandle } from "../components/NavigationSidebar";
 import { NoteCreationDialog } from "../components/NoteCreationDialog";
 import { NoteEditorPanel } from "../components/NoteEditorPanel";
+import { NoteFinder } from "../components/NoteFinder";
 import { VersionHistoryOverlay } from "../components/VersionHistoryOverlay";
 import { useInbox } from "../hooks/useInbox";
 
@@ -67,6 +68,7 @@ export default function KnowledgeBasePage() {
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("three-panel");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showVersionHistory, setShowVersionHistory] = useState(false);
+  const [showNoteFinder, setShowNoteFinder] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
 
   // ── Sidebar widths (imperatively managed for perf) ────────────────────
@@ -316,9 +318,14 @@ export default function KnowledgeBasePage() {
         // Cmd+Shift+G → toggle view mode
         e.preventDefault();
         setViewMode((prev) => (prev === "editor" ? "graph" : "editor"));
-      } else if (e.key === "f" && e.shiftKey) {
+      } else if (e.key === "l" && !e.shiftKey) {
+        // Cmd+L → insert top AI-suggested link at cursor
         e.preventDefault();
-        searchRef.current?.focus();
+        window.dispatchEvent(new CustomEvent("trigger-insert-link"));
+      } else if (e.key === "f" && !e.shiftKey) {
+        // Cmd+F → open note finder
+        e.preventDefault();
+        setShowNoteFinder(true);
       }
     };
     document.addEventListener("keydown", handler);
@@ -331,6 +338,7 @@ export default function KnowledgeBasePage() {
       refetchNotes();
       invalidateQueries("note_backlinks");
       invalidateQueries("note_links_all");
+      invalidateQueries("note_suggestions");
     }
     if (payload.entityKind === "notebook") {
       refetchNotebooks();
@@ -345,7 +353,7 @@ export default function KnowledgeBasePage() {
   const isFocusMode = layoutMode === "focus";
   const isGraphMode = viewMode === "graph";
   const showLeftSidebar = !isFocusMode;
-  const showRightPanel = !isFocusMode;
+  const showRightPanel = !isFocusMode && !!selectedNoteId;
 
   // ── Render ────────────────────────────────────────────────────────────
   return (
@@ -411,9 +419,7 @@ export default function KnowledgeBasePage() {
             />
           </>
         ) : selectedNote ? (
-          <div
-            className="w-full h-full flex flex-col"
-          >
+          <div className="w-full h-full flex flex-col">
             <NoteEditorPanel
               key={selectedNote.id}
               note={selectedNote}
@@ -496,6 +502,17 @@ export default function KnowledgeBasePage() {
           }}
         />
       )}
+
+      {/* Telescope-style fuzzy finder (Cmd+Shift+F) */}
+      <NoteFinder
+        isOpen={showNoteFinder}
+        onClose={() => setShowNoteFinder(false)}
+        onSelectNote={(id) => {
+          setSelectedNoteId(id);
+          setShowNoteFinder(false);
+        }}
+        notes={notes}
+      />
     </div>
   );
 }

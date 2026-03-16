@@ -106,6 +106,21 @@ impl AppCore {
         )
         .await?;
 
+        // ── Note embedding handler (before vector_store is moved into agent) ──
+        let note_embedding_handler: Option<
+            Arc<dyn feature_notes::handlers::embedding::NoteEmbeddingHandler>,
+        > = if let Some(ref vs) = vector_store {
+            let engine = Arc::new(tools::embedding_engine::EmbeddingEngine::new());
+            Some(Arc::new(
+                ::agent::adapters::note_embedding::NoteEmbeddingAdapter::new(
+                    engine,
+                    vs.clone(),
+                ),
+            ))
+        } else {
+            None
+        };
+
         // ── Phase 3: Agent ───────────────────────────────────────────────
         let agent::AgentResult {
             cognitive_provider,
@@ -221,8 +236,45 @@ impl AppCore {
             activity_ingestion_service: Some(Arc::clone(&activity_svc)),
             active_task_focus: Arc::new(std::sync::Mutex::new(None)),
             event_emitter: event_emitter.unwrap_or_else(|| Arc::new(NoopEmitter)),
+            note_embedding_handler,
             launcher_engine,
         };
+
+        // ── Background note embedding catch-up ────────────────────────────
+        if let Some(ref handler) = core.note_embedding_handler {
+            let handler = Arc::clone(handler);
+            let repo = core.note_repo.clone();
+            let token = shutdown_token.clone();
+            tokio::spawn(async move {
+                // Small delay to let the app finish starting
+                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                if token.is_cancelled() {
+                    return;
+                }
+
+                match repo.list_notes_needing_embedding(50).await {
+                    Ok(notes) => {
+                        if !notes.is_empty() {
+                            info!(
+                                count = notes.len(),
+                                "embedding notes without embeddings (background)"
+                            );
+                        }
+                        for note in notes {
+                            if token.is_cancelled() {
+                                break;
+                            }
+                            if let Err(e) = handler.embed_note(&note).await {
+                                tracing::debug!("background embed failed for {}: {e}", note.id);
+                            } else {
+                                let _ = repo.update_embedding_timestamp(&note.id).await;
+                            }
+                        }
+                    }
+                    Err(e) => tracing::warn!("failed to list notes for embedding: {e}"),
+                }
+            });
+        }
 
         // ── Post-core background services ────────────────────────────────
         cognitive::spawn_post_core_services(

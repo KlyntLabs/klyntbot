@@ -2,6 +2,7 @@ use tauri::Manager;
 
 pub const WINDOW_TRAY: &str = "tray";
 pub const WINDOW_LAUNCHER: &str = "launcher";
+pub const WINDOW_QUICK_CAPTURE: &str = "quick-capture";
 
 const RESIZABLE_WINDOWS: &[&str] = &[WINDOW_LAUNCHER, WINDOW_TRAY];
 
