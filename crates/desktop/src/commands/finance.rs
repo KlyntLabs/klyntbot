@@ -6,7 +6,8 @@ use desktop_shared::commands::{
     FinanceBudgetUpdateParams, FinanceCategoryReportResponse, FinanceDailySpendingResponse,
     FinanceGoalCreateParams, FinanceGoalUpdateParams, FinanceInvestmentCreateParams,
     FinanceInvestmentUpdateParams, FinanceLiabilityCreateParams, FinanceLiabilityUpdateParams,
-    FinanceMonthlySummaryResponse, FinanceNetWorthResponse, FinancePeriodSummaryResponse,
+    FinanceDateRangeParams, FinanceMonthlySummaryResponse, FinanceNetWorthResponse,
+    FinancePeriodSummaryResponse,
     FinancePortfolioCreateParams, FinancePortfolioResponse, FinanceTransactionCreateParams,
     FinanceTransactionFilterParams, FinanceTrendPoint,
 };
@@ -292,7 +293,7 @@ pub async fn finance_investment_update(
 
 // ── Reports ─────────────────────────────────────────────────────────────
 
-#[tauri::command]
+#[tauri::command(rename_all = "camelCase")]
 pub async fn finance_report_spending(
     state: State<'_, Arc<AppCore>>,
     date_from: Option<String>,
@@ -326,7 +327,7 @@ pub async fn finance_monthly_summary(
     state.finance_monthly_summary().await
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "camelCase")]
 pub async fn finance_daily_spending(
     state: State<'_, Arc<AppCore>>,
     date_from: String,
@@ -335,7 +336,7 @@ pub async fn finance_daily_spending(
     state.finance_daily_spending(date_from, date_to).await
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "camelCase")]
 pub async fn finance_period_summary(
     state: State<'_, Arc<AppCore>>,
     date_from: String,
@@ -483,7 +484,7 @@ pub(crate) async fn dispatch_dev(
         ),
         // Reports
         "finance_report_spending" => dev::val(
-            core.finance_report_spending(dev::get(body, "date_from"), dev::get(body, "date_to"))
+            core.finance_report_spending(dev::get(body, "dateFrom"), dev::get(body, "dateTo"))
                 .await,
         ),
         "finance_report_income" => dev::val(
@@ -499,13 +500,13 @@ pub(crate) async fn dispatch_dev(
         }
         "finance_monthly_summary" => dev::val(core.finance_monthly_summary().await),
         "finance_daily_spending" => {
-            let date_from = try_field!(dev::get_str(body, "date_from"));
-            let date_to = try_field!(dev::get_str(body, "date_to"));
+            let date_from = try_field!(dev::get_str(body, "dateFrom"));
+            let date_to = try_field!(dev::get_str(body, "dateTo"));
             dev::val(core.finance_daily_spending(date_from, date_to).await)
         }
         "finance_period_summary" => {
-            let date_from = try_field!(dev::get_str(body, "date_from"));
-            let date_to = try_field!(dev::get_str(body, "date_to"));
+            let date_from = try_field!(dev::get_str(body, "dateFrom"));
+            let date_to = try_field!(dev::get_str(body, "dateTo"));
             dev::val(core.finance_period_summary(date_from, date_to).await)
         }
         _ => return None,

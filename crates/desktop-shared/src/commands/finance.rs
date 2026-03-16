@@ -196,6 +196,15 @@ pub struct FinanceInvestmentUpdateParams {
     pub notes: Option<Option<String>>,
 }
 
+// ── Date Range Params ────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FinanceDateRangeParams {
+    pub date_from: String,
+    pub date_to: String,
+}
+
 // ── Finance Filter Params ────────────────────────────────────────────
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

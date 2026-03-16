@@ -39,20 +39,20 @@ export function CashFlowPage() {
   // ── Period-scoped queries ──────────────────────────────────────
   const { data: periodSummary, refetch: rPS } = useQuery<FinancePeriodSummary>(
     "finance_period_summary",
-    { date_from: period.dateFrom, date_to: period.dateTo },
+    { dateFrom: period.dateFrom, dateTo: period.dateTo },
     { income: 0, spending: 0 },
   );
 
   const { data: dailySpendingResp, refetch: rDS } =
     useQuery<FinanceDailySpendingResponse>(
       "finance_daily_spending",
-      { date_from: period.dateFrom, date_to: period.dateTo },
+      { dateFrom: period.dateFrom, dateTo: period.dateTo },
       { days: [] },
     );
 
   const { data: spendingReport, refetch: rSR } = useQuery<FinanceCategoryReport>(
     "finance_report_spending",
-    { date_from: period.dateFrom, date_to: period.dateTo },
+    { dateFrom: period.dateFrom, dateTo: period.dateTo },
     { total: 0, breakdown: [] },
   );
 
@@ -73,12 +73,14 @@ export function CashFlowPage() {
   const { data: transactions, refetch: rTX } = useQuery<FinanceTransaction[]>(
     "finance_transactions_filtered",
     {
-      dateFrom: txDateFrom,
-      dateTo: txDateTo,
-      txType: txFilter === "all" ? undefined : txFilter,
-      accountId: accountFilter,
-      query: debouncedQuery || undefined,
-      limit: 50,
+      params: {
+        dateFrom: txDateFrom,
+        dateTo: txDateTo,
+        txType: txFilter === "all" ? undefined : txFilter,
+        accountId: accountFilter,
+        query: debouncedQuery || undefined,
+        limit: 50,
+      },
     },
     [],
   );
