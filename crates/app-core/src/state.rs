@@ -94,6 +94,10 @@ pub struct AppCore {
         Option<Arc<dyn feature_notes::handlers::embedding::NoteEmbeddingHandler>>,
     /// Launcher search engine (None when launcher feature is disabled).
     pub launcher_engine: Option<Arc<LauncherSearchEngine>>,
+    /// Insight review cache repo (None when cognitive feature unavailable).
+    pub insight_cache_repo: Option<cognitive::InsightCacheRepo>,
+    /// Flashcard repo for FSRS spaced repetition (None when cognitive feature unavailable).
+    pub flashcard_repo: Option<cognitive::FlashcardRepo>,
 }
 
 impl AppCore {
