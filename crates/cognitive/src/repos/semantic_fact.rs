@@ -14,6 +14,11 @@ impl SemanticFactRepo {
         Self { pool }
     }
 
+    /// Access the underlying pool (needed by sibling repos in the same service).
+    pub fn pool(&self) -> &sqlx::SqlitePool {
+        &self.pool
+    }
+
     /// Insert or replace a semantic fact.
     pub async fn upsert(&self, fact: &SemanticFact) -> Result<(), sqlx::Error> {
         sqlx::query(

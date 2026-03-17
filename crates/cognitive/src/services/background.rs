@@ -459,6 +459,45 @@ impl BackgroundConsolidationService {
                                 }
                             }
                         }
+
+                        // ── Entity extraction from new facts ──────────────────
+                        let entity_repo = crate::repos::EntityRepo::new(repo.pool().clone());
+                        for (candidate, op) in candidates.iter().zip(ops.iter()) {
+                            match op {
+                                crate::types::MemoryOp::Add { .. }
+                                | crate::types::MemoryOp::Update { .. } => {
+                                    let fact = &candidate.candidate;
+                                    // Upsert subject as entity
+                                    let _ = entity_repo
+                                        .upsert_entity(&crate::repos::NewEntity {
+                                            name: fact.subject.clone(),
+                                            entity_type: "concept".to_string(),
+                                            description: None,
+                                            source: "extracted".to_string(),
+                                            source_id: Some(fact.id.clone()),
+                                            metadata: None,
+                                        })
+                                        .await;
+                                    // Upsert object as entity (skip numeric/short values)
+                                    if fact.object.len() > 2
+                                        && fact.object.len() < 100
+                                        && !fact.object.chars().all(|c| c.is_ascii_digit() || c == '.')
+                                    {
+                                        let _ = entity_repo
+                                            .upsert_entity(&crate::repos::NewEntity {
+                                                name: fact.object.clone(),
+                                                entity_type: "concept".to_string(),
+                                                description: None,
+                                                source: "extracted".to_string(),
+                                                source_id: Some(fact.id.clone()),
+                                                metadata: None,
+                                            })
+                                            .await;
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
                     }
 
                     // Self-healing: drain dead-letter if LLM is healthy (no fallbacks this batch)
