@@ -30,16 +30,9 @@ impl AppCore {
             feature_insights::InsightService::compute_input_hash(&note.title, &note.body, &related_ids);
 
         if let Some(ref service) = self.insight_service {
-            if let Ok(Some(_cached)) = service.check_cache(note_id, &content_hash).await {
+            if let Ok(Some(cached)) = service.check_cache(note_id, &content_hash).await {
                 return Ok(InsightReviewStarted {
-                    insight_review_id: format!(
-                        "ir-{}",
-                        uuid::Uuid::new_v4()
-                            .to_string()
-                            .split('-')
-                            .next()
-                            .unwrap_or("0000")
-                    ),
+                    insight_review_id: cached.id,
                     content_hash,
                     cached: true,
                 });
@@ -291,7 +284,9 @@ impl AppCore {
 
         if let Some(ref service) = self.insight_service {
             if let Ok(Some(latest)) = service.get_latest(note_id).await {
-                let _ = service.update_tab(&latest.id, tab, &content).await;
+                if let Err(e) = service.update_tab(&latest.id, tab, &content).await {
+                    tracing::warn!("failed to persist regenerated tab {tab}: {e}");
+                }
             }
         }
 
