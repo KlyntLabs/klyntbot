@@ -1,5 +1,6 @@
 mod converters;
 mod crud;
+mod decomposition;
 pub mod focus;
 pub mod proactive;
 mod queries;
