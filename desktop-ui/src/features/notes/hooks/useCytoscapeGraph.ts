@@ -1,50 +1,52 @@
 import cytoscape, { type Core, type ElementDefinition, type Stylesheet } from "cytoscape";
 import fcose from "cytoscape-fcose";
 import { useCallback, useEffect, useRef } from "react";
+import type { GraphSettings } from "./useGraphSettings";
 
 cytoscape.use(fcose);
-
-const prefersReducedMotion =
-  typeof window !== "undefined"
-    ? window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    : false;
-
-const FCOSE_OPTIONS = {
-  name: "fcose" as const,
-  animate: !prefersReducedMotion,
-  animationDuration: prefersReducedMotion ? 0 : 800,
-  fit: true,
-  padding: 40,
-  nodeSeparation: 80,
-  idealEdgeLength: 120,
-  nodeRepulsion: 8000,
-  edgeElasticity: 0.45,
-  gravity: 0.2,
-  gravityRange: 1.5,
-  nestingFactor: 0.1,
-  numIter: 2500,
-  quality: "default" as const,
-};
 
 interface UseCytoscapeGraphParams {
   containerRef: React.RefObject<HTMLDivElement | null>;
   elements: ElementDefinition[];
   stylesheet: Stylesheet[];
+  settings: GraphSettings;
   onNodeClick?: (id: string) => void;
   onNodeDoubleClick?: (id: string) => void;
   onNodeHover?: (id: string | null, x: number, y: number) => void;
   onNodeContext?: (id: string, x: number, y: number) => void;
 }
 
-/** Compute a stable fingerprint of element IDs to detect real data changes */
 function elementsFingerprint(elements: ElementDefinition[]): string {
-  return elements.map((e) => e.data?.id || "").sort().join(",");
+  return elements
+    .map((e) => e.data?.id || "")
+    .sort()
+    .join(",");
+}
+
+function buildLayoutOptions(settings: GraphSettings) {
+  return {
+    name: "fcose" as const,
+    animate: true,
+    animationDuration: 600,
+    fit: true,
+    padding: 40,
+    nodeSeparation: 75,
+    idealEdgeLength: settings.linkDistance,
+    nodeRepulsion: settings.repulsion,
+    edgeElasticity: 0.45,
+    gravity: settings.centerForce,
+    gravityRange: 1.5,
+    nestingFactor: 0.1,
+    numIter: 2500,
+    quality: "default" as const,
+  };
 }
 
 export function useCytoscapeGraph({
   containerRef,
   elements,
   stylesheet,
+  settings,
   onNodeClick,
   onNodeDoubleClick,
   onNodeHover,
@@ -52,6 +54,8 @@ export function useCytoscapeGraph({
 }: UseCytoscapeGraphParams): { cy: React.MutableRefObject<Core | null>; runLayout: () => void } {
   const cyRef = useRef<Core | null>(null);
   const prevFingerprint = useRef("");
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
 
   // ── Create instance on mount ──
   useEffect(() => {
@@ -102,11 +106,33 @@ export function useCytoscapeGraph({
       onNodeContext?.(node.id(), pos.x, pos.y);
     });
 
+    // ── Drag → re-heat simulation for spring-physics feel ──
+    cy.on("drag", "node:childless", () => {
+      // After drag ends, run a quick partial layout on neighbors
+      // to make connected nodes follow slightly
+    });
+
+    cy.on("free", "node:childless", (evt) => {
+      const node = evt.target;
+      // After releasing a dragged node, run a gentle re-layout
+      // that keeps the dragged node fixed and lets neighbors settle
+      const pos = node.position();
+      const opts = buildLayoutOptions(settingsRef.current);
+      cy.layout({
+        ...opts,
+        animate: true,
+        animationDuration: 400,
+        fit: false,
+        fixedNodeConstraint: [{ nodeId: node.id(), position: { x: pos.x, y: pos.y } }],
+      } as Record<string, unknown>).run();
+    });
+
     // ── Zoom-adaptive labels ──
     cy.on("zoom", () => {
       const zoom = cy.zoom();
+      const threshold = settingsRef.current.labelThreshold;
       const childless = cy.nodes(":childless");
-      if (zoom < 0.5) {
+      if (zoom < threshold) {
         childless.addClass("hide-label");
       } else {
         childless.removeClass("hide-label");
@@ -145,7 +171,7 @@ export function useCytoscapeGraph({
     document.addEventListener("keydown", handleKeyDown);
 
     // Run initial layout
-    cy.layout(FCOSE_OPTIONS).run();
+    cy.layout(buildLayoutOptions(settings)).run();
 
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
@@ -155,7 +181,7 @@ export function useCytoscapeGraph({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount/unmount only
   }, [containerRef, stylesheet]);
 
-  // ── Update elements only when data actually changes (not on hover re-renders) ──
+  // ── Update elements only when data actually changes ──
   useEffect(() => {
     const cy = cyRef.current;
     if (!cy) return;
@@ -165,11 +191,42 @@ export function useCytoscapeGraph({
     prevFingerprint.current = newFingerprint;
 
     cy.json({ elements });
-    cy.layout(FCOSE_OPTIONS).run();
+    cy.nodes(":parent").ungrabify();
+    cy.nodes(":parent").unselectify();
+    cy.layout(buildLayoutOptions(settingsRef.current)).run();
   }, [elements]);
 
+  // ── Re-layout when physics settings change ──
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy || cy.elements().length === 0) return;
+    cy.layout(buildLayoutOptions(settings)).run();
+  }, [settings.linkDistance, settings.repulsion, settings.centerForce]);
+
+  // ── Update node sizes when nodeScale changes ──
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    cy.nodes(":childless").forEach((node) => {
+      const baseSize = node.data("size") as number;
+      if (baseSize) {
+        const scaled = baseSize * settings.nodeScale;
+        node.style({ width: scaled, height: scaled });
+      }
+    });
+  }, [settings.nodeScale]);
+
+  // ── Update arrow visibility ──
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    cy.edges().style({
+      "target-arrow-shape": settings.showArrows ? "triangle" : "none",
+    });
+  }, [settings.showArrows]);
+
   const runLayout = useCallback(() => {
-    cyRef.current?.layout(FCOSE_OPTIONS).run();
+    cyRef.current?.layout(buildLayoutOptions(settingsRef.current)).run();
   }, []);
 
   return { cy: cyRef, runLayout };

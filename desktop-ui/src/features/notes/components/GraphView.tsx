@@ -1,13 +1,16 @@
+import { useClickOutside } from "@shared/hooks/useClickOutside";
 import type { Note, Notebook } from "@shared/types";
-import { Maximize2, Minus, Plus, RotateCcw } from "lucide-react";
+import { Maximize2, Minus, Plus, RotateCcw, Settings2 } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 import { type ClusterMode, useCytoscapeElements } from "../hooks/useCytoscapeElements";
 import { useCytoscapeGraph } from "../hooks/useCytoscapeGraph";
 import { useCytoscapeTheme } from "../hooks/useCytoscapeTheme";
 import type { SmartView } from "../hooks/useGraphData";
 import { useGraphData } from "../hooks/useGraphData";
+import { useGraphSettings } from "../hooks/useGraphSettings";
 import { GraphLegend } from "./GraphLegend";
 import { GraphNodeTooltip } from "./GraphNodeTooltip";
+import { GraphSettingsPopover } from "./GraphSettingsPopover";
 import { GraphToolbar } from "./GraphToolbar";
 
 interface GraphViewProps {
@@ -31,11 +34,15 @@ export function GraphView({
   const [hopRadius, setHopRadius] = useState(2);
   const [searchQuery, setSearchQuery] = useState("");
   const [clusterMode] = useState<ClusterMode>("notebook");
-  const [tooltip, setTooltip] = useState<{
-    nodeId: string;
-    x: number;
-    y: number;
-  } | null>(null);
+  const [tooltip, setTooltip] = useState<{ nodeId: string; x: number; y: number } | null>(null);
+  const [hiddenClusters, setHiddenClusters] = useState<Set<string>>(new Set());
+
+  // Settings popover
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const settingsRef = useRef<HTMLDivElement>(null);
+  useClickOutside(settingsRef, () => setSettingsOpen(false), settingsOpen);
+
+  const { settings, setSettings, resetSettings, defaults } = useGraphSettings();
 
   // Data pipeline
   const { nodes: rawNodes, links: rawLinks } = useGraphData(
@@ -46,9 +53,15 @@ export function GraphView({
   );
 
   // Search filter
-  const filteredNodes = searchQuery
+  let filteredNodes = searchQuery
     ? rawNodes.filter((n) => n.title.toLowerCase().includes(searchQuery.toLowerCase()))
     : rawNodes;
+
+  // Orphan filter
+  if (!settings.showOrphans) {
+    filteredNodes = filteredNodes.filter((n) => n.linkCount > 0);
+  }
+
   const filteredNodeIds = new Set(filteredNodes.map((n) => n.id));
   const filteredLinks = rawLinks.filter((l) => {
     const sId = typeof l.source === "string" ? l.source : l.source.id;
@@ -56,13 +69,26 @@ export function GraphView({
     return filteredNodeIds.has(sId) && filteredNodeIds.has(tId);
   });
 
-  const { elements, clusters } = useCytoscapeElements({
+  const { elements: allElements, clusters } = useCytoscapeElements({
     nodes: filteredNodes,
     links: filteredLinks,
     notebooks,
     clusterMode,
     activeNoteId,
   });
+
+  // Apply cluster filtering — hide elements belonging to hidden clusters
+  const elements =
+    hiddenClusters.size > 0
+      ? allElements.filter((el) => {
+          if (el.group === "edges") return true; // edges filtered by Cytoscape automatically
+          const parent = el.data?.parent as string | undefined;
+          if (parent && hiddenClusters.has(parent)) return false;
+          // Compound parent nodes
+          if (!parent && el.data?.type && hiddenClusters.has(el.data.id as string)) return false;
+          return true;
+        })
+      : allElements;
 
   const { stylesheet } = useCytoscapeTheme();
   const nodeMap = new Map(filteredNodes.map((n) => [n.id, n]));
@@ -71,6 +97,7 @@ export function GraphView({
     containerRef,
     elements,
     stylesheet,
+    settings,
     onNodeClick: onSelectNote,
     onNodeDoubleClick: onOpenInEditor,
     onNodeHover: useCallback((id: string | null, x: number, y: number) => {
@@ -82,6 +109,7 @@ export function GraphView({
     }, []),
   });
 
+  // Legend: highlight cluster
   const handleLegendHighlight = useCallback(
     (clusterId: string | null) => {
       const cyInstance = cy.current;
@@ -105,6 +133,24 @@ export function GraphView({
     [cy],
   );
 
+  // Legend: toggle cluster visibility
+  const handleToggleCluster = useCallback((clusterId: string) => {
+    setHiddenClusters((prev) => {
+      const next = new Set(prev);
+      if (next.has(clusterId)) {
+        next.delete(clusterId);
+      } else {
+        next.add(clusterId);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleShowAll = useCallback(() => {
+    setHiddenClusters(new Set());
+  }, []);
+
+  // Zoom controls
   const zoomIn = () =>
     cy.current?.zoom({
       level: (cy.current.zoom() || 1) * 1.3,
@@ -123,6 +169,7 @@ export function GraphView({
     });
   const fitScreen = () => cy.current?.animate({ fit: { padding: 40 }, duration: 300 });
 
+  // Empty state
   if (notes.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-2 text-muted">
@@ -143,12 +190,53 @@ export function GraphView({
         onSearchChange={setSearchQuery}
       />
 
-      <div className="flex-1 relative min-h-0 bg-background" style={{ backgroundImage: "radial-gradient(circle, var(--border) 0.5px, transparent 0.5px)", backgroundSize: "20px 20px" }}>
-        <div ref={containerRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
+      <div
+        className="flex-1 relative min-h-0 bg-background"
+        style={{
+          backgroundImage: "radial-gradient(circle, var(--border) 0.5px, transparent 0.5px)",
+          backgroundSize: "20px 20px",
+        }}
+      >
+        <div
+          ref={containerRef}
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
+        />
 
-        <GraphLegend clusters={clusters} onHighlight={handleLegendHighlight} />
+        {/* Legend with filter */}
+        <GraphLegend
+          clusters={clusters}
+          hiddenClusters={hiddenClusters}
+          onToggleCluster={handleToggleCluster}
+          onShowAll={handleShowAll}
+          onHighlight={handleLegendHighlight}
+        />
 
+        {/* Controls (bottom-right) */}
         <div className="absolute bottom-4 right-4 z-10 flex flex-col gap-1">
+          {/* Settings popover */}
+          <div className="relative" ref={settingsRef}>
+            <button
+              type="button"
+              onClick={() => setSettingsOpen(!settingsOpen)}
+              className={`w-7 h-7 glass-button flex items-center justify-center transition-colors ${
+                settingsOpen ? "text-brand" : "text-secondary hover:text-primary"
+              }`}
+              aria-label="Graph settings"
+            >
+              <Settings2 size={14} />
+            </button>
+            {settingsOpen && (
+              <div className="absolute bottom-9 right-0 glass-dropdown p-3">
+                <GraphSettingsPopover
+                  settings={settings}
+                  defaults={defaults}
+                  onChange={setSettings}
+                  onReset={resetSettings}
+                />
+              </div>
+            )}
+          </div>
+
           <button
             type="button"
             onClick={zoomIn}
@@ -183,6 +271,7 @@ export function GraphView({
           </button>
         </div>
 
+        {/* Tooltip */}
         {tooltip && nodeMap.has(tooltip.nodeId) && (
           <GraphNodeTooltip node={nodeMap.get(tooltip.nodeId)!} x={tooltip.x} y={tooltip.y} />
         )}
