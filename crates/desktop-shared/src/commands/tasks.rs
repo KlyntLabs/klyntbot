@@ -67,6 +67,32 @@ pub struct SuggestionResponse {
     pub created_at: String,
 }
 
+// ── AI Decomposition ────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DecompositionResponse {
+    pub id: String,
+    pub confidence: f64,
+    pub reasoning: String,
+    pub subtasks: Vec<PlannedSubtaskResponse>,
+    pub total_estimated_mins: Option<i32>,
+    pub warnings: Vec<String>,
+    pub auto_applied: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlannedSubtaskResponse {
+    pub temp_id: String,
+    pub title: String,
+    pub description: Option<String>,
+    pub estimated_minutes: Option<i32>,
+    pub energy_level: Option<String>,
+    pub priority: Option<i16>,
+    pub children: Vec<PlannedSubtaskResponse>,
+}
+
 // ── Today Task (tray view) ──────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
