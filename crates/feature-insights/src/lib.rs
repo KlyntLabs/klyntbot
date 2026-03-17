@@ -1,6 +1,7 @@
 //! Feature crate for versioned Insight Reviews with learning progress tracking.
 
 pub mod progress_repo;
+pub mod prompts;
 pub mod repo;
 pub mod traits;
 pub mod types;
