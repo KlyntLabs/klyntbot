@@ -261,92 +261,92 @@ export function GraphView({
           </div>
         )}
 
-          {/* Legend with filter */}
-          <GraphLegend
-            clusters={clusters}
-            hiddenClusters={hiddenClusters}
-            onToggleCluster={handleToggleCluster}
-            onShowAll={handleShowAll}
-            onHighlight={handleLegendHighlight}
-          />
+        {/* Legend with filter */}
+        <GraphLegend
+          clusters={clusters}
+          hiddenClusters={hiddenClusters}
+          onToggleCluster={handleToggleCluster}
+          onShowAll={handleShowAll}
+          onHighlight={handleLegendHighlight}
+        />
 
-          {/* Controls (bottom-right) */}
-          <div className="absolute bottom-4 right-4 z-10 flex flex-col gap-1">
-            {/* Settings popover */}
-            <div className="relative" ref={settingsRef}>
-              <button
-                type="button"
-                onClick={() => setSettingsOpen(!settingsOpen)}
-                className={`w-7 h-7 glass-button flex items-center justify-center transition-colors ${
-                  settingsOpen ? "text-brand" : "text-secondary hover:text-primary"
-                }`}
-                aria-label="Graph settings"
-              >
-                <Settings2 size={14} />
-              </button>
-              {settingsOpen && (
-                <div className="absolute bottom-9 right-0 glass-card p-3">
-                  <GraphSettingsPopover
-                    settings={settings}
-                    defaults={defaults}
-                    onChange={setSettings}
-                    onReset={resetSettings}
-                  />
-                </div>
-              )}
-            </div>
-
+        {/* Controls (bottom-right) */}
+        <div className="absolute bottom-4 right-4 z-10 flex flex-col gap-1">
+          {/* Settings popover */}
+          <div className="relative" ref={settingsRef}>
             <button
               type="button"
-              onClick={() => setSettings({ livePhysics: !settings.livePhysics })}
+              onClick={() => setSettingsOpen(!settingsOpen)}
               className={`w-7 h-7 glass-button flex items-center justify-center transition-colors ${
-                settings.livePhysics ? "text-brand" : "text-secondary hover:text-primary"
+                settingsOpen ? "text-brand" : "text-secondary hover:text-primary"
               }`}
-              aria-label="Live physics"
-              title={settings.livePhysics ? "Disable live physics" : "Enable live physics"}
+              aria-label="Graph settings"
             >
-              <Activity size={14} />
+              <Settings2 size={14} />
             </button>
-
-            <button
-              type="button"
-              onClick={zoomIn}
-              className="w-7 h-7 glass-button flex items-center justify-center text-secondary hover:text-primary"
-              aria-label="Zoom in"
-            >
-              <Plus size={14} />
-            </button>
-            <button
-              type="button"
-              onClick={zoomOut}
-              className="w-7 h-7 glass-button flex items-center justify-center text-secondary hover:text-primary"
-              aria-label="Zoom out"
-            >
-              <Minus size={14} />
-            </button>
-            <button
-              type="button"
-              onClick={fitScreen}
-              className="w-7 h-7 glass-button flex items-center justify-center text-secondary hover:text-primary"
-              aria-label="Fit to screen"
-            >
-              <Maximize2 size={14} />
-            </button>
-            <button
-              type="button"
-              onClick={runLayout}
-              className="w-7 h-7 glass-button flex items-center justify-center text-secondary hover:text-primary"
-              aria-label="Re-layout"
-            >
-              <RotateCcw size={14} />
-            </button>
+            {settingsOpen && (
+              <div className="absolute bottom-9 right-0 glass-card p-3">
+                <GraphSettingsPopover
+                  settings={settings}
+                  defaults={defaults}
+                  onChange={setSettings}
+                  onReset={resetSettings}
+                />
+              </div>
+            )}
           </div>
 
-          {/* Tooltip */}
-          {tooltip && nodeMap.has(tooltip.nodeId) && (
-            <GraphNodeTooltip node={nodeMap.get(tooltip.nodeId)!} x={tooltip.x} y={tooltip.y} />
-          )}
+          <button
+            type="button"
+            onClick={() => setSettings({ livePhysics: !settings.livePhysics })}
+            className={`w-7 h-7 glass-button flex items-center justify-center transition-colors ${
+              settings.livePhysics ? "text-brand" : "text-secondary hover:text-primary"
+            }`}
+            aria-label="Live physics"
+            title={settings.livePhysics ? "Disable live physics" : "Enable live physics"}
+          >
+            <Activity size={14} />
+          </button>
+
+          <button
+            type="button"
+            onClick={zoomIn}
+            className="w-7 h-7 glass-button flex items-center justify-center text-secondary hover:text-primary"
+            aria-label="Zoom in"
+          >
+            <Plus size={14} />
+          </button>
+          <button
+            type="button"
+            onClick={zoomOut}
+            className="w-7 h-7 glass-button flex items-center justify-center text-secondary hover:text-primary"
+            aria-label="Zoom out"
+          >
+            <Minus size={14} />
+          </button>
+          <button
+            type="button"
+            onClick={fitScreen}
+            className="w-7 h-7 glass-button flex items-center justify-center text-secondary hover:text-primary"
+            aria-label="Fit to screen"
+          >
+            <Maximize2 size={14} />
+          </button>
+          <button
+            type="button"
+            onClick={runLayout}
+            className="w-7 h-7 glass-button flex items-center justify-center text-secondary hover:text-primary"
+            aria-label="Re-layout"
+          >
+            <RotateCcw size={14} />
+          </button>
         </div>
+
+        {/* Tooltip */}
+        {tooltip && nodeMap.has(tooltip.nodeId) && (
+          <GraphNodeTooltip node={nodeMap.get(tooltip.nodeId)!} x={tooltip.x} y={tooltip.y} />
+        )}
+      </div>
     </div>
   );
 }

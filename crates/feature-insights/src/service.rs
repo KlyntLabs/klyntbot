@@ -63,18 +63,32 @@ impl InsightService {
         scope_config: &ScopeConfig,
         persona_ids: &[String],
     ) -> Result<InsightReviewRow, sqlx::Error> {
-        let content_json =
-            serde_json::to_string(content).unwrap_or_else(|_| "{}".to_string());
+        let content_json = serde_json::to_string(content).unwrap_or_else(|_| "{}".to_string());
 
         let row = self
             .repo
-            .insert(note_id, &content_json, input_hash, scope_config, persona_ids, None)
+            .insert(
+                note_id,
+                &content_json,
+                input_hash,
+                scope_config,
+                persona_ids,
+                None,
+            )
             .await?;
 
         // Compute initial progress snapshot (all zeros — no flashcard data yet)
         let _ = self
             .progress_repo
-            .upsert(&row.id, row.version, 0.0, 0.0, 0.0, 0.0, &self.progress_weights)
+            .upsert(
+                &row.id,
+                row.version,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                &self.progress_weights,
+            )
             .await;
 
         // Embed the content for future semantic drift + dedup (best effort)
@@ -89,18 +103,12 @@ impl InsightService {
     }
 
     /// Get the latest insight for a note (no LLM call).
-    pub async fn get_latest(
-        &self,
-        note_id: &str,
-    ) -> Result<Option<InsightReviewRow>, sqlx::Error> {
+    pub async fn get_latest(&self, note_id: &str) -> Result<Option<InsightReviewRow>, sqlx::Error> {
         self.repo.get_latest(note_id).await
     }
 
     /// List all versions for a note.
-    pub async fn list_versions(
-        &self,
-        note_id: &str,
-    ) -> Result<Vec<InsightReviewRow>, sqlx::Error> {
+    pub async fn list_versions(&self, note_id: &str) -> Result<Vec<InsightReviewRow>, sqlx::Error> {
         self.repo.list_versions(note_id).await
     }
 
@@ -129,8 +137,7 @@ impl InsightService {
                 _ => return Ok(()),
             }
 
-            let updated_json =
-                serde_json::to_string(&content).unwrap_or_else(|_| "{}".to_string());
+            let updated_json = serde_json::to_string(&content).unwrap_or_else(|_| "{}".to_string());
             self.repo.update_content(insight_id, &updated_json).await?;
         }
         Ok(())

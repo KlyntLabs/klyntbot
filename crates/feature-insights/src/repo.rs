@@ -37,10 +37,8 @@ impl InsightReviewRepo {
                 .await?;
         let version = max_version.unwrap_or(0) + 1;
 
-        let scope_json =
-            serde_json::to_string(scope_config).unwrap_or_else(|_| "{}".to_string());
-        let persona_json =
-            serde_json::to_string(persona_ids).unwrap_or_else(|_| "[]".to_string());
+        let scope_json = serde_json::to_string(scope_config).unwrap_or_else(|_| "{}".to_string());
+        let persona_json = serde_json::to_string(persona_ids).unwrap_or_else(|_| "[]".to_string());
 
         sqlx::query(
             r#"
@@ -74,10 +72,7 @@ impl InsightReviewRepo {
     }
 
     /// Get the latest (highest version) insight for a note.
-    pub async fn get_latest(
-        &self,
-        note_id: &str,
-    ) -> Result<Option<InsightReviewRow>, sqlx::Error> {
+    pub async fn get_latest(&self, note_id: &str) -> Result<Option<InsightReviewRow>, sqlx::Error> {
         sqlx::query_as::<_, InsightReviewRow>(
             "SELECT * FROM insight_reviews WHERE note_id = ?1 AND superseded_at IS NULL ORDER BY version DESC LIMIT 1",
         )
@@ -102,10 +97,7 @@ impl InsightReviewRepo {
     }
 
     /// List all versions for a note, newest first.
-    pub async fn list_versions(
-        &self,
-        note_id: &str,
-    ) -> Result<Vec<InsightReviewRow>, sqlx::Error> {
+    pub async fn list_versions(&self, note_id: &str) -> Result<Vec<InsightReviewRow>, sqlx::Error> {
         sqlx::query_as::<_, InsightReviewRow>(
             "SELECT * FROM insight_reviews WHERE note_id = ?1 ORDER BY version DESC",
         )
@@ -191,20 +183,41 @@ mod tests {
         let scope = ScopeConfig::default();
 
         let v1 = repo
-            .insert("note-1", r#"{"synthesis":"v1"}"#, "hash-1", &scope, &[], None)
+            .insert(
+                "note-1",
+                r#"{"synthesis":"v1"}"#,
+                "hash-1",
+                &scope,
+                &[],
+                None,
+            )
             .await
             .unwrap();
         assert_eq!(v1.version, 1);
 
         let v2 = repo
-            .insert("note-1", r#"{"synthesis":"v2"}"#, "hash-2", &scope, &[], None)
+            .insert(
+                "note-1",
+                r#"{"synthesis":"v2"}"#,
+                "hash-2",
+                &scope,
+                &[],
+                None,
+            )
             .await
             .unwrap();
         assert_eq!(v2.version, 2);
 
         // Different note starts at 1
         let other = repo
-            .insert("note-2", r#"{"synthesis":"v1"}"#, "hash-3", &scope, &[], None)
+            .insert(
+                "note-2",
+                r#"{"synthesis":"v1"}"#,
+                "hash-3",
+                &scope,
+                &[],
+                None,
+            )
             .await
             .unwrap();
         assert_eq!(other.version, 1);
@@ -216,12 +229,26 @@ mod tests {
         let repo = InsightReviewRepo::new(pool);
         let scope = ScopeConfig::default();
 
-        repo.insert("note-1", r#"{"synthesis":"v1"}"#, "hash-1", &scope, &[], None)
-            .await
-            .unwrap();
-        repo.insert("note-1", r#"{"synthesis":"v2"}"#, "hash-2", &scope, &[], None)
-            .await
-            .unwrap();
+        repo.insert(
+            "note-1",
+            r#"{"synthesis":"v1"}"#,
+            "hash-1",
+            &scope,
+            &[],
+            None,
+        )
+        .await
+        .unwrap();
+        repo.insert(
+            "note-1",
+            r#"{"synthesis":"v2"}"#,
+            "hash-2",
+            &scope,
+            &[],
+            None,
+        )
+        .await
+        .unwrap();
 
         let latest = repo.get_latest("note-1").await.unwrap().unwrap();
         assert_eq!(latest.version, 2);
@@ -263,7 +290,14 @@ mod tests {
         let scope = ScopeConfig::default();
 
         let v1 = repo
-            .insert("note-1", r#"{"synthesis":"v1"}"#, "hash-1", &scope, &[], None)
+            .insert(
+                "note-1",
+                r#"{"synthesis":"v1"}"#,
+                "hash-1",
+                &scope,
+                &[],
+                None,
+            )
             .await
             .unwrap();
 

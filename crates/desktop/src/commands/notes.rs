@@ -5,8 +5,8 @@ use desktop_shared::commands::{
     InboxCreateParams, InboxItemResponse, InsightReviewResponse, InsightReviewStarted,
     InsightSaveFlashcardsParams, InsightVersionResponse, NoteCreateParams, NoteLinkResponse,
     NoteResponse, NoteSuggestionsResponse, NoteUpdateParams, NoteVersionResponse,
-    NotebookCreateParams, NotebookResponse, NotebookUpdateParams, PersonaResponse, RatePersonaParams,
-    SetPersonaPinsParams, TabContent, UpdatePersonaParams,
+    NotebookCreateParams, NotebookResponse, NotebookUpdateParams, PersonaResponse,
+    RatePersonaParams, SetPersonaPinsParams, TabContent, UpdatePersonaParams,
 };
 use desktop_shared::errors::ApiError;
 use tauri::State;

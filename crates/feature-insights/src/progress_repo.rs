@@ -138,7 +138,14 @@ mod tests {
         let weights = ProgressWeights::default();
 
         let insight = insight_repo
-            .insert("note-1", r#"{"synthesis":"v1"}"#, "hash-1", &scope, &[], None)
+            .insert(
+                "note-1",
+                r#"{"synthesis":"v1"}"#,
+                "hash-1",
+                &scope,
+                &[],
+                None,
+            )
             .await
             .unwrap();
 
@@ -163,11 +170,25 @@ mod tests {
         let weights = ProgressWeights::default();
 
         let v1 = insight_repo
-            .insert("note-1", r#"{"synthesis":"v1"}"#, "hash-1", &scope, &[], None)
+            .insert(
+                "note-1",
+                r#"{"synthesis":"v1"}"#,
+                "hash-1",
+                &scope,
+                &[],
+                None,
+            )
             .await
             .unwrap();
         let v2 = insight_repo
-            .insert("note-1", r#"{"synthesis":"v2"}"#, "hash-2", &scope, &[], None)
+            .insert(
+                "note-1",
+                r#"{"synthesis":"v2"}"#,
+                "hash-2",
+                &scope,
+                &[],
+                None,
+            )
             .await
             .unwrap();
 

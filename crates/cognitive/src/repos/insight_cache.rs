@@ -46,13 +46,9 @@ struct InsightReviewsRow {
 impl InsightReviewsRow {
     fn into_cache_row(self) -> InsightCacheRow {
         // `content` is a JSON object with optional tab keys.
-        let tabs: serde_json::Value =
-            serde_json::from_str(&self.content).unwrap_or(serde_json::Value::Object(Default::default()));
-        let tab = |k: &str| {
-            tabs.get(k)
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_owned())
-        };
+        let tabs: serde_json::Value = serde_json::from_str(&self.content)
+            .unwrap_or(serde_json::Value::Object(Default::default()));
+        let tab = |k: &str| tabs.get(k).and_then(|v| v.as_str()).map(|s| s.to_owned());
         InsightCacheRow {
             id: self.id,
             note_id: self.note_id,
@@ -63,7 +59,11 @@ impl InsightReviewsRow {
             self_assessment: tab("self_assessment"),
             concept_map: tab("concept_map"),
             perspectives: tab("perspectives"),
-            persona_ids: if self.persona_ids == "[]" { None } else { Some(self.persona_ids) },
+            persona_ids: if self.persona_ids == "[]" {
+                None
+            } else {
+                Some(self.persona_ids)
+            },
             created_at: self.generated_at.clone(),
             updated_at: self.superseded_at.unwrap_or(self.generated_at),
         }
@@ -133,11 +133,33 @@ impl InsightCacheRepo {
 
         // Build content JSON from provided tabs.
         let mut tabs = serde_json::Map::new();
-        if let Some(v) = synthesis       { tabs.insert("synthesis".into(),       serde_json::Value::String(v.to_owned())); }
-        if let Some(v) = gap_analysis    { tabs.insert("gap_analysis".into(),    serde_json::Value::String(v.to_owned())); }
-        if let Some(v) = self_assessment { tabs.insert("self_assessment".into(), serde_json::Value::String(v.to_owned())); }
-        if let Some(v) = concept_map     { tabs.insert("concept_map".into(),     serde_json::Value::String(v.to_owned())); }
-        if let Some(v) = perspectives    { tabs.insert("perspectives".into(),    serde_json::Value::String(v.to_owned())); }
+        if let Some(v) = synthesis {
+            tabs.insert("synthesis".into(), serde_json::Value::String(v.to_owned()));
+        }
+        if let Some(v) = gap_analysis {
+            tabs.insert(
+                "gap_analysis".into(),
+                serde_json::Value::String(v.to_owned()),
+            );
+        }
+        if let Some(v) = self_assessment {
+            tabs.insert(
+                "self_assessment".into(),
+                serde_json::Value::String(v.to_owned()),
+            );
+        }
+        if let Some(v) = concept_map {
+            tabs.insert(
+                "concept_map".into(),
+                serde_json::Value::String(v.to_owned()),
+            );
+        }
+        if let Some(v) = perspectives {
+            tabs.insert(
+                "perspectives".into(),
+                serde_json::Value::String(v.to_owned()),
+            );
+        }
         let content = serde_json::Value::Object(tabs).to_string();
         let persona_json = persona_ids.unwrap_or("[]");
 
@@ -209,9 +231,7 @@ impl InsightCacheRepo {
         // Validate tab name before building JSON patch.
         match tab_name {
             "synthesis" | "gap_analysis" | "self_assessment" | "concept_map" | "perspectives" => {}
-            other => {
-                return Err(sqlx::Error::Protocol(format!("unknown tab name: {other}")))
-            }
+            other => return Err(sqlx::Error::Protocol(format!("unknown tab name: {other}"))),
         }
 
         // Build a JSON patch: {"tab_name": "content"}

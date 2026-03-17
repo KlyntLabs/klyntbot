@@ -26,8 +26,11 @@ impl AppCore {
         }
 
         let related_ids = self.get_related_note_ids(note_id).await;
-        let content_hash =
-            feature_insights::InsightService::compute_input_hash(&note.title, &note.body, &related_ids);
+        let content_hash = feature_insights::InsightService::compute_input_hash(
+            &note.title,
+            &note.body,
+            &related_ids,
+        );
 
         if let Some(ref service) = self.insight_service {
             if let Ok(Some(cached)) = service.check_cache(note_id, &content_hash).await {

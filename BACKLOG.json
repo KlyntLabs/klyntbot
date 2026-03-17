@@ -1,0 +1,63 @@
+[
+  {
+    "id": "theme-full-shadcn-migration",
+    "title": "Complete shadcn/ui theme token migration",
+    "description": "Migrate all Tailwind class usages from legacy Tahoe tokens to shadcn/ui naming conventions. Phase 1 (additive CSS variables) is done — this covers Phase 2 (component migration) and Phase 3 (cleanup).",
+    "status": "todo",
+    "priority": "medium",
+    "tasks": [
+      {
+        "id": "migrate-text-classes",
+        "title": "Migrate text color classes across all components",
+        "description": "Bulk rename legacy text hierarchy to shadcn equivalents",
+        "status": "todo",
+        "replacements": [
+          { "from": "text-primary", "to": "text-foreground", "count": "~356 in 152 files" },
+          { "from": "text-muted", "to": "text-muted-foreground", "count": "~682 in 194 files" },
+          { "from": "text-secondary", "to": "text-muted-foreground (or keep as custom)", "count": "~379 in 144 files" },
+          { "from": "text-dim", "to": "keep as-is (no shadcn equivalent)", "count": "~356 in 113 files" }
+        ]
+      },
+      {
+        "id": "migrate-surface-classes",
+        "title": "Migrate bg-surface-* classes to shadcn equivalents",
+        "description": "Replace surface staircase with shadcn surface tokens",
+        "status": "todo",
+        "replacements": [
+          { "from": "bg-surface-base", "to": "bg-card" },
+          { "from": "bg-surface-raised", "to": "bg-secondary or bg-accent" },
+          { "from": "bg-surface-highest", "to": "bg-muted" },
+          { "from": "bg-surface-lowest", "to": "bg-background" },
+          { "from": "bg-surface-low", "to": "bg-card" }
+        ],
+        "note": "Total ~501 occurrences across 161 files"
+      },
+      {
+        "id": "switch-theme-inline-to-shadcn",
+        "title": "Switch @theme inline from backward-compat to full shadcn mapping",
+        "description": "Once components are migrated, change --color-primary from var(--text-primary) to var(--primary), --color-secondary from var(--text-secondary) to var(--secondary), --color-muted from var(--text-muted) to var(--muted). This enables proper bg-primary/bg-secondary/bg-muted usage.",
+        "status": "todo",
+        "depends_on": ["migrate-text-classes", "migrate-surface-classes"]
+      },
+      {
+        "id": "update-retro-theme",
+        "title": "Update retro.css theme to define new shadcn variables",
+        "description": "Add --foreground, --card, --popover, --primary, --secondary, --muted, --accent, --sidebar-*, --code-*, --selection-*, --chart-* variables to the retro theme so it doesn't fall back to dark theme values.",
+        "status": "todo"
+      },
+      {
+        "id": "remove-legacy-tokens",
+        "title": "Remove legacy Tahoe tokens after full migration",
+        "description": "Once all components use shadcn naming, remove --text-primary, --text-secondary, --text-muted, --text-dim, --surface-lowest through --surface-highest, and their @theme inline registrations from dark.css, theme.css, retro.css, and _base.css.",
+        "status": "todo",
+        "depends_on": ["switch-theme-inline-to-shadcn", "update-retro-theme"]
+      },
+      {
+        "id": "remove-duplicate-glass-utilities",
+        "title": "Deduplicate glass utilities between theme.css and glass.css",
+        "description": "Glass utility classes (.glass-panel, .glass-button, etc.) exist in both theme.css and glass.css. Remove them from theme.css since glass.css is the canonical location imported separately.",
+        "status": "todo"
+      }
+    ]
+  }
+]
