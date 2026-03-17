@@ -425,22 +425,40 @@ CREATE INDEX IF NOT EXISTS idx_flashcards_due ON flashcards(due_at);
 CREATE INDEX IF NOT EXISTS idx_flashcards_deck ON flashcards(deck);
 CREATE INDEX IF NOT EXISTS idx_flashcards_insight ON flashcards(insight_review_id);
 
--- ── Insight Review Cache ────────────────────────────────────────
+-- ── Insight Reviews (versioned, replaces old insight_review_cache) ──────────
 
-CREATE TABLE IF NOT EXISTS insight_review_cache (
-    id TEXT PRIMARY KEY,
-    note_id TEXT NOT NULL,
-    content_hash TEXT NOT NULL,
-    version INTEGER NOT NULL DEFAULT 1,
-    synthesis TEXT,
-    gap_analysis TEXT,
-    self_assessment TEXT,
-    concept_map TEXT,
-    perspectives TEXT,
-    persona_ids JSON,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    UNIQUE(note_id, content_hash)
+DROP TABLE IF EXISTS insight_review_cache;
+
+CREATE TABLE IF NOT EXISTS insight_reviews (
+    id                  TEXT PRIMARY KEY,
+    note_id             TEXT NOT NULL,
+    version             INTEGER NOT NULL DEFAULT 1,
+    generated_at        TEXT NOT NULL,
+    content             TEXT NOT NULL,
+    input_hash          TEXT NOT NULL,
+    scope_config        TEXT NOT NULL DEFAULT '{"scopeType":"backlinks","radius":0.72,"nodeIds":[],"includeCognitive":true,"deepDive":false,"mergeThreshold":0.6}',
+    persona_ids         TEXT NOT NULL DEFAULT '[]',
+    parent_insight_id   TEXT REFERENCES insight_reviews(id),
+    token_cost_usd      REAL,
+    superseded_at       TEXT,
+    UNIQUE(note_id, version)
 );
 
-CREATE INDEX IF NOT EXISTS idx_insight_cache_note ON insight_review_cache(note_id);
+CREATE INDEX IF NOT EXISTS idx_insight_reviews_note ON insight_reviews(note_id, version);
+CREATE INDEX IF NOT EXISTS idx_insight_reviews_hash ON insight_reviews(input_hash);
+CREATE INDEX IF NOT EXISTS idx_insight_reviews_parent ON insight_reviews(parent_insight_id);
+
+CREATE TABLE IF NOT EXISTS insight_progress_snapshots (
+    id                  TEXT PRIMARY KEY,
+    insight_review_id   TEXT NOT NULL REFERENCES insight_reviews(id) ON DELETE CASCADE,
+    version             INTEGER NOT NULL,
+    flashcard_success   REAL NOT NULL DEFAULT 0.0,
+    semantic_drift      REAL NOT NULL DEFAULT 0.0,
+    gap_closure         REAL NOT NULL DEFAULT 0.0,
+    quiz_score          REAL NOT NULL DEFAULT 0.0,
+    overall_progress    REAL NOT NULL DEFAULT 0.0,
+    computed_at         TEXT NOT NULL,
+    UNIQUE(insight_review_id, version)
+);
+
+CREATE INDEX IF NOT EXISTS idx_progress_insight ON insight_progress_snapshots(insight_review_id, version);

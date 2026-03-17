@@ -1,4 +1,6 @@
-//! Repository for the `insight_review_cache` table — per-note AI insight caching.
+//! Legacy repository shim — previously backed `insight_review_cache`; now
+//! maps onto the new `insight_reviews` table.  Will be fully replaced by
+//! `InsightReviewRepo` in a subsequent task (Task 3/9).
 
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -7,7 +9,9 @@ use uuid::Uuid;
 
 // ── Row type ─────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+/// Legacy row shape.  `content_hash` maps to `input_hash`; the tab columns
+/// (`synthesis`, `gap_analysis`, etc.) are stored as JSON in `content`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InsightCacheRow {
     pub id: String,
     pub note_id: String,
@@ -21,6 +25,47 @@ pub struct InsightCacheRow {
     pub persona_ids: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+}
+
+// ── Raw DB row ────────────────────────────────────────────────────
+
+#[derive(sqlx::FromRow)]
+struct InsightReviewsRow {
+    id: String,
+    note_id: String,
+    version: i64,
+    generated_at: String,
+    content: String,
+    input_hash: String,
+    persona_ids: String,
+    superseded_at: Option<String>,
+}
+
+impl InsightReviewsRow {
+    fn into_cache_row(self) -> InsightCacheRow {
+        // `content` is a JSON object with optional tab keys.
+        let tabs: serde_json::Value =
+            serde_json::from_str(&self.content).unwrap_or(serde_json::Value::Object(Default::default()));
+        let tab = |k: &str| {
+            tabs.get(k)
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_owned())
+        };
+        InsightCacheRow {
+            id: self.id,
+            note_id: self.note_id,
+            content_hash: self.input_hash,
+            version: self.version,
+            synthesis: tab("synthesis"),
+            gap_analysis: tab("gap_analysis"),
+            self_assessment: tab("self_assessment"),
+            concept_map: tab("concept_map"),
+            perspectives: tab("perspectives"),
+            persona_ids: if self.persona_ids == "[]" { None } else { Some(self.persona_ids) },
+            created_at: self.generated_at.clone(),
+            updated_at: self.superseded_at.unwrap_or(self.generated_at),
+        }
+    }
 }
 
 // ── Repository ───────────────────────────────────────────────────
@@ -37,13 +82,14 @@ impl InsightCacheRepo {
 
     /// Get the most recent cache entry for a note.
     pub async fn get(&self, note_id: &str) -> Result<Option<InsightCacheRow>, sqlx::Error> {
-        let row = sqlx::query_as::<_, InsightCacheRow>(
-            "SELECT * FROM insight_review_cache WHERE note_id = ?1 ORDER BY updated_at DESC LIMIT 1",
+        let row = sqlx::query_as::<_, InsightReviewsRow>(
+            "SELECT id, note_id, version, generated_at, content, input_hash, persona_ids, superseded_at \
+             FROM insight_reviews WHERE note_id = ?1 ORDER BY version DESC LIMIT 1",
         )
         .bind(note_id)
         .fetch_optional(&self.pool)
         .await?;
-        Ok(row)
+        Ok(row.map(InsightReviewsRow::into_cache_row))
     }
 
     /// Return the cache entry only if the content hash matches (content hasn't changed).
@@ -52,20 +98,21 @@ impl InsightCacheRepo {
         note_id: &str,
         content_hash: &str,
     ) -> Result<Option<InsightCacheRow>, sqlx::Error> {
-        let row = sqlx::query_as::<_, InsightCacheRow>(
-            "SELECT * FROM insight_review_cache WHERE note_id = ?1 AND content_hash = ?2 LIMIT 1",
+        let row = sqlx::query_as::<_, InsightReviewsRow>(
+            "SELECT id, note_id, version, generated_at, content, input_hash, persona_ids, superseded_at \
+             FROM insight_reviews WHERE note_id = ?1 AND input_hash = ?2 ORDER BY version DESC LIMIT 1",
         )
         .bind(note_id)
         .bind(content_hash)
         .fetch_optional(&self.pool)
         .await?;
-        Ok(row)
+        Ok(row.map(InsightReviewsRow::into_cache_row))
     }
 
     /// Insert or update a cache entry.
     ///
-    /// On conflict, existing non-null values are preserved via `COALESCE` when
-    /// the incoming value is `None`.  Returns the stored row after the upsert.
+    /// On conflict (same note + hash), bumps version and merges tab content via
+    /// JSON merge.  Returns the stored row after the upsert.
     pub async fn upsert(
         &self,
         note_id: &str,
@@ -80,36 +127,59 @@ impl InsightCacheRepo {
         let id = Uuid::new_v4().to_string();
         let now = Utc::now().to_rfc3339();
 
-        sqlx::query(
-            r#"
-            INSERT INTO insight_review_cache
-                (id, note_id, content_hash, version, synthesis, gap_analysis,
-                 self_assessment, concept_map, perspectives, persona_ids, created_at, updated_at)
-            VALUES
-                (?1, ?2, ?3, 1, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?10)
-            ON CONFLICT(note_id, content_hash) DO UPDATE SET
-                synthesis        = COALESCE(excluded.synthesis,        insight_review_cache.synthesis),
-                gap_analysis     = COALESCE(excluded.gap_analysis,     insight_review_cache.gap_analysis),
-                self_assessment  = COALESCE(excluded.self_assessment,  insight_review_cache.self_assessment),
-                concept_map      = COALESCE(excluded.concept_map,      insight_review_cache.concept_map),
-                perspectives     = COALESCE(excluded.perspectives,     insight_review_cache.perspectives),
-                persona_ids      = COALESCE(excluded.persona_ids,      insight_review_cache.persona_ids),
-                version          = insight_review_cache.version + 1,
-                updated_at       = excluded.updated_at
-            "#,
+        // Build content JSON from provided tabs.
+        let mut tabs = serde_json::Map::new();
+        if let Some(v) = synthesis       { tabs.insert("synthesis".into(),       serde_json::Value::String(v.to_owned())); }
+        if let Some(v) = gap_analysis    { tabs.insert("gap_analysis".into(),    serde_json::Value::String(v.to_owned())); }
+        if let Some(v) = self_assessment { tabs.insert("self_assessment".into(), serde_json::Value::String(v.to_owned())); }
+        if let Some(v) = concept_map     { tabs.insert("concept_map".into(),     serde_json::Value::String(v.to_owned())); }
+        if let Some(v) = perspectives    { tabs.insert("perspectives".into(),    serde_json::Value::String(v.to_owned())); }
+        let content = serde_json::Value::Object(tabs).to_string();
+        let persona_json = persona_ids.unwrap_or("[]");
+
+        // Determine the next version for this note+hash combination.
+        let existing: Option<(i64,)> = sqlx::query_as(
+            "SELECT version FROM insight_reviews WHERE note_id = ?1 AND input_hash = ?2 ORDER BY version DESC LIMIT 1",
         )
-        .bind(&id)
         .bind(note_id)
         .bind(content_hash)
-        .bind(synthesis)
-        .bind(gap_analysis)
-        .bind(self_assessment)
-        .bind(concept_map)
-        .bind(perspectives)
-        .bind(persona_ids)
-        .bind(&now)
-        .execute(&self.pool)
+        .fetch_optional(&self.pool)
         .await?;
+
+        if let Some((existing_version,)) = existing {
+            // Update existing row in-place (merge content).
+            let next_version = existing_version + 1;
+            sqlx::query(
+                "UPDATE insight_reviews SET \
+                    content = json_patch(content, ?1), \
+                    version = ?2, \
+                    persona_ids = COALESCE(?3, persona_ids), \
+                    superseded_at = ?4 \
+                 WHERE note_id = ?5 AND input_hash = ?6",
+            )
+            .bind(&content)
+            .bind(next_version)
+            .bind(persona_ids)
+            .bind(&now)
+            .bind(note_id)
+            .bind(content_hash)
+            .execute(&self.pool)
+            .await?;
+        } else {
+            sqlx::query(
+                "INSERT INTO insight_reviews \
+                    (id, note_id, version, generated_at, content, input_hash, persona_ids) \
+                 VALUES (?1, ?2, 1, ?3, ?4, ?5, ?6)",
+            )
+            .bind(&id)
+            .bind(note_id)
+            .bind(&now)
+            .bind(&content)
+            .bind(content_hash)
+            .bind(persona_json)
+            .execute(&self.pool)
+            .await?;
+        }
 
         let row = self
             .get_if_fresh(note_id, content_hash)
@@ -132,36 +202,28 @@ impl InsightCacheRepo {
     ) -> Result<(), sqlx::Error> {
         let now = Utc::now().to_rfc3339();
 
-        let sql = match tab_name {
-            "synthesis" => {
-                "UPDATE insight_review_cache SET synthesis = ?1, updated_at = ?2 WHERE note_id = ?3 AND content_hash = ?4"
-            }
-            "gap_analysis" => {
-                "UPDATE insight_review_cache SET gap_analysis = ?1, updated_at = ?2 WHERE note_id = ?3 AND content_hash = ?4"
-            }
-            "self_assessment" => {
-                "UPDATE insight_review_cache SET self_assessment = ?1, updated_at = ?2 WHERE note_id = ?3 AND content_hash = ?4"
-            }
-            "concept_map" => {
-                "UPDATE insight_review_cache SET concept_map = ?1, updated_at = ?2 WHERE note_id = ?3 AND content_hash = ?4"
-            }
-            "perspectives" => {
-                "UPDATE insight_review_cache SET perspectives = ?1, updated_at = ?2 WHERE note_id = ?3 AND content_hash = ?4"
-            }
+        // Validate tab name before building JSON patch.
+        match tab_name {
+            "synthesis" | "gap_analysis" | "self_assessment" | "concept_map" | "perspectives" => {}
             other => {
-                return Err(sqlx::Error::Protocol(format!(
-                    "unknown tab name: {other}"
-                )))
+                return Err(sqlx::Error::Protocol(format!("unknown tab name: {other}")))
             }
-        };
+        }
 
-        sqlx::query(sql)
-            .bind(content)
-            .bind(&now)
-            .bind(note_id)
-            .bind(content_hash)
-            .execute(&self.pool)
-            .await?;
+        // Build a JSON patch: {"tab_name": "content"}
+        let patch = serde_json::json!({ tab_name: content }).to_string();
+
+        sqlx::query(
+            "UPDATE insight_reviews \
+             SET content = json_patch(content, ?1), superseded_at = ?2 \
+             WHERE note_id = ?3 AND input_hash = ?4",
+        )
+        .bind(&patch)
+        .bind(&now)
+        .bind(note_id)
+        .bind(content_hash)
+        .execute(&self.pool)
+        .await?;
 
         Ok(())
     }
