@@ -1,6 +1,6 @@
 use desktop_shared::commands::{
-    ObjectiveResponse, ProjectResponse, SuggestionResponse, TaskCreateParams, TaskResponse,
-    TaskUpdateParams, TodayTaskResponse,
+    DecompositionResponse, ObjectiveResponse, ProjectResponse,
+    SuggestionResponse, TaskCreateParams, TaskResponse, TaskUpdateParams, TodayTaskResponse,
 };
 use desktop_shared::errors::ApiError;
 use std::sync::Arc;
@@ -154,6 +154,36 @@ pub async fn task_dismiss_suggestion(
     state.task_dismiss_suggestion(suggestion_id).await
 }
 
+#[tauri::command]
+pub async fn task_decompose(
+    state: State<'_, Arc<AppCore>>,
+    app: tauri::AppHandle,
+    task_id: String,
+) -> Result<DecompositionResponse, ApiError> {
+    let (response, updates) = state.task_decompose(task_id).await?;
+    super::emit_updates(&app, &updates);
+    Ok(response)
+}
+
+#[tauri::command]
+pub async fn task_apply_decomposition(
+    state: State<'_, Arc<AppCore>>,
+    app: tauri::AppHandle,
+    decomposition_id: String,
+) -> Result<Vec<TaskResponse>, ApiError> {
+    let (response, updates) = state.task_apply_decomposition(decomposition_id).await?;
+    super::emit_updates(&app, &updates);
+    Ok(response)
+}
+
+#[tauri::command]
+pub async fn task_reject_decomposition(
+    state: State<'_, Arc<AppCore>>,
+    decomposition_id: String,
+) -> Result<(), ApiError> {
+    state.task_reject_decomposition(decomposition_id).await
+}
+
 // ── Dev server dispatch ─────────────────────────────────────────────
 
 #[cfg(test)]
@@ -173,6 +203,9 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "task_get_suggestions",
     "task_apply_suggestion",
     "task_dismiss_suggestion",
+    "task_decompose",
+    "task_apply_decomposition",
+    "task_reject_decomposition",
 ];
 
 #[cfg(debug_assertions)]
@@ -242,6 +275,22 @@ pub(crate) async fn dispatch_dev(
             let suggestion_id = try_field!(dev::get_str(body, "suggestionId"));
             dev::val(core.task_dismiss_suggestion(suggestion_id).await)
         }
+        "task_decompose" => dev::val_rh(
+            core.task_decompose(try_field!(dev::get_str(body, "taskId")).into())
+                .await,
+        ),
+        "task_apply_decomposition" => dev::val_rh(
+            core.task_apply_decomposition(
+                try_field!(dev::get_str(body, "decompositionId")).into(),
+            )
+            .await,
+        ),
+        "task_reject_decomposition" => dev::val(
+            core.task_reject_decomposition(
+                try_field!(dev::get_str(body, "decompositionId")).into(),
+            )
+            .await,
+        ),
         _ => return None,
     })
 }

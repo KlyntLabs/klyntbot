@@ -328,6 +328,9 @@ fn run_desktop_app() {
             commands::tasks::task_get_suggestions,
             commands::tasks::task_apply_suggestion,
             commands::tasks::task_dismiss_suggestion,
+            commands::tasks::task_decompose,
+            commands::tasks::task_apply_decomposition,
+            commands::tasks::task_reject_decomposition,
             commands::tasks::project_list,
             commands::tasks::objective_list,
             // Notes
