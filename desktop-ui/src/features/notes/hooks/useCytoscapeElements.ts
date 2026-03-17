@@ -1,6 +1,7 @@
 import type { Notebook } from "@shared/types";
 import type { ElementDefinition } from "cytoscape";
 import { useMemo } from "react";
+import { computeFingerprint } from "../lib/graphFingerprint";
 import type { GraphLink, GraphNode } from "./useGraphData";
 
 const CLUSTER_PALETTE = [
@@ -46,7 +47,7 @@ export function useCytoscapeElements({
   notebooks,
   clusterMode,
   activeNoteId,
-}: UseCytoscapeElementsParams): { elements: ElementDefinition[]; clusters: ClusterInfo[] } {
+}: UseCytoscapeElementsParams): { elements: ElementDefinition[]; clusters: ClusterInfo[]; fingerprint: string } {
   return useMemo(() => {
     const elements: ElementDefinition[] = [];
     const clusterMap = new Map<string, ClusterInfo>();
@@ -162,6 +163,15 @@ export function useCytoscapeElements({
     }
 
     const clusters = Array.from(clusterMap.values()).filter((c) => c.count > 0);
-    return { elements, clusters };
+
+    // Compute structural fingerprint for position cache keying
+    const nodeIdList = nodes.map((n) => n.id);
+    // Extract edge pairs from the deduplicated edge elements (not from seenEdges keys)
+    const edgePairList: [string, string][] = elements
+      .filter((el) => el.group === "edges")
+      .map((el) => [el.data?.source as string, el.data?.target as string]);
+    const fingerprint = computeFingerprint(nodeIdList, edgePairList);
+
+    return { elements, clusters, fingerprint };
   }, [nodes, links, notebooks, clusterMode, activeNoteId]);
 }
