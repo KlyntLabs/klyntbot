@@ -145,6 +145,12 @@ CREATE TRIGGER book_tree_nodes_update_ts AFTER UPDATE ON book_tree_nodes BEGIN
 END;
 ```
 
+**FTS5 rowid note:** The `content='book_tree_nodes'` + `content_rowid='rowid'` directive maps
+FTS results to SQLite's implicit integer `rowid`, NOT to the TEXT `id` column. FTS5 search
+results return this integer rowid. To get the actual tree node, join via
+`SELECT * FROM book_tree_nodes WHERE rowid = ?`. The triggers use `new.rowid`/`old.rowid`
+which reference this implicit integer primary key.
+
 **Tree construction:**
 
 - **Notes**: Parse markdown into blocks (headings, paragraphs, code fences, tables). Heading depth (`#` = level 1, `##` = level 2) determines hierarchy. Non-heading blocks become children of the nearest preceding heading.
@@ -185,13 +191,21 @@ Enables two critical operations:
 ### 1.4 BookIndex Orchestrator
 
 ```rust
+/// Local embedding trait for context_engine (layer L3 cannot import cognitive L5).
+/// Follows the same dependency-inversion pattern as OperatorLlm and DecomposerLlm.
+/// Implemented in agent crate as an adapter over EmbeddingEngine.
+#[async_trait]
+pub trait BookEmbedder: Send + Sync {
+    async fn embed(&self, text: &str) -> Result<Vec<f32>>;
+}
+
 pub struct BookIndex {
-    tree_repo: BookTreeRepo,
-    entity_repo: EntityRepo,
-    gt_link_repo: GTLinkRepo,
+    tree_repo: Arc<dyn BookTreeRepo>,   // Trait object (impl in cognitive)
+    entity_repo: Arc<dyn BookEntityRepo>, // Trait wrapping EntityRepo ops needed by BookIndex
+    gt_link_repo: Arc<dyn GTLinkRepo>,  // Trait object (impl in cognitive)
     vector_store: VectorStore,
-    embedder: Arc<dyn TextEmbedder>,  // cognitive::TextEmbedder trait, NOT the concrete EmbeddingEngine
-    has_content: AtomicBool,          // Cached flag, set true after first successful build
+    embedder: Arc<dyn BookEmbedder>,    // Local trait, NOT cognitive::TextEmbedder
+    has_content: AtomicBool,            // Cached flag; read with Ordering::Relaxed, set with Ordering::Release
 }
 
 impl BookIndex {
@@ -242,12 +256,14 @@ Additionally: if `scores[0] < min_similarity`, skip gradient walk entirely and t
 ### API
 
 ```rust
+// EntityRepo lives in cognitive (L5), so it CAN use cognitive::TextEmbedder directly.
+// This is different from BookIndex which lives in context_engine (L3) and needs BookEmbedder.
 impl EntityRepo {
     pub async fn resolve_entity(
         &self,
         new_entity: &NewEntity,
         vector_store: &VectorStore,
-        embedder: &dyn TextEmbedder,  // cognitive::TextEmbedder, not concrete EmbeddingEngine
+        embedder: &dyn TextEmbedder,  // cognitive::TextEmbedder (same crate, no layer issue)
         config: &EntityResolutionConfig,
     ) -> Result<EntityRow>;
 }
@@ -355,8 +371,9 @@ pub struct OperatorContext {
     pub token_budget: usize,     // for Map/Reduce LLM calls
 }
 
+#[derive(Clone)]
 pub struct ScoredNode {
-    pub node: TreeNode,
+    pub node: TreeNode,  // TreeNode must also derive Clone
     pub graph_score: f64,
     pub text_score: f64,
     pub combined: f64,
@@ -429,6 +446,7 @@ The planner classifies queries and generates tailored operator pipelines, inspir
 ### Query Classification
 
 ```rust
+#[derive(Debug, Clone, PartialEq)]
 pub enum QueryCategory {
     SingleHop,          // Direct lookup: "What's the deadline for Project Alpha?"
     MultiHop,           // Cross-reference: "How do my finance goals relate to work projects?"
@@ -547,14 +565,19 @@ impl DomainSearcher for BookRAGSearcher {
 }
 ```
 
-### Wiring (in `agent_loop/builder.rs`)
+### Wiring (in `agent/src/adapters/book_index_wiring.rs`)
+
+BookIndex construction and searcher registration live in a dedicated wiring module in `agent`,
+NOT in `builder.rs` directly (builder is already large). The builder calls this module.
 
 ```rust
-// After existing searcher registration:
-let book_index = Arc::new(BookIndex::new(tree_repo, entity_repo, gt_link_repo, vector_store, embedder));
-let planner = Arc::new(RetrievalPlanner::new(provider.clone(), book_index.clone()));
-let bookrag_searcher = Arc::new(BookRAGSearcher::new(planner));
+// agent/src/adapters/book_index_wiring.rs
+pub fn build_book_index(/* repos, vector_store, embedder */) -> Arc<BookIndex> { ... }
+pub fn build_bookrag_searcher(book_index: Arc<BookIndex>, llm: Arc<dyn OperatorLlm>) -> Arc<BookRAGSearcher> { ... }
 
+// Called from builder.rs:
+let book_index = book_index_wiring::build_book_index(tree_repo, entity_repo, gt_link_repo, vector_store, embedder);
+let bookrag_searcher = book_index_wiring::build_bookrag_searcher(book_index, operator_llm);
 forge.add_searcher(bookrag_searcher);
 ```
 
@@ -585,6 +608,8 @@ match event {
             book_index.build_from_note(&note_id, &note.content).await?;
         }
     }
+    // NOTE: DomainEvent::NoteDeleted does not exist yet.
+    // Must be added to bus::DomainEvent during implementation.
     DomainEvent::NoteDeleted { note_id } => {
         book_index.delete_source_tree(SourceType::Note, &note_id).await?;
     }
@@ -639,6 +664,10 @@ Built once at boot from compiled skill YAML sections. Rebuilt only when skills c
 | `entity_tree_links` | GT-Link junction (entity <-> tree node) |
 
 ### New LanceDB Table (in `{data_dir}/lance/`, managed by existing `VectorStore`)
+
+**Path note:** The actual `VectorStore::connect()` code uses `{data_dir}/lance/` (see
+`crates/storage/src/vector_store/mod.rs:54`). CLAUDE.md's Storage section mentions `lancedb/`
+but that is stale — the code is authoritative.
 
 The `entity_embeddings` table must be registered in `VectorStore::connect()` via `ensure_table()`
 so it participates in the same managed LanceDB store as all other vector tables.
