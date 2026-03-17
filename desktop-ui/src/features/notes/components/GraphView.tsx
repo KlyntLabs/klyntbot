@@ -242,22 +242,24 @@ export function GraphView({
         onSearchChange={setSearchQuery}
       />
 
-      {!cacheReady ? (
-        <div className="flex-1 flex items-center justify-center text-muted text-sm">
-          Loading graph...
-        </div>
-      ) : (
+      <div
+        className="flex-1 relative min-h-0 bg-background"
+        style={{
+          backgroundImage: "radial-gradient(circle, var(--border) 0.5px, transparent 0.5px)",
+          backgroundSize: "20px 20px",
+        }}
+      >
         <div
-          className="flex-1 relative min-h-0 bg-background"
-          style={{
-            backgroundImage: "radial-gradient(circle, var(--border) 0.5px, transparent 0.5px)",
-            backgroundSize: "20px 20px",
-          }}
-        >
-          <div
-            ref={containerRef}
-            style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
-          />
+          ref={containerRef}
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
+        />
+
+        {/* Loading overlay while cache check completes */}
+        {!cacheReady && (
+          <div className="absolute inset-0 flex items-center justify-center text-muted text-sm z-20">
+            Loading graph...
+          </div>
+        )}
 
           {/* Legend with filter */}
           <GraphLegend
@@ -345,7 +347,6 @@ export function GraphView({
             <GraphNodeTooltip node={nodeMap.get(tooltip.nodeId)!} x={tooltip.x} y={tooltip.y} />
           )}
         </div>
-      )}
     </div>
   );
 }
