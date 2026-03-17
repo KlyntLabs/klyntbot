@@ -1,3 +1,4 @@
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -13,6 +14,7 @@ pub struct BookRAGSearcher {
     max_nodes: usize,
     max_map_nodes: usize,
     operator_timeout_ms: u64,
+    checked_content: AtomicBool,
 }
 
 impl BookRAGSearcher {
@@ -27,6 +29,7 @@ impl BookRAGSearcher {
             max_nodes,
             max_map_nodes,
             operator_timeout_ms,
+            checked_content: AtomicBool::new(false),
         }
     }
 }
@@ -38,6 +41,12 @@ impl DomainSearcher for BookRAGSearcher {
     }
 
     async fn search(&self, query: &str, limit: usize) -> Vec<MemoryEntry> {
+        // Lazy refresh: check DB for content on first call
+        if !self.checked_content.swap(true, Ordering::Relaxed) {
+            if let Err(e) = self.planner.book_index.refresh_has_content().await {
+                tracing::warn!("BookRAG content check failed: {e}");
+            }
+        }
         if !self.planner.book_index.has_content() {
             return vec![];
         }
