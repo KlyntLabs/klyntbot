@@ -92,20 +92,17 @@ export function GraphView({
         return;
       }
 
-      // Find cluster info to get the color, then highlight nodes with that color
-      const cluster = clusters.find((c) => c.id === clusterId);
-      if (!cluster) return;
-
-      cyInstance.elements().addClass("dimmed");
-      // Un-dim nodes belonging to this cluster (matched by color data)
-      cyInstance.nodes().forEach((node) => {
-        if (node.data("color") === cluster.color) {
-          node.removeClass("dimmed");
-          node.connectedEdges().removeClass("dimmed");
-        }
-      });
+      const parent = cyInstance.getElementById(clusterId);
+      if (parent.nonempty()) {
+        const children = parent.children();
+        const edges = children.connectedEdges();
+        cyInstance.elements().addClass("dimmed");
+        children.removeClass("dimmed");
+        edges.removeClass("dimmed");
+        parent.removeClass("dimmed");
+      }
     },
-    [cy, clusters],
+    [cy],
   );
 
   const zoomIn = () =>

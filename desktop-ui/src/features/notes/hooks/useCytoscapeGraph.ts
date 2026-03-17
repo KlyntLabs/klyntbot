@@ -73,10 +73,9 @@ export function useCytoscapeGraph({
     cyRef.current = cy;
     prevFingerprint.current = elementsFingerprint(elements);
 
-    // Make compound parents non-interactive (can't grab/select them)
-    cy.on("grab", "node:parent", (evt) => {
-      evt.target.ungrabify();
-    });
+    // Make compound parents fully non-interactive
+    cy.nodes(":parent").ungrabify();
+    cy.nodes(":parent").unselectify();
 
     // ── Node events ──
     cy.on("tap", "node:childless", (evt) => onNodeClick?.(evt.target.id()));

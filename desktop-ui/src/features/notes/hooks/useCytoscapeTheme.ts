@@ -52,14 +52,17 @@ export function useCytoscapeTheme(): { stylesheet: Stylesheet[]; isLight: boolea
     const brand = light ? "#ca8a04" : "#f97316";
 
     const stylesheet: Stylesheet[] = [
-      // ── Compound parents — invisible (clustering via node color + legend) ──
+      // ── Compound parents — invisible but used by fCoSE for spatial grouping ──
       {
         selector: "node:parent",
         style: {
           "background-opacity": 0,
           "border-width": 0,
+          "border-opacity": 0,
           label: "",
-          padding: "12px",
+          padding: "20px",
+          events: "no",
+          "overlay-opacity": 0,
         },
       },
 

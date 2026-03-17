@@ -106,7 +106,8 @@ export function useCytoscapeElements({
       }
 
       clusterMap.set(clusterId, { id: clusterId, label, color, count: 0 });
-      // No compound parent elements — clustering shown via node color + legend only
+      // Invisible compound parent — fCoSE uses it for spatial grouping
+      elements.push({ group: "nodes", data: { id: clusterId, label, color, type } });
     }
 
     for (const node of nodes) {
@@ -122,6 +123,7 @@ export function useCytoscapeElements({
         data: {
           id: node.id,
           label: node.title,
+          parent: clusterId,
           color,
           size,
           linkCount: node.linkCount,
