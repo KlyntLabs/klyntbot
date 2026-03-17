@@ -1,6 +1,6 @@
 use crate::state::AppCore;
 use cognitive::repos::flashcard::ReviewQuality;
-use desktop_shared::commands::{DeckSummaryResponse, FlashcardReviewParams, FlashcardResponse};
+use desktop_shared::commands::{DeckSummaryResponse, FlashcardResponse, FlashcardReviewParams};
 use desktop_shared::errors::ApiError;
 
 /// Map a FlashcardRow to a FlashcardResponse.

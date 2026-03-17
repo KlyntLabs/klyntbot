@@ -128,8 +128,7 @@ impl AppCore {
         // NoteRow doesn't carry tags — fetch them separately
         let tags = self.note_repo.get_tags(note_id).await.unwrap_or_default();
         let entity_repo = cognitive::repos::EntityRepo::new(self.storage_pool.inner().clone());
-        let note_domains =
-            insight_context::extract_note_domains(&tags, Some(&entity_repo)).await;
+        let note_domains = insight_context::extract_note_domains(&tags, Some(&entity_repo)).await;
 
         // Build context via InsightService pipeline (merge check + cognitive injection)
         let (context_text, note_title, parent_insight_id) =
@@ -366,8 +365,7 @@ impl AppCore {
 
         let tags = self.note_repo.get_tags(note_id).await.unwrap_or_default();
         let entity_repo = cognitive::repos::EntityRepo::new(self.storage_pool.inner().clone());
-        let note_domains =
-            insight_context::extract_note_domains(&tags, Some(&entity_repo)).await;
+        let note_domains = insight_context::extract_note_domains(&tags, Some(&entity_repo)).await;
 
         let ctx_text = if let Some(ref service) = self.insight_service {
             let scope: feature_insights::ScopeConfig = service
@@ -451,8 +449,7 @@ impl AppCore {
         // Fetch tags + domains once (reused for both context building and persona selection).
         let tags = self.note_repo.get_tags(note_id).await.unwrap_or_default();
         let entity_repo = cognitive::repos::EntityRepo::new(self.storage_pool.inner().clone());
-        let note_domains =
-            insight_context::extract_note_domains(&tags, Some(&entity_repo)).await;
+        let note_domains = insight_context::extract_note_domains(&tags, Some(&entity_repo)).await;
 
         // Cache latest insight for both scope config and tab update
         let latest_insight = if let Some(ref service) = self.insight_service {

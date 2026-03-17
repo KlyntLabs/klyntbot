@@ -29,6 +29,14 @@ metadata:
       - decompose
       - weekly review
       - review my week
+      - weekly report
+      - week summary
+      - what happened this week
+      - project retrospective
+      - how did the project go
+      - what did I learn
+      - knowledge review
+      - knowledge growth
       - monthly review
       - score OKRs
       - project status
@@ -112,9 +120,14 @@ See `references/todo.md` for the complete creation workflow.
 | "plan my day" / "morning plan" | Daily planner (references/daily-planner.md) |
 | "break this down" / "decompose" | Task decomposition (references/task-decompose.md) |
 | "weekly review" / "review my week" | Weekly review (references/weekly-review.md) |
+| "weekly report" / "week summary" | Data-driven report (references/reports.md) |
+| "project retrospective" / "how did X go" | Project retro report (references/reports.md) |
+| "what did I learn" / "knowledge growth" | Knowledge growth report (references/reports.md) |
 | "monthly review" / "score OKRs" | Retrospective (references/retrospective.md) |
 | "project status" / "how are my projects" | Project health (references/project-management.md) |
 | "check budget then create task" | Delegate to finance-management first |
+
+> **Report vs Review:** "weekly review" -> interactive GTD workflow (weekly-review.md). "weekly report" -> passive data summary (reports.md). If ambiguous, ask the user.
 
 ## Handoffs
 

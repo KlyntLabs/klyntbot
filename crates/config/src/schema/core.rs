@@ -25,6 +25,7 @@ use super::plugins::PluginsConfig;
 use super::productivity::ProductivityConfig;
 use super::project::ProjectConfig;
 use super::providers::{ProviderManagerConfig, ProvidersConfig};
+use super::scenario::ScenarioConfig;
 use super::todo::TodoConfig;
 use super::tools::ToolsConfig;
 use super::user::UserConfig;
@@ -190,6 +191,10 @@ pub struct Config {
     /// Launcher search sources configuration.
     #[serde(default)]
     pub launcher: LauncherConfig,
+
+    /// Scenario/what-if reasoning configuration.
+    #[serde(default)]
+    pub scenario: ScenarioConfig,
 
     /// Whether the first-run setup wizard has been completed.
     #[serde(default)]

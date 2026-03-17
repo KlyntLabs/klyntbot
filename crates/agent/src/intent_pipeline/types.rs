@@ -72,6 +72,8 @@ pub struct ComplexitySignals {
     pub failure_risk: FailureRisk,
     pub requires_state_tracking: bool,
     pub requires_retries: bool,
+    /// Whether the message contains hypothetical framing ("what if", "suppose", etc.)
+    pub has_hypothetical: bool,
 }
 
 impl ComplexitySignals {
@@ -140,6 +142,8 @@ pub struct PipelineConfig {
     pub channel: String,
     /// Provider name for cost tracking.
     pub provider_name: String,
+    /// Max graph depth for scenario reasoning (from Config.scenario.max_graph_depth).
+    pub scenario_max_graph_depth: u32,
 }
 
 impl Default for PipelineConfig {
@@ -151,6 +155,7 @@ impl Default for PipelineConfig {
             max_response_tokens: 4096,
             channel: "unknown".to_string(),
             provider_name: "unknown".to_string(),
+            scenario_max_graph_depth: 2,
         }
     }
 }
@@ -176,6 +181,7 @@ impl IntentAnalysis {
             failure_risk: FailureRisk::Low,
             requires_state_tracking: false,
             requires_retries: false,
+            has_hypothetical: false,
         };
         Self {
             mode: ExecutionMode::Reactive {
@@ -202,6 +208,7 @@ mod tests {
             failure_risk: FailureRisk::Low,
             requires_state_tracking: false,
             requires_retries: false,
+            has_hypothetical: false,
         };
         assert_eq!(signals.complexity_score(), 0);
     }
@@ -214,6 +221,7 @@ mod tests {
             failure_risk: FailureRisk::High,
             requires_state_tracking: true,
             requires_retries: true,
+            has_hypothetical: false,
         };
         assert!(signals.complexity_score() >= 3);
         // 2 (tool_calls>=3) + 2 (seq_deps) + 1 (high risk) + 1 (state) + 1 (retries) = 7
@@ -228,6 +236,7 @@ mod tests {
             failure_risk: FailureRisk::Low,
             requires_state_tracking: false,
             requires_retries: false,
+            has_hypothetical: false,
         };
         assert_eq!(signals.complexity_score(), 2);
     }
@@ -240,6 +249,7 @@ mod tests {
             failure_risk: FailureRisk::Low,
             requires_state_tracking: false,
             requires_retries: false,
+            has_hypothetical: false,
         };
         assert_eq!(signals.complexity_score(), 1);
     }
@@ -252,6 +262,7 @@ mod tests {
             failure_risk: FailureRisk::Medium,
             requires_state_tracking: false,
             requires_retries: false,
+            has_hypothetical: false,
         };
         assert_eq!(signals.complexity_score(), 1);
     }

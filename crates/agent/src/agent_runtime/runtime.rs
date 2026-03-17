@@ -15,6 +15,7 @@ use tokio::sync::RwLock;
 use tools::RoutingContext;
 use tracing::{debug, warn};
 
+use super::scenario;
 use crate::events::AgentEvent;
 
 use crate::execution::ExecutionParams;
@@ -401,23 +402,34 @@ impl AgentRuntime {
         // Step 7c: Chain-of-thought planning for complex tasks
         // Threshold 4: triggers for multi-step requests (3+ tools + sequential deps)
         const COT_COMPLEXITY_THRESHOLD: u8 = 4;
+        let complexity_score = analysis.signals.complexity_score();
 
         let planning_prompt = match analysis.mode {
             crate::intent_pipeline::types::ExecutionMode::Reactive { .. }
-                if analysis.signals.complexity_score() >= COT_COMPLEXITY_THRESHOLD =>
+                if analysis.signals.has_hypothetical =>
             {
-                let prompt = build_planning_prompt(message, &filtered_tools);
-                if let Some(ref tx) = event_tx {
-                    let _ = tx
-                        .send(AgentEvent::PlanningStarted {
-                            complexity_score: analysis.signals.complexity_score(),
-                        })
-                        .await;
-                }
-                Some(prompt)
+                // Scenario reasoning — use specialized prompt
+                Some(scenario::build_scenario_prompt(
+                    message,
+                    &filtered_tools,
+                    self.config.scenario_max_graph_depth,
+                ))
+            }
+            crate::intent_pipeline::types::ExecutionMode::Reactive { .. }
+                if complexity_score >= COT_COMPLEXITY_THRESHOLD =>
+            {
+                Some(build_planning_prompt(message, &filtered_tools))
             }
             _ => None,
         };
+
+        if planning_prompt.is_some() {
+            if let Some(ref tx) = event_tx {
+                let _ = tx
+                    .send(AgentEvent::PlanningStarted { complexity_score })
+                    .await;
+            }
+        }
 
         // Step 8: Execute via router
         if let Some(ref tx) = event_tx {

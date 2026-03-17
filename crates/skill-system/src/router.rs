@@ -204,4 +204,27 @@ mod tests {
         let selected = router.select_orchestrator("search the web for me", &catalog);
         assert_eq!(selected.skill_type, SkillType::Orchestrator);
     }
+
+    #[test]
+    fn test_report_triggers_route_to_task_management() {
+        let builtin: Vec<(String, String)> = crate::discovery::BUILTIN_SKILLS
+            .iter()
+            .map(|(n, c)| (n.to_string(), c.to_string()))
+            .collect();
+        let source = SkillSource::BuiltIn(builtin);
+        let catalog = SkillCatalog::discover_sync(&[source]).unwrap();
+        let router = SkillRouter::new(&catalog);
+
+        let pkg = router.select_orchestrator("weekly report", &catalog);
+        assert_eq!(
+            pkg.name, "task-management",
+            "weekly report should route to task-management"
+        );
+
+        let pkg = router.select_orchestrator("finance report", &catalog);
+        assert_eq!(
+            pkg.name, "finance-management",
+            "finance report should route to finance-management"
+        );
+    }
 }

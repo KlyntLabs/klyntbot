@@ -76,5 +76,5 @@ fn test_builtin_skills_info_for_ui() {
     assert_eq!(general.references.len(), 5); // search, skill-creator, browser, memory, summarize
 
     let task = info.iter().find(|s| s.name == "task-management").unwrap();
-    assert_eq!(task.references.len(), 6); // todo, daily-planner, task-decompose, project-management, weekly-review, retrospective
+    assert_eq!(task.references.len(), 7); // todo, daily-planner, task-decompose, project-management, weekly-review, retrospective, reports
 }

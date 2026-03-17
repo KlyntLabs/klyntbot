@@ -511,18 +511,16 @@ impl BackgroundConsolidationService {
                                     // Create relationship between subject and object entities
                                     if let (Ok(s), Some(o)) = (subj, obj) {
                                         let _ = entity_repo
-                                            .upsert_relationship(
-                                                &crate::repos::NewRelationship {
-                                                    source_entity_id: s.id,
-                                                    target_entity_id: o.id,
-                                                    relationship_type: fact.predicate.clone(),
-                                                    evidence: Some(format!(
-                                                        "{} {} {}",
-                                                        fact.subject, fact.predicate, fact.object
-                                                    )),
-                                                    source: "extracted".to_string(),
-                                                },
-                                            )
+                                            .upsert_relationship(&crate::repos::NewRelationship {
+                                                source_entity_id: s.id,
+                                                target_entity_id: o.id,
+                                                relationship_type: fact.predicate.clone(),
+                                                evidence: Some(format!(
+                                                    "{} {} {}",
+                                                    fact.subject, fact.predicate, fact.object
+                                                )),
+                                                source: "extracted".to_string(),
+                                            })
                                             .await;
                                     }
                                 }
@@ -1026,10 +1024,7 @@ fn infer_entity_type(predicate: &str) -> String {
     {
         return "person".to_string();
     }
-    if p.contains("project")
-        || p.contains("works_on")
-        || p.contains("contributes_to")
-    {
+    if p.contains("project") || p.contains("works_on") || p.contains("contributes_to") {
         return "project".to_string();
     }
     if p.contains("uses")
@@ -1040,10 +1035,7 @@ fn infer_entity_type(predicate: &str) -> String {
     {
         return "technology".to_string();
     }
-    if p.contains("organization")
-        || p.contains("company")
-        || p.contains("employer")
-    {
+    if p.contains("organization") || p.contains("company") || p.contains("employer") {
         return "organization".to_string();
     }
     "concept".to_string()

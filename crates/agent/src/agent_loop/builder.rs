@@ -700,8 +700,7 @@ impl AgentLoopBuilder {
             });
 
             // One-time entity backfill from note_entity_mentions (non-blocking)
-            let entity_repo2 =
-                cognitive::repos::EntityRepo::new(storage_pool.inner().clone());
+            let entity_repo2 = cognitive::repos::EntityRepo::new(storage_pool.inner().clone());
             tokio::spawn(async move {
                 match entity_repo2.backfill_from_note_mentions().await {
                     Ok(0) => {}
@@ -1243,6 +1242,7 @@ impl AgentLoopBuilder {
             max_response_tokens: config.agents.defaults.max_tokens as usize,
             channel: "unknown".to_string(),
             provider_name: provider.name().to_string(),
+            scenario_max_graph_depth: config.scenario.max_graph_depth,
         };
 
         // ── Interaction recorder ──────────────────────────────────────────

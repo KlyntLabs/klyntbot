@@ -494,8 +494,32 @@ pub fn analyze_heuristic(message: &str) -> Option<IntentAnalysis> {
         return Some(direct_analysis("Greeting detected", 0.95));
     }
 
-    // If negated/hypothetical and has domain content, defer to LLM.
-    if (has_negation || has_hypothetical) && has_any_domain_keyword(&msg, m) {
+    // Hypothetical + domain content → scenario reasoning (Reactive mode with flag).
+    // This lets the runtime inject the scenario planning prompt.
+    if has_hypothetical && has_any_domain_keyword(&msg, m) {
+        let signals = ComplexitySignals {
+            estimated_tool_calls: 3, // baseline + first-order + second-order
+            has_sequential_deps: true,
+            failure_risk: FailureRisk::Low,
+            requires_state_tracking: false,
+            requires_retries: false,
+            has_hypothetical: true,
+        };
+        let budget = compute_iteration_budget(&signals);
+        return Some(IntentAnalysis {
+            mode: ExecutionMode::Reactive {
+                max_iterations: budget,
+            },
+            confidence: 0.80,
+            source: AnalysisSource::Heuristic,
+            reasoning: "Hypothetical scenario with domain context".to_string(),
+            needs_orchestration: false,
+            signals,
+        });
+    }
+
+    // Negation with domain content still defers to LLM (can't parse "don't create" correctly).
+    if has_negation && has_any_domain_keyword(&msg, m) {
         return None;
     }
 
@@ -523,6 +547,7 @@ pub fn analyze_heuristic(message: &str) -> Option<IntentAnalysis> {
             failure_risk: FailureRisk::Low,
             requires_state_tracking: false,
             requires_retries: false,
+            has_hypothetical: false,
         };
         let budget = compute_iteration_budget(&signals);
         return Some(reactive_analysis(budget, reasoning, 0.90, signals));
@@ -781,6 +806,7 @@ fn analyze_complexity(msg: &str, m: &AcMatchers) -> ComplexitySignals {
         failure_risk: assess_failure_risk(msg, m),
         requires_state_tracking: detect_state_requirements(msg, m),
         requires_retries: detect_retry_indicators(msg, m),
+        has_hypothetical: false,
     }
 }
 
@@ -807,6 +833,7 @@ fn direct_analysis(reasoning: &str, confidence: f32) -> IntentAnalysis {
             failure_risk: FailureRisk::Low,
             requires_state_tracking: false,
             requires_retries: false,
+            has_hypothetical: false,
         },
         confidence,
         source: AnalysisSource::Heuristic,
@@ -914,6 +941,7 @@ impl IntentCategory {
                     failure_risk: FailureRisk::Low,
                     requires_state_tracking: false,
                     requires_retries: false,
+                    has_hypothetical: false,
                 };
                 let budget = compute_iteration_budget(&signals);
                 reactive_analysis(
@@ -1067,6 +1095,7 @@ impl IntentClassifier {
             },
             requires_state_tracking: v["requires_state_tracking"].as_bool().unwrap_or(false),
             requires_retries: v["requires_retries"].as_bool().unwrap_or(false),
+            has_hypothetical: v["has_hypothetical"].as_bool().unwrap_or(false),
         };
 
         let mode = match mode_str {
@@ -1959,6 +1988,7 @@ mod tests {
             failure_risk: FailureRisk::Low,
             requires_state_tracking: false,
             requires_retries: false,
+            has_hypothetical: false,
         };
         assert_eq!(compute_iteration_budget(&signals), 15);
     }
@@ -1971,6 +2001,7 @@ mod tests {
             failure_risk: FailureRisk::Low,
             requires_state_tracking: false,
             requires_retries: false,
+            has_hypothetical: false,
         };
         assert_eq!(compute_iteration_budget(&signals), 29);
     }
@@ -1983,6 +2014,7 @@ mod tests {
             failure_risk: FailureRisk::Low,
             requires_state_tracking: false,
             requires_retries: false,
+            has_hypothetical: false,
         };
         assert_eq!(compute_iteration_budget(&signals), 30);
     }
@@ -1995,6 +2027,7 @@ mod tests {
             failure_risk: FailureRisk::Low,
             requires_state_tracking: false,
             requires_retries: false,
+            has_hypothetical: false,
         };
         assert_eq!(compute_iteration_budget(&signals), 15);
     }
@@ -2202,12 +2235,21 @@ mod tests {
     }
 
     #[test]
-    fn hypothetical_with_domain_defers_to_llm() {
-        // "what if I create a task" — hypothetical + domain → defer
+    fn hypothetical_with_domain_routes_reactive() {
+        // "what if I create a task" — hypothetical + domain → Reactive with has_hypothetical
         let result = analyze_heuristic("what if I create a task for this");
         assert!(
-            result.is_none(),
-            "Hypothetical domain question should defer to LLM"
+            result.is_some(),
+            "Hypothetical + domain should return Some (scenario reasoning)"
+        );
+        let analysis = result.unwrap();
+        assert!(
+            matches!(analysis.mode, ExecutionMode::Reactive { .. }),
+            "should be Reactive mode for scenario reasoning"
+        );
+        assert!(
+            analysis.signals.has_hypothetical,
+            "has_hypothetical signal should be set"
         );
     }
 
@@ -2319,5 +2361,49 @@ mod tests {
         assert!(ctx.contains("reactive"));
         assert!(ctx.contains("Avoid these strategies"));
         assert!(ctx.contains("direct"));
+    }
+
+    // ── Hypothetical scenario routing tests ──
+
+    #[test]
+    fn test_what_if_budget_routes_reactive() {
+        let result = analyze_heuristic("what if I increase my budget by 500 per month");
+        assert!(result.is_some());
+        let analysis = result.unwrap();
+        assert!(analysis.signals.has_hypothetical);
+        assert!(matches!(analysis.mode, ExecutionMode::Reactive { .. }));
+    }
+
+    #[test]
+    fn test_what_if_task_routes_reactive() {
+        let result =
+            analyze_heuristic("what if I push the deadline back 2 weeks for the migration task");
+        assert!(result.is_some());
+        let analysis = result.unwrap();
+        assert!(analysis.signals.has_hypothetical);
+    }
+
+    #[test]
+    fn test_hypothetical_with_domain_keyword_returns_reactive() {
+        let result = analyze_heuristic("what if I deprioritize the API migration task");
+        assert!(result.is_some(), "hypothetical + domain should return Some");
+        let analysis = result.unwrap();
+        assert!(
+            matches!(analysis.mode, ExecutionMode::Reactive { .. }),
+            "should be Reactive mode"
+        );
+        assert!(
+            analysis.signals.has_hypothetical,
+            "has_hypothetical signal should be set"
+        );
+    }
+
+    #[test]
+    fn test_simple_hypothetical_without_domain_defers_to_llm() {
+        let result = analyze_heuristic("what if it rains tomorrow");
+        assert!(
+            result.is_none(),
+            "hypothetical without domain should defer to LLM"
+        );
     }
 }
