@@ -669,6 +669,22 @@ Simple heading-based tree construction:
 3. Non-heading blocks become children of the nearest preceding heading
 4. Content blocks without a preceding heading attach to a synthetic root node
 
+### Incremental vs. Full Rebuild Strategy
+
+**Phase 1 (initial implementation):** Delete-then-rebuild per source. A typical note produces
+30-50 tree nodes; full rebuild takes <10ms in SQLite. Acceptable for launch.
+
+**Phase 2 (optimization):** Diff-based updates for frequently edited notes. The markdown parser
+produces a list of `(position, content_hash, node_type)` tuples. Compare with existing tree nodes
+for the same `source_id`:
+- Unchanged nodes (same position + hash): skip
+- Modified nodes (same position, different hash): UPDATE content + re-extract entities
+- New nodes: INSERT
+- Removed nodes: DELETE (cascade cleans GT-Links)
+
+This reduces entity re-extraction to only changed sections, which is the expensive part.
+Phase 2 is recommended after the system proves valuable in Phase 1.
+
 ### Entity Extraction During Build
 
 After tree nodes are inserted:
@@ -808,6 +824,8 @@ pub struct BookIndexConfig {
       },
       "retrieval": {
         "maxNodes": 50,
+        "maxMapNodes": 10,
+        "operatorTimeoutMs": 600,
         "pagerankDamping": 0.85,
         "pagerankIterations": 20
       }
@@ -816,17 +834,44 @@ pub struct BookIndexConfig {
 }
 ```
 
+## Caching
+
+- **Tree queries** (`get_subtree`, `get_linked_nodes`, `get_root_sections`): 60s TTL cache
+  keyed by `(method, args)`, similar to existing `ContextSource` caching. Invalidated on
+  `delete_source_tree` / `build_from_*` calls.
+- **Plan templates**: Pre-built `Vec<Box<dyn Operator>>` per `QueryCategory`, cloned on each
+  query. Avoids re-allocating the same operator sequences.
+- **Skill tree checksum**: SHA-256 hash of compiled skill content. Only rebuild skill tree
+  nodes when hash changes (avoids unnecessary work on boot).
+
+## Testing Strategy
+
+1. **Unit tests** for `detect_gradient` — cover: empty scores, no gradient (Case A), single
+   match (Case B with i=1), multiple matches (Case B with i>1), all below min_similarity
+2. **Unit tests** for `pagerank` — seed convergence, disconnected subgraph, single-node graph
+3. **Unit tests** for `skyline_filter` — all dominated, none dominated, mixed
+4. **Integration tests** for each query type using fixture notes:
+   - SingleHop: create a note with headings + entities, query for a specific entity
+   - MultiHop: create two notes that share entities, query requiring cross-note reasoning
+   - Global: create multiple notes, query with aggregation (count tables, etc.)
+5. **Regression tests**: existing InsightForge tests must still pass with BookRAGSearcher
+   returning empty (no indexed content). Add `BookRAGSearcher` to the test forge with
+   an empty BookIndex.
+
 ## Risks & Mitigations
 
 | Risk | Mitigation |
 |------|-----------|
-| LLM calls in operators (Extract, Decompose, Map, Reduce) add latency | Heuristic-first classification; operators are optional and skip on PassThrough; per-source timeout in InsightForge (800ms default) |
+| LLM calls in operators (Extract, Decompose, Map, Reduce) add latency | Per-operator timeout (600ms default); `max_map_nodes` cap (10); heuristic-first classification; PassThrough skips entirely; partial results on timeout |
+| Map operator triggers too many parallel LLM calls | `max_map_nodes` config (default: 10) caps nodes sent through Map; per-call token budget = `token_budget / max_map_nodes` |
 | Entity extraction during indexing is slow for large notes | Run in background task; note save returns immediately |
 | Gradient-based ER may merge entities that shouldn't be merged | Conservative threshold (g=0.6); min_similarity floor (0.3); entity merge is reversible (split operation can be added later) |
+| Dangling GT-Links after entity merge | `merge_entities()` migrates GT-Links within the same transaction before deleting source entity |
 | Small subgraph PageRank may not converge for disconnected components | Seed-based personalized PageRank handles disconnected components naturally (isolated nodes get low scores) |
-| Tree rebuilds on every note edit | Delete-then-rebuild is fast for typical note sizes (30-50 nodes); SQLite handles this in <10ms |
+| Tree rebuilds on every note edit | Phase 1: delete-then-rebuild (<10ms). Phase 2: diff-based incremental updates |
 | Trait indirection for layer compliance adds complexity | Follows the existing `MemoryRetriever` / `DecomposerLlm` pattern — proven in the codebase |
-| DomainEvent variants may be insufficient for tree updates | Check actual `bus::DomainEvent` enum during implementation; add new variants if needed |
+| DomainEvent variants insufficient for tree updates | New variants added: `NoteContentChanged`, `NoteDeleted`, `TaskHierarchyChanged` — content carried in event payload, zero race conditions |
+| Race between event emission and repo fetch | Eliminated by carrying content in event payload (not refetching from repo) |
 
 ## Success Criteria
 
