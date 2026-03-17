@@ -178,6 +178,11 @@ export function GraphSettingsPopover({
           checked={settings.showOrphans}
           onChange={(v) => onChange({ showOrphans: v })}
         />
+        <Toggle
+          label="Instant Load"
+          checked={settings.instantLoad}
+          onChange={(v) => onChange({ instantLoad: v })}
+        />
       </div>
     </div>
   );

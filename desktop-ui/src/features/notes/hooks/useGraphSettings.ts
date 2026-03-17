@@ -15,6 +15,10 @@ export interface GraphSettings {
   showArrows: boolean;
   /** Show orphan (unlinked) nodes */
   showOrphans: boolean;
+  /** Enable continuous physics simulation (CPU-intensive) */
+  livePhysics: boolean;
+  /** Skip progressive reveal animation on graph load */
+  instantLoad: boolean;
 }
 
 const DEFAULT_SETTINGS: GraphSettings = {
@@ -25,6 +29,8 @@ const DEFAULT_SETTINGS: GraphSettings = {
   labelThreshold: 0.5,
   showArrows: true,
   showOrphans: true,
+  livePhysics: false,
+  instantLoad: false,
 };
 
 const STORAGE_KEY = "klynt-graph-settings";
