@@ -1,37 +1,27 @@
 //! Assemble a knowledge context block for Insight Review prompts.
 //!
-//! Gathers: current note, related notes (backlinks), and optionally
-//! cognitive memory entries. Formats into a structured text block
-//! that LLM prompts can consume.
+//! Legacy context builder — used as fallback when `InsightService` is unavailable.
+//! The primary path now uses `feature_insights::PromptBuilder`.
 
 use feature_notes::models::NoteRow;
 
-/// Assembled context ready for prompt injection.
-#[allow(dead_code)]
-pub struct InsightContext {
-    pub text: String,
-    pub note_title: String,
-    pub related_count: usize,
-}
-
 /// Build a context block from a note and its related notes.
+///
+/// Returns `feature_insights::InsightContext` for compatibility with both the
+/// old inline pipeline and the new `InsightService` pipeline.
 pub fn assemble_context(
     note: &NoteRow,
     related_notes: &[NoteRow],
     memory_entries: Option<&[String]>,
-) -> InsightContext {
+) -> feature_insights::InsightContext {
     let mut parts = Vec::new();
 
     // Current note
     parts.push(format!("## Current Note: {}\n\n{}", note.title, note.body));
 
-    // Related notes (truncate body to 2000 chars each to stay within token limits)
+    // Related notes (truncate body to 2000 bytes, UTF-8 safe)
     for related in related_notes {
-        let body_preview = if related.body.len() > 2000 {
-            format!("{}...", &related.body[..2000])
-        } else {
-            related.body.clone()
-        };
+        let body_preview = common::truncate_at_boundary(&related.body, 2000);
         parts.push(format!(
             "## Related Note: {}\n\n{}",
             related.title, body_preview
@@ -48,7 +38,7 @@ pub fn assemble_context(
         }
     }
 
-    InsightContext {
+    feature_insights::InsightContext {
         text: parts.join("\n\n"),
         note_title: note.title.clone(),
         related_count: related_notes.len(),
@@ -56,9 +46,6 @@ pub fn assemble_context(
 }
 
 /// Extract domain hints from a note's tags for persona selection.
-///
-/// Tags are lowercased and returned as-is — the `PersonaRepo::select_for_note`
-/// method matches them against persona `domains` JSON arrays.
 pub fn extract_note_domains(tags: &[String]) -> Vec<String> {
     tags.iter().map(|t| t.to_lowercase()).collect()
 }

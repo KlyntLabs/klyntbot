@@ -107,16 +107,39 @@ impl AppCore {
         .await?;
 
         // ── Note embedding handler (before vector_store is moved into agent) ──
+        let embedding_engine = Arc::new(tools::embedding_engine::EmbeddingEngine::new());
         let note_embedding_handler: Option<
             Arc<dyn feature_notes::handlers::embedding::NoteEmbeddingHandler>,
         > = if let Some(ref vs) = vector_store {
-            let engine = Arc::new(tools::embedding_engine::EmbeddingEngine::new());
             Some(Arc::new(
-                ::agent::adapters::note_embedding::NoteEmbeddingAdapter::new(engine, vs.clone()),
+                ::agent::adapters::note_embedding::NoteEmbeddingAdapter::new(
+                    Arc::clone(&embedding_engine),
+                    vs.clone(),
+                ),
             ))
         } else {
             None
         };
+
+        // ── Insight embedder (reuses the same EmbeddingEngine) ──
+        let insight_embedder: Arc<dyn feature_insights::InsightEmbedder> =
+            if let Some(ref vs) = vector_store {
+                Arc::new(crate::adapters::insight_embedder::InsightEmbedderImpl::new(
+                    Arc::clone(&embedding_engine),
+                    vs.clone(),
+                ))
+            } else {
+                Arc::new(feature_insights::NoopInsightEmbedder)
+            };
+
+        // ── Cognitive accessor for insight context injection ──
+        let cognitive_accessor: Arc<dyn feature_insights::CognitiveAccessor> = Arc::new(
+            crate::adapters::cognitive_accessor::CognitiveAccessorImpl::new(
+                ::cognitive::SemanticFactRepo::new(storage_pool.inner().clone()),
+                ::cognitive::EpisodicMemoryRepo::new(storage_pool.inner().clone()),
+                ::cognitive::ProceduralRuleRepo::new(storage_pool.inner().clone()),
+            ),
+        );
 
         // ── Phase 3: Agent ───────────────────────────────────────────────
         let agent::AgentResult {
@@ -235,13 +258,21 @@ impl AppCore {
             event_emitter: event_emitter.unwrap_or_else(|| Arc::new(NoopEmitter)),
             note_embedding_handler,
             launcher_engine,
-            insight_service: Some(Arc::new(feature_insights::InsightService::new(
-                feature_insights::InsightReviewRepo::new(storage_pool.inner().clone()),
-                feature_insights::InsightProgressRepo::new(storage_pool.inner().clone()),
-                Arc::new(feature_insights::NoopFlashcardAccessor),
-                Arc::new(feature_insights::NoopInsightEmbedder),
-                feature_insights::ProgressWeights::default(),
-            ))),
+            insight_service: {
+                let insight_repo =
+                    feature_insights::InsightReviewRepo::new(storage_pool.inner().clone());
+                Some(Arc::new(feature_insights::InsightService::new(
+                    insight_repo.clone(),
+                    feature_insights::InsightProgressRepo::new(storage_pool.inner().clone()),
+                    Arc::new(feature_insights::NoopScopeResolver), // Task 9 wires real impl
+                    feature_insights::SmartMergeEngine::new(insight_repo),
+                    feature_insights::PromptBuilder::new(Arc::clone(&cognitive_accessor)),
+                    cognitive_accessor,
+                    Arc::new(feature_insights::NoopFlashcardAccessor), // Phase 3
+                    insight_embedder,
+                    feature_insights::ProgressWeights::default(),
+                )))
+            },
             flashcard_repo: Some(::cognitive::FlashcardRepo::new(
                 storage_pool.inner().clone(),
             )),

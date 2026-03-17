@@ -23,6 +23,7 @@ impl VectorStore {
             "cognitive_fact_embeddings",
             "activity_embeddings",
             "work_context_embeddings",
+            "insight_embeddings",
         ];
         for table_name in tables {
             let tbl = match self.db.open_table(table_name).execute().await {

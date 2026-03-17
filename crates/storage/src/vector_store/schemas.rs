@@ -71,6 +71,14 @@ pub(crate) fn note_embedding_schema() -> Schema {
     ])
 }
 
+pub(crate) fn insight_embedding_schema() -> Schema {
+    Schema::new(vec![
+        Field::new("id", DataType::Utf8, false),
+        vector_field(),
+        Field::new("updated_at", DataType::Utf8, false),
+    ])
+}
+
 pub(crate) fn cognitive_fact_schema() -> Schema {
     Schema::new(vec![
         Field::new("id", DataType::Utf8, false),

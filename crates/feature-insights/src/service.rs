@@ -1,27 +1,44 @@
 //! InsightService — orchestrates the insight generation pipeline.
 //!
-//! This is the Phase 1 version that preserves the existing 5-tab pipeline
-//! but stores results in the new versioned `insight_reviews` table.
-//! Smart Merge, Scope Resolution, and Learning Progress are added in Phases 2-4.
+//! Phase 2: adds scope resolution, smart merge, prompt building, and cognitive context.
+//! The LLM call itself stays in `app-core`'s insight handler (it depends on
+//! `DynProvider` and event emission). This service orchestrates everything
+//! before and after the LLM call.
 
 use std::sync::Arc;
 
 use sha2::{Digest, Sha256};
 
+use crate::merge::SmartMergeEngine;
 use crate::progress_repo::InsightProgressRepo;
+use crate::prompt_builder::{InsightContext, PromptBuilder};
+use feature_notes::models::NoteRow;
 use crate::repo::InsightReviewRepo;
-use crate::traits::{FlashcardAccessor, InsightEmbedder};
+use crate::scope::ScopeResolver;
+use crate::traits::{CognitiveAccessor, FlashcardAccessor, InsightEmbedder};
 use crate::types::{InsightContent, InsightReviewRow, ProgressWeights, ScopeConfig};
+
+/// Result of pre-generation pipeline — ready for LLM call.
+pub struct PreparedInsight {
+    pub context: InsightContext,
+    pub scope_note_ids: Vec<String>,
+    pub parent_insight_id: Option<String>,
+    pub overlap_score: f64,
+}
 
 /// The central orchestrator for insight generation and retrieval.
 ///
-/// Note: Event emission (streaming, tab-done) stays in `app-core`'s
-/// insight handler since it depends on the transport-specific `AppEventEmitter`.
-/// The service handles storage and retrieval only.
+/// Event emission (streaming, tab-done) stays in `app-core`'s insight handler
+/// since it depends on the transport-specific `AppEventEmitter`.
 pub struct InsightService {
     pub(crate) repo: InsightReviewRepo,
     pub(crate) progress_repo: InsightProgressRepo,
-    /// Reserved for Phase 2+ learning progress computation.
+    pub(crate) scope_resolver: Arc<dyn ScopeResolver>,
+    pub(crate) merge_engine: SmartMergeEngine,
+    pub(crate) prompt_builder: PromptBuilder,
+    #[allow(dead_code)]
+    pub(crate) cognitive: Arc<dyn CognitiveAccessor>,
+    /// Reserved for Phase 3 learning progress computation.
     #[allow(dead_code)]
     pub(crate) flashcards: Arc<dyn FlashcardAccessor>,
     pub(crate) embedder: Arc<dyn InsightEmbedder>,
@@ -29,9 +46,14 @@ pub struct InsightService {
 }
 
 impl InsightService {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         repo: InsightReviewRepo,
         progress_repo: InsightProgressRepo,
+        scope_resolver: Arc<dyn ScopeResolver>,
+        merge_engine: SmartMergeEngine,
+        prompt_builder: PromptBuilder,
+        cognitive: Arc<dyn CognitiveAccessor>,
         flashcards: Arc<dyn FlashcardAccessor>,
         embedder: Arc<dyn InsightEmbedder>,
         progress_weights: ProgressWeights,
@@ -39,10 +61,58 @@ impl InsightService {
         Self {
             repo,
             progress_repo,
+            scope_resolver,
+            merge_engine,
+            prompt_builder,
+            cognitive,
             flashcards,
             embedder,
             progress_weights,
         }
+    }
+
+    /// Pre-generation pipeline: check merge → build context.
+    ///
+    /// Accepts pre-resolved `scope_note_ids` (from `resolve_scope`) to avoid
+    /// double resolution. The caller resolves scope once, fetches notes, then
+    /// passes both here.
+    pub async fn prepare_context(
+        &self,
+        note: &NoteRow,
+        related_notes: &[NoteRow],
+        scope_note_ids: &[String],
+        scope_config: &ScopeConfig,
+        domains: &[String],
+    ) -> Result<PreparedInsight, sqlx::Error> {
+        // 1. Check for parent via smart merge
+        let merge_result = self
+            .merge_engine
+            .find_parent(&note.id, scope_note_ids, scope_config.merge_threshold)
+            .await?;
+
+        // 2. Build full context
+        let context = self
+            .prompt_builder
+            .build_context(
+                note,
+                related_notes,
+                scope_config,
+                domains,
+                merge_result.parent.as_ref(),
+            )
+            .await;
+
+        Ok(PreparedInsight {
+            context,
+            scope_note_ids: scope_note_ids.to_vec(),
+            parent_insight_id: merge_result.parent.map(|p| p.id),
+            overlap_score: merge_result.overlap_score,
+        })
+    }
+
+    /// Resolve scope IDs for a note using the configured ScopeResolver.
+    pub async fn resolve_scope(&self, note_id: &str, config: &ScopeConfig) -> Vec<String> {
+        self.scope_resolver.resolve(note_id, config).await
     }
 
     /// Check if a fresh insight exists for the given hash. Returns it if found.
@@ -62,8 +132,14 @@ impl InsightService {
         input_hash: &str,
         scope_config: &ScopeConfig,
         persona_ids: &[String],
+        parent_insight_id: Option<&str>,
+        scope_note_ids: &[String],
     ) -> Result<InsightReviewRow, sqlx::Error> {
         let content_json = serde_json::to_string(content).unwrap_or_else(|_| "{}".to_string());
+
+        // Store resolved scope IDs in scope_config.node_ids for future merge lookups
+        let mut stored_scope = scope_config.clone();
+        stored_scope.node_ids = scope_note_ids.to_vec();
 
         let row = self
             .repo
@@ -71,9 +147,9 @@ impl InsightService {
                 note_id,
                 &content_json,
                 input_hash,
-                scope_config,
+                &stored_scope,
                 persona_ids,
-                None,
+                parent_insight_id,
             )
             .await?;
 

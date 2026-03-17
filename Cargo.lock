@@ -251,6 +251,7 @@ version = "0.1.0"
 dependencies = [
  "activity-log",
  "agent",
+ "async-trait",
  "base64 0.22.1",
  "bus",
  "channels",

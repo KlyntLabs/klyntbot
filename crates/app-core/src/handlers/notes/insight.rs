@@ -25,11 +25,19 @@ impl AppCore {
             return Err(ApiError::new("VALIDATION", "Note has no content"));
         }
 
-        let related_ids = self.get_related_note_ids(note_id).await;
+        let scope = feature_insights::ScopeConfig::default();
+
+        // Resolve scope once — used for both hash computation and context building
+        let scope_note_ids = if let Some(ref service) = self.insight_service {
+            service.resolve_scope(note_id, &scope).await
+        } else {
+            self.get_related_note_ids(note_id).await
+        };
+
         let content_hash = feature_insights::InsightService::compute_input_hash(
             &note.title,
             &note.body,
-            &related_ids,
+            &scope_note_ids,
         );
 
         if let Some(ref service) = self.insight_service {
@@ -57,21 +65,44 @@ impl AppCore {
             .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "LLM provider not configured"))?
             .clone();
 
-        let related_notes = self.fetch_related_notes(note_id).await;
-        let ctx = insight_context::assemble_context(&note, &related_notes, None);
-
         // NoteRow doesn't carry tags — fetch them separately
         let tags = self.note_repo.get_tags(note_id).await.unwrap_or_default();
         let note_domains = insight_context::extract_note_domains(&tags);
 
-        let selected_personas = if let Some(ref persona_repo) = self.persona_repo {
-            persona_repo
-                .select_for_note(note_id, &note_domains, 4)
-                .await
-                .unwrap_or_default()
-        } else {
-            Vec::new()
-        };
+        // Build context via InsightService pipeline (merge check + cognitive injection)
+        let (context_text, note_title, parent_insight_id) =
+            if let Some(ref service) = self.insight_service {
+                // Fetch related notes for the resolved scope
+                let mut related_notes = Vec::new();
+                for id in &scope_note_ids {
+                    if let Ok(Some(n)) = self.note_repo.get_note(id).await {
+                        related_notes.push(n);
+                    }
+                }
+
+                match service
+                    .prepare_context(&note, &related_notes, &scope_note_ids, &scope, &note_domains)
+                    .await
+                {
+                    Ok(prepared) => (
+                        prepared.context.text,
+                        prepared.context.note_title,
+                        prepared.parent_insight_id,
+                    ),
+                    Err(e) => {
+                        tracing::warn!("prepare_context failed, falling back: {e}");
+                        let related_notes = self.fetch_related_notes(note_id).await;
+                        let ctx = insight_context::assemble_context(&note, &related_notes, None);
+                        (ctx.text, ctx.note_title, None)
+                    }
+                }
+            } else {
+                let related_notes = self.fetch_related_notes(note_id).await;
+                let ctx = insight_context::assemble_context(&note, &related_notes, None);
+                (ctx.text, ctx.note_title, None)
+            };
+
+        let selected_personas = self.select_personas(note_id, &note_domains).await;
 
         let config = self.config.read().await;
         let params = providers::cognitive_chat_params(&config, 4096);
@@ -81,8 +112,6 @@ impl AppCore {
         let insight_service = self.insight_service.clone();
         let note_id_owned = note_id.to_string();
         let content_hash_clone = content_hash.clone();
-        let context_text = ctx.text;
-        let note_title = ctx.note_title;
 
         tokio::spawn(async move {
             run_insight_pipeline(InsightPipelineArgs {
@@ -95,6 +124,9 @@ impl AppCore {
                 note_title,
                 params,
                 personas: selected_personas,
+                parent_insight_id,
+                scope_note_ids,
+                scope_config: scope,
             })
             .await;
         });
@@ -245,14 +277,7 @@ impl AppCore {
             "perspectives" => {
                 let tags = self.note_repo.get_tags(note_id).await.unwrap_or_default();
                 let note_domains = insight_context::extract_note_domains(&tags);
-                let personas = if let Some(ref persona_repo) = self.persona_repo {
-                    persona_repo
-                        .select_for_note(note_id, &note_domains, 4)
-                        .await
-                        .unwrap_or_default()
-                } else {
-                    Vec::new()
-                };
+                let personas = self.select_personas(note_id, &note_domains).await;
                 let blocks: Vec<(String, String, String, String, String)> = personas
                     .iter()
                     .map(|p| {
@@ -348,6 +373,20 @@ impl AppCore {
         }
         notes
     }
+
+    async fn select_personas(
+        &self,
+        note_id: &str,
+        domains: &[String],
+    ) -> Vec<cognitive::PersonaRow> {
+        match &self.persona_repo {
+            Some(repo) => repo
+                .select_for_note(note_id, domains, 4)
+                .await
+                .unwrap_or_default(),
+            None => Vec::new(),
+        }
+    }
 }
 
 struct InsightPipelineArgs {
@@ -360,6 +399,9 @@ struct InsightPipelineArgs {
     note_title: String,
     params: providers::ChatParams,
     personas: Vec<cognitive::PersonaRow>,
+    parent_insight_id: Option<String>,
+    scope_note_ids: Vec<String>,
+    scope_config: feature_insights::ScopeConfig,
 }
 
 async fn run_insight_pipeline(args: InsightPipelineArgs) {
@@ -373,6 +415,9 @@ async fn run_insight_pipeline(args: InsightPipelineArgs) {
         note_title,
         params,
         personas,
+        parent_insight_id,
+        scope_note_ids,
+        scope_config,
     } = args;
 
     let synthesis = stream_synthesis(&provider, &emitter, &context, &params).await;
@@ -446,10 +491,17 @@ async fn run_insight_pipeline(args: InsightPipelineArgs) {
             concept_map,
             perspectives,
         };
-        let scope = feature_insights::ScopeConfig::default();
         let persona_ids: Vec<String> = personas.iter().map(|p| p.id.clone()).collect();
         let _ = service
-            .store_insight(&note_id, &content, &content_hash, &scope, &persona_ids)
+            .store_insight(
+                &note_id,
+                &content,
+                &content_hash,
+                &scope_config,
+                &persona_ids,
+                parent_insight_id.as_deref(),
+                &scope_note_ids,
+            )
             .await;
     }
 }
