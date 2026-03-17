@@ -93,6 +93,28 @@ pub struct PlannedSubtaskResponse {
     pub children: Vec<PlannedSubtaskResponse>,
 }
 
+// ── AI Forecast ────────────────────────────────────────────────────────
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct TaskForecastResponse {
+    pub estimated_minutes: i32,
+    pub confidence_low: i32,
+    pub confidence_high: i32,
+    pub methodology: String,
+    pub sample_size: u32,
+    pub data_quality: String,
+    pub risks: Vec<ForecastRiskResponse>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ForecastRiskResponse {
+    pub kind: String,
+    pub description: String,
+    pub impact_minutes: Option<i32>,
+}
+
 // ── Today Task (tray view) ──────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

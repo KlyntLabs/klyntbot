@@ -1,6 +1,6 @@
 use desktop_shared::commands::{
-    DecompositionResponse, ObjectiveResponse, ProjectResponse,
-    SuggestionResponse, TaskCreateParams, TaskResponse, TaskUpdateParams, TodayTaskResponse,
+    DecompositionResponse, ObjectiveResponse, ProjectResponse, SuggestionResponse,
+    TaskCreateParams, TaskForecastResponse, TaskResponse, TaskUpdateParams, TodayTaskResponse,
 };
 use desktop_shared::errors::ApiError;
 use std::sync::Arc;
@@ -184,6 +184,14 @@ pub async fn task_reject_decomposition(
     state.task_reject_decomposition(decomposition_id).await
 }
 
+#[tauri::command]
+pub async fn task_forecast(
+    state: State<'_, Arc<AppCore>>,
+    task_id: String,
+) -> Result<TaskForecastResponse, ApiError> {
+    state.task_forecast(task_id).await
+}
+
 // ── Dev server dispatch ─────────────────────────────────────────────
 
 #[cfg(test)]
@@ -206,6 +214,7 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "task_decompose",
     "task_apply_decomposition",
     "task_reject_decomposition",
+    "task_forecast",
 ];
 
 #[cfg(debug_assertions)]
@@ -290,6 +299,10 @@ pub(crate) async fn dispatch_dev(
                 try_field!(dev::get_str(body, "decompositionId")).into(),
             )
             .await,
+        ),
+        "task_forecast" => dev::val(
+            core.task_forecast(try_field!(dev::get_str(body, "taskId")).into())
+                .await,
         ),
         _ => return None,
     })
