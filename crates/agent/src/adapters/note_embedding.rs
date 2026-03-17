@@ -59,7 +59,10 @@ impl NoteEmbeddingHandler for NoteEmbeddingAdapter {
     }
 
     async fn embed_query(&self, query: &str) -> Result<Vec<f32>> {
-        debug!(query_len = query.len(), "Generating query embedding for notes");
+        debug!(
+            query_len = query.len(),
+            "Generating query embedding for notes"
+        );
         self.engine.clone().embed_async(query.to_string()).await
     }
 

@@ -188,18 +188,14 @@ impl AppCore {
     }
 
     /// Return proactive handler or a "not initialized" error.
-    pub fn proactive_handler(
-        &self,
-    ) -> Result<&dyn feature_tasks::ProactiveHandler, ApiError> {
+    pub fn proactive_handler(&self) -> Result<&dyn feature_tasks::ProactiveHandler, ApiError> {
         self.proactive_handler
             .as_deref()
             .ok_or_else(|| ApiError::new("INTERNAL", "ProactiveHandler not initialized"))
     }
 
     /// Return suggestion applier or a "not initialized" error.
-    pub fn suggestion_applier(
-        &self,
-    ) -> Result<&dyn feature_tasks::SuggestionApplier, ApiError> {
+    pub fn suggestion_applier(&self) -> Result<&dyn feature_tasks::SuggestionApplier, ApiError> {
         self.suggestion_applier
             .as_deref()
             .ok_or_else(|| ApiError::new("INTERNAL", "SuggestionApplier not initialized"))

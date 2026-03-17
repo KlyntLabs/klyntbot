@@ -11,7 +11,7 @@ pub mod cron;
 pub mod finance;
 pub mod learning;
 pub mod llm_summary;
+pub mod note_embedding;
 pub mod productivity;
 pub mod progress;
-pub mod note_embedding;
 pub mod task_embedding;

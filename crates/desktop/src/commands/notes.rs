@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
 use desktop_shared::commands::{
-    BacklinkResponse, HybridSearchResponse, InboxCreateParams, InboxItemResponse,
-    NoteCreateParams, NoteLinkResponse, NoteResponse, NoteSuggestionsResponse, NoteUpdateParams,
-    NoteVersionResponse, NotebookCreateParams, NotebookResponse, NotebookUpdateParams,
+    BacklinkResponse, HybridSearchResponse, InboxCreateParams, InboxItemResponse, NoteCreateParams,
+    NoteLinkResponse, NoteResponse, NoteSuggestionsResponse, NoteUpdateParams, NoteVersionResponse,
+    NotebookCreateParams, NotebookResponse, NotebookUpdateParams,
 };
 use desktop_shared::errors::ApiError;
 use tauri::State;
@@ -238,9 +238,7 @@ pub async fn note_suggestions(
 // ── Tag commands ──────────────────────────────────────────────────────
 
 #[tauri::command]
-pub async fn note_tags_all(
-    state: State<'_, Arc<AppCore>>,
-) -> Result<Vec<(String, i64)>, ApiError> {
+pub async fn note_tags_all(state: State<'_, Arc<AppCore>>) -> Result<Vec<(String, i64)>, ApiError> {
     state
         .note_repo
         .get_all_tags()
@@ -276,10 +274,7 @@ pub async fn inbox_list(
 }
 
 #[tauri::command]
-pub async fn inbox_delete(
-    state: State<'_, Arc<AppCore>>,
-    id: String,
-) -> Result<(), ApiError> {
+pub async fn inbox_delete(state: State<'_, Arc<AppCore>>, id: String) -> Result<(), ApiError> {
     state.inbox_delete(&id).await
 }
 
@@ -402,21 +397,25 @@ pub(crate) async fn dispatch_dev(
             let id = try_field!(dev::get_str(body, "id"));
             dev::val(core.note_suggestions(&id).await)
         }
-        "note_tags_all" => {
-            dev::val(
-                core.note_repo
-                    .get_all_tags()
-                    .await
-                    .map_err(|e| ApiError::new("STORAGE", e.to_string())),
-            )
-        }
+        "note_tags_all" => dev::val(
+            core.note_repo
+                .get_all_tags()
+                .await
+                .map_err(|e| ApiError::new("STORAGE", e.to_string())),
+        ),
         "note_unlinked_mentions" => {
             let id = try_field!(dev::get_str(body, "id"));
             dev::val(core.note_unlinked_mentions(&id).await)
         }
-        "inbox_create" => dev::val(core.inbox_create(
-            &try_field!(dev::parse_params::<desktop_shared::commands::InboxCreateParams>(body)).content,
-        ).await),
+        "inbox_create" => dev::val(
+            core.inbox_create(
+                &try_field!(dev::parse_params::<
+                    desktop_shared::commands::InboxCreateParams,
+                >(body))
+                .content,
+            )
+            .await,
+        ),
         "inbox_list" => dev::val(core.inbox_list().await),
         "inbox_delete" => {
             let id = try_field!(dev::get_str(body, "id"));

@@ -147,13 +147,21 @@ impl AppCore {
         }
 
         let tree: DecompositionTree = serde_json::from_str(&row.plan).map_err(|e| {
-            ApiError::new("INTERNAL", format!("Failed to parse decomposition plan: {e}"))
+            ApiError::new(
+                "INTERNAL",
+                format!("Failed to parse decomposition plan: {e}"),
+            )
         })?;
 
         let mut created_tasks = Vec::new();
         let mut updates = Vec::new();
-        self.create_subtasks_from_plan(&row.task_id, &tree.subtasks, &mut created_tasks, &mut updates)
-            .await?;
+        self.create_subtasks_from_plan(
+            &row.task_id,
+            &tree.subtasks,
+            &mut created_tasks,
+            &mut updates,
+        )
+        .await?;
 
         // Mark decomposition as applied
         self.repos
@@ -245,7 +253,10 @@ fn map_planned_subtasks(subtasks: &[PlannedSubtask]) -> Vec<PlannedSubtaskRespon
             title: s.title.clone(),
             description: s.description.clone(),
             estimated_minutes: s.estimated_minutes,
-            energy_level: s.energy_level.as_ref().map(|e| format!("{e:?}").to_lowercase()),
+            energy_level: s
+                .energy_level
+                .as_ref()
+                .map(|e| format!("{e:?}").to_lowercase()),
             priority: s.priority,
             children: map_planned_subtasks(&s.children),
         })

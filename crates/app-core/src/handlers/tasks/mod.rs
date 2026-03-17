@@ -1,8 +1,8 @@
 mod converters;
 mod crud;
 mod decomposition;
-mod forecast;
 pub mod focus;
+mod forecast;
 pub mod proactive;
 mod queries;
 mod suggestions;

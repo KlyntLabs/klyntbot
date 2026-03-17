@@ -169,7 +169,12 @@ impl AppCore {
         actor: Option<String>,
     ) -> HandlerResult<TaskResponse> {
         // Fetch old task before applying the patch so we can diff
-        let old_task = self.repos.tasks.get(&params.id).await.map_err(map_storage_err)?;
+        let old_task = self
+            .repos
+            .tasks
+            .get(&params.id)
+            .await
+            .map_err(map_storage_err)?;
 
         // Capture fields needed for diffing before they move into the patch
         let task_id = params.id.clone();

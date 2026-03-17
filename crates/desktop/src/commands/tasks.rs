@@ -285,25 +285,20 @@ pub(crate) async fn dispatch_dev(
             dev::val(core.task_dismiss_suggestion(suggestion_id).await)
         }
         "task_decompose" => dev::val_rh(
-            core.task_decompose(try_field!(dev::get_str(body, "taskId")).into())
+            core.task_decompose(try_field!(dev::get_str(body, "taskId")))
                 .await,
         ),
         "task_apply_decomposition" => dev::val_rh(
-            core.task_apply_decomposition(
-                try_field!(dev::get_str(body, "decompositionId")).into(),
-            )
-            .await,
-        ),
-        "task_reject_decomposition" => dev::val(
-            core.task_reject_decomposition(
-                try_field!(dev::get_str(body, "decompositionId")).into(),
-            )
-            .await,
-        ),
-        "task_forecast" => dev::val(
-            core.task_forecast(try_field!(dev::get_str(body, "taskId")).into())
+            core.task_apply_decomposition(try_field!(dev::get_str(body, "decompositionId")))
                 .await,
         ),
+        "task_reject_decomposition" => dev::val(
+            core.task_reject_decomposition(try_field!(dev::get_str(body, "decompositionId")))
+                .await,
+        ),
+        "task_forecast" => {
+            dev::val(core.task_forecast(try_field!(dev::get_str(body, "taskId"))).await)
+        }
         _ => return None,
     })
 }

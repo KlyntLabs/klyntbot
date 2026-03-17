@@ -114,10 +114,7 @@ impl AppCore {
         > = if let Some(ref vs) = vector_store {
             let engine = Arc::new(tools::embedding_engine::EmbeddingEngine::new());
             Some(Arc::new(
-                ::agent::adapters::note_embedding::NoteEmbeddingAdapter::new(
-                    engine,
-                    vs.clone(),
-                ),
+                ::agent::adapters::note_embedding::NoteEmbeddingAdapter::new(engine, vs.clone()),
             ))
         } else {
             None

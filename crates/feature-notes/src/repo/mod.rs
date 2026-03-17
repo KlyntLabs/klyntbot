@@ -98,7 +98,16 @@ mod tests {
             .unwrap();
 
         let updated = repo
-            .update_note("n1", Some("Updated"), None, None, Some(true), None, None, None)
+            .update_note(
+                "n1",
+                Some("Updated"),
+                None,
+                None,
+                Some(true),
+                None,
+                None,
+                None,
+            )
             .await
             .unwrap();
         assert_eq!(updated.title, "Updated");
@@ -388,9 +397,15 @@ mod tests {
         let c = repo.create_note(&sample_note("c", "Note C")).await.unwrap();
         let d = repo.create_note(&sample_note("d", "Note D")).await.unwrap();
 
-        repo.set_links(&a.id, &[b.id.clone(), c.id.clone()]).await.unwrap();
-        repo.set_links(&b.id, std::slice::from_ref(&d.id)).await.unwrap();
-        repo.set_links(&c.id, std::slice::from_ref(&d.id)).await.unwrap();
+        repo.set_links(&a.id, &[b.id.clone(), c.id.clone()])
+            .await
+            .unwrap();
+        repo.set_links(&b.id, std::slice::from_ref(&d.id))
+            .await
+            .unwrap();
+        repo.set_links(&c.id, std::slice::from_ref(&d.id))
+            .await
+            .unwrap();
 
         let holes = repo.find_structural_holes(&a.id).await.unwrap();
         assert!(holes.iter().any(|(id, count)| id == &d.id && *count >= 2));
@@ -402,17 +417,29 @@ mod tests {
         let a = repo.create_note(&sample_note("a", "Note A")).await.unwrap();
         let b = repo.create_note(&sample_note("b", "Note B")).await.unwrap();
 
-        repo.set_entity_mentions(&a.id, &[
-            ("task".to_string(), "t1".to_string()),
-            ("project".to_string(), "p1".to_string()),
-        ]).await.unwrap();
-        repo.set_entity_mentions(&b.id, &[
-            ("task".to_string(), "t1".to_string()),
-            ("project".to_string(), "p1".to_string()),
-        ]).await.unwrap();
+        repo.set_entity_mentions(
+            &a.id,
+            &[
+                ("task".to_string(), "t1".to_string()),
+                ("project".to_string(), "p1".to_string()),
+            ],
+        )
+        .await
+        .unwrap();
+        repo.set_entity_mentions(
+            &b.id,
+            &[
+                ("task".to_string(), "t1".to_string()),
+                ("project".to_string(), "p1".to_string()),
+            ],
+        )
+        .await
+        .unwrap();
 
         let cooccurrences = repo.find_entity_cooccurrences(&a.id).await.unwrap();
-        assert!(cooccurrences.iter().any(|(id, count)| id == &b.id && *count == 2));
+        assert!(cooccurrences
+            .iter()
+            .any(|(id, count)| id == &b.id && *count == 2));
     }
 
     #[tokio::test]
@@ -421,11 +448,17 @@ mod tests {
         let a = repo.create_note(&sample_note("a", "Note A")).await.unwrap();
         let b = repo.create_note(&sample_note("b", "Note B")).await.unwrap();
 
-        repo.set_tags(&a.id, &["rust".to_string(), "async".to_string()]).await.unwrap();
-        repo.set_tags(&b.id, &["rust".to_string(), "async".to_string()]).await.unwrap();
+        repo.set_tags(&a.id, &["rust".to_string(), "async".to_string()])
+            .await
+            .unwrap();
+        repo.set_tags(&b.id, &["rust".to_string(), "async".to_string()])
+            .await
+            .unwrap();
 
         let overlaps = repo.find_tag_overlaps(&a.id).await.unwrap();
-        assert!(overlaps.iter().any(|(id, count)| id == &b.id && *count == 2));
+        assert!(overlaps
+            .iter()
+            .any(|(id, count)| id == &b.id && *count == 2));
     }
 
     #[tokio::test]
@@ -495,7 +528,9 @@ mod tests {
         let a = repo.create_note(&sample_note("a", "Note A")).await.unwrap();
         let b = repo.create_note(&sample_note("b", "Note B")).await.unwrap();
 
-        repo.set_tags(&a.id, &["rust".to_string(), "async".to_string()]).await.unwrap();
+        repo.set_tags(&a.id, &["rust".to_string(), "async".to_string()])
+            .await
+            .unwrap();
         repo.set_tags(&b.id, &["rust".to_string()]).await.unwrap();
 
         let tags = repo.get_all_tags().await.unwrap();
