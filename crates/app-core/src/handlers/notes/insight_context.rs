@@ -22,10 +22,7 @@ pub fn assemble_context(
     let mut parts = Vec::new();
 
     // Current note
-    parts.push(format!(
-        "## Current Note: {}\n\n{}",
-        note.title, note.body
-    ));
+    parts.push(format!("## Current Note: {}\n\n{}", note.title, note.body));
 
     // Related notes (truncate body to 2000 chars each to stay within token limits)
     for related in related_notes {
