@@ -37,6 +37,7 @@ pub struct CognitiveRetrievalConfig {
     pub relevance_weight_importance: f64,
     pub relevance_weight_frequency: f64,
     pub relevance_weight_situation: f64,
+    pub relevance_weight_temporal: f64,
 }
 
 impl Default for CognitiveRetrievalConfig {
@@ -53,6 +54,7 @@ impl Default for CognitiveRetrievalConfig {
             relevance_weight_importance: 0.15,
             relevance_weight_frequency: 0.1,
             relevance_weight_situation: 0.25,
+            relevance_weight_temporal: 0.05,
         }
     }
 }

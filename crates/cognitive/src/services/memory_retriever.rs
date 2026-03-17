@@ -89,6 +89,7 @@ impl UnifiedMemoryService {
             relevance_weight_importance: self.config.relevance_weight_importance,
             relevance_weight_frequency: self.config.relevance_weight_frequency,
             relevance_weight_situation: self.config.relevance_weight_situation,
+            relevance_weight_temporal: self.config.relevance_weight_temporal,
         };
 
         match retrieve_relevant_facts(

@@ -8,7 +8,7 @@
 use chrono::Utc;
 use tracing::{debug, warn};
 
-use crate::decay::{relevance_score, retrievability, update_stability, RelevanceWeights};
+use crate::decay::{relevance_score, retrievability, temporal_recency_score, update_stability, RelevanceWeights};
 use crate::embedder::SemanticFactEmbedder;
 use crate::repos::SemanticFactRepo;
 use crate::types::SemanticFact;
@@ -41,6 +41,7 @@ pub struct RetrievalParams {
     pub relevance_weight_importance: f64,
     pub relevance_weight_frequency: f64,
     pub relevance_weight_situation: f64,
+    pub relevance_weight_temporal: f64,
 }
 
 impl RetrievalParams {
@@ -56,6 +57,7 @@ impl RetrievalParams {
             relevance_weight_importance: 0.15,
             relevance_weight_frequency: 0.1,
             relevance_weight_situation: 0.25,
+            relevance_weight_temporal: 0.05,
         }
     }
 }
@@ -88,6 +90,7 @@ pub async fn retrieve_relevant_facts(
         importance: params.relevance_weight_importance,
         frequency: params.relevance_weight_frequency,
         situation: params.relevance_weight_situation,
+        temporal: params.relevance_weight_temporal,
     };
 
     let mut scored = if use_vector {
@@ -195,12 +198,14 @@ async fn vector_path(
         .map(|fact| {
             let similarity = sim_map.get(fact.id.as_str()).copied().unwrap_or(0.5);
             let (r, freq) = compute_decay_and_freq(&fact, &now);
+            let temporal = temporal_recency_score(&fact.valid_from);
             let score = relevance_score(
                 similarity,
                 r,
                 fact.confidence,
                 freq,
                 situational_boost,
+                temporal,
                 weights,
             );
             ScoredFact {
@@ -231,7 +236,8 @@ async fn fallback_path(
         .into_iter()
         .map(|fact| {
             let (r, freq) = compute_decay_and_freq(&fact, &now);
-            let score = relevance_score(0.5, r, fact.confidence, freq, situational_boost, weights);
+            let temporal = temporal_recency_score(&fact.valid_from);
+            let score = relevance_score(0.5, r, fact.confidence, freq, situational_boost, temporal, weights);
             ScoredFact {
                 fact,
                 score,

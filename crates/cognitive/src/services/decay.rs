@@ -12,7 +12,7 @@ pub fn retrievability(elapsed_days: f64, stability: f64) -> f64 {
     (0.9_f64.ln() * elapsed_days / stability).exp()
 }
 
-/// Configurable relevance weights for the 5-factor scoring formula.
+/// Configurable relevance weights for the 6-factor scoring formula.
 #[derive(Debug, Clone, Copy)]
 pub struct RelevanceWeights {
     pub semantic: f64,
@@ -20,6 +20,7 @@ pub struct RelevanceWeights {
     pub importance: f64,
     pub frequency: f64,
     pub situation: f64,
+    pub temporal: f64,
 }
 
 impl Default for RelevanceWeights {
@@ -29,28 +30,53 @@ impl Default for RelevanceWeights {
             retrievability: 0.2,
             importance: 0.15,
             frequency: 0.1,
-            situation: 0.25,
+            situation: 0.20,
+            temporal: 0.05,
         }
     }
 }
 
 /// Combined relevance score for memory retrieval ranking.
 ///
-/// Default weights: semantic 0.3, retrievability 0.2, importance 0.15, frequency 0.1, situation 0.25
+/// Default weights: semantic 0.3, retrievability 0.2, importance 0.15, frequency 0.1, situation 0.20, temporal 0.05
 pub fn relevance_score(
     semantic_similarity: f64,
     retrievability: f64,
     importance: f64,
     access_frequency: f64,
     situational_boost: f64,
+    temporal_recency: f64,
     weights: &RelevanceWeights,
 ) -> f64 {
     (semantic_similarity * weights.semantic
         + retrievability * weights.retrievability
         + importance * weights.importance
         + access_frequency * weights.frequency
-        + situational_boost * weights.situation)
+        + situational_boost * weights.situation
+        + temporal_recency * weights.temporal)
         .clamp(0.0, 1.0)
+}
+
+/// Compute temporal recency score from a valid_from timestamp string.
+/// Returns a value between 0.1 and 1.0 — recent facts score higher.
+pub fn temporal_recency_score(valid_from: &str) -> f64 {
+    let now = chrono::Utc::now();
+    let age_days: f64 = chrono::DateTime::parse_from_rfc3339(valid_from)
+        .map(|dt| (now - dt.with_timezone(&chrono::Utc)).num_days().max(0) as f64)
+        .map_err(|e| e.to_string())
+        .or_else(|_| {
+            valid_from
+                .parse::<chrono::NaiveDateTime>()
+                .map(|ndt| (now.naive_utc() - ndt).num_days().max(0) as f64)
+                .map_err(|e| e.to_string())
+        })
+        .or_else(|_| {
+            chrono::NaiveDate::parse_from_str(valid_from, "%Y-%m-%d")
+                .map(|d| (now.naive_utc() - d.and_hms_opt(0, 0, 0).unwrap()).num_days().max(0) as f64)
+                .map_err(|e| e.to_string())
+        })
+        .unwrap_or(30.0);
+    (1.0_f64 / (1.0_f64 + age_days / 30.0_f64)).max(0.1_f64)
 }
 
 /// Update stability after a retrieval event.
@@ -75,6 +101,7 @@ mod tests {
         importance: 0.15,
         frequency: 0.1,
         situation: 0.25,
+        temporal: 0.05,
     };
     const MAX_S: f64 = 30.0;
 
@@ -113,16 +140,16 @@ mod tests {
 
     #[test]
     fn test_relevance_score_combines_factors() {
-        let score = relevance_score(0.8, 0.9, 0.7, 0.5, 0.6, &W);
+        let score = relevance_score(0.8, 0.9, 0.7, 0.5, 0.6, 0.5, &W);
         assert!(score > 0.0 && score <= 1.0);
     }
 
     #[test]
     fn test_relevance_score_clamps() {
-        let score = relevance_score(1.0, 1.0, 1.0, 1.0, 1.0, &W);
+        let score = relevance_score(1.0, 1.0, 1.0, 1.0, 1.0, 1.0, &W);
         assert!((score - 1.0).abs() < f64::EPSILON);
 
-        let score = relevance_score(0.0, 0.0, 0.0, 0.0, 0.0, &W);
+        let score = relevance_score(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, &W);
         assert!((score - 0.0).abs() < f64::EPSILON);
     }
 
@@ -135,9 +162,24 @@ mod tests {
             importance: 0.0,
             frequency: 0.0,
             situation: 0.0,
+            temporal: 0.0,
         };
-        let score = relevance_score(0.8, 0.1, 0.1, 0.1, 0.1, &custom);
+        let score = relevance_score(0.8, 0.1, 0.1, 0.1, 0.1, 0.0, &custom);
         assert!((score - 0.8).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_temporal_recency_score_recent() {
+        let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S").to_string();
+        let score = temporal_recency_score(&now);
+        assert!(score > 0.95, "Today's fact should score near 1.0, got {score}");
+    }
+
+    #[test]
+    fn test_temporal_recency_score_old() {
+        let score = temporal_recency_score("2020-01-01T00:00:00");
+        assert!(score < 0.2, "Very old fact should score low, got {score}");
+        assert!(score >= 0.1, "Score should be at least 0.1, got {score}");
     }
 
     #[test]

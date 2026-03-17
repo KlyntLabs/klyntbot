@@ -80,6 +80,10 @@ pub struct CognitiveConfig {
     /// Relevance weight for situational boost (default: 0.25).
     #[serde(default = "default_w_situation")]
     pub relevance_weight_situation: f64,
+
+    /// Relevance weight for temporal recency (default: 0.05).
+    #[serde(default = "default_w_temporal")]
+    pub relevance_weight_temporal: f64,
 }
 
 impl Default for CognitiveConfig {
@@ -104,6 +108,7 @@ impl Default for CognitiveConfig {
             relevance_weight_importance: default_w_importance(),
             relevance_weight_frequency: default_w_frequency(),
             relevance_weight_situation: default_w_situation(),
+            relevance_weight_temporal: default_w_temporal(),
         }
     }
 }
@@ -146,4 +151,7 @@ fn default_w_frequency() -> f64 {
 }
 fn default_w_situation() -> f64 {
     0.25
+}
+fn default_w_temporal() -> f64 {
+    0.05
 }

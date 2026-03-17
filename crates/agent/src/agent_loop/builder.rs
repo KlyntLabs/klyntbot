@@ -320,6 +320,7 @@ impl AgentLoopBuilder {
                     relevance_weight_importance: config.cognitive.relevance_weight_importance,
                     relevance_weight_frequency: config.cognitive.relevance_weight_frequency,
                     relevance_weight_situation: config.cognitive.relevance_weight_situation,
+                    relevance_weight_temporal: config.cognitive.relevance_weight_temporal,
                 };
 
                 // Hoist for UnifiedMemoryService wiring below
