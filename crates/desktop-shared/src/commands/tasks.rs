@@ -53,6 +53,20 @@ pub struct TaskCreateParams {
     pub estimated_minutes: Option<i32>,
 }
 
+// ── AI Suggestion ───────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SuggestionResponse {
+    pub id: String,
+    pub suggestion_type: String,
+    pub title: String,
+    pub description: Option<String>,
+    pub confidence: f64,
+    pub status: String,
+    pub created_at: String,
+}
+
 // ── Today Task (tray view) ──────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
