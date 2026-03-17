@@ -196,7 +196,35 @@ impl InsightForge {
         }
 
         // 4. RRF merge across sub-queries.
-        self.rrf_merge(&all_ranked_lists, limit)
+        let merged = self.rrf_merge(&all_ranked_lists, limit);
+
+        // Budget allocation: ensure no single source provides more than 60% of results.
+        let max_per_source = (limit as f64 * 0.6).ceil() as usize;
+        let mut source_counts: HashMap<String, usize> = HashMap::new();
+        let mut budgeted = Vec::new();
+        let mut overflow = Vec::new();
+
+        for entry in merged {
+            let source_key = match &entry.source {
+                crate::MemorySource::CognitiveFact => "cognitive".to_string(),
+                crate::MemorySource::ConversationRecall => "recall".to_string(),
+                crate::MemorySource::Domain { name } => name.clone(),
+            };
+            let count = source_counts.entry(source_key).or_insert(0);
+            if *count < max_per_source {
+                *count += 1;
+                budgeted.push(entry);
+            } else {
+                overflow.push(entry);
+            }
+        }
+
+        // Fill remaining slots from overflow (highest score first, already sorted)
+        let remaining = limit.saturating_sub(budgeted.len());
+        budgeted.extend(overflow.into_iter().take(remaining));
+        budgeted.truncate(limit);
+
+        budgeted
     }
 
     /// Reciprocal Rank Fusion merge.
