@@ -21,6 +21,7 @@ pub use failed_observation::FailedObservationRepo;
 pub use flashcard::{
     CardType, DeckSummary, FlashcardRepo, FlashcardRow, NewFlashcard, ReviewQuality,
 };
+#[allow(deprecated)]
 pub use insight_cache::{InsightCacheRepo, InsightCacheRow};
 pub use persona::{NewPersona, PersonaRepo, PersonaRow, PersonaUpdate};
 pub use procedural_rule::ProceduralRuleRepo;

@@ -30,6 +30,7 @@ pub use repos::{
     cognitive_migrations, AccumulatedObservationRepo, AnnotationRepo, EpisodicMemoryRepo,
     EventLogRepo, FailedObservationRepo, ProceduralRuleRepo, SemanticFactRepo,
 };
+#[allow(deprecated)]
 pub use repos::{
     CardType, FlashcardRepo, FlashcardRow, InsightCacheRepo, InsightCacheRow, NewFlashcard,
 };

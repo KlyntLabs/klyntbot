@@ -11,6 +11,7 @@ use uuid::Uuid;
 
 /// Legacy row shape.  `content_hash` maps to `input_hash`; the tab columns
 /// (`synthesis`, `gap_analysis`, etc.) are stored as JSON in `content`.
+#[deprecated(note = "Use feature_insights::InsightReviewRow instead")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InsightCacheRow {
     pub id: String,
@@ -41,6 +42,7 @@ struct InsightReviewsRow {
     superseded_at: Option<String>,
 }
 
+#[allow(deprecated)]
 impl InsightReviewsRow {
     fn into_cache_row(self) -> InsightCacheRow {
         // `content` is a JSON object with optional tab keys.
@@ -70,11 +72,13 @@ impl InsightReviewsRow {
 
 // ── Repository ───────────────────────────────────────────────────
 
+#[deprecated(note = "Use feature_insights::InsightReviewRepo instead")]
 #[derive(Debug, Clone)]
 pub struct InsightCacheRepo {
     pool: SqlitePool,
 }
 
+#[allow(deprecated)]
 impl InsightCacheRepo {
     pub fn new(pool: SqlitePool) -> Self {
         Self { pool }
@@ -232,6 +236,7 @@ impl InsightCacheRepo {
 // ── Tests ─────────────────────────────────────────────────────────
 
 #[cfg(test)]
+#[allow(deprecated)]
 mod tests {
     use super::*;
 
