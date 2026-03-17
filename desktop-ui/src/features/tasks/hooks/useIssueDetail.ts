@@ -5,6 +5,7 @@ import { EMPTY_TIMELINE_RESPONSE } from "@shared/types";
 import type { TimelineResponse } from "@shared/types/common";
 import type { Area, Task, TaskUpdateParams } from "@shared/types/tasks";
 import { useCallback, useMemo, useState } from "react";
+import type { DecompositionResult } from "../components/detail/DecompositionModal";
 import { useStatusWorkflow } from "../contexts/StatusWorkflowContext";
 import {
   type ActivityEntry,
@@ -212,6 +213,42 @@ export function useIssueDetail(
     setSuggestions((prev) => prev.filter((s) => s.id !== id));
   }, []);
 
+  // Decomposition
+  const [decompositionResult, setDecompositionResult] = useState<DecompositionResult | null>(null);
+  const [decompositionOpen, setDecompositionOpen] = useState(false);
+  const [decompositionApplying, setDecompositionApplying] = useState(false);
+
+  const decompose = useCallback(async () => {
+    const result = await ipc<DecompositionResult>("task_decompose", { taskId: task.id });
+    if (result.autoApplied) {
+      refetch();
+    } else {
+      setDecompositionResult(result);
+      setDecompositionOpen(true);
+    }
+  }, [task.id, refetch]);
+
+  const applyDecomposition = useCallback(
+    async (id: string) => {
+      setDecompositionApplying(true);
+      try {
+        await ipc("task_apply_decomposition", { decompositionId: id });
+        setDecompositionOpen(false);
+        setDecompositionResult(null);
+        refetch();
+      } finally {
+        setDecompositionApplying(false);
+      }
+    },
+    [refetch],
+  );
+
+  const rejectDecomposition = useCallback(async (id: string) => {
+    await ipc("task_reject_decomposition", { decompositionId: id });
+    setDecompositionOpen(false);
+    setDecompositionResult(null);
+  }, []);
+
   const taskMemory: TaskMemory | null = null;
   const focusSession: FocusSession | null = buildFocusSession(task);
 
@@ -237,5 +274,12 @@ export function useIssueDetail(
     dismissSuggestion,
     applySuggestion,
     stopFocus,
+    decompositionResult,
+    decompositionOpen,
+    setDecompositionOpen,
+    decompositionApplying,
+    decompose,
+    applyDecomposition,
+    rejectDecomposition,
   };
 }

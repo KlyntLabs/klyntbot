@@ -1,10 +1,11 @@
 import { EditorContentWrapper, useNoteEditor } from "@features/notes/components/editor/EditorCore";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { Bot, ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import type { useIssueDetail } from "../../hooks/useIssueDetail";
 import type { SubIssue } from "../../lib/mappers";
 import { renderStatusIcon } from "../../lib/status-utils";
 import { useTabStore } from "../../store/tab-store";
+import { DecompositionModal } from "./DecompositionModal";
 
 interface IssueContentTabProps {
   detail: ReturnType<typeof useIssueDetail>;
@@ -20,7 +21,15 @@ export function IssueContentTab({ detail }: IssueContentTabProps) {
       {detail.task.acceptanceCriteria && (
         <AcceptanceCriteria text={detail.task.acceptanceCriteria} />
       )}
-      {detail.subIssues.length > 0 && <SubIssuesList issues={detail.subIssues} />}
+      <SubIssuesList issues={detail.subIssues} onDecompose={detail.decompose} />
+      <DecompositionModal
+        result={detail.decompositionResult}
+        open={detail.decompositionOpen}
+        onOpenChange={detail.setDecompositionOpen}
+        onApply={detail.applyDecomposition}
+        onReject={detail.rejectDecomposition}
+        applying={detail.decompositionApplying}
+      />
     </div>
   );
 }
@@ -74,15 +83,25 @@ function AcceptanceCriteria({ text }: { text: string }) {
   );
 }
 
-function SubIssuesList({ issues }: { issues: SubIssue[] }) {
+function SubIssuesList({ issues, onDecompose }: { issues: SubIssue[]; onDecompose: () => void }) {
   const navigateInPlace = useTabStore((s) => s.navigateInPlace);
   const completedCount = issues.filter((i) => i.completed).length;
 
   return (
     <div>
-      <h3 className="text-sm font-medium text-[hsl(var(--foreground))] mb-2">
-        Sub-issues ({completedCount}/{issues.length} done)
-      </h3>
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-sm font-medium text-[hsl(var(--foreground))]">
+          Sub-issues ({completedCount}/{issues.length} done)
+        </h3>
+        <button
+          type="button"
+          onClick={onDecompose}
+          className="flex items-center gap-1 text-xs text-purple-300 hover:text-purple-200 transition-colors"
+        >
+          <Bot className="size-3" />
+          Break Down
+        </button>
+      </div>
       <div className="border border-[hsl(var(--border))] rounded-md divide-y divide-[hsl(var(--border))]">
         {issues.map((issue) => {
           const PriorityIcon = issue.priority.icon;
