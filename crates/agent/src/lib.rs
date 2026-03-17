@@ -7,6 +7,7 @@
 
 // ── Grouped modules ─────────────────────────────────────────────────────────
 pub mod adapters;
+pub mod domain_searchers;
 pub mod services;
 
 // ── Core modules ─────────────────────────────────────────────────────────────
