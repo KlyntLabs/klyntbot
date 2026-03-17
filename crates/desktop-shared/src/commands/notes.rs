@@ -187,6 +187,8 @@ pub struct InsightReviewStarted {
 pub struct InsightReviewResponse {
     pub insight_review_id: String,
     pub note_id: String,
+    pub version: i64,
+    pub generated_at: String,
     pub synthesis: Option<String>,
     pub gap_analysis: Option<String>,
     pub self_assessment: Option<Vec<QuizQuestion>>,

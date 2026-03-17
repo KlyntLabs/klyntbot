@@ -13,6 +13,7 @@ common = { workspace = true }
 config = { workspace = true }
 feature-coaching = { workspace = true }
 feature-finance = { workspace = true }
+feature-insights = { workspace = true }
 feature-launcher = { workspace = true }
 feature-notes = { workspace = true }
 feature-productivity = { workspace = true }
@@ -39,7 +40,7 @@ base64 = { workspace = true }
 activity-log = { workspace = true }
 notify = { workspace = true }
 notify-debouncer-mini = { workspace = true }
-sha2 = { workspace = true }
+
 
 [dev-dependencies]
 tempfile = { workspace = true }

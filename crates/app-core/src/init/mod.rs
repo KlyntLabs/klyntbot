@@ -235,9 +235,13 @@ impl AppCore {
             event_emitter: event_emitter.unwrap_or_else(|| Arc::new(NoopEmitter)),
             note_embedding_handler,
             launcher_engine,
-            insight_cache_repo: Some(::cognitive::InsightCacheRepo::new(
-                storage_pool.inner().clone(),
-            )),
+            insight_service: Some(Arc::new(feature_insights::InsightService::new(
+                feature_insights::InsightReviewRepo::new(storage_pool.inner().clone()),
+                feature_insights::InsightProgressRepo::new(storage_pool.inner().clone()),
+                Arc::new(feature_insights::NoopFlashcardAccessor),
+                Arc::new(feature_insights::NoopInsightEmbedder),
+                feature_insights::ProgressWeights::default(),
+            ))),
             flashcard_repo: Some(::cognitive::FlashcardRepo::new(
                 storage_pool.inner().clone(),
             )),

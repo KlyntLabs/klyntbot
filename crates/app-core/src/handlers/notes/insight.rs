@@ -3,7 +3,6 @@ use std::sync::Arc;
 use desktop_shared::commands::*;
 use desktop_shared::errors::ApiError;
 use futures_util::StreamExt;
-use sha2::{Digest, Sha256};
 
 use crate::events::AppEventEmitter;
 use crate::state::AppCore;
@@ -27,11 +26,11 @@ impl AppCore {
         }
 
         let related_ids = self.get_related_note_ids(note_id).await;
-        let hash_input = format!("{}{}{}", note.title, note.body, related_ids.join(","));
-        let content_hash = format!("{:x}", Sha256::digest(hash_input.as_bytes()));
+        let content_hash =
+            feature_insights::InsightService::compute_input_hash(&note.title, &note.body, &related_ids);
 
-        if let Some(ref repo) = self.insight_cache_repo {
-            if let Ok(Some(_cached)) = repo.get_if_fresh(note_id, &content_hash).await {
+        if let Some(ref service) = self.insight_service {
+            if let Ok(Some(_cached)) = service.check_cache(note_id, &content_hash).await {
                 return Ok(InsightReviewStarted {
                     insight_review_id: format!(
                         "ir-{}",
@@ -83,7 +82,7 @@ impl AppCore {
         drop(config);
 
         let emitter = Arc::clone(&self.event_emitter);
-        let cache_repo = self.insight_cache_repo.clone();
+        let insight_service = self.insight_service.clone();
         let note_id_owned = note_id.to_string();
         let content_hash_clone = content_hash.clone();
         let context_text = ctx.text;
@@ -93,7 +92,7 @@ impl AppCore {
             run_insight_pipeline(InsightPipelineArgs {
                 provider,
                 emitter,
-                cache_repo,
+                insight_service,
                 note_id: note_id_owned,
                 content_hash: content_hash_clone,
                 context: context_text,
@@ -115,38 +114,41 @@ impl AppCore {
         &self,
         note_id: &str,
     ) -> Result<Option<InsightReviewResponse>, ApiError> {
-        let repo = match &self.insight_cache_repo {
+        let service = match &self.insight_service {
+            Some(s) => s,
+            None => return Ok(None),
+        };
+
+        let row = match service
+            .get_latest(note_id)
+            .await
+            .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?
+        {
             Some(r) => r,
             None => return Ok(None),
         };
 
-        let cached = match repo
-            .get(note_id)
-            .await
-            .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?
-        {
-            Some(c) => c,
-            None => return Ok(None),
-        };
+        // Parse the JSON content blob
+        let content: feature_insights::InsightContent =
+            serde_json::from_str(&row.content).unwrap_or_default();
 
-        let self_assessment: Option<Vec<QuizQuestion>> = cached
+        let self_assessment: Option<Vec<QuizQuestion>> = content
             .self_assessment
             .as_deref()
             .and_then(|s| serde_json::from_str(s).ok());
 
-        let persona_ids: Option<Vec<String>> = cached
-            .persona_ids
-            .as_deref()
-            .and_then(|s| serde_json::from_str(s).ok());
+        let persona_ids: Option<Vec<String>> = serde_json::from_str(&row.persona_ids).ok();
 
         Ok(Some(InsightReviewResponse {
-            insight_review_id: cached.id,
-            note_id: cached.note_id,
-            synthesis: cached.synthesis,
-            gap_analysis: cached.gap_analysis,
+            insight_review_id: row.id,
+            note_id: row.note_id,
+            version: row.version,
+            generated_at: row.generated_at,
+            synthesis: content.synthesis,
+            gap_analysis: content.gap_analysis,
             self_assessment,
-            concept_map: cached.concept_map,
-            perspectives: cached.perspectives,
+            concept_map: content.concept_map,
+            perspectives: content.perspectives,
             persona_ids,
         }))
     }
@@ -287,11 +289,10 @@ impl AppCore {
 
         let content = response.content.unwrap_or_default();
 
-        if let Some(ref repo) = self.insight_cache_repo {
-            let related_ids = self.get_related_note_ids(note_id).await;
-            let hash_input = format!("{}{}{}", note.title, note.body, related_ids.join(","));
-            let content_hash = format!("{:x}", Sha256::digest(hash_input.as_bytes()));
-            let _ = repo.update_tab(note_id, &content_hash, tab, &content).await;
+        if let Some(ref service) = self.insight_service {
+            if let Ok(Some(latest)) = service.get_latest(note_id).await {
+                let _ = service.update_tab(&latest.id, tab, &content).await;
+            }
         }
 
         Ok(TabContent {
@@ -330,7 +331,7 @@ impl AppCore {
 struct InsightPipelineArgs {
     provider: providers::DynProvider,
     emitter: Arc<dyn AppEventEmitter>,
-    cache_repo: Option<cognitive::InsightCacheRepo>,
+    insight_service: Option<Arc<feature_insights::InsightService>>,
     note_id: String,
     content_hash: String,
     context: String,
@@ -343,7 +344,7 @@ async fn run_insight_pipeline(args: InsightPipelineArgs) {
     let InsightPipelineArgs {
         provider,
         emitter,
-        cache_repo,
+        insight_service,
         note_id,
         content_hash,
         context,
@@ -415,20 +416,18 @@ async fn run_insight_pipeline(args: InsightPipelineArgs) {
         ),
     );
 
-    if let Some(ref repo) = cache_repo {
-        let persona_ids_json =
-            serde_json::to_string(&personas.iter().map(|p| &p.id).collect::<Vec<_>>()).ok();
-        let _ = repo
-            .upsert(
-                &note_id,
-                &content_hash,
-                synthesis.as_deref(),
-                gaps.as_deref(),
-                assessment.as_deref(),
-                concept_map.as_deref(),
-                perspectives.as_deref(),
-                persona_ids_json.as_deref(),
-            )
+    if let Some(ref service) = insight_service {
+        let content = feature_insights::InsightContent {
+            synthesis,
+            gap_analysis: gaps,
+            self_assessment: assessment,
+            concept_map,
+            perspectives,
+        };
+        let scope = feature_insights::ScopeConfig::default();
+        let persona_ids: Vec<String> = personas.iter().map(|p| p.id.clone()).collect();
+        let _ = service
+            .store_insight(&note_id, &content, &content_hash, &scope, &persona_ids)
             .await;
     }
 }
