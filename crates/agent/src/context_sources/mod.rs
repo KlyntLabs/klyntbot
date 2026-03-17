@@ -4,6 +4,7 @@
 //! provides a section of the system prompt. Caching is handled per-source.
 
 pub mod agent;
+pub mod analysis_persona;
 pub mod annotation;
 pub mod area;
 pub mod bootstrap;
