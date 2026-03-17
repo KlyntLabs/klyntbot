@@ -22,7 +22,7 @@ pub use flashcard::{
     CardType, DeckSummary, FlashcardRepo, FlashcardRow, NewFlashcard, ReviewQuality,
 };
 pub use insight_cache::{InsightCacheRepo, InsightCacheRow};
-pub use persona::{NewPersona, PersonaRepo, PersonaRow};
+pub use persona::{NewPersona, PersonaRepo, PersonaRow, PersonaUpdate};
 pub use procedural_rule::ProceduralRuleRepo;
 pub use semantic_fact::SemanticFactRepo;
 

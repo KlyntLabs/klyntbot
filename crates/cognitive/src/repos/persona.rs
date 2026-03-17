@@ -35,6 +35,17 @@ pub struct NewPersona {
     pub domains: Vec<String>,
 }
 
+#[derive(Debug, Clone)]
+pub struct PersonaUpdate {
+    pub name: Option<String>,
+    pub role: Option<String>,
+    pub expertise: Option<String>,
+    pub perspective: Option<String>,
+    pub tone: Option<String>,
+    pub icon: Option<String>,
+    pub domains: Option<Vec<String>>,
+}
+
 // ── Builtin definitions ─────────────────────────────────────────
 
 struct BuiltinPersona {
@@ -189,6 +200,86 @@ impl PersonaRepo {
         )
         .fetch_all(&self.pool)
         .await
+    }
+
+    /// List all personas (including inactive), for the management UI.
+    pub async fn list_all(&self) -> Result<Vec<PersonaRow>, sqlx::Error> {
+        sqlx::query_as::<_, PersonaRow>(
+            "SELECT * FROM insight_personas ORDER BY source ASC, name ASC",
+        )
+        .fetch_all(&self.pool)
+        .await
+    }
+
+    /// Update a non-builtin persona. Returns error for builtins.
+    pub async fn update(
+        &self,
+        id: &str,
+        updates: &PersonaUpdate,
+    ) -> Result<Option<PersonaRow>, sqlx::Error> {
+        let persona = self.get(id).await?;
+        let Some(existing) = persona else {
+            return Ok(None);
+        };
+        if existing.source == "builtin" {
+            return Err(sqlx::Error::Protocol(
+                "Cannot edit builtin persona".into(),
+            ));
+        }
+
+        let now = Utc::now().to_rfc3339();
+        let name = updates.name.as_deref().unwrap_or(&existing.name);
+        let role = updates.role.as_deref().unwrap_or(&existing.role);
+        let expertise = updates.expertise.as_deref().unwrap_or(&existing.expertise);
+        let perspective = updates.perspective.as_deref().unwrap_or(&existing.perspective);
+        let tone = updates.tone.as_deref().unwrap_or(&existing.tone);
+        let icon = updates.icon.as_deref().unwrap_or(&existing.icon);
+        let domains_json = if let Some(ref domains) = updates.domains {
+            serde_json::to_string(domains).unwrap_or_else(|_| "[]".into())
+        } else {
+            existing.domains.clone()
+        };
+
+        sqlx::query(
+            r#"
+            UPDATE insight_personas
+            SET name = ?1, role = ?2, expertise = ?3, perspective = ?4,
+                tone = ?5, icon = ?6, domains = ?7, updated_at = ?8
+            WHERE id = ?9
+            "#,
+        )
+        .bind(name)
+        .bind(role)
+        .bind(expertise)
+        .bind(perspective)
+        .bind(tone)
+        .bind(icon)
+        .bind(&domains_json)
+        .bind(&now)
+        .bind(id)
+        .execute(&self.pool)
+        .await?;
+
+        self.get(id).await
+    }
+
+    /// Adjust a persona's relevance score (for thumbs up/down feedback).
+    pub async fn update_relevance(&self, id: &str, delta: f64) -> Result<(), sqlx::Error> {
+        let now = Utc::now().to_rfc3339();
+        sqlx::query(
+            r#"
+            UPDATE insight_personas
+            SET relevance_score = MAX(0.0, MIN(1.0, relevance_score + ?1)),
+                updated_at = ?2
+            WHERE id = ?3
+            "#,
+        )
+        .bind(delta)
+        .bind(&now)
+        .bind(id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
     }
 
     /// Get a persona by ID.
@@ -441,5 +532,92 @@ mod tests {
         // Can delete user persona
         let deleted = repo.delete(&custom.id).await.unwrap();
         assert!(deleted);
+    }
+
+    #[tokio::test]
+    async fn test_list_all_includes_inactive() {
+        let pool = setup().await;
+        let repo = PersonaRepo::new(pool.clone());
+        repo.seed_builtins().await.unwrap();
+        repo.set_active("builtin-skeptic", false).await.unwrap();
+        let all = repo.list_all().await.unwrap();
+        assert_eq!(all.len(), 6);
+        let active = repo.list_active().await.unwrap();
+        assert_eq!(active.len(), 5);
+    }
+
+    #[tokio::test]
+    async fn test_update_user_persona() {
+        let pool = setup().await;
+        let repo = PersonaRepo::new(pool.clone());
+        repo.seed_builtins().await.unwrap();
+        let custom = repo
+            .create(&NewPersona {
+                name: "Original".into(),
+                role: "Tester".into(),
+                expertise: "Testing".into(),
+                perspective: "Test perspective".into(),
+                tone: "neutral".into(),
+                icon: "🧪".into(),
+                domains: vec!["testing".into()],
+            })
+            .await
+            .unwrap();
+        let updated = repo
+            .update(
+                &custom.id,
+                &PersonaUpdate {
+                    name: Some("Updated Name".into()),
+                    role: None,
+                    expertise: None,
+                    perspective: None,
+                    tone: Some("analytical".into()),
+                    icon: None,
+                    domains: None,
+                },
+            )
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(updated.name, "Updated Name");
+        assert_eq!(updated.role, "Tester");
+        assert_eq!(updated.tone, "analytical");
+    }
+
+    #[tokio::test]
+    async fn test_cannot_update_builtin() {
+        let pool = setup().await;
+        let repo = PersonaRepo::new(pool.clone());
+        repo.seed_builtins().await.unwrap();
+        let result = repo
+            .update(
+                "builtin-skeptic",
+                &PersonaUpdate {
+                    name: Some("Hacked".into()),
+                    role: None,
+                    expertise: None,
+                    perspective: None,
+                    tone: None,
+                    icon: None,
+                    domains: None,
+                },
+            )
+            .await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_update_relevance() {
+        let pool = setup().await;
+        let repo = PersonaRepo::new(pool.clone());
+        repo.seed_builtins().await.unwrap();
+        let before = repo.get("builtin-skeptic").await.unwrap().unwrap();
+        assert!((before.relevance_score - 0.5).abs() < f64::EPSILON);
+        repo.update_relevance("builtin-skeptic", 0.1).await.unwrap();
+        let after = repo.get("builtin-skeptic").await.unwrap().unwrap();
+        assert!((after.relevance_score - 0.6).abs() < f64::EPSILON);
+        repo.update_relevance("builtin-skeptic", 0.5).await.unwrap();
+        let capped = repo.get("builtin-skeptic").await.unwrap().unwrap();
+        assert!((capped.relevance_score - 1.0).abs() < f64::EPSILON);
     }
 }

@@ -98,6 +98,8 @@ pub struct AppCore {
     pub insight_cache_repo: Option<cognitive::InsightCacheRepo>,
     /// Flashcard repo for FSRS spaced repetition (None when cognitive feature unavailable).
     pub flashcard_repo: Option<cognitive::FlashcardRepo>,
+    /// Persona repo for Insight Review personas (None when cognitive feature unavailable).
+    pub persona_repo: Option<cognitive::PersonaRepo>,
 }
 
 impl AppCore {

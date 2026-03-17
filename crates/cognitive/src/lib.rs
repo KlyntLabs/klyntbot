@@ -33,6 +33,7 @@ pub use repos::{
 pub use repos::{
     CardType, FlashcardRepo, FlashcardRow, InsightCacheRepo, InsightCacheRow, NewFlashcard,
 };
+pub use repos::{NewPersona, PersonaRepo, PersonaRow, PersonaUpdate};
 pub use situation::{compute_situation, SituationInputs, UserSituation};
 pub use temporal::{ChangeSummary, FactVersion, TemporalService};
 pub use types::*;
