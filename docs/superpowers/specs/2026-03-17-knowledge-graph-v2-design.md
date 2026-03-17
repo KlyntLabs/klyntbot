@@ -62,6 +62,7 @@ Upgrade the knowledge graph visualization from a basic d3-force SVG renderer to 
   radius = 12 + (pageRankNormalized * 24) + (recencyFactor * 6)
   ```
 - Performance guard: when node count > 1200, cap max radius at 32px and reduce label density
+- Performance mode (> 1500 nodes): cap radius at 28px, disable recency glow, switch to WebGL renderer via `cytoscape-canvas` extension
 
 ### Appearance — Colored Circles
 
@@ -145,7 +146,8 @@ Upgrade the knowledge graph visualization from a basic d3-force SVG renderer to 
 - **Click node** → select, show detail in right panel (existing behavior)
 - **Double-click node** → open in editor
 - **Click compound/cluster** → zoom-to-fit that cluster with 300ms animation
-- **Right-click** → context menu: "Open", "Show neighborhood", "Pin node", "Expand cluster", "Delete"
+- **Right-click node** → context menu: "Open", "Show neighborhood", "Pin node", "Delete"
+- **Right-click compound** → context menu: "Collapse/Expand cluster", "Pin cluster", "AI Summary" (triggers LLM label refresh)
 - **Box select** (shift+drag) → select multiple nodes
 - **Drag node** → pin to position (existing behavior, Cytoscape native)
 - **Pan** → drag background
@@ -265,3 +267,20 @@ CREATE TABLE IF NOT EXISTS graph_communities (
 3. **Phase 3 — Polish:** Edge labels, semantic emphasis ring, AI context highlighting, insights panel, keyboard shortcuts, breadcrumbs.
 
 Phase 1 is self-contained and delivers the biggest impact. Phases 2-3 build on it incrementally.
+
+## 10. Edge Cases & Accessibility
+
+### Empty States
+- **Empty vault** → centered empty state: "Your knowledge graph will appear here" + "Create your first note" CTA
+- **Single node** → centered with subtle pulse animation
+- **No links** → all nodes shown in "Isolated notes" compound, message: "Link notes with [[wikilinks]] to see connections"
+
+### Accessibility
+- ARIA labels on compound nodes and interactive elements
+- Keyboard-navigable node list via Tab cycling
+- Screen reader announcement on node selection ("Selected: Note Title, 5 connections")
+- Reduced motion: disable layout animations when `prefers-reduced-motion` is active
+
+### Future Feature: AI Ask in Graph
+- Click any cluster → "What's the main idea here?" → agent answers using community summary
+- Turns the graph into a live reasoning surface connected to the cognitive pipeline
