@@ -6,7 +6,7 @@ import { useCallback, useState } from "react";
 // Public types
 // ---------------------------------------------------------------------------
 
-export type TabId = "synthesis" | "gaps" | "assessment" | "concept-map";
+export type TabId = "synthesis" | "gaps" | "assessment" | "concept-map" | "perspectives";
 export type TabStatus = "idle" | "streaming" | "loading" | "done" | "error";
 
 export interface QuizQuestion {
@@ -21,6 +21,14 @@ export interface QuizQuestion {
   difficultyScore: number;
 }
 
+export interface PersonaMeta {
+  id: string;
+  name: string;
+  role: string;
+  icon: string;
+  tone: string;
+}
+
 export interface InsightReviewState {
   isOpen: boolean;
   noteId: string | null;
@@ -32,6 +40,7 @@ export interface InsightReviewState {
     gaps: { status: TabStatus; content: string };
     assessment: { status: TabStatus; questions: QuizQuestion[] };
     conceptMap: { status: TabStatus; mermaid: string; fallbackText: string };
+    perspectives: { status: TabStatus; content: string; personas: PersonaMeta[] };
   };
   quizState: {
     answers: Record<string, string>;
@@ -69,6 +78,8 @@ interface InsightReviewCachedResponse {
   gapAnalysis: string | null;
   selfAssessment: QuizQuestion[] | null;
   conceptMap: string | null;
+  perspectives: string | null;
+  personaIds: string[] | null;
 }
 
 interface TabContentResponse {
@@ -91,6 +102,7 @@ const INITIAL_STATE: InsightReviewState = {
     gaps: { status: "idle", content: "" },
     assessment: { status: "idle", questions: [] },
     conceptMap: { status: "idle", mermaid: "", fallbackText: "" },
+    perspectives: { status: "idle", content: "", personas: [] },
   },
   quizState: {
     answers: {},
@@ -161,6 +173,8 @@ export function useInsightReview(): [InsightReviewState, InsightReviewActions] {
         } else {
           tabs.conceptMap = { status: "done", mermaid: content, fallbackText: "" };
         }
+      } else if (tab === "perspectives") {
+        tabs.perspectives = { ...tabs.perspectives, status: "done", content };
       }
 
       return { ...prev, tabs };
@@ -179,10 +193,25 @@ export function useInsightReview(): [InsightReviewState, InsightReviewActions] {
         tabs.assessment = { ...tabs.assessment, status: "error" };
       } else if (tab === "concept-map") {
         tabs.conceptMap = { ...tabs.conceptMap, status: "error" };
+      } else if (tab === "perspectives") {
+        tabs.perspectives = { ...tabs.perspectives, status: "error" };
       }
 
       return { ...prev, tabs };
     });
+  });
+
+  useEvent<{ personas: PersonaMeta[] }>("insight:perspectives-meta", ({ personas }) => {
+    setState((prev) => ({
+      ...prev,
+      tabs: {
+        ...prev.tabs,
+        perspectives: {
+          ...prev.tabs.perspectives,
+          personas,
+        },
+      },
+    }));
   });
 
   // -------------------------------------------------------------------------
@@ -202,6 +231,7 @@ export function useInsightReview(): [InsightReviewState, InsightReviewActions] {
         gaps: { status: "loading", content: "" },
         assessment: { status: "loading", questions: [] },
         conceptMap: { status: "loading", mermaid: "", fallbackText: "" },
+        perspectives: { status: "loading", content: "", personas: [] },
       },
       quizState: {
         answers: {},
@@ -255,6 +285,12 @@ export function useInsightReview(): [InsightReviewState, InsightReviewActions] {
           };
         }
 
+        tabs.perspectives = {
+          status: cached.perspectives ? "done" : "idle",
+          content: cached.perspectives ?? "",
+          personas: [],
+        };
+
         return { ...prev, tabs };
       });
     } else {
@@ -264,6 +300,7 @@ export function useInsightReview(): [InsightReviewState, InsightReviewActions] {
         tabs: {
           ...prev.tabs,
           synthesis: { status: "streaming", content: "" },
+          perspectives: { status: "loading", content: "", personas: [] },
         },
       }));
     }
@@ -290,6 +327,8 @@ export function useInsightReview(): [InsightReviewState, InsightReviewActions] {
           tabs.assessment = { ...tabs.assessment, status: "loading" };
         } else if (tab === "concept-map") {
           tabs.conceptMap = { ...tabs.conceptMap, status: "loading" };
+        } else if (tab === "perspectives") {
+          tabs.perspectives = { ...tabs.perspectives, status: "loading" };
         }
 
         return { ...prev, tabs };
@@ -329,6 +368,8 @@ export function useInsightReview(): [InsightReviewState, InsightReviewActions] {
               fallbackText: "",
             };
           }
+        } else if (response.tab === "perspectives") {
+          tabs.perspectives = { ...tabs.perspectives, status: "done", content: response.content };
         }
 
         return { ...prev, tabs };
