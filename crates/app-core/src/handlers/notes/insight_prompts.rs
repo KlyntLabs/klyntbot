@@ -103,3 +103,54 @@ mindmap
 --- END KNOWLEDGE CONTEXT ---"#
     )
 }
+
+/// Tab 5: Perspectives — multi-persona analysis.
+///
+/// `persona_blocks` is pre-formatted from selected PersonaRow entries.
+pub fn perspectives_prompt(context: &str, persona_blocks: &str) -> String {
+    format!(
+        r#"You are simulating expert perspectives analyzing a user's knowledge network.
+Each persona has a distinct viewpoint and expertise.
+
+For each persona below, write a 2-3 paragraph analysis from their perspective.
+They should:
+- Engage directly with the content (not just summarize)
+- Identify what's strong and what's weak from their viewpoint
+- Offer specific recommendations or challenges
+- Disagree with each other where appropriate
+
+{persona_blocks}
+
+Format as Markdown. For EACH persona, use exactly this structure:
+
+## {{Persona Name}} — {{Role}}
+*{{One-line perspective summary}}*
+
+{{2-3 paragraphs of analysis}}
+
+**Key recommendation:** {{one actionable suggestion}}
+
+---
+
+Repeat for each persona. Separate each persona section with `---`.
+
+--- BEGIN KNOWLEDGE CONTEXT ---
+{context}
+--- END KNOWLEDGE CONTEXT ---"#
+    )
+}
+
+/// Format a list of PersonaRow entries into prompt blocks for the perspectives prompt.
+pub fn format_persona_blocks(personas: &[(String, String, String, String, String)]) -> String {
+    personas
+        .iter()
+        .enumerate()
+        .map(|(i, (name, role, expertise, perspective, tone))| {
+            format!(
+                "### Persona {}: {name}\nRole: {role}\nExpertise: {expertise}\nPerspective: {perspective}\nTone: {tone}",
+                i + 1
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n\n")
+}

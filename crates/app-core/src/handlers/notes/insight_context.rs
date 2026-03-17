@@ -54,3 +54,11 @@ pub fn assemble_context(
         related_count: related_notes.len(),
     }
 }
+
+/// Extract domain hints from a note's tags for persona selection.
+///
+/// Tags are lowercased and returned as-is — the `PersonaRepo::select_for_note`
+/// method matches them against persona `domains` JSON arrays.
+pub fn extract_note_domains(tags: &[String]) -> Vec<String> {
+    tags.iter().map(|t| t.to_lowercase()).collect()
+}
