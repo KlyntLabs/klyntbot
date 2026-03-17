@@ -104,16 +104,14 @@ NoteSearcher wraps `NoteRepo::search_fts()` (which returns `Vec<NoteSearchResult
 
 - [ ] **Step 1: Create module registration**
 
-Create `crates/agent/src/domain_searchers/mod.rs`:
+Create `crates/agent/src/domain_searchers/mod.rs`.
+
+**IMPORTANT:** Only declare `note_searcher` initially. Add `task_searcher` and `graph_searcher` in their respective tasks — the files don't exist yet.
 
 ```rust
 pub mod note_searcher;
-pub mod task_searcher;
-pub mod graph_searcher;
 
 pub use note_searcher::NoteSearcher;
-pub use task_searcher::TaskSearcher;
-pub use graph_searcher::GraphSearcher;
 ```
 
 - [ ] **Step 2: Create NoteSearcher**
@@ -156,17 +154,18 @@ impl DomainSearcher for NoteSearcher {
             .take(limit)
             .enumerate()
             .map(|(i, note)| {
-                let body_preview = if note.body.len() > 500 {
-                    format!("{}...", &note.body[..500])
+                let body = note.body.as_deref().unwrap_or("");
+                let body_preview = if body.len() > 500 {
+                    format!("{}...", &body[..500])
                 } else {
-                    note.body.clone()
+                    body.to_string()
                 };
                 MemoryEntry {
                     id: note.id.clone(),
                     content: format!("[Note: {}] {}", note.title, body_preview),
                     score: 1.0 / (1.0 + i as f64), // decay by rank
                     source: MemorySource::Domain { name: "notes".into() },
-                    raw_score: note.rank.unwrap_or(0.0),
+                    raw_score: note.rank,
                 }
             })
             .collect()
@@ -174,7 +173,7 @@ impl DomainSearcher for NoteSearcher {
 }
 ```
 
-**Note:** Check the actual `NoteSearchResult` fields by reading `crates/feature-notes/src/models.rs`. It may have a `rank` field (from FTS5 BM25). Adapt the code accordingly.
+**Verified types:** `NoteSearchResult` has `body: Option<String>` (not `String`) and `rank: f64` (not `Option<f64>`). The code above handles both correctly.
 
 - [ ] **Step 3: Register module in lib.rs**
 
@@ -232,7 +231,7 @@ impl DomainSearcher for TaskSearcher {
     }
 
     async fn search(&self, query: &str, limit: usize) -> Vec<MemoryEntry> {
-        let rows = match self.repos.task_repo().search_by_keyword(query, Some(limit as i64)).await {
+        let rows = match self.repos.tasks.search_by_keyword(query, Some(limit as i64)).await {
             Ok(r) => r,
             Err(_) => return Vec::new(),
         };
@@ -255,16 +254,24 @@ impl DomainSearcher for TaskSearcher {
 }
 ```
 
-**Note:** Check the actual `TaskRow` fields and `Repos::task_repo()` method. The task repo is accessed via `Repos` (L2 storage crate). Adapt field names to match the actual struct.
+**Verified:** `Repos` has `pub tasks: TaskRepo` field (not a method). `TaskRow` has `id`, `title`, `status` as `String`, `description` as `Option<String>`.
 
-- [ ] **Step 2: Build**
+- [ ] **Step 2: Add module declaration**
+
+In `crates/agent/src/domain_searchers/mod.rs`, add:
+```rust
+pub mod task_searcher;
+pub use task_searcher::TaskSearcher;
+```
+
+- [ ] **Step 3: Build**
 
 Run: `cargo build -p agent`
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
-git add crates/agent/src/domain_searchers/task_searcher.rs
+git add crates/agent/src/domain_searchers/task_searcher.rs crates/agent/src/domain_searchers/mod.rs
 git commit -m "feat(agent): add TaskSearcher domain searcher for InsightForge"
 ```
 
@@ -333,14 +340,22 @@ impl DomainSearcher for GraphSearcher {
 }
 ```
 
-- [ ] **Step 2: Build**
+- [ ] **Step 2: Add module declaration**
+
+In `crates/agent/src/domain_searchers/mod.rs`, add:
+```rust
+pub mod graph_searcher;
+pub use graph_searcher::GraphSearcher;
+```
+
+- [ ] **Step 3: Build**
 
 Run: `cargo build -p agent`
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
-git add crates/agent/src/domain_searchers/graph_searcher.rs
+git add crates/agent/src/domain_searchers/graph_searcher.rs crates/agent/src/domain_searchers/mod.rs
 git commit -m "feat(agent): add GraphSearcher domain searcher for InsightForge"
 ```
 
@@ -383,22 +398,24 @@ let mut forge = context_engine::InsightForge::new(
 );
 
 // Register domain searchers
+// NOTE: `repos` is a local variable (line 177), NOT a field on self.
+// NoteRepo must be constructed from pool since it's not created until later.
+let note_repo_for_searcher = feature_notes::repo::NoteRepo::new(storage_pool.inner().clone());
 forge.add_searcher(Arc::new(
-    crate::domain_searchers::NoteSearcher::new(self.note_repo.clone()),
+    crate::domain_searchers::NoteSearcher::new(note_repo_for_searcher),
 ));
 forge.add_searcher(Arc::new(
-    crate::domain_searchers::TaskSearcher::new(self.repos.clone()),
+    crate::domain_searchers::TaskSearcher::new(repos.clone()),
 ));
-if let Some(ref pool) = cognitive_pool {
-    forge.add_searcher(Arc::new(
-        crate::domain_searchers::GraphSearcher::new(
-            cognitive::repos::EntityRepo::new(pool.clone()),
-        ),
-    ));
-}
+// EntityRepo uses the same pool as other cognitive repos
+forge.add_searcher(Arc::new(
+    crate::domain_searchers::GraphSearcher::new(
+        cognitive::repos::EntityRepo::new(storage_pool.inner().clone()),
+    ),
+));
 ```
 
-**Note:** `self.note_repo` and `self.repos` should be accessible in this scope — check the builder's fields. `cognitive_pool` is the SQLite pool used for cognitive repos. Adapt variable names to match what's actually in scope.
+**Verified:** `repos` is a local `Repos` variable at line 177. `storage_pool.inner()` returns the raw `SqlitePool`. No `self.note_repo` or `cognitive_pool` exists on the builder.
 
 - [ ] **Step 2: Build**
 
@@ -431,6 +448,15 @@ In `crates/cognitive/src/services/background.rs`, after the contradiction detect
                         // For each Add or Update op, upsert the subject and object
                         // as entities in the knowledge graph. No LLM needed — the
                         // SPO triple structure gives us entities directly.
+                        // NOTE: SemanticFactRepo has no pool() accessor. The `repo` variable
+                        // is constructed from `config.repo` which is a SemanticFactRepo.
+                        // We need to get the pool differently. The background service should
+                        // receive the pool or create EntityRepo from the same pool used for `repo`.
+                        // The implementer should find how the pool is accessible in this scope —
+                        // look for how `repo` was created (it comes from BackgroundServiceConfig.repo).
+                        // Option: add `pub fn pool(&self) -> &SqlitePool` to SemanticFactRepo,
+                        // or clone the pool from config before the spawn block.
+                        // Simplest fix: add a pool() accessor to SemanticFactRepo.
                         let entity_repo = crate::repos::EntityRepo::new(repo.pool().clone());
                         for (candidate, op) in candidates.iter().zip(ops.iter()) {
                             match op {
@@ -470,7 +496,16 @@ In `crates/cognitive/src/services/background.rs`, after the contradiction detect
                         }
 ```
 
-**Note:** `repo.pool()` should give access to the underlying `SqlitePool`. Check if `SemanticFactRepo` exposes a `pool()` method. If not, the pool is available from the config's `repo` field. `EntityRepo::new()` takes a `SqlitePool`. `NewEntity` is from `crate::repos`.
+**IMPORTANT:** `SemanticFactRepo` has NO `pool()` accessor — the `pool` field is private. You MUST first add a public accessor to `SemanticFactRepo` in `crates/cognitive/src/repos/semantic_fact.rs`:
+```rust
+/// Access the underlying pool (needed by sibling repos in the same service).
+pub fn pool(&self) -> &sqlx::SqlitePool {
+    &self.pool
+}
+```
+Then the `repo.pool().clone()` call will compile. `NewEntity` is from `crate::repos`. `upsert_entity` takes `&NewEntity`.
+
+Also ensure entity extraction is placed INSIDE the `if !candidates.is_empty()` block, after contradiction detection but before the closing `}`.
 
 - [ ] **Step 2: Build**
 
@@ -494,7 +529,7 @@ After the RRF merge and deduplication in the `retrieve` method, add a budget all
 
 - [ ] **Step 1: Add budget allocation after RRF merge**
 
-In `crates/context_engine/src/insight_forge/mod.rs`, find the `retrieve` method. After the deduplication and score normalization step (where results are sorted and truncated to `limit`), add a diversity pass:
+In `crates/context_engine/src/insight_forge/mod.rs`, find the `retrieve` method. The RRF merge happens inside `self.rrf_merge()` which returns the merged results. Add the budget allocation AFTER the `rrf_merge()` call in `retrieve()`, wrapping its return value. Find the line like `let merged = self.rrf_merge(&all_ranked_lists, limit);` and add the diversity pass after it:
 
 ```rust
         // Budget allocation: ensure no single source provides more than 60% of results.
@@ -527,7 +562,7 @@ In `crates/context_engine/src/insight_forge/mod.rs`, find the `retrieve` method.
         budgeted
 ```
 
-Replace the existing final truncation with this budget-aware version.
+Apply this AFTER `self.rrf_merge()` returns in `retrieve()`. The `merged` variable is the return value of `rrf_merge()`. Do NOT modify `rrf_merge()` itself — add the budget pass in `retrieve()` between the merge call and the return.
 
 - [ ] **Step 2: Build**
 
