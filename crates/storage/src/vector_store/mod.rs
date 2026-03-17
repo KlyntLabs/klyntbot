@@ -92,6 +92,9 @@ impl VectorStore {
         store
             .ensure_table("insight_embeddings", schemas::insight_embedding_schema())
             .await?;
+        store
+            .ensure_table("entity_embeddings", schemas::entity_embedding_schema())
+            .await?;
         Ok(store)
     }
 

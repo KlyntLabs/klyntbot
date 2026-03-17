@@ -259,7 +259,10 @@ fn wire_event_channels(core: &AppCore, channels: EventChannels, app_handle: &tau
                             bus::DomainEvent::CoachingFeedback { .. } => "coaching",
                             bus::DomainEvent::ChatTurnCompleted { .. } => "general",
                             bus::DomainEvent::NoteCreated { .. }
-                            | bus::DomainEvent::NoteUpdated { .. } => "notes",
+                            | bus::DomainEvent::NoteUpdated { .. }
+                            | bus::DomainEvent::NoteContentChanged { .. }
+                            | bus::DomainEvent::NoteDeleted { .. } => "notes",
+                            bus::DomainEvent::TaskHierarchyChanged { .. } => "work",
                             bus::DomainEvent::ToolCallExecuted { .. } => "general",
                             bus::DomainEvent::BehavioralPatternDetected { .. } => "learning",
                             bus::DomainEvent::ContradictionDetected { .. } => "learning",

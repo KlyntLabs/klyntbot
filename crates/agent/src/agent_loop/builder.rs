@@ -690,6 +690,30 @@ impl AgentLoopBuilder {
                 repos.clone(),
             )));
 
+            // BookRAG integration
+            if config.cognitive.book_index.enabled {
+                let book_entity_repo =
+                    cognitive::repos::EntityRepo::new(storage_pool.inner().clone());
+                let tree_repo = Arc::new(cognitive::repos::SqliteBookTreeRepo::new(
+                    storage_pool.inner().clone(),
+                ));
+                let gt_link_repo = Arc::new(cognitive::repos::SqliteGTLinkRepo::new(
+                    storage_pool.inner().clone(),
+                ));
+                let book_index = crate::adapters::book_index_wiring::build_book_index(
+                    tree_repo,
+                    book_entity_repo,
+                    gt_link_repo,
+                    embedding_engine.clone(),
+                );
+                let bookrag_searcher = crate::adapters::book_index_wiring::build_bookrag_searcher(
+                    book_index,
+                    provider.clone(),
+                    &config.cognitive.book_index.retrieval,
+                );
+                forge.add_searcher(bookrag_searcher);
+            }
+
             // One-time entity backfill from pre-existing SPO facts (non-blocking)
             tokio::spawn(async move {
                 match entity_repo.backfill_from_facts().await {

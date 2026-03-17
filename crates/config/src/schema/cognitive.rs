@@ -104,6 +104,10 @@ pub struct CognitiveConfig {
     /// Timeout ms for each domain searcher (default: 800).
     #[serde(default = "default_insight_forge_per_source_timeout_ms")]
     pub insight_forge_per_source_timeout_ms: u64,
+
+    /// BookIndex configuration for hierarchical retrieval.
+    #[serde(default)]
+    pub book_index: BookIndexConfig,
 }
 
 impl Default for CognitiveConfig {
@@ -134,6 +138,7 @@ impl Default for CognitiveConfig {
             insight_forge_per_source_limit: default_insight_forge_per_source_limit(),
             insight_forge_total_limit: default_insight_forge_total_limit(),
             insight_forge_per_source_timeout_ms: default_insight_forge_per_source_timeout_ms(),
+            book_index: BookIndexConfig::default(),
         }
     }
 }
@@ -194,4 +199,108 @@ fn default_insight_forge_total_limit() -> usize {
 }
 fn default_insight_forge_per_source_timeout_ms() -> u64 {
     800
+}
+
+// -- BookIndex config types (defined in config crate L1, not imported from context_engine L3) --
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BookIndexConfig {
+    #[serde(default = "default_book_index_enabled")]
+    pub enabled: bool,
+    #[serde(default)]
+    pub entity_resolution: BookEntityResolutionConfig,
+    #[serde(default)]
+    pub retrieval: BookRetrievalCfg,
+}
+
+impl Default for BookIndexConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_book_index_enabled(),
+            entity_resolution: BookEntityResolutionConfig::default(),
+            retrieval: BookRetrievalCfg::default(),
+        }
+    }
+}
+
+fn default_book_index_enabled() -> bool {
+    true
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BookEntityResolutionConfig {
+    #[serde(default = "default_er_top_k")]
+    pub top_k: usize,
+    #[serde(default = "default_gradient_threshold")]
+    pub gradient_threshold: f64,
+    #[serde(default = "default_er_min_similarity")]
+    pub min_similarity: f64,
+    #[serde(default)]
+    pub use_llm_disambiguation: bool,
+}
+
+impl Default for BookEntityResolutionConfig {
+    fn default() -> Self {
+        Self {
+            top_k: default_er_top_k(),
+            gradient_threshold: default_gradient_threshold(),
+            min_similarity: default_er_min_similarity(),
+            use_llm_disambiguation: false,
+        }
+    }
+}
+
+fn default_er_top_k() -> usize {
+    10
+}
+fn default_gradient_threshold() -> f64 {
+    0.6
+}
+fn default_er_min_similarity() -> f64 {
+    0.3
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BookRetrievalCfg {
+    #[serde(default = "default_max_nodes")]
+    pub max_nodes: usize,
+    #[serde(default = "default_max_map_nodes")]
+    pub max_map_nodes: usize,
+    #[serde(default = "default_operator_timeout_ms")]
+    pub operator_timeout_ms: u64,
+    #[serde(default = "default_pagerank_damping")]
+    pub pagerank_damping: f64,
+    #[serde(default = "default_pagerank_iterations")]
+    pub pagerank_iterations: u32,
+}
+
+impl Default for BookRetrievalCfg {
+    fn default() -> Self {
+        Self {
+            max_nodes: default_max_nodes(),
+            max_map_nodes: default_max_map_nodes(),
+            operator_timeout_ms: default_operator_timeout_ms(),
+            pagerank_damping: default_pagerank_damping(),
+            pagerank_iterations: default_pagerank_iterations(),
+        }
+    }
+}
+
+fn default_max_nodes() -> usize {
+    50
+}
+fn default_max_map_nodes() -> usize {
+    10
+}
+fn default_operator_timeout_ms() -> u64 {
+    600
+}
+fn default_pagerank_damping() -> f64 {
+    0.85
+}
+fn default_pagerank_iterations() -> u32 {
+    20
 }

@@ -213,6 +213,18 @@ pub enum DomainEvent {
         note_id: String,
         title: String,
     },
+    NoteContentChanged {
+        note_id: String,
+        content: String,
+    },
+    NoteDeleted {
+        note_id: String,
+    },
+
+    // -- Task hierarchy (BookIndex) --
+    TaskHierarchyChanged {
+        project_id: String,
+    },
 
     // -- Chat --
     ChatTurnCompleted {

@@ -496,7 +496,7 @@ impl BackgroundConsolidationService {
                                         entity_repo
                                             .upsert_entity(&crate::repos::NewEntity {
                                                 name: fact.object.clone(),
-                                                entity_type: entity_type,
+                                                entity_type,
                                                 description: None,
                                                 source: "extracted".to_string(),
                                                 source_id: Some(fact.id.clone()),
@@ -997,6 +997,9 @@ fn event_type_key(event: &DomainEvent) -> String {
         DomainEvent::TaskPriorityChanged { .. } => "TaskPriorityChanged".into(),
         DomainEvent::TaskFieldUpdated { .. } => "TaskFieldUpdated".into(),
         DomainEvent::ContradictionDetected { .. } => "ContradictionDetected".into(),
+        DomainEvent::NoteContentChanged { .. } => "NoteContentChanged".into(),
+        DomainEvent::NoteDeleted { .. } => "NoteDeleted".into(),
+        DomainEvent::TaskHierarchyChanged { .. } => "TaskHierarchyChanged".into(),
     }
 }
 

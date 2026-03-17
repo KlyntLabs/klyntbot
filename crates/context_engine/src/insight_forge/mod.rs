@@ -1,3 +1,4 @@
+pub mod bookrag_searcher;
 pub mod circuit_breaker;
 pub mod decomposer;
 pub mod domain_searcher;

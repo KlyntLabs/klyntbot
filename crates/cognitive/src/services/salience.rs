@@ -98,6 +98,11 @@ pub fn evaluate_salience(event: &DomainEvent) -> SalienceVerdict {
 
         // Contradiction detection — always extract for cognitive processing
         DomainEvent::ContradictionDetected { .. } => SalienceVerdict::Extract,
+
+        // BookIndex events — discarded from cognitive extraction (handled by BookIndex updater)
+        DomainEvent::NoteContentChanged { .. } => SalienceVerdict::Discard,
+        DomainEvent::NoteDeleted { .. } => SalienceVerdict::Discard,
+        DomainEvent::TaskHierarchyChanged { .. } => SalienceVerdict::Discard,
     }
 }
 

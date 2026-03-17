@@ -426,6 +426,29 @@ impl EntityRepo {
             .execute(&mut *tx)
             .await?;
 
+        // Migrate GT-Links before deleting source entity (table may not exist in older test pools)
+        let table_exists: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='entity_tree_links'",
+        )
+        .fetch_one(&mut *tx)
+        .await?;
+
+        if table_exists.0 > 0 {
+            sqlx::query(
+                "INSERT OR IGNORE INTO entity_tree_links (entity_id, tree_node_id, created_at)
+                 SELECT ?, tree_node_id, created_at FROM entity_tree_links WHERE entity_id = ?",
+            )
+            .bind(target_id)
+            .bind(source_id)
+            .execute(&mut *tx)
+            .await?;
+
+            sqlx::query("DELETE FROM entity_tree_links WHERE entity_id = ?")
+                .bind(source_id)
+                .execute(&mut *tx)
+                .await?;
+        }
+
         // Delete the source entity (FTS trigger handles cleanup)
         sqlx::query("DELETE FROM entities WHERE id = ?1")
             .bind(source_id)

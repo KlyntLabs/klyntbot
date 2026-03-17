@@ -1,9 +1,12 @@
 pub mod assembler;
+pub mod book_index;
 pub mod budget;
 pub mod history_compressor;
 pub mod insight_forge;
 pub mod inventory;
 pub mod memory_retriever;
+pub mod operators;
+pub mod retrieval_planner;
 pub mod source;
 pub mod summary_provider;
 pub mod token_counter;
