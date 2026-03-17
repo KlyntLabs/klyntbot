@@ -296,6 +296,30 @@ impl AppCore {
         })
     }
 
+    pub async fn note_insight_list_versions(
+        &self,
+        note_id: &str,
+    ) -> Result<Vec<InsightVersionResponse>, ApiError> {
+        let service = self
+            .insight_service
+            .as_ref()
+            .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "Insight service not available"))?;
+        let versions = service
+            .list_versions(note_id)
+            .await
+            .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?;
+        Ok(versions
+            .into_iter()
+            .map(|v| InsightVersionResponse {
+                id: v.id,
+                version: v.version,
+                generated_at: v.generated_at,
+                input_hash: v.input_hash,
+                has_parent: v.parent_insight_id.is_some(),
+            })
+            .collect())
+    }
+
     async fn get_related_note_ids(&self, note_id: &str) -> Vec<String> {
         let backlinks = self
             .note_repo

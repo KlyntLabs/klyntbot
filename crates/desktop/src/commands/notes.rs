@@ -3,9 +3,9 @@ use std::sync::Arc;
 use desktop_shared::commands::{
     BacklinkResponse, CreatePersonaParams, FlashcardResponse, HybridSearchResponse,
     InboxCreateParams, InboxItemResponse, InsightReviewResponse, InsightReviewStarted,
-    InsightSaveFlashcardsParams, NoteCreateParams, NoteLinkResponse, NoteResponse,
-    NoteSuggestionsResponse, NoteUpdateParams, NoteVersionResponse, NotebookCreateParams,
-    NotebookResponse, NotebookUpdateParams, PersonaResponse, RatePersonaParams,
+    InsightSaveFlashcardsParams, InsightVersionResponse, NoteCreateParams, NoteLinkResponse,
+    NoteResponse, NoteSuggestionsResponse, NoteUpdateParams, NoteVersionResponse,
+    NotebookCreateParams, NotebookResponse, NotebookUpdateParams, PersonaResponse, RatePersonaParams,
     SetPersonaPinsParams, TabContent, UpdatePersonaParams,
 };
 use desktop_shared::errors::ApiError;
@@ -316,6 +316,14 @@ pub async fn note_insight_regenerate_tab(
     state.note_insight_regenerate_tab(&note_id, &tab).await
 }
 
+#[tauri::command]
+pub async fn note_insight_list_versions(
+    state: State<'_, Arc<AppCore>>,
+    note_id: String,
+) -> Result<Vec<InsightVersionResponse>, ApiError> {
+    state.note_insight_list_versions(&note_id).await
+}
+
 // ── Persona Management commands ───────────────────────────────────
 
 #[tauri::command]
@@ -418,6 +426,7 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "note_insight_cache_get",
     "note_insight_save_flashcards",
     "note_insight_regenerate_tab",
+    "note_insight_list_versions",
     "note_insight_list_personas",
     "note_insight_create_persona",
     "note_insight_update_persona",
@@ -555,6 +564,10 @@ pub(crate) async fn dispatch_dev(
             let id = try_field!(dev::get_str(body, "noteId"));
             let tab = try_field!(dev::get_str(body, "tab"));
             dev::val(core.note_insight_regenerate_tab(&id, &tab).await)
+        }
+        "note_insight_list_versions" => {
+            let id = try_field!(dev::get_str(body, "noteId"));
+            dev::val(core.note_insight_list_versions(&id).await)
         }
         "note_insight_list_personas" => dev::val(core.note_insight_list_personas().await),
         "note_insight_create_persona" => dev::val(
