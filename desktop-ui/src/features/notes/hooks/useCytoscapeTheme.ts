@@ -175,6 +175,43 @@ export function useCytoscapeTheme(): { stylesheet: Stylesheet[]; isLight: boolea
           opacity: 0.05,
         },
       },
+
+      // ── Hub pulse during progressive reveal ──
+      {
+        selector: "node:childless.hub-pulse",
+        style: {
+          "border-width": 4,
+          "border-color": brand,
+          "border-opacity": 0.6,
+          "shadow-blur": 20,
+          "shadow-color": brand,
+          "shadow-opacity": 0.4,
+          "shadow-offset-x": 0,
+          "shadow-offset-y": 0,
+        },
+      },
+
+      // ── Cola drag halo ──
+      {
+        selector: "node:childless.cola-dragging",
+        style: {
+          "shadow-blur": 15,
+          "shadow-color": brand,
+          "shadow-opacity": 0.35,
+          "shadow-offset-x": 0,
+          "shadow-offset-y": 0,
+        },
+      },
+
+      // ── Cola neighbor glow ──
+      {
+        selector: "node:childless.cola-neighbor",
+        style: {
+          "border-width": 2.5,
+          "border-opacity": 0.5,
+          "border-color": brand,
+        },
+      },
     ];
 
     return { stylesheet, isLight: light };
