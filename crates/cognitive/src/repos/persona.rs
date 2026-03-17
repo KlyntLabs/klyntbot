@@ -193,6 +193,39 @@ impl PersonaRepo {
             .await
     }
 
+    /// Create an auto-generated persona (source = "auto").
+    pub async fn create_auto(&self, persona: &NewPersona) -> Result<PersonaRow, sqlx::Error> {
+        let id = Uuid::new_v4().to_string();
+        let now = Utc::now().to_rfc3339();
+        let domains_json =
+            serde_json::to_string(&persona.domains).unwrap_or_else(|_| "[]".into());
+
+        sqlx::query(
+            r#"
+            INSERT INTO insight_personas
+                (id, name, role, expertise, perspective, tone, icon, source, domains,
+                 is_active, relevance_score, created_at, updated_at)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'auto', ?8, 1, 0.5, ?9, ?9)
+            "#,
+        )
+        .bind(&id)
+        .bind(&persona.name)
+        .bind(&persona.role)
+        .bind(&persona.expertise)
+        .bind(&persona.perspective)
+        .bind(&persona.tone)
+        .bind(&persona.icon)
+        .bind(&domains_json)
+        .bind(&now)
+        .execute(&self.pool)
+        .await?;
+
+        sqlx::query_as::<_, PersonaRow>("SELECT * FROM insight_personas WHERE id = ?1")
+            .bind(&id)
+            .fetch_one(&self.pool)
+            .await
+    }
+
     /// List all active personas.
     pub async fn list_active(&self) -> Result<Vec<PersonaRow>, sqlx::Error> {
         sqlx::query_as::<_, PersonaRow>(

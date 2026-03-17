@@ -374,6 +374,14 @@ pub async fn note_insight_rate_persona(
     state.note_insight_rate_persona(params).await
 }
 
+#[tauri::command]
+pub async fn note_insight_auto_generate_persona(
+    state: State<'_, Arc<AppCore>>,
+    note_id: String,
+) -> Result<PersonaResponse, ApiError> {
+    state.note_insight_auto_generate_persona(&note_id).await
+}
+
 // ── Dev server dispatch ─────────────────────────────────────────────
 
 #[cfg(test)]
@@ -417,6 +425,7 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "note_insight_toggle_persona",
     "note_insight_set_pins",
     "note_insight_rate_persona",
+    "note_insight_auto_generate_persona",
 ];
 
 #[cfg(debug_assertions)]
@@ -568,6 +577,10 @@ pub(crate) async fn dispatch_dev(
         }
         "note_insight_rate_persona" => {
             dev::val(core.note_insight_rate_persona(try_field!(dev::parse_params(body))).await)
+        }
+        "note_insight_auto_generate_persona" => {
+            let note_id = try_field!(dev::get_str(body, "noteId"));
+            dev::val(core.note_insight_auto_generate_persona(&note_id).await)
         }
         _ => return None,
     })

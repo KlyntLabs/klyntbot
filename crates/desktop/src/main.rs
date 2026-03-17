@@ -367,6 +367,7 @@ fn run_desktop_app() {
             commands::notes::note_insight_toggle_persona,
             commands::notes::note_insight_set_pins,
             commands::notes::note_insight_rate_persona,
+            commands::notes::note_insight_auto_generate_persona,
             // Areas
             commands::areas::area_list,
             commands::areas::area_create,
