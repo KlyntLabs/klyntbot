@@ -2,5 +2,7 @@ mod converters;
 mod crud;
 mod inbox;
 mod insight;
+mod insight_context;
+mod insight_prompts;
 mod notebooks;
 mod suggestions;
