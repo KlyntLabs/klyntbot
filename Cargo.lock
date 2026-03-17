@@ -3704,6 +3704,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "feature-insights"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "cognitive",
+ "common",
+ "feature-notes",
+ "futures-util",
+ "providers",
+ "serde",
+ "serde_json",
+ "sha2",
+ "sqlx",
+ "storage",
+ "tokio",
+ "tools-core",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "feature-launcher"
 version = "0.1.0"
 dependencies = [

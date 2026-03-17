@@ -26,6 +26,7 @@ members = [
     "crates/feature-productivity",
     "crates/cognitive",
     "crates/feature-coaching",
+    "crates/feature-insights",
     "crates/app-core",
     "crates/activity-log",
     "crates/feature-tasks",
@@ -62,6 +63,7 @@ feature-productivity = { path = "crates/feature-productivity" }
 plugin-runtime = { path = "crates/plugin-runtime" }
 cognitive = { path = "crates/cognitive" }
 feature-coaching = { path = "crates/feature-coaching" }
+feature-insights = { path = "crates/feature-insights" }
 desktop-shared = { path = "crates/desktop-shared" }
 desktop = { path = "crates/desktop" }
 app-core = { path = "crates/app-core" }
