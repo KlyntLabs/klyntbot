@@ -72,7 +72,11 @@ export function GraphView({
     return filteredNodeIds.has(sId) && filteredNodeIds.has(tId);
   });
 
-  const { elements: allElements, clusters, fingerprint } = useCytoscapeElements({
+  const {
+    elements: allElements,
+    clusters,
+    fingerprint,
+  } = useCytoscapeElements({
     nodes: filteredNodes,
     links: filteredLinks,
     notebooks,
@@ -106,7 +110,7 @@ export function GraphView({
       setCachedPositions(pos);
       setCacheReady(true);
     });
-  }, [loadPositions, fingerprint]);
+  }, [loadPositions]);
 
   // BFS waves
   const waves = useMemo(() => {

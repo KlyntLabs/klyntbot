@@ -69,7 +69,9 @@ export function useProgressiveReveal() {
       let userInteracted = false;
 
       // Listen for user interaction to suppress auto-fit
-      const onViewport = () => { userInteracted = true; };
+      const onViewport = () => {
+        userInteracted = true;
+      };
       cy.on("viewport", onViewport);
 
       const revealWave = (waveIndex: number) => {
@@ -82,10 +84,7 @@ export function useProgressiveReveal() {
         const wave = waves[waveIndex];
 
         // If beyond maxWaves, batch all remaining
-        const nodeIds =
-          waveIndex >= options.maxWaves
-            ? waves.slice(waveIndex).flat()
-            : wave;
+        const nodeIds = waveIndex >= options.maxWaves ? waves.slice(waveIndex).flat() : wave;
 
         const batch: ElementDefinition[] = [];
 
@@ -138,7 +137,7 @@ export function useProgressiveReveal() {
           childless.forEach((node) => {
             const size = (node.data("size") as number) || 20;
             node.style({ opacity: 0, width: size * 0.7, height: size * 0.7 });
-            node.animate({
+            void node.animate({
               style: { opacity: 1, width: size, height: size },
               duration: 200,
               easing: "ease-out",

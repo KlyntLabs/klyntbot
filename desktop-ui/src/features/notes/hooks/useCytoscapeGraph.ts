@@ -1,7 +1,12 @@
-import cytoscape, { type Core, type ElementDefinition, type NodeSingular, type Stylesheet } from "cytoscape";
+import cytoscape, {
+  type Core,
+  type ElementDefinition,
+  type NodeSingular,
+  type Stylesheet,
+} from "cytoscape";
 import { useCallback, useEffect, useRef } from "react";
 import { diffElements } from "../lib/elementDiff";
-import { registerCytoscapePlugins, snapshotPositions, type PositionMap } from "../lib/graphUtils";
+import { type PositionMap, registerCytoscapePlugins, snapshotPositions } from "../lib/graphUtils";
 import { useColaPhysics } from "./useColaPhysics";
 import type { GraphSettings } from "./useGraphSettings";
 import { useProgressiveReveal } from "./useProgressiveReveal";
@@ -69,18 +74,14 @@ export function useCytoscapeGraph({
 
   // Sub-hooks
   const { revealWithPositions, cancelReveal } = useProgressiveReveal();
-  const {
-    startDragCola,
-    stopDragCola,
-    startLivePhysics,
-    stopLivePhysics,
-  } = useColaPhysics({
+  const { startDragCola, stopDragCola, startLivePhysics, stopLivePhysics } = useColaPhysics({
     cy: cyRef,
     settings,
     onPositionsChanged: onSavePositions,
   });
 
   // ── Create Cytoscape instance on mount ──
+  // biome-ignore lint/correctness/useExhaustiveDependencies: mount/unmount only — callbacks accessed via ref or stable
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -183,7 +184,6 @@ export function useCytoscapeGraph({
       cy.destroy();
       cyRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount/unmount only
   }, [containerRef, stylesheet]);
 
   // ── Initial load: progressive reveal or fCoSE ──
@@ -227,9 +227,8 @@ export function useCytoscapeGraph({
           return;
         }
 
-        const nodeIds = waveIndex >= maxAnimatedWaves
-          ? waves.slice(waveIndex).flat()
-          : waves[waveIndex];
+        const nodeIds =
+          waveIndex >= maxAnimatedWaves ? waves.slice(waveIndex).flat() : waves[waveIndex];
 
         const batch: ElementDefinition[] = [];
 
@@ -260,7 +259,11 @@ export function useCytoscapeGraph({
           const src = el.data?.source as string;
           const tgt = el.data?.target as string;
           const edgeId = el.data?.id as string;
-          if (revealedNodes.has(src) && revealedNodes.has(tgt) && !cy.getElementById(edgeId).nonempty()) {
+          if (
+            revealedNodes.has(src) &&
+            revealedNodes.has(tgt) &&
+            !cy.getElementById(edgeId).nonempty()
+          ) {
             batch.push(el);
           }
         }
@@ -279,15 +282,17 @@ export function useCytoscapeGraph({
 
         const numIter = waveIndex <= 2 ? 2500 : waveIndex <= 4 ? 1500 : 1000;
 
-        const layout = cy.layout(buildFcoseOptions(settingsRef.current, {
-          fit: true,
-          animate: true,
-          animationDuration: 400,
-          randomize: false,
-          quality: "proof",
-          numIter,
-          fixedNodeConstraint: fixedConstraints.length > 0 ? fixedConstraints : undefined,
-        }));
+        const layout = cy.layout(
+          buildFcoseOptions(settingsRef.current, {
+            fit: true,
+            animate: true,
+            animationDuration: 400,
+            randomize: false,
+            quality: "proof",
+            numIter,
+            fixedNodeConstraint: fixedConstraints.length > 0 ? fixedConstraints : undefined,
+          }),
+        );
 
         layout.on("layoutstop", () => {
           const isFinal = waveIndex >= maxAnimatedWaves || waveIndex >= waves.length - 1;
@@ -303,7 +308,7 @@ export function useCytoscapeGraph({
 
       revealWaveFcose(0);
     }
-  }, [elements, cachedPositions, cacheReady, waves, revealWithPositions, onSavePositions, cancelReveal]);
+  }, [elements, cachedPositions, cacheReady, waves, revealWithPositions, onSavePositions]);
 
   // ── Incremental updates: element diffing ──
   useEffect(() => {
@@ -337,14 +342,10 @@ export function useCytoscapeGraph({
         const id = el.data?.id;
         if (!id) continue;
         const connectedEdges = elements.filter(
-          (e) =>
-            e.group === "edges" &&
-            (e.data?.source === id || e.data?.target === id),
+          (e) => e.group === "edges" && (e.data?.source === id || e.data?.target === id),
         );
         const neighborIds = connectedEdges
-          .map((e) =>
-            e.data?.source === id ? e.data?.target : e.data?.source,
-          )
+          .map((e) => (e.data?.source === id ? e.data?.target : e.data?.source))
           .filter((nid): nid is string => !!nid && cy.getElementById(nid as string).nonempty());
 
         if (neighborIds.length > 0) {
@@ -386,7 +387,9 @@ export function useCytoscapeGraph({
       );
       const fixedConstraints = cy
         .nodes(":childless")
-        .filter((n) => existingNodeIds.has(n.id()) || !childNodes.some((el) => el.data?.id === n.id()))
+        .filter(
+          (n) => existingNodeIds.has(n.id()) || !childNodes.some((el) => el.data?.id === n.id()),
+        )
         .map((n) => {
           const node = n as NodeSingular;
           const pos = node.position();
@@ -415,6 +418,7 @@ export function useCytoscapeGraph({
   }, [elements, onSavePositions]);
 
   // ── Re-layout when physics settings change ──
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally specific deps to avoid re-layout on non-physics changes
   useEffect(() => {
     const cy = cyRef.current;
     if (!cy || cy.elements().length === 0 || !initialLoadDoneRef.current) return;

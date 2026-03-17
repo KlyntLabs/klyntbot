@@ -1,6 +1,6 @@
 import type { Core, Layouts, NodeSingular } from "cytoscape";
 import { useCallback, useEffect, useRef } from "react";
-import { snapshotPositions, type PositionMap } from "../lib/graphUtils";
+import { type PositionMap, snapshotPositions } from "../lib/graphUtils";
 import type { GraphSettings } from "./useGraphSettings";
 
 const SETTLE_DURATION_MS = 300;
@@ -41,11 +41,7 @@ function getNeighborhood(cy: Core, nodeId: string, hops: number): Set<string> {
  * - Auto-activate on drag (scoped to N-hop neighborhood)
  * - Live Physics mode (continuous simulation on visible nodes)
  */
-export function useColaPhysics({
-  cy: cyRef,
-  settings,
-  onPositionsChanged,
-}: UseColaPhysicsParams) {
+export function useColaPhysics({ cy: cyRef, settings, onPositionsChanged }: UseColaPhysicsParams) {
   const activeLayoutRef = useRef<Layouts | null>(null);
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
@@ -85,15 +81,19 @@ export function useColaPhysics({
         const neighbors = draggedNode
           .neighborhood("node:childless")
           .sort((a, b) => {
-            const wA = (a as NodeSingular).connectedEdges().reduce((sum: number, e) => sum + ((e.data("weight") as number) || 1), 0);
-            const wB = (b as NodeSingular).connectedEdges().reduce((sum: number, e) => sum + ((e.data("weight") as number) || 1), 0);
+            const wA = (a as NodeSingular)
+              .connectedEdges()
+              .reduce((sum: number, e) => sum + ((e.data("weight") as number) || 1), 0);
+            const wB = (b as NodeSingular)
+              .connectedEdges()
+              .reduce((sum: number, e) => sum + ((e.data("weight") as number) || 1), 0);
             return wB - wA;
           })
           .toArray()
           .slice(0, HUB_CONNECTION_CAP) as NodeSingular[];
 
         scope = new Set([draggedNodeId]);
-        neighbors.forEach((n) => scope.add(n.id()));
+        for (const n of neighbors) scope.add(n.id());
       }
 
       // Lock all nodes outside scope
@@ -113,8 +113,7 @@ export function useColaPhysics({
 
       // Start Cola
       const s = settingsRef.current;
-      // biome-ignore lint/suspicious/noExplicitAny: cytoscape-cola options not typed
-      const layout = cy.layout({
+      const colaOptions = {
         name: "cola",
         infinite: true,
         fit: false,
@@ -124,7 +123,9 @@ export function useColaPhysics({
         nodeSpacing: Math.max(5, Math.round(s.repulsion / 1000)),
         unconstrainedIterations: 50,
         userConstraintIterations: 100,
-      } as any);
+      };
+      // biome-ignore lint/suspicious/noExplicitAny: cytoscape-cola options not typed
+      const layout = cy.layout(colaOptions as any);
 
       activeLayoutRef.current = layout;
       layout.run();
@@ -169,8 +170,7 @@ export function useColaPhysics({
     });
 
     const s = settingsRef.current;
-    // biome-ignore lint/suspicious/noExplicitAny: cytoscape-cola options not typed
-    const layout = cy.layout({
+    const liveColaOptions = {
       name: "cola",
       infinite: true,
       fit: false,
@@ -178,7 +178,9 @@ export function useColaPhysics({
       handleDisconnected: false,
       edgeLength: s.linkDistance,
       nodeSpacing: Math.max(5, Math.round(s.repulsion / 1000)),
-    } as any);
+    };
+    // biome-ignore lint/suspicious/noExplicitAny: cytoscape-cola options not typed
+    const layout = cy.layout(liveColaOptions as any);
 
     activeLayoutRef.current = layout;
     layout.run();
@@ -193,8 +195,7 @@ export function useColaPhysics({
         cy.nodes(":childless").forEach((node) => {
           const p = node.position();
           const offScreen =
-            p.x < ext.x1 - buf || p.x > ext.x2 + buf ||
-            p.y < ext.y1 - buf || p.y > ext.y2 + buf;
+            p.x < ext.x1 - buf || p.x > ext.x2 + buf || p.y < ext.y1 - buf || p.y > ext.y2 + buf;
           if (offScreen && !node.locked()) node.lock();
           else if (!offScreen && node.locked()) node.unlock();
         });

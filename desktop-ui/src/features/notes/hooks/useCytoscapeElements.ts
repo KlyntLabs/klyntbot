@@ -46,8 +46,12 @@ export function useCytoscapeElements({
   links,
   notebooks,
   clusterMode,
-  activeNoteId,
-}: UseCytoscapeElementsParams): { elements: ElementDefinition[]; clusters: ClusterInfo[]; fingerprint: string } {
+  activeNoteId: _activeNoteId,
+}: UseCytoscapeElementsParams): {
+  elements: ElementDefinition[];
+  clusters: ClusterInfo[];
+  fingerprint: string;
+} {
   return useMemo(() => {
     const elements: ElementDefinition[] = [];
     const clusterMap = new Map<string, ClusterInfo>();
@@ -173,5 +177,5 @@ export function useCytoscapeElements({
     const fingerprint = computeFingerprint(nodeIdList, edgePairList);
 
     return { elements, clusters, fingerprint };
-  }, [nodes, links, notebooks, clusterMode, activeNoteId]);
+  }, [nodes, links, notebooks, clusterMode]);
 }
