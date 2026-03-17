@@ -12,6 +12,7 @@ interface SidebarAiInsightsProps {
   onDismiss: (id: string) => void;
   onFetchSuggestions: () => void;
   suggestionsLoading: boolean;
+  aiError: string | null;
 }
 
 export function SidebarAiInsights({
@@ -23,17 +24,28 @@ export function SidebarAiInsights({
   onDismiss,
   onFetchSuggestions,
   suggestionsLoading,
+  aiError,
 }: SidebarAiInsightsProps) {
   return (
     <div className="px-4 py-3 space-y-4">
       <SectionLabel>AI Insights</SectionLabel>
 
+      {aiError && (
+        <div className="rounded-md bg-red-500/10 border border-red-500/30 p-2 text-xs text-red-300">
+          {aiError}
+        </div>
+      )}
+
       {taskState === "completed" && taskMemory ? (
         <WhatAiLearned memory={taskMemory} />
-      ) : taskState === "new" && suggestions.filter((s) => s.status === "pending").length === 0 ? (
-        <WhyThisTaskNow task={task} />
       ) : (
-        <SuggestionsList suggestions={suggestions} onApply={onApply} onDismiss={onDismiss} />
+        <>
+          {suggestions.filter((s) => s.status === "pending").length > 0 ? (
+            <SuggestionsList suggestions={suggestions} onApply={onApply} onDismiss={onDismiss} />
+          ) : (
+            <WhyThisTaskNow task={task} />
+          )}
+        </>
       )}
 
       {taskState !== "completed" &&

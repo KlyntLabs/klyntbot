@@ -181,8 +181,11 @@ export function useIssueDetail(
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
 
+  const [aiError, setAiError] = useState<string | null>(null);
+
   const fetchSuggestions = useCallback(async () => {
     setSuggestionsLoading(true);
+    setAiError(null);
     try {
       const results = await ipc<
         Array<{
@@ -205,6 +208,8 @@ export function useIssueDetail(
           status: s.status as SuggestionStatus,
         })),
       );
+    } catch (e) {
+      setAiError(String(e));
     } finally {
       setSuggestionsLoading(false);
     }
@@ -230,12 +235,17 @@ export function useIssueDetail(
   const [decompositionApplying, setDecompositionApplying] = useState(false);
 
   const decompose = useCallback(async () => {
-    const result = await ipc<DecompositionResult>("task_decompose", { taskId: task.id });
-    if (result.autoApplied) {
-      refetch();
-    } else {
-      setDecompositionResult(result);
-      setDecompositionOpen(true);
+    setAiError(null);
+    try {
+      const result = await ipc<DecompositionResult>("task_decompose", { taskId: task.id });
+      if (result.autoApplied) {
+        refetch();
+      } else {
+        setDecompositionResult(result);
+        setDecompositionOpen(true);
+      }
+    } catch (e) {
+      setAiError(String(e));
     }
   }, [task.id, refetch]);
 
@@ -311,5 +321,6 @@ export function useIssueDetail(
     forecast,
     forecastLoading,
     fetchForecast,
+    aiError,
   };
 }

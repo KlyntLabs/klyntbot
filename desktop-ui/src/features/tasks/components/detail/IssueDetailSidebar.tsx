@@ -63,6 +63,7 @@ export function IssueDetailSidebar({ detail, onClose }: IssueDetailSidebarProps)
           onDismiss={detail.dismissSuggestion}
           onFetchSuggestions={detail.fetchSuggestions}
           suggestionsLoading={detail.suggestionsLoading}
+          aiError={detail.aiError}
         />
       </div>
     </div>
