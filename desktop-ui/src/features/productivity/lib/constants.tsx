@@ -483,7 +483,7 @@ export function resolveActivityColor(categoryType: string | undefined, isIdle: b
   if (isIdle) return "var(--surface-highest)";
   if (categoryType === "productive") return "var(--success)";
   if (categoryType === "distracting") return "var(--destructive)";
-  if (categoryType === "neutral") return "var(--text-muted)";
+  if (categoryType === "neutral") return "var(--text-muted-foreground)";
   return "var(--brand)";
 }
 
@@ -499,7 +499,7 @@ export function resolveCategoryLabel(categoryType: string): string {
 export function scoreColor(score: number): string {
   if (score >= 80) return "var(--success)";
   if (score >= 60) return "var(--brand)";
-  if (score >= 40) return "var(--text-muted)";
+  if (score >= 40) return "var(--text-muted-foreground)";
   return "var(--destructive)";
 }
 
@@ -519,7 +519,7 @@ export function buildBreakdownSegments(
 /** Productivity legend items for bar charts. */
 export const PRODUCTIVITY_LEGEND = [
   { label: "Productive", color: "var(--success)" },
-  { label: "Neutral", color: "var(--text-muted)" },
+  { label: "Neutral", color: "var(--text-muted-foreground)" },
   { label: "Distracting", color: "var(--destructive)" },
 ] as const;
 

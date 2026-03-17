@@ -21,7 +21,7 @@ export function CollapsibleSection({
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 w-full px-3 py-2 text-sm font-medium text-heading hover:bg-surface-hover rounded-md"
+        className="flex items-center gap-2 w-full px-3 py-2 text-sm font-medium text-foreground hover:bg-accent rounded-md"
       >
         <span className="text-[10px] text-muted-foreground">{open ? "\u25BE" : "\u25B8"}</span>
         {icon && <span>{icon}</span>}

@@ -259,7 +259,7 @@ export function WeekCalendarView() {
           })}
         </div>
 
-        {loading && <div className="px-4 py-1 text-xs text-muted">Loading...</div>}
+        {loading && <div className="px-4 py-1 text-xs text-muted-foreground">Loading...</div>}
 
         <div ref={scrollRef} className="flex-1 overflow-y-auto">
           <div className="relative" style={{ height: TOTAL_HEIGHT }}>
@@ -271,7 +271,7 @@ export function WeekCalendarView() {
                 style={{ top: h * HOUR_HEIGHT }}
               >
                 <div
-                  className="text-[9px] text-muted text-right pr-1 select-none"
+                  className="text-[9px] text-muted-foreground text-right pr-1 select-none"
                   style={{ width: HOUR_GUTTER }}
                 >
                   {formatHour(h)}

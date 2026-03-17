@@ -26,7 +26,7 @@ export function InboxSection({ items, onCreateAsNote, onDiscard }: InboxSectionP
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className="flex items-center gap-1 px-2 py-1 text-[10px] uppercase tracking-wider text-dim hover:text-muted transition-colors"
+        className="flex items-center gap-1 px-2 py-1 text-[10px] uppercase tracking-wider text-dim hover:text-muted-foreground transition-colors"
       >
         <ChevronRight className={`w-3 h-3 transition-transform ${isOpen ? "rotate-90" : ""}`} />
         <Inbox className="w-3 h-3" />

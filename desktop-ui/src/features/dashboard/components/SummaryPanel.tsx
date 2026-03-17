@@ -154,7 +154,7 @@ function DaySummary({
                     className="h-full"
                     style={{
                       width: `${(ps.neutralSecs / ps.totalActiveSecs) * 100}%`,
-                      backgroundColor: "var(--text-muted)",
+                      backgroundColor: "var(--text-muted-foreground)",
                     }}
                   />
                 )}
@@ -189,7 +189,7 @@ function DaySummary({
             )}
             {/* Deep Work */}
             {ps.deepWorkBlocks > 0 && (
-              <div className="flex items-center justify-between text-xs text-muted px-1 mt-2">
+              <div className="flex items-center justify-between text-xs text-muted-foreground px-1 mt-2">
                 <span>
                   {ps.deepWorkBlocks} deep work block{ps.deepWorkBlocks !== 1 ? "s" : ""}
                 </span>
@@ -199,7 +199,7 @@ function DaySummary({
 
             {/* Recovery Time */}
             {ps.avgRecoverySecs != null && (
-              <div className="text-xs text-muted px-1 mt-1">
+              <div className="text-xs text-muted-foreground px-1 mt-1">
                 Avg recovery: {Math.round(ps.avgRecoverySecs)}s
               </div>
             )}
@@ -216,7 +216,7 @@ function DaySummary({
 
       {/* ── 3. LLM suggestion ── */}
       {intel?.focusRecommendation && (
-        <p className="text-[10px] text-muted italic leading-relaxed">{intel.focusRecommendation}</p>
+        <p className="text-[10px] text-muted-foreground italic leading-relaxed">{intel.focusRecommendation}</p>
       )}
 
       {/* ── 4. Weekly sparkline ── */}
@@ -247,7 +247,7 @@ function DaySummary({
           <div className="flex flex-col gap-2">
             {intel.patterns.map((p, i) => (
               <div key={`p-${i}`} className="flex items-start gap-2 text-[11px]">
-                <Brain className="w-3 h-3 text-muted mt-0.5 shrink-0" />
+                <Brain className="w-3 h-3 text-muted-foreground mt-0.5 shrink-0" />
                 <span className="text-muted-foreground">{p}</span>
               </div>
             ))}
@@ -387,7 +387,7 @@ function SessionDetail({ session, onClose }: { session: SessionBlock; onClose: (
   return (
     <div className="w-80 px-4 py-3 flex flex-col gap-3 overflow-y-auto shrink-0">
       <div className="flex items-center justify-between">
-        <h3 className="text-xs font-semibold text-muted uppercase tracking-wider">
+        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
           Activity Session
         </h3>
         <button type="button" onClick={onClose} className="text-muted-foreground hover:text-foreground">
@@ -452,7 +452,7 @@ function SessionDetail({ session, onClose }: { session: SessionBlock; onClose: (
       )}
 
       {/* Time info */}
-      <div className="text-xs text-muted space-y-1">
+      <div className="text-xs text-muted-foreground space-y-1">
         <div>
           {fmt(startH, startM)} – {fmt(endH, endM)}
         </div>
@@ -462,7 +462,7 @@ function SessionDetail({ session, onClose }: { session: SessionBlock; onClose: (
       {/* App breakdown */}
       {session.appBreakdown.length > 0 && (
         <div>
-          <h4 className="text-xs font-medium text-muted mb-2">Apps in this session</h4>
+          <h4 className="text-xs font-medium text-muted-foreground mb-2">Apps in this session</h4>
           <div className="flex flex-col gap-2">
             {session.appBreakdown.map((app) => {
               const appCatColor = resolveActivityColor(app.catType, false);
@@ -502,7 +502,7 @@ function EntryDetail({
   return (
     <div className="w-80 px-4 py-3 flex flex-col gap-3 overflow-y-auto shrink-0">
       <div className="flex items-center justify-between">
-        <h3 className="text-xs font-semibold text-muted uppercase tracking-wider">Details</h3>
+        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Details</h3>
         <button type="button" onClick={onClose} className="text-muted-foreground hover:text-foreground">
           <X className="w-4 h-4" />
         </button>
@@ -513,9 +513,9 @@ function EntryDetail({
         <span className="text-sm font-medium text-foreground">{entry.title}</span>
       </div>
 
-      {entry.description && <p className="text-xs text-muted">{entry.description}</p>}
+      {entry.description && <p className="text-xs text-muted-foreground">{entry.description}</p>}
 
-      <div className="text-xs text-muted space-y-1">
+      <div className="text-xs text-muted-foreground space-y-1">
         <div>Started: {new Date(entry.startedAt).toLocaleTimeString()}</div>
         {entry.endedAt && <div>Ended: {new Date(entry.endedAt).toLocaleTimeString()}</div>}
         {entry.durationSecs != null && entry.durationSecs > 0 && (

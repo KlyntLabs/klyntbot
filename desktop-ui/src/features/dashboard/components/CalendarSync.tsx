@@ -33,7 +33,7 @@ export function CalendarSync() {
       disabled={loading}
       className={cn(
         "flex items-center gap-1.5 px-2 py-1 rounded-md text-xs",
-        "text-muted-foreground hover:text-foreground hover:bg-surface-hover transition-colors",
+        "text-muted-foreground hover:text-foreground hover:bg-accent transition-colors",
         loading && "opacity-50 cursor-not-allowed",
       )}
       title={

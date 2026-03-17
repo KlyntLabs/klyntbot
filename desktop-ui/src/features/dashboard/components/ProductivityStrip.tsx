@@ -19,7 +19,7 @@ function CategoryBar({ summary }: { summary: ProductivitySummary }) {
 
   const segments = [
     { key: "productive", secs: summary.productiveSecs, color: "var(--success)" },
-    { key: "neutral", secs: summary.neutralSecs, color: "var(--text-muted)" },
+    { key: "neutral", secs: summary.neutralSecs, color: "var(--text-muted-foreground)" },
     { key: "distracting", secs: summary.distractingSecs, color: "var(--destructive)" },
   ].filter((s) => s.secs > 0);
 
@@ -52,7 +52,7 @@ function MiniScore({ score }: { score: number | null }) {
         background: `conic-gradient(${color} ${clamped * 3.6}deg, rgba(255,255,255,0.06) 0deg)`,
       }}
     >
-      <div className="w-[18px] h-[18px] rounded-full bg-surface-floating flex items-center justify-center">
+      <div className="w-[18px] h-[18px] rounded-full bg-popover flex items-center justify-center">
         <span style={{ color }}>{Math.round(clamped)}</span>
       </div>
     </div>
@@ -69,7 +69,7 @@ function TopAppsMini({ summary }: { summary: ProductivitySummary }) {
     <div className="flex flex-col gap-1">
       {apps.map((app) => (
         <div key={app.appName} className="flex items-center gap-2">
-          <span className="text-[9px] text-muted truncate w-14">{app.appName}</span>
+          <span className="text-[9px] text-muted-foreground truncate w-14">{app.appName}</span>
           <div className="flex-1 h-1 rounded-full bg-accent overflow-hidden">
             <div
               className="h-full rounded-full"
@@ -119,7 +119,7 @@ export function ProductivityStrip({ summary }: ProductivityStripProps) {
             {productivePct}%<span className="text-dim"> productive</span>
           </span>
           {summary.focusSessionsCount > 0 && (
-            <span className="text-muted">
+            <span className="text-muted-foreground">
               {summary.focusSessionsCount}
               <span className="text-dim"> sessions</span>
             </span>
@@ -148,15 +148,15 @@ export function ProductivityStrip({ summary }: ProductivityStripProps) {
           <div className="flex items-center gap-4 text-[9px] shrink-0">
             <span className="flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-success" />
-              <span className="text-muted">{formatHumanDuration(summary.productiveSecs)}</span>
+              <span className="text-muted-foreground">{formatHumanDuration(summary.productiveSecs)}</span>
             </span>
             <span className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-[var(--text-muted)]" />
-              <span className="text-muted">{formatHumanDuration(summary.neutralSecs)}</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--text-muted-foreground)]" />
+              <span className="text-muted-foreground">{formatHumanDuration(summary.neutralSecs)}</span>
             </span>
             <span className="flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-destructive" />
-              <span className="text-muted">{formatHumanDuration(summary.distractingSecs)}</span>
+              <span className="text-muted-foreground">{formatHumanDuration(summary.distractingSecs)}</span>
             </span>
           </div>
         </div>

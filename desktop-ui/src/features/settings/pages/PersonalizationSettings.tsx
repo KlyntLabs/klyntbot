@@ -255,11 +255,11 @@ export function PersonalizationSettings() {
                 onChange={(e) => handleProviderChange(e.target.value)}
                 className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
               >
-                <option value="" className="bg-surface-floating">
+                <option value="" className="bg-popover">
                   Auto-detect
                 </option>
                 {PROVIDERS.map((p) => (
-                  <option key={p.value} value={p.value} className="bg-surface-floating">
+                  <option key={p.value} value={p.value} className="bg-popover">
                     {p.label}
                   </option>
                 ))}
@@ -331,12 +331,12 @@ export function PersonalizationSettings() {
                 }
                 className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
               >
-                <option value="" className="bg-surface-floating">
+                <option value="" className="bg-popover">
                   Same as main ({PROVIDERS.find((p) => p.value === editedProvider)?.label || "auto"}
                   )
                 </option>
                 {PROVIDERS.map((p) => (
-                  <option key={p.value} value={p.value} className="bg-surface-floating">
+                  <option key={p.value} value={p.value} className="bg-popover">
                     {p.label}
                   </option>
                 ))}
@@ -353,11 +353,11 @@ export function PersonalizationSettings() {
                   }
                   className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
                 >
-                  <option value="" className="bg-surface-floating">
+                  <option value="" className="bg-popover">
                     Same as main agent model
                   </option>
                   {cogModelOptions.map((m) => (
-                    <option key={m.value} value={m.value} className="bg-surface-floating">
+                    <option key={m.value} value={m.value} className="bg-popover">
                       {m.label}
                       {m.recommended ? " ★ recommended" : ""}
                     </option>

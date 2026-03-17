@@ -39,7 +39,7 @@ export function SynthesisTab({ status, content }: SynthesisTabProps) {
       <div className="space-y-3">
         <div className="flex items-center gap-2">
           <span className="inline-block w-1.5 h-3.5 bg-purple animate-pulse rounded-sm" />
-          <span className="text-[11px] text-muted animate-pulse">Generating synthesis...</span>
+          <span className="text-[11px] text-muted-foreground animate-pulse">Generating synthesis...</span>
         </div>
         <SkeletonLoader />
       </div>

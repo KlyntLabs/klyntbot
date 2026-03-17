@@ -5,9 +5,9 @@ import type { InsightCard, InsightPayload } from "@shared/types";
 
 const SENTIMENT_STYLES: Record<string, { bg: string; text: string; label: string }> = {
   positive: { bg: "bg-success/15", text: "text-success", label: "Positive" },
-  warning: { bg: "bg-[var(--text-muted)]/15", text: "text-[var(--text-muted)]", label: "Heads up" },
+  warning: { bg: "bg-[var(--text-muted-foreground)]/15", text: "text-[var(--text-muted-foreground)]", label: "Heads up" },
   negative: { bg: "bg-destructive/15", text: "text-destructive", label: "Alert" },
-  neutral: { bg: "bg-surface-glass", text: "text-muted-foreground", label: "Info" },
+  neutral: { bg: "bg-card", text: "text-muted-foreground", label: "Info" },
 };
 
 function sentimentStyle(sentiment: string) {

@@ -5,7 +5,7 @@ import { useState } from "react";
 const STATE_CONFIG: Record<string, { label: string; color: string; pulse: boolean }> = {
   building: { label: "Building focus", color: "var(--brand)", pulse: true },
   focused: { label: "Deep focus", color: "var(--success)", pulse: false },
-  cooldown: { label: "Cooldown", color: "var(--text-muted)", pulse: true },
+  cooldown: { label: "Cooldown", color: "var(--text-muted-foreground)", pulse: true },
 };
 
 export function FocusStateIndicator() {

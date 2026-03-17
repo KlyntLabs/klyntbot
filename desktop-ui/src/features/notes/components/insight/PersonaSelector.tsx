@@ -17,7 +17,7 @@ export function PersonaSelector({ personas, selectedIds, onSelect }: PersonaSele
         if (e.target.value) onSelect(e.target.value);
         e.target.value = "";
       }}
-      className="text-[10px] px-2 py-1 rounded-md bg-white/[0.04] text-muted border border-border"
+      className="text-[10px] px-2 py-1 rounded-md bg-white/[0.04] text-muted-foreground border border-border"
       defaultValue=""
     >
       <option value="" disabled>

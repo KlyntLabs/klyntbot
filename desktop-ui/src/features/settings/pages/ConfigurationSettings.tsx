@@ -310,13 +310,13 @@ export function ConfigurationSettings() {
                 }
                 className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
               >
-                <option value="strict" className="bg-surface-floating">
+                <option value="strict" className="bg-popover">
                   Strict — confirm every write
                 </option>
-                <option value="autonomous" className="bg-surface-floating">
+                <option value="autonomous" className="bg-popover">
                   Autonomous — confirm dangerous only
                 </option>
-                <option value="full" className="bg-surface-floating">
+                <option value="full" className="bg-popover">
                   Full — no confirmations
                 </option>
               </select>

@@ -149,12 +149,12 @@ export function MonthCalendarView() {
   return (
     <div className="flex gap-2 h-full">
       <div className="flex-1 glass-card p-3 flex flex-col overflow-hidden">
-        {loading && <div className="text-xs text-muted mb-1">Loading...</div>}
+        {loading && <div className="text-xs text-muted-foreground mb-1">Loading...</div>}
 
         {/* Day-of-week header */}
         <div className="grid grid-cols-7 mb-1">
           {DAY_LABELS.map((label) => (
-            <div key={label} className="text-center text-[10px] text-muted font-medium py-1">
+            <div key={label} className="text-center text-[10px] text-muted-foreground font-medium py-1">
               {label}
             </div>
           ))}
@@ -202,7 +202,7 @@ export function MonthCalendarView() {
                         {cell.day}
                       </span>
                       {stats.focusSecs > 0 && (
-                        <span className="text-[8px] text-muted/60">
+                        <span className="text-[8px] text-muted-foreground/60">
                           {formatHumanDuration(stats.focusSecs)}
                         </span>
                       )}

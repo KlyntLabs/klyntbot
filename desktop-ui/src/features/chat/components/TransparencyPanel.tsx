@@ -69,7 +69,7 @@ function AgentGroupLabel({ name }: { name: string }) {
 /** Skills popup shown on hover over an agent name in the Agents section. */
 function AgentSkillsPopup({ skills }: { skills: { name: string; trigger: string }[] }) {
   return (
-    <div className="absolute left-0 top-full mt-1 z-50 w-48 rounded-xl p-2.5 space-y-0.5 text-[10px] font-light bg-surface-floating border border-border">
+    <div className="absolute left-0 top-full mt-1 z-50 w-48 rounded-xl p-2.5 space-y-0.5 text-[10px] font-light bg-popover border border-border">
       <div className="text-dim text-[9px] font-medium uppercase tracking-wider mb-1">Skills</div>
       {skills.map((skill) => {
         const isActive = skill.trigger === "always" || skill.trigger === "activated";

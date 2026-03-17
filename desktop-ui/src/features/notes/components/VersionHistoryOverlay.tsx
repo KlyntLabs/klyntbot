@@ -157,7 +157,7 @@ export function VersionHistoryOverlay({
                       >
                         {formatTime(v.createdAt)}
                       </div>
-                      <div className="text-xs text-muted mt-0.5">{wordCountDelta(v)}</div>
+                      <div className="text-xs text-muted-foreground mt-0.5">{wordCountDelta(v)}</div>
                     </div>
                   </button>
                 ))}

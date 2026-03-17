@@ -195,7 +195,7 @@ function TasksWidget({
               </span>
             )}
             <svg
-              className="w-3.5 h-3.5 text-muted/0 group-hover:text-muted/60 transition-colors shrink-0"
+              className="w-3.5 h-3.5 text-muted-foreground/0 group-hover:text-muted-foreground/60 transition-colors shrink-0"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"

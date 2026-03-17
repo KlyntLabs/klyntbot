@@ -49,7 +49,7 @@ export function ScoreTrendChart({ summaries }: Props) {
           <Line
             type="monotone"
             dataKey="baseline"
-            stroke="var(--text-muted)"
+            stroke="var(--text-muted-foreground)"
             strokeWidth={1}
             strokeDasharray="4 4"
             dot={false}

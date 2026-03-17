@@ -18,7 +18,7 @@ export function DetailPanel() {
           }}
         >
           &larr; Back
-          <span className="ml-1 text-muted/60">Tab</span>
+          <span className="ml-1 text-muted-foreground/60">Tab</span>
         </button>
         <span className="text-sm text-foreground truncate">{item.title}</span>
       </div>

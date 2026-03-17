@@ -47,7 +47,7 @@ function Slider({
           className="relative z-10 w-full h-5 cursor-pointer outline-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:bg-brand [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-background"
         />
       </div>
-      <span className="text-[10px] text-muted tabular-nums w-[36px] text-right shrink-0">
+      <span className="text-[10px] text-muted-foreground tabular-nums w-[36px] text-right shrink-0">
         {value}
         {unit}
       </span>
@@ -102,14 +102,14 @@ export function GraphSettingsPopover({
     <div className="w-[280px]">
       {/* Header */}
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[10px] font-semibold text-muted uppercase tracking-wider">
+        <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
           Settings
         </span>
         {!isDefault && (
           <button
             type="button"
             onClick={onReset}
-            className="flex items-center gap-1 text-[10px] text-muted hover:text-foreground transition-colors"
+            className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
           >
             <RotateCcw size={9} />
             Reset

@@ -68,7 +68,7 @@ export function FinanceBasicsForm({ registerSave, onDirty }: FinanceBasicsFormPr
             className="w-full px-3 py-2 text-[13px] text-foreground bg-accent border border-border rounded-lg focus:outline-none focus:border-brand/50 transition-colors"
           >
             {CURRENCIES.map((c) => (
-              <option key={c} value={c} className="bg-surface-floating">
+              <option key={c} value={c} className="bg-popover">
                 {c}
               </option>
             ))}

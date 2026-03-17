@@ -73,6 +73,10 @@ interface TreeItem {
   updatedAt?: string;
   notebookId?: string;
   noteCount?: number;
+  /** Whether this is the last sibling at its depth (renders └ vs ├) */
+  isLastChild?: boolean;
+  /** Which ancestor depths have continuing vertical lines */
+  guides?: boolean[];
 }
 
 interface NotebookTreeProps {
@@ -247,7 +251,7 @@ const TreeRow = memo(function TreeRow({
       onDragLeave={onDragLeave}
       onDrop={(e) => onDrop(e, item)}
       onDragEnd={onDragEnd}
-      className={`flex items-center gap-2 py-1.5 pr-2 rounded-lg text-[12px] font-light cursor-default select-none outline-none transition-all ${
+      className={`relative flex items-center gap-2 py-1.5 pr-2 rounded-lg text-[12px] font-light cursor-default select-none outline-none transition-all ${
         isDragging ? "opacity-40" : ""
       } ${
         isDropTarget
@@ -256,8 +260,42 @@ const TreeRow = memo(function TreeRow({
             ? "bg-muted text-foreground"
             : "text-muted-foreground hover:bg-accent hover:text-foreground"
       }`}
-      style={{ paddingLeft: `${item.depth * INDENT + 8}px` }}
+      style={{ paddingLeft: `${item.depth * INDENT + (item.depth > 0 ? 12 : 8)}px` }}
     >
+      {/* Tree guide lines */}
+      {item.depth > 0 && item.guides && (
+        <>
+          {/* Ancestor vertical lines */}
+          {item.guides.map(
+            (continues, d) =>
+              continues && (
+                <div
+                  key={d}
+                  className="absolute top-0 bottom-0 w-px bg-border/40"
+                  style={{ left: d * INDENT + 14 }}
+                />
+              ),
+          )}
+          {/* Own connector: vertical portion */}
+          <div
+            className="absolute w-px bg-border/40"
+            style={{
+              left: (item.depth - 1) * INDENT + 14,
+              top: 0,
+              height: item.isLastChild ? "50%" : "100%",
+            }}
+          />
+          {/* Own connector: horizontal branch */}
+          <div
+            className="absolute h-px bg-border/40"
+            style={{
+              left: (item.depth - 1) * INDENT + 14,
+              top: "50%",
+              width: INDENT - 6,
+            }}
+          />
+        </>
+      )}
       {/* Chevron for folders */}
       {isFolder && (
         <ChevronRight
@@ -287,12 +325,12 @@ const TreeRow = memo(function TreeRow({
       ) : isFolder ? (
         item.isExpanded ? (
           <FolderOpen
-            className={`w-3.5 h-3.5 shrink-0 ${item.color ? "" : "text-muted"}`}
+            className={`w-3.5 h-3.5 shrink-0 ${item.color ? "" : "text-muted-foreground"}`}
             style={item.color ? { color: item.color } : undefined}
           />
         ) : (
           <FolderClosed
-            className={`w-3.5 h-3.5 shrink-0 ${item.color ? "" : "text-muted"}`}
+            className={`w-3.5 h-3.5 shrink-0 ${item.color ? "" : "text-muted-foreground"}`}
             style={item.color ? { color: item.color } : undefined}
           />
         )
@@ -300,7 +338,7 @@ const TreeRow = memo(function TreeRow({
         <Pin className="w-3 h-3 shrink-0 text-brand" />
       ) : (
         <FileText
-          className={`w-3.5 h-3.5 shrink-0 ${item.color ? "" : "text-muted"}`}
+          className={`w-3.5 h-3.5 shrink-0 ${item.color ? "" : "text-muted-foreground"}`}
           style={item.color ? { color: item.color } : undefined}
         />
       )}
@@ -337,12 +375,12 @@ const TreeRow = memo(function TreeRow({
 
       {/* Note count for folders */}
       {isFolder && !isRenaming && item.noteCount != null && item.noteCount > 0 && (
-        <span className="text-[10px] text-muted shrink-0">{item.noteCount}</span>
+        <span className="text-[10px] text-muted-foreground shrink-0">{item.noteCount}</span>
       )}
 
       {/* Date badge for notes */}
       {isNote && item.updatedAt && !isRenaming && (
-        <span className="text-[10px] text-muted shrink-0">
+        <span className="text-[10px] text-muted-foreground shrink-0">
           {formatDate(item.updatedAt.slice(0, 10))}
         </span>
       )}
@@ -501,6 +539,42 @@ export function NotebookTree({
         pinned: n.pinned,
         updatedAt: n.updatedAt,
       });
+    }
+
+    // Compute tree guide metadata for each item
+    for (let i = 0; i < result.length; i++) {
+      const item = result[i];
+      if (item.depth === 0) {
+        item.isLastChild = false;
+        item.guides = [];
+        continue;
+      }
+
+      // isLastChild: true if no later item exists at the same depth before depth drops
+      let isLast = true;
+      for (let j = i + 1; j < result.length; j++) {
+        if (result[j].depth < item.depth) break;
+        if (result[j].depth === item.depth) {
+          isLast = false;
+          break;
+        }
+      }
+      item.isLastChild = isLast;
+
+      // guides: for each ancestor depth 0..depth-1, does the vertical line continue?
+      const guides: boolean[] = [];
+      for (let d = 0; d < item.depth; d++) {
+        let continues = false;
+        for (let j = i + 1; j < result.length; j++) {
+          if (result[j].depth <= d) {
+            continues = result[j].depth === d;
+            break;
+          }
+          // If we reach end of list without finding depth <= d, line doesn't continue
+        }
+        guides.push(continues);
+      }
+      item.guides = guides;
     }
 
     return result;
@@ -750,7 +824,7 @@ export function NotebookTree({
     <div className="flex flex-col min-h-0 flex-1" onContextMenu={handleBlankContextMenu}>
       {/* Header */}
       <div className="flex items-center justify-between px-4 pb-1 pt-3">
-        <span className="text-[10px] uppercase tracking-wider text-muted font-medium">
+        <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
           Notebooks
         </span>
         <div className="flex items-center gap-0.5">

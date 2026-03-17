@@ -30,7 +30,7 @@ export function FocusBanner({ activeTask, onEndFocus }: Props) {
       <button
         type="button"
         onClick={() => onEndFocus(activeTask.id)}
-        className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-surface-hover transition-colors"
+        className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-accent transition-colors"
       >
         End Focus
       </button>

@@ -130,7 +130,7 @@ export function NoteCreationDialog({
           <div className="border-t border-border-subtle px-5 py-3">
             <div className="flex items-center gap-1.5 mb-2">
               <Sparkles size={12} className="text-brand" />
-              <span className="text-[10px] uppercase tracking-wider text-muted">Similar notes</span>
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Similar notes</span>
             </div>
             {searching && similarNotes.length === 0 ? (
               <div className="text-xs text-dim py-1">Searching...</div>
@@ -143,7 +143,7 @@ export function NoteCreationDialog({
                     onClick={() => handleNavigate(note.id)}
                     className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-left hover:bg-accent transition-colors group"
                   >
-                    <FileText size={14} className="text-dim group-hover:text-muted shrink-0" />
+                    <FileText size={14} className="text-dim group-hover:text-muted-foreground shrink-0" />
                     <span className="text-sm text-muted-foreground group-hover:text-foreground truncate">
                       {note.title || "Untitled"}
                     </span>
@@ -159,7 +159,7 @@ export function NoteCreationDialog({
           <button
             type="button"
             onClick={handleCreate}
-            className="text-xs text-dim hover:text-muted transition-colors"
+            className="text-xs text-dim hover:text-muted-foreground transition-colors"
           >
             Create blank
           </button>

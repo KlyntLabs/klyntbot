@@ -29,7 +29,7 @@ export function TokenBadge({ transparency, isStreaming }: TokenBadgeProps) {
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
-        className="ml-auto flex items-center gap-1.5 text-[10px] font-light text-dim hover:text-muted transition-colors"
+        className="ml-auto flex items-center gap-1.5 text-[10px] font-light text-dim hover:text-muted-foreground transition-colors"
       >
         <span>
           {"\u2191"}

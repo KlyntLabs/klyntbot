@@ -57,7 +57,7 @@ export function MonthlyChart({ summaries }: MonthlyChartProps) {
               cursor={{ fill: "var(--surface-raised)", radius: 2 }}
             />
             <Bar dataKey="productive" stackId="a" fill="var(--success)" />
-            <Bar dataKey="neutral" stackId="a" fill="var(--text-muted)" />
+            <Bar dataKey="neutral" stackId="a" fill="var(--text-muted-foreground)" />
             <Bar
               dataKey="distracting"
               stackId="a"

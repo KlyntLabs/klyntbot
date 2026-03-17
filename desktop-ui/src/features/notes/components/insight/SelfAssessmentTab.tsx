@@ -166,7 +166,7 @@ export function SelfAssessmentTab({
 
             {isRevealed && (
               <div className="pt-2 border-t border-border-subtle">
-                <div className="text-[10px] text-muted leading-relaxed">
+                <div className="text-[10px] text-muted-foreground leading-relaxed">
                   <span className="font-medium text-muted-foreground">Correct: </span>
                   {q.correctAnswer}
                 </div>

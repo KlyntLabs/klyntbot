@@ -57,7 +57,7 @@ export function WeeklyChart({ summaries }: WeeklyChartProps) {
               cursor={{ fill: "var(--surface-raised)", radius: 4 }}
             />
             <Bar dataKey="productive" stackId="a" fill="var(--success)" radius={[0, 0, 0, 0]} />
-            <Bar dataKey="neutral" stackId="a" fill="var(--text-muted)" />
+            <Bar dataKey="neutral" stackId="a" fill="var(--text-muted-foreground)" />
             <Bar
               dataKey="distracting"
               stackId="a"
