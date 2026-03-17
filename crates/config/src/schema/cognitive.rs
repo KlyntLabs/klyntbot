@@ -84,6 +84,26 @@ pub struct CognitiveConfig {
     /// Relevance weight for temporal recency (default: 0.05).
     #[serde(default = "default_w_temporal")]
     pub relevance_weight_temporal: f64,
+
+    /// Whether InsightForge multi-dimensional retrieval is enabled (default: true).
+    #[serde(default = "default_insight_forge_enabled")]
+    pub insight_forge_enabled: bool,
+
+    /// Max sub-queries for InsightForge decomposer (default: 5).
+    #[serde(default = "default_insight_forge_max_sub_queries")]
+    pub insight_forge_max_sub_queries: usize,
+
+    /// Max results per source per sub-query (default: 5).
+    #[serde(default = "default_insight_forge_per_source_limit")]
+    pub insight_forge_per_source_limit: usize,
+
+    /// Hard cap on total InsightForge results (default: 15).
+    #[serde(default = "default_insight_forge_total_limit")]
+    pub insight_forge_total_limit: usize,
+
+    /// Timeout ms for each domain searcher (default: 800).
+    #[serde(default = "default_insight_forge_per_source_timeout_ms")]
+    pub insight_forge_per_source_timeout_ms: u64,
 }
 
 impl Default for CognitiveConfig {
@@ -109,6 +129,11 @@ impl Default for CognitiveConfig {
             relevance_weight_frequency: default_w_frequency(),
             relevance_weight_situation: default_w_situation(),
             relevance_weight_temporal: default_w_temporal(),
+            insight_forge_enabled: default_insight_forge_enabled(),
+            insight_forge_max_sub_queries: default_insight_forge_max_sub_queries(),
+            insight_forge_per_source_limit: default_insight_forge_per_source_limit(),
+            insight_forge_total_limit: default_insight_forge_total_limit(),
+            insight_forge_per_source_timeout_ms: default_insight_forge_per_source_timeout_ms(),
         }
     }
 }
@@ -154,4 +179,19 @@ fn default_w_situation() -> f64 {
 }
 fn default_w_temporal() -> f64 {
     0.05
+}
+fn default_insight_forge_enabled() -> bool {
+    true
+}
+fn default_insight_forge_max_sub_queries() -> usize {
+    5
+}
+fn default_insight_forge_per_source_limit() -> usize {
+    5
+}
+fn default_insight_forge_total_limit() -> usize {
+    15
+}
+fn default_insight_forge_per_source_timeout_ms() -> u64 {
+    800
 }
