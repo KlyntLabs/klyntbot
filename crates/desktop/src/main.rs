@@ -359,6 +359,7 @@ fn run_desktop_app() {
             commands::notes::note_insight_review,
             commands::notes::note_insight_cache_get,
             commands::notes::note_insight_save_flashcards,
+            commands::notes::note_insight_submit_quiz,
             commands::notes::note_insight_regenerate_tab,
             commands::notes::note_insight_list_versions,
             commands::notes::note_insight_get_evolution,

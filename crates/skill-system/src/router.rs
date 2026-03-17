@@ -150,19 +150,8 @@ fn tokenize(text: &str) -> Vec<String> {
         .collect()
 }
 
-fn cosine_similarity(a: &[f32], b: &[f32]) -> f64 {
-    if a.is_empty() || a.len() != b.len() {
-        return 0.0;
-    }
-    let dot: f32 = a.iter().zip(b).map(|(x, y)| x * y).sum();
-    let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
-    let norm_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
-    if norm_a == 0.0 || norm_b == 0.0 {
-        0.0
-    } else {
-        (dot / (norm_a * norm_b)) as f64
-    }
-}
+// Re-use canonical implementation from common crate.
+use common::helpers::cosine_similarity;
 
 #[cfg(test)]
 mod tests {

@@ -584,7 +584,10 @@ impl AgentLoop {
                 "system" => Message::system(&m.content),
                 "user" => Message::user(&m.content),
                 "assistant" => Message::assistant(&m.content),
-                _ => Message::user(&m.content),
+                other => {
+                    tracing::warn!("Unknown message role '{}', treating as user", other);
+                    Message::user(&m.content)
+                }
             })
             .collect()
     }

@@ -300,12 +300,15 @@ impl AgentRuntime {
             }
         }
 
-        // Step 4: Override max_iterations from agent profile
-        if let crate::intent_pipeline::types::ExecutionMode::Reactive {
-            ref mut max_iterations,
-        } = analysis.mode
-        {
-            *max_iterations = (*max_iterations).min(profile.max_iterations());
+        // Step 4: Cap max_iterations from agent profile (skip for orchestrator —
+        // the orchestration boost in step 3b must not be clipped by the profile cap)
+        if !analysis.needs_orchestration {
+            if let crate::intent_pipeline::types::ExecutionMode::Reactive {
+                ref mut max_iterations,
+            } = analysis.mode
+            {
+                *max_iterations = (*max_iterations).min(profile.max_iterations());
+            }
         }
 
         // Step 5: Confidence check — downgrade to Direct mode for low-confidence
@@ -462,31 +465,32 @@ impl AgentRuntime {
 
         let mode_name = router_result.final_mode.clone();
 
-        // Step 10: Record usage + strategy
+        // Step 10: Record usage + strategy + interaction in parallel (independent DB writes)
         let pipeline_elapsed_ms = pipeline_start.elapsed().as_millis() as u64;
-        self.record_usage(
+        let usage_fut = self.record_usage(
             &router_result,
             &mode_name,
             ctx,
             &event_tx,
             pipeline_elapsed_ms,
-        )
-        .await;
-        self.record_strategy(&analysis, &router_result, &validation, ctx, pipeline_start)
-            .await;
-
-        // Record interaction for behavioral pattern learning
-        if let Some(ref recorder) = self.interaction_recorder {
-            let tools_used: Vec<&str> = router_result.tool_name.as_deref().into_iter().collect();
-            recorder
-                .record(
-                    &agent_name,
-                    &tools_used,
-                    ctx.channel.as_str(),
-                    pipeline_elapsed_ms,
-                )
-                .await;
-        }
+        );
+        let strategy_fut =
+            self.record_strategy(&analysis, &router_result, &validation, ctx, pipeline_start);
+        let interaction_fut = async {
+            if let Some(ref recorder) = self.interaction_recorder {
+                let tools_used: Vec<&str> =
+                    router_result.tool_name.as_deref().into_iter().collect();
+                recorder
+                    .record(
+                        &agent_name,
+                        &tools_used,
+                        ctx.channel.as_str(),
+                        pipeline_elapsed_ms,
+                    )
+                    .await;
+            }
+        };
+        tokio::join!(usage_fut, strategy_fut, interaction_fut);
 
         let final_content = std::mem::take(&mut validation.filtered_content);
 

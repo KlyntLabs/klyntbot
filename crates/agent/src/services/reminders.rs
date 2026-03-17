@@ -91,8 +91,8 @@ impl ReminderEngine {
 
         for todo in &todos {
             // Rule #1: Due date alerts (within 2 hours)
-            if Self::should_remind_due_date(todo) {
-                let time_left = todo.due_date.unwrap().signed_duration_since(Utc::now());
+            if let Some(due_date) = todo.due_date.filter(|_| Self::should_remind_due_date(todo)) {
+                let time_left = due_date.signed_duration_since(Utc::now());
                 let hours_left = time_left.num_hours();
                 let mins_left = time_left.num_minutes() % 60;
 
@@ -119,11 +119,11 @@ impl ReminderEngine {
             }
 
             // Rule #2: Focused deadlines (within 1 hour)
-            if Self::should_remind_focused_deadline(todo) {
-                let time_left = todo
-                    .focus_deadline
-                    .unwrap()
-                    .signed_duration_since(Utc::now());
+            if let Some(deadline) = todo
+                .focus_deadline
+                .filter(|_| Self::should_remind_focused_deadline(todo))
+            {
+                let time_left = deadline.signed_duration_since(Utc::now());
                 let mins_left = time_left.num_minutes();
 
                 dispatcher
@@ -135,8 +135,8 @@ impl ReminderEngine {
             }
 
             // Rule #3: Overdue nagging (once per day)
-            if Self::should_remind_overdue(todo) {
-                let overdue_by = Utc::now().signed_duration_since(todo.due_date.unwrap());
+            if let Some(due_date) = todo.due_date.filter(|_| Self::should_remind_overdue(todo)) {
+                let overdue_by = Utc::now().signed_duration_since(due_date);
                 let days_overdue = overdue_by.num_days();
 
                 let overdue_str = if days_overdue == 1 {

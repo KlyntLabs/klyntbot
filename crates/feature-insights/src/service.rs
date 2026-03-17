@@ -232,10 +232,14 @@ impl InsightService {
     }
 
     /// Compute and store a progress snapshot for an insight.
+    ///
+    /// Pass `quiz_score` as `Some(score)` after a user completes a quiz,
+    /// or `None` for the default daily refresh path.
     pub async fn compute_progress(
         &self,
         insight_id: &str,
         note_body: &str,
+        quiz_score: Option<f64>,
     ) -> Result<ProgressSnapshotRow, sqlx::Error> {
         let insight = self
             .repo
@@ -243,7 +247,9 @@ impl InsightService {
             .await?
             .ok_or(sqlx::Error::RowNotFound)?;
 
-        self.progress_computer().compute(&insight, note_body).await
+        self.progress_computer()
+            .compute(&insight, note_body, quiz_score)
+            .await
     }
 
     /// Get the evolution timeline for a note — versions + progress + change notes.

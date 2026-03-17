@@ -83,6 +83,32 @@ pub fn tool_def_name(def: &serde_json::Value) -> Option<&str> {
         .and_then(|n| n.as_str())
 }
 
+/// Cosine similarity between two equal-length f32 vectors.
+///
+/// Returns 0.0 for empty, mismatched-length, or zero-norm vectors.
+/// NaN values are treated as 0.0.
+pub fn cosine_similarity(a: &[f32], b: &[f32]) -> f64 {
+    if a.is_empty() || a.len() != b.len() {
+        return 0.0;
+    }
+    let mut dot = 0.0f64;
+    let mut norm_a = 0.0f64;
+    let mut norm_b = 0.0f64;
+    for (va, vb) in a.iter().zip(b.iter()) {
+        let fa = if va.is_nan() { 0.0f64 } else { *va as f64 };
+        let fb = if vb.is_nan() { 0.0f64 } else { *vb as f64 };
+        dot += fa * fb;
+        norm_a += fa * fa;
+        norm_b += fb * fb;
+    }
+    let denom = norm_a.sqrt() * norm_b.sqrt();
+    if denom == 0.0 {
+        0.0
+    } else {
+        dot / denom
+    }
+}
+
 /// Format a timestamp in milliseconds to ISO 8601 string
 pub fn format_timestamp_ms(ms: i64) -> String {
     let dt = DateTime::from_timestamp_millis(ms).unwrap_or_else(Utc::now);

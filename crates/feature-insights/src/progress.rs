@@ -42,10 +42,14 @@ impl ProgressComputer {
     /// Compute and store a progress snapshot for a specific insight.
     ///
     /// Gathers all 4 signals and stores the result via InsightProgressRepo.
+    ///
+    /// `quiz_score_override` — if `Some`, uses the provided score instead of
+    /// the default 0.0. Called with a real score after the user completes a quiz.
     pub async fn compute(
         &self,
         insight: &InsightReviewRow,
         note_body: &str,
+        quiz_score_override: Option<f64>,
     ) -> Result<ProgressSnapshotRow, sqlx::Error> {
         // Fetch versions once for both drift and gap closure
         let prev = if insight.version > 1 {
@@ -71,9 +75,8 @@ impl ProgressComputer {
         // 3. Gap closure (compare previous gaps against current note body)
         let gap_closure = Self::compute_gap_closure(prev.as_ref(), note_body);
 
-        // 4. Quiz score — placeholder until quiz response persistence is implemented
-        // For now, 0.0 (no quiz data). Phase 4 will persist user quiz answers.
-        let quiz_score = 0.0;
+        // 4. Quiz score (from user quiz answers, or 0.0 if no quiz data yet)
+        let quiz_score = quiz_score_override.unwrap_or(0.0);
 
         self.progress_repo
             .upsert(

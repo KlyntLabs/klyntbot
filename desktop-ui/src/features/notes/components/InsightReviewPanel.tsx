@@ -20,6 +20,7 @@ import type {
   TabId,
   TabStatus,
 } from "../hooks/useInsightReview";
+import { useInsightSSE } from "../hooks/useInsightSSE";
 import { useInsightVersions } from "../hooks/useInsightVersions";
 import { usePersonas } from "../hooks/usePersonas";
 import { ConceptMapTab } from "./insight/ConceptMapTab";
@@ -103,6 +104,7 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
   const [allPersonas, personaActions] = usePersonas();
   const evolution = useInsightEvolution();
   const versions = useInsightVersions();
+  useInsightSSE(state.isOpen);
 
   // Lazy-fetch evolution + versions only when History panel is shown
   useEffect(() => {

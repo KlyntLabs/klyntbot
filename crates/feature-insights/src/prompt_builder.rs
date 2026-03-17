@@ -91,6 +91,39 @@ impl PromptBuilder {
             }
         }
 
+        // Section 3b: Deep dive context (user model, entity graph, fact history)
+        if scope_config.deep_dive {
+            let note_title_for_subject = note.title.clone();
+            let (user_model, neighborhood, history) = tokio::join!(
+                self.cognitive.user_model_summary(""),
+                self.cognitive.entity_neighborhood(&note.id, 2),
+                self.cognitive.fact_history(&note_title_for_subject),
+            );
+
+            let mut deep_parts = Vec::new();
+            if let Some(model) = user_model {
+                deep_parts.push(format!("### User Model\n{model}"));
+            }
+            if !neighborhood.is_empty() {
+                deep_parts.push(format!(
+                    "### Entity Connections\n{}",
+                    bullet_list(&neighborhood)
+                ));
+            }
+            if !history.is_empty() {
+                deep_parts.push(format!(
+                    "### Knowledge Evolution\n{}",
+                    bullet_list(&history)
+                ));
+            }
+            if !deep_parts.is_empty() {
+                sections.push(format!(
+                    "## Deep Dive Context\n\n{}",
+                    deep_parts.join("\n\n")
+                ));
+            }
+        }
+
         // Section 4: Parent insight context (from smart merge)
         if let Some(parent_row) = parent {
             if let Ok(parent_content) = serde_json::from_str::<InsightContent>(&parent_row.content)

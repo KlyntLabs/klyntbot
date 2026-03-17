@@ -2,11 +2,12 @@ use std::sync::Arc;
 
 use desktop_shared::commands::{
     BacklinkResponse, CreatePersonaParams, FlashcardResponse, HybridSearchResponse,
-    InboxCreateParams, InboxItemResponse, InsightEvolutionResponse, InsightReviewResponse,
-    InsightReviewStarted, InsightSaveFlashcardsParams, InsightVersionResponse, NoteCreateParams,
-    NoteLinkResponse, NoteResponse, NoteSuggestionsResponse, NoteUpdateParams, NoteVersionResponse,
-    NotebookCreateParams, NotebookResponse, NotebookUpdateParams, PersonaResponse,
-    RatePersonaParams, SetPersonaPinsParams, TabContent, UpdatePersonaParams,
+    InboxCreateParams, InboxItemResponse, InsightEvolutionResponse, InsightQuizSubmitParams,
+    InsightReviewResponse, InsightReviewStarted, InsightSaveFlashcardsParams,
+    InsightVersionResponse, NoteCreateParams, NoteLinkResponse, NoteResponse,
+    NoteSuggestionsResponse, NoteUpdateParams, NoteVersionResponse, NotebookCreateParams,
+    NotebookResponse, NotebookUpdateParams, PersonaResponse, RatePersonaParams,
+    SetPersonaPinsParams, TabContent, UpdatePersonaParams,
 };
 use desktop_shared::errors::ApiError;
 use tauri::State;
@@ -290,7 +291,7 @@ pub async fn note_insight_review(
     scope_config: Option<desktop_shared::commands::InsightScopeConfigParams>,
 ) -> Result<InsightReviewStarted, ApiError> {
     state
-        .note_insight_review(&note_id, scope_config.as_ref())
+        .note_insight_review(&note_id, scope_config.as_ref(), None)
         .await
 }
 
@@ -308,6 +309,14 @@ pub async fn note_insight_save_flashcards(
     params: InsightSaveFlashcardsParams,
 ) -> Result<Vec<FlashcardResponse>, ApiError> {
     state.insight_save_flashcards(params).await
+}
+
+#[tauri::command]
+pub async fn note_insight_submit_quiz(
+    state: State<'_, Arc<AppCore>>,
+    params: InsightQuizSubmitParams,
+) -> Result<(), ApiError> {
+    state.note_insight_submit_quiz(&params).await
 }
 
 #[tauri::command]
@@ -444,6 +453,7 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "note_insight_review",
     "note_insight_cache_get",
     "note_insight_save_flashcards",
+    "note_insight_submit_quiz",
     "note_insight_regenerate_tab",
     "note_insight_list_versions",
     "note_insight_get_evolution",
@@ -567,13 +577,8 @@ pub(crate) async fn dispatch_dev(
             let id = try_field!(dev::get_str(body, "id"));
             dev::val(core.inbox_delete(&id).await)
         }
-        "note_insight_review" => {
-            let id = try_field!(dev::get_str(body, "noteId"));
-            let scope: Option<desktop_shared::commands::InsightScopeConfigParams> = body
-                .get("scopeConfig")
-                .and_then(|v| serde_json::from_value(v.clone()).ok());
-            dev::val(core.note_insight_review(&id, scope.as_ref()).await)
-        }
+        // note_insight_review is handled inline in dev_server/dispatch.rs
+        // (needs SSE emitter injection, like chat_send)
         "note_insight_cache_get" => {
             let id = try_field!(dev::get_str(body, "noteId"));
             dev::val(core.note_insight_cache_get(&id).await)
@@ -581,6 +586,12 @@ pub(crate) async fn dispatch_dev(
         "note_insight_save_flashcards" => dev::val(
             core.insight_save_flashcards(try_field!(dev::parse_params::<
                 desktop_shared::commands::InsightSaveFlashcardsParams,
+            >(body)))
+                .await,
+        ),
+        "note_insight_submit_quiz" => dev::val(
+            core.note_insight_submit_quiz(&try_field!(dev::parse_params::<
+                desktop_shared::commands::InsightQuizSubmitParams,
             >(body)))
                 .await,
         ),

@@ -245,6 +245,16 @@ pub struct InsightSaveFlashcardsParams {
     pub questions: Vec<QuizQuestion>,
 }
 
+// ── Insight Quiz ─────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InsightQuizSubmitParams {
+    pub insight_review_id: String,
+    pub score: f64,
+    pub total: i32,
+}
+
 // ── Insight Versions ─────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize)]

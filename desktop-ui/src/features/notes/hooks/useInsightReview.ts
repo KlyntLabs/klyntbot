@@ -1,6 +1,6 @@
 import { useEvent } from "@shared/hooks/useEvent";
 import { ipc } from "@shared/hooks/useIpc";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -119,6 +119,8 @@ const INITIAL_STATE: InsightReviewState = {
 
 export function useInsightReview(): [InsightReviewState, InsightReviewActions] {
   const [state, setState] = useState<InsightReviewState>(INITIAL_STATE);
+  const insightReviewIdRef = useRef<string | null>(null);
+  insightReviewIdRef.current = state.insightReviewId;
 
   // -------------------------------------------------------------------------
   // Event listeners
@@ -408,12 +410,17 @@ export function useInsightReview(): [InsightReviewState, InsightReviewActions] {
           ...prev.quizState,
           revealed: newRevealed,
           score: isCorrect ? prev.quizState.score + 1 : prev.quizState.score,
+          total: prev.tabs.assessment.questions.length,
         },
       };
     });
   }, []);
 
   const revealAll = useCallback(() => {
+    // Compute score synchronously before setState to avoid side-effects in updater
+    let computedScore = 0;
+    let computedTotal = 0;
+
     setState((prev) => {
       const questions = prev.tabs.assessment.questions;
       const newRevealed = new Set(questions.map((q) => q.id));
@@ -426,6 +433,10 @@ export function useInsightReview(): [InsightReviewState, InsightReviewActions] {
         }
       }
 
+      // Capture for IPC call after setState
+      computedScore = score;
+      computedTotal = questions.length;
+
       return {
         ...prev,
         quizState: {
@@ -436,6 +447,16 @@ export function useInsightReview(): [InsightReviewState, InsightReviewActions] {
         },
       };
     });
+
+    // Submit quiz score to backend (best-effort, outside setState)
+    const reviewId = insightReviewIdRef.current;
+    if (reviewId && computedTotal > 0) {
+      ipc("note_insight_submit_quiz", {
+        insightReviewId: reviewId,
+        score: computedScore / computedTotal,
+        total: computedTotal,
+      }).catch(() => {});
+    }
   }, []);
 
   const actions: InsightReviewActions = {

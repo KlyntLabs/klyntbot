@@ -1,5 +1,7 @@
 //! Area context source — available areas for the LLM.
 
+use std::fmt::Write;
+
 use async_trait::async_trait;
 use context_engine::source::{ContextSource, SourceContext};
 use context_engine::TtlCache;
@@ -50,7 +52,7 @@ impl ContextSource for AreaSource {
                 } else {
                     let mut out = String::from("Available areas:\n");
                     for area in &areas {
-                        out.push_str(&format!("- {} (ID: {})\n", area.name, area.id));
+                        let _ = writeln!(out, "- {} (ID: {})", area.name, area.id);
                     }
                     out
                 }

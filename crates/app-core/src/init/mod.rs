@@ -142,6 +142,13 @@ impl AppCore {
             ),
         );
 
+        // ── Scope resolver for insight context ──
+        let scope_resolver: Arc<dyn feature_insights::ScopeResolver> =
+            Arc::new(crate::adapters::scope_resolver::ScopeResolverImpl::new(
+                note_repo.clone(),
+                vector_store.clone(),
+            ));
+
         // ── Phase 3: Agent ───────────────────────────────────────────────
         let agent::AgentResult {
             cognitive_provider,
@@ -265,7 +272,7 @@ impl AppCore {
                 Some(Arc::new(feature_insights::InsightService::new(
                     insight_repo.clone(),
                     feature_insights::InsightProgressRepo::new(storage_pool.inner().clone()),
-                    Arc::new(feature_insights::NoopScopeResolver), // Task 9 wires real impl
+                    scope_resolver,
                     feature_insights::SmartMergeEngine::new(insight_repo),
                     feature_insights::PromptBuilder::new(Arc::clone(&cognitive_accessor)),
                     cognitive_accessor,

@@ -40,6 +40,7 @@ impl AppCore {
         &self,
         note_id: &str,
         scope_params: Option<&InsightScopeConfigParams>,
+        emitter_override: Option<Arc<dyn crate::events::AppEventEmitter>>,
     ) -> Result<InsightReviewStarted, ApiError> {
         let note = self
             .note_repo
@@ -170,7 +171,7 @@ impl AppCore {
         let params = providers::cognitive_chat_params(&config, 4096);
         drop(config);
 
-        let emitter = Arc::clone(&self.event_emitter);
+        let emitter = emitter_override.unwrap_or_else(|| Arc::clone(&self.event_emitter));
         let insight_service = self.insight_service.clone();
         let note_id_owned = note_id.to_string();
         let content_hash_clone = content_hash.clone();
@@ -285,6 +286,36 @@ impl AppCore {
             .collect())
     }
 
+    pub async fn note_insight_submit_quiz(
+        &self,
+        params: &InsightQuizSubmitParams,
+    ) -> Result<(), ApiError> {
+        let service = self
+            .insight_service
+            .as_ref()
+            .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "Insight service not available"))?;
+
+        let insight = service
+            .get_version(&params.insight_review_id)
+            .await
+            .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?
+            .ok_or_else(|| ApiError::new("NOT_FOUND", "Insight not found"))?;
+
+        let note = self
+            .note_repo
+            .get_note(&insight.note_id)
+            .await
+            .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?
+            .ok_or_else(|| ApiError::new("NOT_FOUND", "Note not found"))?;
+
+        service
+            .compute_progress(&params.insight_review_id, &note.body, Some(params.score))
+            .await
+            .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?;
+
+        Ok(())
+    }
+
     pub async fn note_insight_regenerate_tab(
         &self,
         note_id: &str,
@@ -302,21 +333,60 @@ impl AppCore {
             .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?
             .ok_or_else(|| ApiError::new("NOT_FOUND", "Note not found"))?;
 
-        let related_notes = self.fetch_related_notes(note_id).await;
-        let ctx = insight_context::assemble_context(&note, &related_notes, None);
+        // Use InsightService pipeline for consistent context quality.
+        // Fetch tags + domains once (reused for both context building and persona selection).
+        let tags = self.note_repo.get_tags(note_id).await.unwrap_or_default();
+        let note_domains = insight_context::extract_note_domains(&tags);
+
+        // Cache latest insight for both scope config and tab update
+        let latest_insight = if let Some(ref service) = self.insight_service {
+            service.get_latest(note_id).await.ok().flatten()
+        } else {
+            None
+        };
+
+        let (ctx_text, ctx_note_title) = if let Some(ref service) = self.insight_service {
+            let scope: feature_insights::ScopeConfig = latest_insight
+                .as_ref()
+                .and_then(|l| serde_json::from_str(&l.scope_config).ok())
+                .unwrap_or_default();
+
+            let scope_ids = service.resolve_scope(note_id, &scope).await;
+            let mut related_notes = Vec::new();
+            for id in &scope_ids {
+                if let Ok(Some(n)) = self.note_repo.get_note(id).await {
+                    related_notes.push(n);
+                }
+            }
+
+            match service
+                .prepare_context(&note, &related_notes, &scope_ids, &scope, &note_domains)
+                .await
+            {
+                Ok(prepared) => (prepared.context.text, prepared.context.note_title),
+                Err(e) => {
+                    tracing::warn!("prepare_context failed in regenerate_tab, falling back: {e}");
+                    let related = self.fetch_related_notes(note_id).await;
+                    let ctx = insight_context::assemble_context(&note, &related, None);
+                    (ctx.text, ctx.note_title)
+                }
+            }
+        } else {
+            let related = self.fetch_related_notes(note_id).await;
+            let ctx = insight_context::assemble_context(&note, &related, None);
+            (ctx.text, ctx.note_title)
+        };
 
         let config = self.config.read().await;
         let params = providers::cognitive_chat_params(&config, 4096);
         drop(config);
 
         let prompt = match tab {
-            "synthesis" => insight_prompts::synthesis_prompt(&ctx.text),
-            "gaps" => insight_prompts::gap_analysis_prompt(&ctx.text),
-            "assessment" => insight_prompts::self_assessment_prompt(&ctx.text),
-            "concept-map" => insight_prompts::concept_map_prompt(&ctx.text, &ctx.note_title),
+            "synthesis" => insight_prompts::synthesis_prompt(&ctx_text),
+            "gaps" => insight_prompts::gap_analysis_prompt(&ctx_text),
+            "assessment" => insight_prompts::self_assessment_prompt(&ctx_text),
+            "concept-map" => insight_prompts::concept_map_prompt(&ctx_text, &ctx_note_title),
             "perspectives" => {
-                let tags = self.note_repo.get_tags(note_id).await.unwrap_or_default();
-                let note_domains = insight_context::extract_note_domains(&tags);
                 let personas = self.select_personas(note_id, &note_domains).await;
                 let blocks: Vec<(String, String, String, String, String)> = personas
                     .iter()
@@ -331,7 +401,7 @@ impl AppCore {
                     })
                     .collect();
                 let persona_blocks = insight_prompts::format_persona_blocks(&blocks);
-                insight_prompts::perspectives_prompt(&ctx.text, &persona_blocks)
+                insight_prompts::perspectives_prompt(&ctx_text, &persona_blocks)
             }
             _ => return Err(ApiError::new("VALIDATION", "Invalid tab name")),
         };
@@ -350,11 +420,9 @@ impl AppCore {
 
         let content = response.content.unwrap_or_default();
 
-        if let Some(ref service) = self.insight_service {
-            if let Ok(Some(latest)) = service.get_latest(note_id).await {
-                if let Err(e) = service.update_tab(&latest.id, tab, &content).await {
-                    tracing::warn!("failed to persist regenerated tab {tab}: {e}");
-                }
+        if let (Some(ref service), Some(ref latest)) = (&self.insight_service, &latest_insight) {
+            if let Err(e) = service.update_tab(&latest.id, tab, &content).await {
+                tracing::warn!("failed to persist regenerated tab {tab}: {e}");
             }
         }
 
@@ -372,6 +440,15 @@ impl AppCore {
             .insight_service
             .as_ref()
             .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "Insight service not available"))?;
+
+        let note_title = self
+            .note_repo
+            .get_note(note_id)
+            .await
+            .ok()
+            .flatten()
+            .map(|n| n.title)
+            .unwrap_or_default();
 
         let evolution = service
             .get_evolution(note_id)
@@ -406,7 +483,7 @@ impl AppCore {
 
         Ok(InsightEvolutionResponse {
             note_id: note_id.to_string(),
-            note_title: String::new(),
+            note_title,
             versions: points,
         })
     }

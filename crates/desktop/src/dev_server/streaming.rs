@@ -92,6 +92,37 @@ pub(super) async fn sse_handler(
     Sse::new(stream).keep_alive(KeepAlive::default())
 }
 
+/// SSE endpoint — streams insight review events (synthesis chunks, tab-done, etc.).
+///
+/// The frontend (`useInsightSSE.ts`) connects here in browser dev mode
+/// via `new EventSource("/api/insight/events")`.
+pub(super) async fn insight_sse_handler(
+    State(state): State<DevState>,
+) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
+    let rx = state.insight_tx.subscribe();
+
+    let stream = futures_util::stream::unfold(rx, |mut rx| async move {
+        loop {
+            match rx.recv().await {
+                Ok((event_name, payload)) => {
+                    let data = serde_json::to_string(&payload).unwrap_or_default();
+                    let event = Event::default().event(&event_name).data(data);
+                    return Some((Ok(event), rx));
+                }
+                Err(broadcast::error::RecvError::Lagged(n)) => {
+                    tracing::warn!("insight SSE stream lagged by {n} events");
+                    continue;
+                }
+                Err(broadcast::error::RecvError::Closed) => {
+                    return None;
+                }
+            }
+        }
+    });
+
+    Sse::new(stream).keep_alive(KeepAlive::default())
+}
+
 /// SSE endpoint — streams cognitive debug events (domain events + pipeline).
 ///
 /// The frontend (`DebugDashboard.tsx`) connects here in browser dev mode

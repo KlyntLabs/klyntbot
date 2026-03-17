@@ -504,8 +504,19 @@ pub fn analyze_heuristic(message: &str) -> Option<IntentAnalysis> {
         return None;
     }
 
-    // 2. Task management patterns → Reactive
-    if is_task_management(&msg, m) {
+    // 2. Domain-specific patterns → Reactive
+    let domain_match = if is_task_management(&msg, m) {
+        Some("Task management operation")
+    } else if is_finance_operation(&msg, m) {
+        Some("Finance operation")
+    } else if is_notes_operation(&msg, m) {
+        Some("Notes operation")
+    } else if is_automation_operation(&msg, m) {
+        Some("Automation/scheduling operation")
+    } else {
+        None
+    };
+    if let Some(reasoning) = domain_match {
         let signals = ComplexitySignals {
             estimated_tool_calls: count_tool_indicators(&msg, m).max(1),
             has_sequential_deps: false,
@@ -514,61 +525,7 @@ pub fn analyze_heuristic(message: &str) -> Option<IntentAnalysis> {
             requires_retries: false,
         };
         let budget = compute_iteration_budget(&signals);
-        return Some(reactive_analysis(
-            budget,
-            "Task management operation",
-            0.90,
-            signals,
-        ));
-    }
-
-    // 2b. Finance domain patterns → Reactive
-    if is_finance_operation(&msg, m) {
-        let signals = ComplexitySignals {
-            estimated_tool_calls: count_tool_indicators(&msg, m).max(1),
-            has_sequential_deps: false,
-            failure_risk: FailureRisk::Low,
-            requires_state_tracking: false,
-            requires_retries: false,
-        };
-        let budget = compute_iteration_budget(&signals);
-        return Some(reactive_analysis(
-            budget,
-            "Finance operation",
-            0.90,
-            signals,
-        ));
-    }
-
-    // 2c. Notes domain patterns → Reactive
-    if is_notes_operation(&msg, m) {
-        let signals = ComplexitySignals {
-            estimated_tool_calls: count_tool_indicators(&msg, m).max(1),
-            has_sequential_deps: false,
-            failure_risk: FailureRisk::Low,
-            requires_state_tracking: false,
-            requires_retries: false,
-        };
-        let budget = compute_iteration_budget(&signals);
-        return Some(reactive_analysis(budget, "Notes operation", 0.90, signals));
-    }
-
-    // 2d. Automation/scheduling domain patterns → Reactive
-    if is_automation_operation(&msg, m) {
-        let signals = ComplexitySignals {
-            estimated_tool_calls: count_tool_indicators(&msg, m).max(1),
-            has_sequential_deps: false,
-            failure_risk: FailureRisk::Low,
-            requires_state_tracking: false,
-            requires_retries: false,
-        };
-        let budget = compute_iteration_budget(&signals);
-        return Some(reactive_analysis(
-            budget,
-            "Automation/scheduling operation",
-            0.90,
-            signals,
-        ));
+        return Some(reactive_analysis(budget, reasoning, 0.90, signals));
     }
 
     // 3. Very short non-keyword messages → Direct
@@ -748,8 +705,7 @@ fn has_any_domain_keyword(msg: &str, m: &AcMatchers) -> bool {
 }
 
 fn has_domain_verb(msg: &str, m: &AcMatchers) -> bool {
-    let words: Vec<&str> = msg.split_whitespace().collect();
-    words.iter().any(|w| {
+    msg.split_whitespace().any(|w| {
         m.domain_verbs
             .contains(w.trim_matches(|c: char| !c.is_alphabetic()))
     })
@@ -977,22 +933,9 @@ struct IntentCentroid {
     centroid: Vec<f32>,
 }
 
-fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
-    if a.len() != b.len() || a.is_empty() {
-        return 0.0;
-    }
-    let (mut dot, mut norm_a, mut norm_b) = (0.0f64, 0.0f64, 0.0f64);
-    for (x, y) in a.iter().zip(b.iter()) {
-        let (x, y) = (*x as f64, *y as f64);
-        dot += x * y;
-        norm_a += x * x;
-        norm_b += y * y;
-    }
-    let denom = norm_a.sqrt() * norm_b.sqrt();
-    if denom < 1e-12 {
-        return 0.0;
-    }
-    (dot / denom) as f32
+// Re-use canonical implementation from common crate.
+fn cosine_similarity_f32(a: &[f32], b: &[f32]) -> f32 {
+    common::helpers::cosine_similarity(a, b) as f32
 }
 
 fn mean_embedding(embeddings: &[Vec<f32>]) -> Vec<f32> {
@@ -1370,7 +1313,7 @@ impl IntentAnalyzer {
         let mut best_score = f32::NEG_INFINITY;
         let mut best_category = None;
         for centroid in centroids {
-            let score = cosine_similarity(&msg_embedding, &centroid.centroid);
+            let score = cosine_similarity_f32(&msg_embedding, &centroid.centroid);
             if score > best_score {
                 best_score = score;
                 best_category = Some(centroid.category);
@@ -2323,19 +2266,19 @@ mod tests {
     fn cosine_similarity_identical_vectors() {
         let a = vec![1.0, 0.0, 0.0];
         let b = vec![1.0, 0.0, 0.0];
-        assert!((cosine_similarity(&a, &b) - 1.0).abs() < 1e-6);
+        assert!((cosine_similarity_f32(&a, &b) - 1.0).abs() < 1e-6);
     }
 
     #[test]
     fn cosine_similarity_orthogonal_vectors() {
         let a = vec![1.0, 0.0, 0.0];
         let b = vec![0.0, 1.0, 0.0];
-        assert!(cosine_similarity(&a, &b).abs() < 1e-6);
+        assert!(cosine_similarity_f32(&a, &b).abs() < 1e-6);
     }
 
     #[test]
     fn cosine_similarity_empty_vectors() {
-        assert_eq!(cosine_similarity(&[], &[]), 0.0);
+        assert_eq!(cosine_similarity_f32(&[], &[]), 0.0);
     }
 
     #[test]

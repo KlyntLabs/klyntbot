@@ -2,9 +2,12 @@ use axum::extract::{Path, State};
 use axum::Json;
 use serde_json::Value;
 
-use super::{err, into_api_result, ok, ApiResult, DevState};
+use std::sync::Arc;
+
+use super::{err, into_api_result, ok, ApiResult, DevState, SseEmitter};
 use crate::commands;
 use crate::commands::dev_helpers as dev;
+use ::app_core::events::AppEventEmitter;
 
 // ── Dispatch ────────────────────────────────────────────────────────────
 //
@@ -21,6 +24,22 @@ pub(super) async fn dispatch(
 ) -> ApiResult {
     let core = &state.core;
     let cmd = cmd.as_str();
+
+    // ── note_insight_review (needs SSE emitter, handled inline) ─────
+    if cmd == "note_insight_review" {
+        let id = dev::get_str(&body, "noteId").unwrap_or_default();
+        let scope: Option<desktop_shared::commands::InsightScopeConfigParams> = body
+            .get("scopeConfig")
+            .and_then(|v| serde_json::from_value(v.clone()).ok());
+        let emitter: Arc<dyn AppEventEmitter> = Arc::new(SseEmitter {
+            tx: state.insight_tx.clone(),
+        });
+        return into_api_result(
+            core.note_insight_review(&id, scope.as_ref(), Some(emitter))
+                .await
+                .map(|v| serde_json::to_value(v).unwrap_or_default()),
+        );
+    }
 
     // ── Per-module dispatch (co-located with Tauri commands) ─────────
     if let Some(r) = commands::tasks::dispatch_dev(cmd, core, &body).await {

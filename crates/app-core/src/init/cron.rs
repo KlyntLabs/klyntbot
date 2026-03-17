@@ -546,7 +546,7 @@ pub async fn refresh_insight_progress(
 
     for note in &all_notes {
         if let Ok(Some(latest)) = svc.get_latest(&note.id).await {
-            if let Err(e) = svc.compute_progress(&latest.id, &note.body).await {
+            if let Err(e) = svc.compute_progress(&latest.id, &note.body, None).await {
                 tracing::debug!("progress refresh failed for {}: {e}", note.id);
             } else {
                 refreshed += 1;
