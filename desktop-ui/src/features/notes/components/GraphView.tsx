@@ -139,7 +139,7 @@ export function GraphView({
         onSearchChange={setSearchQuery}
       />
 
-      <div className="flex-1 relative min-h-0">
+      <div className="flex-1 relative min-h-0 bg-background" style={{ backgroundImage: "radial-gradient(circle, var(--border) 0.5px, transparent 0.5px)", backgroundSize: "20px 20px" }}>
         <div ref={containerRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
 
         <GraphLegend clusters={clusters} onHighlight={handleLegendHighlight} />

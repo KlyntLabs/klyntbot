@@ -28,8 +28,8 @@ export interface ClusterInfo {
 }
 
 function getNodeSize(linkCount: number): number {
-  const normalized = Math.min(linkCount, 30) / 30;
-  return 12 + normalized * 28;
+  const normalized = Math.min(linkCount, 20) / 20;
+  return 18 + normalized * 28; // 18px (orphan) → 46px (hub)
 }
 
 interface UseCytoscapeElementsParams {

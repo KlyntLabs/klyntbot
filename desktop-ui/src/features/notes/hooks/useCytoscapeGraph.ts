@@ -16,10 +16,10 @@ const FCOSE_OPTIONS = {
   fit: true,
   padding: 40,
   nodeSeparation: 80,
-  idealEdgeLength: 100,
-  nodeRepulsion: 6000,
+  idealEdgeLength: 120,
+  nodeRepulsion: 8000,
   edgeElasticity: 0.45,
-  gravity: 0.25,
+  gravity: 0.2,
   gravityRange: 1.5,
   nestingFactor: 0.1,
   numIter: 2500,
@@ -36,6 +36,11 @@ interface UseCytoscapeGraphParams {
   onNodeContext?: (id: string, x: number, y: number) => void;
 }
 
+/** Compute a stable fingerprint of element IDs to detect real data changes */
+function elementsFingerprint(elements: ElementDefinition[]): string {
+  return elements.map((e) => e.data?.id || "").sort().join(",");
+}
+
 export function useCytoscapeGraph({
   containerRef,
   elements,
@@ -46,7 +51,9 @@ export function useCytoscapeGraph({
   onNodeContext,
 }: UseCytoscapeGraphParams): { cy: React.MutableRefObject<Core | null>; runLayout: () => void } {
   const cyRef = useRef<Core | null>(null);
+  const prevFingerprint = useRef("");
 
+  // ── Create instance on mount ──
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -60,20 +67,26 @@ export function useCytoscapeGraph({
       wheelSensitivity: 0.3,
       boxSelectionEnabled: true,
       selectionType: "single",
+      autoungrabify: false,
     });
 
     cyRef.current = cy;
+    prevFingerprint.current = elementsFingerprint(elements);
 
+    // Make compound parents non-interactive (can't grab/select them)
+    cy.on("grab", "node:parent", (evt) => {
+      evt.target.ungrabify();
+    });
+
+    // ── Node events ──
     cy.on("tap", "node:childless", (evt) => onNodeClick?.(evt.target.id()));
     cy.on("dbltap", "node:childless", (evt) => onNodeDoubleClick?.(evt.target.id()));
-    cy.on("tap", "node:parent", (evt) => {
-      cy.animate({ fit: { eles: evt.target.children(), padding: 50 }, duration: 300 });
-    });
 
     cy.on("mouseover", "node:childless", (evt) => {
       const node = evt.target;
       const pos = node.renderedPosition();
       onNodeHover?.(node.id(), pos.x, pos.y);
+      node.addClass("hovered");
       const neighborhood = node.neighborhood().add(node);
       cy.elements().not(neighborhood).addClass("dimmed");
       neighborhood.connectedEdges().addClass("highlighted");
@@ -81,7 +94,7 @@ export function useCytoscapeGraph({
 
     cy.on("mouseout", "node:childless", () => {
       onNodeHover?.(null, 0, 0);
-      cy.elements().removeClass("dimmed").removeClass("highlighted");
+      cy.elements().removeClass("dimmed").removeClass("highlighted").removeClass("hovered");
     });
 
     cy.on("cxttap", "node:childless", (evt) => {
@@ -90,6 +103,7 @@ export function useCytoscapeGraph({
       onNodeContext?.(node.id(), pos.x, pos.y);
     });
 
+    // ── Zoom-adaptive labels ──
     cy.on("zoom", () => {
       const zoom = cy.zoom();
       const childless = cy.nodes(":childless");
@@ -100,7 +114,7 @@ export function useCytoscapeGraph({
       }
     });
 
-    // Keyboard shortcuts
+    // ── Keyboard shortcuts ──
     const handleKeyDown = (e: KeyboardEvent) => {
       if (
         document.activeElement?.tagName === "INPUT" ||
@@ -131,6 +145,7 @@ export function useCytoscapeGraph({
     };
     document.addEventListener("keydown", handleKeyDown);
 
+    // Run initial layout
     cy.layout(FCOSE_OPTIONS).run();
 
     return () => {
@@ -138,11 +153,18 @@ export function useCytoscapeGraph({
       cy.destroy();
       cyRef.current = null;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount/unmount only
   }, [containerRef, stylesheet]);
 
+  // ── Update elements only when data actually changes (not on hover re-renders) ──
   useEffect(() => {
     const cy = cyRef.current;
     if (!cy) return;
+
+    const newFingerprint = elementsFingerprint(elements);
+    if (newFingerprint === prevFingerprint.current) return;
+    prevFingerprint.current = newFingerprint;
+
     cy.json({ elements });
     cy.layout(FCOSE_OPTIONS).run();
   }, [elements]);

@@ -29,30 +29,25 @@ export function useCytoscapeTheme(): { stylesheet: Stylesheet[]; isLight: boolea
   return useMemo(() => {
     const light = isLightTheme();
     const textPrimary = getCssVar("--text-primary") || (light ? "#000000" : "#f0f2f5");
+    const textSecondary = getCssVar("--text-secondary") || (light ? "#525252" : "#c8cdd4");
     const textMuted = getCssVar("--text-muted") || (light ? "#737373" : "#7d8590");
-    const border = getCssVar("--border") || (light ? "#e5e5e5" : "rgba(255,255,255,0.08)");
+    const border = getCssVar("--border") || (light ? "#d4d4d4" : "rgba(255,255,255,0.1)");
+    const edgeColor = light ? "#d4d4d4" : "rgba(255,255,255,0.12)";
     const brand = getCssVar("--brand") || (light ? "#ca8a04" : "#f97316");
 
     const stylesheet: Stylesheet[] = [
+      // ── Compound parents — invisible (clustering via node color + legend) ──
       {
         selector: "node:parent",
         style: {
-          "background-opacity": 0.06,
-          "border-width": 1,
-          "border-color": border,
-          "border-opacity": 0.5,
-          label: "data(label)",
-          "font-size": 11,
-          "font-weight": "600",
-          color: textMuted,
-          "text-valign": "top",
-          "text-halign": "center",
-          "text-margin-y": -6,
-          padding: "24px",
-          shape: "roundrectangle",
-          "corner-radius": light ? 0 : 12,
+          "background-opacity": 0,
+          "border-width": 0,
+          label: "",
+          padding: "12px",
         },
       },
+
+      // ── Nodes — colored circles with right-aligned labels ──
       {
         selector: "node:childless",
         style: {
@@ -60,75 +55,106 @@ export function useCytoscapeTheme(): { stylesheet: Stylesheet[]; isLight: boolea
           width: "data(size)",
           height: "data(size)",
           "background-color": "data(color)",
-          "border-width": 1.5,
+          "background-opacity": 0.85,
+          "border-width": 2,
           "border-color": "data(color)",
-          "border-opacity": 0.35,
-          "font-size": 10,
+          "border-opacity": 0.2,
+          // Label styling — positioned to the right like MiroFish
+          "font-size": 11,
           "font-weight": "500",
-          color: textPrimary,
-          "text-valign": "bottom",
-          "text-halign": "center",
-          "text-margin-y": 4,
-          "text-max-width": "80px",
+          "font-family": "Inter, system-ui, sans-serif",
+          color: textSecondary,
+          "text-valign": "center",
+          "text-halign": "right",
+          "text-margin-x": 6,
+          "text-max-width": "120px",
           "text-wrap": "ellipsis",
-          "min-zoomed-font-size": 0,
+          "min-zoomed-font-size": 8,
           "text-opacity": 1,
+          // Smooth transitions
+          "transition-property":
+            "background-color, border-color, width, height, opacity, border-width",
+          "transition-duration": 180,
         },
       },
+
+      // ── Hide labels at low zoom ──
       {
         selector: "node:childless.hide-label",
         style: { "text-opacity": 0 },
       },
+
+      // ── Hovered node ──
+      {
+        selector: "node:childless.hovered",
+        style: {
+          "border-width": 3,
+          "border-opacity": 0.6,
+          "background-opacity": 1,
+          "font-weight": "600",
+          color: textPrimary,
+        },
+      },
+
+      // ── Selected node ──
       {
         selector: "node:childless:selected",
         style: {
           "border-width": 3,
           "border-color": brand,
-          "shadow-blur": 12,
+          "border-opacity": 1,
+          "background-opacity": 1,
+          "shadow-blur": 15,
           "shadow-color": brand,
-          "shadow-opacity": 0.4,
+          "shadow-opacity": 0.35,
           "shadow-offset-x": 0,
           "shadow-offset-y": 0,
           "font-weight": "600",
-          "font-size": 11,
+          "font-size": 12,
+          color: textPrimary,
         },
       },
+
+      // ── Edges — thin, subtle, curved ──
       {
         selector: "edge",
         style: {
-          width: "data(weight)",
-          "line-color": border,
-          "target-arrow-color": border,
+          width: 1,
+          "line-color": edgeColor,
+          "line-opacity": light ? 0.5 : 0.35,
+          "target-arrow-color": edgeColor,
           "target-arrow-shape": "triangle",
-          "arrow-scale": 0.5,
+          "arrow-scale": 0.4,
           "curve-style": "bezier",
-          opacity: 0.6,
+          "transition-property": "line-color, width, opacity",
+          "transition-duration": 180,
         },
       },
+
+      // ── Highlighted edges (neighbor of hovered/selected) ──
       {
         selector: "edge.highlighted",
         style: {
           "line-color": "data(sourceColor)",
+          "line-opacity": 0.7,
           "target-arrow-color": "data(sourceColor)",
-          width: 2.5,
-          opacity: 0.8,
+          width: 2,
+        },
+      },
+
+      // ── Dimmed (non-neighbors during hover) ──
+      {
+        selector: "node.dimmed",
+        style: {
+          opacity: 0.12,
+          "text-opacity": 0,
         },
       },
       {
-        selector: "node.dimmed",
-        style: { opacity: 0.15 },
-      },
-      {
         selector: "edge.dimmed",
-        style: { opacity: 0.08 },
-      },
-      {
-        selector: 'node:parent[type="orphan-linked"]',
-        style: { "background-color": "#9CA3AF" },
-      },
-      {
-        selector: 'node:parent[type="orphan-isolated"]',
-        style: { "background-color": "#6B7280" },
+        style: {
+          opacity: 0.05,
+        },
       },
     ];
 
