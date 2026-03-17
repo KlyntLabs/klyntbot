@@ -26,23 +26,22 @@ function Slider({
   onChange: (v: number) => void;
 }) {
   return (
-    <div className="space-y-1">
-      <div className="flex items-center justify-between">
-        <span className="text-[10px] text-muted">{label}</span>
-        <span className="text-[10px] text-dim tabular-nums">
-          {value}
-          {unit}
-        </span>
+    <div className="flex items-center gap-3">
+      <span className="text-[11px] text-secondary w-[90px] shrink-0">{label}</span>
+      <div className="flex-1 relative flex items-center">
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          onChange={(e) => onChange(Number(e.target.value))}
+          className="w-full h-[3px] rounded-full appearance-none cursor-pointer bg-surface-raised outline-none [&::-webkit-slider-thumb]:w-[10px] [&::-webkit-slider-thumb]:h-[10px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:bg-brand [&::-webkit-slider-thumb]:shadow-sm [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-brand/30 [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:hover:scale-125 [&::-webkit-slider-thumb]:transition-transform"
+        />
       </div>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full h-1 bg-surface-raised rounded-full appearance-none cursor-pointer accent-brand [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:bg-brand"
-      />
+      <span className="text-[10px] text-muted tabular-nums w-[36px] text-right shrink-0">
+        {value}{unit}
+      </span>
     </div>
   );
 }
@@ -57,24 +56,24 @@ function Toggle({
   onChange: (v: boolean) => void;
 }) {
   return (
-    <label className="flex items-center justify-between cursor-pointer">
-      <span className="text-[10px] text-muted">{label}</span>
+    <div className="flex items-center gap-3">
+      <span className="text-[11px] text-secondary flex-1">{label}</span>
       <button
         type="button"
         role="switch"
         aria-checked={checked}
         onClick={() => onChange(!checked)}
-        className={`relative w-7 h-4 rounded-full transition-colors ${
+        className={`relative w-8 h-[18px] rounded-full transition-colors shrink-0 ${
           checked ? "bg-brand" : "bg-surface-raised"
         }`}
       >
         <span
-          className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${
-            checked ? "translate-x-3.5" : "translate-x-0.5"
+          className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow-sm transition-transform ${
+            checked ? "translate-x-[14px]" : "translate-x-[2px]"
           }`}
         />
       </button>
-    </label>
+    </div>
   );
 }
 
@@ -91,22 +90,26 @@ export function GraphSettingsPopover({
     settings.nodeScale === defaults.nodeScale;
 
   return (
-    <div className="w-[220px] space-y-3">
-      <div className="flex items-center justify-between">
-        <span className="text-[11px] font-medium text-primary">Graph Settings</span>
+    <div className="w-[280px]">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-[10px] font-semibold text-muted uppercase tracking-wider">
+          Settings
+        </span>
         {!isDefault && (
           <button
             type="button"
             onClick={onReset}
             className="flex items-center gap-1 text-[10px] text-muted hover:text-secondary transition-colors"
           >
-            <RotateCcw size={10} />
+            <RotateCcw size={9} />
             Reset
           </button>
         )}
       </div>
 
-      <div className="space-y-2.5">
+      {/* Sliders */}
+      <div className="space-y-2">
         <Slider
           label="Link Distance"
           value={settings.linkDistance}
@@ -142,7 +145,7 @@ export function GraphSettingsPopover({
           onChange={(v) => onChange({ nodeScale: v })}
         />
         <Slider
-          label="Label Zoom Threshold"
+          label="Label Threshold"
           value={settings.labelThreshold}
           min={0.1}
           max={1.5}
@@ -152,7 +155,8 @@ export function GraphSettingsPopover({
         />
       </div>
 
-      <div className="border-t border-border-subtle pt-2 space-y-2">
+      {/* Toggles */}
+      <div className="mt-3 pt-2 border-t border-border-subtle space-y-2">
         <Toggle
           label="Show Arrows"
           checked={settings.showArrows}
