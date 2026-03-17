@@ -3,10 +3,7 @@
  * Used as cache key for position persistence — changes when nodes/edges change.
  * Uses null byte separator for edge pairs to avoid conflicts with node IDs containing colons.
  */
-export function computeFingerprint(
-  nodeIds: string[],
-  edgePairs: [string, string][],
-): string {
+export function computeFingerprint(nodeIds: string[], edgePairs: [string, string][]): string {
   const sortedNodes = [...nodeIds].sort().join(",");
   const sortedEdges = edgePairs
     .map(([a, b]) => [a, b].sort().join("\x00"))

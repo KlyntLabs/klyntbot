@@ -38,7 +38,14 @@ describe("selectHub", () => {
 
 describe("computeBfsWaves", () => {
   it("returns hub as wave 0", () => {
-    const waves = computeBfsWaves("a", new Map([["a", new Set(["b"])], ["b", new Set(["a"])]]), new Set(["a", "b"]));
+    const waves = computeBfsWaves(
+      "a",
+      new Map([
+        ["a", new Set(["b"])],
+        ["b", new Set(["a"])],
+      ]),
+      new Set(["a", "b"]),
+    );
     expect(waves[0]).toEqual(["a"]);
   });
 
@@ -54,7 +61,10 @@ describe("computeBfsWaves", () => {
   });
 
   it("puts orphans in the last wave", () => {
-    const adj = new Map([["a", new Set(["b"])], ["b", new Set(["a"])]]);
+    const adj = new Map([
+      ["a", new Set(["b"])],
+      ["b", new Set(["a"])],
+    ]);
     const allNodeIds = new Set(["a", "b", "orphan1", "orphan2"]);
     const waves = computeBfsWaves("a", adj, allNodeIds);
     const lastWave = waves[waves.length - 1];

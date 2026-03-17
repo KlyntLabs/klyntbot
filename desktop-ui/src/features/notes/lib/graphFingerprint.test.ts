@@ -3,8 +3,20 @@ import { computeFingerprint } from "./graphFingerprint";
 
 describe("computeFingerprint", () => {
   it("returns same hash for same nodes and edges regardless of order", () => {
-    const a = computeFingerprint(["b", "a", "c"], [["a", "b"], ["b", "c"]]);
-    const b = computeFingerprint(["c", "a", "b"], [["b", "c"], ["a", "b"]]);
+    const a = computeFingerprint(
+      ["b", "a", "c"],
+      [
+        ["a", "b"],
+        ["b", "c"],
+      ],
+    );
+    const b = computeFingerprint(
+      ["c", "a", "b"],
+      [
+        ["b", "c"],
+        ["a", "b"],
+      ],
+    );
     expect(a).toBe(b);
   });
 
@@ -16,7 +28,13 @@ describe("computeFingerprint", () => {
 
   it("returns different hash when an edge is added", () => {
     const a = computeFingerprint(["a", "b", "c"], [["a", "b"]]);
-    const b = computeFingerprint(["a", "b", "c"], [["a", "b"], ["b", "c"]]);
+    const b = computeFingerprint(
+      ["a", "b", "c"],
+      [
+        ["a", "b"],
+        ["b", "c"],
+      ],
+    );
     expect(a).not.toBe(b);
   });
 

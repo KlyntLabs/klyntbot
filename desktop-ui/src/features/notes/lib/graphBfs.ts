@@ -8,10 +8,7 @@ interface HubCandidate {
  * Select the hub node (center of the graph).
  * Priority: activeNoteId > most-connected > alphabetical fallback.
  */
-export function selectHub(
-  nodes: HubCandidate[],
-  activeNoteId: string | null,
-): string {
+export function selectHub(nodes: HubCandidate[], activeNoteId: string | null): string {
   if (activeNoteId && nodes.some((n) => n.id === activeNoteId)) {
     return activeNoteId;
   }

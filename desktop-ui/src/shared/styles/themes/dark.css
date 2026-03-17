@@ -6,20 +6,20 @@
 [data-theme="dark"],
 :root {
   /* ── Background ──────────────────────────────────────────────────────── */
-  --background: oklch(0.2478 0.0000 0.0000);
+  --background: oklch(0.2478 0 0);
 
   /* ── Surface staircase (derived from scheme surface hierarchy) ────────── */
-  --surface-lowest: oklch(0.2090 0.0000 0.0000);
-  --surface-low: oklch(0.2178 0.0000 0.0000);
-  --surface-base: oklch(0.2264 0.0000 0.0000);
-  --surface-raised: oklch(0.2850 0.0000 0.0000);
-  --surface-highest: oklch(0.3132 0.0000 0.0000);
+  --surface-lowest: oklch(0.209 0 0);
+  --surface-low: oklch(0.2178 0 0);
+  --surface-base: oklch(0.2264 0 0);
+  --surface-raised: oklch(0.285 0 0);
+  --surface-highest: oklch(0.3132 0 0);
 
   /* ── Text hierarchy ──────────────────────────────────────────────────── */
-  --text-primary: oklch(0.9642 0.0000 0.0000);
-  --text-secondary: oklch(0.8400 0.0000 0.0000);
-  --text-muted: oklch(0.7324 0.0011 17.1840);
-  --text-dim: oklch(0.4313 0.0000 0.0000);
+  --text-primary: oklch(0.9642 0 0);
+  --text-secondary: oklch(0.84 0 0);
+  --text-muted: oklch(0.7324 0.0011 17.184);
+  --text-dim: oklch(0.4313 0 0);
 
   /* ── Brand (orange accent — hue ~23) ────────────────────────────────── */
   --brand: oklch(0.6962 0.1942 23.6149);
@@ -40,8 +40,8 @@
   --origin-plugin: #fbbf24;
 
   /* ── Border ───────────────────────────────────────────────────────────── */
-  --border: oklch(0.3132 0.0000 0.0000);
-  --border-subtle: oklch(0.2850 0.0000 0.0000);
+  --border: oklch(0.3132 0 0);
+  --border-subtle: oklch(0.285 0 0);
 
   /* ── Timeline / Dashboard ──────────────────────────────────────────────── */
   --timeline-app-productive: oklch(0.72 0.15 145);
@@ -71,7 +71,7 @@
   --shadow-tooltip: 0 4px 20px rgba(0, 0, 0, 0.35);
 
   /* ── Floating / glass (Tahoe Liquid Glass) ─────────────────────────── */
-  --surface-floating: oklch(0.2178 0.0000 0.0000 / 0.92);
+  --surface-floating: oklch(0.2178 0 0 / 0.92);
 
   /* Glass material — primary tier */
   --surface-glass: rgba(255, 255, 255, 0.08);

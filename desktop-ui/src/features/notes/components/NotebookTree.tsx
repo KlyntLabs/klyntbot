@@ -750,7 +750,9 @@ export function NotebookTree({
     <div className="flex flex-col min-h-0 flex-1" onContextMenu={handleBlankContextMenu}>
       {/* Header */}
       <div className="flex items-center justify-between px-4 pb-1 pt-3">
-        <span className="text-[10px] uppercase tracking-wider text-muted font-medium">Notebooks</span>
+        <span className="text-[10px] uppercase tracking-wider text-muted font-medium">
+          Notebooks
+        </span>
         <div className="flex items-center gap-0.5">
           <button
             type="button"

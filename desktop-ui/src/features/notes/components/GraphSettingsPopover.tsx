@@ -33,10 +33,7 @@ function Slider({
       <div className="flex-1 relative flex items-center h-5">
         {/* Custom track with progress fill */}
         <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[4px] rounded-full bg-surface-raised overflow-hidden">
-          <div
-            className="h-full rounded-full bg-brand/50"
-            style={{ width: `${pct}%` }}
-          />
+          <div className="h-full rounded-full bg-brand/50" style={{ width: `${pct}%` }} />
         </div>
         {/* Native range input (invisible track, visible thumb) */}
         <input
@@ -51,7 +48,8 @@ function Slider({
         />
       </div>
       <span className="text-[10px] text-muted tabular-nums w-[36px] text-right shrink-0">
-        {value}{unit}
+        {value}
+        {unit}
       </span>
     </div>
   );

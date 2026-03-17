@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
 import type { ElementDefinition } from "cytoscape";
+import { describe, expect, it } from "vitest";
 import { diffElements } from "./elementDiff";
 
 const node = (id: string): ElementDefinition => ({

@@ -1,7 +1,7 @@
 import type { Core } from "cytoscape";
 import cytoscape from "cytoscape";
-import fcose from "cytoscape-fcose";
 import cola from "cytoscape-cola";
+import fcose from "cytoscape-fcose";
 
 // Register Cytoscape plugins once. Guard with a flag to prevent
 // "Plugin already registered" errors during HMR/test re-runs.
