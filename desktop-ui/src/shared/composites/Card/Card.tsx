@@ -12,7 +12,7 @@ export interface CardProps {
 
 const cardVariants = {
   glass: "glass-card",
-  surface: "bg-surface-base border border-border rounded-2xl",
+  surface: "bg-accent border border-border rounded-2xl",
   outline: "border border-border rounded-2xl bg-transparent",
 };
 
@@ -53,7 +53,7 @@ export function CardHeader({ className, children }: { className?: string; childr
 
 export function CardTitle({ className, children }: { className?: string; children: ReactNode }) {
   return (
-    <h3 className={cn("text-xs font-medium text-muted uppercase tracking-wider", className)}>
+    <h3 className={cn("text-xs font-medium text-muted-foreground uppercase tracking-wider", className)}>
       {children}
     </h3>
   );

@@ -47,7 +47,7 @@ export function TagsExplorer({
           <button
             type="button"
             onClick={onClearTags}
-            className="text-[10px] text-muted hover:text-secondary"
+            className="text-[10px] text-muted-foreground hover:text-foreground"
           >
             Clear
           </button>
@@ -81,7 +81,7 @@ export function TagsExplorer({
       {/* Filtered notes list */}
       {filteredNotes.length > 0 && (
         <div className="flex flex-col gap-0.5 mt-1">
-          <div className="h-px bg-surface-low mx-2" />
+          <div className="h-px bg-card mx-2" />
           {filteredNotes.map((note) => (
             <button
               type="button"
@@ -89,8 +89,8 @@ export function TagsExplorer({
               onClick={() => onSelectNote(note.id)}
               className={`px-2 py-1 rounded text-sm truncate text-left w-full transition-colors ${
                 note.id === selectedNoteId
-                  ? "bg-surface-raised text-primary"
-                  : "text-secondary hover:bg-surface-low"
+                  ? "bg-muted text-foreground"
+                  : "text-muted-foreground hover:bg-card"
               }`}
             >
               {note.title || "Untitled"}

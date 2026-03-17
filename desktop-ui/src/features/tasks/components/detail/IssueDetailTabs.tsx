@@ -29,8 +29,8 @@ export function IssueDetailTabs({ detail }: IssueDetailTabsProps) {
             className={cn(
               "pb-2 text-sm font-medium transition-colors border-b-2 -mb-px",
               activeTab === tab.id
-                ? "border-primary text-primary"
-                : "border-transparent text-muted hover:text-primary",
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground",
             )}
           >
             {tab.label}

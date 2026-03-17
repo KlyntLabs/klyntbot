@@ -59,8 +59,8 @@ export function InlineCheckboxList({
               onClick={() => toggle(opt.value)}
               className={`flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 border ${
                 isChecked
-                  ? "bg-brand/8 border-brand/25 text-primary"
-                  : "bg-surface-lowest border-border-subtle text-muted hover:bg-surface-base hover:border-border"
+                  ? "bg-brand/8 border-brand/25 text-foreground"
+                  : "bg-card border-border-subtle text-muted-foreground hover:bg-accent hover:border-border"
               }`}
             >
               {/* Checkbox */}
@@ -79,7 +79,7 @@ export function InlineCheckboxList({
               {opt.detected !== undefined && (
                 <span
                   className={`text-[10px] font-medium px-1.5 py-0.5 rounded-md flex-shrink-0 ${
-                    opt.detected ? "bg-success/10 text-success" : "bg-surface-base text-dim"
+                    opt.detected ? "bg-success/10 text-success" : "bg-accent text-dim"
                   }`}
                 >
                   {opt.detected ? "Found" : "N/A"}

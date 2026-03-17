@@ -103,11 +103,11 @@ export function VersionHistoryOverlay({
         <div className="w-[40%] flex flex-col border-r border-border-subtle">
           {/* Header */}
           <div className="shrink-0 flex items-center justify-between px-5 py-4 border-b border-border-subtle">
-            <h2 className="text-sm font-medium text-primary">Version History</h2>
+            <h2 className="text-sm font-medium text-foreground">Version History</h2>
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 rounded-md text-dim hover:text-secondary transition-colors"
+              className="p-1.5 rounded-md text-dim hover:text-foreground transition-colors"
               aria-label="Close"
             >
               <X size={16} />
@@ -131,7 +131,7 @@ export function VersionHistoryOverlay({
                     type="button"
                     onClick={() => setSelectedId(v.id)}
                     className={`w-full flex gap-3 px-5 py-3 text-left transition-colors ${
-                      v.id === selectedId ? "bg-surface-raised" : "hover:bg-surface-low"
+                      v.id === selectedId ? "bg-muted" : "hover:bg-card"
                     }`}
                   >
                     {/* Timeline dot + line */}
@@ -144,7 +144,7 @@ export function VersionHistoryOverlay({
                         }`}
                       />
                       {i < versions.length - 1 && (
-                        <div className="w-px flex-1 min-h-[20px] bg-surface-raised mt-1" />
+                        <div className="w-px flex-1 min-h-[20px] bg-muted mt-1" />
                       )}
                     </div>
 
@@ -152,7 +152,7 @@ export function VersionHistoryOverlay({
                     <div className="flex-1 min-w-0">
                       <div
                         className={`text-sm ${
-                          v.id === selectedId ? "text-primary font-medium" : "text-secondary"
+                          v.id === selectedId ? "text-foreground font-medium" : "text-muted-foreground"
                         }`}
                       >
                         {formatTime(v.createdAt)}
@@ -190,8 +190,8 @@ export function VersionHistoryOverlay({
                   onClick={() => setShowDiff((prev) => !prev)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                     showDiff
-                      ? "bg-surface-raised text-primary"
-                      : "text-muted hover:text-secondary hover:bg-surface-base"
+                      ? "bg-muted text-foreground"
+                      : "text-muted-foreground hover:text-foreground hover:bg-accent"
                   }`}
                 >
                   {showDiff ? "Hide diff" : "Show diff"}
@@ -218,7 +218,7 @@ export function VersionHistoryOverlay({
                           ? "bg-success/20 text-success"
                           : part.removed
                             ? "bg-destructive/20 text-destructive"
-                            : "text-secondary"
+                            : "text-muted-foreground"
                       }
                     >
                       {part.value}
@@ -227,7 +227,7 @@ export function VersionHistoryOverlay({
                 })}
               </div>
             ) : (
-              <div className="text-sm text-secondary leading-relaxed whitespace-pre-wrap">
+              <div className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
                 {selectedVersion.body}
               </div>
             )}

@@ -20,17 +20,17 @@ export function FocusBanner({ activeTask, onEndFocus }: Props) {
     <div className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 py-2 bg-surface-elevated border-b border-border">
       <div className="flex items-center gap-3">
         <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
-        <span className="text-sm font-medium text-primary truncate max-w-xs">
+        <span className="text-sm font-medium text-foreground truncate max-w-xs">
           {activeTask.title}
         </span>
-        <span className="text-xs text-muted font-mono tabular-nums">
+        <span className="text-xs text-muted-foreground font-mono tabular-nums">
           {formatElapsed(elapsedSecs)}
         </span>
       </div>
       <button
         type="button"
         onClick={() => onEndFocus(activeTask.id)}
-        className="text-xs text-muted hover:text-primary px-2 py-1 rounded hover:bg-surface-hover transition-colors"
+        className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded hover:bg-surface-hover transition-colors"
       >
         End Focus
       </button>

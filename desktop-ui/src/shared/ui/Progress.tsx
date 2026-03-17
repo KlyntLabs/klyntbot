@@ -19,7 +19,7 @@ export function Progress({ value, className, color = "brand" }: ProgressProps) {
   return (
     <ProgressPrimitive.Root
       value={value}
-      className={cn("h-1.5 w-full bg-surface-raised rounded-full overflow-hidden", className)}
+      className={cn("h-1.5 w-full bg-muted rounded-full overflow-hidden", className)}
     >
       <ProgressPrimitive.Indicator
         className={cn(colors[color], "h-full rounded-full transition-[width] duration-500")}

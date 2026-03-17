@@ -51,18 +51,18 @@ function AcceptanceCriteria({ text }: { text: string }) {
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
-        className="flex items-center gap-2 w-full px-3 py-2 text-sm font-medium text-primary hover:bg-surface-raised/50 transition-colors"
+        className="flex items-center gap-2 w-full px-3 py-2 text-sm font-medium text-foreground hover:bg-accent/50 transition-colors"
       >
         {expanded ? (
-          <ChevronDown className="size-4 text-muted" />
+          <ChevronDown className="size-4 text-muted-foreground" />
         ) : (
-          <ChevronRight className="size-4 text-muted" />
+          <ChevronRight className="size-4 text-muted-foreground" />
         )}
         Acceptance Criteria
-        {!expanded && <span className="text-muted font-normal truncate">— {preview}</span>}
+        {!expanded && <span className="text-muted-foreground font-normal truncate">— {preview}</span>}
       </button>
       {expanded && (
-        <div className="px-3 pb-3 text-sm text-primary whitespace-pre-wrap font-mono">{text}</div>
+        <div className="px-3 pb-3 text-sm text-foreground whitespace-pre-wrap font-mono">{text}</div>
       )}
     </div>
   );
@@ -74,7 +74,7 @@ function SubIssuesList({ issues }: { issues: SubIssue[] }) {
 
   return (
     <div>
-      <h3 className="text-sm font-medium text-primary mb-2">
+      <h3 className="text-sm font-medium text-foreground mb-2">
         Sub-issues ({completedCount}/{issues.length} done)
       </h3>
       <div className="border border-border rounded-md divide-y divide-border">
@@ -85,14 +85,14 @@ function SubIssuesList({ issues }: { issues: SubIssue[] }) {
               key={issue.id}
               type="button"
               onClick={() => navigateInPlace("issue", issue.id, issue.identifier)}
-              className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-surface-raised/50 transition-colors text-left"
+              className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-accent/50 transition-colors text-left"
             >
               <span className="flex items-center justify-center size-4">
                 {renderStatusIcon(issue.status)}
               </span>
-              <PriorityIcon className="size-3.5 text-muted shrink-0" />
-              <span className="text-xs text-muted shrink-0">{issue.identifier}</span>
-              <span className="truncate text-primary">{issue.title}</span>
+              <PriorityIcon className="size-3.5 text-muted-foreground shrink-0" />
+              <span className="text-xs text-muted-foreground shrink-0">{issue.identifier}</span>
+              <span className="truncate text-foreground">{issue.title}</span>
             </button>
           );
         })}

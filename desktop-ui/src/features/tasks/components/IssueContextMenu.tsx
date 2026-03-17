@@ -44,7 +44,7 @@ export function IssueContextMenu({ issue, children }: IssueContextMenuProps) {
             }}
           >
             Copy ID
-            <span className="ml-auto text-xs text-muted">{issue.identifier}</span>
+            <span className="ml-auto text-xs text-muted-foreground">{issue.identifier}</span>
           </ContextMenuItem>
           <ContextMenuItem
             onSelect={() => {
@@ -78,7 +78,7 @@ export function IssueContextMenu({ issue, children }: IssueContextMenuProps) {
                 <span className="mr-2 flex items-center">{renderStatusIcon(s)}</span>
                 {s.name}
                 {issue.status.id === s.id && (
-                  <span className="ml-auto text-xs text-muted">Current</span>
+                  <span className="ml-auto text-xs text-muted-foreground">Current</span>
                 )}
               </ContextMenuItem>
             ))}
@@ -88,7 +88,7 @@ export function IssueContextMenu({ issue, children }: IssueContextMenuProps) {
         {/* Priority submenu */}
         <ContextMenuSub>
           <ContextMenuSubTrigger>
-            <issue.priority.icon className="mr-2 h-4 w-4 text-muted" />
+            <issue.priority.icon className="mr-2 h-4 w-4 text-muted-foreground" />
             Priority
           </ContextMenuSubTrigger>
           <ContextMenuSubContent className="w-48">
@@ -102,10 +102,10 @@ export function IssueContextMenu({ issue, children }: IssueContextMenuProps) {
                     refetch();
                   }}
                 >
-                  <Icon className="mr-2 h-4 w-4 text-muted" />
+                  <Icon className="mr-2 h-4 w-4 text-muted-foreground" />
                   {p.name}
                   {issue.priority.id === p.id && (
-                    <span className="ml-auto text-xs text-muted">Current</span>
+                    <span className="ml-auto text-xs text-muted-foreground">Current</span>
                   )}
                 </ContextMenuItem>
               );

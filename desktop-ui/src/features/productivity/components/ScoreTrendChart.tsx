@@ -27,7 +27,7 @@ export function ScoreTrendChart({ summaries }: Props) {
 
   return (
     <div className="mt-2">
-      <div className="text-xs font-medium text-muted mb-1 px-1">Score Trend</div>
+      <div className="text-xs font-medium text-muted-foreground mb-1 px-1">Score Trend</div>
       <ResponsiveContainer width="100%" height={120}>
         <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
           <XAxis dataKey="date" tick={{ fontSize: 10 }} />

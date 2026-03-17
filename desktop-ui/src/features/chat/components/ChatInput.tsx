@@ -18,7 +18,7 @@ export function ChatInput({ input, isStreaming, onInputChange, onSend }: ChatInp
           <button
             type="button"
             aria-label="Add attachment"
-            className="w-8 h-8 flex items-center justify-center text-muted hover:text-secondary transition-colors shrink-0 rounded-lg hover:bg-surface-base"
+            className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors shrink-0 rounded-lg hover:bg-accent"
           >
             <Plus className="w-4 h-4" strokeWidth={1.5} />
           </button>
@@ -36,13 +36,13 @@ export function ChatInput({ input, isStreaming, onInputChange, onSend }: ChatInp
             aria-label="Message input"
             placeholder="Ask Klynt anything, @ to add files, / for commands"
             rows={1}
-            className="flex-1 bg-transparent py-3.5 text-[13px] text-primary placeholder:text-muted font-light resize-none overflow-hidden outline-none"
+            className="flex-1 bg-transparent py-3.5 text-[13px] text-foreground placeholder:text-muted-foreground font-light resize-none overflow-hidden outline-none"
             style={{ maxHeight: "200px" }}
           />
           <button
             type="button"
             aria-label="Voice input"
-            className="w-8 h-8 flex items-center justify-center text-muted hover:text-secondary transition-colors shrink-0 rounded-lg hover:bg-surface-base"
+            className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors shrink-0 rounded-lg hover:bg-accent"
           >
             <Mic className="w-4 h-4" strokeWidth={1.5} />
           </button>
@@ -51,7 +51,7 @@ export function ChatInput({ input, isStreaming, onInputChange, onSend }: ChatInp
             onClick={onSend}
             disabled={!input.trim() || isStreaming}
             aria-label="Send message"
-            className="w-9 h-9 rounded-full bg-brand hover:bg-brand-hover disabled:bg-surface-base disabled:text-muted flex items-center justify-center transition-all shrink-0"
+            className="w-9 h-9 rounded-full bg-brand hover:bg-brand-hover disabled:bg-accent disabled:text-muted-foreground flex items-center justify-center transition-all shrink-0"
           >
             <Send className="w-4 h-4" strokeWidth={2} />
           </button>
@@ -60,7 +60,7 @@ export function ChatInput({ input, isStreaming, onInputChange, onSend }: ChatInp
           <div className="flex items-center gap-2">
             <button
               type="button"
-              className="glass-button flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-light text-muted"
+              className="glass-button flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-light text-muted-foreground"
             >
               <Server className="w-3.5 h-3.5" strokeWidth={1.5} />
               <span>Local</span>
@@ -68,7 +68,7 @@ export function ChatInput({ input, isStreaming, onInputChange, onSend }: ChatInp
             </button>
             <button
               type="button"
-              className="glass-button flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-light text-muted"
+              className="glass-button flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-light text-muted-foreground"
             >
               <Shield className="w-3.5 h-3.5" strokeWidth={1.5} />
               <span>Default permissions</span>
@@ -77,7 +77,7 @@ export function ChatInput({ input, isStreaming, onInputChange, onSend }: ChatInp
           </div>
           <button
             type="button"
-            className="glass-button flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-light text-muted"
+            className="glass-button flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-light text-muted-foreground"
           >
             <FolderOpen className="w-3.5 h-3.5" strokeWidth={1.5} />
             <span>KlyntBot</span>

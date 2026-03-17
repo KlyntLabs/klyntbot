@@ -100,7 +100,7 @@ export function Filter({ issues, projects }: FilterProps) {
                         {count}
                       </span>
                     )}
-                    <ChevronRight className="size-4 text-muted" />
+                    <ChevronRight className="size-4 text-muted-foreground" />
                   </div>
                 </CommandItem>
               );
@@ -148,7 +148,7 @@ export function Filter({ issues, projects }: FilterProps) {
                   </div>
                   <span className="flex items-center">{renderStatusIcon(s)}</span>
                   <span className="flex-1">{s.name}</span>
-                  <span className="text-xs text-muted">{count}</span>
+                  <span className="text-xs text-muted-foreground">{count}</span>
                 </CommandItem>
               );
             })}
@@ -178,9 +178,9 @@ export function Filter({ issues, projects }: FilterProps) {
                   <div className="flex items-center justify-center size-4">
                     {isSelected ? <Check className="size-4" /> : <span className="size-4" />}
                   </div>
-                  <Icon className="size-4 text-muted" />
+                  <Icon className="size-4 text-muted-foreground" />
                   <span className="flex-1">{p.name}</span>
-                  <span className="text-xs text-muted">{count}</span>
+                  <span className="text-xs text-muted-foreground">{count}</span>
                 </CommandItem>
               );
             })}
@@ -211,7 +211,7 @@ export function Filter({ issues, projects }: FilterProps) {
                   </div>
                   <span className="size-2 rounded-full" style={{ backgroundColor: label.color }} />
                   <span className="flex-1">{label.name}</span>
-                  <span className="text-xs text-muted">{count}</span>
+                  <span className="text-xs text-muted-foreground">{count}</span>
                 </CommandItem>
               );
             })}
@@ -241,9 +241,9 @@ export function Filter({ issues, projects }: FilterProps) {
                   <div className="flex items-center justify-center size-4">
                     {isSelected ? <Check className="size-4" /> : <span className="size-4" />}
                   </div>
-                  <Icon className="size-4 text-muted" />
+                  <Icon className="size-4 text-muted-foreground" />
                   <span className="flex-1">{project.name}</span>
-                  <span className="text-xs text-muted">{count}</span>
+                  <span className="text-xs text-muted-foreground">{count}</span>
                 </CommandItem>
               );
             })}
@@ -293,7 +293,7 @@ export function Filter({ issues, projects }: FilterProps) {
             <button
               type="button"
               onClick={() => setActiveCategory(null)}
-              className="flex items-center gap-1 px-3 py-2 text-sm text-muted hover:text-primary transition-colors w-full border-b border-border"
+              className="flex items-center gap-1 px-3 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors w-full border-b border-border"
             >
               <ChevronLeft className="size-4" />
               {categories.find((c) => c.key === activeCategory)?.label}

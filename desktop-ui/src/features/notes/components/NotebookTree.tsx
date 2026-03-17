@@ -253,8 +253,8 @@ const TreeRow = memo(function TreeRow({
         isDropTarget
           ? "bg-brand/[0.12] ring-1 ring-brand/40"
           : isSelected
-            ? "bg-surface-highest text-primary"
-            : "text-muted hover:bg-surface-base hover:text-secondary"
+            ? "bg-muted text-foreground"
+            : "text-muted-foreground hover:bg-accent hover:text-foreground"
       }`}
       style={{ paddingLeft: `${item.depth * INDENT + 8}px` }}
     >
@@ -271,7 +271,7 @@ const TreeRow = memo(function TreeRow({
       {item.icon && ICON_MAP[item.icon] ? (
         <ItemIcon
           name={item.icon}
-          className={`w-3.5 h-3.5 shrink-0 ${item.color ? "" : "text-secondary"}`}
+          className={`w-3.5 h-3.5 shrink-0 ${item.color ? "" : "text-muted-foreground"}`}
           style={item.color ? { color: item.color } : undefined}
         />
       ) : item.icon?.startsWith("#") ? (
@@ -315,7 +315,7 @@ const TreeRow = memo(function TreeRow({
             }
           }}
           defaultValue={item.title}
-          className="flex-1 min-w-0 text-[12px] bg-surface-base border border-brand/40 rounded-md px-1.5 py-0.5 text-primary focus:outline-none"
+          className="flex-1 min-w-0 text-[12px] bg-accent border border-brand/40 rounded-md px-1.5 py-0.5 text-foreground focus:outline-none"
           onBlur={(e) => onCommitRename(item, e.currentTarget.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") e.currentTarget.blur();
@@ -757,7 +757,7 @@ export function NotebookTree({
           <button
             type="button"
             onClick={() => onCreateNote()}
-            className="w-5 h-5 rounded-md flex items-center justify-center text-dim hover:text-secondary hover:bg-surface-base transition-all"
+            className="w-5 h-5 rounded-md flex items-center justify-center text-dim hover:text-foreground hover:bg-accent transition-all"
             aria-label="New note"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -765,7 +765,7 @@ export function NotebookTree({
           <button
             type="button"
             onClick={() => onCreateNotebook()}
-            className="w-5 h-5 rounded-md flex items-center justify-center text-dim hover:text-secondary hover:bg-surface-base transition-all"
+            className="w-5 h-5 rounded-md flex items-center justify-center text-dim hover:text-foreground hover:bg-accent transition-all"
             aria-label="New notebook"
           >
             <FolderPlus className="w-3.5 h-3.5" />
@@ -982,8 +982,8 @@ function TreeContextMenu({
                     onUpdate(entityId, { icon: name });
                   }
                 }}
-                className={`w-8 h-8 rounded-md flex items-center justify-center hover:bg-surface-raised transition-colors ${
-                  isActive ? "bg-surface-highest ring-1 ring-brand/40" : ""
+                className={`w-8 h-8 rounded-md flex items-center justify-center hover:bg-muted transition-colors ${
+                  isActive ? "bg-muted ring-1 ring-brand/40" : ""
                 }`}
                 title={isActive ? `Remove ${name} icon` : name}
               >
@@ -997,7 +997,7 @@ function TreeContextMenu({
         </div>
 
         {/* Color row */}
-        <div className="h-px bg-surface-raised mx-2" />
+        <div className="h-px bg-muted mx-2" />
         <div className="flex items-center gap-1.5 px-2.5 py-2">
           {ITEM_COLORS.map((color) => (
             <button
@@ -1028,7 +1028,7 @@ function TreeContextMenu({
         {/* Reset all button */}
         {(activeIcon || activeColor) && (
           <>
-            <div className="h-px bg-surface-raised mx-2" />
+            <div className="h-px bg-muted mx-2" />
             <button
               type="button"
               onClick={() => {
@@ -1036,7 +1036,7 @@ function TreeContextMenu({
                 setPreviewColor(null);
                 onUpdate(entityId, { icon: null, color: null });
               }}
-              className="w-full px-2.5 py-1.5 text-[11px] text-dim hover:text-secondary text-left hover:bg-surface-low transition-colors"
+              className="w-full px-2.5 py-1.5 text-[11px] text-dim hover:text-foreground text-left hover:bg-card transition-colors"
             >
               Reset all
             </button>

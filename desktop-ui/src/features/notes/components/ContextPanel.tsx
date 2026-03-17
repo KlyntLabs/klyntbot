@@ -40,7 +40,7 @@ function MoreSection({ note }: { note: Note }) {
       <button
         type="button"
         onClick={() => setCollapsed(!collapsed)}
-        className="w-full flex items-center gap-1.5 px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-muted hover:text-secondary transition-colors"
+        className="w-full flex items-center gap-1.5 px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
       >
         {collapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
         <span>More</span>
@@ -64,15 +64,15 @@ function MoreSection({ note }: { note: Note }) {
             <div className="space-y-1">
               <div className="flex justify-between text-[10px]">
                 <span className="text-dim">Created</span>
-                <span className="text-muted">{formatRelativeTime(note.createdAt)}</span>
+                <span className="text-muted-foreground">{formatRelativeTime(note.createdAt)}</span>
               </div>
               <div className="flex justify-between text-[10px]">
                 <span className="text-dim">Updated</span>
-                <span className="text-muted">{formatRelativeTime(note.updatedAt)}</span>
+                <span className="text-muted-foreground">{formatRelativeTime(note.updatedAt)}</span>
               </div>
               <div className="flex justify-between text-[10px]">
                 <span className="text-dim">Words</span>
-                <span className="text-muted">{wordCount.toLocaleString()}</span>
+                <span className="text-muted-foreground">{wordCount.toLocaleString()}</span>
               </div>
             </div>
           </div>
@@ -90,13 +90,13 @@ function NotePreview({ note, onSelectNote }: { note: Note; onSelectNote: (id: st
       <button
         type="button"
         onClick={() => onSelectNote(note.id)}
-        className="flex items-center gap-1.5 text-[11px] text-brand hover:text-primary transition-colors"
+        className="flex items-center gap-1.5 text-[11px] text-brand hover:text-foreground transition-colors"
       >
         <ExternalLink size={11} />
         Open in editor
       </button>
 
-      <h2 className="text-[15px] font-medium text-primary">{note.title}</h2>
+      <h2 className="text-[15px] font-medium text-foreground">{note.title}</h2>
 
       {note.tags.length > 0 && (
         <div className="flex gap-1 flex-wrap">
@@ -116,7 +116,7 @@ function NotePreview({ note, onSelectNote }: { note: Note; onSelectNote: (id: st
       )}
 
       {note.body && (
-        <div className="text-[12px] text-secondary leading-relaxed whitespace-pre-wrap line-clamp-[20]">
+        <div className="text-[12px] text-muted-foreground leading-relaxed whitespace-pre-wrap line-clamp-[20]">
           {note.body}
         </div>
       )}
@@ -143,7 +143,7 @@ export function ContextPanel({
     return (
       <div
         style={{ width }}
-        className="border-l border-border flex flex-col flex-shrink-0 h-full bg-surface-lowest"
+        className="glass-sidebar flex flex-col flex-shrink-0 h-full"
       />
     );
   }
@@ -153,7 +153,7 @@ export function ContextPanel({
     return (
       <div
         style={{ width }}
-        className="border-l border-border flex flex-col flex-shrink-0 h-full overflow-y-auto bg-surface-lowest"
+        className="glass-sidebar flex flex-col flex-shrink-0 h-full overflow-y-auto"
       >
         <NotePreview note={note} onSelectNote={onSelectNote} />
       </div>
@@ -165,7 +165,7 @@ export function ContextPanel({
     return (
       <div
         style={{ width }}
-        className="border-l border-border flex flex-col flex-shrink-0 h-full bg-surface-lowest"
+        className="glass-sidebar flex flex-col flex-shrink-0 h-full"
       >
         <InsightReviewPanel state={insightState} actions={insightActions} />
       </div>
@@ -176,7 +176,7 @@ export function ContextPanel({
   return (
     <div
       style={{ width }}
-      className="border-l border-border flex flex-col flex-shrink-0 h-full overflow-y-auto bg-surface-lowest"
+      className="glass-sidebar flex flex-col flex-shrink-0 h-full overflow-y-auto"
     >
       <AISuggestionsPanel
         noteId={noteId}

@@ -11,13 +11,13 @@ interface CustomServerCardProps {
 
 export function CustomServerCard({ server, onToggle, onRemove, onEdit }: CustomServerCardProps) {
   return (
-    <div className="flex items-center justify-between py-3 px-4 bg-surface-low rounded-lg border border-border">
+    <div className="flex items-center justify-between py-3 px-4 bg-card rounded-lg border border-border">
       <div className="flex items-center gap-3 min-w-0">
-        <div className="w-8 h-8 rounded-md bg-surface-highest flex items-center justify-center text-muted flex-shrink-0">
+        <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center text-muted-foreground flex-shrink-0">
           <McpServerIcon name={server.name} className="w-4 h-4" />
         </div>
         <div className="min-w-0">
-          <div className="text-[13px] font-medium text-primary truncate">{server.name}</div>
+          <div className="text-[13px] font-medium text-foreground truncate">{server.name}</div>
           <div className="text-[11px] text-dim">
             {server.transport === "stdio" ? server.command : server.url}
           </div>
@@ -36,7 +36,7 @@ export function CustomServerCard({ server, onToggle, onRemove, onEdit }: CustomS
           type="button"
           onClick={() => onToggle(server.name, !server.enabled)}
           className={`w-7 h-7 rounded-md flex items-center justify-center transition-colors ${
-            server.enabled ? "text-success hover:bg-surface-base" : "text-dim hover:bg-surface-base"
+            server.enabled ? "text-success hover:bg-accent" : "text-dim hover:bg-accent"
           }`}
           aria-label={server.enabled ? "Disable" : "Enable"}
         >
@@ -45,7 +45,7 @@ export function CustomServerCard({ server, onToggle, onRemove, onEdit }: CustomS
         <button
           type="button"
           onClick={() => onEdit(server)}
-          className="w-7 h-7 rounded-md flex items-center justify-center text-muted hover:text-secondary hover:bg-surface-base transition-colors"
+          className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-muted-foreground hover:bg-accent transition-colors"
           aria-label="Edit"
         >
           <Settings2 className="w-3.5 h-3.5" strokeWidth={1.5} />
@@ -53,7 +53,7 @@ export function CustomServerCard({ server, onToggle, onRemove, onEdit }: CustomS
         <button
           type="button"
           onClick={() => onRemove(server.name)}
-          className="w-7 h-7 rounded-md flex items-center justify-center text-muted hover:text-destructive hover:bg-surface-base transition-colors"
+          className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-accent transition-colors"
           aria-label="Remove"
         >
           <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5} />
@@ -93,17 +93,17 @@ export function RecommendedServerCard({
   const isConnected = installed && hasOAuth && oauthConnected;
 
   return (
-    <div className="flex items-center justify-between py-3 px-4 bg-surface-low rounded-lg border border-border">
+    <div className="flex items-center justify-between py-3 px-4 bg-card rounded-lg border border-border">
       <div className="flex items-center gap-3 min-w-0">
-        <div className="w-8 h-8 rounded-md bg-surface-highest flex items-center justify-center text-secondary flex-shrink-0">
+        <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center text-muted-foreground flex-shrink-0">
           <McpServerIcon name={server.name} className="w-4 h-4" />
         </div>
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
-            <span className="text-[13px] font-medium text-primary">{server.name}</span>
+            <span className="text-[13px] font-medium text-foreground">{server.name}</span>
             <span className="text-[11px] text-dim">by {server.author}</span>
           </div>
-          <div className="text-[11px] text-muted truncate">{server.description}</div>
+          <div className="text-[11px] text-muted-foreground truncate">{server.description}</div>
         </div>
       </div>
 
@@ -160,7 +160,7 @@ export function RecommendedServerCard({
                 className={`text-[12px] px-3 py-1 rounded-md border transition-colors ${
                   enabled
                     ? "border-success/30 text-success bg-success/5 hover:bg-success/10"
-                    : "border-border text-dim bg-surface-base hover:bg-surface-raised"
+                    : "border-border text-dim bg-accent hover:bg-muted"
                 }`}
               >
                 {enabled ? "Enabled" : "Disabled"}
@@ -171,7 +171,7 @@ export function RecommendedServerCard({
             <button
               type="button"
               onClick={() => onEdit?.(server)}
-              className="w-7 h-7 rounded-md flex items-center justify-center text-muted hover:text-secondary hover:bg-surface-base transition-colors"
+              className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-muted-foreground hover:bg-accent transition-colors"
               aria-label="Configure"
             >
               <Settings2 className="w-3.5 h-3.5" strokeWidth={1.5} />
@@ -183,7 +183,7 @@ export function RecommendedServerCard({
                 type="button"
                 onClick={() => onToggle?.(server.name, !enabled)}
                 className={`w-7 h-7 rounded-md flex items-center justify-center transition-colors ${
-                  enabled ? "text-success hover:bg-surface-base" : "text-dim hover:bg-surface-base"
+                  enabled ? "text-success hover:bg-accent" : "text-dim hover:bg-accent"
                 }`}
                 aria-label={enabled ? "Disable" : "Enable"}
               >

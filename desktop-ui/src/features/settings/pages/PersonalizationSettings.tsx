@@ -235,8 +235,8 @@ export function PersonalizationSettings() {
   return (
     <div>
       <div className="mb-8">
-        <h2 className="text-lg font-medium text-primary">Personalization</h2>
-        <p className="text-[13px] text-muted mt-1">Provider, model, and learning preferences</p>
+        <h2 className="text-lg font-medium text-foreground">Personalization</h2>
+        <p className="text-[13px] text-muted-foreground mt-1">Provider, model, and learning preferences</p>
       </div>
 
       <div className="space-y-4">
@@ -249,11 +249,11 @@ export function PersonalizationSettings() {
         <SettingsCard title="Provider & Model">
           <div className="space-y-3">
             <label className="block">
-              <span className="block text-[11px] text-muted mb-1">Active provider</span>
+              <span className="block text-[11px] text-muted-foreground mb-1">Active provider</span>
               <select
                 value={editedProvider}
                 onChange={(e) => handleProviderChange(e.target.value)}
-                className="w-full px-3 py-1.5 text-[12px] text-primary bg-surface-base border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
               >
                 <option value="" className="bg-surface-floating">
                   Auto-detect
@@ -269,7 +269,7 @@ export function PersonalizationSettings() {
             {editedProvider && (
               <>
                 <div>
-                  <span className="block text-[11px] text-muted mb-1">
+                  <span className="block text-[11px] text-muted-foreground mb-1">
                     API Key ({PROVIDERS.find((p) => p.value === editedProvider)?.label})
                   </span>
                   <SecretInput
@@ -280,7 +280,7 @@ export function PersonalizationSettings() {
                 </div>
 
                 <label className="block">
-                  <span className="block text-[11px] text-muted mb-1">API Base (optional)</span>
+                  <span className="block text-[11px] text-muted-foreground mb-1">API Base (optional)</span>
                   <input
                     type="text"
                     value={editedApiBase}
@@ -288,20 +288,20 @@ export function PersonalizationSettings() {
                       setProviderEdits((prev) => ({ ...prev, apiBase: e.target.value }))
                     }
                     placeholder="Leave blank for default"
-                    className="w-full px-3 py-1.5 text-[12px] text-primary bg-surface-base border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                    className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
                   />
                 </label>
               </>
             )}
 
             <label className="block">
-              <span className="block text-[11px] text-muted mb-1">Default model</span>
+              <span className="block text-[11px] text-muted-foreground mb-1">Default model</span>
               <input
                 type="text"
                 value={editedModel}
                 onChange={(e) => setProviderEdits((prev) => ({ ...prev, model: e.target.value }))}
                 placeholder="e.g. anthropic/claude-opus-4-5"
-                className="w-full px-3 py-1.5 text-[12px] text-primary bg-surface-base border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
               />
             </label>
 
@@ -318,7 +318,7 @@ export function PersonalizationSettings() {
             </p>
 
             <label className="block">
-              <span className="block text-[11px] text-muted mb-1">Provider override</span>
+              <span className="block text-[11px] text-muted-foreground mb-1">Provider override</span>
               <select
                 value={cogProvider}
                 onChange={(e) =>
@@ -329,7 +329,7 @@ export function PersonalizationSettings() {
                     model: "",
                   }))
                 }
-                className="w-full px-3 py-1.5 text-[12px] text-primary bg-surface-base border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
               >
                 <option value="" className="bg-surface-floating">
                   Same as main ({PROVIDERS.find((p) => p.value === editedProvider)?.label || "auto"}
@@ -344,14 +344,14 @@ export function PersonalizationSettings() {
             </label>
 
             <div>
-              <span className="block text-[11px] text-muted mb-1">Model</span>
+              <span className="block text-[11px] text-muted-foreground mb-1">Model</span>
               {cogModelOptions.length > 0 ? (
                 <select
                   value={cogModel}
                   onChange={(e) =>
                     setCognitiveEdits((prev) => ({ ...prev, model: e.target.value }))
                   }
-                  className="w-full px-3 py-1.5 text-[12px] text-primary bg-surface-base border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                  className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
                 >
                   <option value="" className="bg-surface-floating">
                     Same as main agent model
@@ -371,7 +371,7 @@ export function PersonalizationSettings() {
                     setCognitiveEdits((prev) => ({ ...prev, model: e.target.value }))
                   }
                   placeholder="Leave blank to use main agent model"
-                  className="w-full px-3 py-1.5 text-[12px] text-primary bg-surface-base border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                  className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
                 />
               )}
             </div>
@@ -390,7 +390,7 @@ export function PersonalizationSettings() {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-[12px] text-secondary">Enable learning</span>
+                <span className="text-[12px] text-muted-foreground">Enable learning</span>
                 <p className="text-[11px] text-dim">
                   Adaptive confidence thresholds based on outcomes
                 </p>
@@ -402,7 +402,7 @@ export function PersonalizationSettings() {
             </div>
 
             <label className="block">
-              <span className="block text-[11px] text-muted mb-1">Analysis interval (seconds)</span>
+              <span className="block text-[11px] text-muted-foreground mb-1">Analysis interval (seconds)</span>
               <input
                 type="number"
                 value={getLearningValue("analysisIntervalSecs", 3600)}
@@ -414,13 +414,13 @@ export function PersonalizationSettings() {
                 }
                 step="60"
                 min="60"
-                className="w-full px-3 py-1.5 text-[12px] text-primary bg-surface-base border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
               />
             </label>
 
             <div className="flex gap-3">
               <label className="flex-1">
-                <span className="block text-[11px] text-muted mb-1">Min threshold</span>
+                <span className="block text-[11px] text-muted-foreground mb-1">Min threshold</span>
                 <input
                   type="number"
                   value={getLearningValue("minThreshold", 0.4)}
@@ -433,11 +433,11 @@ export function PersonalizationSettings() {
                   step="0.05"
                   min="0"
                   max="1"
-                  className="w-full px-3 py-1.5 text-[12px] text-primary bg-surface-base border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                  className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
                 />
               </label>
               <label className="flex-1">
-                <span className="block text-[11px] text-muted mb-1">Max threshold</span>
+                <span className="block text-[11px] text-muted-foreground mb-1">Max threshold</span>
                 <input
                   type="number"
                   value={getLearningValue("maxThreshold", 0.9)}
@@ -450,13 +450,13 @@ export function PersonalizationSettings() {
                   step="0.05"
                   min="0"
                   max="1"
-                  className="w-full px-3 py-1.5 text-[12px] text-primary bg-surface-base border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                  className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
                 />
               </label>
             </div>
 
             <label className="block">
-              <span className="block text-[11px] text-muted mb-1">Min outcomes for adaptation</span>
+              <span className="block text-[11px] text-muted-foreground mb-1">Min outcomes for adaptation</span>
               <input
                 type="number"
                 value={getLearningValue("minOutcomesForAdaptation", 50)}
@@ -467,7 +467,7 @@ export function PersonalizationSettings() {
                   }))
                 }
                 min="1"
-                className="w-full px-3 py-1.5 text-[12px] text-primary bg-surface-base border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
               />
             </label>
 

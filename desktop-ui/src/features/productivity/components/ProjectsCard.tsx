@@ -13,7 +13,7 @@ export function ProjectsCard({ projects, totalSecs }: ProjectsCardProps) {
   return (
     <div className="glass-card p-4 flex flex-col gap-3">
       <div className="flex items-baseline justify-between">
-        <h2 className="text-[13px] font-medium text-secondary">Projects</h2>
+        <h2 className="text-[13px] font-medium text-muted-foreground">Projects</h2>
         <span className="text-[10px] font-light text-dim tabular-nums">
           {projects.length} tracked
         </span>
@@ -32,10 +32,10 @@ export function ProjectsCard({ projects, totalSecs }: ProjectsCardProps) {
                 className="w-2 h-2 rounded-[3px] flex-shrink-0"
                 style={{ backgroundColor: color }}
               />
-              <span className="text-[11px] font-light text-secondary flex-1 truncate">
+              <span className="text-[11px] font-light text-muted-foreground flex-1 truncate">
                 {p.displayName}
               </span>
-              <div className="flex-1 h-1.5 rounded-full bg-surface-base overflow-hidden">
+              <div className="flex-1 h-1.5 rounded-full bg-accent overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all duration-500"
                   style={{ width: `${pct}%`, backgroundColor: color }}

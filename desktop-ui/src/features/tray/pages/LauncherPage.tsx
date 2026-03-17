@@ -101,7 +101,7 @@ export function Launcher() {
   );
 
   return (
-    <div className="w-screen text-primary">
+    <div className="w-screen text-foreground">
       <div
         ref={contentRef}
         className="w-full glass-floating overflow-hidden"

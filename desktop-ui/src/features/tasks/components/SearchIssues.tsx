@@ -19,7 +19,7 @@ export function SearchIssues({ issues }: SearchIssuesProps) {
         <div>
           {searchResults.length > 0 ? (
             <div className="border border-border rounded-md mt-4">
-              <div className="py-2 px-4 border-b border-border bg-surface-low/50">
+              <div className="py-2 px-4 border-b border-border bg-card/50">
                 <h3 className="text-sm font-medium">Results ({searchResults.length})</h3>
               </div>
               <div className="divide-y divide-border">
@@ -29,7 +29,7 @@ export function SearchIssues({ issues }: SearchIssuesProps) {
               </div>
             </div>
           ) : (
-            <div className="text-center py-8 text-muted">
+            <div className="text-center py-8 text-muted-foreground">
               No results found for &quot;{searchQuery}&quot;
             </div>
           )}

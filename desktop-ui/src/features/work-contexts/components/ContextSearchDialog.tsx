@@ -57,15 +57,15 @@ export function ContextSearchDialog({ open, onClose, onSelect }: ContextSearchDi
         <div className="glass-panel w-full max-w-lg pointer-events-auto rounded-2xl overflow-hidden">
           {/* Search input */}
           <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
-            <Search className="w-4 h-4 text-muted shrink-0" />
+            <Search className="w-4 h-4 text-muted-foreground shrink-0" />
             <input
               ref={inputRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search work contexts…"
-              className="flex-1 bg-transparent text-[14px] text-primary placeholder-muted outline-none"
+              className="flex-1 bg-transparent text-[14px] text-foreground placeholder-muted outline-none"
             />
-            <button type="button" onClick={onClose} className="text-muted hover:text-secondary">
+            <button type="button" onClick={onClose} className="text-muted-foreground hover:text-foreground">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -73,7 +73,7 @@ export function ContextSearchDialog({ open, onClose, onSelect }: ContextSearchDi
           {/* Results */}
           <div className="max-h-80 overflow-y-auto py-2">
             {debouncedQuery && results.length === 0 && (
-              <p className="text-[12px] text-muted px-4 py-3">No contexts found</p>
+              <p className="text-[12px] text-muted-foreground px-4 py-3">No contexts found</p>
             )}
             {results.map((ctx) => {
               const color = contextColor(ctx.color, ctx.contextType);
@@ -85,20 +85,20 @@ export function ContextSearchDialog({ open, onClose, onSelect }: ContextSearchDi
                     onSelect(ctx);
                     onClose();
                   }}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-surface-base transition-colors text-left"
+                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-accent transition-colors text-left"
                 >
                   <div
                     className="w-2.5 h-2.5 rounded-full shrink-0"
                     style={{ backgroundColor: color }}
                   />
                   <div className="flex-1 min-w-0">
-                    <p className="text-[13px] text-primary font-medium truncate">{ctx.title}</p>
-                    <p className="text-[11px] text-muted">
+                    <p className="text-[13px] text-foreground font-medium truncate">{ctx.title}</p>
+                    <p className="text-[11px] text-muted-foreground">
                       {ctx.contextType} · {formatHumanDuration(ctx.totalDurationSecs)} ·{" "}
                       {ctx.eventCount} events
                     </p>
                   </div>
-                  <span className="text-[10px] text-muted shrink-0">{ctx.status}</span>
+                  <span className="text-[10px] text-muted-foreground shrink-0">{ctx.status}</span>
                 </button>
               );
             })}

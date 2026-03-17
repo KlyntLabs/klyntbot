@@ -58,7 +58,7 @@ export function CategoriesList({ categories, totalSecs }: CategoriesListProps) {
   if (active.length === 0) {
     return (
       <div className="glass-card p-4">
-        <h2 className="text-[13px] font-medium text-secondary mb-3">Categories</h2>
+        <h2 className="text-[13px] font-medium text-muted-foreground mb-3">Categories</h2>
         <p className="text-[12px] font-light text-dim">No category data</p>
       </div>
     );
@@ -67,7 +67,7 @@ export function CategoriesList({ categories, totalSecs }: CategoriesListProps) {
   return (
     <div className="glass-card p-4 flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-[13px] font-medium text-secondary">Categories</h2>
+        <h2 className="text-[13px] font-medium text-muted-foreground">Categories</h2>
         <span className="text-[10px] font-light text-dim tabular-nums">
           {formatHumanDuration(totalSecs)} tracked
         </span>
@@ -125,8 +125,8 @@ export function CategoriesList({ categories, totalSecs }: CategoriesListProps) {
                   className="w-1.5 h-1.5 rounded-full flex-shrink-0"
                   style={{ backgroundColor: group.color }}
                 />
-                <span className="text-[11px] font-medium text-secondary flex-1">{group.label}</span>
-                <span className="text-[10px] font-medium text-secondary tabular-nums">
+                <span className="text-[11px] font-medium text-muted-foreground flex-1">{group.label}</span>
+                <span className="text-[10px] font-medium text-muted-foreground tabular-nums">
                   {groupPct}%
                 </span>
                 <span className="text-[10px] font-light text-dim tabular-nums w-14 text-right">
@@ -142,7 +142,7 @@ export function CategoriesList({ categories, totalSecs }: CategoriesListProps) {
                       className="w-2 h-2 rounded-sm flex-shrink-0"
                       style={{ backgroundColor: getCategoryColor(cat.categoryId, i) }}
                     />
-                    <span className="text-[11px] font-light text-primary flex-1 truncate">
+                    <span className="text-[11px] font-light text-foreground flex-1 truncate">
                       {cat.category}
                     </span>
                     <span className="text-[10px] font-light text-dim tabular-nums">{pct}%</span>

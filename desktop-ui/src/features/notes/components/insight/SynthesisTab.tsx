@@ -9,9 +9,9 @@ interface SynthesisTabProps {
 function SkeletonLoader() {
   return (
     <div className="space-y-3 animate-pulse">
-      <div className="h-3 bg-surface-low rounded w-3/4" />
-      <div className="h-3 bg-surface-low rounded w-full" />
-      <div className="h-3 bg-surface-low rounded w-5/6" />
+      <div className="h-3 bg-card rounded w-3/4" />
+      <div className="h-3 bg-card rounded w-full" />
+      <div className="h-3 bg-card rounded w-5/6" />
     </div>
   );
 }
@@ -48,7 +48,7 @@ export function SynthesisTab({ status, content }: SynthesisTabProps) {
 
   // streaming with content, or done
   return (
-    <div className="text-[12px] text-secondary leading-relaxed">
+    <div className="text-[12px] text-muted-foreground leading-relaxed">
       <MarkdownContent content={content} />
       {status === "streaming" && (
         <span className="inline-block w-1.5 h-3.5 bg-purple animate-pulse ml-0.5 align-text-bottom rounded-sm" />

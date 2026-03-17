@@ -57,13 +57,13 @@ export function FormModal({
         className="glass-panel w-full max-w-md"
         style={{ animation: "glass-appear 0.2s ease-out" }}
       >
-        <div className="bg-surface-low rounded-[var(--glass-radius-inner)]">
+        <div className="bg-card rounded-[var(--glass-radius-inner)]">
           <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-            <h3 className="text-[14px] font-medium text-primary">{title}</h3>
+            <h3 className="text-[14px] font-medium text-foreground">{title}</h3>
             <button
               type="button"
               onClick={onClose}
-              className="w-7 h-7 rounded-md flex items-center justify-center text-muted hover:text-secondary hover:bg-surface-base transition-colors"
+              className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
             >
               <X className="w-4 h-4" />
             </button>
@@ -75,7 +75,7 @@ export function FormModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-3 py-1.5 text-[12px] text-muted hover:text-secondary rounded-md hover:bg-surface-base transition-colors"
+              className="px-3 py-1.5 text-[12px] text-muted-foreground hover:text-foreground rounded-md hover:bg-accent transition-colors"
             >
               Cancel
             </button>
@@ -96,11 +96,11 @@ export function FormModal({
 export function FormField({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="text-[11px] font-medium text-secondary">{label}</label>
+      <label className="text-[11px] font-medium text-muted-foreground">{label}</label>
       {children}
     </div>
   );
 }
 
 export const fieldClass =
-  "glass-input w-full px-3 py-2 text-[12px] font-light text-primary placeholder:text-dim rounded-lg";
+  "glass-input w-full px-3 py-2 text-[12px] font-light text-foreground placeholder:text-dim rounded-lg";

@@ -46,11 +46,11 @@ export function CategoryList({ categories, selectedId, onSelect, onCreated }: Ca
   return (
     <div className="glass-card p-3 flex flex-col gap-2">
       <div className="flex items-center justify-between">
-        <h3 className="text-[12px] font-medium text-secondary">Categories</h3>
+        <h3 className="text-[12px] font-medium text-muted-foreground">Categories</h3>
         <button
           type="button"
           onClick={handleCreate}
-          className="p-1 rounded-md hover:bg-surface-base text-muted hover:text-primary transition-colors"
+          className="p-1 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
           title="Add category"
         >
           <Plus size={14} />
@@ -61,7 +61,7 @@ export function CategoryList({ categories, selectedId, onSelect, onCreated }: Ca
         <div key={group.type} className="flex flex-col gap-0.5">
           <div className="flex items-center gap-1.5 py-1">
             <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: group.color }} />
-            <span className="text-[10px] font-medium text-muted uppercase tracking-wider">
+            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
               {group.label}
             </span>
           </div>
@@ -74,8 +74,8 @@ export function CategoryList({ categories, selectedId, onSelect, onCreated }: Ca
                 onClick={() => onSelect(cat.id)}
                 className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition-colors ${
                   isSelected
-                    ? "bg-surface-raised text-primary"
-                    : "text-secondary hover:bg-surface-low hover:text-primary"
+                    ? "bg-muted text-foreground"
+                    : "text-muted-foreground hover:bg-card hover:text-foreground"
                 }`}
               >
                 <span

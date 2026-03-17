@@ -49,8 +49,8 @@ export function PermissionsCard() {
   };
 
   return (
-    <div className="bg-surface-low rounded-lg border border-border p-4">
-      <h3 className="text-[13px] font-medium text-secondary mb-1">macOS Permissions</h3>
+    <div className="bg-card rounded-lg border border-border p-4">
+      <h3 className="text-[13px] font-medium text-muted-foreground mb-1">macOS Permissions</h3>
       <p className="text-[11px] text-dim mb-4">
         These permissions are required for productivity tracking and smart distraction detection.
       </p>
@@ -62,7 +62,7 @@ export function PermissionsCard() {
           const denied = status === false;
 
           return (
-            <div key={p.label} className="flex items-start gap-3 p-3 rounded-lg bg-surface-base">
+            <div key={p.label} className="flex items-start gap-3 p-3 rounded-lg bg-accent">
               {/* Status icon */}
               <div className="flex-shrink-0 mt-0.5">
                 {granted ? (
@@ -92,14 +92,14 @@ export function PermissionsCard() {
                     />
                   </div>
                 ) : (
-                  <div className="w-5 h-5 rounded-full bg-surface-raised" />
+                  <div className="w-5 h-5 rounded-full bg-muted" />
                 )}
               </div>
 
               {/* Info */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-[13px] font-medium text-primary">{p.label}</span>
+                  <span className="text-[13px] font-medium text-foreground">{p.label}</span>
                   {granted && <span className="text-[10px] text-success">Granted</span>}
                   {denied && (
                     <span className="text-[10px]" style={{ color: "var(--destructive)" }}>
@@ -125,7 +125,7 @@ export function PermissionsCard() {
                 <button
                   type="button"
                   onClick={() => handleOpen(p)}
-                  className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] text-dim hover:text-muted transition-colors"
+                  className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] text-dim hover:text-muted-foreground transition-colors"
                 >
                   <ExternalLink className="w-3 h-3" />
                   Open
@@ -154,7 +154,7 @@ export function PermissionsCard() {
             <span className="font-medium" style={{ color: "var(--destructive)" }}>
               Permissions needed.
             </span>{" "}
-            <span className="text-muted">
+            <span className="text-muted-foreground">
               After granting permissions in System Settings, you may need to restart Klynt for
               changes to take effect.
             </span>

@@ -51,17 +51,17 @@ function SkeletonRows<T>({
         <tr key={`skel-${i}`} className="border-b border-border-subtle">
           {expandable && (
             <td className="px-3 py-2.5 w-8">
-              <div className="w-3 h-3 rounded animate-pulse bg-surface-raised" />
+              <div className="w-3 h-3 rounded animate-pulse bg-muted" />
             </td>
           )}
           {hasPrefix && (
             <td className="px-2 py-2.5 w-10">
-              <div className="w-7 h-4 rounded-full animate-pulse bg-surface-raised" />
+              <div className="w-7 h-4 rounded-full animate-pulse bg-muted" />
             </td>
           )}
           {columns.map((col) => (
             <td key={col.key} className={cn("px-5 py-2.5", col.width)}>
-              <div className="h-4 rounded animate-pulse bg-surface-raised" />
+              <div className="h-4 rounded animate-pulse bg-muted" />
             </td>
           ))}
         </tr>
@@ -94,7 +94,7 @@ export function DataTable<T>({
     <div className={cn("overflow-hidden", className)}>
       <table className="w-full border-collapse">
         <thead>
-          <tr className="border-b border-border-subtle text-[11px] text-muted font-light text-left bg-surface-lowest">
+          <tr className="border-b border-border-subtle text-[11px] text-muted-foreground font-light text-left bg-card">
             {expandable && <th className="px-3 py-2.5 w-8 font-light" />}
             {renderRowPrefix && <th className="px-2 py-2.5 w-10 font-light" />}
             {columns.map((col) => (
@@ -194,8 +194,8 @@ function DataTableRow<T>({
         onKeyDown={isInteractive ? (e) => e.key === "Enter" && handleClick() : undefined}
         className={cn(
           "transition-colors border-b border-border-subtle last:border-b-0 whitespace-nowrap",
-          isInteractive && "hover:bg-surface-low cursor-pointer",
-          !isInteractive && "hover:bg-surface-lowest",
+          isInteractive && "hover:bg-accent cursor-pointer",
+          !isInteractive && "hover:bg-card",
           rowClassName?.(item),
         )}
       >

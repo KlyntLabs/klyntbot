@@ -63,7 +63,7 @@ export function EntityReferencesPanel({
       <button
         type="button"
         onClick={() => setCollapsed(!collapsed)}
-        className="w-full flex items-center gap-1.5 px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-muted hover:text-secondary transition-colors"
+        className="w-full flex items-center gap-1.5 px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
       >
         {collapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
         <span>Entity References</span>

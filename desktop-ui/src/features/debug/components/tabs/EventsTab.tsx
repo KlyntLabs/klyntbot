@@ -24,7 +24,7 @@ interface DomainEventRow {
 const salienceColors: Record<string, string> = {
   extract: "bg-success/20 text-success",
   accumulate: "bg-warning/20 text-warning",
-  discard: "bg-surface-base text-muted",
+  discard: "bg-accent text-muted-foreground",
 };
 
 const salienceBorders: Record<string, string> = {
@@ -90,7 +90,7 @@ export function EventsTab() {
             type="button"
             onClick={() => setFilters((f) => ({ ...f, [s]: !f[s] }))}
             className={`text-[11px] px-2 py-1 rounded transition-all ${
-              filters[s] ? salienceColors[s] : "bg-surface-low text-muted"
+              filters[s] ? salienceColors[s] : "bg-card text-muted-foreground"
             }`}
           >
             {s.charAt(0).toUpperCase() + s.slice(1)}
@@ -100,7 +100,7 @@ export function EventsTab() {
         <button
           type="button"
           onClick={() => setPaused(!paused)}
-          className="flex items-center gap-1 text-[11px] text-muted hover:text-secondary"
+          className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
         >
           {paused ? <Play className="w-3 h-3" /> : <Pause className="w-3 h-3" />}
           {paused ? "Resume" : "Pause"}
@@ -108,11 +108,11 @@ export function EventsTab() {
         <button
           type="button"
           onClick={() => setEvents([])}
-          className="flex items-center gap-1 text-[11px] text-muted hover:text-secondary"
+          className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
         >
           <Trash2 className="w-3 h-3" /> Clear
         </button>
-        <span className="text-[11px] text-muted">{events.length} events</span>
+        <span className="text-[11px] text-muted-foreground">{events.length} events</span>
       </div>
 
       {/* Event Stream */}
@@ -130,7 +130,7 @@ export function EventsTab() {
               className={`w-full text-left p-2 rounded border-l-2 transition-all ${color} ${border}`}
             >
               <div className="flex items-center gap-2">
-                <span className="text-[10px] text-muted font-mono w-20 shrink-0">
+                <span className="text-[10px] text-muted-foreground font-mono w-20 shrink-0">
                   {new Date(e.timestamp).toLocaleTimeString(undefined, {
                     hour: "2-digit",
                     minute: "2-digit",
@@ -138,12 +138,12 @@ export function EventsTab() {
                     hour12: false,
                   })}
                 </span>
-                <span className="text-[11px] text-secondary">{e.eventType}</span>
+                <span className="text-[11px] text-muted-foreground">{e.eventType}</span>
                 <span className={`text-[9px] px-1 py-0.5 rounded ${color}`}>{e.salience}</span>
-                <span className="text-[10px] text-muted">{e.domain}</span>
+                <span className="text-[10px] text-muted-foreground">{e.domain}</span>
               </div>
               {isExpanded && (
-                <pre className="mt-2 text-[10px] text-muted font-mono whitespace-pre-wrap">
+                <pre className="mt-2 text-[10px] text-muted-foreground font-mono whitespace-pre-wrap">
                   {JSON.stringify(e.payload, null, 2)}
                 </pre>
               )}
@@ -151,7 +151,7 @@ export function EventsTab() {
           );
         })}
         {visibleEvents.length === 0 && (
-          <p className="text-[12px] text-muted text-center py-8">
+          <p className="text-[12px] text-muted-foreground text-center py-8">
             {paused ? "Stream paused" : "Waiting for domain events..."}
           </p>
         )}

@@ -125,11 +125,11 @@ export function TrackedAppsList({ apps, categories, onReassigned }: TrackedAppsL
 
   return (
     <div className="glass-card p-3 flex flex-col gap-2">
-      <h3 className="text-[12px] font-medium text-secondary">Tracked Apps & Sites</h3>
+      <h3 className="text-[12px] font-medium text-muted-foreground">Tracked Apps & Sites</h3>
 
       {/* Search */}
       <div className="relative">
-        <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted" />
+        <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
         <input
           type="text"
           value={search}
@@ -145,7 +145,7 @@ export function TrackedAppsList({ apps, categories, onReassigned }: TrackedAppsL
           type="button"
           onClick={() => setShowUncategorized(!showUncategorized)}
           className={`text-[10px] font-light px-2 py-1 rounded-lg transition-colors ${
-            showUncategorized ? "bg-brand/20 text-brand" : "text-muted hover:bg-surface-low"
+            showUncategorized ? "bg-brand/20 text-brand" : "text-muted-foreground hover:bg-card"
           }`}
         >
           Uncategorized ({uncategorizedCount})
@@ -195,14 +195,14 @@ function TrackedAppRow({
   onCancel: () => void;
 }) {
   return (
-    <div className="flex items-center gap-2 px-1.5 py-1 rounded-md hover:bg-surface-lowest group">
+    <div className="flex items-center gap-2 px-1.5 py-1 rounded-md hover:bg-card group">
       {color ? (
         <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ backgroundColor: color }} />
       ) : (
         <span className="w-2 h-2 rounded-sm flex-shrink-0 border border-dashed border-muted" />
       )}
       <div className="flex-1 min-w-0">
-        <div className="text-[11px] font-light text-primary truncate">{app.displayName}</div>
+        <div className="text-[11px] font-light text-foreground truncate">{app.displayName}</div>
         <div className="text-[9px] font-light text-dim">
           {app.categoryName ?? "Uncategorized"} · {formatHumanDuration(app.totalSecs)}
         </div>
@@ -227,7 +227,7 @@ function TrackedAppRow({
         <button
           type="button"
           onClick={onEdit}
-          className="text-[9px] font-light text-dim opacity-0 group-hover:opacity-100 transition-opacity hover:text-primary"
+          className="text-[9px] font-light text-dim opacity-0 group-hover:opacity-100 transition-opacity hover:text-foreground"
         >
           Edit
         </button>

@@ -20,7 +20,7 @@ export function TabContent({ tasksData }: TabContentProps) {
 
   if (!activeTab) {
     return (
-      <div className="flex-1 flex items-center justify-center text-sm text-muted">
+      <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
         Click + to open a tab
       </div>
     );
@@ -31,7 +31,7 @@ export function TabContent({ tasksData }: TabContentProps) {
 
   if (!currentView) {
     return (
-      <div className="flex-1 flex items-center justify-center text-sm text-muted">
+      <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
         Click + to open a tab
       </div>
     );

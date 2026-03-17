@@ -24,12 +24,12 @@ export function ConfirmDialog({
   return (
     <Dialog open={open} onClose={onClose} title={title} size="sm">
       <div className="flex flex-col gap-4">
-        <p className="text-sm text-secondary">{message}</p>
+        <p className="text-sm text-muted-foreground">{message}</p>
         <div className="flex items-center justify-end gap-2">
           <button
             type="button"
             onClick={onClose}
-            className="px-3 py-1.5 text-[12px] text-muted hover:text-secondary rounded-md hover:bg-surface-base transition-colors"
+            className="px-3 py-1.5 text-[12px] text-muted-foreground hover:text-foreground rounded-md hover:bg-accent transition-colors"
           >
             {cancelLabel}
           </button>

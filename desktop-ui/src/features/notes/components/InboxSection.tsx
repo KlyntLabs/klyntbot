@@ -62,8 +62,8 @@ function InboxItemRow({
   onDiscard: () => void;
 }) {
   return (
-    <div className="flex flex-col gap-1 px-2 py-1.5 rounded-lg hover:bg-surface-low transition-colors group">
-      <span className="text-xs text-secondary line-clamp-2">{item.content}</span>
+    <div className="flex flex-col gap-1 px-2 py-1.5 rounded-lg hover:bg-accent transition-colors group">
+      <span className="text-xs text-muted-foreground line-clamp-2">{item.content}</span>
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
         <button
           type="button"

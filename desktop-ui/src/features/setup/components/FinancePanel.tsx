@@ -70,7 +70,7 @@ export function FinancePanel({ onComplete }: FinancePanelProps) {
   };
 
   return (
-    <div className="mt-4 bg-surface-low rounded-xl border border-border p-6 animate-in slide-in-from-top-2 duration-300">
+    <div className="mt-4 bg-card rounded-xl border border-border p-6 animate-in slide-in-from-top-2 duration-300">
       {/* Mini progress */}
       <div className="flex items-center gap-1 mb-5">
         {SUB_STEPS.map((step, i) => (
@@ -83,7 +83,7 @@ export function FinancePanel({ onComplete }: FinancePanelProps) {
                 ? "bg-brand text-white"
                 : i < subStep
                   ? "bg-brand/20 text-brand"
-                  : "bg-surface-base text-dim"
+                  : "bg-accent text-dim"
             }`}
           >
             {SUB_STEP_LABELS[step]}
@@ -121,7 +121,7 @@ export function FinancePanel({ onComplete }: FinancePanelProps) {
             <button
               type="button"
               onClick={handleBack}
-              className="px-3 py-1.5 text-[12px] text-muted hover:text-secondary transition-colors"
+              className="px-3 py-1.5 text-[12px] text-muted-foreground hover:text-foreground transition-colors"
             >
               Back
             </button>
@@ -129,7 +129,7 @@ export function FinancePanel({ onComplete }: FinancePanelProps) {
           <button
             type="button"
             onClick={onComplete}
-            className="px-3 py-1.5 text-[12px] text-muted hover:text-secondary transition-colors"
+            className="px-3 py-1.5 text-[12px] text-muted-foreground hover:text-foreground transition-colors"
           >
             Skip
           </button>

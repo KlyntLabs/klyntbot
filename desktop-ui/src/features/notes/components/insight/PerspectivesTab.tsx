@@ -29,15 +29,15 @@ function SkeletonLoader() {
       {[1, 2, 3].map((i) => (
         <div key={i} className="glass-card rounded-lg p-3 space-y-2 animate-pulse">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-full bg-surface-low" />
+            <div className="w-7 h-7 rounded-full bg-card" />
             <div className="space-y-1">
-              <div className="h-3 bg-surface-low rounded w-24" />
-              <div className="h-2 bg-surface-low rounded w-16" />
+              <div className="h-3 bg-card rounded w-24" />
+              <div className="h-2 bg-card rounded w-16" />
             </div>
           </div>
-          <div className="h-3 bg-surface-low rounded w-full" />
-          <div className="h-3 bg-surface-low rounded w-4/5" />
-          <div className="h-3 bg-surface-low rounded w-3/4" />
+          <div className="h-3 bg-card rounded w-full" />
+          <div className="h-3 bg-card rounded w-4/5" />
+          <div className="h-3 bg-card rounded w-3/4" />
         </div>
       ))}
     </div>
@@ -74,7 +74,7 @@ export function PerspectivesTab({ status, content, personas }: PerspectivesTabPr
         <div className="text-[10px] text-dim italic">
           Perspectives (persona details unavailable)
         </div>
-        <div className="text-[12px] text-secondary leading-relaxed whitespace-pre-wrap">
+        <div className="text-[12px] text-muted-foreground leading-relaxed whitespace-pre-wrap">
           {content}
         </div>
       </div>

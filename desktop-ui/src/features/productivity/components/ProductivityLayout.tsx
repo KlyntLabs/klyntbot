@@ -72,8 +72,8 @@ export function ProductivityLayout({ children, period, dateParam }: Productivity
               onClick={() => navigate(periodTodayUrl(p.key))}
               className={`px-3 py-1.5 rounded-xl text-[13px] font-light transition-all duration-200 ${
                 period === p.key
-                  ? "glass-button-active text-primary"
-                  : "text-muted hover:text-secondary hover:bg-surface-low"
+                  ? "glass-button-active text-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-card"
               }`}
             >
               {p.label}
@@ -84,8 +84,8 @@ export function ProductivityLayout({ children, period, dateParam }: Productivity
             onClick={() => navigate("/productivity/categories")}
             className={`px-3 py-1.5 rounded-xl text-[13px] font-light transition-all duration-200 ${
               pathname.includes("/categories")
-                ? "glass-button-active text-primary"
-                : "text-muted hover:text-secondary hover:bg-surface-low"
+                ? "glass-button-active text-foreground"
+                : "text-muted-foreground hover:text-foreground hover:bg-card"
             }`}
           >
             Categories

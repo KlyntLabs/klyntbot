@@ -34,8 +34,8 @@ export function ThemeSwitcher() {
               {t.id === "retro" && <RetroPreview />}
             </div>
             <div>
-              <span className="text-sm font-medium text-primary">{t.label}</span>
-              <p className="text-xs text-muted mt-0.5">{t.description}</p>
+              <span className="text-sm font-medium text-foreground">{t.label}</span>
+              <p className="text-xs text-muted-foreground mt-0.5">{t.description}</p>
             </div>
             {theme === t.id && (
               <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-brand flex items-center justify-center">

@@ -10,7 +10,7 @@ export function Dashboard({ onOpenTask }: DashboardProps) {
   const dashboard = useLauncherStore((s) => s.dashboard);
 
   if (!dashboard) {
-    return <div className="p-6 text-center text-muted text-sm animate-pulse">Loading...</div>;
+    return <div className="p-6 text-center text-muted-foreground text-sm animate-pulse">Loading...</div>;
   }
 
   const hasContent =
@@ -22,7 +22,7 @@ export function Dashboard({ onOpenTask }: DashboardProps) {
   if (!hasContent) {
     return (
       <div className="px-4 py-6 text-center">
-        <p className="text-sm text-muted">No activity yet today</p>
+        <p className="text-sm text-muted-foreground">No activity yet today</p>
         <p className="text-xs text-dim mt-1">Start a focus session or search for anything</p>
       </div>
     );
@@ -73,7 +73,7 @@ function FocusWidget({ focus }: { focus: NonNullable<DashboardData["focus"]> }) 
         <p className="text-[13px] text-foreground/90 truncate pl-3.5">{focus.taskName}</p>
       )}
       {progress !== null && (
-        <div className="mt-2 h-[3px] bg-surface-base rounded-full overflow-hidden">
+        <div className="mt-2 h-[3px] bg-accent rounded-full overflow-hidden">
           <div
             className="h-full rounded-full transition-all duration-1000 ease-out"
             style={{
@@ -91,7 +91,7 @@ function FocusWidget({ focus }: { focus: NonNullable<DashboardData["focus"]> }) 
 
 function CalendarWidget({ events }: { events: DashboardData["calendar"] }) {
   return (
-    <div className="rounded-lg border border-border-subtle bg-surface-lowest/50 p-3">
+    <div className="rounded-lg border border-border-subtle bg-card/50 p-3">
       <div className="flex items-center gap-1.5 mb-2">
         <svg
           className="w-3.5 h-3.5 text-info/70"
@@ -107,7 +107,7 @@ function CalendarWidget({ events }: { events: DashboardData["calendar"] }) {
             d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
           />
         </svg>
-        <span className="text-[11px] font-medium uppercase tracking-wider text-muted">
+        <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
           Upcoming
         </span>
       </div>
@@ -125,7 +125,7 @@ function CalendarWidget({ events }: { events: DashboardData["calendar"] }) {
               <span className="text-[13px] text-foreground/90 truncate flex-1">{event.title}</span>
               <span
                 className={`text-[11px] tabular-nums shrink-0 ${
-                  isNow ? "text-destructive font-medium" : isSoon ? "text-warning" : "text-muted"
+                  isNow ? "text-destructive font-medium" : isSoon ? "text-warning" : "text-muted-foreground"
                 }`}
               >
                 {isNow ? "Now" : `${event.minutesUntil}m`}
@@ -154,7 +154,7 @@ function TasksWidget({
   onOpenTask?: (id: string) => void;
 }) {
   return (
-    <div className="rounded-lg border border-border-subtle bg-surface-lowest/50 p-3">
+    <div className="rounded-lg border border-border-subtle bg-card/50 p-3">
       <div className="flex items-center gap-1.5 mb-2">
         <svg
           className="w-3.5 h-3.5 text-success/70"
@@ -170,7 +170,7 @@ function TasksWidget({
             d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
           />
         </svg>
-        <span className="text-[11px] font-medium uppercase tracking-wider text-muted">Tasks</span>
+        <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Tasks</span>
         <span className="text-[11px] text-dim ml-auto">{tasks.length}</span>
       </div>
       <div className="space-y-0.5">
@@ -179,7 +179,7 @@ function TasksWidget({
             key={task.id}
             type="button"
             onClick={() => onOpenTask?.(task.id)}
-            className="flex items-center gap-2.5 py-1 group w-full text-left rounded-md px-1 -mx-1 hover:bg-surface-low active:bg-surface-base transition-colors cursor-pointer"
+            className="flex items-center gap-2.5 py-1 group w-full text-left rounded-md px-1 -mx-1 hover:bg-accent active:bg-accent transition-colors cursor-pointer"
           >
             <div
               className={`w-[7px] h-[7px] rounded-full shrink-0 ring-1 ring-inset ring-white/10 ${
@@ -274,22 +274,22 @@ function ProductivityWidget({ productivity }: { productivity: DashboardData["pro
   const timeStr = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
 
   return (
-    <div className="rounded-lg border border-border-subtle bg-surface-lowest/50 p-3">
+    <div className="rounded-lg border border-border-subtle bg-card/50 p-3">
       <div className="flex items-center gap-3">
         <ScoreRing score={productivity.score} />
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-1.5">
             <span className="text-[13px] font-medium text-foreground">{timeStr}</span>
-            <span className="text-[11px] text-muted">today</span>
+            <span className="text-[11px] text-muted-foreground">today</span>
           </div>
           <div className="mt-1.5">
             <div className="flex items-center justify-between mb-0.5">
-              <span className="text-[11px] text-muted">{productivity.topCategory}</span>
+              <span className="text-[11px] text-muted-foreground">{productivity.topCategory}</span>
               <span className="text-[11px] tabular-nums text-dim">
                 {Math.round(productivity.topCategoryPct)}%
               </span>
             </div>
-            <div className="h-[3px] bg-surface-base rounded-full overflow-hidden">
+            <div className="h-[3px] bg-accent rounded-full overflow-hidden">
               <div
                 className="h-full rounded-full transition-all duration-700 ease-out"
                 style={{

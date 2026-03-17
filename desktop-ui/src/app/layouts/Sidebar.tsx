@@ -52,7 +52,7 @@ export function Sidebar({ active, onNavigate, isChatOpen, onToggleChat }: Sideba
           type="button"
           onClick={() => navigate("/")}
           aria-label="Home"
-          className="w-8 h-8 rounded-xl bg-surface-highest flex items-center justify-center p-0.5 hover:bg-surface-highest transition-all"
+          className="w-8 h-8 rounded-xl bg-muted flex items-center justify-center p-0.5 hover:bg-muted transition-all"
         >
           <KlyntLogo className="w-full h-full" />
         </button>
@@ -71,7 +71,7 @@ export function Sidebar({ active, onNavigate, isChatOpen, onToggleChat }: Sideba
             className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-200 ${
               isActive
                 ? "glass-button-active text-brand"
-                : "text-muted hover:text-secondary hover:bg-surface-base"
+                : "text-muted-foreground hover:text-foreground hover:bg-accent"
             }`}
           >
             <Icon className="w-[17px] h-[17px]" strokeWidth={1.5} aria-hidden="true" />
@@ -91,7 +91,7 @@ export function Sidebar({ active, onNavigate, isChatOpen, onToggleChat }: Sideba
           className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-200 ${
             isChatOpen
               ? "glass-button-active text-brand"
-              : "text-muted hover:text-secondary hover:bg-surface-base"
+              : "text-muted-foreground hover:text-foreground hover:bg-accent"
           }`}
         >
           <MessageCircle className="w-[17px] h-[17px]" strokeWidth={1.5} aria-hidden="true" />
@@ -111,7 +111,7 @@ export function Sidebar({ active, onNavigate, isChatOpen, onToggleChat }: Sideba
             className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-200 ${
               isActive
                 ? "glass-button-active text-brand"
-                : "text-muted hover:text-secondary hover:bg-surface-base"
+                : "text-muted-foreground hover:text-foreground hover:bg-accent"
             }`}
           >
             <Icon className="w-[17px] h-[17px]" strokeWidth={1.5} aria-hidden="true" />

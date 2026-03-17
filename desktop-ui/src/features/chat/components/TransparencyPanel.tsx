@@ -18,12 +18,12 @@ function CollapsibleBox({ title, icon: Icon, children, defaultOpen = true }: Col
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-2 px-3 py-2 rounded-t-[var(--radius-2xl)] bg-surface-base"
+        className="w-full flex items-center gap-2 px-3 py-2 rounded-t-[var(--radius-2xl)] bg-accent"
       >
-        <Icon className="w-3 h-3 text-muted" strokeWidth={1.5} />
-        <span className="flex-1 text-left text-[11px] font-medium text-secondary">{title}</span>
+        <Icon className="w-3 h-3 text-muted-foreground" strokeWidth={1.5} />
+        <span className="flex-1 text-left text-[11px] font-medium text-muted-foreground">{title}</span>
         <ChevronDown
-          className={`w-3 h-3 text-muted transition-transform ${open ? "rotate-0" : "-rotate-90"}`}
+          className={`w-3 h-3 text-muted-foreground transition-transform ${open ? "rotate-0" : "-rotate-90"}`}
           strokeWidth={1.5}
         />
       </button>
@@ -44,9 +44,9 @@ function Row({
   active?: boolean;
 }) {
   return (
-    <div className={`flex items-center gap-1.5 ${active ? "text-secondary" : "text-muted"}`}>
+    <div className={`flex items-center gap-1.5 ${active ? "text-muted-foreground" : "text-muted-foreground"}`}>
       <Icon className={`w-3 h-3 shrink-0 ${active ? "text-brand" : ""}`} strokeWidth={1.5} />
-      <span className={active ? "text-primary font-medium" : "text-secondary"}>{label}</span>
+      <span className={active ? "text-foreground font-medium" : "text-muted-foreground"}>{label}</span>
       {detail && (
         <span
           className={`ml-auto ${active ? "text-brand text-[9px] font-medium uppercase" : "text-dim"}`}
@@ -76,10 +76,10 @@ function AgentSkillsPopup({ skills }: { skills: { name: string; trigger: string 
         return (
           <div key={`sp-${skill.name}`} className="flex items-center gap-1.5">
             <Package
-              className={`w-2.5 h-2.5 shrink-0 ${isActive ? "text-brand" : "text-muted"}`}
+              className={`w-2.5 h-2.5 shrink-0 ${isActive ? "text-brand" : "text-muted-foreground"}`}
               strokeWidth={1.5}
             />
-            <span className={isActive ? "text-primary font-medium" : "text-secondary"}>
+            <span className={isActive ? "text-foreground font-medium" : "text-muted-foreground"}>
               {skill.name}
             </span>
             <span
@@ -123,14 +123,14 @@ function AgentWithSkills({
       onMouseEnter={() => hasSkills && setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <div className={`flex items-center gap-1.5 ${isMain ? "text-muted" : "text-muted pl-3"}`}>
+      <div className={`flex items-center gap-1.5 ${isMain ? "text-muted-foreground" : "text-muted-foreground pl-3"}`}>
         {isMain ? (
           <Bot className="w-3 h-3 shrink-0 text-brand" strokeWidth={1.5} />
         ) : (
           <span className="text-[9px]">{statusIcon ?? "◇"}</span>
         )}
         <span
-          className={`text-secondary ${isMain ? "font-medium" : ""} ${hasSkills ? "underline decoration-dotted decoration-border underline-offset-2 cursor-default" : ""}`}
+          className={`text-muted-foreground ${isMain ? "font-medium" : ""} ${hasSkills ? "underline decoration-dotted decoration-border underline-offset-2 cursor-default" : ""}`}
         >
           {name}
         </span>

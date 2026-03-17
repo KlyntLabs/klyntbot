@@ -69,11 +69,11 @@ export function ManagePersonasModal({ personas, actions, onClose }: ManagePerson
         {/* Header */}
         <div className="flex items-center gap-2 px-4 py-3 border-b border-border shrink-0">
           <Settings2 size={14} className="text-purple-400" />
-          <span className="text-[13px] font-medium text-primary flex-1">Manage Personas</span>
+          <span className="text-[13px] font-medium text-foreground flex-1">Manage Personas</span>
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded-md text-muted hover:text-primary hover:bg-white/[0.06]"
+            className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-white/[0.06]"
           >
             <X size={14} />
           </button>
@@ -88,7 +88,7 @@ export function ManagePersonasModal({ personas, actions, onClose }: ManagePerson
             >
               <span className="text-sm shrink-0">{p.icon}</span>
               <div className="flex-1 min-w-0">
-                <div className="text-[11px] font-medium text-primary truncate">{p.name}</div>
+                <div className="text-[11px] font-medium text-foreground truncate">{p.name}</div>
                 <div className="text-[10px] text-dim truncate">
                   {p.role} · {p.tone}
                   {p.source === "builtin" && (
@@ -135,14 +135,14 @@ export function ManagePersonasModal({ personas, actions, onClose }: ManagePerson
                 placeholder="Name"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className="text-[11px] px-2 py-1.5 rounded-md bg-white/[0.04] text-primary border border-border"
+                className="text-[11px] px-2 py-1.5 rounded-md bg-white/[0.04] text-foreground border border-border"
               />
               <input
                 type="text"
                 placeholder="Role"
                 value={form.role}
                 onChange={(e) => setForm({ ...form, role: e.target.value })}
-                className="text-[11px] px-2 py-1.5 rounded-md bg-white/[0.04] text-primary border border-border"
+                className="text-[11px] px-2 py-1.5 rounded-md bg-white/[0.04] text-foreground border border-border"
               />
             </div>
             <input
@@ -150,20 +150,20 @@ export function ManagePersonasModal({ personas, actions, onClose }: ManagePerson
               placeholder="Expertise"
               value={form.expertise}
               onChange={(e) => setForm({ ...form, expertise: e.target.value })}
-              className="w-full text-[11px] px-2 py-1.5 rounded-md bg-white/[0.04] text-primary border border-border"
+              className="w-full text-[11px] px-2 py-1.5 rounded-md bg-white/[0.04] text-foreground border border-border"
             />
             <input
               type="text"
               placeholder="Perspective (how they analyze)"
               value={form.perspective}
               onChange={(e) => setForm({ ...form, perspective: e.target.value })}
-              className="w-full text-[11px] px-2 py-1.5 rounded-md bg-white/[0.04] text-primary border border-border"
+              className="w-full text-[11px] px-2 py-1.5 rounded-md bg-white/[0.04] text-foreground border border-border"
             />
             <div className="grid grid-cols-3 gap-2">
               <select
                 value={form.tone}
                 onChange={(e) => setForm({ ...form, tone: e.target.value })}
-                className="text-[11px] px-2 py-1.5 rounded-md bg-white/[0.04] text-primary border border-border"
+                className="text-[11px] px-2 py-1.5 rounded-md bg-white/[0.04] text-foreground border border-border"
               >
                 {TONE_OPTIONS.map((t) => (
                   <option key={t} value={t}>
@@ -176,7 +176,7 @@ export function ManagePersonasModal({ personas, actions, onClose }: ManagePerson
                 placeholder="Icon emoji"
                 value={form.icon}
                 onChange={(e) => setForm({ ...form, icon: e.target.value })}
-                className="text-[11px] px-2 py-1.5 rounded-md bg-white/[0.04] text-primary border border-border"
+                className="text-[11px] px-2 py-1.5 rounded-md bg-white/[0.04] text-foreground border border-border"
                 maxLength={4}
               />
               <input
@@ -184,14 +184,14 @@ export function ManagePersonasModal({ personas, actions, onClose }: ManagePerson
                 placeholder="Domains (comma-sep)"
                 value={form.domains}
                 onChange={(e) => setForm({ ...form, domains: e.target.value })}
-                className="text-[11px] px-2 py-1.5 rounded-md bg-white/[0.04] text-primary border border-border"
+                className="text-[11px] px-2 py-1.5 rounded-md bg-white/[0.04] text-foreground border border-border"
               />
             </div>
             <div className="flex justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setShowCreate(false)}
-                className="text-[10px] px-3 py-1 rounded-md text-muted hover:text-primary"
+                className="text-[10px] px-3 py-1 rounded-md text-muted-foreground hover:text-foreground"
               >
                 Cancel
               </button>
@@ -213,7 +213,7 @@ export function ManagePersonasModal({ personas, actions, onClose }: ManagePerson
             <button
               type="button"
               onClick={() => setShowCreate(true)}
-              className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-white/[0.04] text-muted hover:text-secondary hover:bg-white/[0.06]"
+              className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-white/[0.04] text-muted-foreground hover:text-foreground hover:bg-white/[0.06]"
             >
               <Plus size={10} />
               Create Persona
@@ -223,7 +223,7 @@ export function ManagePersonasModal({ personas, actions, onClose }: ManagePerson
           <button
             type="button"
             onClick={onClose}
-            className="text-[10px] px-3 py-1 rounded-md bg-white/[0.06] text-secondary hover:text-primary"
+            className="text-[10px] px-3 py-1 rounded-md bg-white/[0.06] text-muted-foreground hover:text-foreground"
           >
             Done
           </button>

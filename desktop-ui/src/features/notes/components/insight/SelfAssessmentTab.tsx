@@ -24,11 +24,11 @@ function SkeletonLoader() {
       {[0, 1, 2].map((i) => (
         <div
           key={i}
-          className="rounded-lg bg-surface-lowest border border-border-subtle p-4 space-y-3"
+          className="rounded-lg bg-card border border-border-subtle p-4 space-y-3"
         >
-          <div className="h-3 bg-surface-low rounded w-3/4" />
-          <div className="h-3 bg-surface-low rounded w-full" />
-          <div className="h-3 bg-surface-low rounded w-1/2" />
+          <div className="h-3 bg-card rounded w-3/4" />
+          <div className="h-3 bg-card rounded w-full" />
+          <div className="h-3 bg-card rounded w-1/2" />
         </div>
       ))}
     </div>
@@ -70,14 +70,14 @@ export function SelfAssessmentTab({
     <div className="space-y-3">
       {anyRevealed && (
         <div className="flex items-center justify-between mb-4">
-          <div className="text-[13px] font-medium text-primary">
+          <div className="text-[13px] font-medium text-foreground">
             Score: {quizState.score} / {quizState.total}
           </div>
           {quizState.revealed.size >= 3 && quizState.revealed.size < questions.length && (
             <button
               type="button"
               onClick={onRevealAll}
-              className="text-[10px] text-muted hover:text-secondary transition-colors"
+              className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
             >
               Reveal all answers
             </button>
@@ -92,11 +92,11 @@ export function SelfAssessmentTab({
         return (
           <div
             key={q.id}
-            className="rounded-lg bg-surface-lowest border border-border-subtle p-4 space-y-3"
+            className="rounded-lg bg-card border border-border-subtle p-4 space-y-3"
           >
             <div className="flex items-start justify-between gap-2">
-              <span className="text-[12px] text-primary leading-relaxed">{q.question}</span>
-              <span className="text-[9px] px-1.5 py-0.5 rounded bg-surface-base text-dim shrink-0">
+              <span className="text-[12px] text-foreground leading-relaxed">{q.question}</span>
+              <span className="text-[9px] px-1.5 py-0.5 rounded bg-accent text-dim shrink-0">
                 {q.difficulty}
               </span>
             </div>
@@ -113,19 +113,19 @@ export function SelfAssessmentTab({
 
                   if (isRevealed) {
                     if (isCorrect) {
-                      choiceClass += "border-success/50 bg-success/10 text-primary";
+                      choiceClass += "border-success/50 bg-success/10 text-foreground";
                     } else if (isSelected && !isCorrect) {
-                      choiceClass += "border-destructive/50 bg-destructive/10 text-primary";
+                      choiceClass += "border-destructive/50 bg-destructive/10 text-foreground";
                     } else {
-                      choiceClass += "border-border-subtle bg-surface-lowest text-dim";
+                      choiceClass += "border-border-subtle bg-card text-dim";
                     }
                   } else {
                     if (isSelected) {
                       choiceClass +=
-                        "border-border bg-surface-raised text-primary hover:bg-surface-raised";
+                        "border-border bg-muted text-foreground hover:bg-muted";
                     } else {
                       choiceClass +=
-                        "border-border-subtle bg-surface-lowest text-secondary hover:bg-surface-base";
+                        "border-border-subtle bg-card text-muted-foreground hover:bg-accent";
                     }
                   }
 
@@ -150,7 +150,7 @@ export function SelfAssessmentTab({
                 onChange={(e) => onAnswer(q.id, e.target.value)}
                 placeholder="Type your answer..."
                 disabled={isRevealed}
-                className="w-full bg-surface-low border border-border rounded-md px-3 py-1.5 text-[11px] text-primary placeholder:text-dim focus:border-purple-400/50 focus:outline-none disabled:opacity-50"
+                className="w-full bg-card border border-border rounded-md px-3 py-1.5 text-[11px] text-foreground placeholder:text-dim focus:border-purple-400/50 focus:outline-none disabled:opacity-50"
               />
             )}
 
@@ -167,7 +167,7 @@ export function SelfAssessmentTab({
             {isRevealed && (
               <div className="pt-2 border-t border-border-subtle">
                 <div className="text-[10px] text-muted leading-relaxed">
-                  <span className="font-medium text-secondary">Correct: </span>
+                  <span className="font-medium text-muted-foreground">Correct: </span>
                   {q.correctAnswer}
                 </div>
                 <div className="text-[10px] text-dim mt-1">{q.explanation}</div>

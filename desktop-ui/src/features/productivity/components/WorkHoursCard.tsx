@@ -50,7 +50,7 @@ function SegmentedBar({ clampedPct, targetSecs }: { clampedPct: number; targetSe
 
   return (
     <div className="relative">
-      <div className="h-2 rounded-full bg-surface-raised overflow-hidden flex">
+      <div className="h-2 rounded-full bg-muted overflow-hidden flex">
         {positioned.map((seg, i) => (
           <div
             key={seg.from}
@@ -79,7 +79,7 @@ function SegmentedBar({ clampedPct, targetSecs }: { clampedPct: number; targetSe
       {/* Tooltip */}
       {hovered !== null && positioned[hovered] && (
         <div
-          className="absolute -top-9 z-10 px-2.5 py-1 rounded-lg text-[10px] font-light text-primary whitespace-nowrap pointer-events-none"
+          className="absolute -top-9 z-10 px-2.5 py-1 rounded-lg text-[10px] font-light text-foreground whitespace-nowrap pointer-events-none"
           style={{
             left: `${positioned[hovered].leftPct + positioned[hovered].widthPct / 2}%`,
             transform: "translateX(-50%)",
@@ -111,13 +111,13 @@ export function WorkHoursCard({ totalActiveSecs, workDayHours = 8 }: WorkHoursCa
   return (
     <div className="glass-card p-4 flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-[13px] font-medium text-secondary">Work Hours</h2>
+        <h2 className="text-[13px] font-medium text-muted-foreground">Work Hours</h2>
         <span className="text-[10px] font-light text-dim">of {workDayHours}h target</span>
       </div>
 
       {/* Hero number */}
       <div className="flex items-baseline gap-2">
-        <span className="text-[28px] font-light text-primary tabular-nums leading-none">
+        <span className="text-[28px] font-light text-foreground tabular-nums leading-none">
           {formatLongDuration(totalActiveSecs)}
         </span>
         <span className="text-[13px] font-medium tabular-nums" style={{ color: statusColor }}>

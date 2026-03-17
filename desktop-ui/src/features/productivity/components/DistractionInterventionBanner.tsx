@@ -114,8 +114,8 @@ export function DistractionInterventionBanner() {
       <div className="px-4 py-3 pl-5 flex flex-col gap-3">
         {/* Header message */}
         <div className="flex flex-col gap-1">
-          <p className="text-sm text-muted">Looks like you drifted from</p>
-          <p className="text-base font-semibold text-primary">
+          <p className="text-sm text-muted-foreground">Looks like you drifted from</p>
+          <p className="text-base font-semibold text-foreground">
             {distraction.previousContext || distraction.previousApp}
           </p>
           {distraction.appName && (
@@ -140,7 +140,7 @@ export function DistractionInterventionBanner() {
             onClick={handleNotDistraction}
             className={cn(
               "flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors",
-              "bg-surface-base text-secondary border border-border hover:bg-surface-raised",
+              "bg-accent text-muted-foreground border border-border hover:bg-muted",
             )}
           >
             Not a distraction
@@ -156,8 +156,8 @@ export function DistractionInterventionBanner() {
             className={cn(
               "flex-1 px-2 py-1.5 rounded-md font-medium transition-colors",
               snoozeCountdown > 0
-                ? "bg-surface-low text-dim cursor-not-allowed"
-                : "bg-surface-base text-secondary hover:bg-surface-raised border border-border",
+                ? "bg-card text-dim cursor-not-allowed"
+                : "bg-accent text-muted-foreground hover:bg-muted border border-border",
             )}
           >
             {snoozeCountdown > 0 ? `${Math.ceil(snoozeCountdown / 60)}m snooze` : "5 more minutes"}
@@ -167,7 +167,7 @@ export function DistractionInterventionBanner() {
             onClick={handleEndFocus}
             className={cn(
               "flex-1 px-2 py-1.5 rounded-md font-medium transition-colors",
-              "text-muted hover:text-secondary hover:bg-surface-base",
+              "text-muted-foreground hover:text-foreground hover:bg-accent",
             )}
           >
             End focus session

@@ -269,7 +269,7 @@ export function CashFlowPage() {
                 spellCheck={false}
               />
             </div>
-            <div className="flex gap-1 bg-surface-low rounded-xl p-1" role="tablist">
+            <div className="flex gap-1 bg-card rounded-xl p-1" role="tablist">
               {["all", "income", "expense", "transfer"].map((t) => (
                 <button
                   key={t}
@@ -279,8 +279,8 @@ export function CashFlowPage() {
                   onClick={() => setTxFilter(t)}
                   className={`px-2.5 py-1 rounded-lg text-[10px] font-light capitalize transition-colors ${
                     t === txFilter
-                      ? "glass-button-active text-primary"
-                      : "text-muted hover:text-secondary"
+                      ? "glass-button-active text-foreground"
+                      : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   {t}
@@ -327,17 +327,17 @@ export function CashFlowPage() {
                 return (
                   <div
                     key={tx.id}
-                    className="flex items-center gap-3 px-4 py-2 hover:bg-surface-base transition-colors border-b border-border-subtle last:border-b-0"
+                    className="flex items-center gap-3 px-4 py-2 hover:bg-accent transition-colors border-b border-border-subtle last:border-b-0"
                   >
                     <span className="text-[10px] text-dim font-light w-10 flex-shrink-0 tabular-nums">
                       {tx.txDate.slice(5)}
                     </span>
                     <TxIcon className={cn("w-3 h-3 flex-shrink-0", col)} strokeWidth={1.5} />
-                    <span className="text-[12px] font-light text-secondary truncate flex-1">
+                    <span className="text-[12px] font-light text-muted-foreground truncate flex-1">
                       {tx.counterparty ?? tx.notes ?? tx.txType}
                     </span>
                     {tx.category && (
-                      <span className="px-1.5 py-0.5 text-[9px] font-light rounded bg-surface-base text-dim">
+                      <span className="px-1.5 py-0.5 text-[9px] font-light rounded bg-accent text-dim">
                         {tx.category}
                       </span>
                     )}
@@ -382,7 +382,7 @@ export function CashFlowPage() {
 
           {/* Accounts sidebar */}
           <Card compact className="p-3">
-            <p className="text-[10px] text-muted uppercase tracking-widest mb-2">Accounts</p>
+            <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-2">Accounts</p>
             {activeAccounts.map((acct) => {
               const Icon = ACCT_ICONS[acct.accountType] ?? Wallet;
               const isSelected = accountFilter === acct.id;
@@ -400,12 +400,12 @@ export function CashFlowPage() {
                   }}
                   className={cn(
                     "flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-colors",
-                    isSelected ? "bg-surface-raised" : "hover:bg-surface-low",
+                    isSelected ? "bg-muted" : "hover:bg-accent",
                   )}
                 >
-                  <Icon className="w-3.5 h-3.5 text-muted" strokeWidth={1.5} />
-                  <span className="text-[11px] text-secondary flex-1 truncate">{acct.name}</span>
-                  <span className="text-[10px] text-muted tabular-nums">
+                  <Icon className="w-3.5 h-3.5 text-muted-foreground" strokeWidth={1.5} />
+                  <span className="text-[11px] text-muted-foreground flex-1 truncate">{acct.name}</span>
+                  <span className="text-[10px] text-muted-foreground tabular-nums">
                     {displayAmount({
                       amount: acct.balance,
                       currency: acct.currency,
@@ -424,7 +424,7 @@ export function CashFlowPage() {
           {/* Spending & Budgets (merged) */}
           <Card compact className="overflow-hidden">
             <div className="px-3 pt-3 pb-1">
-              <p className="text-[10px] text-muted uppercase tracking-widest">Spending & Budgets</p>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-widest">Spending & Budgets</p>
             </div>
             {spendingWithBudgets.map((item, i) => {
               // Use baseAmount for budget comparison (same currency as spending report)
@@ -451,10 +451,10 @@ export function CashFlowPage() {
                         className="w-1.5 h-1.5 rounded-full flex-shrink-0"
                         style={{ backgroundColor: COLORS[i % COLORS.length] }}
                       />
-                      <span className="text-[10px] text-secondary capitalize">{item.category}</span>
+                      <span className="text-[10px] text-muted-foreground capitalize">{item.category}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] text-primary tabular-nums">
+                      <span className="text-[10px] text-foreground tabular-nums">
                         {fmtCompact(convertTotal(item.spent), displayCur, hidden)}
                       </span>
                       {hasBudget && (
@@ -470,7 +470,7 @@ export function CashFlowPage() {
                       </span>
                     </div>
                   </div>
-                  <div className="h-1 bg-surface-base rounded-full">
+                  <div className="h-1 bg-accent rounded-full">
                     <div
                       className="h-full rounded-full"
                       style={{ width: `${barWidth}%`, background: barColor }}
@@ -521,7 +521,7 @@ export function CashFlowPage() {
                     "flex-1 py-1.5 text-[12px] rounded-md border transition-colors capitalize",
                     txType === t
                       ? "border-brand/50 text-brand bg-brand/5"
-                      : "border-border text-muted bg-surface-base hover:bg-surface-raised",
+                      : "border-border text-muted-foreground bg-accent hover:bg-muted",
                   )}
                 >
                   {t}

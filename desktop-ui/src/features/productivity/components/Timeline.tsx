@@ -152,7 +152,7 @@ export function TimelineBar({ date }: TimelineBarProps) {
   return (
     <div className="glass-card p-4 flex flex-col gap-2 col-span-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-[13px] font-medium text-secondary">Timeline</h2>
+        <h2 className="text-[13px] font-medium text-muted-foreground">Timeline</h2>
         <span className="text-[10px] font-light text-dim tabular-nums">{rangeLabel}</span>
       </div>
 
@@ -161,7 +161,7 @@ export function TimelineBar({ date }: TimelineBarProps) {
         {/* Hover tooltip — outside overflow-hidden so it's not clipped */}
         {hoveredIdx !== null && blocks[hoveredIdx] && (
           <div
-            className="absolute -top-7 z-10 px-2 py-1 rounded text-[10px] font-light text-primary whitespace-nowrap pointer-events-none"
+            className="absolute -top-7 z-10 px-2 py-1 rounded text-[10px] font-light text-foreground whitespace-nowrap pointer-events-none"
             style={{
               left: `${Math.min(blocks[hoveredIdx].leftPct + blocks[hoveredIdx].widthPct / 2, 95)}%`,
               transform: "translateX(-50%)",
@@ -174,7 +174,7 @@ export function TimelineBar({ date }: TimelineBarProps) {
           </div>
         )}
 
-        <div className="relative h-9 rounded-lg bg-surface-raised overflow-hidden">
+        <div className="relative h-9 rounded-lg bg-muted overflow-hidden">
           {blocks.map((b, idx) => (
             <div
               aria-hidden="true"
@@ -226,7 +226,7 @@ export function TimelineBar({ date }: TimelineBarProps) {
       </div>
 
       {/* Legend */}
-      <div className="flex items-center gap-4 text-[10px] font-light text-muted">
+      <div className="flex items-center gap-4 text-[10px] font-light text-muted-foreground">
         <span className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-success" />
           Productive

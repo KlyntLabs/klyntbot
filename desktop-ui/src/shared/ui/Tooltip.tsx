@@ -29,7 +29,7 @@ export function Tooltip({ content, side = "top", children, className }: TooltipP
         <div
           className={cn(
             "absolute whitespace-nowrap px-2 py-1 text-xs rounded-md",
-            "bg-surface-highest text-secondary border border-border",
+            "bg-muted text-muted-foreground border border-border",
             "pointer-events-none animate-in fade-in-50 duration-100",
             "z-50 shadow-lg",
             sideClasses[side],

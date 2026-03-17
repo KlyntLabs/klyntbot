@@ -38,11 +38,11 @@ export function CategoryRanking({
             {/* Color dot */}
             <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: colorHex }} />
             {/* Category name */}
-            <span className="flex-1 text-[12px] font-light text-secondary truncate capitalize">
+            <span className="flex-1 text-[12px] font-light text-muted-foreground truncate capitalize">
               {row.category}
             </span>
             {/* Amount */}
-            <span className="text-[12px] font-light text-primary tabular-nums">
+            <span className="text-[12px] font-light text-foreground tabular-nums">
               {fmtCompact(convertTotal(row.total), displayCur, hidden)}
             </span>
             {/* Percentage */}
@@ -57,7 +57,7 @@ export function CategoryRanking({
         <button
           type="button"
           onClick={() => setShowAll((v) => !v)}
-          className="text-[11px] font-light text-muted hover:text-secondary transition-colors mt-1"
+          className="text-[11px] font-light text-muted-foreground hover:text-foreground transition-colors mt-1"
         >
           {showAll ? "Show less" : `Show ${breakdown.length - MAX_VISIBLE} more`}
         </button>

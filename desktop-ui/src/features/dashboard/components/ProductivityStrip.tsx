@@ -24,7 +24,7 @@ function CategoryBar({ summary }: { summary: ProductivitySummary }) {
   ].filter((s) => s.secs > 0);
 
   return (
-    <div className="flex h-1.5 rounded-full overflow-hidden bg-surface-base">
+    <div className="flex h-1.5 rounded-full overflow-hidden bg-accent">
       {segments.map((seg) => (
         <div
           key={seg.key}
@@ -70,7 +70,7 @@ function TopAppsMini({ summary }: { summary: ProductivitySummary }) {
       {apps.map((app) => (
         <div key={app.appName} className="flex items-center gap-2">
           <span className="text-[9px] text-muted truncate w-14">{app.appName}</span>
-          <div className="flex-1 h-1 rounded-full bg-surface-base overflow-hidden">
+          <div className="flex-1 h-1 rounded-full bg-accent overflow-hidden">
             <div
               className="h-full rounded-full"
               style={{
@@ -96,12 +96,12 @@ export function ProductivityStrip({ summary }: ProductivityStripProps) {
   const productivePct = Math.round((summary.productiveSecs / summary.totalActiveSecs) * 100);
 
   return (
-    <div className="border-b border-border bg-surface-lowest">
+    <div className="border-b border-border bg-card">
       {/* Compact bar — always visible */}
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
-        className="w-full px-3 py-2 flex items-center gap-3 hover:bg-surface-lowest transition-colors"
+        className="w-full px-3 py-2 flex items-center gap-3 hover:bg-card transition-colors"
       >
         <MiniScore score={summary.productivityScore} />
 
@@ -111,7 +111,7 @@ export function ProductivityStrip({ summary }: ProductivityStripProps) {
 
         {/* Quick stats */}
         <div className="flex items-center gap-3 text-[10px] tabular-nums shrink-0">
-          <span className="text-secondary">
+          <span className="text-muted-foreground">
             {formatHumanDuration(summary.totalActiveSecs)}
             <span className="text-dim"> active</span>
           </span>

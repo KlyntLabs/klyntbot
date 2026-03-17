@@ -60,7 +60,7 @@ export function PomodoroTimer() {
   return (
     <div className="glass-card p-4 flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-[13px] font-medium text-secondary">
+        <h2 className="text-[13px] font-medium text-muted-foreground">
           {isPomodoro ? "Pomodoro Timer" : "Focus Session"}
         </h2>
         {session && (
@@ -92,7 +92,7 @@ export function PomodoroTimer() {
           </div>
 
           {targetSecs > 0 && (
-            <div className="h-1.5 rounded-full bg-surface-raised overflow-hidden">
+            <div className="h-1.5 rounded-full bg-muted overflow-hidden">
               <div
                 className="h-full rounded-full bg-brand transition-[width]"
                 style={{ width: `${Math.min((elapsed / targetSecs) * 100, 100)}%` }}
@@ -104,7 +104,7 @@ export function PomodoroTimer() {
             type="button"
             onClick={handleEnd}
             disabled={endFocus.loading}
-            className="flex items-center justify-center gap-2 py-2 rounded-lg bg-surface-raised text-destructive text-[12px] font-light hover:bg-surface-highest transition-colors"
+            className="flex items-center justify-center gap-2 py-2 rounded-lg bg-muted text-destructive text-[12px] font-light hover:bg-muted transition-colors"
           >
             <Square className="w-3.5 h-3.5" strokeWidth={1.5} />
             End Session
@@ -125,7 +125,7 @@ export function PomodoroTimer() {
             type="button"
             onClick={handleStartPomodoro}
             disabled={startPomodoro.loading}
-            className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-surface-raised text-secondary text-[13px] font-light hover:bg-surface-highest transition-colors"
+            className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-muted text-muted-foreground text-[13px] font-light hover:bg-muted transition-colors"
           >
             <Timer className="w-4 h-4" strokeWidth={1.5} />
             Pomodoro

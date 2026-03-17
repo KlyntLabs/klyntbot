@@ -13,8 +13,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         "px-3 py-1.5 text-sm font-light rounded-lg",
         "transition-colors focus:outline-none",
         variant === "glass"
-          ? "glass-input text-primary placeholder:text-dim"
-          : "bg-surface-base border border-border text-primary placeholder:text-dim hover:border-border focus:border-brand/50",
+          ? "glass-input text-foreground placeholder:text-dim"
+          : "bg-accent border border-border text-foreground placeholder:text-dim hover:border-border focus:border-brand/50",
         className,
       )}
       {...props}

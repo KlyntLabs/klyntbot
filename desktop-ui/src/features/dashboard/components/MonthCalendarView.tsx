@@ -182,8 +182,8 @@ export function MonthCalendarView() {
                     onClick={() => navigate(`/day/${cell.date}`)}
                     className={cn(
                       "rounded-lg p-1.5 flex flex-col items-start text-left transition-colors min-h-[64px]",
-                      "hover:bg-surface-base cursor-pointer",
-                      cell.isCurrentMonth ? "text-primary" : "text-muted/40",
+                      "hover:bg-accent cursor-pointer",
+                      cell.isCurrentMonth ? "text-foreground" : "text-muted-foreground/40",
                       cell.date === today && "ring-1 ring-brand/50",
                       cell.date === focusedDate && cell.date !== today && "ring-1 ring-white/30",
                     )}
@@ -211,7 +211,7 @@ export function MonthCalendarView() {
                     {/* Activity bar — proportional to active time */}
                     {stats.activeSecs > 0 && (
                       <div className="w-full mt-auto flex flex-col gap-0.5">
-                        <div className="w-full h-[3px] rounded-full bg-surface-base overflow-hidden">
+                        <div className="w-full h-[3px] rounded-full bg-accent overflow-hidden">
                           <div
                             className="h-full rounded-full"
                             style={{
@@ -221,7 +221,7 @@ export function MonthCalendarView() {
                             }}
                           />
                         </div>
-                        <span className="text-[8px] text-secondary/50">
+                        <span className="text-[8px] text-muted-foreground/50">
                           {formatHumanDuration(stats.activeSecs)}
                         </span>
                       </div>

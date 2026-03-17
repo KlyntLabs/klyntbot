@@ -38,13 +38,13 @@ export function PersonaCard({ name, role, icon, tone, content }: PersonaCardProp
           {icon}
         </span>
         <div className="min-w-0">
-          <div className="text-[12px] font-medium text-primary truncate">{name}</div>
+          <div className="text-[12px] font-medium text-foreground truncate">{name}</div>
           <div className="text-[10px] text-dim">{role}</div>
         </div>
       </div>
 
       {/* Analysis content */}
-      <div className="text-[12px] text-secondary leading-relaxed">
+      <div className="text-[12px] text-muted-foreground leading-relaxed">
         <MarkdownContent content={content} />
       </div>
     </div>

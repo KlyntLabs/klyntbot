@@ -28,7 +28,7 @@ export function AreaView({ areaId, tasksData }: AreaViewProps) {
   }, [tasksData.issues]);
 
   if (!area) {
-    return <div className="px-6 py-8 text-center text-sm text-muted">Area not found</div>;
+    return <div className="px-6 py-8 text-center text-sm text-muted-foreground">Area not found</div>;
   }
 
   return (
@@ -46,11 +46,11 @@ export function AreaView({ areaId, tasksData }: AreaViewProps) {
                 navigateInPlace("project", project.id, project.name);
               }
             }}
-            className="flex items-center gap-3 px-4 py-3 text-left hover:bg-surface-raised transition-colors border-b border-border"
+            className="flex items-center gap-3 px-4 py-3 text-left hover:bg-accent transition-colors border-b border-border"
           >
-            <Folder className="h-4 w-4 text-muted" />
-            <span className="text-sm text-primary flex-1">{project.name}</span>
-            <span className="text-xs text-muted">{count} issues</span>
+            <Folder className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm text-foreground flex-1">{project.name}</span>
+            <span className="text-xs text-muted-foreground">{count} issues</span>
           </button>
         );
       })}

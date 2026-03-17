@@ -47,7 +47,7 @@ export function AISuggestionsPanel({
       <button
         type="button"
         onClick={() => setCollapsed(!collapsed)}
-        className="w-full flex items-center gap-1.5 px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-muted hover:text-secondary transition-colors"
+        className="w-full flex items-center gap-1.5 px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
       >
         {collapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
         <span style={{ color: ACCENT }}>AI Suggestions</span>
@@ -72,9 +72,9 @@ export function AISuggestionsPanel({
                     key={item.note.id}
                     type="button"
                     onClick={() => onSelectNote(item.note.id)}
-                    className="flex flex-col gap-0.5 px-2 py-1 rounded text-left hover:bg-surface-base transition-colors"
+                    className="flex flex-col gap-0.5 px-2 py-1 rounded text-left hover:bg-accent transition-colors"
                   >
-                    <span className="text-[11px] text-secondary truncate">{item.note.title}</span>
+                    <span className="text-[11px] text-muted-foreground truncate">{item.note.title}</span>
                     <span className="text-[9px] text-dim truncate">{item.reason}</span>
                   </button>
                 ))}
@@ -98,9 +98,9 @@ export function AISuggestionsPanel({
                     key={item.note.id}
                     type="button"
                     onClick={() => onSelectNote(item.note.id)}
-                    className="flex flex-col gap-0.5 px-2 py-1 rounded text-left hover:bg-surface-base transition-colors"
+                    className="flex flex-col gap-0.5 px-2 py-1 rounded text-left hover:bg-accent transition-colors"
                   >
-                    <span className="text-[11px] text-secondary truncate">
+                    <span className="text-[11px] text-muted-foreground truncate">
                       Link to: {item.note.title}
                     </span>
                     <span className="text-[9px] text-dim truncate">{item.reason}</span>
@@ -143,7 +143,7 @@ export function AISuggestionsPanel({
               type="button"
               onClick={() => onOpenInsight?.()}
               disabled={!noteId}
-              className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-surface-low text-secondary hover:bg-surface-raised hover:text-primary transition-colors disabled:text-dim disabled:cursor-not-allowed"
+              className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-accent text-muted-foreground hover:bg-accent/80 hover:text-foreground transition-colors disabled:text-dim disabled:cursor-not-allowed"
             >
               <Brain size={10} />
               Insight Review
@@ -151,7 +151,7 @@ export function AISuggestionsPanel({
             <button
               type="button"
               disabled
-              className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-surface-low text-dim cursor-not-allowed"
+              className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-accent text-dim cursor-not-allowed"
             >
               <MessageSquare size={10} />
               Ask AI
@@ -169,8 +169,8 @@ export function AISuggestionsPanel({
               disabled={!noteId || suggestions.linkSuggestions.length === 0}
               className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded-md transition-colors ${
                 noteId && suggestions.linkSuggestions.length > 0
-                  ? "bg-surface-base text-secondary hover:bg-surface-raised hover:text-primary"
-                  : "bg-surface-low text-dim cursor-not-allowed"
+                  ? "bg-accent text-muted-foreground hover:bg-accent/80 hover:text-foreground"
+                  : "bg-accent text-dim cursor-not-allowed"
               }`}
             >
               <Link2 size={10} />
@@ -188,7 +188,7 @@ export function AISuggestionsPanel({
                       insertWikiLink(item.note.id, item.note.title);
                       setShowLinkPicker(false);
                     }}
-                    className="w-full text-left px-3 py-1.5 text-[11px] text-secondary hover:bg-surface-base hover:text-primary transition-colors truncate"
+                    className="w-full text-left px-3 py-1.5 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground transition-colors truncate"
                   >
                     [[{item.note.title}]]
                   </button>

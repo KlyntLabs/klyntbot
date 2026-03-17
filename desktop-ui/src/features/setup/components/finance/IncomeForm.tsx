@@ -70,7 +70,7 @@ export function IncomeForm({ registerSave, onDirty }: IncomeFormProps) {
 
   return (
     <div>
-      <h3 className="text-[14px] font-medium text-secondary mb-1">Budgeting</h3>
+      <h3 className="text-[14px] font-medium text-muted-foreground mb-1">Budgeting</h3>
       <p className="text-[11px] text-dim mb-4">Choose how you want to manage your budget.</p>
 
       <div className="space-y-4">
@@ -81,7 +81,7 @@ export function IncomeForm({ registerSave, onDirty }: IncomeFormProps) {
               className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
                 method === m.value
                   ? "border-brand/50 bg-brand/[0.06]"
-                  : "border-border bg-surface-lowest hover:bg-surface-base"
+                  : "border-border bg-card hover:bg-accent"
               }`}
             >
               <input
@@ -96,7 +96,7 @@ export function IncomeForm({ registerSave, onDirty }: IncomeFormProps) {
                 className="mt-0.5 accent-brand"
               />
               <div>
-                <span className="text-[13px] font-medium text-primary">{m.label}</span>
+                <span className="text-[13px] font-medium text-foreground">{m.label}</span>
                 <p className="text-[11px] text-dim mt-0.5">{m.desc}</p>
               </div>
             </label>
@@ -104,9 +104,9 @@ export function IncomeForm({ registerSave, onDirty }: IncomeFormProps) {
         </div>
 
         {method === "six_jar" && (
-          <div className="bg-surface-lowest rounded-lg border border-border-subtle p-3 space-y-2">
+          <div className="bg-card rounded-lg border border-border-subtle p-3 space-y-2">
             <div className="flex items-center justify-between mb-1">
-              <span className="text-[12px] font-medium text-secondary">Jar ratios</span>
+              <span className="text-[12px] font-medium text-muted-foreground">Jar ratios</span>
               <span
                 className={`text-[11px] font-mono ${total === 100 ? "text-success" : "text-warning"}`}
               >
@@ -115,7 +115,7 @@ export function IncomeForm({ registerSave, onDirty }: IncomeFormProps) {
             </div>
             {(Object.keys(JAR_LABELS) as (keyof SixJarRatios)[]).map((key) => (
               <label key={key} className="flex items-center gap-3">
-                <span className="text-[12px] text-muted w-24">{JAR_LABELS[key]}</span>
+                <span className="text-[12px] text-muted-foreground w-24">{JAR_LABELS[key]}</span>
                 <input
                   type="range"
                   min={0}
@@ -128,7 +128,7 @@ export function IncomeForm({ registerSave, onDirty }: IncomeFormProps) {
                   }}
                   className="flex-1 accent-brand"
                 />
-                <span className="text-[12px] text-secondary font-mono w-10 text-right">
+                <span className="text-[12px] text-muted-foreground font-mono w-10 text-right">
                   {ratios[key]}%
                 </span>
               </label>

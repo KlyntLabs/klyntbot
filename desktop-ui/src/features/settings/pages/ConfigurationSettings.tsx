@@ -197,8 +197,8 @@ export function ConfigurationSettings() {
   return (
     <div>
       <div className="mb-8">
-        <h2 className="text-lg font-medium text-primary">Configuration</h2>
-        <p className="text-[13px] text-muted mt-1">Channels, tools, and gateway settings</p>
+        <h2 className="text-lg font-medium text-foreground">Configuration</h2>
+        <p className="text-[13px] text-muted-foreground mt-1">Channels, tools, and gateway settings</p>
       </div>
 
       <div className="space-y-4">
@@ -213,13 +213,13 @@ export function ConfigurationSettings() {
               return (
                 <div
                   key={ch.key}
-                  className="bg-surface-lowest rounded-lg border border-border-subtle"
+                  className="bg-card rounded-lg border border-border-subtle"
                 >
                   <div className="flex items-center gap-2 p-3">
                     <button
                       type="button"
                       onClick={() => setExpanded(isExpanded ? null : ch.key)}
-                      className="text-muted hover:text-secondary transition-colors"
+                      className="text-muted-foreground hover:text-foreground transition-colors"
                     >
                       {isExpanded ? (
                         <ChevronDown className="w-3.5 h-3.5" />
@@ -227,7 +227,7 @@ export function ConfigurationSettings() {
                         <ChevronRight className="w-3.5 h-3.5" />
                       )}
                     </button>
-                    <span className="flex-1 text-[13px] font-medium text-secondary">
+                    <span className="flex-1 text-[13px] font-medium text-muted-foreground">
                       {ch.label}
                     </span>
                     <Toggle
@@ -240,7 +240,7 @@ export function ConfigurationSettings() {
                     <div className="px-3 pb-3 space-y-2 border-t border-border-subtle pt-2">
                       {ch.fields.map((field) => (
                         <div key={field.key}>
-                          <span className="block text-[11px] text-muted mb-1">{field.label}</span>
+                          <span className="block text-[11px] text-muted-foreground mb-1">{field.label}</span>
                           {field.secret ? (
                             <SecretInput
                               value={String(getChannelValue(ch.key, field.key) || "")}
@@ -253,7 +253,7 @@ export function ConfigurationSettings() {
                               value={String(getChannelValue(ch.key, field.key) || "")}
                               onChange={(e) => setChannelEdit(ch.key, field.key, e.target.value)}
                               placeholder={field.placeholder}
-                              className="w-full px-3 py-1.5 text-[12px] text-primary bg-surface-base border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                              className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
                             />
                           )}
                         </div>
@@ -279,7 +279,7 @@ export function ConfigurationSettings() {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-[12px] text-secondary">Restrict to workspace</span>
+                <span className="text-[12px] text-muted-foreground">Restrict to workspace</span>
                 <p className="text-[11px] text-dim">
                   Limit file operations to the workspace directory
                 </p>
@@ -292,7 +292,7 @@ export function ConfigurationSettings() {
 
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-[12px] text-secondary">Browser automation</span>
+                <span className="text-[12px] text-muted-foreground">Browser automation</span>
                 <p className="text-[11px] text-dim">Enable the browser tool for web automation</p>
               </div>
               <Toggle
@@ -302,13 +302,13 @@ export function ConfigurationSettings() {
             </div>
 
             <label className="block">
-              <span className="block text-[11px] text-muted mb-1">Browser trust level</span>
+              <span className="block text-[11px] text-muted-foreground mb-1">Browser trust level</span>
               <select
                 value={String(getToolValue("browser.trustLevel") || "autonomous")}
                 onChange={(e) =>
                   setToolEdits((prev) => ({ ...prev, "browser.trustLevel": e.target.value }))
                 }
-                className="w-full px-3 py-1.5 text-[12px] text-primary bg-surface-base border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
               >
                 <option value="strict" className="bg-surface-floating">
                   Strict — confirm every write
@@ -323,7 +323,7 @@ export function ConfigurationSettings() {
             </label>
 
             <div>
-              <span className="block text-[11px] text-muted mb-1">Brave Search API key</span>
+              <span className="block text-[11px] text-muted-foreground mb-1">Brave Search API key</span>
               <SecretInput
                 value={String(getToolValue("web.braveApiKey") || "")}
                 onChange={(v) => setToolEdits((prev) => ({ ...prev, "web.braveApiKey": v }))}
@@ -340,18 +340,18 @@ export function ConfigurationSettings() {
           <div className="space-y-3">
             <div className="flex gap-3">
               <label className="flex-1">
-                <span className="block text-[11px] text-muted mb-1">Host</span>
+                <span className="block text-[11px] text-muted-foreground mb-1">Host</span>
                 <input
                   type="text"
                   value={String(
                     "host" in gatewayEdits ? gatewayEdits.host : (gateway.host ?? "127.0.0.1"),
                   )}
                   onChange={(e) => setGatewayEdits((prev) => ({ ...prev, host: e.target.value }))}
-                  className="w-full px-3 py-1.5 text-[12px] text-primary bg-surface-base border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                  className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
                 />
               </label>
               <label className="w-28">
-                <span className="block text-[11px] text-muted mb-1">Port</span>
+                <span className="block text-[11px] text-muted-foreground mb-1">Port</span>
                 <input
                   type="number"
                   value={
@@ -363,7 +363,7 @@ export function ConfigurationSettings() {
                       port: Number.parseInt(e.target.value, 10) || 0,
                     }))
                   }
-                  className="w-full px-3 py-1.5 text-[12px] text-primary bg-surface-base border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                  className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
                 />
               </label>
             </div>

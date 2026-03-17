@@ -29,7 +29,7 @@ export function GraphToolbar({
   return (
     <div className="flex items-center gap-2 px-3 py-2 shrink-0">
       {/* Smart view pills */}
-      <div className="flex items-center gap-0.5 bg-surface-low rounded-lg p-0.5">
+      <div className="flex items-center gap-0.5 bg-card rounded-lg p-0.5">
         {VIEW_OPTIONS.map((opt) => (
           <button
             key={opt.value}
@@ -38,7 +38,7 @@ export function GraphToolbar({
             className={`px-2.5 py-1 text-xs rounded-md transition-all ${
               view === opt.value
                 ? "bg-brand/20 text-brand font-medium shadow-sm"
-                : "text-muted hover:text-secondary hover:bg-surface-base"
+                : "text-muted-foreground hover:text-foreground hover:bg-accent"
             }`}
           >
             {opt.label}
@@ -48,9 +48,9 @@ export function GraphToolbar({
 
       {/* Hop radius selector (only for local view) */}
       {view === "local" && (
-        <div className="flex items-center gap-1 text-xs text-muted">
+        <div className="flex items-center gap-1 text-xs text-muted-foreground">
           <span>Hops:</span>
-          <div className="flex items-center gap-0.5 bg-surface-low rounded-lg p-0.5">
+          <div className="flex items-center gap-0.5 bg-card rounded-lg p-0.5">
             {[1, 2, 3].map((r) => (
               <button
                 key={r}
@@ -59,7 +59,7 @@ export function GraphToolbar({
                 className={`w-6 h-6 rounded-md text-xs flex items-center justify-center transition-all ${
                   hopRadius === r
                     ? "bg-brand/20 text-brand font-medium"
-                    : "text-muted hover:text-secondary hover:bg-surface-base"
+                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
                 }`}
               >
                 {r}
@@ -80,7 +80,7 @@ export function GraphToolbar({
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder="Filter nodes..."
-          className="w-40 pl-7 pr-2 py-1 text-xs rounded-lg bg-surface-low border border-border-subtle text-primary placeholder:text-dim outline-none focus:border-brand/40 transition-colors"
+          className="w-40 pl-7 pr-2 py-1 text-xs rounded-lg bg-card border border-border-subtle text-foreground placeholder:text-dim outline-none focus:border-brand/40 transition-colors"
         />
       </div>
     </div>

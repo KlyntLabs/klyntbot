@@ -24,8 +24,8 @@ export function NetWorthCard({
   return (
     <Card className="p-5 flex items-center justify-between">
       <div>
-        <p className="text-[10px] text-muted uppercase tracking-widest mb-1">Net Worth</p>
-        <p className="text-[32px] font-light text-primary tracking-tight leading-none tabular-nums">
+        <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">Net Worth</p>
+        <p className="text-[32px] font-light text-foreground tracking-tight leading-none tabular-nums">
           {fmtCompact(convertTotal(totalNet), displayCur, hidden)}
         </p>
       </div>
@@ -40,15 +40,15 @@ export function NetWorthCard({
           )}
         </div>
         <div className="flex gap-3 justify-end">
-          <span className="text-[10px] text-muted flex items-center gap-1">
+          <span className="text-[10px] text-muted-foreground flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-success" />
             Cash {fmtCompact(convertTotal(cashAmount), displayCur, hidden)}
           </span>
-          <span className="text-[10px] text-muted flex items-center gap-1">
+          <span className="text-[10px] text-muted-foreground flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-info" />
             Invest {fmtCompact(convertTotal(totalInvest), displayCur, hidden)}
           </span>
-          <span className="text-[10px] text-muted flex items-center gap-1">
+          <span className="text-[10px] text-muted-foreground flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-destructive" />
             Debt {fmtCompact(convertTotal(totalDebt), displayCur, hidden)}
           </span>

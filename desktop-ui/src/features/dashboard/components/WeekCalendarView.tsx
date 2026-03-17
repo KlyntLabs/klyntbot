@@ -243,14 +243,14 @@ export function WeekCalendarView() {
                 key={day}
                 onClick={() => navigate(`/day/${day}`)}
                 className={cn(
-                  "flex-1 text-center py-1.5 text-xs cursor-pointer hover:bg-surface-lowest transition-colors",
-                  day === today ? "text-brand font-semibold" : "text-muted",
+                  "flex-1 text-center py-1.5 text-xs cursor-pointer hover:bg-card transition-colors",
+                  day === today ? "text-brand font-semibold" : "text-muted-foreground",
                 )}
               >
                 <div>{DAY_LABELS[i]}</div>
                 <div className="text-[10px]">{new Date(`${day}T00:00:00`).getDate()}</div>
                 {activeSecs > 0 && (
-                  <div className="text-[9px] text-secondary/60 mt-0.5">
+                  <div className="text-[9px] text-muted-foreground/60 mt-0.5">
                     {formatHumanDuration(activeSecs)}
                   </div>
                 )}
@@ -318,7 +318,7 @@ export function WeekCalendarView() {
                           title={`${session.label}${appSuffix} · ${durationLabel}`}
                         >
                           {height > 20 && (
-                            <span className="text-[8px] text-primary font-medium px-1 truncate block leading-tight mt-0.5">
+                            <span className="text-[8px] text-foreground font-medium px-1 truncate block leading-tight mt-0.5">
                               {session.label}
                             </span>
                           )}

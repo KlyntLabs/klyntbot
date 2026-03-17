@@ -34,7 +34,7 @@ export function VimCommandLine({ prefix, onSubmit, onCancel }: VimCommandLinePro
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={handleKeyDown}
         onBlur={onCancel}
-        className="flex-1 bg-transparent text-xs font-mono text-primary outline-none placeholder:text-dim"
+        className="flex-1 bg-transparent text-xs font-mono text-foreground outline-none placeholder:text-dim"
         placeholder={prefix === "/" ? "Search..." : "Command..."}
       />
     </div>

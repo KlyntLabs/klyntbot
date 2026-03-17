@@ -62,7 +62,7 @@ export function DistractionBanner({ summary }: DistractionBannerProps) {
       />
 
       {/* Content */}
-      <div className="relative flex items-center gap-3 bg-surface-low px-4 py-3">
+      <div className="relative flex items-center gap-3 bg-card px-4 py-3">
         {/* Pulsing dot */}
         <div className="relative flex-shrink-0">
           <span
@@ -83,7 +83,7 @@ export function DistractionBanner({ summary }: DistractionBannerProps) {
             <span className="text-[13px] font-medium" style={{ color: "var(--destructive)" }}>
               {formatHumanDuration(distractingSecs)}
             </span>
-            <span className="text-[12px] text-muted">
+            <span className="text-[12px] text-muted-foreground">
               on distracting apps
               {distractingPct > 0 && (
                 <span className="text-dim tabular-nums"> · {distractingPct}% of active time</span>
@@ -119,7 +119,7 @@ export function DistractionBanner({ summary }: DistractionBannerProps) {
           className={`flex-shrink-0 px-2 py-1 rounded-md text-[10px] transition-colors ${
             urgeSurfingCountdown > 0
               ? "text-dim cursor-not-allowed animate-[breathe_4s_ease-in-out_infinite]"
-              : "text-muted hover:text-secondary hover:bg-surface-raised"
+              : "text-muted-foreground hover:text-foreground hover:bg-muted"
           }`}
           aria-label={urgeSurfingCountdown > 0 ? "Pause and reflect" : "Dismiss"}
         >

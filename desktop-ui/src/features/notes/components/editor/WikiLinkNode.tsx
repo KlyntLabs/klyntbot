@@ -330,8 +330,8 @@ export function WikiLinkMenu({ editor, currentNoteTitle }: WikiLinkMenuProps) {
           onClick={() => handleCreateAndLink(state.query)}
           className={`w-full px-3 py-1.5 text-sm text-left flex items-center gap-2 transition-colors ${
             selectedIndex === 0
-              ? "bg-surface-raised text-brand"
-              : "text-brand/80 hover:bg-surface-low"
+              ? "bg-muted text-brand"
+              : "text-brand/80 hover:bg-card"
           }`}
         >
           <span className="text-xs">&#10024;</span>
@@ -350,8 +350,8 @@ export function WikiLinkMenu({ editor, currentNoteTitle }: WikiLinkMenuProps) {
             onClick={() => insertWikiLink(note)}
             className={`w-full px-3 py-1.5 text-sm text-left flex items-center gap-2 transition-colors ${
               itemIndex === selectedIndex
-                ? "bg-surface-raised text-primary"
-                : "text-secondary hover:bg-surface-low"
+                ? "bg-muted text-foreground"
+                : "text-muted-foreground hover:bg-card"
             }`}
           >
             <span className="truncate">{note.title}</span>

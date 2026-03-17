@@ -231,7 +231,7 @@ export function Finance() {
             {netWorth.totalsByCurrency.map((c) => (
               <span key={c.currency} className="text-[9px] font-light">
                 <span className="text-dim">{c.currency}</span>{" "}
-                <span className="text-secondary">
+                <span className="text-muted-foreground">
                   {hidden ? "•••••" : fmtCompact(c.net, c.currency)}
                 </span>
               </span>
@@ -248,7 +248,7 @@ export function Finance() {
           <Card className="overflow-hidden">
             <div className="px-4 pt-4 pb-1">
               <div className="flex items-center justify-between mb-2.5 px-1">
-                <span className="text-[10px] text-muted uppercase tracking-widest">Accounts</span>
+                <span className="text-[10px] text-muted-foreground uppercase tracking-widest">Accounts</span>
                 <Link
                   to="/finance/cashflow"
                   className="text-[10px] text-brand normal-case tracking-normal"
@@ -272,19 +272,19 @@ export function Finance() {
                 return (
                   <div
                     key={acct.id}
-                    className="flex items-center gap-3 px-4 py-2.5 hover:bg-surface-base transition-colors"
+                    className="flex items-center gap-3 px-4 py-2.5 hover:bg-accent transition-colors"
                   >
-                    <div className="w-7 h-7 rounded-lg bg-surface-raised flex items-center justify-center flex-shrink-0">
-                      <Icon className="w-3.5 h-3.5 text-muted" strokeWidth={1.5} />
+                    <div className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                      <Icon className="w-3.5 h-3.5 text-muted-foreground" strokeWidth={1.5} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[11px] font-medium text-secondary truncate">{acct.name}</p>
+                      <p className="text-[11px] font-medium text-muted-foreground truncate">{acct.name}</p>
                       <p className="text-[9px] text-dim font-light">
                         {acct.accountType.replaceAll("_", " ")}
                       </p>
                     </div>
                     <div className="text-right flex-shrink-0">
-                      <p className="text-[12px] font-light text-primary tabular-nums">
+                      <p className="text-[12px] font-light text-foreground tabular-nums">
                         {displayAmount({
                           amount: acct.balance,
                           currency: acct.currency,
@@ -307,7 +307,7 @@ export function Finance() {
           <Card className="overflow-hidden">
             <div className="px-4 pt-4 pb-1">
               <div className="flex items-center justify-between mb-2.5 px-1">
-                <span className="text-[10px] text-muted uppercase tracking-widest">Goals</span>
+                <span className="text-[10px] text-muted-foreground uppercase tracking-widest">Goals</span>
                 <Link
                   to="/finance/targets"
                   className="text-[10px] text-brand normal-case tracking-normal"
@@ -321,19 +321,19 @@ export function Finance() {
                 const p = pct(g.currentAmount, g.targetAmount);
                 const Icon = GOAL_ICONS[g.goalType] ?? Target;
                 return (
-                  <div key={g.id} className="px-4 py-3 hover:bg-surface-base transition-colors">
+                  <div key={g.id} className="px-4 py-3 hover:bg-accent transition-colors">
                     <div className="flex items-center gap-2 mb-1.5">
                       <Icon
                         className={cn(
                           "w-3.5 h-3.5 flex-shrink-0",
-                          g.goalType === "fire" ? "text-brand" : "text-muted",
+                          g.goalType === "fire" ? "text-brand" : "text-muted-foreground",
                         )}
                         strokeWidth={1.5}
                       />
-                      <span className="text-[11px] font-medium text-secondary truncate flex-1">
+                      <span className="text-[11px] font-medium text-muted-foreground truncate flex-1">
                         {g.name}
                       </span>
-                      <span className="px-1.5 py-0.5 text-[9px] font-light rounded bg-surface-base text-dim flex-shrink-0">
+                      <span className="px-1.5 py-0.5 text-[9px] font-light rounded bg-accent text-dim flex-shrink-0">
                         {g.goalType}
                       </span>
                       <span className="text-[10px] text-brand font-light flex-shrink-0">{p}%</span>
@@ -380,7 +380,7 @@ export function Finance() {
           <Card className="overflow-hidden">
             <div className="px-4 pt-4 pb-1">
               <div className="flex items-center justify-between mb-2.5 px-1">
-                <span className="text-[10px] text-muted uppercase tracking-widest">
+                <span className="text-[10px] text-muted-foreground uppercase tracking-widest">
                   Investments
                 </span>
                 <Link
@@ -392,7 +392,7 @@ export function Finance() {
               </div>
             </div>
             <div className="px-4 pb-3">
-              <p className="text-[28px] font-light text-primary tracking-tight leading-none tabular-nums mb-0.5">
+              <p className="text-[28px] font-light text-foreground tracking-tight leading-none tabular-nums mb-0.5">
                 {fmtCompact(convertTotal(totalInvest), displayCur, hidden)}
               </p>
               <p className="text-[9px] text-dim font-light">Total portfolio value</p>
@@ -404,9 +404,9 @@ export function Finance() {
                   return (
                     <div
                       key={p.id}
-                      className="flex items-center justify-between px-4 py-2.5 hover:bg-surface-base transition-colors"
+                      className="flex items-center justify-between px-4 py-2.5 hover:bg-accent transition-colors"
                     >
-                      <span className="text-[11px] text-secondary truncate">{p.name}</span>
+                      <span className="text-[11px] text-muted-foreground truncate">{p.name}</span>
                       <span
                         className={cn(
                           "text-[11px] font-light flex-shrink-0 ml-2",
@@ -427,7 +427,7 @@ export function Finance() {
           <Card className="overflow-hidden">
             <div className="px-4 pt-4 pb-1">
               <div className="flex items-center justify-between mb-2.5 px-1">
-                <span className="text-[10px] text-muted uppercase tracking-widest">
+                <span className="text-[10px] text-muted-foreground uppercase tracking-widest">
                   Liabilities
                 </span>
                 <Link
@@ -443,16 +443,16 @@ export function Finance() {
                 const Icon = LIAB_ICONS[l.liabilityType] ?? Wallet;
                 const paid = pct(l.principal - l.remaining, l.principal);
                 return (
-                  <div key={l.id} className="px-4 py-3 hover:bg-surface-base transition-colors">
+                  <div key={l.id} className="px-4 py-3 hover:bg-accent transition-colors">
                     <div className="flex items-center gap-2 mb-1.5">
                       <Icon
                         className="w-3.5 h-3.5 text-destructive/60 flex-shrink-0"
                         strokeWidth={1.5}
                       />
-                      <span className="text-[11px] font-medium text-secondary truncate flex-1">
+                      <span className="text-[11px] font-medium text-muted-foreground truncate flex-1">
                         {l.name}
                       </span>
-                      <span className="px-1.5 py-0.5 text-[9px] font-light rounded bg-surface-base text-dim flex-shrink-0">
+                      <span className="px-1.5 py-0.5 text-[9px] font-light rounded bg-accent text-dim flex-shrink-0">
                         {l.liabilityType.replaceAll("_", " ")}
                       </span>
                       {l.interestRate != null && (
@@ -462,7 +462,7 @@ export function Finance() {
                       )}
                     </div>
                     <div className="flex items-center gap-2 mb-1.5">
-                      <div className="flex-1 h-1.5 bg-surface-raised rounded-full overflow-hidden">
+                      <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
                         <div
                           className="h-full bg-success rounded-full"
                           style={{ width: `${paid}%` }}
@@ -486,8 +486,8 @@ export function Finance() {
               })}
             </div>
             {liabilities.length > 0 && (
-              <div className="px-4 py-2.5 border-t border-border bg-surface-lowest flex justify-between">
-                <span className="text-[10px] font-light text-muted">Total Debt</span>
+              <div className="px-4 py-2.5 border-t border-border bg-card flex justify-between">
+                <span className="text-[10px] font-light text-muted-foreground">Total Debt</span>
                 <span className="text-[10px] font-light text-destructive">
                   {fmtCompact(convertTotal(totalDebt), displayCur, hidden)}
                 </span>
@@ -501,7 +501,7 @@ export function Finance() {
       <Card className="overflow-hidden mb-3">
         <div className="px-4 pt-4 pb-1">
           <div className="flex items-center justify-between mb-2.5 px-1">
-            <span className="text-[10px] text-muted uppercase tracking-widest">
+            <span className="text-[10px] text-muted-foreground uppercase tracking-widest">
               Recent Transactions
             </span>
             <Link
@@ -536,7 +536,7 @@ export function Finance() {
           return (
             <div
               key={tx.id}
-              className="flex items-center gap-3 px-4 py-2.5 hover:bg-surface-base transition-colors border-b border-border-subtle last:border-b-0"
+              className="flex items-center gap-3 px-4 py-2.5 hover:bg-accent transition-colors border-b border-border-subtle last:border-b-0"
             >
               <span className="text-[10px] text-dim font-light w-10 flex-shrink-0 tabular-nums">
                 {tx.txDate.slice(5)}
@@ -550,12 +550,12 @@ export function Finance() {
                 <TxI className={cn("w-3.5 h-3.5", col)} strokeWidth={1.5} />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[12px] font-light text-secondary truncate">
+                <p className="text-[12px] font-light text-muted-foreground truncate">
                   {tx.counterparty ?? tx.notes ?? tx.txType}
                 </p>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   {tx.category && (
-                    <span className="px-1.5 py-0.5 text-[9px] font-light rounded bg-surface-base text-dim">
+                    <span className="px-1.5 py-0.5 text-[9px] font-light rounded bg-accent text-dim">
                       {tx.category}
                     </span>
                   )}

@@ -87,7 +87,7 @@ export function ActivityFeed() {
   if (events.length === 0) {
     return (
       <div className="glass-card p-4">
-        <h2 className="text-[13px] font-medium text-secondary mb-3">Activity</h2>
+        <h2 className="text-[13px] font-medium text-muted-foreground mb-3">Activity</h2>
         <p className="text-[12px] font-light text-dim">No recent activity</p>
       </div>
     );
@@ -96,7 +96,7 @@ export function ActivityFeed() {
   return (
     <div className="glass-card p-4 flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-[13px] font-medium text-secondary">Activity</h2>
+        <h2 className="text-[13px] font-medium text-muted-foreground">Activity</h2>
         <div className="flex items-center gap-1.5">
           <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
           <span className="text-[10px] font-light text-dim">Live</span>
@@ -122,7 +122,7 @@ export function ActivityFeed() {
               {/* App icon */}
               <div className="flex-shrink-0">
                 {e.isIdle ? (
-                  <span className="w-3.5 h-3.5 rounded-full bg-surface-raised block" />
+                  <span className="w-3.5 h-3.5 rounded-full bg-muted block" />
                 ) : (
                   <AppIcon appName={name} color={color} />
                 )}
@@ -134,7 +134,7 @@ export function ActivityFeed() {
               </span>
               {tag && (
                 <span
-                  className={`text-[9px] font-medium tabular-nums flex-shrink-0 ${isRecent ? "text-success" : "text-muted"}`}
+                  className={`text-[9px] font-medium tabular-nums flex-shrink-0 ${isRecent ? "text-success" : "text-muted-foreground"}`}
                 >
                   {tag}
                 </span>
@@ -144,7 +144,7 @@ export function ActivityFeed() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
                   <span
-                    className={`text-[11px] truncate ${e.isIdle ? "text-dim italic" : isFirst ? "font-normal text-primary" : "font-light text-secondary"}`}
+                    className={`text-[11px] truncate ${e.isIdle ? "text-dim italic" : isFirst ? "font-normal text-foreground" : "font-light text-muted-foreground"}`}
                   >
                     {name}
                   </span>

@@ -101,11 +101,11 @@ export function NoteCreationDialog({
       <div className="relative w-full max-w-[480px] mx-4 glass-panel rounded-2xl border border-border-subtle shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between px-5 pt-4 pb-2">
-          <h2 className="text-sm font-medium text-primary">New Note</h2>
+          <h2 className="text-sm font-medium text-foreground">New Note</h2>
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded-md text-dim hover:text-secondary transition-colors"
+            className="p-1 rounded-md text-dim hover:text-foreground transition-colors"
             aria-label="Close"
           >
             <X size={16} />
@@ -121,7 +121,7 @@ export function NoteCreationDialog({
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             onKeyDown={handleKeyDown}
-            className="w-full text-lg bg-transparent border-none outline-none text-primary placeholder:text-dim/50 font-medium"
+            className="w-full text-lg bg-transparent border-none outline-none text-foreground placeholder:text-dim/50 font-medium"
           />
         </div>
 
@@ -141,10 +141,10 @@ export function NoteCreationDialog({
                     key={note.id}
                     type="button"
                     onClick={() => handleNavigate(note.id)}
-                    className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-left hover:bg-surface-base transition-colors group"
+                    className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-left hover:bg-accent transition-colors group"
                   >
                     <FileText size={14} className="text-dim group-hover:text-muted shrink-0" />
-                    <span className="text-sm text-secondary group-hover:text-primary truncate">
+                    <span className="text-sm text-muted-foreground group-hover:text-foreground truncate">
                       {note.title || "Untitled"}
                     </span>
                   </button>

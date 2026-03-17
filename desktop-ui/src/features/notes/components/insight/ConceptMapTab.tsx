@@ -12,8 +12,8 @@ interface ConceptMapTabProps {
 function SkeletonLoader() {
   return (
     <div className="space-y-4 animate-pulse">
-      <div className="h-40 bg-surface-low rounded-lg" />
-      <div className="h-3 bg-surface-low rounded w-1/2 mx-auto" />
+      <div className="h-40 bg-card rounded-lg" />
+      <div className="h-3 bg-card rounded w-1/2 mx-auto" />
     </div>
   );
 }
@@ -22,7 +22,7 @@ function TextOutline({ text }: { text: string }) {
   // Render as a simple indented text outline
   const lines = text.split("\n").filter(Boolean);
   return (
-    <div className="space-y-1 font-mono text-[11px] text-secondary">
+    <div className="space-y-1 font-mono text-[11px] text-muted-foreground">
       {lines.map((line, i) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: static derived list with no reordering
         <div key={i} className="whitespace-pre-wrap">
@@ -47,7 +47,7 @@ function CopyButton({
     <button
       type="button"
       onClick={onCopy}
-      className="flex items-center gap-1.5 text-[10px] text-muted hover:text-secondary transition-colors"
+      className="flex items-center gap-1.5 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
     >
       <ClipboardCopy size={10} />
       {copied ? "Copied!" : "Copy Mermaid code"}
@@ -104,7 +104,7 @@ export function ConceptMapTab({ status, mermaid: mermaidCode, fallbackText }: Co
   if (mermaidCode) {
     return (
       <div className="space-y-3">
-        <div className="rounded-lg bg-surface-lowest border border-border p-4">
+        <div className="rounded-lg bg-card border border-border p-4">
           <MermaidRenderer code={mermaidCode} onError={handleRenderError} />
         </div>
         <CopyButton mermaidCode={mermaidCode} copied={copied} onCopy={handleCopy} />

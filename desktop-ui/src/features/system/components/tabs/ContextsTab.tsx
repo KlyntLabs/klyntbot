@@ -36,8 +36,8 @@ export function ContextsTab() {
             onClick={() => setStatusFilter(value as string | undefined)}
             className={`px-2.5 py-1 rounded-lg text-[11px] font-light transition-colors ${
               statusFilter === value
-                ? "glass-button-active text-primary"
-                : "text-muted hover:text-secondary hover:bg-surface-low"
+                ? "glass-button-active text-foreground"
+                : "text-muted-foreground hover:text-foreground hover:bg-card"
             }`}
           >
             {label}

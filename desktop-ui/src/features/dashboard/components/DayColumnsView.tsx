@@ -425,7 +425,7 @@ export function DayColumnsView({
             <button
               type="button"
               onClick={() => setFeedExpanded(!feedExpanded)}
-              className="flex items-center gap-2 px-3 py-2 text-xs text-muted hover:text-secondary transition-colors w-full"
+              className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors w-full"
             >
               {feedExpanded ? (
                 <ChevronDown className="w-3.5 h-3.5" />
@@ -497,7 +497,7 @@ function ColumnEntry({
         style={{ top, height }}
         title={entry.title}
       >
-        <span className="text-secondary truncate block">{entry.title}</span>
+        <span className="text-muted-foreground truncate block">{entry.title}</span>
         {height > 28 && (
           <span className="text-muted text-[10px] truncate block">
             {dur > 0 && `${formatHumanDuration(dur)} · `}
@@ -521,14 +521,14 @@ function ColumnEntry({
           "absolute left-1 right-1 rounded-md px-1.5 py-0.5 text-[11px] leading-tight overflow-hidden cursor-pointer transition-colors",
           isDue
             ? "border-l-2 border-l-[var(--timeline-todo)] bg-[var(--timeline-todo)]/15 hover:bg-[var(--timeline-todo)]/25"
-            : "border-l border-border bg-surface-low hover:bg-surface-raised",
+            : "border-l border-border bg-card hover:bg-muted",
           isCompleted && "opacity-60 line-through",
           selected && "ring-1 ring-brand",
         )}
         style={{ top, height: Math.max(height, 20) }}
         title={entry.title}
       >
-        <span className="text-secondary truncate block">{entry.title}</span>
+        <span className="text-muted-foreground truncate block">{entry.title}</span>
         {isDue && status && height > 28 && (
           <span className="text-muted text-[10px] truncate block capitalize">{status}</span>
         )}
@@ -575,7 +575,7 @@ function ColumnEntry({
         onClick={onClick}
         className={cn(
           "absolute left-1 right-1 flex items-center gap-1 text-[10px] cursor-pointer transition-colors",
-          "text-muted hover:text-secondary",
+          "text-muted hover:text-muted-foreground",
           selected && "text-brand",
         )}
         style={{ top }}
@@ -596,7 +596,7 @@ function ColumnEntry({
       type="button"
       onClick={onClick}
       className={cn(
-        "absolute left-1 right-1 flex items-center gap-1 text-[10px] text-muted hover:text-secondary cursor-pointer transition-colors",
+        "absolute left-1 right-1 flex items-center gap-1 text-[10px] text-muted hover:text-muted-foreground cursor-pointer transition-colors",
         selected && "text-brand",
       )}
       style={{ top }}

@@ -219,22 +219,13 @@
   --shadow-xl: var(--shadow-xl);
   --shadow-2xl: var(--shadow-2xl);
 
-  /* ── Backward-compat tokens (existing Tailwind classes still work) ───── */
+  /* ── Full shadcn/ui tokens ───────────────────────────────────────────── */
+  --color-primary: var(--primary);
+  --color-secondary: var(--secondary);
+  --color-muted: var(--muted);
 
-  /* Text hierarchy — text-primary, text-secondary, text-muted, text-dim */
-  --color-primary: var(--text-primary);
-  --color-secondary: var(--text-secondary);
-  --color-muted: var(--text-muted);
+  /* App-specific (no shadcn equivalent) */
   --color-dim: var(--text-dim);
-
-  /* Surface staircase — bg-surface-base, bg-surface-raised, etc. */
-  --color-surface-lowest: var(--surface-lowest);
-  --color-surface-low: var(--surface-low);
-  --color-surface-base: var(--surface-base);
-  --color-surface-raised: var(--surface-raised);
-  --color-surface-highest: var(--surface-highest);
-  --color-surface-floating: var(--surface-floating);
-  --color-surface-glass: var(--surface-glass);
 
   /* Brand */
   --color-brand: var(--brand);
@@ -295,7 +286,7 @@
   }
 
   body {
-    @apply bg-background text-primary;
+    @apply bg-background text-foreground;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     background-image:

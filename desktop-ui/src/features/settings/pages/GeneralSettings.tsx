@@ -71,50 +71,50 @@ export function GeneralSettings() {
   return (
     <div>
       <div className="mb-8">
-        <h2 className="text-lg font-medium text-primary">General</h2>
-        <p className="text-[13px] text-muted mt-1">Overview and system information</p>
+        <h2 className="text-lg font-medium text-foreground">General</h2>
+        <p className="text-[13px] text-muted-foreground mt-1">Overview and system information</p>
       </div>
 
       <div className="space-y-4">
-        <div className="bg-surface-low rounded-lg border border-border p-4">
-          <h3 className="text-[13px] font-medium text-secondary mb-3">System</h3>
+        <div className="bg-card rounded-lg border border-border p-4">
+          <h3 className="text-[13px] font-medium text-muted-foreground mb-3">System</h3>
           <div className="space-y-2">
             <div className="flex justify-between text-[13px]">
-              <span className="text-muted">Version</span>
-              <span className="text-secondary font-mono">{appInfo.version}</span>
+              <span className="text-muted-foreground">Version</span>
+              <span className="text-muted-foreground font-mono">{appInfo.version}</span>
             </div>
             <div className="flex justify-between text-[13px]">
-              <span className="text-muted">Data directory</span>
-              <span className="text-secondary font-mono">{appInfo.dataDir}</span>
+              <span className="text-muted-foreground">Data directory</span>
+              <span className="text-muted-foreground font-mono">{appInfo.dataDir}</span>
             </div>
             <div className="flex justify-between text-[13px]">
-              <span className="text-muted">Agent status</span>
-              <span className="text-secondary">{status.status}</span>
+              <span className="text-muted-foreground">Agent status</span>
+              <span className="text-muted-foreground">{status.status}</span>
             </div>
             <div className="flex justify-between text-[13px]">
-              <span className="text-muted">Active tasks</span>
-              <span className="text-secondary">{status.activeTaskCount}</span>
+              <span className="text-muted-foreground">Active tasks</span>
+              <span className="text-muted-foreground">{status.activeTaskCount}</span>
             </div>
           </div>
         </div>
 
-        <div className="bg-surface-low rounded-lg border border-border p-4">
-          <h3 className="text-[13px] font-medium text-secondary mb-3">Agent defaults</h3>
+        <div className="bg-card rounded-lg border border-border p-4">
+          <h3 className="text-[13px] font-medium text-muted-foreground mb-3">Agent defaults</h3>
           <div className="space-y-3">
             <label className="block">
-              <span className="block text-[12px] text-muted mb-1">Default model</span>
+              <span className="block text-[12px] text-muted-foreground mb-1">Default model</span>
               <input
                 type="text"
                 value={currentModel}
                 onChange={(e) => setModel(e.target.value)}
                 placeholder="e.g. anthropic/claude-opus-4-5"
-                className="w-full px-3 py-1.5 text-[13px] text-primary bg-surface-base border border-border rounded-lg focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                className="w-full px-3 py-1.5 text-[13px] text-foreground bg-accent border border-border rounded-lg focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
               />
             </label>
 
             <div className="flex gap-3">
               <label className="flex-1">
-                <span className="block text-[12px] text-muted mb-1">Temperature</span>
+                <span className="block text-[12px] text-muted-foreground mb-1">Temperature</span>
                 <input
                   type="number"
                   value={currentTemp}
@@ -122,18 +122,18 @@ export function GeneralSettings() {
                   step="0.1"
                   min="0"
                   max="2"
-                  className="w-full px-3 py-1.5 text-[13px] text-primary bg-surface-base border border-border rounded-lg focus:outline-none focus:border-brand/50 transition-colors"
+                  className="w-full px-3 py-1.5 text-[13px] text-foreground bg-accent border border-border rounded-lg focus:outline-none focus:border-brand/50 transition-colors"
                 />
               </label>
               <label className="flex-1">
-                <span className="block text-[12px] text-muted mb-1">Max tokens</span>
+                <span className="block text-[12px] text-muted-foreground mb-1">Max tokens</span>
                 <input
                   type="number"
                   value={currentMaxTokens}
                   onChange={(e) => setMaxTokens(e.target.value)}
                   step="256"
                   min="256"
-                  className="w-full px-3 py-1.5 text-[13px] text-primary bg-surface-base border border-border rounded-lg focus:outline-none focus:border-brand/50 transition-colors"
+                  className="w-full px-3 py-1.5 text-[13px] text-foreground bg-accent border border-border rounded-lg focus:outline-none focus:border-brand/50 transition-colors"
                 />
               </label>
             </div>

@@ -39,7 +39,7 @@ const opColors: Record<string, string> = {
   update: "bg-info/20 text-info",
   DELETE: "bg-destructive/20 text-destructive",
   delete: "bg-destructive/20 text-destructive",
-  NOOP: "bg-surface-base text-muted",
+  NOOP: "bg-accent text-muted-foreground",
 };
 
 export function PipelineTab() {
@@ -107,17 +107,17 @@ export function PipelineTab() {
       <div className="grid grid-cols-2 gap-6">
         {/* Extraction Log */}
         <div>
-          <h2 className="text-[13px] font-medium text-secondary mb-3 flex items-center gap-1.5">
+          <h2 className="text-[13px] font-medium text-muted-foreground mb-3 flex items-center gap-1.5">
             <GitBranch className="w-3.5 h-3.5" /> Extraction Log
           </h2>
           <div className="space-y-2">
             {extractions.map((e) => (
               <div
                 key={`ext-${e.ts}-${e.observation.slice(0, 20)}`}
-                className="p-3 bg-surface-low rounded-lg border border-border"
+                className="p-3 bg-card rounded-lg border border-border"
               >
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-[10px] text-muted font-mono">
+                  <span className="text-[10px] text-muted-foreground font-mono">
                     {new Date(e.ts).toLocaleTimeString(undefined, {
                       hour: "2-digit",
                       minute: "2-digit",
@@ -129,26 +129,26 @@ export function PipelineTab() {
                     {e.factsExtracted} facts
                   </span>
                 </div>
-                <p className="text-[11px] text-secondary">{e.observation}</p>
+                <p className="text-[11px] text-muted-foreground">{e.observation}</p>
               </div>
             ))}
             {extractions.length === 0 && (
-              <p className="text-[12px] text-muted text-center py-4">No extraction events yet</p>
+              <p className="text-[12px] text-muted-foreground text-center py-4">No extraction events yet</p>
             )}
           </div>
         </div>
 
         {/* Consolidation Log */}
         <div>
-          <h2 className="text-[13px] font-medium text-secondary mb-3">Consolidation Log</h2>
+          <h2 className="text-[13px] font-medium text-muted-foreground mb-3">Consolidation Log</h2>
           <div className="space-y-2">
             {consolidations.map((c) => (
               <div
                 key={`con-${c.ts}-${c.fact.slice(0, 20)}`}
-                className="p-3 bg-surface-low rounded-lg border border-border"
+                className="p-3 bg-card rounded-lg border border-border"
               >
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-[10px] text-muted font-mono">
+                  <span className="text-[10px] text-muted-foreground font-mono">
                     {new Date(c.ts).toLocaleTimeString(undefined, {
                       hour: "2-digit",
                       minute: "2-digit",
@@ -162,31 +162,31 @@ export function PipelineTab() {
                     {c.operation}
                   </span>
                 </div>
-                <p className="text-[11px] text-secondary">{c.fact}</p>
+                <p className="text-[11px] text-muted-foreground">{c.fact}</p>
               </div>
             ))}
             {consolidations.length === 0 && (
-              <p className="text-[12px] text-muted text-center py-4">No consolidation events yet</p>
+              <p className="text-[12px] text-muted-foreground text-center py-4">No consolidation events yet</p>
             )}
           </div>
         </div>
       </div>
 
       {/* Pipeline stats summary */}
-      <div className="flex items-center gap-4 p-3 bg-surface-low rounded-lg border border-border">
-        <span className="text-[11px] text-muted">
-          Extractions: <span className="text-secondary">{extractions.length}</span>
+      <div className="flex items-center gap-4 p-3 bg-card rounded-lg border border-border">
+        <span className="text-[11px] text-muted-foreground">
+          Extractions: <span className="text-muted-foreground">{extractions.length}</span>
         </span>
-        <span className="text-[11px] text-muted">
-          Consolidations: <span className="text-secondary">{consolidations.length}</span>
+        <span className="text-[11px] text-muted-foreground">
+          Consolidations: <span className="text-muted-foreground">{consolidations.length}</span>
         </span>
-        <span className="text-[11px] text-muted">
+        <span className="text-[11px] text-muted-foreground">
           ADDs: <span className="text-success">{opCounts.ADD}</span>
         </span>
-        <span className="text-[11px] text-muted">
+        <span className="text-[11px] text-muted-foreground">
           UPDATEs: <span className="text-info">{opCounts.UPDATE}</span>
         </span>
-        <span className="text-[11px] text-muted">
+        <span className="text-[11px] text-muted-foreground">
           DELETEs: <span className="text-destructive">{opCounts.DELETE}</span>
         </span>
       </div>

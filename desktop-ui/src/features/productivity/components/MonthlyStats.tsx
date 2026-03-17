@@ -76,7 +76,7 @@ export function MonthlyStats({ yearMonth, summaries: current }: MonthlyStatsProp
 
   return (
     <div className="glass-card p-4 flex flex-col gap-3">
-      <h2 className="text-[13px] font-medium text-secondary">Work Hours</h2>
+      <h2 className="text-[13px] font-medium text-muted-foreground">Work Hours</h2>
       <div className="flex flex-col gap-0">
         {rows.map((row, i) => (
           <div
@@ -86,7 +86,7 @@ export function MonthlyStats({ yearMonth, summaries: current }: MonthlyStatsProp
             <span className="text-[10px] font-light text-dim uppercase tracking-wider">
               {row.label}
             </span>
-            <span className="text-[20px] font-light text-primary tabular-nums leading-tight">
+            <span className="text-[20px] font-light text-foreground tabular-nums leading-tight">
               {row.value}
             </span>
             <div className="flex items-center gap-2 text-[10px] font-light">

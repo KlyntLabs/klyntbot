@@ -29,10 +29,10 @@ function Slider({
 
   return (
     <div className="flex items-center gap-3 h-7">
-      <span className="text-[11px] text-secondary w-[90px] shrink-0">{label}</span>
+      <span className="text-[11px] text-muted-foreground w-[90px] shrink-0">{label}</span>
       <div className="flex-1 relative flex items-center h-5">
         {/* Custom track with progress fill */}
-        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[4px] rounded-full bg-surface-raised overflow-hidden">
+        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[4px] rounded-full bg-muted overflow-hidden">
           <div className="h-full rounded-full bg-brand/50" style={{ width: `${pct}%` }} />
         </div>
         {/* Native range input (invisible track, visible thumb) */}
@@ -66,14 +66,14 @@ function Toggle({
 }) {
   return (
     <div className="flex items-center gap-3 h-7">
-      <span className="text-[11px] text-secondary flex-1">{label}</span>
+      <span className="text-[11px] text-muted-foreground flex-1">{label}</span>
       <button
         type="button"
         role="switch"
         aria-checked={checked}
         onClick={() => onChange(!checked)}
         className={`relative w-[34px] h-[18px] rounded-full transition-colors shrink-0 ${
-          checked ? "bg-brand" : "bg-surface-raised"
+          checked ? "bg-brand" : "bg-muted"
         }`}
       >
         <span
@@ -109,7 +109,7 @@ export function GraphSettingsPopover({
           <button
             type="button"
             onClick={onReset}
-            className="flex items-center gap-1 text-[10px] text-muted hover:text-secondary transition-colors"
+            className="flex items-center gap-1 text-[10px] text-muted hover:text-foreground transition-colors"
           >
             <RotateCcw size={9} />
             Reset

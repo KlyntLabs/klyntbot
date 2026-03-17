@@ -31,9 +31,9 @@ function parseGaps(content: string): { markdown: string; gaps: Gap[] } {
 function SkeletonLoader() {
   return (
     <div className="space-y-3 animate-pulse">
-      <div className="h-3 bg-surface-low rounded w-3/4" />
-      <div className="h-3 bg-surface-low rounded w-full" />
-      <div className="h-3 bg-surface-low rounded w-5/6" />
+      <div className="h-3 bg-card rounded w-3/4" />
+      <div className="h-3 bg-card rounded w-full" />
+      <div className="h-3 bg-card rounded w-5/6" />
     </div>
   );
 }
@@ -61,7 +61,7 @@ export function GapAnalysisTab({ status, content, onCreateNote }: GapAnalysisTab
 
   return (
     <div className="space-y-4">
-      <div className="text-[12px] text-secondary leading-relaxed">
+      <div className="text-[12px] text-muted-foreground leading-relaxed">
         <MarkdownContent content={markdown} />
       </div>
 
@@ -75,11 +75,11 @@ export function GapAnalysisTab({ status, content, onCreateNote }: GapAnalysisTab
               key={gap.topic}
               type="button"
               onClick={() => onCreateNote?.(gap.suggestedTitle, gap.description)}
-              className="w-full flex items-start gap-2 p-2 rounded-lg bg-surface-lowest hover:bg-surface-base transition-colors text-left group"
+              className="w-full flex items-start gap-2 p-2 rounded-lg bg-card hover:bg-accent transition-colors text-left group"
             >
               <FilePlus size={12} className="text-dim group-hover:text-brand mt-0.5 shrink-0" />
               <div>
-                <div className="text-[11px] text-secondary group-hover:text-primary">
+                <div className="text-[11px] text-muted-foreground group-hover:text-foreground">
                   {gap.topic}
                 </div>
                 <div className="text-[10px] text-dim mt-0.5 line-clamp-2">{gap.description}</div>

@@ -31,13 +31,13 @@ function ActivityEntry({ entry }: { entry: ActivityEntryType }) {
       <ActorAvatar type={entry.actorType} />
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline gap-2">
-          <span className="text-sm font-medium text-primary">{entry.actorName}</span>
-          <span className="text-sm text-muted">{entry.action}</span>
-          <span className="ml-auto text-xs text-muted shrink-0">
+          <span className="text-sm font-medium text-foreground">{entry.actorName}</span>
+          <span className="text-sm text-muted-foreground">{entry.action}</span>
+          <span className="ml-auto text-xs text-muted-foreground shrink-0">
             {formatActivityTime(entry.createdAt)}
           </span>
         </div>
-        {entry.detail && <p className="text-sm text-muted mt-0.5">{entry.detail}</p>}
+        {entry.detail && <p className="text-sm text-muted-foreground mt-0.5">{entry.detail}</p>}
       </div>
     </div>
   );
@@ -53,14 +53,14 @@ function ActorAvatar({ type }: { type: ActorType }) {
   }
   if (type === "system") {
     return (
-      <div className="size-7 rounded-full shrink-0 flex items-center justify-center bg-surface-low">
-        <Monitor className="size-3.5 text-muted" />
+      <div className="size-7 rounded-full shrink-0 flex items-center justify-center bg-card">
+        <Monitor className="size-3.5 text-muted-foreground" />
       </div>
     );
   }
   return (
-    <div className="size-7 rounded-full shrink-0 flex items-center justify-center bg-surface-raised">
-      <User className="size-3.5 text-primary" />
+    <div className="size-7 rounded-full shrink-0 flex items-center justify-center bg-muted">
+      <User className="size-3.5 text-foreground" />
     </div>
   );
 }

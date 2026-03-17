@@ -60,7 +60,7 @@ export function InlineSelect({
         disabled={disabled}
         className="inline-block border-b-2 border-accent bg-transparent text-accent font-semibold outline-none cursor-pointer hover:border-accent/70 transition-colors disabled:opacity-50"
       >
-        {selectedLabel} <span className="text-muted/50 text-xs">&#9662;</span>
+        {selectedLabel} <span className="text-muted-foreground/50 text-xs">&#9662;</span>
       </button>
 
       {open &&
@@ -86,7 +86,7 @@ export function InlineSelect({
                   className={`block w-full text-left px-3 py-1.5 text-[13px] transition-colors ${
                     opt.value === value
                       ? "text-accent bg-accent/10"
-                      : "text-foreground hover:bg-surface-base"
+                      : "text-foreground hover:bg-accent"
                   }`}
                 >
                   {opt.label}

@@ -121,7 +121,7 @@ export function NoteFinder({ isOpen, onClose, onSelectNote, notes }: NoteFinderP
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search notes..."
-            className="flex-1 bg-transparent text-[13px] text-primary placeholder:text-muted/50 focus:outline-none"
+            className="flex-1 bg-transparent text-[13px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
           />
           <span className="text-[10px] text-muted shrink-0">
             {results.length}/{notes.length}
@@ -146,8 +146,8 @@ export function NoteFinder({ isOpen, onClose, onSelectNote, notes }: NoteFinderP
                   onMouseEnter={() => setSelectedIndex(i)}
                   className={`w-full flex items-center gap-2 px-3 py-1.5 text-left transition-colors ${
                     i === selectedIndex
-                      ? "bg-surface-raised text-primary"
-                      : "text-secondary hover:bg-surface-lowest"
+                      ? "bg-muted text-foreground"
+                      : "text-muted-foreground hover:bg-card"
                   }`}
                 >
                   <FileText className="w-3 h-3 shrink-0 text-muted/60" />
@@ -164,7 +164,7 @@ export function NoteFinder({ isOpen, onClose, onSelectNote, notes }: NoteFinderP
           <div className="w-[62%] overflow-y-auto px-5 py-4">
             {selectedNote ? (
               <>
-                <div className="text-[12px] font-medium text-primary/90 mb-1">
+                <div className="text-[12px] font-medium text-foreground/90 mb-1">
                   {selectedNote.title}
                 </div>
                 {selectedNote.tags.length > 0 && (
@@ -172,14 +172,14 @@ export function NoteFinder({ isOpen, onClose, onSelectNote, notes }: NoteFinderP
                     {selectedNote.tags.map((tag) => (
                       <span
                         key={tag}
-                        className="text-[9px] px-1.5 py-0.5 rounded-full bg-surface-base text-muted"
+                        className="text-[9px] px-1.5 py-0.5 rounded-full bg-accent text-muted-foreground"
                       >
                         {tag}
                       </span>
                     ))}
                   </div>
                 )}
-                <div className="text-[11px] text-secondary/80 leading-relaxed whitespace-pre-wrap">
+                <div className="text-[11px] text-muted-foreground/80 leading-relaxed whitespace-pre-wrap">
                   {selectedNote.body || "No content"}
                 </div>
               </>
@@ -192,16 +192,16 @@ export function NoteFinder({ isOpen, onClose, onSelectNote, notes }: NoteFinderP
         {/* Footer */}
         <div className="flex items-center gap-4 px-4 py-1.5 border-t border-border-subtle text-[9px] text-muted/50">
           <span>
-            <kbd className="px-1 py-0.5 rounded bg-surface-base text-[8px]">↑↓</kbd> navigate
+            <kbd className="px-1 py-0.5 rounded bg-accent text-[8px]">↑↓</kbd> navigate
           </span>
           <span>
-            <kbd className="px-1 py-0.5 rounded bg-surface-base text-[8px]">Enter</kbd> open
+            <kbd className="px-1 py-0.5 rounded bg-accent text-[8px]">Enter</kbd> open
           </span>
           <span>
-            <kbd className="px-1 py-0.5 rounded bg-surface-base text-[8px]">Esc</kbd> close
+            <kbd className="px-1 py-0.5 rounded bg-accent text-[8px]">Esc</kbd> close
           </span>
           <span>
-            <kbd className="px-1 py-0.5 rounded bg-surface-base text-[8px]">^J/K</kbd> vim
+            <kbd className="px-1 py-0.5 rounded bg-accent text-[8px]">^J/K</kbd> vim
           </span>
         </div>
       </div>

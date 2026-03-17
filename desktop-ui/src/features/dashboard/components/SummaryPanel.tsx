@@ -125,7 +125,7 @@ function DaySummary({
             {/* Active time + ratio bar */}
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="text-sm font-semibold text-primary tabular-nums">
+                <span className="text-sm font-semibold text-foreground tabular-nums">
                   {formatHumanDuration(ps.totalActiveSecs)}
                 </span>
                 <TrendArrow
@@ -139,7 +139,7 @@ function DaySummary({
                 />
                 <span className="text-[9px] text-dim">active</span>
               </div>
-              <div className="flex h-1 rounded-full overflow-hidden bg-surface-base mt-1">
+              <div className="flex h-1 rounded-full overflow-hidden bg-accent mt-1">
                 {ps.productiveSecs > 0 && (
                   <div
                     className="h-full"
@@ -209,7 +209,7 @@ function DaySummary({
 
       {/* Fallback when no productivity data */}
       {!hasProductivity && (
-        <section className="text-sm font-semibold text-primary">
+        <section className="text-sm font-semibold text-foreground">
           {formatHumanDuration(summary.totalTrackedSecs)} tracked
         </section>
       )}
@@ -248,13 +248,13 @@ function DaySummary({
             {intel.patterns.map((p, i) => (
               <div key={`p-${i}`} className="flex items-start gap-2 text-[11px]">
                 <Brain className="w-3 h-3 text-muted mt-0.5 shrink-0" />
-                <span className="text-secondary">{p}</span>
+                <span className="text-muted-foreground">{p}</span>
               </div>
             ))}
             {intel.nudges.map((n, i) => (
               <div key={`n-${i}`} className="flex items-start gap-2 text-[11px]">
                 <Lightbulb className="w-3 h-3 text-warning mt-0.5 shrink-0" />
-                <span className="text-secondary">{n.message}</span>
+                <span className="text-muted-foreground">{n.message}</span>
               </div>
             ))}
           </div>
@@ -264,7 +264,7 @@ function DaySummary({
       {/* ── 7. AI Summary ── */}
       {ps?.aiSummary && (
         <section className="rounded-lg bg-brand/[0.06] border border-brand/15 p-2.5">
-          <p className="text-[11px] text-secondary leading-relaxed">{ps.aiSummary}</p>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">{ps.aiSummary}</p>
         </section>
       )}
 
@@ -291,8 +291,8 @@ function TopAppsChart({
         const pct = maxSecs > 0 ? (app.durationSecs / maxSecs) * 100 : 0;
         return (
           <div key={app.appName} className="flex items-center gap-2">
-            <span className="text-[11px] text-secondary truncate w-20 shrink-0">{app.appName}</span>
-            <div className="flex-1 h-[6px] rounded-full bg-surface-base overflow-hidden">
+            <span className="text-[11px] text-muted-foreground truncate w-20 shrink-0">{app.appName}</span>
+            <div className="flex-1 h-[6px] rounded-full bg-accent overflow-hidden">
               <div
                 className="h-full rounded-full"
                 style={{
@@ -390,7 +390,7 @@ function SessionDetail({ session, onClose }: { session: SessionBlock; onClose: (
         <h3 className="text-xs font-semibold text-muted uppercase tracking-wider">
           Activity Session
         </h3>
-        <button type="button" onClick={onClose} className="text-muted hover:text-secondary">
+        <button type="button" onClick={onClose} className="text-muted-foreground hover:text-foreground">
           <X className="w-4 h-4" />
         </button>
       </div>
@@ -398,12 +398,12 @@ function SessionDetail({ session, onClose }: { session: SessionBlock; onClose: (
       {/* Session header */}
       <div className="flex items-center gap-2">
         <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: session.color }} />
-        <span className="text-sm font-medium text-primary">{session.label}</span>
+        <span className="text-sm font-medium text-foreground">{session.label}</span>
       </div>
 
       {/* Intelligence description */}
       {matched?.description && (
-        <p className="text-xs text-secondary leading-relaxed">{matched.description}</p>
+        <p className="text-xs text-muted-foreground leading-relaxed">{matched.description}</p>
       )}
 
       {/* Quality score + Category badge row */}
@@ -439,15 +439,15 @@ function SessionDetail({ session, onClose }: { session: SessionBlock; onClose: (
           {matched.categoryPurity != null && (
             <>
               <span className="text-dim">Focus purity</span>
-              <span className="text-secondary tabular-nums text-right">
+              <span className="text-muted-foreground tabular-nums text-right">
                 {Math.round(matched.categoryPurity * 100)}%
               </span>
             </>
           )}
           <span className="text-dim">Context switches</span>
-          <span className="text-secondary tabular-nums text-right">{matched.contextSwitches}</span>
+          <span className="text-muted-foreground tabular-nums text-right">{matched.contextSwitches}</span>
           <span className="text-dim">Distractions</span>
-          <span className="text-secondary tabular-nums text-right">{matched.distractionCount}</span>
+          <span className="text-muted-foreground tabular-nums text-right">{matched.distractionCount}</span>
         </div>
       )}
 
@@ -472,7 +472,7 @@ function SessionDetail({ session, onClose }: { session: SessionBlock; onClose: (
                     className="w-1.5 h-1.5 rounded-full shrink-0"
                     style={{ backgroundColor: appCatColor }}
                   />
-                  <span className="text-xs text-secondary truncate flex-1">{app.app}</span>
+                  <span className="text-xs text-muted-foreground truncate flex-1">{app.app}</span>
                   <span className="text-[10px] text-dim tabular-nums">
                     {formatHumanDuration(app.dur)}
                   </span>
@@ -503,14 +503,14 @@ function EntryDetail({
     <div className="w-80 px-4 py-3 flex flex-col gap-3 overflow-y-auto shrink-0">
       <div className="flex items-center justify-between">
         <h3 className="text-xs font-semibold text-muted uppercase tracking-wider">Details</h3>
-        <button type="button" onClick={onClose} className="text-muted hover:text-secondary">
+        <button type="button" onClick={onClose} className="text-muted-foreground hover:text-foreground">
           <X className="w-4 h-4" />
         </button>
       </div>
 
       <div className="flex items-center gap-2">
         <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: entry.color }} />
-        <span className="text-sm font-medium text-primary">{entry.title}</span>
+        <span className="text-sm font-medium text-foreground">{entry.title}</span>
       </div>
 
       {entry.description && <p className="text-xs text-muted">{entry.description}</p>}

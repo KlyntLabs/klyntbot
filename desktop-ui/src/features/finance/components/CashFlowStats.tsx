@@ -15,7 +15,7 @@ function StatCard({ label, value, accentColor }: StatCardProps) {
         style={{ backgroundColor: accentColor }}
       />
       <p className="text-[8px] font-medium text-dim uppercase tracking-wider mb-1">{label}</p>
-      <p className="text-[22px] font-light text-primary tabular-nums leading-none">{value}</p>
+      <p className="text-[22px] font-light text-foreground tabular-nums leading-none">{value}</p>
     </Card>
   );
 }

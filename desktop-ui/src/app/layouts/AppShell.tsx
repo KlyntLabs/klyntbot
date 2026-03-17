@@ -132,7 +132,7 @@ export function AppShell() {
   if (setupState === "needed") return <Navigate to="/setup/welcome" replace />;
 
   return (
-    <div className="h-screen w-screen bg-background text-primary flex gap-2 p-2 overflow-hidden">
+    <div className="h-screen w-screen bg-background text-foreground flex gap-2 p-2 overflow-hidden">
       <FocusBanner
         activeTask={activeTask}
         onEndFocus={async (taskId) => {

@@ -40,7 +40,7 @@ interface PropertyRowProps {
 function PropertyRow({ label, children }: PropertyRowProps) {
   return (
     <div className="flex items-center gap-2 py-1.5">
-      <span className="w-[72px] shrink-0 text-xs text-muted">{label}</span>
+      <span className="w-[72px] shrink-0 text-xs text-muted-foreground">{label}</span>
       <div className="flex-1 min-w-0">{children}</div>
     </div>
   );
@@ -58,7 +58,7 @@ function ValueButton({ children, onClick, className }: ValueButtonProps) {
       type="button"
       onClick={onClick}
       className={cn(
-        "flex items-center gap-1.5 px-1.5 py-0.5 rounded text-xs text-primary hover:bg-surface-raised transition-colors w-full text-left",
+        "flex items-center gap-1.5 px-1.5 py-0.5 rounded text-xs text-foreground hover:bg-accent transition-colors w-full text-left",
         className,
       )}
     >
@@ -131,7 +131,7 @@ export function SidebarProperties({ task, compact, onUpdate }: SidebarProperties
         <Popover open={priorityOpen} onOpenChange={setPriorityOpen}>
           <PopoverTrigger asChild>
             <ValueButton>
-              <PriorityIcon className="size-3.5 text-muted shrink-0" />
+              <PriorityIcon className="size-3.5 text-muted-foreground shrink-0" />
               <span className="truncate">{task.priority.name}</span>
             </ValueButton>
           </PopoverTrigger>
@@ -152,7 +152,7 @@ export function SidebarProperties({ task, compact, onUpdate }: SidebarProperties
                           setPriorityOpen(false);
                         }}
                       >
-                        <Icon className="mr-2 h-4 w-4 text-muted" />
+                        <Icon className="mr-2 h-4 w-4 text-muted-foreground" />
                         {p.name}
                         <Check
                           className={cn(
@@ -213,7 +213,7 @@ export function SidebarProperties({ task, compact, onUpdate }: SidebarProperties
 
       {/* Due date */}
       <PropertyRow label="Due">
-        <span className={cn("px-1.5 py-0.5 text-xs", task.dueDate ? "text-primary" : "text-muted")}>
+        <span className={cn("px-1.5 py-0.5 text-xs", task.dueDate ? "text-foreground" : "text-muted-foreground")}>
           {dueDateDisplay}
         </span>
       </PropertyRow>
@@ -223,7 +223,7 @@ export function SidebarProperties({ task, compact, onUpdate }: SidebarProperties
         <span
           className={cn(
             "px-1.5 py-0.5 text-xs",
-            task.estimatedMinutes != null ? "text-primary" : "text-muted",
+            task.estimatedMinutes != null ? "text-foreground" : "text-muted-foreground",
           )}
         >
           {estimateDisplay}
@@ -274,7 +274,7 @@ export function SidebarProperties({ task, compact, onUpdate }: SidebarProperties
 
           {/* Area */}
           <PropertyRow label="Area">
-            <span className="px-1.5 py-0.5 text-xs text-primary">
+            <span className="px-1.5 py-0.5 text-xs text-foreground">
               {task.area?.name ?? "No area"}
             </span>
           </PropertyRow>
@@ -282,7 +282,7 @@ export function SidebarProperties({ task, compact, onUpdate }: SidebarProperties
           {/* Project */}
           <PropertyRow label="Project">
             <span
-              className={cn("px-1.5 py-0.5 text-xs", task.project ? "text-primary" : "text-muted")}
+              className={cn("px-1.5 py-0.5 text-xs", task.project ? "text-foreground" : "text-muted-foreground")}
             >
               {task.project ? task.project.name : "No project"}
             </span>
@@ -295,14 +295,14 @@ export function SidebarProperties({ task, compact, onUpdate }: SidebarProperties
                 {task.tags.map((tag) => (
                   <span
                     key={tag}
-                    className="px-1.5 py-0.5 rounded-full bg-surface-raised text-primary text-xs"
+                    className="px-1.5 py-0.5 rounded-full bg-muted text-foreground text-xs"
                   >
                     {tag}
                   </span>
                 ))}
               </div>
             ) : (
-              <span className="px-1.5 py-0.5 text-xs text-muted">None</span>
+              <span className="px-1.5 py-0.5 text-xs text-muted-foreground">None</span>
             )}
           </PropertyRow>
         </>

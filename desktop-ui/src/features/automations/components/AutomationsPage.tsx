@@ -40,7 +40,7 @@ function OriginBadge({ origin }: { origin: CronOrigin }) {
 function ScheduleTypeBadge({ schedule }: { schedule: CronSchedule }) {
   const label = schedule.kind === "every" ? "Interval" : schedule.kind === "cron" ? "Cron" : "Once";
   return (
-    <span className="px-1.5 py-0.5 rounded text-[10px] font-light text-dim bg-surface-base">
+    <span className="px-1.5 py-0.5 rounded text-[10px] font-light text-dim bg-accent">
       {label}
     </span>
   );
@@ -90,7 +90,7 @@ function InlineTextCell({
         onClick={(e) => e.stopPropagation()}
         placeholder={placeholder}
         className={cn(
-          "bg-transparent border-b border-brand outline-none w-full text-[12px] font-light text-primary",
+          "bg-transparent border-b border-brand outline-none w-full text-[12px] font-light text-foreground",
           className,
         )}
       />
@@ -103,7 +103,7 @@ function InlineTextCell({
       onClick={startEdit}
       className={cn(
         "text-left truncate max-w-full",
-        editable && "cursor-text rounded px-1 -mx-1 transition-colors hover:bg-surface-base",
+        editable && "cursor-text rounded px-1 -mx-1 transition-colors hover:bg-accent",
         className,
       )}
     >
@@ -288,7 +288,7 @@ function SchedulePanel({
               <span
                 className={cn(
                   "text-[13px] transition-colors",
-                  fields.mode === key ? "text-secondary font-medium" : "text-muted font-light",
+                  fields.mode === key ? "text-muted-foreground font-medium" : "text-muted-foreground font-light",
                 )}
               >
                 {label}
@@ -340,7 +340,7 @@ function SchedulePanel({
                   "px-4 py-2 text-[13px] rounded-lg font-medium transition-colors",
                   fields.intervalUnit === u
                     ? "bg-brand/20 text-brand border border-brand/30"
-                    : "bg-surface-base text-muted hover:text-secondary hover:bg-surface-raised border border-transparent",
+                    : "bg-accent text-muted-foreground hover:text-foreground hover:bg-muted border border-transparent",
                 )}
               >
                 {u === "days" ? "Every Day" : "Every Week"}
@@ -365,7 +365,7 @@ function SchedulePanel({
                   "flex-1 py-2 rounded-lg text-[11px] font-semibold transition-colors",
                   fields.weekdays[i]
                     ? "bg-brand text-white"
-                    : "bg-surface-base text-dim hover:text-muted hover:bg-surface-raised",
+                    : "bg-accent text-dim hover:text-muted-foreground hover:bg-muted",
                 )}
               >
                 {day}
@@ -427,8 +427,8 @@ function InlineScheduleCell({
         type="button"
         onClick={handleOpen}
         className={cn(
-          "text-[12px] font-light text-muted text-left truncate",
-          editable && "cursor-text rounded px-1 -mx-1 transition-colors hover:bg-surface-base",
+          "text-[12px] font-light text-muted-foreground text-left truncate",
+          editable && "cursor-text rounded px-1 -mx-1 transition-colors hover:bg-accent",
         )}
       >
         {humanizeSchedule(schedule)}
@@ -531,10 +531,10 @@ function AutomationCreateForm({
   };
 
   return (
-    <div className="border border-border rounded-xl p-4 bg-surface-low space-y-3 mx-4 mt-3">
+    <div className="border border-border rounded-xl p-4 bg-card space-y-3 mx-4 mt-3">
       <div className="flex items-center justify-between">
-        <h3 className="text-[13px] font-medium text-secondary">New Automation</h3>
-        <button type="button" onClick={onClose} className="text-dim hover:text-muted">
+        <h3 className="text-[13px] font-medium text-muted-foreground">New Automation</h3>
+        <button type="button" onClick={onClose} className="text-dim hover:text-muted-foreground">
           <X size={14} />
         </button>
       </div>
@@ -693,7 +693,7 @@ export function AutomationsPage() {
               value={humanizeJobName(job.name)}
               editable={editable}
               onSave={(v) => handleUpdate(job.id, { name: v })}
-              className={cn("text-[13px] font-light", job.enabled ? "text-secondary" : "text-dim")}
+              className={cn("text-[13px] font-light", job.enabled ? "text-muted-foreground" : "text-dim")}
             />
           );
         },
@@ -721,7 +721,7 @@ export function AutomationsPage() {
               value={job.payload.message}
               editable={editable}
               onSave={(v) => handleUpdate(job.id, { message: v })}
-              className="text-[12px] font-light text-muted"
+              className="text-[12px] font-light text-muted-foreground"
               placeholder="No message"
             />
           );
@@ -781,7 +781,7 @@ export function AutomationsPage() {
             <button
               type="button"
               onClick={() => handleRun(job.id)}
-              className="p-1 rounded text-dim hover:text-brand hover:bg-surface-base transition-colors"
+              className="p-1 rounded text-dim hover:text-brand hover:bg-accent transition-colors"
               title="Run now"
             >
               <Play size={12} />
@@ -818,7 +818,7 @@ export function AutomationsPage() {
     () => (
       <div className="flex flex-col items-center justify-center py-16 text-dim">
         <Clock size={32} className="mb-3 opacity-30" />
-        <p className="text-muted text-sm font-light">
+        <p className="text-muted-foreground text-sm font-light">
           {debouncedQ || originFilter !== "all" ? "No matching automations" : "No automations yet"}
         </p>
         <p className="text-dim text-xs font-light mt-1">
@@ -852,15 +852,15 @@ export function AutomationsPage() {
               className={cn(
                 "px-3 py-1.5 rounded-lg text-[12px] font-light transition-colors",
                 originFilter === tab.key
-                  ? "bg-surface-highest text-primary"
-                  : "text-muted hover:text-secondary",
+                  ? "bg-muted text-foreground"
+                  : "text-muted-foreground hover:text-foreground",
               )}
             >
               {tab.label}
             </button>
           ))}
 
-          <div className="w-px h-5 bg-surface-raised mx-1" />
+          <div className="w-px h-5 bg-muted mx-1" />
 
           <div className="relative">
             <Search

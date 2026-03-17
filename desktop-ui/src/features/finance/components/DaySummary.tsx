@@ -38,9 +38,9 @@ export function DaySummary({
       className="glass-card flex items-start justify-between gap-3"
     >
       <div className="flex-1 min-w-0">
-        <p className="text-[13px] font-medium text-primary mb-1.5">
+        <p className="text-[13px] font-medium text-foreground mb-1.5">
           {dateLabel} &mdash;{" "}
-          <span className="font-light text-secondary">
+          <span className="font-light text-muted-foreground">
             {txCount} {txCount === 1 ? "transaction" : "transactions"}, spent {spendingDisplay}
           </span>
         </p>
@@ -50,7 +50,7 @@ export function DaySummary({
             {categories.map((cat) => (
               <span
                 key={cat}
-                className="px-2 py-0.5 rounded-md bg-surface-base border border-border text-[10px] font-light text-dim capitalize"
+                className="px-2 py-0.5 rounded-md bg-accent border border-border text-[10px] font-light text-dim capitalize"
               >
                 {cat}
               </span>
@@ -63,7 +63,7 @@ export function DaySummary({
         type="button"
         onClick={onClose}
         aria-label="Close day summary"
-        className="p-1 rounded-lg text-dim hover:text-secondary hover:bg-surface-base transition-colors shrink-0 text-[14px] leading-none"
+        className="p-1 rounded-lg text-dim hover:text-foreground hover:bg-accent transition-colors shrink-0 text-[14px] leading-none"
       >
         &times;
       </button>

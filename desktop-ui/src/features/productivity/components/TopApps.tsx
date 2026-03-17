@@ -23,7 +23,7 @@ export function TopApps({ apps }: TopAppsProps) {
   if (apps.length === 0) {
     return (
       <div className="glass-card p-4">
-        <h2 className="text-[13px] font-medium text-secondary mb-3">Top Apps</h2>
+        <h2 className="text-[13px] font-medium text-muted-foreground mb-3">Top Apps</h2>
         <p className="text-[12px] font-light text-dim">No app data yet</p>
       </div>
     );
@@ -32,7 +32,7 @@ export function TopApps({ apps }: TopAppsProps) {
   return (
     <div className="glass-card p-4 flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-[13px] font-medium text-secondary">Top Apps</h2>
+        <h2 className="text-[13px] font-medium text-muted-foreground">Top Apps</h2>
         <span className="text-[10px] font-light text-dim tabular-nums">{apps.length} tracked</span>
       </div>
       <div className="flex flex-col gap-1.5">
@@ -45,13 +45,13 @@ export function TopApps({ apps }: TopAppsProps) {
           return (
             <div
               key={app.appName}
-              className="group flex items-center gap-2.5 py-1 rounded-md px-1 -mx-1 hover:bg-surface-base transition-colors"
+              className="group flex items-center gap-2.5 py-1 rounded-md px-1 -mx-1 hover:bg-accent transition-colors"
             >
               {/* Icon + pct */}
               <div className="flex items-center gap-1.5 w-14 flex-shrink-0">
                 <AppIcon appName={app.appName} color={color} />
                 <span
-                  className={`text-[10px] tabular-nums ${isTop3 ? "font-medium text-muted" : "font-light text-dim"}`}
+                  className={`text-[10px] tabular-nums ${isTop3 ? "font-medium text-muted-foreground" : "font-light text-dim"}`}
                 >
                   {pct}%
                 </span>
@@ -59,13 +59,13 @@ export function TopApps({ apps }: TopAppsProps) {
 
               {/* App name */}
               <span
-                className={`text-[11px] w-28 truncate flex-shrink-0 ${isTop3 ? "font-normal text-primary" : "font-light text-secondary"}`}
+                className={`text-[11px] w-28 truncate flex-shrink-0 ${isTop3 ? "font-normal text-foreground" : "font-light text-muted-foreground"}`}
               >
                 {app.appName}
               </span>
 
               {/* Bar */}
-              <div className="flex-1 h-2 rounded-full bg-surface-raised overflow-hidden relative">
+              <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden relative">
                 <div
                   className="h-full rounded-full transition-[width] duration-500"
                   style={{
@@ -77,7 +77,7 @@ export function TopApps({ apps }: TopAppsProps) {
 
               {/* Duration */}
               <span
-                className={`text-[11px] tabular-nums w-14 text-right flex-shrink-0 ${isTop3 ? "font-normal text-muted" : "font-light text-dim"}`}
+                className={`text-[11px] tabular-nums w-14 text-right flex-shrink-0 ${isTop3 ? "font-normal text-muted-foreground" : "font-light text-dim"}`}
               >
                 {formatHumanDuration(app.durationSecs)}
               </span>

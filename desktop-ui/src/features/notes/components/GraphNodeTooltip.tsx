@@ -15,11 +15,11 @@ export function GraphNodeTooltip({ node, x, y }: GraphNodeTooltipProps) {
       style={{ left: x + 12, top: y + 12 }}
     >
       {/* Title */}
-      <div className="text-sm font-semibold text-primary truncate">{node.title}</div>
+      <div className="text-sm font-semibold text-foreground truncate">{node.title}</div>
 
       {/* Body preview */}
       {node.bodyPreview && (
-        <div className="text-xs text-muted mt-1 line-clamp-2">{node.bodyPreview}</div>
+        <div className="text-xs text-muted-foreground mt-1 line-clamp-2">{node.bodyPreview}</div>
       )}
 
       {/* Tags */}

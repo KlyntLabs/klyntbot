@@ -29,14 +29,14 @@ export function CurrencyToggle({ mode, currencies, onSelect }: CurrencyTogglePro
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-light transition-all duration-200 border border-border hover:bg-surface-base"
+        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-light transition-all duration-200 border border-border hover:bg-accent"
       >
         {mode === "multi" ? (
-          <ArrowLeftRight className="w-3 h-3 text-muted" strokeWidth={1.5} />
+          <ArrowLeftRight className="w-3 h-3 text-muted-foreground" strokeWidth={1.5} />
         ) : null}
-        <span className={mode === "multi" ? "text-muted" : "text-brand font-medium"}>{label}</span>
+        <span className={mode === "multi" ? "text-muted-foreground" : "text-brand font-medium"}>{label}</span>
         <ChevronDown
-          className={`w-3 h-3 text-muted transition-transform ${open ? "rotate-180" : ""}`}
+          className={`w-3 h-3 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
           strokeWidth={1.5}
         />
       </button>
@@ -52,7 +52,7 @@ export function CurrencyToggle({ mode, currencies, onSelect }: CurrencyTogglePro
               setOpen(false);
             }}
           />
-          <div className="h-px bg-surface-base mx-2 my-1" />
+          <div className="h-px bg-accent mx-2 my-1" />
           {currencies.map((c) => (
             <DropItem
               key={c}
@@ -86,7 +86,7 @@ function DropItem({
       type="button"
       onClick={onClick}
       className={`w-full flex items-center gap-2 px-3 py-1.5 text-[11px] transition-colors ${
-        active ? "text-brand" : "text-secondary hover:text-primary hover:bg-surface-low"
+        active ? "text-brand" : "text-muted-foreground hover:text-foreground hover:bg-accent"
       }`}
     >
       <span className="w-3 flex-shrink-0">

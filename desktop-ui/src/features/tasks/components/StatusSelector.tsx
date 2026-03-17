@@ -35,7 +35,7 @@ export function StatusSelector({ issueId, status, onChanged }: StatusSelectorPro
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="flex items-center justify-center size-5 rounded hover:bg-surface-raised transition-colors"
+          className="flex items-center justify-center size-5 rounded hover:bg-accent transition-colors"
           aria-label={`Status: ${status.name}`}
         >
           {renderStatusIcon(status)}

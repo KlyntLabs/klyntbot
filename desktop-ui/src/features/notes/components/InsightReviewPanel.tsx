@@ -43,7 +43,7 @@ const TABS: { id: TabId; label: string }[] = [
 function statusDotClass(status: TabStatus): string {
   switch (status) {
     case "idle":
-      return "bg-surface-raised w-1.5 h-1.5 rounded-full";
+      return "bg-muted-foreground/40 w-1.5 h-1.5 rounded-full";
     case "loading":
     case "streaming":
       return "bg-purple w-1.5 h-1.5 rounded-full animate-pulse";
@@ -144,11 +144,11 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
       {/* Header */}
       <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border shrink-0">
         <Brain size={14} className="text-purple shrink-0" />
-        <span className="text-[12px] font-medium text-primary flex-1">Insight Review</span>
+        <span className="text-[12px] font-medium text-foreground flex-1">Insight Review</span>
         <button
           type="button"
           onClick={() => setShowPersonaManager(true)}
-          className="p-1 rounded-md text-muted hover:text-primary hover:bg-white/[0.06] transition-colors"
+          className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
           title="Manage Personas"
         >
           <Settings2 size={12} />
@@ -156,7 +156,7 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
         <button
           type="button"
           disabled
-          className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-surface-low text-dim cursor-not-allowed"
+          className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-accent text-dim cursor-not-allowed"
           title="Regenerate all tabs"
         >
           <RefreshCw size={10} />
@@ -165,7 +165,7 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
         <button
           type="button"
           onClick={() => actions.close()}
-          className="p-1 rounded-md text-muted hover:text-primary hover:bg-surface-base transition-colors"
+          className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
           aria-label="Close Insight Review"
         >
           <X size={14} />
@@ -184,8 +184,8 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
               onClick={() => actions.switchTab(tab.id)}
               className={`flex items-center gap-1.5 px-3 py-2 text-[11px] whitespace-nowrap transition-colors border-b-2 ${
                 isActive
-                  ? "border-purple-400 text-primary"
-                  : "border-transparent text-muted hover:text-secondary"
+                  ? "border-purple-400 text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
             >
               <span className={statusDotClass(status)} />
@@ -243,7 +243,7 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
           type="button"
           onClick={handleInsertIntoNote}
           disabled={!hasActiveContent}
-          className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-surface-low text-muted hover:text-secondary hover:bg-surface-base transition-colors disabled:text-dim disabled:cursor-not-allowed"
+          className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-accent text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors disabled:text-dim disabled:cursor-not-allowed"
           title="Insert into note"
         >
           <FileInput size={10} />
@@ -253,7 +253,7 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
           type="button"
           onClick={handleCreateInsightNote}
           disabled={!hasActiveContent}
-          className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-surface-low text-muted hover:text-secondary hover:bg-surface-base transition-colors disabled:text-dim disabled:cursor-not-allowed"
+          className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-accent text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors disabled:text-dim disabled:cursor-not-allowed"
           title="Create note from insight"
         >
           <FilePlus size={10} />
@@ -277,7 +277,7 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
           type="button"
           onClick={handleCopy}
           disabled={!hasActiveContent}
-          className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-surface-low text-muted hover:text-secondary hover:bg-surface-base transition-colors disabled:text-dim disabled:cursor-not-allowed ml-auto"
+          className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-accent text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors disabled:text-dim disabled:cursor-not-allowed ml-auto"
           title="Copy to clipboard"
         >
           <Copy size={10} />

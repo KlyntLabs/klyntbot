@@ -7,7 +7,7 @@ export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
 }
 
 const variants = {
-  default: "bg-surface-base text-muted border-border",
+  default: "bg-accent text-muted-foreground border-border",
   success: "bg-success/10 text-success border-success/30",
   warning: "bg-warning/10 text-warning border-warning/30",
   destructive: "bg-destructive/10 text-destructive border-destructive/30",

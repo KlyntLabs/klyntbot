@@ -37,7 +37,7 @@ function ViewModeToggle({
         type="button"
         aria-label="Editor view"
         onClick={() => onChange("editor")}
-        className={`p-1.5 rounded-md transition-colors ${viewMode === "editor" ? "bg-surface-raised text-primary" : "text-muted hover:text-secondary"}`}
+        className={`p-1.5 rounded-md transition-colors ${viewMode === "editor" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}
       >
         <PenLine size={16} />
       </button>
@@ -45,7 +45,7 @@ function ViewModeToggle({
         type="button"
         aria-label="Graph view"
         onClick={() => onChange("graph")}
-        className={`p-1.5 rounded-md transition-colors ${viewMode === "graph" ? "bg-surface-raised text-primary" : "text-muted hover:text-secondary"}`}
+        className={`p-1.5 rounded-md transition-colors ${viewMode === "graph" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}
       >
         <GitGraph size={16} />
       </button>
@@ -472,14 +472,14 @@ export default function KnowledgeBasePage() {
               <ViewModeToggle viewMode={viewMode} onChange={setViewMode} />
             </div>
             <div className="flex-1 flex flex-col items-center justify-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-surface-low flex items-center justify-center">
+              <div className="w-12 h-12 rounded-2xl bg-card flex items-center justify-center">
                 <FileText className="w-6 h-6 text-dim" strokeWidth={1.5} />
               </div>
               <div className="text-center">
-                <div className="text-muted text-sm">Select a note to view</div>
+                <div className="text-muted-foreground text-sm">Select a note to view</div>
                 <div className="text-dim text-xs mt-1">
                   or press{" "}
-                  <kbd className="px-1.5 py-0.5 rounded bg-surface-base text-[10px] font-mono">
+                  <kbd className="px-1.5 py-0.5 rounded bg-accent text-[10px] font-mono">
                     Cmd+N
                   </kbd>{" "}
                   to create one

@@ -20,13 +20,13 @@ export function SecretInput({ value, onChange, placeholder, className }: SecretI
         placeholder={placeholder}
         className={
           className ??
-          "w-full px-3 py-1.5 pr-9 text-[12px] text-primary bg-surface-base border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+          "w-full px-3 py-1.5 pr-9 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
         }
       />
       <button
         type="button"
         onClick={() => setShow(!show)}
-        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-secondary transition-colors"
+        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
       >
         {show ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
       </button>
