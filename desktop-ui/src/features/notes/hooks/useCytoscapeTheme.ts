@@ -5,6 +5,23 @@ function getCssVar(name: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
 
+/** Resolve a CSS variable to a computed hex/rgb color that Cytoscape can understand.
+ *  CSS vars may use oklch() or other color spaces that Cytoscape doesn't support.
+ *  We create a temporary element, apply the color, and read the computed value. */
+function resolveColor(varName: string, fallback: string): string {
+  const raw = getCssVar(varName);
+  if (!raw) return fallback;
+  // If already hex or rgb, return directly
+  if (raw.startsWith("#") || raw.startsWith("rgb")) return raw;
+  // Resolve via temporary element
+  const el = document.createElement("div");
+  el.style.color = raw;
+  document.body.appendChild(el);
+  const resolved = getComputedStyle(el).color;
+  document.body.removeChild(el);
+  return resolved || fallback;
+}
+
 function isLightTheme(): boolean {
   const bg = getCssVar("--background");
   return bg.startsWith("#f") || bg.startsWith("#e") || bg === "#ffffff";
@@ -28,12 +45,11 @@ export function useCytoscapeTheme(): { stylesheet: Stylesheet[]; isLight: boolea
 
   return useMemo(() => {
     const light = isLightTheme();
-    const textPrimary = getCssVar("--text-primary") || (light ? "#000000" : "#f0f2f5");
-    const textSecondary = getCssVar("--text-secondary") || (light ? "#525252" : "#c8cdd4");
-    const textMuted = getCssVar("--text-muted") || (light ? "#737373" : "#7d8590");
-    const border = getCssVar("--border") || (light ? "#d4d4d4" : "rgba(255,255,255,0.1)");
-    const edgeColor = light ? "#d4d4d4" : "rgba(255,255,255,0.12)";
-    const brand = getCssVar("--brand") || (light ? "#ca8a04" : "#f97316");
+    const textPrimary = resolveColor("--text-primary", light ? "#000000" : "#f0f2f5");
+    const textSecondary = resolveColor("--text-secondary", light ? "#525252" : "#c8cdd4");
+    const border = resolveColor("--border", light ? "#d4d4d4" : "rgba(255,255,255,0.1)");
+    const edgeColor = light ? "#d4d4d4" : "rgba(255,255,255,0.15)";
+    const brand = resolveColor("--brand", light ? "#ca8a04" : "#f97316");
 
     const stylesheet: Stylesheet[] = [
       // ── Compound parents — invisible (clustering via node color + legend) ──
