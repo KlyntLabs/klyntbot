@@ -92,13 +92,20 @@ export function GraphView({
         return;
       }
 
-      const parent = cyInstance.getElementById(clusterId);
-      const children = parent.children();
-      const neighborhood = children.union(children.connectedEdges()).union(parent);
+      // Find cluster info to get the color, then highlight nodes with that color
+      const cluster = clusters.find((c) => c.id === clusterId);
+      if (!cluster) return;
+
       cyInstance.elements().addClass("dimmed");
-      neighborhood.removeClass("dimmed");
+      // Un-dim nodes belonging to this cluster (matched by color data)
+      cyInstance.nodes().forEach((node) => {
+        if (node.data("color") === cluster.color) {
+          node.removeClass("dimmed");
+          node.connectedEdges().removeClass("dimmed");
+        }
+      });
     },
-    [cy],
+    [cy, clusters],
   );
 
   const zoomIn = () =>

@@ -106,7 +106,7 @@ export function useCytoscapeElements({
       }
 
       clusterMap.set(clusterId, { id: clusterId, label, color, count: 0 });
-      elements.push({ group: "nodes", data: { id: clusterId, label, color, type } });
+      // No compound parent elements — clustering shown via node color + legend only
     }
 
     for (const node of nodes) {
@@ -122,7 +122,6 @@ export function useCytoscapeElements({
         data: {
           id: node.id,
           label: node.title,
-          parent: clusterId,
           color,
           size,
           linkCount: node.linkCount,
