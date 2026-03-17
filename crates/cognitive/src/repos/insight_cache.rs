@@ -74,6 +74,8 @@ impl InsightCacheRepo {
         gap_analysis: Option<&str>,
         self_assessment: Option<&str>,
         concept_map: Option<&str>,
+        perspectives: Option<&str>,
+        persona_ids: Option<&str>,
     ) -> Result<InsightCacheRow, sqlx::Error> {
         let id = Uuid::new_v4().to_string();
         let now = Utc::now().to_rfc3339();
@@ -81,14 +83,17 @@ impl InsightCacheRepo {
         sqlx::query(
             r#"
             INSERT INTO insight_review_cache
-                (id, note_id, content_hash, version, synthesis, gap_analysis, self_assessment, concept_map, created_at, updated_at)
+                (id, note_id, content_hash, version, synthesis, gap_analysis,
+                 self_assessment, concept_map, perspectives, persona_ids, created_at, updated_at)
             VALUES
-                (?1, ?2, ?3, 1, ?4, ?5, ?6, ?7, ?8, ?8)
+                (?1, ?2, ?3, 1, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?10)
             ON CONFLICT(note_id, content_hash) DO UPDATE SET
                 synthesis        = COALESCE(excluded.synthesis,        insight_review_cache.synthesis),
                 gap_analysis     = COALESCE(excluded.gap_analysis,     insight_review_cache.gap_analysis),
                 self_assessment  = COALESCE(excluded.self_assessment,  insight_review_cache.self_assessment),
                 concept_map      = COALESCE(excluded.concept_map,      insight_review_cache.concept_map),
+                perspectives     = COALESCE(excluded.perspectives,     insight_review_cache.perspectives),
+                persona_ids      = COALESCE(excluded.persona_ids,      insight_review_cache.persona_ids),
                 version          = insight_review_cache.version + 1,
                 updated_at       = excluded.updated_at
             "#,
@@ -100,11 +105,12 @@ impl InsightCacheRepo {
         .bind(gap_analysis)
         .bind(self_assessment)
         .bind(concept_map)
+        .bind(perspectives)
+        .bind(persona_ids)
         .bind(&now)
         .execute(&self.pool)
         .await?;
 
-        // Fetch and return the stored row.
         let row = self
             .get_if_fresh(note_id, content_hash)
             .await?
@@ -180,7 +186,7 @@ mod tests {
         let hash = "hash-001";
 
         let row = repo
-            .upsert(note_id, hash, Some("synthesis text"), None, None, None)
+            .upsert(note_id, hash, Some("synthesis text"), None, None, None, None, None)
             .await
             .unwrap();
 
@@ -214,7 +220,7 @@ mod tests {
         let hash = "hash-002";
 
         // Create initial entry with synthesis only
-        repo.upsert(note_id, hash, Some("initial synthesis"), None, None, None)
+        repo.upsert(note_id, hash, Some("initial synthesis"), None, None, None, None, None)
             .await
             .unwrap();
 

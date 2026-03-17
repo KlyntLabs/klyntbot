@@ -11,7 +11,6 @@ use crate::state::AppCore;
 use super::{insight_context, insight_prompts};
 
 impl AppCore {
-    /// Start insight review: check cache, return initial response.
     pub async fn note_insight_review(
         &self,
         note_id: &str,
@@ -27,12 +26,10 @@ impl AppCore {
             return Err(ApiError::new("VALIDATION", "Note has no content"));
         }
 
-        // Compute content hash: SHA-256(title + body + sorted related note IDs)
         let related_ids = self.get_related_note_ids(note_id).await;
         let hash_input = format!("{}{}{}", note.title, note.body, related_ids.join(","));
         let content_hash = format!("{:x}", Sha256::digest(hash_input.as_bytes()));
 
-        // Check cache
         if let Some(ref repo) = self.insight_cache_repo {
             if let Ok(Some(_cached)) = repo.get_if_fresh(note_id, &content_hash).await {
                 return Ok(InsightReviewStarted {
@@ -59,23 +56,32 @@ impl AppCore {
                 .unwrap_or("0000")
         );
 
-        // Get the cognitive LLM provider
         let provider = self
             .cognitive_provider
             .as_ref()
             .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "LLM provider not configured"))?
             .clone();
 
-        // Assemble context from note + related notes
         let related_notes = self.fetch_related_notes(note_id).await;
         let ctx = insight_context::assemble_context(&note, &related_notes, None);
 
-        // Read chat params from config before spawning
+        // NoteRow doesn't carry tags — fetch them separately
+        let tags = self.note_repo.get_tags(note_id).await.unwrap_or_default();
+        let note_domains = insight_context::extract_note_domains(&tags);
+
+        let selected_personas = if let Some(ref persona_repo) = self.persona_repo {
+            persona_repo
+                .select_for_note(note_id, &note_domains, 4)
+                .await
+                .unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+
         let config = self.config.read().await;
         let params = providers::cognitive_chat_params(&config, 4096);
         drop(config);
 
-        // Clone everything needed for the background task
         let emitter = Arc::clone(&self.event_emitter);
         let cache_repo = self.insight_cache_repo.clone();
         let note_id_owned = note_id.to_string();
@@ -83,7 +89,6 @@ impl AppCore {
         let context_text = ctx.text;
         let note_title = ctx.note_title;
 
-        // Spawn background task for LLM calls + streaming events
         tokio::spawn(async move {
             run_insight_pipeline(InsightPipelineArgs {
                 provider,
@@ -94,6 +99,7 @@ impl AppCore {
                 context: context_text,
                 note_title,
                 params,
+                personas: selected_personas,
             })
             .await;
         });
@@ -105,7 +111,6 @@ impl AppCore {
         })
     }
 
-    /// Get cached insight review for instant re-open.
     pub async fn note_insight_cache_get(
         &self,
         note_id: &str,
@@ -129,6 +134,11 @@ impl AppCore {
             .as_deref()
             .and_then(|s| serde_json::from_str(s).ok());
 
+        let persona_ids: Option<Vec<String>> = cached
+            .persona_ids
+            .as_deref()
+            .and_then(|s| serde_json::from_str(s).ok());
+
         Ok(Some(InsightReviewResponse {
             insight_review_id: cached.id,
             note_id: cached.note_id,
@@ -136,6 +146,8 @@ impl AppCore {
             gap_analysis: cached.gap_analysis,
             self_assessment,
             concept_map: cached.concept_map,
+            perspectives: cached.perspectives,
+            persona_ids,
         }))
     }
 
@@ -156,7 +168,7 @@ impl AppCore {
                 let (stability, difficulty) = match q.difficulty.as_str() {
                     "easy" => (4.0, 0.3),
                     "hard" => (0.8, 0.7),
-                    _ => (2.0, 0.5), // medium
+                    _ => (2.0, 0.5),
                 };
                 cognitive::NewFlashcard {
                     source_note_id: Some(params.note_id.clone()),
@@ -203,7 +215,6 @@ impl AppCore {
             .collect())
     }
 
-    /// Regenerate a single tab.
     pub async fn note_insight_regenerate_tab(
         &self,
         note_id: &str,
@@ -233,6 +244,32 @@ impl AppCore {
             "gaps" => insight_prompts::gap_analysis_prompt(&ctx.text),
             "assessment" => insight_prompts::self_assessment_prompt(&ctx.text),
             "concept-map" => insight_prompts::concept_map_prompt(&ctx.text, &ctx.note_title),
+            "perspectives" => {
+                let tags = self.note_repo.get_tags(note_id).await.unwrap_or_default();
+                let note_domains = insight_context::extract_note_domains(&tags);
+                let personas = if let Some(ref persona_repo) = self.persona_repo {
+                    persona_repo
+                        .select_for_note(note_id, &note_domains, 4)
+                        .await
+                        .unwrap_or_default()
+                } else {
+                    Vec::new()
+                };
+                let blocks: Vec<(String, String, String, String, String)> = personas
+                    .iter()
+                    .map(|p| {
+                        (
+                            p.name.clone(),
+                            p.role.clone(),
+                            p.expertise.clone(),
+                            p.perspective.clone(),
+                            p.tone.clone(),
+                        )
+                    })
+                    .collect();
+                let persona_blocks = insight_prompts::format_persona_blocks(&blocks);
+                insight_prompts::perspectives_prompt(&ctx.text, &persona_blocks)
+            }
             _ => return Err(ApiError::new("VALIDATION", "Invalid tab name")),
         };
 
@@ -250,7 +287,6 @@ impl AppCore {
 
         let content = response.content.unwrap_or_default();
 
-        // Update cache if available
         if let Some(ref repo) = self.insight_cache_repo {
             let related_ids = self.get_related_note_ids(note_id).await;
             let hash_input = format!("{}{}{}", note.title, note.body, related_ids.join(","));
@@ -264,7 +300,6 @@ impl AppCore {
         })
     }
 
-    /// Helper: get sorted related note IDs for cache hash computation.
     async fn get_related_note_ids(&self, note_id: &str) -> Vec<String> {
         let backlinks = self
             .note_repo
@@ -276,7 +311,6 @@ impl AppCore {
         ids
     }
 
-    /// Helper: fetch full NoteRow for each backlinked note.
     async fn fetch_related_notes(&self, note_id: &str) -> Vec<feature_notes::models::NoteRow> {
         let backlinks = self
             .note_repo
@@ -293,7 +327,6 @@ impl AppCore {
     }
 }
 
-/// Bundles all data needed by the background insight pipeline task.
 struct InsightPipelineArgs {
     provider: providers::DynProvider,
     emitter: Arc<dyn AppEventEmitter>,
@@ -303,9 +336,9 @@ struct InsightPipelineArgs {
     context: String,
     note_title: String,
     params: providers::ChatParams,
+    personas: Vec<cognitive::PersonaRow>,
 }
 
-/// Run the full insight pipeline: stream synthesis, then fire tabs 2-4 in parallel.
 async fn run_insight_pipeline(args: InsightPipelineArgs) {
     let InsightPipelineArgs {
         provider,
@@ -316,16 +349,48 @@ async fn run_insight_pipeline(args: InsightPipelineArgs) {
         context,
         note_title,
         params,
+        personas,
     } = args;
-    // 1. Stream synthesis (Tab 1)
+
     let synthesis = stream_synthesis(&provider, &emitter, &context, &params).await;
 
-    // 2. Fire tabs 2-4 in parallel
     let gaps_prompt = insight_prompts::gap_analysis_prompt(&context);
     let assessment_prompt = insight_prompts::self_assessment_prompt(&context);
     let concept_map_prompt = insight_prompts::concept_map_prompt(&context, &note_title);
 
-    let (gaps, assessment, concept_map) = tokio::join!(
+    let persona_blocks: Vec<(String, String, String, String, String)> = personas
+        .iter()
+        .map(|p| {
+            (
+                p.name.clone(),
+                p.role.clone(),
+                p.expertise.clone(),
+                p.perspective.clone(),
+                p.tone.clone(),
+            )
+        })
+        .collect();
+    let formatted_blocks = insight_prompts::format_persona_blocks(&persona_blocks);
+    let perspectives_prompt = insight_prompts::perspectives_prompt(&context, &formatted_blocks);
+
+    let personas_meta: Vec<serde_json::Value> = personas
+        .iter()
+        .map(|p| {
+            serde_json::json!({
+                "id": p.id,
+                "name": p.name,
+                "role": p.role,
+                "icon": p.icon,
+                "tone": p.tone,
+            })
+        })
+        .collect();
+    emitter.emit_event(
+        "insight:perspectives-meta",
+        serde_json::json!({ "personas": personas_meta }),
+    );
+
+    let (gaps, assessment, concept_map, perspectives) = tokio::join!(
         generate_tab(&provider, &emitter, "gaps", &gaps_prompt, &params),
         generate_tab(
             &provider,
@@ -341,10 +406,20 @@ async fn run_insight_pipeline(args: InsightPipelineArgs) {
             &concept_map_prompt,
             &params,
         ),
+        generate_tab(
+            &provider,
+            &emitter,
+            "perspectives",
+            &perspectives_prompt,
+            &params,
+        ),
     );
 
-    // 3. Cache all results
     if let Some(ref repo) = cache_repo {
+        let persona_ids_json = serde_json::to_string(
+            &personas.iter().map(|p| &p.id).collect::<Vec<_>>(),
+        )
+        .ok();
         let _ = repo
             .upsert(
                 &note_id,
@@ -353,12 +428,13 @@ async fn run_insight_pipeline(args: InsightPipelineArgs) {
                 gaps.as_deref(),
                 assessment.as_deref(),
                 concept_map.as_deref(),
+                perspectives.as_deref(),
+                persona_ids_json.as_deref(),
             )
             .await;
     }
 }
 
-/// Stream Tab 1 (Synthesis) token-by-token, emitting chunks via events.
 async fn stream_synthesis(
     provider: &providers::DynProvider,
     emitter: &Arc<dyn AppEventEmitter>,
@@ -410,7 +486,6 @@ async fn stream_synthesis(
     }
 }
 
-/// Generate a non-streaming tab (gaps, assessment, concept-map) via a single LLM call.
 async fn generate_tab(
     provider: &providers::DynProvider,
     emitter: &Arc<dyn AppEventEmitter>,
