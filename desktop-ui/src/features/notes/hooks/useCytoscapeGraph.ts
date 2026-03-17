@@ -1,29 +1,33 @@
-import cytoscape, { type Core, type ElementDefinition, type Stylesheet } from "cytoscape";
-import fcose from "cytoscape-fcose";
+import cytoscape, { type Core, type ElementDefinition, type NodeSingular, type Stylesheet } from "cytoscape";
 import { useCallback, useEffect, useRef } from "react";
+import { diffElements } from "../lib/elementDiff";
+import { registerCytoscapePlugins, snapshotPositions, type PositionMap } from "../lib/graphUtils";
+import { useColaPhysics } from "./useColaPhysics";
 import type { GraphSettings } from "./useGraphSettings";
+import { useProgressiveReveal } from "./useProgressiveReveal";
 
-cytoscape.use(fcose);
+registerCytoscapePlugins();
 
 interface UseCytoscapeGraphParams {
   containerRef: React.RefObject<HTMLDivElement | null>;
   elements: ElementDefinition[];
   stylesheet: Stylesheet[];
   settings: GraphSettings;
+  /** BFS waves for progressive reveal (from graphBfs.ts) */
+  waves: string[][];
+  /** Cached positions (null = cache miss, undefined = not yet loaded) */
+  cachedPositions: PositionMap | null | undefined;
+  /** Whether the cache check has completed */
+  cacheReady: boolean;
+  /** Callback to save positions after layout completes */
+  onSavePositions: (positions: PositionMap) => void;
   onNodeClick?: (id: string) => void;
   onNodeDoubleClick?: (id: string) => void;
   onNodeHover?: (id: string | null, x: number, y: number) => void;
   onNodeContext?: (id: string, x: number, y: number) => void;
 }
 
-function elementsFingerprint(elements: ElementDefinition[]): string {
-  return elements
-    .map((e) => e.data?.id || "")
-    .sort()
-    .join(",");
-}
-
-function buildLayoutOptions(settings: GraphSettings) {
+function buildFcoseOptions(settings: GraphSettings, overrides?: Record<string, unknown>) {
   return {
     name: "fcose" as const,
     animate: true,
@@ -39,6 +43,7 @@ function buildLayoutOptions(settings: GraphSettings) {
     nestingFactor: 0.1,
     numIter: 2500,
     quality: "default" as const,
+    ...overrides,
   };
 }
 
@@ -47,23 +52,41 @@ export function useCytoscapeGraph({
   elements,
   stylesheet,
   settings,
+  waves,
+  cachedPositions,
+  cacheReady,
+  onSavePositions,
   onNodeClick,
   onNodeDoubleClick,
   onNodeHover,
   onNodeContext,
 }: UseCytoscapeGraphParams): { cy: React.MutableRefObject<Core | null>; runLayout: () => void } {
   const cyRef = useRef<Core | null>(null);
-  const prevFingerprint = useRef("");
+  const prevElementsRef = useRef<ElementDefinition[]>([]);
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
+  const initialLoadDoneRef = useRef(false);
 
-  // ── Create instance on mount ──
+  // Sub-hooks
+  const { revealWithPositions, cancelReveal } = useProgressiveReveal();
+  const {
+    startDragCola,
+    stopDragCola,
+    startLivePhysics,
+    stopLivePhysics,
+  } = useColaPhysics({
+    cy: cyRef,
+    settings,
+    onPositionsChanged: onSavePositions,
+  });
+
+  // ── Create Cytoscape instance on mount ──
   useEffect(() => {
     if (!containerRef.current) return;
 
     const cy = cytoscape({
       container: containerRef.current,
-      elements,
+      elements: [], // Start empty — progressive reveal will add elements
       style: stylesheet,
       layout: { name: "preset" },
       minZoom: 0.1,
@@ -75,11 +98,7 @@ export function useCytoscapeGraph({
     });
 
     cyRef.current = cy;
-    prevFingerprint.current = elementsFingerprint(elements);
-
-    // Make compound parents fully non-interactive
-    cy.nodes(":parent").ungrabify();
-    cy.nodes(":parent").unselectify();
+    initialLoadDoneRef.current = false;
 
     // ── Node events ──
     cy.on("tap", "node:childless", (evt) => onNodeClick?.(evt.target.id()));
@@ -106,25 +125,13 @@ export function useCytoscapeGraph({
       onNodeContext?.(node.id(), pos.x, pos.y);
     });
 
-    // ── Drag → re-heat simulation for spring-physics feel ──
-    cy.on("drag", "node:childless", () => {
-      // After drag ends, run a quick partial layout on neighbors
-      // to make connected nodes follow slightly
+    // ── Drag → Cola physics ──
+    cy.on("grab", "node:childless", (evt) => {
+      startDragCola(evt.target.id());
     });
 
-    cy.on("free", "node:childless", (evt) => {
-      const node = evt.target;
-      // After releasing a dragged node, run a gentle re-layout
-      // that keeps the dragged node fixed and lets neighbors settle
-      const pos = node.position();
-      const opts = buildLayoutOptions(settingsRef.current);
-      cy.layout({
-        ...opts,
-        animate: true,
-        animationDuration: 400,
-        fit: false,
-        fixedNodeConstraint: [{ nodeId: node.id(), position: { x: pos.x, y: pos.y } }],
-      } as Record<string, unknown>).run();
+    cy.on("free", "node:childless", () => {
+      stopDragCola();
     });
 
     // ── Zoom-adaptive labels ──
@@ -161,7 +168,7 @@ export function useCytoscapeGraph({
           });
           break;
         case "f":
-          cy.animate({ fit: { padding: 40 }, duration: 300 });
+          cy.animate({ fit: { eles: cy.elements(), padding: 40 }, duration: 300 });
           break;
         case "Escape":
           cy.elements(":selected").unselect();
@@ -170,10 +177,8 @@ export function useCytoscapeGraph({
     };
     document.addEventListener("keydown", handleKeyDown);
 
-    // Run initial layout
-    cy.layout(buildLayoutOptions(settings)).run();
-
     return () => {
+      cancelReveal();
       document.removeEventListener("keydown", handleKeyDown);
       cy.destroy();
       cyRef.current = null;
@@ -181,27 +186,244 @@ export function useCytoscapeGraph({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount/unmount only
   }, [containerRef, stylesheet]);
 
-  // ── Update elements only when data actually changes ──
+  // ── Initial load: progressive reveal or fCoSE ──
   useEffect(() => {
     const cy = cyRef.current;
-    if (!cy) return;
+    if (!cy || elements.length === 0 || initialLoadDoneRef.current || !cacheReady) return;
 
-    const newFingerprint = elementsFingerprint(elements);
-    if (newFingerprint === prevFingerprint.current) return;
-    prevFingerprint.current = newFingerprint;
+    initialLoadDoneRef.current = true;
+    prevElementsRef.current = elements;
 
-    cy.json({ elements });
-    cy.nodes(":parent").ungrabify();
-    cy.nodes(":parent").unselectify();
-    cy.layout(buildLayoutOptions(settingsRef.current)).run();
-  }, [elements]);
+    if (cachedPositions && Object.keys(cachedPositions).length > 0) {
+      // Cache HIT → progressive reveal with cached positions
+      revealWithPositions(cy, waves, elements, cachedPositions, {
+        waveDelay: 80,
+        maxWaves: 5,
+        instant: settingsRef.current.instantLoad,
+      });
+    } else if (settingsRef.current.instantLoad) {
+      // Cache MISS + instant mode → add all, run fCoSE once
+      cy.add(elements);
+      cy.nodes(":parent").ungrabify().unselectify();
+      const layout = cy.layout(buildFcoseOptions(settingsRef.current));
+      layout.on("layoutstop", () => {
+        onSavePositions(snapshotPositions(cy));
+      });
+      layout.run();
+    } else {
+      // Cache MISS → progressive fCoSE: add nodes wave by wave,
+      // pinning earlier waves with fixedNodeConstraint.
+      const elementById = new Map<string, ElementDefinition>();
+      for (const el of elements) {
+        if (el.data?.id) elementById.set(el.data.id, el);
+      }
+      const allEdges = elements.filter((el) => el.group === "edges");
+      const revealedNodes = new Set<string>();
+      const maxAnimatedWaves = Math.min(waves.length, 5);
+
+      const revealWaveFcose = (waveIndex: number) => {
+        if (waveIndex >= waves.length) {
+          onSavePositions(snapshotPositions(cy));
+          return;
+        }
+
+        const nodeIds = waveIndex >= maxAnimatedWaves
+          ? waves.slice(waveIndex).flat()
+          : waves[waveIndex];
+
+        const batch: ElementDefinition[] = [];
+
+        // Add compound parents first
+        for (const id of nodeIds) {
+          const el = elementById.get(id);
+          if (!el) continue;
+          const parentId = el.data?.parent as string | undefined;
+          if (parentId && !revealedNodes.has(parentId)) {
+            const parentEl = elementById.get(parentId);
+            if (parentEl) {
+              batch.push(parentEl);
+              revealedNodes.add(parentId);
+            }
+          }
+        }
+
+        // Add nodes
+        for (const id of nodeIds) {
+          const el = elementById.get(id);
+          if (!el || el.group === "edges") continue;
+          batch.push(el);
+          revealedNodes.add(id);
+        }
+
+        // Add edges where both endpoints visible
+        for (const el of allEdges) {
+          const src = el.data?.source as string;
+          const tgt = el.data?.target as string;
+          const edgeId = el.data?.id as string;
+          if (revealedNodes.has(src) && revealedNodes.has(tgt) && !cy.getElementById(edgeId).nonempty()) {
+            batch.push(el);
+          }
+        }
+
+        if (batch.length > 0) cy.add(batch);
+        cy.nodes(":parent").ungrabify().unselectify();
+
+        // Build fixedNodeConstraint for all previously placed nodes
+        const fixedConstraints: { nodeId: string; position: { x: number; y: number } }[] = [];
+        cy.nodes(":childless").forEach((n) => {
+          if (!nodeIds.includes(n.id())) {
+            const pos = n.position();
+            fixedConstraints.push({ nodeId: n.id(), position: { x: pos.x, y: pos.y } });
+          }
+        });
+
+        const numIter = waveIndex <= 2 ? 2500 : waveIndex <= 4 ? 1500 : 1000;
+
+        const layout = cy.layout(buildFcoseOptions(settingsRef.current, {
+          fit: true,
+          animate: true,
+          animationDuration: 400,
+          randomize: false,
+          quality: "proof",
+          numIter,
+          fixedNodeConstraint: fixedConstraints.length > 0 ? fixedConstraints : undefined,
+        }));
+
+        layout.on("layoutstop", () => {
+          const isFinal = waveIndex >= maxAnimatedWaves || waveIndex >= waves.length - 1;
+          if (isFinal) {
+            onSavePositions(snapshotPositions(cy));
+          } else {
+            setTimeout(() => revealWaveFcose(waveIndex + 1), 150);
+          }
+        });
+
+        layout.run();
+      };
+
+      revealWaveFcose(0);
+    }
+  }, [elements, cachedPositions, cacheReady, waves, revealWithPositions, onSavePositions, cancelReveal]);
+
+  // ── Incremental updates: element diffing ──
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy || !initialLoadDoneRef.current) return;
+
+    // Capture old elements BEFORE updating the ref (fixes stale ref bug)
+    const prevElements = prevElementsRef.current;
+    const diff = diffElements(prevElements, elements);
+    if (!diff.hasChanges) return;
+
+    prevElementsRef.current = elements;
+
+    // Remove first (prevents dangling edges)
+    for (const id of diff.removedEdgeIds) {
+      cy.getElementById(id).remove();
+    }
+    for (const id of diff.removedNodeIds) {
+      cy.getElementById(id).remove();
+    }
+
+    // Add compound parents before their children
+    const parentNodes = diff.addedNodes.filter((el) => !el.data?.parent && el.data?.type);
+    const childNodes = diff.addedNodes.filter((el) => el.data?.parent || !el.data?.type);
+
+    if (parentNodes.length > 0) cy.add(parentNodes);
+
+    if (childNodes.length > 0) {
+      // Place new nodes near their neighbors if possible
+      for (const el of childNodes) {
+        const id = el.data?.id;
+        if (!id) continue;
+        const connectedEdges = elements.filter(
+          (e) =>
+            e.group === "edges" &&
+            (e.data?.source === id || e.data?.target === id),
+        );
+        const neighborIds = connectedEdges
+          .map((e) =>
+            e.data?.source === id ? e.data?.target : e.data?.source,
+          )
+          .filter((nid): nid is string => !!nid && cy.getElementById(nid as string).nonempty());
+
+        if (neighborIds.length > 0) {
+          let avgX = 0;
+          let avgY = 0;
+          for (const nid of neighborIds) {
+            const pos = cy.getElementById(nid).position();
+            avgX += pos.x;
+            avgY += pos.y;
+          }
+          avgX /= neighborIds.length;
+          avgY /= neighborIds.length;
+          const angle = Math.random() * Math.PI * 2;
+          const offset = 120 + Math.random() * 60;
+          el.position = {
+            x: avgX + Math.cos(angle) * offset,
+            y: avgY + Math.sin(angle) * offset,
+          };
+        }
+      }
+
+      cy.add(childNodes);
+    }
+
+    if (diff.addedEdges.length > 0) {
+      cy.add(diff.addedEdges);
+    }
+
+    cy.nodes(":parent").ungrabify().unselectify();
+
+    // Run scoped fCoSE for new nodes only (existing stay pinned)
+    if (childNodes.length > 0) {
+      // Use prevElements (captured before ref update) to identify existing nodes
+      const existingNodeIds = new Set(
+        prevElements
+          .filter((el) => el.group !== "edges")
+          .map((el) => el.data?.id)
+          .filter(Boolean) as string[],
+      );
+      const fixedConstraints = cy
+        .nodes(":childless")
+        .filter((n) => existingNodeIds.has(n.id()) || !childNodes.some((el) => el.data?.id === n.id()))
+        .map((n) => {
+          const node = n as NodeSingular;
+          const pos = node.position();
+          return { nodeId: node.id(), position: { x: pos.x, y: pos.y } };
+        });
+
+      if (fixedConstraints.length > 0) {
+        const layout = cy.layout(
+          buildFcoseOptions(settingsRef.current, {
+            fit: false,
+            animate: true,
+            animationDuration: 400,
+            randomize: false,
+            quality: "proof",
+            fixedNodeConstraint: fixedConstraints,
+          }),
+        );
+        layout.on("layoutstop", () => {
+          onSavePositions(snapshotPositions(cy));
+        });
+        layout.run();
+      }
+    } else if (diff.removedNodeIds.length > 0) {
+      onSavePositions(snapshotPositions(cy));
+    }
+  }, [elements, onSavePositions]);
 
   // ── Re-layout when physics settings change ──
   useEffect(() => {
     const cy = cyRef.current;
-    if (!cy || cy.elements().length === 0) return;
-    cy.layout(buildLayoutOptions(settings)).run();
-  }, [settings.linkDistance, settings.repulsion, settings.centerForce]);
+    if (!cy || cy.elements().length === 0 || !initialLoadDoneRef.current) return;
+    const layout = cy.layout(buildFcoseOptions(settings));
+    layout.on("layoutstop", () => {
+      onSavePositions(snapshotPositions(cy));
+    });
+    layout.run();
+  }, [settings.linkDistance, settings.repulsion, settings.centerForce, onSavePositions]);
 
   // ── Update node sizes when nodeScale changes ──
   useEffect(() => {
@@ -225,9 +447,24 @@ export function useCytoscapeGraph({
     });
   }, [settings.showArrows]);
 
+  // ── Live Physics toggle ──
+  useEffect(() => {
+    if (settings.livePhysics) {
+      startLivePhysics();
+    } else {
+      stopLivePhysics();
+    }
+  }, [settings.livePhysics, startLivePhysics, stopLivePhysics]);
+
   const runLayout = useCallback(() => {
-    cyRef.current?.layout(buildLayoutOptions(settingsRef.current)).run();
-  }, []);
+    const cy = cyRef.current;
+    if (!cy) return;
+    const layout = cy.layout(buildFcoseOptions(settingsRef.current));
+    layout.on("layoutstop", () => {
+      onSavePositions(snapshotPositions(cy));
+    });
+    layout.run();
+  }, [onSavePositions]);
 
   return { cy: cyRef, runLayout };
 }
