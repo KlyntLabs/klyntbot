@@ -1,0 +1,234 @@
+import { Plus, Settings2, Trash2, X } from "lucide-react";
+import { useCallback, useState } from "react";
+import type { Persona, PersonaActions } from "../../hooks/usePersonas";
+
+interface ManagePersonasModalProps {
+  personas: Persona[];
+  actions: PersonaActions;
+  onClose: () => void;
+}
+
+const TONE_OPTIONS = [
+  "analytical",
+  "curious",
+  "pragmatic",
+  "skeptical",
+  "inquisitive",
+  "provocative",
+  "direct",
+  "formal",
+];
+
+export function ManagePersonasModal({ personas, actions, onClose }: ManagePersonasModalProps) {
+  const [showCreate, setShowCreate] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [form, setForm] = useState({
+    name: "",
+    role: "",
+    expertise: "",
+    perspective: "",
+    tone: "analytical",
+    icon: "🧠",
+    domains: "",
+  });
+
+  const handleCreate = useCallback(async () => {
+    if (!form.name.trim() || !form.role.trim()) return;
+    setCreating(true);
+    try {
+      await actions.create({
+        name: form.name,
+        role: form.role,
+        expertise: form.expertise,
+        perspective: form.perspective,
+        tone: form.tone,
+        icon: form.icon,
+        domains: form.domains
+          .split(",")
+          .map((d) => d.trim().toLowerCase())
+          .filter(Boolean),
+      });
+      setShowCreate(false);
+      setForm({
+        name: "",
+        role: "",
+        expertise: "",
+        perspective: "",
+        tone: "analytical",
+        icon: "🧠",
+        domains: "",
+      });
+    } finally {
+      setCreating(false);
+    }
+  }, [form, actions]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+      <div className="glass-panel w-[480px] max-h-[80vh] rounded-xl flex flex-col">
+        {/* Header */}
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-border shrink-0">
+          <Settings2 size={14} className="text-purple-400" />
+          <span className="text-[13px] font-medium text-primary flex-1">Manage Personas</span>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1 rounded-md text-muted hover:text-primary hover:bg-white/[0.06]"
+          >
+            <X size={14} />
+          </button>
+        </div>
+
+        {/* Persona list */}
+        <div className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0">
+          {personas.map((p) => (
+            <div
+              key={p.id}
+              className="flex items-center gap-2 p-2 rounded-lg bg-white/[0.03] group"
+            >
+              <span className="text-sm shrink-0">{p.icon}</span>
+              <div className="flex-1 min-w-0">
+                <div className="text-[11px] font-medium text-primary truncate">{p.name}</div>
+                <div className="text-[10px] text-dim truncate">
+                  {p.role} · {p.tone}
+                  {p.source === "builtin" && (
+                    <span className="ml-1 text-[9px] px-1 py-px rounded bg-white/[0.06]">
+                      builtin
+                    </span>
+                  )}
+                  {p.source === "auto" && (
+                    <span className="ml-1 text-[9px] px-1 py-px rounded bg-purple-400/20 text-purple-300">
+                      auto
+                    </span>
+                  )}
+                </div>
+              </div>
+              <label className="flex items-center gap-1 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={p.isActive}
+                  onChange={(e) => actions.toggle(p.id, e.target.checked)}
+                  className="w-3 h-3 accent-purple-400"
+                />
+                <span className="text-[9px] text-dim">Active</span>
+              </label>
+              {p.source !== "builtin" && (
+                <button
+                  type="button"
+                  onClick={() => actions.remove(p.id)}
+                  className="p-1 text-dim hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Delete persona"
+                >
+                  <Trash2 size={12} />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Create form */}
+        {showCreate && (
+          <div className="border-t border-border p-3 space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="text"
+                placeholder="Name"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                className="text-[11px] px-2 py-1.5 rounded-md bg-white/[0.04] text-primary border border-border"
+              />
+              <input
+                type="text"
+                placeholder="Role"
+                value={form.role}
+                onChange={(e) => setForm({ ...form, role: e.target.value })}
+                className="text-[11px] px-2 py-1.5 rounded-md bg-white/[0.04] text-primary border border-border"
+              />
+            </div>
+            <input
+              type="text"
+              placeholder="Expertise"
+              value={form.expertise}
+              onChange={(e) => setForm({ ...form, expertise: e.target.value })}
+              className="w-full text-[11px] px-2 py-1.5 rounded-md bg-white/[0.04] text-primary border border-border"
+            />
+            <input
+              type="text"
+              placeholder="Perspective (how they analyze)"
+              value={form.perspective}
+              onChange={(e) => setForm({ ...form, perspective: e.target.value })}
+              className="w-full text-[11px] px-2 py-1.5 rounded-md bg-white/[0.04] text-primary border border-border"
+            />
+            <div className="grid grid-cols-3 gap-2">
+              <select
+                value={form.tone}
+                onChange={(e) => setForm({ ...form, tone: e.target.value })}
+                className="text-[11px] px-2 py-1.5 rounded-md bg-white/[0.04] text-primary border border-border"
+              >
+                {TONE_OPTIONS.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="text"
+                placeholder="Icon emoji"
+                value={form.icon}
+                onChange={(e) => setForm({ ...form, icon: e.target.value })}
+                className="text-[11px] px-2 py-1.5 rounded-md bg-white/[0.04] text-primary border border-border"
+                maxLength={4}
+              />
+              <input
+                type="text"
+                placeholder="Domains (comma-sep)"
+                value={form.domains}
+                onChange={(e) => setForm({ ...form, domains: e.target.value })}
+                className="text-[11px] px-2 py-1.5 rounded-md bg-white/[0.04] text-primary border border-border"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowCreate(false)}
+                className="text-[10px] px-3 py-1 rounded-md text-muted hover:text-primary"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleCreate}
+                disabled={creating || !form.name.trim() || !form.role.trim()}
+                className="text-[10px] px-3 py-1 rounded-md bg-purple-400/20 text-purple-300 hover:bg-purple-400/30 disabled:opacity-50"
+              >
+                {creating ? "Creating..." : "Create"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Footer */}
+        <div className="flex items-center gap-2 px-4 py-2.5 border-t border-border shrink-0">
+          {!showCreate && (
+            <button
+              type="button"
+              onClick={() => setShowCreate(true)}
+              className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-white/[0.04] text-muted hover:text-secondary hover:bg-white/[0.06]"
+            >
+              <Plus size={10} />
+              Create Persona
+            </button>
+          )}
+          <div className="flex-1" />
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-[10px] px-3 py-1 rounded-md bg-white/[0.06] text-secondary hover:text-primary"
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

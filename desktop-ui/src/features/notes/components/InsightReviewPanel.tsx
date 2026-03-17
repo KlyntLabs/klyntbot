@@ -1,5 +1,5 @@
 import { ipc } from "@shared/hooks/useIpc";
-import { BookOpen, Brain, Copy, FileInput, FilePlus, RefreshCw, X } from "lucide-react";
+import { BookOpen, Brain, Copy, FileInput, FilePlus, RefreshCw, Settings2, X } from "lucide-react";
 import { useCallback, useState } from "react";
 import type {
   InsightReviewActions,
@@ -7,8 +7,11 @@ import type {
   TabId,
   TabStatus,
 } from "../hooks/useInsightReview";
+import { usePersonas } from "../hooks/usePersonas";
 import { ConceptMapTab } from "./insight/ConceptMapTab";
 import { GapAnalysisTab } from "./insight/GapAnalysisTab";
+import { ManagePersonasModal } from "./insight/ManagePersonasModal";
+import { PerspectivesTab } from "./insight/PerspectivesTab";
 import { SelfAssessmentTab } from "./insight/SelfAssessmentTab";
 import { SynthesisTab } from "./insight/SynthesisTab";
 
@@ -30,6 +33,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "gaps", label: "Gap Analysis" },
   { id: "assessment", label: "Self-Assessment" },
   { id: "concept-map", label: "Concept Map" },
+  { id: "perspectives", label: "Perspectives" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -39,14 +43,14 @@ const TABS: { id: TabId; label: string }[] = [
 function statusDotClass(status: TabStatus): string {
   switch (status) {
     case "idle":
-      return "bg-white/10 w-1.5 h-1.5 rounded-full";
+      return "bg-surface-raised w-1.5 h-1.5 rounded-full";
     case "loading":
     case "streaming":
-      return "bg-purple-400 w-1.5 h-1.5 rounded-full animate-pulse";
+      return "bg-purple w-1.5 h-1.5 rounded-full animate-pulse";
     case "done":
-      return "bg-green-400 w-1.5 h-1.5 rounded-full";
+      return "bg-success w-1.5 h-1.5 rounded-full";
     case "error":
-      return "bg-red-400 w-1.5 h-1.5 rounded-full";
+      return "bg-destructive w-1.5 h-1.5 rounded-full";
   }
 }
 
@@ -60,6 +64,8 @@ function tabStatus(state: InsightReviewState, tabId: TabId): TabStatus {
       return state.tabs.assessment.status;
     case "concept-map":
       return state.tabs.conceptMap.status;
+    case "perspectives":
+      return state.tabs.perspectives.status;
   }
 }
 
@@ -69,6 +75,8 @@ function tabStatus(state: InsightReviewState, tabId: TabId): TabStatus {
 
 export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) {
   const [copied, setCopied] = useState(false);
+  const [showPersonaManager, setShowPersonaManager] = useState(false);
+  const [allPersonas, personaActions] = usePersonas();
 
   const handleCreateDeepDiveNote = useCallback(async (title: string, body: string) => {
     try {
@@ -91,6 +99,8 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
           .join("\n\n");
       case "concept-map":
         return state.tabs.conceptMap.mermaid || state.tabs.conceptMap.fallbackText;
+      case "perspectives":
+        return state.tabs.perspectives.content;
     }
   }, [state]);
 
@@ -133,12 +143,20 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border shrink-0">
-        <Brain size={14} className="text-purple-400 shrink-0" />
+        <Brain size={14} className="text-purple shrink-0" />
         <span className="text-[12px] font-medium text-primary flex-1">Insight Review</span>
         <button
           type="button"
+          onClick={() => setShowPersonaManager(true)}
+          className="p-1 rounded-md text-muted hover:text-primary hover:bg-white/[0.06] transition-colors"
+          title="Manage Personas"
+        >
+          <Settings2 size={12} />
+        </button>
+        <button
+          type="button"
           disabled
-          className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-white/[0.04] text-dim cursor-not-allowed"
+          className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-surface-low text-dim cursor-not-allowed"
           title="Regenerate all tabs"
         >
           <RefreshCw size={10} />
@@ -147,7 +165,7 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
         <button
           type="button"
           onClick={() => actions.close()}
-          className="p-1 rounded-md text-muted hover:text-primary hover:bg-white/[0.06] transition-colors"
+          className="p-1 rounded-md text-muted hover:text-primary hover:bg-surface-base transition-colors"
           aria-label="Close Insight Review"
         >
           <X size={14} />
@@ -210,6 +228,13 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
             fallbackText={state.tabs.conceptMap.fallbackText}
           />
         )}
+        {state.activeTab === "perspectives" && (
+          <PerspectivesTab
+            status={state.tabs.perspectives.status}
+            content={state.tabs.perspectives.content}
+            personas={state.tabs.perspectives.personas}
+          />
+        )}
       </div>
 
       {/* Footer actions */}
@@ -218,7 +243,7 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
           type="button"
           onClick={handleInsertIntoNote}
           disabled={!hasActiveContent}
-          className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-white/[0.04] text-muted hover:text-secondary hover:bg-white/[0.06] transition-colors disabled:text-dim disabled:cursor-not-allowed"
+          className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-surface-low text-muted hover:text-secondary hover:bg-surface-base transition-colors disabled:text-dim disabled:cursor-not-allowed"
           title="Insert into note"
         >
           <FileInput size={10} />
@@ -228,7 +253,7 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
           type="button"
           onClick={handleCreateInsightNote}
           disabled={!hasActiveContent}
-          className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-white/[0.04] text-muted hover:text-secondary hover:bg-white/[0.06] transition-colors disabled:text-dim disabled:cursor-not-allowed"
+          className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-surface-low text-muted hover:text-secondary hover:bg-surface-base transition-colors disabled:text-dim disabled:cursor-not-allowed"
           title="Create note from insight"
         >
           <FilePlus size={10} />
@@ -252,13 +277,20 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
           type="button"
           onClick={handleCopy}
           disabled={!hasActiveContent}
-          className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-white/[0.04] text-muted hover:text-secondary hover:bg-white/[0.06] transition-colors disabled:text-dim disabled:cursor-not-allowed ml-auto"
+          className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-surface-low text-muted hover:text-secondary hover:bg-surface-base transition-colors disabled:text-dim disabled:cursor-not-allowed ml-auto"
           title="Copy to clipboard"
         >
           <Copy size={10} />
           {copied ? "Copied!" : "Copy"}
         </button>
       </div>
+      {showPersonaManager && (
+        <ManagePersonasModal
+          personas={allPersonas}
+          actions={personaActions}
+          onClose={() => setShowPersonaManager(false)}
+        />
+      )}
     </div>
   );
 }
