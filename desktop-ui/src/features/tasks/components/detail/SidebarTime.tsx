@@ -17,7 +17,7 @@ export function SidebarTime({ task, taskState }: SidebarTimeProps) {
     return (
       <div className="px-4 py-3">
         <SectionLabel>Time</SectionLabel>
-        <div className="mt-2 text-sm text-[hsl(var(--foreground))]">
+        <div className="mt-2 text-sm text-primary">
           {task.estimatedMinutes
             ? `Estimate: ${formatHumanDuration(estimatedSecs)}`
             : "No estimate"}
@@ -75,13 +75,13 @@ export function SidebarTime({ task, taskState }: SidebarTimeProps) {
 
         {estimatedSecs > 0 && (
           <>
-            <div className="h-1.5 rounded-full bg-[hsl(var(--accent))] mt-2 overflow-hidden">
+            <div className="h-1.5 rounded-full bg-surface-raised mt-2 overflow-hidden">
               <div
                 className={cn("h-full rounded-full transition-all", barColor)}
                 style={{ width: `${barWidth}%` }}
               />
             </div>
-            <div className="text-xs text-[hsl(var(--muted-foreground))] mt-1">{statusText}</div>
+            <div className="text-xs text-muted mt-1">{statusText}</div>
           </>
         )}
       </div>
@@ -92,8 +92,8 @@ export function SidebarTime({ task, taskState }: SidebarTimeProps) {
 function TimeRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-xs text-[hsl(var(--muted-foreground))]">{label}</span>
-      <span className="text-sm text-[hsl(var(--foreground))] font-mono tabular-nums">{value}</span>
+      <span className="text-xs text-muted">{label}</span>
+      <span className="text-sm text-primary font-mono tabular-nums">{value}</span>
     </div>
   );
 }

@@ -40,7 +40,7 @@ interface PropertyRowProps {
 function PropertyRow({ label, children }: PropertyRowProps) {
   return (
     <div className="flex items-center gap-2 py-1.5">
-      <span className="w-[72px] shrink-0 text-xs text-[hsl(var(--muted-foreground))]">{label}</span>
+      <span className="w-[72px] shrink-0 text-xs text-muted">{label}</span>
       <div className="flex-1 min-w-0">{children}</div>
     </div>
   );
@@ -58,7 +58,7 @@ function ValueButton({ children, onClick, className }: ValueButtonProps) {
       type="button"
       onClick={onClick}
       className={cn(
-        "flex items-center gap-1.5 px-1.5 py-0.5 rounded text-xs text-[hsl(var(--foreground))] hover:bg-[hsl(var(--accent))] transition-colors w-full text-left",
+        "flex items-center gap-1.5 px-1.5 py-0.5 rounded text-xs text-primary hover:bg-surface-raised transition-colors w-full text-left",
         className,
       )}
     >
@@ -131,7 +131,7 @@ export function SidebarProperties({ task, compact, onUpdate }: SidebarProperties
         <Popover open={priorityOpen} onOpenChange={setPriorityOpen}>
           <PopoverTrigger asChild>
             <ValueButton>
-              <PriorityIcon className="size-3.5 text-[hsl(var(--muted-foreground))] shrink-0" />
+              <PriorityIcon className="size-3.5 text-muted shrink-0" />
               <span className="truncate">{task.priority.name}</span>
             </ValueButton>
           </PopoverTrigger>
@@ -152,7 +152,7 @@ export function SidebarProperties({ task, compact, onUpdate }: SidebarProperties
                           setPriorityOpen(false);
                         }}
                       >
-                        <Icon className="mr-2 h-4 w-4 text-[hsl(var(--muted-foreground))]" />
+                        <Icon className="mr-2 h-4 w-4 text-muted" />
                         {p.name}
                         <Check
                           className={cn(
@@ -216,7 +216,7 @@ export function SidebarProperties({ task, compact, onUpdate }: SidebarProperties
         <span
           className={cn(
             "px-1.5 py-0.5 text-xs",
-            task.dueDate ? "text-[hsl(var(--foreground))]" : "text-[hsl(var(--muted-foreground))]",
+            task.dueDate ? "text-primary" : "text-muted",
           )}
         >
           {dueDateDisplay}
@@ -229,8 +229,8 @@ export function SidebarProperties({ task, compact, onUpdate }: SidebarProperties
           className={cn(
             "px-1.5 py-0.5 text-xs",
             task.estimatedMinutes != null
-              ? "text-[hsl(var(--foreground))]"
-              : "text-[hsl(var(--muted-foreground))]",
+              ? "text-primary"
+              : "text-muted",
           )}
         >
           {estimateDisplay}
@@ -281,7 +281,7 @@ export function SidebarProperties({ task, compact, onUpdate }: SidebarProperties
 
           {/* Area */}
           <PropertyRow label="Area">
-            <span className="px-1.5 py-0.5 text-xs text-[hsl(var(--foreground))]">
+            <span className="px-1.5 py-0.5 text-xs text-primary">
               {task.area?.name ?? "No area"}
             </span>
           </PropertyRow>
@@ -292,8 +292,8 @@ export function SidebarProperties({ task, compact, onUpdate }: SidebarProperties
               className={cn(
                 "px-1.5 py-0.5 text-xs",
                 task.project
-                  ? "text-[hsl(var(--foreground))]"
-                  : "text-[hsl(var(--muted-foreground))]",
+                  ? "text-primary"
+                  : "text-muted",
               )}
             >
               {task.project ? task.project.name : "No project"}
@@ -307,14 +307,14 @@ export function SidebarProperties({ task, compact, onUpdate }: SidebarProperties
                 {task.tags.map((tag) => (
                   <span
                     key={tag}
-                    className="px-1.5 py-0.5 rounded-full bg-[hsl(var(--accent))] text-[hsl(var(--foreground))] text-xs"
+                    className="px-1.5 py-0.5 rounded-full bg-surface-raised text-primary text-xs"
                   >
                     {tag}
                   </span>
                 ))}
               </div>
             ) : (
-              <span className="px-1.5 py-0.5 text-xs text-[hsl(var(--muted-foreground))]">
+              <span className="px-1.5 py-0.5 text-xs text-muted">
                 None
               </span>
             )}

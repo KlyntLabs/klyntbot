@@ -637,17 +637,15 @@ impl AgentLoopBuilder {
             // Register domain searchers
             let note_repo_for_searcher =
                 feature_notes::repo::NoteRepo::new(storage_pool.inner().clone());
-            forge.add_searcher(Arc::new(
-                crate::domain_searchers::NoteSearcher::new(note_repo_for_searcher),
-            ));
-            forge.add_searcher(Arc::new(
-                crate::domain_searchers::TaskSearcher::new(repos.clone()),
-            ));
-            forge.add_searcher(Arc::new(
-                crate::domain_searchers::GraphSearcher::new(
-                    cognitive::repos::EntityRepo::new(storage_pool.inner().clone()),
-                ),
-            ));
+            forge.add_searcher(Arc::new(crate::domain_searchers::NoteSearcher::new(
+                note_repo_for_searcher,
+            )));
+            forge.add_searcher(Arc::new(crate::domain_searchers::TaskSearcher::new(
+                repos.clone(),
+            )));
+            forge.add_searcher(Arc::new(crate::domain_searchers::GraphSearcher::new(
+                cognitive::repos::EntityRepo::new(storage_pool.inner().clone()),
+            )));
 
             context_engine
                 .with_memory_retriever(retriever)

@@ -25,8 +25,8 @@ export const TabPill = memo(function TabPill({ tab, isActive }: TabPillProps) {
       aria-selected={isActive}
       className={`group flex items-center gap-1.5 whitespace-nowrap rounded-t-lg px-3.5 py-1.5 text-[13px] transition-colors cursor-pointer ${
         isActive
-          ? "bg-[hsl(var(--accent))] text-[hsl(var(--foreground))]"
-          : "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
+          ? "bg-surface-raised text-primary"
+          : "text-muted hover:text-primary"
       }`}
     >
       <span className="truncate max-w-[200px]">{label}</span>
@@ -37,7 +37,7 @@ export const TabPill = memo(function TabPill({ tab, isActive }: TabPillProps) {
           e.stopPropagation();
           closeTab(tab.id);
         }}
-        className="text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition-colors"
+        className="text-muted hover:text-primary transition-colors"
       >
         <X className="h-3 w-3" />
       </button>

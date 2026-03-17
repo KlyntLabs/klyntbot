@@ -481,7 +481,10 @@ impl BackgroundConsolidationService {
                                     // Upsert object as entity (skip numeric/short values)
                                     if fact.object.len() > 2
                                         && fact.object.len() < 100
-                                        && !fact.object.chars().all(|c| c.is_ascii_digit() || c == '.')
+                                        && !fact
+                                            .object
+                                            .chars()
+                                            .all(|c| c.is_ascii_digit() || c == '.')
                                     {
                                         let _ = entity_repo
                                             .upsert_entity(&crate::repos::NewEntity {

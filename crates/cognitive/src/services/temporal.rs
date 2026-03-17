@@ -161,7 +161,14 @@ mod tests {
         (pool, service)
     }
 
-    fn make_fact(id: &str, domain: &str, subject: &str, predicate: &str, valid_from: &str, recorded_at: &str) -> SemanticFact {
+    fn make_fact(
+        id: &str,
+        domain: &str,
+        subject: &str,
+        predicate: &str,
+        valid_from: &str,
+        recorded_at: &str,
+    ) -> SemanticFact {
         SemanticFact {
             id: id.into(),
             domain: domain.into(),
@@ -188,13 +195,30 @@ mod tests {
         let (_pool, service) = setup().await;
         let repo = service.fact_repo.clone();
 
-        let f1 = make_fact("h1", "productivity", "user", "peak_hours", "2026-01-01", "2026-01-01");
-        let f2 = make_fact("h2", "productivity", "user", "peak_hours", "2026-02-01", "2026-02-01");
+        let f1 = make_fact(
+            "h1",
+            "productivity",
+            "user",
+            "peak_hours",
+            "2026-01-01",
+            "2026-01-01",
+        );
+        let f2 = make_fact(
+            "h2",
+            "productivity",
+            "user",
+            "peak_hours",
+            "2026-02-01",
+            "2026-02-01",
+        );
 
         repo.upsert(&f1).await.unwrap();
         repo.upsert(&f2).await.unwrap();
 
-        let history = service.get_fact_history("user", "peak_hours").await.unwrap();
+        let history = service
+            .get_fact_history("user", "peak_hours")
+            .await
+            .unwrap();
 
         assert_eq!(history.len(), 2, "expected 2 versions in history");
 
@@ -230,7 +254,10 @@ mod tests {
 
         let summary = service.change_summary(since, None).await.unwrap();
 
-        assert!(!summary.new_facts.is_empty(), "expected at least one new fact");
+        assert!(
+            !summary.new_facts.is_empty(),
+            "expected at least one new fact"
+        );
         assert!(
             summary.new_facts.iter().any(|f| f.id == "cs1"),
             "cs1 should appear in new_facts"
@@ -265,8 +292,14 @@ mod tests {
         let summary = service.change_summary(since, None).await.unwrap();
 
         assert!(summary.new_facts.is_empty(), "expected no new facts");
-        assert!(summary.updated_facts.is_empty(), "expected no updated facts");
-        assert!(summary.superseded_facts.is_empty(), "expected no superseded facts");
+        assert!(
+            summary.updated_facts.is_empty(),
+            "expected no updated facts"
+        );
+        assert!(
+            summary.superseded_facts.is_empty(),
+            "expected no superseded facts"
+        );
         assert!(summary.by_domain.is_empty(), "expected empty domain map");
     }
 }

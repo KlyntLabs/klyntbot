@@ -72,7 +72,11 @@ pub fn temporal_recency_score(valid_from: &str) -> f64 {
         })
         .or_else(|_| {
             chrono::NaiveDate::parse_from_str(valid_from, "%Y-%m-%d")
-                .map(|d| (now.naive_utc() - d.and_hms_opt(0, 0, 0).unwrap()).num_days().max(0) as f64)
+                .map(|d| {
+                    (now.naive_utc() - d.and_hms_opt(0, 0, 0).unwrap())
+                        .num_days()
+                        .max(0) as f64
+                })
                 .map_err(|e| e.to_string())
         })
         .unwrap_or(30.0);
@@ -172,7 +176,10 @@ mod tests {
     fn test_temporal_recency_score_recent() {
         let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S").to_string();
         let score = temporal_recency_score(&now);
-        assert!(score > 0.95, "Today's fact should score near 1.0, got {score}");
+        assert!(
+            score > 0.95,
+            "Today's fact should score near 1.0, got {score}"
+        );
     }
 
     #[test]

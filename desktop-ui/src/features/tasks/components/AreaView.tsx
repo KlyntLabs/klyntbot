@@ -29,7 +29,7 @@ export function AreaView({ areaId, tasksData }: AreaViewProps) {
 
   if (!area) {
     return (
-      <div className="px-6 py-8 text-center text-sm text-[hsl(var(--muted-foreground))]">
+      <div className="px-6 py-8 text-center text-sm text-muted">
         Area not found
       </div>
     );
@@ -50,11 +50,11 @@ export function AreaView({ areaId, tasksData }: AreaViewProps) {
                 navigateInPlace("project", project.id, project.name);
               }
             }}
-            className="flex items-center gap-3 px-4 py-3 text-left hover:bg-[hsl(var(--accent))] transition-colors border-b border-[hsl(var(--border))]"
+            className="flex items-center gap-3 px-4 py-3 text-left hover:bg-surface-raised transition-colors border-b border-border"
           >
-            <Folder className="h-4 w-4 text-[hsl(var(--muted-foreground))]" />
-            <span className="text-sm text-[hsl(var(--foreground))] flex-1">{project.name}</span>
-            <span className="text-xs text-[hsl(var(--muted-foreground))]">{count} issues</span>
+            <Folder className="h-4 w-4 text-muted" />
+            <span className="text-sm text-primary flex-1">{project.name}</span>
+            <span className="text-xs text-muted">{count} issues</span>
           </button>
         );
       })}

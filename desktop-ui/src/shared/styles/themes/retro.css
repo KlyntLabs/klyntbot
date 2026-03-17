@@ -1,121 +1,114 @@
-/* ── RETRO 90s THEME ──────────────────────────────────────────────────────
-   Inspired by Windows 95/98, 90s gaming UIs, retro web design.
-   Warm cream backgrounds, chunky black borders, hard drop shadows,
-   solid opaque surfaces (NO glassmorphism), bold accent colors,
-   pixel-perfect aesthetic with a playful personality.
+/* ── NEXORA TECH THEME ────────────────────────────────────────────────────
+   Inspired by the NexoraSIM schematic design language.
+   Clean white backgrounds, monochromatic gray scale, sharp 0px radii,
+   thin gray borders, monospace headings, flat surfaces (NO glassmorphism),
+   technical precision aesthetic with gold/amber accent.
    ──────────────────────────────────────────────────────────────────────── */
 
 [data-theme="retro"] {
-  /* ── Background — Warm cream paper ──────────────────────────────────── */
-  --background: #f5f0e1;
+  /* ── Background — Pure white ──────────────────────────────────────────── */
+  --background: #ffffff;
 
-  /* ── Surface staircase — Solid opaque warm tones (NO alpha/glass) ──── */
-  --surface-lowest: #ebe6d5;
-  --surface-low: #e8e2cf;
-  --surface-base: #e3dcc9;
-  --surface-raised: #ddd5bf;
-  --surface-highest: #d4ccb5;
+  /* ── Surface staircase — Neutral gray scale (NO alpha/glass) ──────────── */
+  --surface-lowest: #fafafa;
+  --surface-low: #f5f5f5;
+  --surface-base: #fafafa;
+  --surface-raised: #f5f5f5;
+  --surface-highest: #e5e5e5;
 
-  /* ── Text — High contrast on cream ─────────────────────────────────── */
-  --text-primary: #1a1a1a;
-  --text-secondary: #3d3929;
-  --text-muted: #7a7260;
-  --text-dim: #a69e8c;
+  /* ── Text — High contrast monochrome ──────────────────────────────────── */
+  --text-primary: #000000;
+  --text-secondary: #525252;
+  --text-muted: #737373;
+  --text-dim: #a3a3a3;
 
-  /* ── Brand — Bold warm orange ──────────────────────────────────────── */
-  --brand: #e8740c;
-  --brand-hover: #d4680a;
-  --brand-glow: rgba(232, 116, 12, 0.3);
+  /* ── Brand — Gold/amber accent ────────────────────────────────────────── */
+  --brand: #ca8a04;
+  --brand-hover: #a16207;
+  --brand-glow: rgba(202, 138, 4, 0.2);
 
-  /* ── Semantic colors — Saturated retro palette ─────────────────────── */
-  --success: #2d8c3c;
-  --destructive: #cc2936;
-  --info: #2663b0;
-  --warning: #d4950a;
-  --purple: #7b3fa0;
+  /* ── Semantic colors — Clean, saturated ───────────────────────────────── */
+  --success: #16a34a;
+  --destructive: #dc2626;
+  --info: #2563eb;
+  --warning: #d97706;
+  --purple: #7c3aed;
 
-  /* ── Origin badges — Bold retro colors ─────────────────────────────── */
-  --origin-system: #2663b0;
-  --origin-ai: #7b3fa0;
-  --origin-user: #2d8c3c;
-  --origin-plugin: #d4950a;
+  /* ── Origin badges ────────────────────────────────────────────────────── */
+  --origin-system: #2563eb;
+  --origin-ai: #7c3aed;
+  --origin-user: #16a34a;
+  --origin-plugin: #d97706;
 
-  /* ── Border — Solid black/dark outlines ────────────────────────────── */
-  --border: #2a2520;
-  --border-subtle: #c4b89e;
+  /* ── Border — Thin neutral gray ───────────────────────────────────────── */
+  --border: #e5e5e5;
+  --border-subtle: #f5f5f5;
 
-  /* ── Timeline / Dashboard — Muted retro palette ────────────────────── */
-  --timeline-app-productive: #2d8c3c;
-  --timeline-app-distracting: #cc2936;
-  --timeline-app-neutral: #8c8476;
-  --timeline-focus: #7b3fa0;
-  --timeline-task: #2663b0;
-  --timeline-note: #d4950a;
-  --timeline-finance: #2d8c3c;
-  --timeline-todo: #2663b0;
-  --timeline-finance-expense: #cc2936;
-  --timeline-finance-income: #2d8c3c;
-  --timeline-system: #8c8476;
-  --timeline-calendar: #7b3fa0;
-  --timeline-focus-high: #5c2680;
-  --timeline-focus-low: #a06ac0;
-  --timeline-unfocused: #e3dcc9;
-  --timeline-dot-note: #d4950a;
-  --timeline-dot-task-done: #2d8c3c;
-  --timeline-dot-finance: #d4950a;
+  /* ── Timeline / Dashboard — Technical palette ─────────────────────────── */
+  --timeline-app-productive: #16a34a;
+  --timeline-app-distracting: #dc2626;
+  --timeline-app-neutral: #737373;
+  --timeline-focus: #7c3aed;
+  --timeline-task: #2563eb;
+  --timeline-note: #ca8a04;
+  --timeline-finance: #16a34a;
+  --timeline-todo: #2563eb;
+  --timeline-finance-expense: #dc2626;
+  --timeline-finance-income: #16a34a;
+  --timeline-system: #737373;
+  --timeline-calendar: #7c3aed;
+  --timeline-focus-high: #6d28d9;
+  --timeline-focus-low: #a78bfa;
+  --timeline-unfocused: #f5f5f5;
+  --timeline-dot-note: #ca8a04;
+  --timeline-dot-task-done: #16a34a;
+  --timeline-dot-finance: #ca8a04;
 
-  /* ── Overlay — Paper-colored ───────────────────────────────────────── */
-  --overlay: rgba(42, 37, 32, 0.35);
-  --overlay-heavy: rgba(42, 37, 32, 0.6);
+  /* ── Overlay ──────────────────────────────────────────────────────────── */
+  --overlay: rgba(0, 0, 0, 0.25);
+  --overlay-heavy: rgba(0, 0, 0, 0.5);
 
-  /* ── Shadows — Hard pixel-style drop shadows ───────────────────────── */
-  --shadow-tooltip: 3px 3px 0px #2a2520;
+  /* ── Shadows — Minimal, flat design ───────────────────────────────────── */
+  --shadow-tooltip: 0 2px 8px rgba(0, 0, 0, 0.08);
 
-  /* ── Floating / surfaces — Solid opaque, NO glass ──────────────────── */
-  --surface-floating: #f0eadb;
+  /* ── Floating / surfaces — Solid opaque, NO glass ─────────────────────── */
+  --surface-floating: #ffffff;
 
-  /* Glass → Solid surface overrides (retro uses opaque, not translucent) */
-  --surface-glass: #e8e2cf;
-  --glass-border: #2a2520;
-  --glass-border-strong: #1a1510;
-  --glass-shadow: 3px 3px 0px #2a2520;
+  /* Glass → Solid surface overrides (flat white/gray, no blur) */
+  --surface-glass: #ffffff;
+  --glass-border: #e5e5e5;
+  --glass-border-strong: #d4d4d4;
+  --glass-shadow: none;
 
-  --surface-glass-sidebar: #ebe6d5;
-  --surface-glass-subtle: #e3dcc9;
-  --surface-glass-subtle-hover: #ddd5bf;
-  --surface-glass-elevated: #d4ccb5;
+  --surface-glass-sidebar: #fafafa;
+  --surface-glass-subtle: #fafafa;
+  --surface-glass-subtle-hover: #f5f5f5;
+  --surface-glass-elevated: #e5e5e5;
 
-  --glass-tint-brand: #fcefd5;
-  --glass-tint-info: #dde8f5;
-  --glass-tint-success: #d9f0dd;
-  --glass-tint-destructive: #f8dce0;
+  --glass-tint-brand: rgba(202, 138, 4, 0.06);
+  --glass-tint-info: rgba(37, 99, 235, 0.06);
+  --glass-tint-success: rgba(22, 163, 74, 0.06);
+  --glass-tint-destructive: rgba(220, 38, 38, 0.06);
 
-  /* ── Retro-specific structural overrides ────────────────────────────── */
-  --radius: 4px;
-  --radius-sm: 2px;
-  --radius-md: 3px;
-  --radius-lg: 4px;
-  --radius-xl: 6px;
-  --radius-2xl: 8px;
-  --radius-pill: 4px;
-  --glass-padding: 3px;
-  --glass-radius-inner: 3px;
+  /* ── Structural overrides — Sharp, technical corners ──────────────────── */
+  --radius: 0px;
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --radius-2xl: 0px;
+  --radius-pill: 0px;
+  --glass-padding: 4px;
+  --glass-radius-inner: 0px;
 
-  /* ── Typography — Chunky pixel-inspired ────────────────────────────── */
-  --font-sans: "Space Grotesk", "DM Sans", "Inter", system-ui, sans-serif;
+  /* ── Typography — Inter body + JetBrains Mono accents ─────────────────── */
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
 
-  /* ── Retro design tokens ───────────────────────────────────────────── */
-  --retro-border: 2px solid #2a2520;
-  --retro-border-thin: 1.5px solid #2a2520;
-  --retro-shadow: 3px 3px 0px #2a2520;
-  --retro-shadow-sm: 2px 2px 0px #2a2520;
-  --retro-shadow-lg: 5px 5px 0px #2a2520;
-  --retro-shadow-inset: inset 2px 2px 0px rgba(0, 0, 0, 0.08);
-  --retro-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.5);
-  --retro-title-bar: #2663b0;
-  --retro-title-bar-text: #ffffff;
-  --retro-title-bar-secondary: #8c8476;
-  --retro-bg-pattern: url("data:image/svg+xml,%3Csvg width='8' height='8' viewBox='0 0 8 8' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%232a2520' fill-opacity='0.04'%3E%3Cpath d='M0 0h4v4H0V0zm4 4h4v4H4V4z'/%3E%3C/g%3E%3C/svg%3E");
+  /* ── Nexora design tokens ─────────────────────────────────────────────── */
+  --nexora-border: 1px solid #e5e5e5;
+  --nexora-border-strong: 2px solid #e5e5e5;
+  --nexora-border-dark: 1px solid #d4d4d4;
+  --nexora-grid-pattern: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%23e5e5e5' stroke-width='0.5'%3E%3Cpath d='M0 0h40v40'/%3E%3C/g%3E%3C/svg%3E");
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -170,23 +163,23 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
-   RETRO STRUCTURAL OVERRIDES — radius, shadows for Tailwind @theme
+   STRUCTURAL OVERRIDES — Sharp 0px radii everywhere
    ═══════════════════════════════════════════════════════════════════════ */
 [data-theme="retro"] {
-  --radius-sm: 2px;
-  --radius-md: 3px;
-  --radius-lg: 4px;
-  --radius-xl: 6px;
-  --radius-2xl: 8px;
-  --radius-pill: 4px;
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --radius-2xl: 0px;
+  --radius-pill: 0px;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
-   BODY & ROOT — Checkerboard pattern background, no pseudo-element effects
+   BODY & ROOT — Clean white with subtle grid pattern
    ═══════════════════════════════════════════════════════════════════════ */
 [data-theme="retro"] body {
   background-color: var(--background);
-  background-image: var(--retro-bg-pattern);
+  background-image: var(--nexora-grid-pattern);
 }
 
 /* Kill any dark-theme pseudo effects */
@@ -197,38 +190,38 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
-   GLASS → SOLID — Override all glass/blur classes to be opaque + bordered
+   GLASS → SOLID — Override all glass/blur classes to flat white/gray
    ═══════════════════════════════════════════════════════════════════════ */
 
 /* ── Panel (dialogs, popovers) ─────────────────────────────────────── */
 [data-theme="retro"] .glass-panel {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
-  background: #f0eadb;
-  border: 2px solid #2a2520;
-  border-radius: 6px;
-  box-shadow: var(--retro-shadow-lg);
-  padding: 3px;
+  background: #ffffff;
+  border: 1px solid #d4d4d4;
+  border-radius: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  padding: 4px;
 }
 
 /* ── Sidebar ───────────────────────────────────────────────────────── */
 [data-theme="retro"] .glass-sidebar {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
-  background: #ebe6d5;
-  border: 2px solid #2a2520;
-  border-radius: 6px;
-  border-right: 2px solid #2a2520;
+  background: #fafafa;
+  border: none;
+  border-radius: 0;
+  border-right: 1px solid #e5e5e5;
 }
 
 /* ── Toolbar ───────────────────────────────────────────────────────── */
 [data-theme="retro"] .glass-toolbar {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
-  background: #e8e2cf;
-  border: 2px solid #2a2520;
-  border-radius: 4px;
-  box-shadow: var(--retro-highlight);
+  background: #ffffff;
+  border: 1px solid #e5e5e5;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 /* ── Input ──────────────────────────────────────────────────────────── */
@@ -236,247 +229,250 @@
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
   background: #ffffff;
-  border: 2px solid #2a2520;
-  border-radius: 3px;
-  box-shadow: var(--retro-shadow-inset);
+  border: 1px solid #d4d4d4;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 [data-theme="retro"] .glass-input:focus-within {
   background: #ffffff;
-  border-color: var(--brand);
-  box-shadow:
-    var(--retro-shadow-inset),
-    0 0 0 1px var(--brand);
+  border-color: #000000;
+  box-shadow: none;
 }
 
 /* ── Button ─────────────────────────────────────────────────────────── */
 [data-theme="retro"] .glass-button {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
-  background: #e8e2cf;
-  border: 2px solid #2a2520;
-  border-radius: 4px;
-  box-shadow: var(--retro-shadow-sm), var(--retro-highlight);
+  background: #ffffff;
+  border: 1px solid #e5e5e5;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 [data-theme="retro"] .glass-button:hover {
-  background: #ddd5bf;
-  border-color: #1a1510;
+  background: #f5f5f5;
+  border-color: #d4d4d4;
 }
 
 [data-theme="retro"] .glass-button:active,
 [data-theme="retro"] .glass-button-active {
-  background: #d4ccb5;
-  box-shadow: var(--retro-shadow-inset);
-  transform: translate(1px, 1px);
+  background: #e5e5e5;
+  box-shadow: none;
+  transform: none;
 }
 
 /* ── Floating (launcher, tray) ──────────────────────────────────────── */
 [data-theme="retro"] .glass-floating {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
-  background: #f0eadb;
-  border: 2px solid #2a2520;
-  border-radius: 6px;
-  box-shadow: var(--retro-shadow-lg);
-  padding: 3px;
+  background: #ffffff;
+  border: 1px solid #d4d4d4;
+  border-radius: 0;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  padding: 4px;
 }
 
 [data-theme="retro"] :root[data-vibrancy] .glass-floating {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
-  background: #f0eadb;
+  background: #ffffff;
 }
 
 /* ── Dropdown ───────────────────────────────────────────────────────── */
 [data-theme="retro"] .glass-dropdown {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
-  background: #f5f0e1;
-  border: 2px solid #2a2520;
-  border-radius: 4px;
-  box-shadow: var(--retro-shadow);
-  padding: 3px;
+  background: #ffffff;
+  border: 1px solid #d4d4d4;
+  border-radius: 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  padding: 4px;
 }
 
 /* ── Card ───────────────────────────────────────────────────────────── */
 [data-theme="retro"] .glass-card {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
-  background: #f0eadb;
-  border: 2px solid #2a2520;
-  border-radius: 6px;
-  box-shadow: var(--retro-shadow-sm);
+  background: #ffffff;
+  border: 2px solid #e5e5e5;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 [data-theme="retro"] .glass-card:hover {
-  box-shadow: var(--retro-shadow);
+  border-color: #d4d4d4;
+  box-shadow: none;
 }
 
 /* ── Chat bubbles ──────────────────────────────────────────────────── */
 [data-theme="retro"] .glass-bubble {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
-  background: #f5f0e1;
-  border: 2px solid #2a2520;
-  border-radius: 6px 6px 6px 2px;
-  box-shadow: var(--retro-shadow-sm);
+  background: #fafafa;
+  border: 1px solid #e5e5e5;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 [data-theme="retro"] .glass-bubble-user {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
-  background: #fcefd5;
-  border: 2px solid #2a2520;
-  border-radius: 6px 6px 2px 6px;
-  box-shadow: var(--retro-shadow-sm);
+  background: #f5f5f5;
+  border: 1px solid #e5e5e5;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 /* ── Context menu ──────────────────────────────────────────────────── */
 [data-theme="retro"] .context-menu {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
-  background: #f5f0e1;
-  border: 2px solid #2a2520;
-  border-radius: 4px;
-  box-shadow: var(--retro-shadow);
+  background: #ffffff;
+  border: 1px solid #d4d4d4;
+  border-radius: 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
 /* ── Badge ──────────────────────────────────────────────────────────── */
 [data-theme="retro"] .glass-badge {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
-  background: #e8e2cf;
-  border: 1.5px solid #2a2520;
-  border-radius: 3px;
+  background: #000000;
+  border: none;
+  border-radius: 0;
+  color: #ffffff;
+  font-family: "JetBrains Mono", "SF Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
 /* ── Divider ───────────────────────────────────────────────────────── */
 [data-theme="retro"] .glass-divider {
-  height: 2px;
-  background: #2a2520;
+  height: 1px;
+  background: #e5e5e5;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
-   COMPONENT-LEVEL RETRO OVERRIDES
+   COMPONENT-LEVEL OVERRIDES
    ═══════════════════════════════════════════════════════════════════════ */
 
-/* ── Note cards — Solid paper cards ────────────────────────────────── */
+/* ── Note cards — Clean bordered cards ──────────────────────────────── */
 [data-theme="retro"] .note-card {
-  border: 1.5px solid #c4b89e;
-  border-radius: 4px;
-  background: #f5f0e1;
+  border: 1px solid #e5e5e5;
+  border-radius: 0;
+  background: #ffffff;
 }
 
 [data-theme="retro"] .note-card:hover {
-  border-color: #2a2520;
-  background: #f0eadb;
+  border-color: #d4d4d4;
+  background: #fafafa;
   transform: none;
-  box-shadow: var(--retro-shadow-sm);
+  box-shadow: none;
 }
 
 [data-theme="retro"] .note-card-active {
-  background: #fcefd5;
-  border-color: #2a2520;
-  box-shadow:
-    inset 3px 0 0 0 var(--brand),
-    var(--retro-shadow-sm);
+  background: #fafafa;
+  border-color: #000000;
+  box-shadow: inset 3px 0 0 0 #000000;
 }
 
-/* ── Tag pills — Solid bordered tags ──────────────────────────────── */
+/* ── Tag pills — Monochrome bordered tags ────────────────────────────── */
 [data-theme="retro"] .tag-pill {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
-  background: #e8e2cf;
-  border: 1.5px solid #2a2520;
-  border-radius: 3px;
-  color: var(--text-secondary);
+  background: #ffffff;
+  border: 1px solid #e5e5e5;
+  border-radius: 0;
+  color: var(--text-muted);
+  font-family: "JetBrains Mono", "SF Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
 }
 
 [data-theme="retro"] .tag-pill:hover {
-  background: #ddd5bf;
+  background: #f5f5f5;
   color: var(--text-primary);
-  box-shadow: 1px 1px 0px #2a2520;
+  border-color: #d4d4d4;
+  box-shadow: none;
 }
 
 [data-theme="retro"] .tag-pill-active {
-  background: #fcefd5;
-  border-color: var(--brand);
-  color: var(--brand);
+  background: #000000;
+  border-color: #000000;
+  color: #ffffff;
 }
 
-/* ── Version dots — Square pixels ─────────────────────────────────── */
+/* ── Version dots — Square technical indicators ──────────────────────── */
 [data-theme="retro"] .version-dot {
-  border-radius: 2px;
-  background: #c4b89e;
-  border: 1.5px solid #2a2520;
+  border-radius: 0;
+  background: #e5e5e5;
+  border: 1px solid #d4d4d4;
 }
 
 [data-theme="retro"] .version-dot-active {
-  background: var(--brand);
-  border-color: #2a2520;
+  background: #000000;
+  border-color: #000000;
   box-shadow: none;
 }
 
 [data-theme="retro"] .version-line {
-  background: #2a2520;
-  width: 2px;
+  background: #e5e5e5;
+  width: 1px;
 }
 
-/* ── Streaming cursor — Solid block cursor ────────────────────────── */
+/* ── Streaming cursor — Solid black block cursor ─────────────────────── */
 [data-theme="retro"] .streaming-cursor > div > *:last-child::after {
-  background: var(--brand);
+  background: #000000;
   box-shadow: none;
-  border-radius: 1px;
+  border-radius: 0;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
-   INTERACTIVE STATE OVERRIDES — Retro push-button feel
+   INTERACTIVE STATE OVERRIDES — Clean, minimal
    ═══════════════════════════════════════════════════════════════════════ */
 
-/* ── Focus ring — Bold double outline ─────────────────────────────── */
+/* ── Focus ring — Thin black outline ──────────────────────────────────── */
 [data-theme="retro"] button:focus-visible,
 [data-theme="retro"] input:focus-visible,
 [data-theme="retro"] textarea:focus-visible,
 [data-theme="retro"] select:focus-visible,
 [data-theme="retro"] [role="button"]:focus-visible,
 [data-theme="retro"] [tabindex="0"]:focus-visible {
-  outline: 2px solid #2a2520;
+  outline: 2px solid #000000;
   outline-offset: 2px;
   box-shadow: none;
 }
 
-/* ── Scrollbar — Chunky retro style ──────────────────────────────── */
+/* ── Scrollbar — Minimal, thin ───────────────────────────────────────── */
 [data-theme="retro"] ::-webkit-scrollbar {
-  width: 14px;
-  height: 14px;
+  width: 8px;
+  height: 8px;
 }
 
 [data-theme="retro"] ::-webkit-scrollbar-track {
-  background: #e3dcc9;
-  border-left: 1px solid #2a2520;
+  background: #fafafa;
+  border-left: 1px solid #e5e5e5;
 }
 
 [data-theme="retro"] ::-webkit-scrollbar-thumb {
-  background: #c4b89e;
-  border: 1px solid #2a2520;
+  background: #d4d4d4;
+  border: none;
   border-radius: 0;
 }
 
 [data-theme="retro"] ::-webkit-scrollbar-thumb:hover {
-  background: #b0a78f;
+  background: #a3a3a3;
 }
 
 [data-theme="retro"] ::-webkit-scrollbar-button {
-  display: block;
-  height: 14px;
-  width: 14px;
-  background: #e3dcc9;
-  border: 1px solid #2a2520;
+  display: none;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
-   TYPOGRAPHY — Override alpha-based text colors for solid dark-on-light
+   TYPOGRAPHY — Override alpha-based colors for solid monochrome
    ═══════════════════════════════════════════════════════════════════════ */
 
 /* Many components use bg-white/[0.04] etc inline — override those to solid */
@@ -500,9 +496,9 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
-   SELECTION — Retro highlight
+   SELECTION — Black highlight
    ═══════════════════════════════════════════════════════════════════════ */
 [data-theme="retro"] ::selection {
-  background: var(--brand);
-  color: white;
+  background: #000000;
+  color: #ffffff;
 }

@@ -5,7 +5,7 @@ import { useTabStore } from "../store/tab-store";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 
 const menuItemCls =
-  "w-full text-left px-2 py-1.5 text-[13px] rounded-sm hover:bg-[hsl(var(--accent))] text-[hsl(var(--foreground))] transition-colors";
+  "w-full text-left px-2 py-1.5 text-[13px] rounded-sm hover:bg-surface-raised text-primary transition-colors";
 
 interface AddTabMenuProps {
   areas: Area[];
@@ -31,7 +31,7 @@ export function AddTabMenu({ areas, projects }: AddTabMenuProps) {
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="flex items-center justify-center w-[26px] h-[26px] rounded-md text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--accent))] transition-colors flex-shrink-0"
+          className="flex items-center justify-center w-[26px] h-[26px] rounded-md text-muted hover:text-primary hover:bg-surface-raised transition-colors flex-shrink-0"
         >
           <Plus className="h-4 w-4" />
         </button>
@@ -47,8 +47,8 @@ export function AddTabMenu({ areas, projects }: AddTabMenuProps) {
         >
           All Issues
         </button>
-        <div className="h-px bg-[hsl(var(--border))] my-1.5" />
-        <div className="text-[11px] font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wider px-2 py-1">
+        <div className="h-px bg-border my-1.5" />
+        <div className="text-[11px] font-medium text-muted uppercase tracking-wider px-2 py-1">
           Areas
         </div>
         {areas.map((area) => (
@@ -61,8 +61,8 @@ export function AddTabMenu({ areas, projects }: AddTabMenuProps) {
             {area.name}
           </button>
         ))}
-        <div className="h-px bg-[hsl(var(--border))] my-1.5" />
-        <div className="text-[11px] font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wider px-2 py-1">
+        <div className="h-px bg-border my-1.5" />
+        <div className="text-[11px] font-medium text-muted uppercase tracking-wider px-2 py-1">
           Projects
         </div>
         {projects.map((project) => (

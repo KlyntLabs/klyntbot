@@ -8,8 +8,8 @@ const themes: { id: Theme; label: string; description: string }[] = [
   },
   {
     id: "retro",
-    label: "Retro 90s",
-    description: "Warm cream tones, chunky borders, pixel-perfect nostalgia",
+    label: "Nexora Tech",
+    description: "Clean monochrome, sharp corners, technical precision",
   },
 ];
 
@@ -74,45 +74,35 @@ function DarkPreview() {
   );
 }
 
-/** Mini retro 90s preview */
+/** Mini Nexora Tech preview */
 function RetroPreview() {
   return (
-    <div className="w-full h-full p-1.5 flex gap-1" style={{ background: "#f5f0e1" }}>
+    <div className="w-full h-full p-1.5 flex gap-1" style={{ background: "#ffffff" }}>
       <div
-        className="w-7 h-full border border-black/80"
-        style={{ background: "#ebe6d5", borderWidth: "1.5px" }}
+        className="w-7 h-full"
+        style={{ background: "#fafafa", borderRight: "1px solid #e5e5e5" }}
       />
       <div className="flex-1 flex flex-col gap-1">
-        {/* Title bar */}
+        {/* Toolbar */}
         <div
-          className="h-3 flex items-center px-1 gap-0.5"
-          style={{ background: "#2663b0", borderRadius: "1px" }}
+          className="h-3 flex items-center px-1 gap-1"
+          style={{ borderBottom: "1px solid #e5e5e5" }}
         >
-          <div className="w-1.5 h-1.5 border border-white/60" style={{ borderWidth: "1px" }} />
+          <div className="h-1.5 w-6" style={{ background: "#000000" }} />
           <div className="flex-1" />
-          <div className="flex gap-px">
-            <div
-              className="w-2 h-2 border border-white/40"
-              style={{ background: "#c4b89e", borderWidth: "1px" }}
-            />
-            <div
-              className="w-2 h-2 border border-white/40"
-              style={{ background: "#c4b89e", borderWidth: "1px" }}
-            />
-          </div>
+          <div className="h-1.5 w-3" style={{ background: "#e5e5e5" }} />
         </div>
         {/* Content card */}
         <div
           className="flex-1 p-1 flex flex-col gap-0.5"
           style={{
-            background: "#f0eadb",
-            border: "1.5px solid #2a2520",
-            boxShadow: "2px 2px 0px #2a2520",
+            background: "#ffffff",
+            border: "1px solid #e5e5e5",
           }}
         >
-          <div className="h-1.5 w-3/4" style={{ background: "#2a2520" }} />
-          <div className="h-1.5 w-1/2" style={{ background: "#7a7260" }} />
-          <div className="h-1.5 w-2/3" style={{ background: "#e8740c" }} />
+          <div className="h-1.5 w-3/4" style={{ background: "#000000" }} />
+          <div className="h-1.5 w-1/2" style={{ background: "#737373" }} />
+          <div className="h-1.5 w-8" style={{ background: "#ca8a04" }} />
         </div>
       </div>
     </div>

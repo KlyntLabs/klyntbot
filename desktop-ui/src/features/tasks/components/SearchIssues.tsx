@@ -18,18 +18,18 @@ export function SearchIssues({ issues }: SearchIssuesProps) {
       {searchQuery.trim() !== "" && (
         <div>
           {searchResults.length > 0 ? (
-            <div className="border border-[hsl(var(--border))] rounded-md mt-4">
-              <div className="py-2 px-4 border-b border-[hsl(var(--border))] bg-[hsl(var(--muted))]/50">
+            <div className="border border-border rounded-md mt-4">
+              <div className="py-2 px-4 border-b border-border bg-surface-low/50">
                 <h3 className="text-sm font-medium">Results ({searchResults.length})</h3>
               </div>
-              <div className="divide-y divide-[hsl(var(--border))]">
+              <div className="divide-y divide-border">
                 {searchResults.map((issue) => (
                   <IssueLine key={issue.id} issue={issue} />
                 ))}
               </div>
             </div>
           ) : (
-            <div className="text-center py-8 text-[hsl(var(--muted-foreground))]">
+            <div className="text-center py-8 text-muted">
               No results found for &quot;{searchQuery}&quot;
             </div>
           )}

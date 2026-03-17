@@ -17,17 +17,17 @@ export function IssueDetailBreadcrumb() {
         return (
           <div key={`${entry.type}-${entry.targetId}`} className="flex items-center gap-1 min-w-0">
             {index > 0 && (
-              <span className="text-xs text-[hsl(var(--muted-foreground))] shrink-0">›</span>
+              <span className="text-xs text-muted shrink-0">›</span>
             )}
             {isLast ? (
-              <span className="text-xs font-medium text-[hsl(var(--foreground))] truncate">
+              <span className="text-xs font-medium text-primary truncate">
                 {entry.label}
               </span>
             ) : (
               <button
                 type="button"
                 onClick={() => navigateToStackIndex(index)}
-                className="text-xs text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition-colors truncate"
+                className="text-xs text-muted hover:text-primary transition-colors truncate"
               >
                 {entry.label}
               </button>

@@ -22,7 +22,7 @@ export function SidebarWorkState({
     return (
       <div className="px-4 py-3">
         <SectionLabel>Session Summary</SectionLabel>
-        <p className="text-sm text-[hsl(var(--muted-foreground))] mt-1">
+        <p className="text-sm text-muted mt-1">
           Total tracked: {formatElapsed(task.totalTrackedSecs)}
         </p>
       </div>
@@ -37,7 +37,7 @@ export function SidebarWorkState({
       <FocusTimer focusedAt={task.focusedAt} />
       {focusSession.qualityScore != null && (
         <div className="flex items-center justify-between">
-          <span className="text-xs text-[hsl(var(--muted-foreground))]">Quality</span>
+          <span className="text-xs text-muted">Quality</span>
           <span
             className={cn(
               "text-sm font-mono tabular-nums",
@@ -54,15 +54,15 @@ export function SidebarWorkState({
       )}
       {focusSession.distractionCount != null && (
         <div className="flex items-center justify-between">
-          <span className="text-xs text-[hsl(var(--muted-foreground))]">Distractions</span>
-          <span className="text-sm text-[hsl(var(--foreground))]">
+          <span className="text-xs text-muted">Distractions</span>
+          <span className="text-sm text-primary">
             {focusSession.distractionCount}
           </span>
         </div>
       )}
       {focusSession.flowState != null && (
         <div className="flex items-center justify-between">
-          <span className="text-xs text-[hsl(var(--muted-foreground))]">Flow</span>
+          <span className="text-xs text-muted">Flow</span>
           <FlowBadge state={focusSession.flowState} />
         </div>
       )}
@@ -74,7 +74,7 @@ export function SidebarWorkState({
           type="button"
           disabled
           title="Coming soon"
-          className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs rounded border border-[hsl(var(--border))] text-[hsl(var(--foreground))] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs rounded border border-border text-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           <Pause className="size-3" />
           Pause
@@ -82,7 +82,7 @@ export function SidebarWorkState({
         <button
           type="button"
           onClick={onStopFocus}
-          className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs rounded border border-[hsl(var(--border))] text-red-400 hover:bg-red-400/10 transition-colors"
+          className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs rounded border border-border text-red-400 hover:bg-red-400/10 transition-colors"
         >
           <Square className="size-3" />
           Stop
@@ -107,7 +107,7 @@ function FocusTimer({ focusedAt }: { focusedAt: string }) {
   }, [focusedAt]);
 
   return (
-    <div className="text-2xl font-mono tabular-nums text-[hsl(var(--foreground))] text-center">
+    <div className="text-2xl font-mono tabular-nums text-primary text-center">
       {formatElapsed(elapsed)}
     </div>
   );
@@ -122,7 +122,7 @@ function FlowBadge({ state }: { state: string }) {
         : "text-red-400";
 
   return (
-    <span className={cn("text-xs px-1.5 py-0.5 rounded bg-[hsl(var(--accent))] capitalize", color)}>
+    <span className={cn("text-xs px-1.5 py-0.5 rounded bg-surface-raised capitalize", color)}>
       {state}
     </span>
   );

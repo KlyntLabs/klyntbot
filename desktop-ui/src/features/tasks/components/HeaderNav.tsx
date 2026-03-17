@@ -20,7 +20,7 @@ export default function HeaderNav() {
   }, []);
 
   return (
-    <div className="flex items-center justify-between px-4 py-2 border-b border-[hsl(var(--border))]">
+    <div className="flex items-center justify-between px-4 py-2 border-b border-border">
       {/* Left — Breadcrumb */}
       <div className="flex items-center gap-1 min-w-0">
         {navStack.map((entry, index) => {
@@ -31,17 +31,17 @@ export default function HeaderNav() {
               className="flex items-center gap-1 min-w-0"
             >
               {index > 0 && (
-                <span className="text-xs text-[hsl(var(--muted-foreground))] flex-shrink-0">›</span>
+                <span className="text-xs text-muted flex-shrink-0">›</span>
               )}
               {isLast ? (
-                <span className="text-sm font-medium text-[hsl(var(--foreground))] truncate">
+                <span className="text-sm font-medium text-primary truncate">
                   {entry.label}
                 </span>
               ) : (
                 <button
                   type="button"
                   onClick={() => navigateToStackIndex(index)}
-                  className="text-sm text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition-colors truncate"
+                  className="text-sm text-muted hover:text-primary transition-colors truncate"
                 >
                   {entry.label}
                 </button>
@@ -56,14 +56,14 @@ export default function HeaderNav() {
         {isSearchOpen ? (
           <div className="flex items-center gap-2">
             <div className="relative">
-              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-[hsl(var(--muted-foreground))]" />
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted" />
               <input
                 ref={inputRef}
                 type="text"
                 placeholder="Search issues..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-7 w-[200px] rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] pl-8 pr-2 text-sm text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] outline-none focus:ring-1 focus:ring-[hsl(var(--ring))]"
+                className="h-7 w-[200px] rounded-md border border-border bg-background pl-8 pr-2 text-sm text-primary placeholder:text-muted outline-none focus:ring-1 focus:ring-brand"
               />
             </div>
             <Button size="xs" variant="ghost" onClick={closeSearch}>

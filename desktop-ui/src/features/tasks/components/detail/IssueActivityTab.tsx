@@ -27,20 +27,20 @@ export function IssueActivityTab({ activity }: IssueActivityTabProps) {
 
 function ActivityEntry({ entry }: { entry: ActivityEntryType }) {
   return (
-    <div className="flex gap-3 py-3 border-b border-[hsl(var(--border))]/50 last:border-b-0">
+    <div className="flex gap-3 py-3 border-b border-border/50 last:border-b-0">
       <ActorAvatar type={entry.actorType} />
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline gap-2">
-          <span className="text-sm font-medium text-[hsl(var(--foreground))]">
+          <span className="text-sm font-medium text-primary">
             {entry.actorName}
           </span>
-          <span className="text-sm text-[hsl(var(--muted-foreground))]">{entry.action}</span>
-          <span className="ml-auto text-xs text-[hsl(var(--muted-foreground))] shrink-0">
+          <span className="text-sm text-muted">{entry.action}</span>
+          <span className="ml-auto text-xs text-muted shrink-0">
             {formatActivityTime(entry.createdAt)}
           </span>
         </div>
         {entry.detail && (
-          <p className="text-sm text-[hsl(var(--muted-foreground))] mt-0.5">{entry.detail}</p>
+          <p className="text-sm text-muted mt-0.5">{entry.detail}</p>
         )}
       </div>
     </div>
@@ -57,14 +57,14 @@ function ActorAvatar({ type }: { type: ActorType }) {
   }
   if (type === "system") {
     return (
-      <div className="size-7 rounded-full shrink-0 flex items-center justify-center bg-[hsl(var(--muted))]">
-        <Monitor className="size-3.5 text-[hsl(var(--muted-foreground))]" />
+      <div className="size-7 rounded-full shrink-0 flex items-center justify-center bg-surface-low">
+        <Monitor className="size-3.5 text-muted" />
       </div>
     );
   }
   return (
-    <div className="size-7 rounded-full shrink-0 flex items-center justify-center bg-[hsl(var(--accent))]">
-      <User className="size-3.5 text-[hsl(var(--foreground))]" />
+    <div className="size-7 rounded-full shrink-0 flex items-center justify-center bg-surface-raised">
+      <User className="size-3.5 text-primary" />
     </div>
   );
 }

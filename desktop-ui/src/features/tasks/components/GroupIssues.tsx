@@ -28,14 +28,14 @@ export function GroupIssues({ status, issues }: GroupIssuesProps) {
     return (
       <div className="w-[348px] shrink-0 flex flex-col">
         {/* Column Header */}
-        <div className="flex items-center gap-2 px-3 py-2 sticky top-0 z-10 bg-[hsl(var(--container))]">
+        <div className="flex items-center gap-2 px-3 py-2 sticky top-0 z-10 bg-background">
           <span className="flex items-center">{renderStatusIcon(status)}</span>
-          <span className="text-sm font-medium text-[hsl(var(--foreground))]">{status.name}</span>
-          <span className="text-xs text-[hsl(var(--muted-foreground))]">{issues.length}</span>
+          <span className="text-sm font-medium text-primary">{status.name}</span>
+          <span className="text-xs text-muted">{issues.length}</span>
           <button
             type="button"
             onClick={() => openModal(status)}
-            className="ml-auto flex items-center justify-center size-5 rounded hover:bg-[hsl(var(--accent))] text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition-colors"
+            className="ml-auto flex items-center justify-center size-5 rounded hover:bg-surface-raised text-muted hover:text-primary transition-colors"
             aria-label={`Add issue to ${status.name}`}
           >
             <Plus className="size-4" />
@@ -46,7 +46,7 @@ export function GroupIssues({ status, issues }: GroupIssuesProps) {
         <div
           ref={setNodeRef}
           className={`flex-1 flex flex-col gap-2 p-2 rounded-md min-h-[100px] transition-colors ${
-            isOver ? "bg-[hsl(var(--accent))]/50" : ""
+            isOver ? "bg-surface-raised/50" : ""
           }`}
         >
           {sorted.map((issue) => (
@@ -60,14 +60,14 @@ export function GroupIssues({ status, issues }: GroupIssuesProps) {
   return (
     <div className="mb-2">
       {/* Header */}
-      <div className="flex items-center gap-2 px-4 py-2 sticky top-0 z-10 bg-[hsl(var(--container))]">
+      <div className="flex items-center gap-2 px-4 py-2 sticky top-0 z-10 bg-background">
         <span className="flex items-center">{renderStatusIcon(status)}</span>
-        <span className="text-sm font-medium text-[hsl(var(--foreground))]">{status.name}</span>
-        <span className="text-xs text-[hsl(var(--muted-foreground))]">{issues.length}</span>
+        <span className="text-sm font-medium text-primary">{status.name}</span>
+        <span className="text-xs text-muted">{issues.length}</span>
         <button
           type="button"
           onClick={() => openModal(status)}
-          className="ml-auto flex items-center justify-center size-5 rounded hover:bg-[hsl(var(--accent))] text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition-colors opacity-0 group-hover/group:opacity-100"
+          className="ml-auto flex items-center justify-center size-5 rounded hover:bg-surface-raised text-muted hover:text-primary transition-colors opacity-0 group-hover/group:opacity-100"
           aria-label={`Add issue to ${status.name}`}
         >
           <Plus className="size-4" />

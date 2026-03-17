@@ -8,7 +8,9 @@
 use chrono::Utc;
 use tracing::{debug, warn};
 
-use crate::decay::{relevance_score, retrievability, temporal_recency_score, update_stability, RelevanceWeights};
+use crate::decay::{
+    relevance_score, retrievability, temporal_recency_score, update_stability, RelevanceWeights,
+};
 use crate::embedder::SemanticFactEmbedder;
 use crate::repos::SemanticFactRepo;
 use crate::types::SemanticFact;
@@ -237,7 +239,15 @@ async fn fallback_path(
         .map(|fact| {
             let (r, freq) = compute_decay_and_freq(&fact, &now);
             let temporal = temporal_recency_score(&fact.valid_from);
-            let score = relevance_score(0.5, r, fact.confidence, freq, situational_boost, temporal, weights);
+            let score = relevance_score(
+                0.5,
+                r,
+                fact.confidence,
+                freq,
+                situational_boost,
+                temporal,
+                weights,
+            );
             ScoredFact {
                 fact,
                 score,
