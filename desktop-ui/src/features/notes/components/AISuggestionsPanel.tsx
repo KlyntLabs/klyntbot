@@ -74,7 +74,9 @@ export function AISuggestionsPanel({
                     onClick={() => onSelectNote(item.note.id)}
                     className="flex flex-col gap-0.5 px-2 py-1 rounded text-left hover:bg-accent transition-colors"
                   >
-                    <span className="text-[11px] text-muted-foreground truncate">{item.note.title}</span>
+                    <span className="text-[11px] text-muted-foreground truncate">
+                      {item.note.title}
+                    </span>
                     <span className="text-[9px] text-dim truncate">{item.reason}</span>
                   </button>
                 ))}

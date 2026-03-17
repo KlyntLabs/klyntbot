@@ -138,6 +138,7 @@ impl AppCore {
                 ::cognitive::SemanticFactRepo::new(storage_pool.inner().clone()),
                 ::cognitive::EpisodicMemoryRepo::new(storage_pool.inner().clone()),
                 ::cognitive::ProceduralRuleRepo::new(storage_pool.inner().clone()),
+                ::cognitive::repos::EntityRepo::new(storage_pool.inner().clone()),
             ),
         );
 
@@ -268,7 +269,11 @@ impl AppCore {
                     feature_insights::SmartMergeEngine::new(insight_repo),
                     feature_insights::PromptBuilder::new(Arc::clone(&cognitive_accessor)),
                     cognitive_accessor,
-                    Arc::new(feature_insights::NoopFlashcardAccessor), // Phase 3
+                    Arc::new(
+                        crate::adapters::flashcard_accessor::FlashcardAccessorImpl::new(
+                            storage_pool.inner().clone(),
+                        ),
+                    ),
                     insight_embedder,
                     feature_insights::ProgressWeights::default(),
                 )))
@@ -278,6 +283,32 @@ impl AppCore {
             )),
             persona_repo: Some(::cognitive::PersonaRepo::new(storage_pool.inner().clone())),
         };
+
+        // ── Background insight progress refresh (daily) ──────────────────
+        if let Some(ref insight_svc) = core.insight_service {
+            let svc = Arc::clone(insight_svc);
+            let note_repo_clone = core.note_repo.clone();
+            let token = shutdown_token.clone();
+            tokio::spawn(async move {
+                // Initial delay so the app finishes starting
+                tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+                loop {
+                    if token.is_cancelled() {
+                        break;
+                    }
+                    match cron::refresh_insight_progress(&svc, &note_repo_clone).await {
+                        Ok(Some(msg)) => info!("{msg}"),
+                        Ok(None) => {}
+                        Err(e) => tracing::debug!("insight progress refresh error: {e}"),
+                    }
+                    // Sleep ~24 hours (86400 seconds)
+                    tokio::select! {
+                        _ = tokio::time::sleep(std::time::Duration::from_secs(86400)) => {}
+                        _ = token.cancelled() => break,
+                    }
+                }
+            });
+        }
 
         // ── Background note embedding catch-up ────────────────────────────
         if let Some(ref handler) = core.note_embedding_handler {

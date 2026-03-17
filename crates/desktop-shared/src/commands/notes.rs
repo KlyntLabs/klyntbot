@@ -257,6 +257,44 @@ pub struct InsightVersionResponse {
     pub has_parent: bool,
 }
 
+// ── Insight Evolution ────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InsightEvolutionResponse {
+    pub note_id: String,
+    pub note_title: String,
+    pub versions: Vec<InsightEvolutionPoint>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InsightEvolutionPoint {
+    pub version: i64,
+    pub generated_at: String,
+    pub flashcard_success: f64,
+    pub semantic_drift: f64,
+    pub gap_closure: f64,
+    pub quiz_score: f64,
+    pub overall_progress: f64,
+    pub change_note: String,
+}
+
+// ── Insight Scope Config ─────────────────────────────────────────
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InsightScopeConfigParams {
+    #[serde(default)]
+    pub scope_type: Option<String>,
+    pub radius: Option<f64>,
+    #[serde(default)]
+    pub node_ids: Option<Vec<String>>,
+    pub include_cognitive: Option<bool>,
+    pub deep_dive: Option<bool>,
+    pub merge_threshold: Option<f64>,
+}
+
 // ── Persona Management ──────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize)]

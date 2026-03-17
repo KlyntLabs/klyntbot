@@ -125,7 +125,9 @@ export function CategoriesList({ categories, totalSecs }: CategoriesListProps) {
                   className="w-1.5 h-1.5 rounded-full flex-shrink-0"
                   style={{ backgroundColor: group.color }}
                 />
-                <span className="text-[11px] font-medium text-muted-foreground flex-1">{group.label}</span>
+                <span className="text-[11px] font-medium text-muted-foreground flex-1">
+                  {group.label}
+                </span>
                 <span className="text-[10px] font-medium text-muted-foreground tabular-nums">
                   {groupPct}%
                 </span>

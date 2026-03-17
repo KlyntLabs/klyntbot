@@ -530,7 +530,9 @@ function ColumnEntry({
       >
         <span className="text-muted-foreground truncate block">{entry.title}</span>
         {isDue && status && height > 28 && (
-          <span className="text-muted-foreground text-[10px] truncate block capitalize">{status}</span>
+          <span className="text-muted-foreground text-[10px] truncate block capitalize">
+            {status}
+          </span>
         )}
       </button>
     );

@@ -139,7 +139,9 @@ export function FireForm({ registerSave, onDirty }: FireFormProps) {
             </div>
 
             <div>
-              <span className="block text-[12px] font-medium text-muted-foreground mb-2">FIRE type</span>
+              <span className="block text-[12px] font-medium text-muted-foreground mb-2">
+                FIRE type
+              </span>
               <div className="grid grid-cols-2 gap-2">
                 {FIRE_TYPES.map((ft) => (
                   <label

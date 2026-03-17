@@ -28,7 +28,9 @@ export function LinkedNotes({ entityType, entityId }: LinkedNotesProps) {
             className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left hover:bg-accent transition-colors border-b border-border-subtle last:border-b-0"
           >
             <FileText className="w-3.5 h-3.5 text-brand shrink-0" strokeWidth={1.5} />
-            <span className="text-[13px] font-light text-muted-foreground truncate">{note.title}</span>
+            <span className="text-[13px] font-light text-muted-foreground truncate">
+              {note.title}
+            </span>
             {note.tags.length > 0 && (
               <span className="text-[10px] text-dim ml-auto shrink-0">
                 {note.tags.slice(0, 2).join(", ")}

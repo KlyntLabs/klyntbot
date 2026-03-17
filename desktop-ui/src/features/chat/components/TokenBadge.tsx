@@ -63,19 +63,25 @@ export function TokenBadge({ transparency, isStreaming }: TokenBadgeProps) {
           {usage.cacheReadTokens > 0 && (
             <div className="flex justify-between text-muted-foreground">
               <span>Cache read</span>
-              <span className="text-muted-foreground">{usage.cacheReadTokens.toLocaleString()}</span>
+              <span className="text-muted-foreground">
+                {usage.cacheReadTokens.toLocaleString()}
+              </span>
             </div>
           )}
           {usage.cacheWriteTokens > 0 && (
             <div className="flex justify-between text-muted-foreground">
               <span>Cache write</span>
-              <span className="text-muted-foreground">{usage.cacheWriteTokens.toLocaleString()}</span>
+              <span className="text-muted-foreground">
+                {usage.cacheWriteTokens.toLocaleString()}
+              </span>
             </div>
           )}
           {transparency.toolTokensTotal && transparency.toolTokensTotal > 0 && (
             <div className="flex justify-between text-muted-foreground">
               <span>Tool I/O (est.)</span>
-              <span className="text-muted-foreground">~{formatTokens(transparency.toolTokensTotal)}</span>
+              <span className="text-muted-foreground">
+                ~{formatTokens(transparency.toolTokensTotal)}
+              </span>
             </div>
           )}
           {cost && (

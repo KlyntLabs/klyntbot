@@ -116,7 +116,9 @@ export function CategoryEditor({ category, onSaved, onDeleted }: CategoryEditorP
 
       {/* Name */}
       <div className="flex flex-col gap-1">
-        <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Name</span>
+        <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+          Name
+        </span>
         <input
           type="text"
           value={name}
@@ -127,7 +129,9 @@ export function CategoryEditor({ category, onSaved, onDeleted }: CategoryEditorP
 
       {/* Type */}
       <div className="flex flex-col gap-1">
-        <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Type</span>
+        <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+          Type
+        </span>
         <div className="flex gap-1.5">
           {TYPE_OPTIONS.map((opt) => (
             <button
@@ -214,7 +218,9 @@ function TagListField({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">{label}</span>
+      <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+        {label}
+      </span>
       <div className="flex flex-wrap gap-1">
         {items.map((item) => (
           <span

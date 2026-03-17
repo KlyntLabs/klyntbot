@@ -59,10 +59,14 @@ function AcceptanceCriteria({ text }: { text: string }) {
           <ChevronRight className="size-4 text-muted-foreground" />
         )}
         Acceptance Criteria
-        {!expanded && <span className="text-muted-foreground font-normal truncate">— {preview}</span>}
+        {!expanded && (
+          <span className="text-muted-foreground font-normal truncate">— {preview}</span>
+        )}
       </button>
       {expanded && (
-        <div className="px-3 pb-3 text-sm text-foreground whitespace-pre-wrap font-mono">{text}</div>
+        <div className="px-3 pb-3 text-sm text-foreground whitespace-pre-wrap font-mono">
+          {text}
+        </div>
       )}
     </div>
   );

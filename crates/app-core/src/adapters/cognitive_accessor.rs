@@ -11,6 +11,8 @@ pub struct CognitiveAccessorImpl {
     fact_repo: cognitive::SemanticFactRepo,
     memory_repo: cognitive::EpisodicMemoryRepo,
     rule_repo: cognitive::ProceduralRuleRepo,
+    entity_repo: cognitive::repos::EntityRepo,
+    temporal_svc: cognitive::TemporalService,
 }
 
 impl CognitiveAccessorImpl {
@@ -18,11 +20,15 @@ impl CognitiveAccessorImpl {
         fact_repo: cognitive::SemanticFactRepo,
         memory_repo: cognitive::EpisodicMemoryRepo,
         rule_repo: cognitive::ProceduralRuleRepo,
+        entity_repo: cognitive::repos::EntityRepo,
     ) -> Self {
+        let temporal_svc = cognitive::TemporalService::new(fact_repo.clone());
         Self {
             fact_repo,
             memory_repo,
             rule_repo,
+            entity_repo,
+            temporal_svc,
         }
     }
 }
@@ -63,16 +69,84 @@ impl CognitiveAccessor for CognitiveAccessorImpl {
             .collect()
     }
 
-    // Deep dive methods — Phase 4
     async fn user_model_summary(&self, _domain: &str) -> Option<String> {
-        None
+        let model = cognitive::repos::load_user_model(&self.fact_repo).await;
+        let mut parts = Vec::new();
+
+        let domains: &[(&str, &[cognitive::SemanticFact])] = &[
+            ("identity", &model.identity),
+            ("energy", &model.energy),
+            ("work", &model.work),
+            ("finance", &model.finance),
+            ("learning", &model.learning),
+            ("preferences", &model.preferences),
+        ];
+
+        for &(name, facts) in domains {
+            if !facts.is_empty() {
+                let summary: Vec<String> = facts
+                    .iter()
+                    .take(3)
+                    .map(|f| format!("{} {}", f.predicate, f.object))
+                    .collect();
+                parts.push(format!("**{}:** {}", name, summary.join("; ")));
+            }
+        }
+
+        if parts.is_empty() {
+            return None;
+        }
+        Some(parts.join("\n"))
     }
 
-    async fn entity_neighborhood(&self, _note_id: &str, _depth: u8) -> Vec<String> {
-        Vec::new()
+    async fn entity_neighborhood(&self, note_id: &str, depth: u8) -> Vec<String> {
+        match self
+            .entity_repo
+            .get_neighborhood(note_id, depth as u32)
+            .await
+        {
+            Ok(Some(neighborhood)) => {
+                // Build ID → name lookup from center + neighbors
+                let mut names: std::collections::HashMap<&str, &str> =
+                    std::collections::HashMap::new();
+                names.insert(&neighborhood.center.id, &neighborhood.center.name);
+                for n in &neighborhood.neighbors {
+                    names.insert(&n.id, &n.name);
+                }
+
+                neighborhood
+                    .relationships
+                    .iter()
+                    .map(|rel| {
+                        let source = names
+                            .get(rel.source_entity_id.as_str())
+                            .copied()
+                            .unwrap_or(&rel.source_entity_id);
+                        let target = names
+                            .get(rel.target_entity_id.as_str())
+                            .copied()
+                            .unwrap_or(&rel.target_entity_id);
+                        format!("{source} → {} → {target}", rel.relationship_type)
+                    })
+                    .collect()
+            }
+            _ => Vec::new(),
+        }
     }
 
-    async fn fact_history(&self, _subject: &str) -> Vec<String> {
-        Vec::new()
+    async fn fact_history(&self, subject: &str) -> Vec<String> {
+        match self.temporal_svc.get_fact_history(subject, "%").await {
+            Ok(versions) => versions
+                .iter()
+                .take(10)
+                .map(|v| {
+                    format!(
+                        "[{}] {} {} → {}",
+                        &v.fact.valid_from, subject, v.fact.predicate, v.fact.object,
+                    )
+                })
+                .collect(),
+            Err(_) => Vec::new(),
+        }
     }
 }

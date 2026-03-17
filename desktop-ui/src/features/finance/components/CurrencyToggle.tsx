@@ -34,7 +34,9 @@ export function CurrencyToggle({ mode, currencies, onSelect }: CurrencyTogglePro
         {mode === "multi" ? (
           <ArrowLeftRight className="w-3 h-3 text-muted-foreground" strokeWidth={1.5} />
         ) : null}
-        <span className={mode === "multi" ? "text-muted-foreground" : "text-brand font-medium"}>{label}</span>
+        <span className={mode === "multi" ? "text-muted-foreground" : "text-brand font-medium"}>
+          {label}
+        </span>
         <ChevronDown
           className={`w-3 h-3 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
           strokeWidth={1.5}

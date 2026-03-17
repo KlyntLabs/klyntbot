@@ -236,7 +236,9 @@ export function PersonalizationSettings() {
     <div>
       <div className="mb-8">
         <h2 className="text-lg font-medium text-foreground">Personalization</h2>
-        <p className="text-[13px] text-muted-foreground mt-1">Provider, model, and learning preferences</p>
+        <p className="text-[13px] text-muted-foreground mt-1">
+          Provider, model, and learning preferences
+        </p>
       </div>
 
       <div className="space-y-4">
@@ -280,7 +282,9 @@ export function PersonalizationSettings() {
                 </div>
 
                 <label className="block">
-                  <span className="block text-[11px] text-muted-foreground mb-1">API Base (optional)</span>
+                  <span className="block text-[11px] text-muted-foreground mb-1">
+                    API Base (optional)
+                  </span>
                   <input
                     type="text"
                     value={editedApiBase}
@@ -318,7 +322,9 @@ export function PersonalizationSettings() {
             </p>
 
             <label className="block">
-              <span className="block text-[11px] text-muted-foreground mb-1">Provider override</span>
+              <span className="block text-[11px] text-muted-foreground mb-1">
+                Provider override
+              </span>
               <select
                 value={cogProvider}
                 onChange={(e) =>
@@ -402,7 +408,9 @@ export function PersonalizationSettings() {
             </div>
 
             <label className="block">
-              <span className="block text-[11px] text-muted-foreground mb-1">Analysis interval (seconds)</span>
+              <span className="block text-[11px] text-muted-foreground mb-1">
+                Analysis interval (seconds)
+              </span>
               <input
                 type="number"
                 value={getLearningValue("analysisIntervalSecs", 3600)}
@@ -456,7 +464,9 @@ export function PersonalizationSettings() {
             </div>
 
             <label className="block">
-              <span className="block text-[11px] text-muted-foreground mb-1">Min outcomes for adaptation</span>
+              <span className="block text-[11px] text-muted-foreground mb-1">
+                Min outcomes for adaptation
+              </span>
               <input
                 type="number"
                 value={getLearningValue("minOutcomesForAdaptation", 50)}

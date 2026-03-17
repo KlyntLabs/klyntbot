@@ -129,7 +129,10 @@ export function TrackedAppsList({ apps, categories, onReassigned }: TrackedAppsL
 
       {/* Search */}
       <div className="relative">
-        <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+        <Search
+          size={12}
+          className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+        />
         <input
           type="text"
           value={search}

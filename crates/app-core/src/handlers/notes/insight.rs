@@ -9,10 +9,37 @@ use crate::state::AppCore;
 
 use super::{insight_context, insight_prompts};
 
+/// Convert an `InsightReviewRow` to the frontend-facing `InsightReviewResponse`.
+fn row_to_insight_response(row: feature_insights::InsightReviewRow) -> InsightReviewResponse {
+    let content: feature_insights::InsightContent =
+        serde_json::from_str(&row.content).unwrap_or_default();
+
+    let self_assessment: Option<Vec<QuizQuestion>> = content
+        .self_assessment
+        .as_deref()
+        .and_then(|s| serde_json::from_str(s).ok());
+
+    let persona_ids: Option<Vec<String>> = serde_json::from_str(&row.persona_ids).ok();
+
+    InsightReviewResponse {
+        insight_review_id: row.id,
+        note_id: row.note_id,
+        version: row.version,
+        generated_at: row.generated_at,
+        synthesis: content.synthesis,
+        gap_analysis: content.gap_analysis,
+        self_assessment,
+        concept_map: content.concept_map,
+        perspectives: content.perspectives,
+        persona_ids,
+    }
+}
+
 impl AppCore {
     pub async fn note_insight_review(
         &self,
         note_id: &str,
+        scope_params: Option<&InsightScopeConfigParams>,
     ) -> Result<InsightReviewStarted, ApiError> {
         let note = self
             .note_repo
@@ -25,7 +52,36 @@ impl AppCore {
             return Err(ApiError::new("VALIDATION", "Note has no content"));
         }
 
-        let scope = feature_insights::ScopeConfig::default();
+        let scope = match scope_params {
+            Some(params) => {
+                let mut s = feature_insights::ScopeConfig::default();
+                if let Some(ref st) = params.scope_type {
+                    s.scope_type = match st.as_str() {
+                        "semantic" => feature_insights::ScopeType::Semantic,
+                        "project" => feature_insights::ScopeType::Project,
+                        "manual" => feature_insights::ScopeType::Manual,
+                        _ => feature_insights::ScopeType::Backlinks,
+                    };
+                }
+                if let Some(r) = params.radius {
+                    s.radius = r;
+                }
+                if let Some(ref ids) = params.node_ids {
+                    s.node_ids = ids.clone();
+                }
+                if let Some(c) = params.include_cognitive {
+                    s.include_cognitive = c;
+                }
+                if let Some(d) = params.deep_dive {
+                    s.deep_dive = d;
+                }
+                if let Some(m) = params.merge_threshold {
+                    s.merge_threshold = m;
+                }
+                s
+            }
+            None => feature_insights::ScopeConfig::default(),
+        };
 
         // Resolve scope once — used for both hash computation and context building
         let scope_note_ids = if let Some(ref service) = self.insight_service {
@@ -81,7 +137,13 @@ impl AppCore {
                 }
 
                 match service
-                    .prepare_context(&note, &related_notes, &scope_note_ids, &scope, &note_domains)
+                    .prepare_context(
+                        &note,
+                        &related_notes,
+                        &scope_note_ids,
+                        &scope,
+                        &note_domains,
+                    )
                     .await
                 {
                     Ok(prepared) => (
@@ -156,29 +218,7 @@ impl AppCore {
             None => return Ok(None),
         };
 
-        // Parse the JSON content blob
-        let content: feature_insights::InsightContent =
-            serde_json::from_str(&row.content).unwrap_or_default();
-
-        let self_assessment: Option<Vec<QuizQuestion>> = content
-            .self_assessment
-            .as_deref()
-            .and_then(|s| serde_json::from_str(s).ok());
-
-        let persona_ids: Option<Vec<String>> = serde_json::from_str(&row.persona_ids).ok();
-
-        Ok(Some(InsightReviewResponse {
-            insight_review_id: row.id,
-            note_id: row.note_id,
-            version: row.version,
-            generated_at: row.generated_at,
-            synthesis: content.synthesis,
-            gap_analysis: content.gap_analysis,
-            self_assessment,
-            concept_map: content.concept_map,
-            perspectives: content.perspectives,
-            persona_ids,
-        }))
+        Ok(Some(row_to_insight_response(row)))
     }
 
     /// Save quiz questions as flashcards with FSRS init.
@@ -322,6 +362,71 @@ impl AppCore {
             tab: tab.to_string(),
             content,
         })
+    }
+
+    pub async fn note_insight_get_evolution(
+        &self,
+        note_id: &str,
+    ) -> Result<InsightEvolutionResponse, ApiError> {
+        let service = self
+            .insight_service
+            .as_ref()
+            .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "Insight service not available"))?;
+
+        let evolution = service
+            .get_evolution(note_id)
+            .await
+            .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?;
+
+        let mut points = Vec::new();
+        let mut prev_snapshot: Option<feature_insights::ProgressSnapshotRow> = None;
+
+        // Iterate oldest-first for change note generation
+        for (version, snapshot) in evolution.iter().rev() {
+            let change_note = match snapshot {
+                Some(snap) => feature_insights::generate_change_note(snap, prev_snapshot.as_ref()),
+                None => "No progress data".to_string(),
+            };
+
+            points.push(InsightEvolutionPoint {
+                version: version.version,
+                generated_at: version.generated_at.clone(),
+                flashcard_success: snapshot.as_ref().map_or(0.0, |s| s.flashcard_success),
+                semantic_drift: snapshot.as_ref().map_or(0.0, |s| s.semantic_drift),
+                gap_closure: snapshot.as_ref().map_or(0.0, |s| s.gap_closure),
+                quiz_score: snapshot.as_ref().map_or(0.0, |s| s.quiz_score),
+                overall_progress: snapshot.as_ref().map_or(0.0, |s| s.overall_progress),
+                change_note,
+            });
+
+            if let Some(snap) = snapshot {
+                prev_snapshot = Some(snap.clone());
+            }
+        }
+
+        Ok(InsightEvolutionResponse {
+            note_id: note_id.to_string(),
+            note_title: String::new(),
+            versions: points,
+        })
+    }
+
+    pub async fn note_insight_get_version(
+        &self,
+        insight_id: &str,
+    ) -> Result<InsightReviewResponse, ApiError> {
+        let service = self
+            .insight_service
+            .as_ref()
+            .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "Insight service not available"))?;
+
+        let row = service
+            .get_version(insight_id)
+            .await
+            .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?
+            .ok_or_else(|| ApiError::new("NOT_FOUND", "Insight version not found"))?;
+
+        Ok(row_to_insight_response(row))
     }
 
     pub async fn note_insight_list_versions(

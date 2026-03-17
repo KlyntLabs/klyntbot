@@ -196,11 +196,15 @@ export function CoachingTab() {
           <div className="flex flex-col gap-1 ml-4 text-[11px]">
             <span className="text-muted-foreground">
               Hours active:{" "}
-              <span className="text-muted-foreground">{situation.hoursActiveToday.toFixed(1)}h</span>
+              <span className="text-muted-foreground">
+                {situation.hoursActiveToday.toFixed(1)}h
+              </span>
             </span>
             <span className="text-muted-foreground">
               Since break:{" "}
-              <span className="text-muted-foreground">{situation.minsSinceBreak.toFixed(0)}min</span>
+              <span className="text-muted-foreground">
+                {situation.minsSinceBreak.toFixed(0)}min
+              </span>
             </span>
             <span className="text-muted-foreground">
               Context switches:{" "}
@@ -230,7 +234,9 @@ export function CoachingTab() {
                       </span>
                       <span className="text-[10px] text-muted-foreground">{iv.triggerName}</span>
                     </div>
-                    <p className="text-[12px] text-muted-foreground leading-relaxed">{iv.message}</p>
+                    <p className="text-[12px] text-muted-foreground leading-relaxed">
+                      {iv.message}
+                    </p>
                   </div>
                   <div className="flex gap-1 shrink-0">
                     <button
@@ -280,7 +286,9 @@ export function CoachingTab() {
               </button>
             </div>
             <div className="p-3 bg-card rounded-lg border border-border">
-              <p className="text-[12px] text-muted-foreground">{signals.windowSize} signals in 30min window</p>
+              <p className="text-[12px] text-muted-foreground">
+                {signals.windowSize} signals in 30min window
+              </p>
               {signals.triggers.length > 0 && (
                 <div className="mt-2 space-y-1">
                   {signals.triggers.map((t) => (
@@ -299,13 +307,17 @@ export function CoachingTab() {
           </div>
 
           <div>
-            <h3 className="text-[13px] font-medium text-muted-foreground mb-2">Detected Patterns</h3>
+            <h3 className="text-[13px] font-medium text-muted-foreground mb-2">
+              Detected Patterns
+            </h3>
             <div className="space-y-2">
               {patterns.map((p) => (
                 <div key={p.name} className="p-3 bg-card rounded-lg border border-border">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-[12px] text-muted-foreground font-medium">{p.name}</span>
-                    <span className="text-[10px] text-muted-foreground">{p.signalCount} signals</span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {p.signalCount} signals
+                    </span>
                   </div>
                   <div className="w-full bg-muted rounded-full h-1 mb-1">
                     <div
@@ -326,7 +338,9 @@ export function CoachingTab() {
         {/* Right: Router & Feedback */}
         <div className="space-y-4">
           <div>
-            <h3 className="text-[13px] font-medium text-muted-foreground mb-2">Intervention Router</h3>
+            <h3 className="text-[13px] font-medium text-muted-foreground mb-2">
+              Intervention Router
+            </h3>
             <div className="p-3 bg-card rounded-lg border border-border">
               <div className="flex gap-4 text-[12px]">
                 <span className="text-muted-foreground">
@@ -373,8 +387,12 @@ export function CoachingTab() {
                       <td className="p-2 text-muted-foreground">{s.strategyType}</td>
                       <td className="p-2 text-muted-foreground">{s.domain}</td>
                       <td className="p-2 text-muted-foreground">{s.timesUsed}</td>
-                      <td className="p-2 text-muted-foreground">{(s.acceptanceRate * 100).toFixed(0)}%</td>
-                      <td className="p-2 text-muted-foreground">{(s.effectiveness * 100).toFixed(0)}%</td>
+                      <td className="p-2 text-muted-foreground">
+                        {(s.acceptanceRate * 100).toFixed(0)}%
+                      </td>
+                      <td className="p-2 text-muted-foreground">
+                        {(s.effectiveness * 100).toFixed(0)}%
+                      </td>
                     </tr>
                   ))}
                   {feedback.length === 0 && (

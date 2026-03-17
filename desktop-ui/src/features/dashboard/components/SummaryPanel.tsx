@@ -216,7 +216,9 @@ function DaySummary({
 
       {/* ── 3. LLM suggestion ── */}
       {intel?.focusRecommendation && (
-        <p className="text-[10px] text-muted-foreground italic leading-relaxed">{intel.focusRecommendation}</p>
+        <p className="text-[10px] text-muted-foreground italic leading-relaxed">
+          {intel.focusRecommendation}
+        </p>
       )}
 
       {/* ── 4. Weekly sparkline ── */}
@@ -291,7 +293,9 @@ function TopAppsChart({
         const pct = maxSecs > 0 ? (app.durationSecs / maxSecs) * 100 : 0;
         return (
           <div key={app.appName} className="flex items-center gap-2">
-            <span className="text-[11px] text-muted-foreground truncate w-20 shrink-0">{app.appName}</span>
+            <span className="text-[11px] text-muted-foreground truncate w-20 shrink-0">
+              {app.appName}
+            </span>
             <div className="flex-1 h-[6px] rounded-full bg-accent overflow-hidden">
               <div
                 className="h-full rounded-full"
@@ -390,7 +394,11 @@ function SessionDetail({ session, onClose }: { session: SessionBlock; onClose: (
         <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
           Activity Session
         </h3>
-        <button type="button" onClick={onClose} className="text-muted-foreground hover:text-foreground">
+        <button
+          type="button"
+          onClick={onClose}
+          className="text-muted-foreground hover:text-foreground"
+        >
           <X className="w-4 h-4" />
         </button>
       </div>
@@ -445,9 +453,13 @@ function SessionDetail({ session, onClose }: { session: SessionBlock; onClose: (
             </>
           )}
           <span className="text-dim">Context switches</span>
-          <span className="text-muted-foreground tabular-nums text-right">{matched.contextSwitches}</span>
+          <span className="text-muted-foreground tabular-nums text-right">
+            {matched.contextSwitches}
+          </span>
           <span className="text-dim">Distractions</span>
-          <span className="text-muted-foreground tabular-nums text-right">{matched.distractionCount}</span>
+          <span className="text-muted-foreground tabular-nums text-right">
+            {matched.distractionCount}
+          </span>
         </div>
       )}
 
@@ -502,8 +514,14 @@ function EntryDetail({
   return (
     <div className="w-80 px-4 py-3 flex flex-col gap-3 overflow-y-auto shrink-0">
       <div className="flex items-center justify-between">
-        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Details</h3>
-        <button type="button" onClick={onClose} className="text-muted-foreground hover:text-foreground">
+        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+          Details
+        </h3>
+        <button
+          type="button"
+          onClick={onClose}
+          className="text-muted-foreground hover:text-foreground"
+        >
           <X className="w-4 h-4" />
         </button>
       </div>

@@ -213,7 +213,12 @@ export function SidebarProperties({ task, compact, onUpdate }: SidebarProperties
 
       {/* Due date */}
       <PropertyRow label="Due">
-        <span className={cn("px-1.5 py-0.5 text-xs", task.dueDate ? "text-foreground" : "text-muted-foreground")}>
+        <span
+          className={cn(
+            "px-1.5 py-0.5 text-xs",
+            task.dueDate ? "text-foreground" : "text-muted-foreground",
+          )}
+        >
           {dueDateDisplay}
         </span>
       </PropertyRow>
@@ -282,7 +287,10 @@ export function SidebarProperties({ task, compact, onUpdate }: SidebarProperties
           {/* Project */}
           <PropertyRow label="Project">
             <span
-              className={cn("px-1.5 py-0.5 text-xs", task.project ? "text-foreground" : "text-muted-foreground")}
+              className={cn(
+                "px-1.5 py-0.5 text-xs",
+                task.project ? "text-foreground" : "text-muted-foreground",
+              )}
             >
               {task.project ? task.project.name : "No project"}
             </span>

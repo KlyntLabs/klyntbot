@@ -40,9 +40,7 @@ function OriginBadge({ origin }: { origin: CronOrigin }) {
 function ScheduleTypeBadge({ schedule }: { schedule: CronSchedule }) {
   const label = schedule.kind === "every" ? "Interval" : schedule.kind === "cron" ? "Cron" : "Once";
   return (
-    <span className="px-1.5 py-0.5 rounded text-[10px] font-light text-dim bg-accent">
-      {label}
-    </span>
+    <span className="px-1.5 py-0.5 rounded text-[10px] font-light text-dim bg-accent">{label}</span>
   );
 }
 
@@ -288,7 +286,9 @@ function SchedulePanel({
               <span
                 className={cn(
                   "text-[13px] transition-colors",
-                  fields.mode === key ? "text-muted-foreground font-medium" : "text-muted-foreground font-light",
+                  fields.mode === key
+                    ? "text-muted-foreground font-medium"
+                    : "text-muted-foreground font-light",
                 )}
               >
                 {label}
@@ -693,7 +693,10 @@ export function AutomationsPage() {
               value={humanizeJobName(job.name)}
               editable={editable}
               onSave={(v) => handleUpdate(job.id, { name: v })}
-              className={cn("text-[13px] font-light", job.enabled ? "text-muted-foreground" : "text-dim")}
+              className={cn(
+                "text-[13px] font-light",
+                job.enabled ? "text-muted-foreground" : "text-dim",
+              )}
             />
           );
         },

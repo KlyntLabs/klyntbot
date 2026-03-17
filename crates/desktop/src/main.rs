@@ -361,6 +361,8 @@ fn run_desktop_app() {
             commands::notes::note_insight_save_flashcards,
             commands::notes::note_insight_regenerate_tab,
             commands::notes::note_insight_list_versions,
+            commands::notes::note_insight_get_evolution,
+            commands::notes::note_insight_get_version,
             commands::notes::note_insight_list_personas,
             commands::notes::note_insight_create_persona,
             commands::notes::note_insight_update_persona,

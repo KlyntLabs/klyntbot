@@ -479,9 +479,7 @@ export default function KnowledgeBasePage() {
                 <div className="text-muted-foreground text-sm">Select a note to view</div>
                 <div className="text-dim text-xs mt-1">
                   or press{" "}
-                  <kbd className="px-1.5 py-0.5 rounded bg-accent text-[10px] font-mono">
-                    Cmd+N
-                  </kbd>{" "}
+                  <kbd className="px-1.5 py-0.5 rounded bg-accent text-[10px] font-mono">Cmd+N</kbd>{" "}
                   to create one
                 </div>
               </div>

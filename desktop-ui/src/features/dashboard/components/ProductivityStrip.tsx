@@ -148,15 +148,21 @@ export function ProductivityStrip({ summary }: ProductivityStripProps) {
           <div className="flex items-center gap-4 text-[9px] shrink-0">
             <span className="flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-success" />
-              <span className="text-muted-foreground">{formatHumanDuration(summary.productiveSecs)}</span>
+              <span className="text-muted-foreground">
+                {formatHumanDuration(summary.productiveSecs)}
+              </span>
             </span>
             <span className="flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-[var(--text-muted-foreground)]" />
-              <span className="text-muted-foreground">{formatHumanDuration(summary.neutralSecs)}</span>
+              <span className="text-muted-foreground">
+                {formatHumanDuration(summary.neutralSecs)}
+              </span>
             </span>
             <span className="flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-destructive" />
-              <span className="text-muted-foreground">{formatHumanDuration(summary.distractingSecs)}</span>
+              <span className="text-muted-foreground">
+                {formatHumanDuration(summary.distractingSecs)}
+              </span>
             </span>
           </div>
         </div>

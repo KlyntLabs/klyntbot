@@ -47,11 +47,14 @@ impl InsightEmbedder for InsightEmbedderImpl {
         Ok(())
     }
 
-    async fn similarity(&self, _id_a: &str, _id_b: &str) -> Option<f64> {
-        // Phase 2 placeholder — semantic drift calculation requires fetching
-        // raw vectors from LanceDB, which needs a new VectorStore method.
-        // Returns None → semantic_drift defaults to 0.0 (no drift detected).
-        // Phase 3 adds the full implementation with vector fetch + cosine_similarity.
-        None
+    async fn similarity(&self, id_a: &str, id_b: &str) -> Option<f64> {
+        let (res_a, res_b) = tokio::join!(
+            self.store.get_embedding("insight_embeddings", id_a),
+            self.store.get_embedding("insight_embeddings", id_b),
+        );
+        let vec_a = res_a.ok()??;
+        let vec_b = res_b.ok()??;
+
+        Some(EmbeddingEngine::cosine_similarity(&vec_a, &vec_b))
     }
 }

@@ -22,10 +22,7 @@ function SkeletonLoader() {
   return (
     <div className="space-y-3 animate-pulse">
       {[0, 1, 2].map((i) => (
-        <div
-          key={i}
-          className="rounded-lg bg-card border border-border-subtle p-4 space-y-3"
-        >
+        <div key={i} className="rounded-lg bg-card border border-border-subtle p-4 space-y-3">
           <div className="h-3 bg-card rounded w-3/4" />
           <div className="h-3 bg-card rounded w-full" />
           <div className="h-3 bg-card rounded w-1/2" />
@@ -90,10 +87,7 @@ export function SelfAssessmentTab({
         const userAnswer = quizState.answers[q.id];
 
         return (
-          <div
-            key={q.id}
-            className="rounded-lg bg-card border border-border-subtle p-4 space-y-3"
-          >
+          <div key={q.id} className="rounded-lg bg-card border border-border-subtle p-4 space-y-3">
             <div className="flex items-start justify-between gap-2">
               <span className="text-[12px] text-foreground leading-relaxed">{q.question}</span>
               <span className="text-[9px] px-1.5 py-0.5 rounded bg-accent text-dim shrink-0">
@@ -121,8 +115,7 @@ export function SelfAssessmentTab({
                     }
                   } else {
                     if (isSelected) {
-                      choiceClass +=
-                        "border-border bg-muted text-foreground hover:bg-muted";
+                      choiceClass += "border-border bg-muted text-foreground hover:bg-muted";
                     } else {
                       choiceClass +=
                         "border-border-subtle bg-card text-muted-foreground hover:bg-accent";

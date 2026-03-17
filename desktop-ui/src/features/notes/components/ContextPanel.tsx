@@ -140,12 +140,7 @@ export function ContextPanel({
   onOpenInsight,
 }: ContextPanelProps) {
   if (!noteId || !note) {
-    return (
-      <div
-        style={{ width }}
-        className="glass-sidebar flex flex-col flex-shrink-0 h-full"
-      />
-    );
+    return <div style={{ width }} className="glass-sidebar flex flex-col flex-shrink-0 h-full" />;
   }
 
   // Graph mode: show note preview instead of context sections
@@ -163,10 +158,7 @@ export function ContextPanel({
   // Editor mode: insight panel takes over when open
   if (insightOpen && insightState && insightActions) {
     return (
-      <div
-        style={{ width }}
-        className="glass-sidebar flex flex-col flex-shrink-0 h-full"
-      >
+      <div style={{ width }} className="glass-sidebar flex flex-col flex-shrink-0 h-full">
         <InsightReviewPanel state={insightState} actions={insightActions} />
       </div>
     );

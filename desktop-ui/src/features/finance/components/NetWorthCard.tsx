@@ -24,7 +24,9 @@ export function NetWorthCard({
   return (
     <Card className="p-5 flex items-center justify-between">
       <div>
-        <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">Net Worth</p>
+        <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">
+          Net Worth
+        </p>
         <p className="text-[32px] font-light text-foreground tracking-tight leading-none tabular-nums">
           {fmtCompact(convertTotal(totalNet), displayCur, hidden)}
         </p>

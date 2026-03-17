@@ -84,7 +84,10 @@ export function AddServerDialog({ open, onClose, onAdd, prefill }: AddServerDial
           <div className="px-5 py-4 space-y-4">
             {/* Name */}
             <div>
-              <label htmlFor="mcp-server-name" className="block text-[12px] text-muted-foreground mb-1.5">
+              <label
+                htmlFor="mcp-server-name"
+                className="block text-[12px] text-muted-foreground mb-1.5"
+              >
                 Server name
               </label>
               <input
@@ -122,7 +125,10 @@ export function AddServerDialog({ open, onClose, onAdd, prefill }: AddServerDial
             {transport === "stdio" && (
               <>
                 <div>
-                  <label htmlFor="mcp-command" className="block text-[12px] text-muted-foreground mb-1.5">
+                  <label
+                    htmlFor="mcp-command"
+                    className="block text-[12px] text-muted-foreground mb-1.5"
+                  >
                     Command
                   </label>
                   <input
@@ -136,7 +142,10 @@ export function AddServerDialog({ open, onClose, onAdd, prefill }: AddServerDial
                 </div>
 
                 <div>
-                  <label htmlFor="mcp-args" className="block text-[12px] text-muted-foreground mb-1.5">
+                  <label
+                    htmlFor="mcp-args"
+                    className="block text-[12px] text-muted-foreground mb-1.5"
+                  >
                     Arguments <span className="text-dim">(comma-separated)</span>
                   </label>
                   <input
@@ -209,7 +218,10 @@ export function AddServerDialog({ open, onClose, onAdd, prefill }: AddServerDial
             {transport === "http" && (
               <>
                 <div>
-                  <label htmlFor="mcp-url" className="block text-[12px] text-muted-foreground mb-1.5">
+                  <label
+                    htmlFor="mcp-url"
+                    className="block text-[12px] text-muted-foreground mb-1.5"
+                  >
                     URL
                   </label>
                   <input

@@ -83,7 +83,9 @@ function Slider({
         onChange={(e) => onChange(Number(e.target.value))}
         className="flex-1 accent-accent"
       />
-      <span className="text-[12px] text-muted-foreground w-12 text-right tabular-nums">{display}</span>
+      <span className="text-[12px] text-muted-foreground w-12 text-right tabular-nums">
+        {display}
+      </span>
     </div>
   );
 }

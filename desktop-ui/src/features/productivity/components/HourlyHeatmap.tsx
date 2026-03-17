@@ -30,10 +30,10 @@ export function HourlyHeatmap({ startDate, endDate }: Props) {
   const heatColor = (ratio: number): string => {
     const t = Math.max(0, Math.min(1, ratio));
     const stops: [number, number, number][] = [
-      [0, 70, 50],    // red    – low
-      [25, 80, 50],   // orange – below avg
-      [45, 85, 50],   // yellow – moderate
-      [145, 65, 45],  // green  – high
+      [0, 70, 50], // red    – low
+      [25, 80, 50], // orange – below avg
+      [45, 85, 50], // yellow – moderate
+      [145, 65, 45], // green  – high
     ];
     const seg = t * (stops.length - 1);
     const i = Math.min(Math.floor(seg), stops.length - 2);
@@ -46,14 +46,18 @@ export function HourlyHeatmap({ startDate, endDate }: Props) {
     <div className="space-y-1 px-1 py-2">
       <div className="text-xs font-medium text-foreground">
         Hourly Productivity
-        {peakHour && <span className="text-muted-foreground font-normal ml-1">Peak: {peakHour.hour}:00</span>}
+        {peakHour && (
+          <span className="text-muted-foreground font-normal ml-1">Peak: {peakHour.hour}:00</span>
+        )}
       </div>
       <div className="space-y-px">
         {working.map((h) => {
           const width = (h.productiveRatio / maxRatio) * 100;
           return (
             <div key={h.hour} className="flex items-center gap-1.5">
-              <span className="text-[10px] text-muted-foreground w-6 text-right tabular-nums">{h.hour}</span>
+              <span className="text-[10px] text-muted-foreground w-6 text-right tabular-nums">
+                {h.hour}
+              </span>
               <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all"

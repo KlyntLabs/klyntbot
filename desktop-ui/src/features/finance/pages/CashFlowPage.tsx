@@ -382,7 +382,9 @@ export function CashFlowPage() {
 
           {/* Accounts sidebar */}
           <Card compact className="p-3">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-2">Accounts</p>
+            <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-2">
+              Accounts
+            </p>
             {activeAccounts.map((acct) => {
               const Icon = ACCT_ICONS[acct.accountType] ?? Wallet;
               const isSelected = accountFilter === acct.id;
@@ -404,7 +406,9 @@ export function CashFlowPage() {
                   )}
                 >
                   <Icon className="w-3.5 h-3.5 text-muted-foreground" strokeWidth={1.5} />
-                  <span className="text-[11px] text-muted-foreground flex-1 truncate">{acct.name}</span>
+                  <span className="text-[11px] text-muted-foreground flex-1 truncate">
+                    {acct.name}
+                  </span>
                   <span className="text-[10px] text-muted-foreground tabular-nums">
                     {displayAmount({
                       amount: acct.balance,
@@ -424,7 +428,9 @@ export function CashFlowPage() {
           {/* Spending & Budgets (merged) */}
           <Card compact className="overflow-hidden">
             <div className="px-3 pt-3 pb-1">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-widest">Spending & Budgets</p>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-widest">
+                Spending & Budgets
+              </p>
             </div>
             {spendingWithBudgets.map((item, i) => {
               // Use baseAmount for budget comparison (same currency as spending report)
@@ -451,7 +457,9 @@ export function CashFlowPage() {
                         className="w-1.5 h-1.5 rounded-full flex-shrink-0"
                         style={{ backgroundColor: COLORS[i % COLORS.length] }}
                       />
-                      <span className="text-[10px] text-muted-foreground capitalize">{item.category}</span>
+                      <span className="text-[10px] text-muted-foreground capitalize">
+                        {item.category}
+                      </span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] text-foreground tabular-nums">

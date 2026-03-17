@@ -131,7 +131,9 @@ export function MiniCalendar({
               onClick={() => onSelect(s.iso)}
               className={cn(
                 "px-2 py-0.5 text-[11px] rounded-lg transition-all",
-                value === s.iso ? "glass-button-active text-brand" : "glass-button text-muted-foreground",
+                value === s.iso
+                  ? "glass-button-active text-brand"
+                  : "glass-button text-muted-foreground",
               )}
             >
               {s.label}

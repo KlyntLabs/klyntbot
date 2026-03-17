@@ -76,10 +76,7 @@ impl PromptBuilder {
             );
 
             if !facts.is_empty() {
-                sections.push(format!(
-                    "## Relevant Knowledge\n\n{}",
-                    bullet_list(&facts)
-                ));
+                sections.push(format!("## Relevant Knowledge\n\n{}", bullet_list(&facts)));
             }
 
             if !memories.is_empty() {

@@ -10,13 +10,16 @@ use std::sync::Arc;
 use sha2::{Digest, Sha256};
 
 use crate::merge::SmartMergeEngine;
+use crate::progress::ProgressComputer;
 use crate::progress_repo::InsightProgressRepo;
 use crate::prompt_builder::{InsightContext, PromptBuilder};
-use feature_notes::models::NoteRow;
 use crate::repo::InsightReviewRepo;
 use crate::scope::ScopeResolver;
 use crate::traits::{CognitiveAccessor, FlashcardAccessor, InsightEmbedder};
-use crate::types::{InsightContent, InsightReviewRow, ProgressWeights, ScopeConfig};
+use crate::types::{
+    InsightContent, InsightReviewRow, ProgressSnapshotRow, ProgressWeights, ScopeConfig,
+};
+use feature_notes::models::NoteRow;
 
 /// Result of pre-generation pipeline — ready for LLM call.
 pub struct PreparedInsight {
@@ -38,8 +41,6 @@ pub struct InsightService {
     pub(crate) prompt_builder: PromptBuilder,
     #[allow(dead_code)]
     pub(crate) cognitive: Arc<dyn CognitiveAccessor>,
-    /// Reserved for Phase 3 learning progress computation.
-    #[allow(dead_code)]
     pub(crate) flashcards: Arc<dyn FlashcardAccessor>,
     pub(crate) embedder: Arc<dyn InsightEmbedder>,
     pub(crate) progress_weights: ProgressWeights,
@@ -217,6 +218,63 @@ impl InsightService {
             self.repo.update_content(insight_id, &updated_json).await?;
         }
         Ok(())
+    }
+
+    /// Create a ProgressComputer from the service's shared dependencies.
+    fn progress_computer(&self) -> ProgressComputer {
+        ProgressComputer::new(
+            self.repo.clone(),
+            self.progress_repo.clone(),
+            Arc::clone(&self.flashcards),
+            Arc::clone(&self.embedder),
+            self.progress_weights.clone(),
+        )
+    }
+
+    /// Compute and store a progress snapshot for an insight.
+    pub async fn compute_progress(
+        &self,
+        insight_id: &str,
+        note_body: &str,
+    ) -> Result<ProgressSnapshotRow, sqlx::Error> {
+        let insight = self
+            .repo
+            .get(insight_id)
+            .await?
+            .ok_or(sqlx::Error::RowNotFound)?;
+
+        self.progress_computer().compute(&insight, note_body).await
+    }
+
+    /// Get the evolution timeline for a note — versions + progress + change notes.
+    pub async fn get_evolution(
+        &self,
+        note_id: &str,
+    ) -> Result<Vec<(InsightReviewRow, Option<ProgressSnapshotRow>)>, sqlx::Error> {
+        let versions = self.repo.list_versions(note_id).await?;
+        let timeline = self.progress_repo.get_timeline(note_id).await?;
+
+        // Match versions with their progress snapshots
+        let result: Vec<_> = versions
+            .into_iter()
+            .map(|v| {
+                let snapshot = timeline
+                    .iter()
+                    .find(|s| s.insight_review_id == v.id)
+                    .cloned();
+                (v, snapshot)
+            })
+            .collect();
+
+        Ok(result)
+    }
+
+    /// Get a specific insight by ID.
+    pub async fn get_version(
+        &self,
+        insight_id: &str,
+    ) -> Result<Option<InsightReviewRow>, sqlx::Error> {
+        self.repo.get(insight_id).await
     }
 
     /// Compute input hash for cache check (same algorithm as before).

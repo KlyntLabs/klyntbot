@@ -482,7 +482,9 @@ export function FinanceTargets() {
         <div className="w-72 flex-shrink-0 sticky top-0 self-start space-y-4">
           {/* Goal Progress overview */}
           <Card compact className="p-4">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-3">Goal Progress</p>
+            <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-3">
+              Goal Progress
+            </p>
             <div className="flex items-center justify-center mb-3">
               <Donut
                 segments={goalSegs}
@@ -526,7 +528,9 @@ export function FinanceTargets() {
 
           {/* Debt Breakdown */}
           <Card compact className="p-4">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-3">Debt Breakdown</p>
+            <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-3">
+              Debt Breakdown
+            </p>
             <div className="flex items-center justify-center mb-3">
               <Donut
                 segments={liabSegs}
@@ -551,14 +555,18 @@ export function FinanceTargets() {
                             {l.name}
                           </span>
                         </div>
-                        <span className="text-[10px] text-muted-foreground font-light">{paid}%</span>
+                        <span className="text-[10px] text-muted-foreground font-light">
+                          {paid}%
+                        </span>
                       </div>
                       <Progress value={paid} />
                     </div>
                   );
                 })}
                 <div className="pt-2 border-t border-border-subtle flex justify-between">
-                  <span className="text-[10px] text-muted-foreground font-light">Monthly Payments</span>
+                  <span className="text-[10px] text-muted-foreground font-light">
+                    Monthly Payments
+                  </span>
                   <span className="text-[10px] text-brand font-light tabular-nums">
                     {fmtCompact(convertTotal(liabMonthlyTotal), displayCur, hidden)}/mo
                   </span>

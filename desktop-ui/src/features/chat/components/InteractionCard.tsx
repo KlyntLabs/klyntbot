@@ -191,7 +191,9 @@ export function InteractionCard({
     >
       <div className="w-full max-w-[85%] rounded-xl bg-accent border border-border overflow-hidden">
         {/* Header */}
-        <div className="px-4 pt-3 pb-2 text-[11px] font-light text-muted-foreground">Klynt is asking…</div>
+        <div className="px-4 pt-3 pb-2 text-[11px] font-light text-muted-foreground">
+          Klynt is asking…
+        </div>
 
         {/* Tabs (if >1 question) */}
         {request.questions.length > 1 && (

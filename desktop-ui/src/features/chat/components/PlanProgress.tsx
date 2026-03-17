@@ -48,7 +48,11 @@ export function PlanProgress({ steps, completedSteps, isStreaming }: PlanProgres
               )}
               <span
                 className={`text-[11px] font-light leading-snug ${
-                  isCompleted ? "text-dim line-through" : isActive ? "text-muted-foreground" : "text-muted-foreground"
+                  isCompleted
+                    ? "text-dim line-through"
+                    : isActive
+                      ? "text-muted-foreground"
+                      : "text-muted-foreground"
                 }`}
               >
                 {step}

@@ -51,7 +51,8 @@ export interface InsightReviewState {
 }
 
 export interface InsightReviewActions {
-  open: (noteId: string) => Promise<void>;
+  open: (noteId: string, scopeConfig?: Record<string, unknown>) => Promise<void>;
+  applyCachedContent: (cached: InsightReviewCachedResponse) => void;
   close: () => void;
   switchTab: (tab: TabId) => void;
   regenerateTab: (tab: TabId) => Promise<void>;
@@ -71,7 +72,7 @@ interface InsightReviewStartedResponse {
   cached: boolean;
 }
 
-interface InsightReviewCachedResponse {
+export interface InsightReviewCachedResponse {
   insightReviewId: string;
   noteId: string;
   synthesis: string | null;
@@ -218,93 +219,81 @@ export function useInsightReview(): [InsightReviewState, InsightReviewActions] {
   // Actions
   // -------------------------------------------------------------------------
 
-  const open = useCallback(async (noteId: string) => {
-    setState((prev) => ({
-      ...prev,
-      isOpen: true,
-      noteId,
-      insightReviewId: null,
-      contentHash: null,
-      activeTab: "synthesis",
-      tabs: {
-        synthesis: { status: "loading", content: "" },
-        gaps: { status: "loading", content: "" },
-        assessment: { status: "loading", questions: [] },
-        conceptMap: { status: "loading", mermaid: "", fallbackText: "" },
-        perspectives: { status: "loading", content: "", personas: [] },
-      },
-      quizState: {
-        answers: {},
-        revealed: new Set(),
-        score: 0,
-        total: 0,
-      },
-    }));
+  // Shared helper: apply cached insight content to tab state
+  const applyCachedContent = useCallback((cached: InsightReviewCachedResponse) => {
+    setState((prev) => {
+      const tabs = { ...prev.tabs };
 
-    const response = await ipc<InsightReviewStartedResponse>("note_insight_review", { noteId });
+      tabs.synthesis = { status: "done", content: cached.synthesis ?? "" };
+      tabs.gaps = { status: "done", content: cached.gapAnalysis ?? "" };
+      tabs.assessment = {
+        status: "done",
+        questions: cached.selfAssessment ?? [],
+      };
 
-    setState((prev) => ({
-      ...prev,
-      insightReviewId: response.insightReviewId,
-      contentHash: response.contentHash,
-    }));
-
-    if (response.cached) {
-      const cached = await ipc<InsightReviewCachedResponse>("note_insight_cache_get", { noteId });
-
-      setState((prev) => {
-        const tabs = { ...prev.tabs };
-
-        tabs.synthesis = {
+      const cm = cached.conceptMap ?? "";
+      if (cm.startsWith("FALLBACK:")) {
+        tabs.conceptMap = {
           status: "done",
-          content: cached.synthesis ?? "",
+          mermaid: "",
+          fallbackText: cm.slice("FALLBACK:".length),
         };
+      } else {
+        tabs.conceptMap = { status: "done", mermaid: cm, fallbackText: "" };
+      }
 
-        tabs.gaps = {
-          status: "done",
-          content: cached.gapAnalysis ?? "",
-        };
+      tabs.perspectives = {
+        status: cached.perspectives ? "done" : "idle",
+        content: cached.perspectives ?? "",
+        personas: [],
+      };
 
-        tabs.assessment = {
-          status: "done",
-          questions: cached.selfAssessment ?? [],
-        };
+      return { ...prev, tabs };
+    });
+  }, []);
 
-        const conceptMapContent = cached.conceptMap ?? "";
-        if (conceptMapContent.startsWith("FALLBACK:")) {
-          tabs.conceptMap = {
-            status: "done",
-            mermaid: "",
-            fallbackText: conceptMapContent.slice("FALLBACK:".length),
-          };
-        } else {
-          tabs.conceptMap = {
-            status: "done",
-            mermaid: conceptMapContent,
-            fallbackText: "",
-          };
-        }
-
-        tabs.perspectives = {
-          status: cached.perspectives ? "done" : "idle",
-          content: cached.perspectives ?? "",
-          personas: [],
-        };
-
-        return { ...prev, tabs };
-      });
-    } else {
-      // Streaming path: synthesis will arrive via events; set it to streaming
-      setState((prev) => ({
-        ...prev,
+  const open = useCallback(
+    async (noteId: string, scopeConfig?: Record<string, unknown>) => {
+      setState({
+        ...INITIAL_STATE,
+        isOpen: true,
+        noteId,
         tabs: {
-          ...prev.tabs,
-          synthesis: { status: "streaming", content: "" },
+          synthesis: { status: "loading", content: "" },
+          gaps: { status: "loading", content: "" },
+          assessment: { status: "loading", questions: [] },
+          conceptMap: { status: "loading", mermaid: "", fallbackText: "" },
           perspectives: { status: "loading", content: "", personas: [] },
         },
+      });
+
+      const args: Record<string, unknown> = { noteId };
+      if (scopeConfig) args.scopeConfig = scopeConfig;
+
+      const response = await ipc<InsightReviewStartedResponse>("note_insight_review", args);
+
+      setState((prev) => ({
+        ...prev,
+        insightReviewId: response.insightReviewId,
+        contentHash: response.contentHash,
       }));
-    }
-  }, []);
+
+      if (response.cached) {
+        const cached = await ipc<InsightReviewCachedResponse>("note_insight_cache_get", { noteId });
+        applyCachedContent(cached);
+      } else {
+        setState((prev) => ({
+          ...prev,
+          tabs: {
+            ...prev.tabs,
+            synthesis: { status: "streaming", content: "" },
+            perspectives: { status: "loading", content: "", personas: [] },
+          },
+        }));
+      }
+    },
+    [applyCachedContent],
+  );
 
   const close = useCallback(() => {
     setState(INITIAL_STATE);
@@ -451,6 +440,7 @@ export function useInsightReview(): [InsightReviewState, InsightReviewActions] {
 
   const actions: InsightReviewActions = {
     open,
+    applyCachedContent,
     close,
     switchTab,
     regenerateTab,

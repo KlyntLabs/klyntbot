@@ -120,9 +120,7 @@ function FlowBadge({ state }: { state: string }) {
         : "text-destructive";
 
   return (
-    <span className={cn("text-xs px-1.5 py-0.5 rounded bg-muted capitalize", color)}>
-      {state}
-    </span>
+    <span className={cn("text-xs px-1.5 py-0.5 rounded bg-muted capitalize", color)}>{state}</span>
   );
 }
 

@@ -93,7 +93,9 @@ export function YearHeatmapView() {
             const weeks = buildMonthGrid(year, monthIdx);
             return (
               <div key={monthIdx}>
-                <div className="text-xs font-medium text-muted-foreground mb-1.5">{MONTH_NAMES[monthIdx]}</div>
+                <div className="text-xs font-medium text-muted-foreground mb-1.5">
+                  {MONTH_NAMES[monthIdx]}
+                </div>
 
                 {/* Day-of-week labels */}
                 <div className="grid grid-cols-7 gap-px mb-0.5">

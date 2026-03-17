@@ -197,7 +197,8 @@ export function MemoryTab() {
       <div>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-[13px] font-medium text-muted-foreground">
-            Semantic Facts {domainFilter && <span className="text-muted-foreground">({domainFilter})</span>}
+            Semantic Facts{" "}
+            {domainFilter && <span className="text-muted-foreground">({domainFilter})</span>}
           </h2>
           <button
             type="button"
@@ -248,7 +249,9 @@ export function MemoryTab() {
                     </div>
                   </td>
                   <td className="p-2 text-muted-foreground">{f.stability.toFixed(1)}</td>
-                  <td className="p-2 text-muted-foreground">{(f.retrievability * 100).toFixed(0)}%</td>
+                  <td className="p-2 text-muted-foreground">
+                    {(f.retrievability * 100).toFixed(0)}%
+                  </td>
                   <td className="p-2 text-muted-foreground">{f.accessCount}x</td>
                   <td className="p-2">
                     <button
@@ -286,13 +289,17 @@ export function MemoryTab() {
                   {m.domain}
                 </span>
                 <span className="text-[10px] text-muted-foreground">{m.occurredAt}</span>
-                <span className="text-[10px] text-muted-foreground">imp: {m.importance.toFixed(2)}</span>
+                <span className="text-[10px] text-muted-foreground">
+                  imp: {m.importance.toFixed(2)}
+                </span>
               </div>
               <p className="text-[12px] text-muted-foreground">{m.content}</p>
               {m.summary && <p className="text-[11px] text-muted-foreground mt-1">{m.summary}</p>}
             </div>
           ))}
-          {episodic.length === 0 && <p className="text-[12px] text-muted-foreground">No episodic memories</p>}
+          {episodic.length === 0 && (
+            <p className="text-[12px] text-muted-foreground">No episodic memories</p>
+          )}
         </div>
       </div>
 

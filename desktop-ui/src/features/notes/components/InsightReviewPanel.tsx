@@ -1,15 +1,36 @@
 import { ipc } from "@shared/hooks/useIpc";
-import { BookOpen, Brain, Copy, FileInput, FilePlus, RefreshCw, Settings2, X } from "lucide-react";
-import { useCallback, useState } from "react";
+import {
+  BookOpen,
+  Brain,
+  Copy,
+  FileInput,
+  FilePlus,
+  History,
+  RefreshCw,
+  Settings2,
+  Sliders,
+  X,
+} from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { useInsightEvolution } from "../hooks/useInsightEvolution";
 import type {
   InsightReviewActions,
+  InsightReviewCachedResponse,
   InsightReviewState,
   TabId,
   TabStatus,
 } from "../hooks/useInsightReview";
+import { useInsightVersions } from "../hooks/useInsightVersions";
 import { usePersonas } from "../hooks/usePersonas";
 import { ConceptMapTab } from "./insight/ConceptMapTab";
 import { GapAnalysisTab } from "./insight/GapAnalysisTab";
+import { InsightEvolutionChart } from "./insight/InsightEvolutionChart";
+import {
+  DEFAULT_SCOPE,
+  InsightScopePopover,
+  type ScopeConfig,
+} from "./insight/InsightScopePopover";
+import { InsightVersionList } from "./insight/InsightVersionList";
 import { ManagePersonasModal } from "./insight/ManagePersonasModal";
 import { PerspectivesTab } from "./insight/PerspectivesTab";
 import { SelfAssessmentTab } from "./insight/SelfAssessmentTab";
@@ -76,7 +97,24 @@ function tabStatus(state: InsightReviewState, tabId: TabId): TabStatus {
 export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) {
   const [copied, setCopied] = useState(false);
   const [showPersonaManager, setShowPersonaManager] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [showScope, setShowScope] = useState(false);
+  const [scopeConfig, setScopeConfig] = useState<ScopeConfig>(DEFAULT_SCOPE);
   const [allPersonas, personaActions] = usePersonas();
+  const evolution = useInsightEvolution();
+  const versions = useInsightVersions();
+
+  // Lazy-fetch evolution + versions only when History panel is shown
+  useEffect(() => {
+    if (showHistory && state.isOpen && state.noteId) {
+      evolution.fetch(state.noteId);
+      versions.fetch(state.noteId);
+    }
+    if (!state.isOpen) {
+      evolution.clear();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showHistory, state.isOpen, state.noteId]);
 
   const handleCreateDeepDiveNote = useCallback(async (title: string, body: string) => {
     try {
@@ -145,6 +183,35 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
       <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border shrink-0">
         <Brain size={14} className="text-purple shrink-0" />
         <span className="text-[12px] font-medium text-foreground flex-1">Insight Review</span>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setShowScope((p) => !p)}
+            className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            title="Scope Config"
+          >
+            <Sliders size={12} />
+          </button>
+          {showScope && (
+            <InsightScopePopover
+              value={scopeConfig}
+              onChange={setScopeConfig}
+              onClose={() => setShowScope(false)}
+            />
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowHistory((p) => !p)}
+          className={`p-1 rounded-md transition-colors ${
+            showHistory
+              ? "text-purple bg-purple/10"
+              : "text-muted-foreground hover:text-foreground hover:bg-accent"
+          }`}
+          title="Version History"
+        >
+          <History size={12} />
+        </button>
         <button
           type="button"
           onClick={() => setShowPersonaManager(true)}
@@ -155,12 +222,22 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
         </button>
         <button
           type="button"
-          disabled
-          className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-accent text-dim cursor-not-allowed"
-          title="Regenerate all tabs"
+          onClick={() => {
+            if (state.noteId) {
+              void actions.open(state.noteId, {
+                scopeType: scopeConfig.scopeType,
+                radius: scopeConfig.radius,
+                includeCognitive: scopeConfig.includeCognitive,
+                deepDive: scopeConfig.deepDive,
+              });
+            }
+          }}
+          disabled={!state.noteId}
+          className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-accent text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors disabled:text-dim disabled:cursor-not-allowed"
+          title="Regenerate all tabs with current scope"
         >
           <RefreshCw size={10} />
-          Regenerate All
+          Regenerate
         </button>
         <button
           type="button"
@@ -171,6 +248,21 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
           <X size={14} />
         </button>
       </div>
+
+      {/* Scope coverage hint */}
+      {state.isOpen && (
+        <div className="px-3 py-1.5 border-b border-border text-[10px] text-dim flex items-center gap-1">
+          <span>Scope:</span>
+          <span className="text-muted-foreground capitalize">{scopeConfig.scopeType}</span>
+          {scopeConfig.deepDive && <span className="text-purple text-[9px] ml-1">(deep dive)</span>}
+          {evolution.data && (
+            <span className="ml-auto">
+              {evolution.data.versions.length} version
+              {evolution.data.versions.length !== 1 ? "s" : ""}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Tab bar */}
       <div className="flex border-b border-border shrink-0 overflow-x-auto">
@@ -194,6 +286,36 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
           );
         })}
       </div>
+
+      {/* History panel (collapsible) */}
+      {showHistory && (
+        <div className="border-b border-border shrink-0 max-h-[300px] overflow-y-auto">
+          {evolution.data && evolution.data.versions.length > 0 && (
+            <div className="p-3 border-b border-border">
+              <InsightEvolutionChart versions={evolution.data.versions} />
+            </div>
+          )}
+          <InsightVersionList
+            versions={versions.versions}
+            selectedId={versions.selectedId}
+            currentId={state.insightReviewId}
+            onSelect={async (id) => {
+              versions.select(id);
+              if (id) {
+                try {
+                  const versionData = await ipc<InsightReviewCachedResponse>(
+                    "note_insight_get_version",
+                    { insightId: id },
+                  );
+                  actions.applyCachedContent(versionData);
+                } catch {
+                  // Silently fail — version may have been deleted
+                }
+              }
+            }}
+          />
+        </div>
+      )}
 
       {/* Content area */}
       <div className="flex-1 overflow-y-auto p-4 min-h-0">

@@ -699,8 +699,12 @@ pub(crate) async fn dispatch_dev(
             let start_date = try_field!(dev::get_str(body, "start_date"));
             let end_date = try_field!(dev::get_str(body, "end_date"));
             dev::val(
-                core.productivity_hourly_breakdown(start_date, end_date, dev::get(body, "tz_offset_mins"))
-                    .await,
+                core.productivity_hourly_breakdown(
+                    start_date,
+                    end_date,
+                    dev::get(body, "tz_offset_mins"),
+                )
+                .await,
             )
         }
         _ => return None,

@@ -53,7 +53,9 @@ export function IssueLine({ issue }: IssueLineProps) {
         )}
 
         {/* Date */}
-        <span className="text-xs text-muted-foreground w-[60px] shrink-0 text-right">{createdDate}</span>
+        <span className="text-xs text-muted-foreground w-[60px] shrink-0 text-right">
+          {createdDate}
+        </span>
 
         {/* Assignee */}
         <AssigneeUser user={issue.assignee} />

@@ -23,7 +23,9 @@ export function PatternsCard() {
         <div>Peak hours: {peakLabel}</div>
         {data.bestDayOfWeek && <div>Best day: {data.bestDayOfWeek}</div>}
         <div>Avg session: {Math.round(data.avgSessionMins)}min</div>
-        <div className="text-[10px] text-muted-foreground/60">{data.daysAnalyzed} days analyzed</div>
+        <div className="text-[10px] text-muted-foreground/60">
+          {data.daysAnalyzed} days analyzed
+        </div>
       </div>
     </div>
   );

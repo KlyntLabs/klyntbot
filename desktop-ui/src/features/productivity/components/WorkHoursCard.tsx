@@ -7,7 +7,13 @@ interface WorkHoursCardProps {
 }
 
 const SEGMENTS = [
-  { from: 0, to: 50, color: "var(--text-muted-foreground)", label: "Getting started", range: "0–50%" },
+  {
+    from: 0,
+    to: 50,
+    color: "var(--text-muted-foreground)",
+    label: "Getting started",
+    range: "0–50%",
+  },
   { from: 50, to: 80, color: "var(--brand)", label: "Progressing", range: "50–80%" },
   { from: 80, to: 100, color: "var(--success)", label: "On target", range: "80–100%" },
   { from: 100, to: 120, color: "var(--info)", label: "Slight overtime", range: "100–120%" },

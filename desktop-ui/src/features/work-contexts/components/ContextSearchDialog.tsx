@@ -65,7 +65,11 @@ export function ContextSearchDialog({ open, onClose, onSelect }: ContextSearchDi
               placeholder="Search work contexts…"
               className="flex-1 bg-transparent text-[14px] text-foreground placeholder-muted outline-none"
             />
-            <button type="button" onClick={onClose} className="text-muted-foreground hover:text-foreground">
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-muted-foreground hover:text-foreground"
+            >
               <X className="w-4 h-4" />
             </button>
           </div>

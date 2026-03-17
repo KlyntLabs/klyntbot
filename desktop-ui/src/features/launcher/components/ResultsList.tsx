@@ -96,7 +96,9 @@ function ResultRow({
       <ItemIcon kind={item.kind.type} icon={item.icon} />
       <div className="flex-1 min-w-0">
         <div className="text-sm text-foreground truncate">{item.title}</div>
-        {item.subtitle && <div className="text-xs text-muted-foreground truncate">{item.subtitle}</div>}
+        {item.subtitle && (
+          <div className="text-xs text-muted-foreground truncate">{item.subtitle}</div>
+        )}
       </div>
       <KindBadge type={item.kind.type} />
     </div>

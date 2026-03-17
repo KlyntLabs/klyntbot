@@ -279,6 +279,7 @@ dependencies = [
  "session",
  "shellexpand",
  "skill-system",
+ "sqlx",
  "storage",
  "tempfile",
  "tokio",

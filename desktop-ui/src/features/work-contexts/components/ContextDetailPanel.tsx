@@ -182,7 +182,9 @@ function ResourceRow({ resource }: { resource: WorkResource }) {
 function EventRow({ event }: { event: ActivityEvent }) {
   return (
     <div className="flex items-center gap-2 text-[11px] py-1 px-1.5 rounded hover:bg-card">
-      <span className="text-muted-foreground shrink-0 w-12 text-right">{formatTime(event.timestamp)}</span>
+      <span className="text-muted-foreground shrink-0 w-12 text-right">
+        {formatTime(event.timestamp)}
+      </span>
       <span className="text-muted-foreground">{event.action}</span>
       {event.resourceName && (
         <span className="text-muted-foreground truncate flex-1">{event.resourceName}</span>

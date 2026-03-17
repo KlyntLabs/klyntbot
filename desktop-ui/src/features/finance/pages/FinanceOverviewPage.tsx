@@ -248,7 +248,9 @@ export function Finance() {
           <Card className="overflow-hidden">
             <div className="px-4 pt-4 pb-1">
               <div className="flex items-center justify-between mb-2.5 px-1">
-                <span className="text-[10px] text-muted-foreground uppercase tracking-widest">Accounts</span>
+                <span className="text-[10px] text-muted-foreground uppercase tracking-widest">
+                  Accounts
+                </span>
                 <Link
                   to="/finance/cashflow"
                   className="text-[10px] text-brand normal-case tracking-normal"
@@ -278,7 +280,9 @@ export function Finance() {
                       <Icon className="w-3.5 h-3.5 text-muted-foreground" strokeWidth={1.5} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[11px] font-medium text-muted-foreground truncate">{acct.name}</p>
+                      <p className="text-[11px] font-medium text-muted-foreground truncate">
+                        {acct.name}
+                      </p>
                       <p className="text-[9px] text-dim font-light">
                         {acct.accountType.replaceAll("_", " ")}
                       </p>
@@ -307,7 +311,9 @@ export function Finance() {
           <Card className="overflow-hidden">
             <div className="px-4 pt-4 pb-1">
               <div className="flex items-center justify-between mb-2.5 px-1">
-                <span className="text-[10px] text-muted-foreground uppercase tracking-widest">Goals</span>
+                <span className="text-[10px] text-muted-foreground uppercase tracking-widest">
+                  Goals
+                </span>
                 <Link
                   to="/finance/targets"
                   className="text-[10px] text-brand normal-case tracking-normal"

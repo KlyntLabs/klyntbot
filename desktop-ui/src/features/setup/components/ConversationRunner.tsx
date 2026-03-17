@@ -30,11 +30,7 @@ function StepDots({
           <div
             key={i}
             className={`rounded-full transition-all duration-300 ${
-              isActive
-                ? "w-6 h-2 bg-brand"
-                : isDone
-                  ? "w-2 h-2 bg-brand/60"
-                  : "w-2 h-2 bg-muted"
+              isActive ? "w-6 h-2 bg-brand" : isDone ? "w-2 h-2 bg-brand/60" : "w-2 h-2 bg-muted"
             }`}
           />
         );

@@ -160,7 +160,9 @@ function NoteDetail({ item, kind }: { item: LauncherItem; kind: KindOf<"note"> }
     <div className="flex flex-col gap-3">
       <div className="text-base text-foreground font-medium">{item.title}</div>
       {kind.preview && (
-        <div className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">{kind.preview}</div>
+        <div className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+          {kind.preview}
+        </div>
       )}
       <KindTag label="Note" />
     </div>

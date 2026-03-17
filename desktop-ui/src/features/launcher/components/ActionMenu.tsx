@@ -111,7 +111,9 @@ export function ActionMenu() {
       >
         {/* Header */}
         <div className="px-4 py-2.5 border-b border-border">
-          <div className="text-xs text-muted-foreground uppercase tracking-wider mb-0.5">Actions</div>
+          <div className="text-xs text-muted-foreground uppercase tracking-wider mb-0.5">
+            Actions
+          </div>
           <div className="text-sm text-foreground truncate">{item.title}</div>
         </div>
 
@@ -127,9 +129,13 @@ export function ActionMenu() {
               onClick={() => executeAction(index)}
               onMouseEnter={() => setFocusedIndex(index)}
             >
-              <span className="text-xs text-muted-foreground w-4 text-center shrink-0">{index + 1}</span>
+              <span className="text-xs text-muted-foreground w-4 text-center shrink-0">
+                {index + 1}
+              </span>
               <span className="text-sm text-foreground flex-1">{action.label}</span>
-              {action.shortcut && <span className="text-[10px] text-muted-foreground">{action.shortcut}</span>}
+              {action.shortcut && (
+                <span className="text-[10px] text-muted-foreground">{action.shortcut}</span>
+              )}
             </button>
           ))}
         </div>

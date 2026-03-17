@@ -58,7 +58,9 @@ export function ContextSidebar({
                 />
                 <div className="flex-1 min-w-0">
                   <p className="text-[12px] font-medium truncate">{ctx.title}</p>
-                  <p className="text-[10px] text-muted-foreground">{isRecent ? "Active now" : `${ago} ago`}</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {isRecent ? "Active now" : `${ago} ago`}
+                  </p>
                 </div>
                 <span className="text-[10px] text-muted-foreground bg-accent rounded-full px-1.5 py-0.5 shrink-0">
                   {ctx.eventCount}

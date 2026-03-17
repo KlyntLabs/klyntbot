@@ -2,9 +2,9 @@ use std::sync::Arc;
 
 use desktop_shared::commands::{
     BacklinkResponse, CreatePersonaParams, FlashcardResponse, HybridSearchResponse,
-    InboxCreateParams, InboxItemResponse, InsightReviewResponse, InsightReviewStarted,
-    InsightSaveFlashcardsParams, InsightVersionResponse, NoteCreateParams, NoteLinkResponse,
-    NoteResponse, NoteSuggestionsResponse, NoteUpdateParams, NoteVersionResponse,
+    InboxCreateParams, InboxItemResponse, InsightEvolutionResponse, InsightReviewResponse,
+    InsightReviewStarted, InsightSaveFlashcardsParams, InsightVersionResponse, NoteCreateParams,
+    NoteLinkResponse, NoteResponse, NoteSuggestionsResponse, NoteUpdateParams, NoteVersionResponse,
     NotebookCreateParams, NotebookResponse, NotebookUpdateParams, PersonaResponse,
     RatePersonaParams, SetPersonaPinsParams, TabContent, UpdatePersonaParams,
 };
@@ -287,8 +287,11 @@ pub async fn inbox_delete(state: State<'_, Arc<AppCore>>, id: String) -> Result<
 pub async fn note_insight_review(
     state: State<'_, Arc<AppCore>>,
     note_id: String,
+    scope_config: Option<desktop_shared::commands::InsightScopeConfigParams>,
 ) -> Result<InsightReviewStarted, ApiError> {
-    state.note_insight_review(&note_id).await
+    state
+        .note_insight_review(&note_id, scope_config.as_ref())
+        .await
 }
 
 #[tauri::command]
@@ -322,6 +325,22 @@ pub async fn note_insight_list_versions(
     note_id: String,
 ) -> Result<Vec<InsightVersionResponse>, ApiError> {
     state.note_insight_list_versions(&note_id).await
+}
+
+#[tauri::command]
+pub async fn note_insight_get_evolution(
+    state: State<'_, Arc<AppCore>>,
+    note_id: String,
+) -> Result<InsightEvolutionResponse, ApiError> {
+    state.note_insight_get_evolution(&note_id).await
+}
+
+#[tauri::command]
+pub async fn note_insight_get_version(
+    state: State<'_, Arc<AppCore>>,
+    insight_id: String,
+) -> Result<InsightReviewResponse, ApiError> {
+    state.note_insight_get_version(&insight_id).await
 }
 
 // ── Persona Management commands ───────────────────────────────────
@@ -427,6 +446,8 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "note_insight_save_flashcards",
     "note_insight_regenerate_tab",
     "note_insight_list_versions",
+    "note_insight_get_evolution",
+    "note_insight_get_version",
     "note_insight_list_personas",
     "note_insight_create_persona",
     "note_insight_update_persona",
@@ -548,7 +569,10 @@ pub(crate) async fn dispatch_dev(
         }
         "note_insight_review" => {
             let id = try_field!(dev::get_str(body, "noteId"));
-            dev::val(core.note_insight_review(&id).await)
+            let scope: Option<desktop_shared::commands::InsightScopeConfigParams> = body
+                .get("scopeConfig")
+                .and_then(|v| serde_json::from_value(v.clone()).ok());
+            dev::val(core.note_insight_review(&id, scope.as_ref()).await)
         }
         "note_insight_cache_get" => {
             let id = try_field!(dev::get_str(body, "noteId"));
@@ -568,6 +592,14 @@ pub(crate) async fn dispatch_dev(
         "note_insight_list_versions" => {
             let id = try_field!(dev::get_str(body, "noteId"));
             dev::val(core.note_insight_list_versions(&id).await)
+        }
+        "note_insight_get_evolution" => {
+            let id = try_field!(dev::get_str(body, "noteId"));
+            dev::val(core.note_insight_get_evolution(&id).await)
+        }
+        "note_insight_get_version" => {
+            let id = try_field!(dev::get_str(body, "insightId"));
+            dev::val(core.note_insight_get_version(&id).await)
         }
         "note_insight_list_personas" => dev::val(core.note_insight_list_personas().await),
         "note_insight_create_persona" => dev::val(

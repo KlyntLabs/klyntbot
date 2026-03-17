@@ -182,19 +182,25 @@ export function FinanceInvestments() {
       {/* ── Stats row ─────────────────────────────────── */}
       <div className="grid grid-cols-4 gap-4 mb-4">
         <Card compact className="p-4">
-          <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">Total Value</p>
+          <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">
+            Total Value
+          </p>
           <p className="text-[24px] font-light text-foreground tabular-nums">
             {fmtCompact(convertTotal(totalValue), displayCur, hidden)}
           </p>
         </Card>
         <Card compact className="p-4">
-          <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">Cost Basis</p>
+          <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">
+            Cost Basis
+          </p>
           <p className="text-[24px] font-light text-muted-foreground tabular-nums">
             {fmtCompact(convertTotal(totalCost), displayCur, hidden)}
           </p>
         </Card>
         <Card compact className="p-4">
-          <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">Total Return</p>
+          <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">
+            Total Return
+          </p>
           <p
             className={cn(
               "text-[24px] font-light tabular-nums",
@@ -206,7 +212,9 @@ export function FinanceInvestments() {
           </p>
         </Card>
         <Card compact className="p-4">
-          <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">Holdings</p>
+          <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">
+            Holdings
+          </p>
           <p className="text-[24px] font-light text-foreground">{investments.length}</p>
         </Card>
       </div>
@@ -252,7 +260,9 @@ export function FinanceInvestments() {
                           className="w-2.5 h-2.5 rounded-full"
                           style={{ backgroundColor: COLORS[i % COLORS.length] }}
                         />
-                        <span className="text-[13px] font-medium text-muted-foreground">{p.name}</span>
+                        <span className="text-[13px] font-medium text-muted-foreground">
+                          {p.name}
+                        </span>
                       </div>
                       <div className="flex items-center gap-1">
                         {r >= 0 ? (

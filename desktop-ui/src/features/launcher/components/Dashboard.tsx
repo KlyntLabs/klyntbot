@@ -10,7 +10,9 @@ export function Dashboard({ onOpenTask }: DashboardProps) {
   const dashboard = useLauncherStore((s) => s.dashboard);
 
   if (!dashboard) {
-    return <div className="p-6 text-center text-muted-foreground text-sm animate-pulse">Loading...</div>;
+    return (
+      <div className="p-6 text-center text-muted-foreground text-sm animate-pulse">Loading...</div>
+    );
   }
 
   const hasContent =
@@ -125,7 +127,11 @@ function CalendarWidget({ events }: { events: DashboardData["calendar"] }) {
               <span className="text-[13px] text-foreground/90 truncate flex-1">{event.title}</span>
               <span
                 className={`text-[11px] tabular-nums shrink-0 ${
-                  isNow ? "text-destructive font-medium" : isSoon ? "text-warning" : "text-muted-foreground"
+                  isNow
+                    ? "text-destructive font-medium"
+                    : isSoon
+                      ? "text-warning"
+                      : "text-muted-foreground"
                 }`}
               >
                 {isNow ? "Now" : `${event.minutesUntil}m`}
@@ -170,7 +176,9 @@ function TasksWidget({
             d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
           />
         </svg>
-        <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Tasks</span>
+        <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+          Tasks
+        </span>
         <span className="text-[11px] text-dim ml-auto">{tasks.length}</span>
       </div>
       <div className="space-y-0.5">

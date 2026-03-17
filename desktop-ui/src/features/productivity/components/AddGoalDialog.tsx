@@ -92,7 +92,10 @@ export function AddGoalDialog({ open, onClose, onAdd }: AddGoalDialogProps) {
             </div>
 
             <div>
-              <label htmlFor="goal-target" className="block text-[12px] text-muted-foreground mb-1.5">
+              <label
+                htmlFor="goal-target"
+                className="block text-[12px] text-muted-foreground mb-1.5"
+              >
                 Target <span className="text-dim">({selectedMetric.unit})</span>
               </label>
               <input

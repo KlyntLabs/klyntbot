@@ -96,7 +96,9 @@ function SuggestionCard({
               {Math.round(suggestion.confidence * 100)}%
             </span>
           </div>
-          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{suggestion.description}</p>
+          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+            {suggestion.description}
+          </p>
         </div>
       </div>
       <div className="flex gap-2">

@@ -62,7 +62,9 @@ export function IssueGrid({ issue }: { issue: Issue }) {
         )}
         {issue.project && <ProjectBadge project={issue.project} />}
         <div className="flex items-center justify-between">
-          <span className="text-xs text-muted-foreground">{format(new Date(issue.createdAt), "MMM dd")}</span>
+          <span className="text-xs text-muted-foreground">
+            {format(new Date(issue.createdAt), "MMM dd")}
+          </span>
           <AssigneeUser user={issue.assignee} />
         </div>
       </motion.div>

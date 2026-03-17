@@ -4,7 +4,9 @@ import { DIRECTION_ICONS } from "../lib/monthlyPulse";
 export function MonthlyPulse({ rows }: { rows: PulseRow[] }) {
   return (
     <div className="flex flex-col justify-center h-full">
-      <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-4">Monthly Pulse</p>
+      <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-4">
+        Monthly Pulse
+      </p>
       {rows.map((row) => (
         <div key={row.label} className="flex items-center gap-3 mb-3.5 last:mb-0">
           <div

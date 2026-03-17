@@ -39,10 +39,7 @@ export function PeriodSelector({
           <ChevronRight className="w-4 h-4" strokeWidth={1.5} />
         </button>
       </div>
-      <div
-        className="flex gap-1 bg-card rounded-xl p-1 border border-border-subtle"
-        role="tablist"
-      >
+      <div className="flex gap-1 bg-card rounded-xl p-1 border border-border-subtle" role="tablist">
         {MODES.map((m) => (
           <button
             key={m}
@@ -51,7 +48,9 @@ export function PeriodSelector({
             aria-selected={m === mode}
             onClick={() => onSetMode(m)}
             className={`px-3 py-1.5 rounded-lg text-[11px] font-light transition-all capitalize ${
-              m === mode ? "glass-button-active text-foreground" : "text-muted-foreground hover:text-foreground"
+              m === mode
+                ? "glass-button-active text-foreground"
+                : "text-muted-foreground hover:text-foreground"
             }`}
           >
             {m}

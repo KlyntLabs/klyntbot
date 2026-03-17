@@ -198,7 +198,9 @@ export function ConfigurationSettings() {
     <div>
       <div className="mb-8">
         <h2 className="text-lg font-medium text-foreground">Configuration</h2>
-        <p className="text-[13px] text-muted-foreground mt-1">Channels, tools, and gateway settings</p>
+        <p className="text-[13px] text-muted-foreground mt-1">
+          Channels, tools, and gateway settings
+        </p>
       </div>
 
       <div className="space-y-4">
@@ -211,10 +213,7 @@ export function ConfigurationSettings() {
               const hasEdits = Object.keys(channelEdits[ch.key] ?? {}).length > 0;
 
               return (
-                <div
-                  key={ch.key}
-                  className="bg-card rounded-lg border border-border-subtle"
-                >
+                <div key={ch.key} className="bg-card rounded-lg border border-border-subtle">
                   <div className="flex items-center gap-2 p-3">
                     <button
                       type="button"
@@ -240,7 +239,9 @@ export function ConfigurationSettings() {
                     <div className="px-3 pb-3 space-y-2 border-t border-border-subtle pt-2">
                       {ch.fields.map((field) => (
                         <div key={field.key}>
-                          <span className="block text-[11px] text-muted-foreground mb-1">{field.label}</span>
+                          <span className="block text-[11px] text-muted-foreground mb-1">
+                            {field.label}
+                          </span>
                           {field.secret ? (
                             <SecretInput
                               value={String(getChannelValue(ch.key, field.key) || "")}
@@ -302,7 +303,9 @@ export function ConfigurationSettings() {
             </div>
 
             <label className="block">
-              <span className="block text-[11px] text-muted-foreground mb-1">Browser trust level</span>
+              <span className="block text-[11px] text-muted-foreground mb-1">
+                Browser trust level
+              </span>
               <select
                 value={String(getToolValue("browser.trustLevel") || "autonomous")}
                 onChange={(e) =>
@@ -323,7 +326,9 @@ export function ConfigurationSettings() {
             </label>
 
             <div>
-              <span className="block text-[11px] text-muted-foreground mb-1">Brave Search API key</span>
+              <span className="block text-[11px] text-muted-foreground mb-1">
+                Brave Search API key
+              </span>
               <SecretInput
                 value={String(getToolValue("web.braveApiKey") || "")}
                 onChange={(v) => setToolEdits((prev) => ({ ...prev, "web.braveApiKey": v }))}
