@@ -12,6 +12,8 @@ use tracing::{error, info, warn};
 pub(super) struct CronResult {
     pub cron_service: Arc<CronService>,
     pub notification_dispatcher: Arc<agent::NotificationDispatcher>,
+    pub proactive_handler: Option<Arc<dyn feature_tasks::ProactiveHandler>>,
+    pub suggestion_applier: Option<Arc<dyn SuggestionApplier>>,
 }
 
 pub const JOB_PROACTIVE_SCAN: &str = "proactive_scan";
@@ -66,6 +68,10 @@ pub(super) async fn init_cron(
         )))
     };
 
+    // Clone handlers before they're moved into cron closures so AppCore can hold refs too.
+    let proactive_handler_out = Some(proactive_handler.clone());
+    let suggestion_applier_out = suggestion_applier.clone();
+
     register_cron_callbacks(
         &mut cron_service,
         repos,
@@ -88,6 +94,8 @@ pub(super) async fn init_cron(
     Ok(CronResult {
         cron_service,
         notification_dispatcher,
+        proactive_handler: proactive_handler_out,
+        suggestion_applier: suggestion_applier_out,
     })
 }
 

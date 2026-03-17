@@ -94,6 +94,8 @@ impl AppCore {
         let cron::CronResult {
             cron_service,
             notification_dispatcher,
+            proactive_handler,
+            suggestion_applier,
         } = cron::init_cron(
             &config,
             &repos,
@@ -238,6 +240,10 @@ impl AppCore {
             event_emitter: event_emitter.unwrap_or_else(|| Arc::new(NoopEmitter)),
             note_embedding_handler,
             launcher_engine,
+            proactive_handler,
+            suggestion_applier,
+            decomposition_handler: None,
+            forecast_handler: None,
         };
 
         // ── Background note embedding catch-up ────────────────────────────
