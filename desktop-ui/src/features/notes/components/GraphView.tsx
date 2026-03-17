@@ -1,13 +1,16 @@
 import { useClickOutside } from "@shared/hooks/useClickOutside";
 import type { Note, Notebook } from "@shared/types";
-import { Maximize2, Minus, Plus, RotateCcw, Settings2 } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
+import { Activity, Maximize2, Minus, Plus, RotateCcw, Settings2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type ClusterMode, useCytoscapeElements } from "../hooks/useCytoscapeElements";
 import { useCytoscapeGraph } from "../hooks/useCytoscapeGraph";
 import { useCytoscapeTheme } from "../hooks/useCytoscapeTheme";
 import type { SmartView } from "../hooks/useGraphData";
 import { useGraphData } from "../hooks/useGraphData";
+import { useGraphPositionCache } from "../hooks/useGraphPositionCache";
 import { useGraphSettings } from "../hooks/useGraphSettings";
+import { computeBfsWaves, selectHub } from "../lib/graphBfs";
+import type { PositionMap } from "../lib/graphUtils";
 import { GraphLegend } from "./GraphLegend";
 import { GraphNodeTooltip } from "./GraphNodeTooltip";
 import { GraphSettingsPopover } from "./GraphSettingsPopover";
@@ -69,7 +72,7 @@ export function GraphView({
     return filteredNodeIds.has(sId) && filteredNodeIds.has(tId);
   });
 
-  const { elements: allElements, clusters } = useCytoscapeElements({
+  const { elements: allElements, clusters, fingerprint } = useCytoscapeElements({
     nodes: filteredNodes,
     links: filteredLinks,
     notebooks,
@@ -90,6 +93,47 @@ export function GraphView({
         })
       : allElements;
 
+  // Position cache — undefined = not yet loaded, null = cache miss, PositionMap = cache hit
+  const { loadPositions, savePositions } = useGraphPositionCache(smartView, fingerprint);
+  const [cachedPositions, setCachedPositions] = useState<PositionMap | null | undefined>(undefined);
+  const [cacheReady, setCacheReady] = useState(false);
+
+  // Load positions on mount or fingerprint change
+  useEffect(() => {
+    setCacheReady(false);
+    setCachedPositions(undefined);
+    loadPositions().then((pos) => {
+      setCachedPositions(pos);
+      setCacheReady(true);
+    });
+  }, [loadPositions, fingerprint]);
+
+  // BFS waves
+  const waves = useMemo(() => {
+    if (filteredNodes.length === 0) return [];
+    const adjacency = new Map<string, Set<string>>();
+    for (const link of filteredLinks) {
+      const sId = typeof link.source === "string" ? link.source : link.source.id;
+      const tId = typeof link.target === "string" ? link.target : link.target.id;
+      if (!adjacency.has(sId)) adjacency.set(sId, new Set());
+      if (!adjacency.has(tId)) adjacency.set(tId, new Set());
+      adjacency.get(sId)!.add(tId);
+      adjacency.get(tId)!.add(sId);
+    }
+    const hubId = selectHub(
+      filteredNodes.map((n) => ({ id: n.id, linkCount: n.linkCount, title: n.title })),
+      activeNoteId,
+    );
+    return computeBfsWaves(hubId, adjacency, new Set(filteredNodes.map((n) => n.id)));
+  }, [filteredNodes, filteredLinks, activeNoteId]);
+
+  const handleSavePositions = useCallback(
+    (positions: PositionMap) => {
+      savePositions(positions);
+    },
+    [savePositions],
+  );
+
   const { stylesheet } = useCytoscapeTheme();
   const nodeMap = new Map(filteredNodes.map((n) => [n.id, n]));
 
@@ -98,6 +142,10 @@ export function GraphView({
     elements,
     stylesheet,
     settings,
+    waves,
+    cachedPositions,
+    cacheReady,
+    onSavePositions: handleSavePositions,
     onNodeClick: onSelectNote,
     onNodeDoubleClick: onOpenInEditor,
     onNodeHover: useCallback((id: string | null, x: number, y: number) => {
@@ -190,92 +238,110 @@ export function GraphView({
         onSearchChange={setSearchQuery}
       />
 
-      <div
-        className="flex-1 relative min-h-0 bg-background"
-        style={{
-          backgroundImage: "radial-gradient(circle, var(--border) 0.5px, transparent 0.5px)",
-          backgroundSize: "20px 20px",
-        }}
-      >
+      {!cacheReady ? (
+        <div className="flex-1 flex items-center justify-center text-muted text-sm">
+          Loading graph...
+        </div>
+      ) : (
         <div
-          ref={containerRef}
-          style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
-        />
+          className="flex-1 relative min-h-0 bg-background"
+          style={{
+            backgroundImage: "radial-gradient(circle, var(--border) 0.5px, transparent 0.5px)",
+            backgroundSize: "20px 20px",
+          }}
+        >
+          <div
+            ref={containerRef}
+            style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
+          />
 
-        {/* Legend with filter */}
-        <GraphLegend
-          clusters={clusters}
-          hiddenClusters={hiddenClusters}
-          onToggleCluster={handleToggleCluster}
-          onShowAll={handleShowAll}
-          onHighlight={handleLegendHighlight}
-        />
+          {/* Legend with filter */}
+          <GraphLegend
+            clusters={clusters}
+            hiddenClusters={hiddenClusters}
+            onToggleCluster={handleToggleCluster}
+            onShowAll={handleShowAll}
+            onHighlight={handleLegendHighlight}
+          />
 
-        {/* Controls (bottom-right) */}
-        <div className="absolute bottom-4 right-4 z-10 flex flex-col gap-1">
-          {/* Settings popover */}
-          <div className="relative" ref={settingsRef}>
+          {/* Controls (bottom-right) */}
+          <div className="absolute bottom-4 right-4 z-10 flex flex-col gap-1">
+            {/* Settings popover */}
+            <div className="relative" ref={settingsRef}>
+              <button
+                type="button"
+                onClick={() => setSettingsOpen(!settingsOpen)}
+                className={`w-7 h-7 glass-button flex items-center justify-center transition-colors ${
+                  settingsOpen ? "text-brand" : "text-secondary hover:text-primary"
+                }`}
+                aria-label="Graph settings"
+              >
+                <Settings2 size={14} />
+              </button>
+              {settingsOpen && (
+                <div className="absolute bottom-9 right-0 glass-card p-3">
+                  <GraphSettingsPopover
+                    settings={settings}
+                    defaults={defaults}
+                    onChange={setSettings}
+                    onReset={resetSettings}
+                  />
+                </div>
+              )}
+            </div>
+
             <button
               type="button"
-              onClick={() => setSettingsOpen(!settingsOpen)}
+              onClick={() => setSettings({ livePhysics: !settings.livePhysics })}
               className={`w-7 h-7 glass-button flex items-center justify-center transition-colors ${
-                settingsOpen ? "text-brand" : "text-secondary hover:text-primary"
+                settings.livePhysics ? "text-brand" : "text-secondary hover:text-primary"
               }`}
-              aria-label="Graph settings"
+              aria-label="Live physics"
+              title={settings.livePhysics ? "Disable live physics" : "Enable live physics"}
             >
-              <Settings2 size={14} />
+              <Activity size={14} />
             </button>
-            {settingsOpen && (
-              <div className="absolute bottom-9 right-0 glass-card p-3">
-                <GraphSettingsPopover
-                  settings={settings}
-                  defaults={defaults}
-                  onChange={setSettings}
-                  onReset={resetSettings}
-                />
-              </div>
-            )}
+
+            <button
+              type="button"
+              onClick={zoomIn}
+              className="w-7 h-7 glass-button flex items-center justify-center text-secondary hover:text-primary"
+              aria-label="Zoom in"
+            >
+              <Plus size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={zoomOut}
+              className="w-7 h-7 glass-button flex items-center justify-center text-secondary hover:text-primary"
+              aria-label="Zoom out"
+            >
+              <Minus size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={fitScreen}
+              className="w-7 h-7 glass-button flex items-center justify-center text-secondary hover:text-primary"
+              aria-label="Fit to screen"
+            >
+              <Maximize2 size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={runLayout}
+              className="w-7 h-7 glass-button flex items-center justify-center text-secondary hover:text-primary"
+              aria-label="Re-layout"
+            >
+              <RotateCcw size={14} />
+            </button>
           </div>
 
-          <button
-            type="button"
-            onClick={zoomIn}
-            className="w-7 h-7 glass-button flex items-center justify-center text-secondary hover:text-primary"
-            aria-label="Zoom in"
-          >
-            <Plus size={14} />
-          </button>
-          <button
-            type="button"
-            onClick={zoomOut}
-            className="w-7 h-7 glass-button flex items-center justify-center text-secondary hover:text-primary"
-            aria-label="Zoom out"
-          >
-            <Minus size={14} />
-          </button>
-          <button
-            type="button"
-            onClick={fitScreen}
-            className="w-7 h-7 glass-button flex items-center justify-center text-secondary hover:text-primary"
-            aria-label="Fit to screen"
-          >
-            <Maximize2 size={14} />
-          </button>
-          <button
-            type="button"
-            onClick={runLayout}
-            className="w-7 h-7 glass-button flex items-center justify-center text-secondary hover:text-primary"
-            aria-label="Re-layout"
-          >
-            <RotateCcw size={14} />
-          </button>
+          {/* Tooltip */}
+          {tooltip && nodeMap.has(tooltip.nodeId) && (
+            <GraphNodeTooltip node={nodeMap.get(tooltip.nodeId)!} x={tooltip.x} y={tooltip.y} />
+          )}
         </div>
-
-        {/* Tooltip */}
-        {tooltip && nodeMap.has(tooltip.nodeId) && (
-          <GraphNodeTooltip node={nodeMap.get(tooltip.nodeId)!} x={tooltip.x} y={tooltip.y} />
-        )}
-      </div>
+      )}
     </div>
   );
 }
