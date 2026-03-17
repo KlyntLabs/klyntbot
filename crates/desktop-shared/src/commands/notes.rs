@@ -195,6 +195,19 @@ pub struct InsightReviewResponse {
     pub concept_map: Option<String>,
     pub perspectives: Option<String>,
     pub persona_ids: Option<Vec<String>>,
+    /// Full persona metadata resolved from persona_ids (for frontend PersonaCard rendering).
+    #[serde(default)]
+    pub personas: Vec<PersonaMetaResponse>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PersonaMetaResponse {
+    pub id: String,
+    pub name: String,
+    pub role: String,
+    pub icon: String,
+    pub tone: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -217,6 +230,9 @@ pub struct QuizQuestion {
 pub struct TabContent {
     pub tab: String,
     pub content: String,
+    /// Persona metadata — only populated when tab == "perspectives".
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub personas: Vec<PersonaMetaResponse>,
 }
 
 #[derive(Debug, Clone, Serialize)]

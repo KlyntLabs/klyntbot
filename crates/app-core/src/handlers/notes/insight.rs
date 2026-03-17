@@ -35,6 +35,7 @@ fn row_to_insight_response(row: feature_insights::InsightReviewRow) -> InsightRe
         concept_map: content.concept_map,
         perspectives: content.perspectives,
         persona_ids,
+        personas: vec![], // Resolved by caller (note_insight_cache_get) when async context is available
     }
 }
 
@@ -266,7 +267,30 @@ impl AppCore {
             None => return Ok(None),
         };
 
-        Ok(Some(row_to_insight_response(row)))
+        let mut response = row_to_insight_response(row);
+
+        // Resolve persona IDs → full metadata for PersonaCard rendering
+        if let Some(ref ids) = response.persona_ids {
+            if !ids.is_empty() {
+                if let Some(ref repo) = self.persona_repo {
+                    let mut personas = Vec::new();
+                    for id in ids {
+                        if let Ok(Some(p)) = repo.get(id).await {
+                            personas.push(PersonaMetaResponse {
+                                id: p.id,
+                                name: p.name,
+                                role: p.role,
+                                icon: p.icon,
+                                tone: p.tone,
+                            });
+                        }
+                    }
+                    response.personas = personas;
+                }
+            }
+        }
+
+        Ok(Some(response))
     }
 
     /// Knowledge growth metrics from the cognitive fact store.
@@ -591,6 +615,9 @@ impl AppCore {
         let params = providers::cognitive_chat_params(&config, 4096);
         drop(config);
 
+        // Track persona metadata for perspectives tab (returned alongside content)
+        let mut tab_personas: Vec<PersonaMetaResponse> = Vec::new();
+
         let prompt = match tab {
             "synthesis" => insight_prompts::synthesis_prompt(&ctx_text),
             "gaps" => insight_prompts::gap_analysis_prompt(&ctx_text),
@@ -598,6 +625,16 @@ impl AppCore {
             "concept-map" => insight_prompts::concept_map_prompt(&ctx_text, &ctx_note_title),
             "perspectives" => {
                 let personas = self.select_personas(note_id, &note_domains).await;
+                tab_personas = personas
+                    .iter()
+                    .map(|p| PersonaMetaResponse {
+                        id: p.id.clone(),
+                        name: p.name.clone(),
+                        role: p.role.clone(),
+                        icon: p.icon.clone(),
+                        tone: p.tone.clone(),
+                    })
+                    .collect();
                 let blocks: Vec<(String, String, String, String, String)> = personas
                     .iter()
                     .map(|p| {
@@ -679,6 +716,7 @@ impl AppCore {
         Ok(TabContent {
             tab: tab.to_string(),
             content,
+            personas: tab_personas,
         })
     }
 

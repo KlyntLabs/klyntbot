@@ -79,11 +79,13 @@ export interface InsightReviewCachedResponse {
   conceptMap: string | null;
   perspectives: string | null;
   personaIds: string[] | null;
+  personas: PersonaMeta[];
 }
 
 interface TabContentResponse {
   tab: string;
   content: string;
+  personas?: PersonaMeta[];
 }
 
 // ---------------------------------------------------------------------------
@@ -260,7 +262,11 @@ export function useInsightReview(): [InsightReviewState, InsightReviewActions] {
             ? { status: "done" as const, ...parseConceptMap(cached.conceptMap) }
             : { status: "idle" as const, mermaid: "", fallbackText: "" },
           perspectives: cached.perspectives
-            ? { status: "done" as const, content: cached.perspectives, personas: [] }
+            ? {
+                status: "done" as const,
+                content: cached.perspectives,
+                personas: cached.personas ?? [],
+              }
             : { status: "idle" as const, content: "", personas: [] },
         },
       }));
@@ -346,7 +352,11 @@ export function useInsightReview(): [InsightReviewState, InsightReviewActions] {
         } else if (response.tab === "concept-map") {
           tabs.conceptMap = { status: "done", ...parseConceptMap(response.content) };
         } else if (response.tab === "perspectives") {
-          tabs.perspectives = { ...tabs.perspectives, status: "done", content: response.content };
+          tabs.perspectives = {
+            status: "done",
+            content: response.content,
+            personas: response.personas ?? prev.tabs.perspectives.personas,
+          };
         }
 
         return { ...prev, tabs };
