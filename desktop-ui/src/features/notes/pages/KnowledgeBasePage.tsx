@@ -444,6 +444,7 @@ export default function KnowledgeBasePage() {
             </div>
             <GraphView
               notes={notes}
+              notebooks={notebooks}
               activeNoteId={selectedNoteId}
               onSelectNote={setSelectedNoteId}
               onOpenInEditor={(id) => {
