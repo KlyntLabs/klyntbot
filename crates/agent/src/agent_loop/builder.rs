@@ -396,6 +396,7 @@ impl AgentLoopBuilder {
                             failed_obs_repo: Some(failed_obs_repo),
                             promote_threshold: config.cognitive.accumulate_promote_threshold,
                             min_days: config.cognitive.accumulate_min_days,
+                            domain_bus: self.domain_event_bus.clone(),
                         },
                     );
                     info!("Cognitive background consolidation service started");

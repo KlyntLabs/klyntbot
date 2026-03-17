@@ -199,6 +199,7 @@ pub struct BackgroundServiceConfig {
     pub failed_obs_repo: Option<FailedObservationRepo>,
     pub promote_threshold: usize,
     pub min_days: usize,
+    pub domain_bus: Option<Arc<bus::DomainEventBus>>,
 }
 
 /// Background service that processes domain events into cognitive memory.
@@ -223,6 +224,7 @@ impl BackgroundConsolidationService {
             failed_obs_repo,
             promote_threshold,
             min_days,
+            domain_bus,
         } = config;
         let cancel_clone = cancel.clone();
         let handle = tokio::spawn(async move {
@@ -256,6 +258,8 @@ impl BackgroundConsolidationService {
             let mut dlq_reprocess_ids: Vec<String> = Vec::new();
             // Accumulator promotions — separate from DLQ to avoid index corruption
             let mut promotion_queue: Vec<Observation> = Vec::new();
+
+            let session_start = chrono::Utc::now().to_rfc3339();
 
             loop {
                 // Collect batch (3s window, max 10 events)
@@ -427,6 +431,31 @@ impl BackgroundConsolidationService {
                             embedder.as_deref(),
                         )
                         .await;
+
+                        // ── Contradiction detection ──────────────────────────
+                        if let Some(ref bus) = domain_bus {
+                            for (candidate, op) in candidates.iter().zip(ops.iter()) {
+                                if let crate::types::MemoryOp::Update { id: _, old_id } = op {
+                                    let new = &candidate.candidate;
+                                    if new.confidence < 0.7 || new.source != "user_stated" {
+                                        continue;
+                                    }
+                                    if let Ok(Some(old_fact)) = repo.get(old_id).await {
+                                        if old_fact.object != new.object
+                                            && !is_same_session(&old_fact.recorded_at, &session_start)
+                                        {
+                                            let _ = bus.publish(DomainEvent::ContradictionDetected {
+                                                existing_subject: old_fact.subject.clone(),
+                                                existing_predicate: old_fact.predicate.clone(),
+                                                existing_object: old_fact.object.clone(),
+                                                new_object: new.object.clone(),
+                                                confidence: new.confidence,
+                                            });
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
 
                     // Self-healing: drain dead-letter if LLM is healthy (no fallbacks this batch)
@@ -898,6 +927,19 @@ fn event_type_key(event: &DomainEvent) -> String {
         DomainEvent::TaskFieldUpdated { .. } => "TaskFieldUpdated".into(),
         DomainEvent::ContradictionDetected { .. } => "ContradictionDetected".into(),
     }
+}
+
+/// Check if a fact was recorded in the current session.
+fn is_same_session(recorded_at: &str, session_start: &str) -> bool {
+    let recorded = chrono::DateTime::parse_from_rfc3339(recorded_at)
+        .or_else(|_| {
+            recorded_at
+                .parse::<chrono::NaiveDateTime>()
+                .map(|ndt| ndt.and_utc().fixed_offset())
+        })
+        .unwrap_or_default();
+    let start = chrono::DateTime::parse_from_rfc3339(session_start).unwrap_or_default();
+    (recorded - start).num_seconds().abs() < 300
 }
 
 /// Convert a MemoryOp to a string label for the debug dashboard.
