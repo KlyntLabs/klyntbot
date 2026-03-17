@@ -1,6 +1,6 @@
 use desktop_shared::commands::{
-    ObjectiveResponse, ProjectResponse, TaskCreateParams, TaskResponse, TaskUpdateParams,
-    TodayTaskResponse,
+    ObjectiveResponse, ProjectResponse, SuggestionResponse, TaskCreateParams, TaskResponse,
+    TaskUpdateParams, TodayTaskResponse,
 };
 use desktop_shared::errors::ApiError;
 use std::sync::Arc;
@@ -127,6 +127,33 @@ pub async fn objective_list(
     state.objective_list_for_tasks(project_id).await
 }
 
+#[tauri::command]
+pub async fn task_get_suggestions(
+    state: State<'_, Arc<AppCore>>,
+    task_id: String,
+) -> Result<Vec<SuggestionResponse>, ApiError> {
+    state.task_get_suggestions(task_id).await
+}
+
+#[tauri::command]
+pub async fn task_apply_suggestion(
+    state: State<'_, Arc<AppCore>>,
+    app: tauri::AppHandle,
+    suggestion_id: String,
+) -> Result<TaskResponse, ApiError> {
+    let (response, updates) = state.task_apply_suggestion(suggestion_id).await?;
+    super::emit_updates(&app, &updates);
+    Ok(response)
+}
+
+#[tauri::command]
+pub async fn task_dismiss_suggestion(
+    state: State<'_, Arc<AppCore>>,
+    suggestion_id: String,
+) -> Result<(), ApiError> {
+    state.task_dismiss_suggestion(suggestion_id).await
+}
+
 // ── Dev server dispatch ─────────────────────────────────────────────
 
 #[cfg(test)]
@@ -143,6 +170,9 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "objective_list",
     "task_start_focus",
     "task_end_focus",
+    "task_get_suggestions",
+    "task_apply_suggestion",
+    "task_dismiss_suggestion",
 ];
 
 #[cfg(debug_assertions)]
@@ -166,7 +196,10 @@ pub(crate) async fn dispatch_dev(
             dev::val(core.task_get(id).await)
         }
         "task_create" => dev::val_rh(core.task_create(try_field!(dev::parse_params(body))).await),
-        "task_update" => dev::val_rh(core.task_update(try_field!(dev::parse_params(body)), Some("user".into())).await),
+        "task_update" => dev::val_rh(
+            core.task_update(try_field!(dev::parse_params(body)), Some("user".into()))
+                .await,
+        ),
         "task_delete" => {
             let id = try_field!(dev::get_str(body, "id"));
             dev::val_rh(core.task_delete(id).await)
@@ -196,6 +229,18 @@ pub(crate) async fn dispatch_dev(
                 Ok(None) => dev::val(Ok::<_, ApiError>(None::<TaskResponse>)),
                 Err(e) => dev::val(Err::<Option<TaskResponse>, _>(e)),
             }
+        }
+        "task_get_suggestions" => {
+            let task_id = try_field!(dev::get_str(body, "taskId"));
+            dev::val(core.task_get_suggestions(task_id).await)
+        }
+        "task_apply_suggestion" => {
+            let suggestion_id = try_field!(dev::get_str(body, "suggestionId"));
+            dev::val_rh(core.task_apply_suggestion(suggestion_id).await)
+        }
+        "task_dismiss_suggestion" => {
+            let suggestion_id = try_field!(dev::get_str(body, "suggestionId"));
+            dev::val(core.task_dismiss_suggestion(suggestion_id).await)
         }
         _ => return None,
     })
