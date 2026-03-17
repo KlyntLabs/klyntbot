@@ -191,6 +191,8 @@ pub struct InsightReviewResponse {
     pub gap_analysis: Option<String>,
     pub self_assessment: Option<Vec<QuizQuestion>>,
     pub concept_map: Option<String>,
+    pub perspectives: Option<String>,
+    pub persona_ids: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -239,4 +241,63 @@ pub struct InsightSaveFlashcardsParams {
     pub insight_review_id: String,
     pub deck_name: String,
     pub questions: Vec<QuizQuestion>,
+}
+
+// ── Persona Management ──────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PersonaResponse {
+    pub id: String,
+    pub name: String,
+    pub role: String,
+    pub expertise: String,
+    pub perspective: String,
+    pub tone: String,
+    pub icon: String,
+    pub source: String,
+    pub domains: Vec<String>,
+    pub is_active: bool,
+    pub relevance_score: f64,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreatePersonaParams {
+    pub name: String,
+    pub role: String,
+    pub expertise: String,
+    pub perspective: String,
+    pub tone: String,
+    pub icon: String,
+    pub domains: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdatePersonaParams {
+    pub id: String,
+    pub name: Option<String>,
+    pub role: Option<String>,
+    pub expertise: Option<String>,
+    pub perspective: Option<String>,
+    pub tone: Option<String>,
+    pub icon: Option<String>,
+    pub domains: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetPersonaPinsParams {
+    pub note_id: String,
+    pub persona_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RatePersonaParams {
+    pub id: String,
+    pub helpful: bool,
 }
