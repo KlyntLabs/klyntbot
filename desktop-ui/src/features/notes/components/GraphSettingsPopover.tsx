@@ -25,10 +25,20 @@ function Slider({
   unit?: string;
   onChange: (v: number) => void;
 }) {
+  const pct = ((value - min) / (max - min)) * 100;
+
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-3 h-7">
       <span className="text-[11px] text-secondary w-[90px] shrink-0">{label}</span>
-      <div className="flex-1 relative flex items-center">
+      <div className="flex-1 relative flex items-center h-5">
+        {/* Custom track with progress fill */}
+        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[4px] rounded-full bg-surface-raised overflow-hidden">
+          <div
+            className="h-full rounded-full bg-brand/50"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        {/* Native range input (invisible track, visible thumb) */}
         <input
           type="range"
           min={min}
@@ -36,7 +46,8 @@ function Slider({
           step={step}
           value={value}
           onChange={(e) => onChange(Number(e.target.value))}
-          className="w-full h-[3px] rounded-full appearance-none cursor-pointer bg-surface-raised outline-none [&::-webkit-slider-thumb]:w-[10px] [&::-webkit-slider-thumb]:h-[10px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:bg-brand [&::-webkit-slider-thumb]:shadow-sm [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-brand/30 [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:hover:scale-125 [&::-webkit-slider-thumb]:transition-transform"
+          style={{ WebkitAppearance: "none", appearance: "none", background: "transparent" }}
+          className="relative z-10 w-full h-5 cursor-pointer outline-none [&::-webkit-slider-thumb]:w-[12px] [&::-webkit-slider-thumb]:h-[12px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:bg-brand [&::-webkit-slider-thumb]:shadow-[0_1px_3px_rgba(0,0,0,0.3)] [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-background [&::-webkit-slider-thumb]:transition-transform [&::-webkit-slider-thumb]:hover:scale-110"
         />
       </div>
       <span className="text-[10px] text-muted tabular-nums w-[36px] text-right shrink-0">
@@ -56,20 +67,20 @@ function Toggle({
   onChange: (v: boolean) => void;
 }) {
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-3 h-7">
       <span className="text-[11px] text-secondary flex-1">{label}</span>
       <button
         type="button"
         role="switch"
         aria-checked={checked}
         onClick={() => onChange(!checked)}
-        className={`relative w-8 h-[18px] rounded-full transition-colors shrink-0 ${
+        className={`relative w-9 h-5 rounded-full transition-colors shrink-0 ${
           checked ? "bg-brand" : "bg-surface-raised"
         }`}
       >
         <span
-          className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow-sm transition-transform ${
-            checked ? "translate-x-[14px]" : "translate-x-[2px]"
+          className={`absolute top-[3px] w-[14px] h-[14px] rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.25)] transition-transform ${
+            checked ? "translate-x-[18px]" : "translate-x-[3px]"
           }`}
         />
       </button>
@@ -92,7 +103,7 @@ export function GraphSettingsPopover({
   return (
     <div className="w-[280px]">
       {/* Header */}
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-2">
         <span className="text-[10px] font-semibold text-muted uppercase tracking-wider">
           Settings
         </span>
@@ -109,7 +120,7 @@ export function GraphSettingsPopover({
       </div>
 
       {/* Sliders */}
-      <div className="space-y-2">
+      <div className="space-y-0.5">
         <Slider
           label="Link Distance"
           value={settings.linkDistance}
@@ -156,7 +167,7 @@ export function GraphSettingsPopover({
       </div>
 
       {/* Toggles */}
-      <div className="mt-3 pt-2 border-t border-border-subtle space-y-2">
+      <div className="mt-2 pt-2 border-t border-border-subtle space-y-0.5">
         <Toggle
           label="Show Arrows"
           checked={settings.showArrows}
