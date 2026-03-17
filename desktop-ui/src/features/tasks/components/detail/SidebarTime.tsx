@@ -1,4 +1,5 @@
 import { formatHumanDuration } from "@shared/lib/dates";
+import type { TaskForecast } from "../../hooks/useIssueDetail";
 import type { DetailTask, TaskState } from "../../lib/mappers";
 import { cn } from "../../lib/utils";
 import { SectionLabel } from "./SectionLabel";
@@ -6,12 +7,20 @@ import { SectionLabel } from "./SectionLabel";
 interface SidebarTimeProps {
   task: DetailTask;
   taskState: TaskState;
+  forecast: TaskForecast | null;
+  forecastLoading: boolean;
+  onFetchForecast: () => void;
 }
 
-export function SidebarTime({ task, taskState }: SidebarTimeProps) {
+export function SidebarTime({
+  task,
+  taskState,
+  forecast,
+  forecastLoading,
+  onFetchForecast,
+}: SidebarTimeProps) {
   const estimatedSecs = (task.estimatedMinutes ?? 0) * 60;
   const trackedSecs = task.totalTrackedSecs;
-  const forecastSecs = estimatedSecs > 0 ? Math.round(estimatedSecs * 1.1) : 0;
 
   if (taskState === "new") {
     return (
@@ -22,6 +31,13 @@ export function SidebarTime({ task, taskState }: SidebarTimeProps) {
             ? `Estimate: ${formatHumanDuration(estimatedSecs)}`
             : "No estimate"}
         </div>
+        {task.estimatedMinutes != null && (
+          <ForecastSection
+            forecast={forecast}
+            forecastLoading={forecastLoading}
+            onFetchForecast={onFetchForecast}
+          />
+        )}
       </div>
     );
   }
@@ -68,10 +84,15 @@ export function SidebarTime({ task, taskState }: SidebarTimeProps) {
           value={estimatedSecs > 0 ? formatHumanDuration(estimatedSecs) : "—"}
         />
         <TimeRow label="Tracked" value={formatHumanDuration(trackedSecs)} />
-        <TimeRow
-          label="Forecast"
-          value={forecastSecs > 0 ? formatHumanDuration(forecastSecs) : "—"}
-        />
+
+        {forecast ? (
+          <TimeRow
+            label="Forecast"
+            value={`${formatHumanDuration(forecast.confidenceLow * 60)} — ${formatHumanDuration(forecast.estimatedMinutes * 60)} — ${formatHumanDuration(forecast.confidenceHigh * 60)}`}
+          />
+        ) : (
+          <TimeRow label="Forecast" value="—" />
+        )}
 
         {estimatedSecs > 0 && (
           <>
@@ -84,7 +105,56 @@ export function SidebarTime({ task, taskState }: SidebarTimeProps) {
             <div className="text-xs text-[hsl(var(--muted-foreground))] mt-1">{statusText}</div>
           </>
         )}
+
+        {task.estimatedMinutes != null && (
+          <ForecastSection
+            forecast={forecast}
+            forecastLoading={forecastLoading}
+            onFetchForecast={onFetchForecast}
+          />
+        )}
       </div>
+    </div>
+  );
+}
+
+function ForecastSection({
+  forecast,
+  forecastLoading,
+  onFetchForecast,
+}: {
+  forecast: TaskForecast | null;
+  forecastLoading: boolean;
+  onFetchForecast: () => void;
+}) {
+  if (!forecast) {
+    return (
+      <button
+        type="button"
+        onClick={onFetchForecast}
+        disabled={forecastLoading}
+        className="mt-2 text-xs text-[hsl(var(--primary))] hover:underline disabled:opacity-50"
+      >
+        {forecastLoading ? "Loading..." : "Get AI Forecast"}
+      </button>
+    );
+  }
+
+  return (
+    <div className="mt-2 space-y-1">
+      <div className="text-xs text-[hsl(var(--muted-foreground))]">
+        Based on {forecast.sampleSize} similar tasks ({forecast.dataQuality})
+      </div>
+      {forecast.risks.length > 0 && (
+        <ul className="text-xs text-[hsl(var(--muted-foreground))] list-disc pl-3 space-y-0.5">
+          {forecast.risks.map((risk) => (
+            <li key={risk.kind}>
+              {risk.description}
+              {risk.impactMinutes != null && ` (+${risk.impactMinutes}m)`}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

@@ -36,6 +36,16 @@ export type {
   ActivityEntry,
 };
 
+export interface TaskForecast {
+  estimatedMinutes: number;
+  confidenceLow: number;
+  confidenceHigh: number;
+  methodology: string;
+  sampleSize: number;
+  dataQuality: string;
+  risks: Array<{ kind: string; description: string; impactMinutes: number | null }>;
+}
+
 const PLACEHOLDER_TASK: DetailTask = {
   id: "",
   identifier: "",
@@ -61,6 +71,7 @@ const PLACEHOLDER_TASK: DetailTask = {
   totalTrackedSecs: 0,
   focusedAt: null,
   acceptanceCriteria: null,
+  complexityScore: null,
   completed: false,
   createdAt: "",
   updatedAt: "",
@@ -249,6 +260,22 @@ export function useIssueDetail(
     setDecompositionResult(null);
   }, []);
 
+  // Forecast
+  const [forecast, setForecast] = useState<TaskForecast | null>(null);
+  const [forecastLoading, setForecastLoading] = useState(false);
+
+  const fetchForecast = useCallback(async () => {
+    setForecastLoading(true);
+    try {
+      const result = await ipc<TaskForecast>("task_forecast", { taskId: task.id });
+      setForecast(result);
+    } catch {
+      setForecast(null);
+    } finally {
+      setForecastLoading(false);
+    }
+  }, [task.id]);
+
   const taskMemory: TaskMemory | null = null;
   const focusSession: FocusSession | null = buildFocusSession(task);
 
@@ -281,5 +308,8 @@ export function useIssueDetail(
     decompose,
     applyDecomposition,
     rejectDecomposition,
+    forecast,
+    forecastLoading,
+    fetchForecast,
   };
 }

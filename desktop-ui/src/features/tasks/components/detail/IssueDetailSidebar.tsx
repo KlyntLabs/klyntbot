@@ -45,7 +45,15 @@ export function IssueDetailSidebar({ detail, onClose }: IssueDetailSidebarProps)
             onStopFocus={detail.stopFocus}
           />
         )}
-        {showTime && <SidebarTime task={detail.task} taskState={taskState} />}
+        {showTime && (
+          <SidebarTime
+            task={detail.task}
+            taskState={taskState}
+            forecast={detail.forecast}
+            forecastLoading={detail.forecastLoading}
+            onFetchForecast={detail.fetchForecast}
+          />
+        )}
         <SidebarAiInsights
           taskState={taskState}
           suggestions={detail.suggestions}

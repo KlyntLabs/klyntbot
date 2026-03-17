@@ -211,6 +211,13 @@ export function SidebarProperties({ task, compact, onUpdate }: SidebarProperties
         </Popover>
       </PropertyRow>
 
+      {/* Complexity */}
+      {task.complexityScore != null && (
+        <PropertyRow label="Complexity">
+          <ComplexityBadge score={task.complexityScore} />
+        </PropertyRow>
+      )}
+
       {/* Due date */}
       <PropertyRow label="Due">
         <span
@@ -322,5 +329,22 @@ export function SidebarProperties({ task, compact, onUpdate }: SidebarProperties
         </>
       )}
     </div>
+  );
+}
+
+function ComplexityBadge({ score }: { score: number }) {
+  const { label, color } =
+    score <= 30
+      ? { label: "Low", color: "text-green-400 bg-green-500/20" }
+      : score <= 60
+        ? { label: "Medium", color: "text-yellow-400 bg-yellow-500/20" }
+        : score <= 80
+          ? { label: "High", color: "text-orange-400 bg-orange-500/20" }
+          : { label: "Very High", color: "text-red-400 bg-red-500/20" };
+
+  return (
+    <span className={`text-xs px-1.5 py-0.5 rounded ${color}`}>
+      {label} ({score})
+    </span>
   );
 }
