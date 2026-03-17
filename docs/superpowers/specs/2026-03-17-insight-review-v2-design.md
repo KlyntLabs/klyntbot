@@ -36,13 +36,55 @@ Create a new `feature-insights` crate at **L4** (same layer as `feature-tasks`, 
 - Clean deprecation of old `insight_review_cache` table in cognitive
 - Fully testable with ephemeral SQLite (`StoragePool::connect_in_memory()`)
 
-### Dependencies (upward only)
+### Dependencies (upward only — no L5 imports)
 - `common` (L0) — `Result<T>`, error types
 - `tools-core` (L1) — `FeaturePackage`, `Tool`, derive macros
-- `storage` (L2) — `SqlitePool`, migrations
+- `storage` (L2) — `SqlitePool`, migrations, `VectorStore` (LanceDB access lives here, not in cognitive)
 - `providers` (L3) — `DynProvider` for LLM calls
-- `cognitive` (L5, via trait/dependency inversion) — `SemanticFactRepo`, `EpisodicMemoryRepo`, `FlashcardRepo`, LanceDB access
+- `context_engine` (L3) — `TokenCounter` for prompt truncation
 - `feature-notes` (L4, read-only) — `NoteRepo` for fetching note content + backlinks + tags
+
+**Dependency inversion for cognitive data (L5 → L4):**
+`feature-insights` defines accessor traits; `app-core` (L7) wires implementations that call `cognitive` repos. This follows the established pattern used by `SpawnHandler`, `CronHandler`, `ExtractionHandler`, etc.
+
+```rust
+// In feature-insights/src/traits.rs
+
+/// Provides cognitive memory data for insight context injection.
+#[async_trait]
+pub trait CognitiveAccessor: Send + Sync {
+    /// Search semantic facts by query text, optionally filtered by domain.
+    async fn search_facts(&self, query: &str, domain: Option<&str>, limit: usize) -> Vec<String>;
+    /// Get recent episodic memories mentioning a note.
+    async fn recent_memories(&self, note_id: &str, limit: usize) -> Vec<String>;
+    /// Get active procedural rules for a domain.
+    async fn domain_rules(&self, domain: &str) -> Vec<String>;
+    /// Get user model summary for a domain (deep dive only).
+    async fn user_model_summary(&self, domain: &str) -> Option<String>;
+    /// Get entity graph neighborhood (deep dive only).
+    async fn entity_neighborhood(&self, note_id: &str, depth: u8) -> Vec<String>;
+    /// Get temporal fact history (deep dive only).
+    async fn fact_history(&self, subject: &str) -> Vec<String>;
+}
+
+/// Provides flashcard review data for learning progress computation.
+#[async_trait]
+pub trait FlashcardAccessor: Send + Sync {
+    /// Get average review success rate for an insight (0.0-1.0).
+    async fn review_success_rate(&self, insight_review_id: &str, days: i64) -> f64;
+}
+
+/// Provides embedding operations for insight content.
+#[async_trait]
+pub trait InsightEmbedder: Send + Sync {
+    /// Embed insight content and store in LanceDB.
+    async fn embed_and_store(&self, insight_id: &str, content: &str) -> Result<(), String>;
+    /// Get cosine similarity between two insight embeddings.
+    async fn similarity(&self, id_a: &str, id_b: &str) -> Option<f64>;
+}
+```
+
+These traits are implemented in `agent` (L5) or `app-core` (L7) where `cognitive` repos are available, then injected into `InsightService` as `Arc<dyn Trait>` during `AppCore::init()`.
 
 ### Crate Structure
 
@@ -52,6 +94,7 @@ crates/feature-insights/
 │   └── (consolidated into cognitive 001_cognitive_tables.sql — pre-release)
 ├── src/
 │   ├── lib.rs                        # FeaturePackage impl, re-exports
+│   ├── traits.rs                     # CognitiveAccessor, FlashcardAccessor, InsightEmbedder traits
 │   ├── repo.rs                       # InsightReviewRepo + InsightProgressRepo
 │   ├── service.rs                    # InsightService (orchestrator)
 │   ├── scope.rs                      # ScopeResolver (backlinks/semantic/project/manual)
@@ -63,12 +106,17 @@ crates/feature-insights/
 ```
 
 ### Migration from Old System
-Since we haven't released production yet:
-- Update `001_cognitive_tables.sql` in-place, bump cognitive feature migration version
-- `DROP TABLE IF EXISTS insight_review_cache`
-- Create new `insight_reviews` + `insight_progress_snapshots` tables
+Since we haven't released production yet (per CLAUDE.md: "Pre-release — no user data to migrate"):
+- Update `001_cognitive_tables.sql` in-place, bump cognitive feature migration version to 4
+- `DROP TABLE IF EXISTS insight_review_cache` — removes old cache table
+- Create new `insight_reviews` + `insight_progress_snapshots` tables in the same SQL file
 - `app-core/handlers/notes/insight.rs` becomes a thin adapter delegating to `InsightService`
 - Old `InsightCacheRepo` and `InsightCacheRow` deprecated from cognitive crate
+
+**Migration ownership note:** Ideally `feature-insights` would own its migration via `FeatureMigration` (like `feature-tasks` does). However, since the new tables replace `insight_review_cache` which is already in cognitive's migration file, and we're pre-release, consolidating into cognitive's SQL is simpler. Post-release, if insights need schema changes, they should get their own `FeatureMigration` in the `feature-insights` crate.
+
+### Tools
+`feature-insights` exposes no agent tools in v1 — insights are UI-driven only. `FeaturePackage::tools()` returns an empty vec. An `insight` tool for the agent (e.g., "generate insight for this note") can be added later as a natural extension.
 
 ---
 
@@ -115,7 +163,13 @@ CREATE TABLE IF NOT EXISTS insight_progress_snapshots (
 CREATE INDEX IF NOT EXISTS idx_progress_insight ON insight_progress_snapshots(insight_review_id, version);
 ```
 
-**Insight embeddings** are stored in LanceDB (not SQLite), created via `VectorStore::ensure_indexes()` at startup. Table: `insight_embeddings`, 384-dim vectors, matching the existing embedding infrastructure.
+**Insight embeddings** are stored in LanceDB (not SQLite). This requires adding an `insight_embeddings` table to `VectorStore`:
+
+1. Add schema definition in `crates/storage/src/vector_store/schemas.rs` — 384-dim vector (matching existing tables like `note_embeddings`)
+2. Add table creation in `VectorStore::connect()` — same pattern as the 7 existing tables
+3. Add `ensure_indexes()` entry for IVF-PQ index
+
+The `InsightEmbedder` trait (defined in `feature-insights/src/traits.rs`) abstracts this — the concrete implementation in `app-core` calls `VectorStore` directly since it's at L2 (accessible from L7).
 
 ### 3.2 Content Storage
 
@@ -139,10 +193,22 @@ pub struct InsightContent {
 ```rust
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub enum ScopeType {
+    Backlinks,
+    Semantic,
+    Project,
+    Manual,
+}
+
+impl Default for ScopeType {
+    fn default() -> Self { Self::Backlinks }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ScopeConfig {
-    /// backlinks | semantic | project | manual
-    #[serde(default = "default_scope_type")]
-    pub scope_type: String,
+    #[serde(default)]
+    pub scope_type: ScopeType,
     /// Similarity threshold for semantic scope (0.0-1.0)
     #[serde(default = "default_radius")]
     pub radius: f64,
@@ -160,7 +226,6 @@ pub struct ScopeConfig {
     pub merge_threshold: f64,
 }
 
-fn default_scope_type() -> String { "backlinks".to_string() }
 fn default_radius() -> f64 { 0.72 }
 fn default_true() -> bool { true }
 fn default_merge_threshold() -> f64 { 0.60 }
@@ -203,21 +268,25 @@ Two tiers of cognitive data injection, controlled by `ScopeConfig.include_cognit
 
 ### 5.1 Medium (default, `include_cognitive: true`)
 
-| Source | Method | Token budget |
-|--------|--------|-------------|
-| Semantic facts (domain-relevant) | `SemanticFactRepo::search_fts(note_title, 10)` | ~500 tokens |
-| Episodic memories (recent sessions) | `EpisodicMemoryRepo` — sessions mentioning this note | ~500 tokens |
-| Procedural rules (domain-active) | `ProceduralRuleRepo` — active rules for note's domain | ~200 tokens |
+All cognitive data is accessed via the `CognitiveAccessor` trait (dependency inversion — no direct L5 imports).
+
+| Source | Trait method | Token budget |
+|--------|-------------|-------------|
+| Semantic facts (domain-relevant) | `accessor.search_facts(note_title, Some(domain), 10)` | ~500 tokens |
+| Episodic memories (recent sessions) | `accessor.recent_memories(note_id, 5)` | ~500 tokens |
+| Procedural rules (domain-active) | `accessor.domain_rules(domain)` | ~200 tokens |
 
 ### 5.2 Deep Dive (opt-in, `deep_dive: true`)
 
 Everything above, plus:
 
-| Source | Method | Token budget |
-|--------|--------|-------------|
-| User model summary | `load_user_model()` for note's domain | ~300 tokens |
-| Entity graph neighborhood | `EntityRepo::get_neighborhood(depth=2)` | ~500 tokens |
-| Temporal fact history | `TemporalService::get_fact_history()` | ~400 tokens |
+| Source | Trait method | Token budget |
+|--------|-------------|-------------|
+| User model summary | `accessor.user_model_summary(domain)` | ~300 tokens |
+| Entity graph neighborhood | `accessor.entity_neighborhood(note_id, 2)` | ~500 tokens |
+| Temporal fact history | `accessor.fact_history(note_title)` | ~400 tokens |
+
+**Implementation note:** The concrete `CognitiveAccessor` implementation (in `app-core` or `agent`) calls the actual repos: `SemanticFactRepo::search_fts(query, domain, limit)` (3 args), `EpisodicMemoryRepo`, `ProceduralRuleRepo`, `load_user_model()`, `EntityRepo::get_neighborhood(entity_id, depth)`, and `TemporalService::get_fact_history(subject, predicate)`. The trait abstracts these into simpler string-based interfaces so `feature-insights` never imports `cognitive` directly.
 
 ---
 
@@ -284,7 +353,7 @@ Parent summary truncation uses the existing `tiktoken_rs` token estimator from `
 
 ### 6.4 Post-Generation Embedding
 
-After storing the insight, embed the full content via the existing `TextEmbedder` and store in LanceDB `insight_embeddings` table. This enables:
+After storing the insight, embed the full content via the `InsightEmbedder` trait (concrete implementation uses `EmbeddingEngine` from `tools` crate + `VectorStore` from `storage` crate) and store in LanceDB `insight_embeddings` table. This enables:
 - Semantic drift calculation between versions (cosine distance)
 - Cross-note dedup search for the timeline view
 - Future "similar insights" discovery
@@ -303,26 +372,29 @@ After storing the insight, embed the full content via the existing `TextEmbedder
 
 **Signal 1 — Flashcard Success (weight: 0.40)**
 
+The `flashcards` table has no per-review `quality` column — FSRS review quality is consumed immediately to update `stability`, `difficulty`, `state`, and `lapses`. We derive success from these stored FSRS metrics:
+
 ```sql
 SELECT AVG(
-    CASE quality
-        WHEN 'easy' THEN 1.0
-        WHEN 'good' THEN 0.75
-        WHEN 'hard' THEN 0.4
-        WHEN 'again' THEN 0.0
+    CASE
+        WHEN state = 'review' AND lapses = 0 THEN
+            MIN(1.0, stability / 10.0)  -- high stability + no lapses = mastery
+        WHEN state = 'review' AND lapses > 0 THEN
+            MAX(0.2, MIN(0.7, stability / 10.0))  -- recovered but weaker
+        WHEN state = 'relearning' THEN 0.1  -- currently struggling
+        ELSE 0.0  -- 'new' or no data
     END
 ) as success_rate
 FROM flashcards
 WHERE insight_review_id = ?1
-  AND state != 'new'
-  AND updated_at > datetime('now', '-30 days')
+  AND review_count > 0
 ```
 
-Falls back to 0.0 if no flashcards exist.
+This is wrapped by the `FlashcardAccessor` trait — the concrete implementation lives in `app-core` where `FlashcardRepo` is accessible. Falls back to 0.0 if no flashcards exist for this insight.
 
 **Signal 2 — Semantic Drift (weight: 0.25)**
 
-Cosine distance between current and previous version embeddings from LanceDB. Low drift (< 0.2) = stable understanding. High drift (> 0.5) = significant evolution. v1 has no drift (0.0).
+Cosine distance between current and previous version embeddings via `InsightEmbedder::similarity(current_id, prev_id)`. Low drift (< 0.2) = stable understanding. High drift (> 0.5) = significant evolution. v1 has no drift (0.0).
 
 **Signal 3 — Gap Closure (weight: 0.20)**
 
@@ -433,6 +505,9 @@ pub struct InsightService {
     merge_engine: SmartMergeEngine,
     progress_computer: ProgressComputer,
     prompt_builder: PromptBuilder,
+    cognitive: Arc<dyn CognitiveAccessor>,
+    flashcards: Arc<dyn FlashcardAccessor>,
+    embedder: Arc<dyn InsightEmbedder>,
 }
 
 impl InsightService {
