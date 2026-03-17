@@ -10,7 +10,7 @@ pub mod types;
 // ── Module re-exports (backward-compatible paths) ──────────
 pub use services::{
     background, compaction, consolidation, context_source, conversation_recall, decay, extraction,
-    memory_retriever, reflection, retrieval, salience, situation,
+    memory_retriever, reflection, retrieval, salience, situation, temporal,
 };
 
 // ── Type re-exports ────────────────────────────────────────
@@ -34,4 +34,5 @@ pub use repos::{
     CardType, FlashcardRepo, FlashcardRow, InsightCacheRepo, InsightCacheRow, NewFlashcard,
 };
 pub use situation::{compute_situation, SituationInputs, UserSituation};
+pub use temporal::{ChangeSummary, FactVersion, TemporalService};
 pub use types::*;

@@ -442,9 +442,12 @@ impl BackgroundConsolidationService {
                                     }
                                     if let Ok(Some(old_fact)) = repo.get(old_id).await {
                                         if old_fact.object != new.object
-                                            && !is_same_session(&old_fact.recorded_at, &session_start)
+                                            && !is_same_session(
+                                                &old_fact.recorded_at,
+                                                &session_start,
+                                            )
                                         {
-                                            let _ = bus.publish(DomainEvent::ContradictionDetected {
+                                            bus.publish(DomainEvent::ContradictionDetected {
                                                 existing_subject: old_fact.subject.clone(),
                                                 existing_predicate: old_fact.predicate.clone(),
                                                 existing_object: old_fact.object.clone(),
