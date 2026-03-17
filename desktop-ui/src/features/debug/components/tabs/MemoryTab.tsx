@@ -75,12 +75,12 @@ interface CompactionResult {
 const DOMAINS = ["identity", "energy", "work", "finance", "learning", "preferences"] as const;
 
 const domainColors: Record<string, string> = {
-  identity: "bg-purple-500/20 text-purple-300",
-  energy: "bg-yellow-500/20 text-yellow-300",
-  work: "bg-blue-500/20 text-blue-300",
-  finance: "bg-green-500/20 text-green-300",
-  learning: "bg-orange-500/20 text-orange-300",
-  preferences: "bg-pink-500/20 text-pink-300",
+  identity: "bg-purple/20 text-purple",
+  energy: "bg-warning/20 text-warning",
+  work: "bg-info/20 text-info",
+  finance: "bg-success/20 text-success",
+  learning: "bg-brand/20 text-brand",
+  preferences: "bg-purple/20 text-purple",
 };
 
 export function MemoryTab() {
@@ -172,7 +172,7 @@ export function MemoryTab() {
               className={`text-left p-3 rounded-lg border transition-all ${
                 domainFilter === domain
                   ? "border-brand/50 bg-brand/10"
-                  : "border-white/[0.08] bg-white/[0.04] hover:bg-white/[0.06]"
+                  : "border-border bg-surface-low hover:bg-surface-base"
               }`}
             >
               <div className="flex items-center justify-between mb-1">
@@ -206,10 +206,10 @@ export function MemoryTab() {
             <Plus className="w-3 h-3" /> Add Fact
           </button>
         </div>
-        <div className="bg-white/[0.04] rounded-lg border border-white/[0.08] overflow-hidden">
+        <div className="bg-surface-low rounded-lg border border-border overflow-hidden">
           <table className="w-full text-[12px]">
             <thead>
-              <tr className="border-b border-white/[0.06]">
+              <tr className="border-b border-border-subtle">
                 <th className="text-left p-2 text-muted font-normal">Domain</th>
                 <th className="text-left p-2 text-muted font-normal">Subject</th>
                 <th className="text-left p-2 text-muted font-normal">Predicate</th>
@@ -225,7 +225,7 @@ export function MemoryTab() {
               {facts.map((f) => (
                 <tr
                   key={f.id}
-                  className={`border-b border-white/[0.04] hover:bg-white/[0.02] ${
+                  className={`border-b border-border-subtle hover:bg-surface-lowest ${
                     f.retrievability < 0.3 ? "opacity-40" : ""
                   }`}
                 >
@@ -240,7 +240,7 @@ export function MemoryTab() {
                   <td className="p-2 text-secondary">{f.predicate}</td>
                   <td className="p-2 text-primary">{f.object}</td>
                   <td className="p-2">
-                    <div className="w-12 bg-white/[0.1] rounded-full h-1.5">
+                    <div className="w-12 bg-surface-raised rounded-full h-1.5">
                       <div
                         className="bg-brand h-1.5 rounded-full"
                         style={{ width: `${f.confidence * 100}%` }}
@@ -254,7 +254,7 @@ export function MemoryTab() {
                     <button
                       type="button"
                       onClick={() => handleDeleteFact(f.id)}
-                      className="text-muted hover:text-red-400"
+                      className="text-muted hover:text-destructive"
                     >
                       <Trash2 className="w-3 h-3" />
                     </button>
@@ -278,7 +278,7 @@ export function MemoryTab() {
         <h2 className="text-[13px] font-medium text-secondary mb-3">Episodic Memories</h2>
         <div className="space-y-2">
           {episodic.map((m) => (
-            <div key={m.id} className="p-3 bg-white/[0.04] rounded-lg border border-white/[0.08]">
+            <div key={m.id} className="p-3 bg-surface-low rounded-lg border border-border">
               <div className="flex items-center gap-2 mb-1">
                 <span
                   className={`text-[10px] px-1 py-0.5 rounded ${domainColors[m.domain] ?? "text-muted"}`}
@@ -299,10 +299,10 @@ export function MemoryTab() {
       {/* Procedural Rules */}
       <div>
         <h2 className="text-[13px] font-medium text-secondary mb-3">Procedural Rules</h2>
-        <div className="bg-white/[0.04] rounded-lg border border-white/[0.08] overflow-hidden">
+        <div className="bg-surface-low rounded-lg border border-border overflow-hidden">
           <table className="w-full text-[12px]">
             <thead>
-              <tr className="border-b border-white/[0.06]">
+              <tr className="border-b border-border-subtle">
                 <th className="text-left p-2 text-muted font-normal">Domain</th>
                 <th className="text-left p-2 text-muted font-normal">Rule</th>
                 <th className="text-left p-2 text-muted font-normal">Conf</th>
@@ -312,7 +312,7 @@ export function MemoryTab() {
             </thead>
             <tbody>
               {rules.map((r) => (
-                <tr key={r.id} className="border-b border-white/[0.04]">
+                <tr key={r.id} className="border-b border-border-subtle">
                   <td className="p-2">
                     <span
                       className={`text-[10px] px-1 py-0.5 rounded ${domainColors[r.domain] ?? "text-muted"}`}
@@ -324,7 +324,9 @@ export function MemoryTab() {
                   <td className="p-2 text-muted">{r.confidence.toFixed(2)}</td>
                   <td className="p-2 text-muted">{r.signalCount}</td>
                   <td className="p-2">
-                    <span className={`text-[10px] ${r.active ? "text-green-400" : "text-red-400"}`}>
+                    <span
+                      className={`text-[10px] ${r.active ? "text-success" : "text-destructive"}`}
+                    >
                       {r.active ? "ON" : "OFF"}
                     </span>
                   </td>
@@ -343,7 +345,7 @@ export function MemoryTab() {
       </div>
 
       {/* Stats Bar */}
-      <div className="flex items-center gap-4 p-3 bg-white/[0.04] rounded-lg border border-white/[0.08]">
+      <div className="flex items-center gap-4 p-3 bg-surface-low rounded-lg border border-border">
         <span className="text-[11px] text-muted">
           Active: <span className="text-secondary">{stats.activeFacts}</span>
         </span>

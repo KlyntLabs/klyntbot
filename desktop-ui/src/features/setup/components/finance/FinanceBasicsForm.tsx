@@ -65,10 +65,10 @@ export function FinanceBasicsForm({ registerSave, onDirty }: FinanceBasicsFormPr
               setCurrency(e.target.value);
               onDirty();
             }}
-            className="w-full px-3 py-2 text-[13px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-lg focus:outline-none focus:border-brand/50 transition-colors"
+            className="w-full px-3 py-2 text-[13px] text-primary bg-surface-base border border-border rounded-lg focus:outline-none focus:border-brand/50 transition-colors"
           >
             {CURRENCIES.map((c) => (
-              <option key={c} value={c} className="bg-[#1a1a1a]">
+              <option key={c} value={c} className="bg-surface-floating">
                 {c}
               </option>
             ))}
@@ -86,7 +86,7 @@ export function FinanceBasicsForm({ registerSave, onDirty }: FinanceBasicsFormPr
                 className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
                   proactivity === level.value
                     ? "border-brand/50 bg-brand/[0.06]"
-                    : "border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.05]"
+                    : "border-border bg-surface-lowest hover:bg-surface-base"
                 }`}
               >
                 <input

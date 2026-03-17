@@ -9,9 +9,9 @@ interface SynthesisTabProps {
 function SkeletonLoader() {
   return (
     <div className="space-y-3 animate-pulse">
-      <div className="h-3 bg-white/[0.04] rounded w-3/4" />
-      <div className="h-3 bg-white/[0.04] rounded w-full" />
-      <div className="h-3 bg-white/[0.04] rounded w-5/6" />
+      <div className="h-3 bg-surface-low rounded w-3/4" />
+      <div className="h-3 bg-surface-low rounded w-full" />
+      <div className="h-3 bg-surface-low rounded w-5/6" />
     </div>
   );
 }
@@ -27,7 +27,9 @@ export function SynthesisTab({ status, content }: SynthesisTabProps) {
 
   if (status === "error") {
     return (
-      <p className="text-[11px] text-red-400">Failed to generate synthesis. Try regenerating.</p>
+      <p className="text-[11px] text-destructive">
+        Failed to generate synthesis. Try regenerating.
+      </p>
     );
   }
 
@@ -36,7 +38,7 @@ export function SynthesisTab({ status, content }: SynthesisTabProps) {
     <div className="text-[12px] text-secondary leading-relaxed">
       <MarkdownContent content={content} />
       {status === "streaming" && (
-        <span className="inline-block w-1.5 h-3.5 bg-purple-400 animate-pulse ml-0.5 align-text-bottom rounded-sm" />
+        <span className="inline-block w-1.5 h-3.5 bg-purple animate-pulse ml-0.5 align-text-bottom rounded-sm" />
       )}
     </div>
   );

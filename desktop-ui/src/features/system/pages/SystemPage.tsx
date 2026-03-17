@@ -114,7 +114,7 @@ export function SystemPage() {
                 className={`flex-1 min-w-0 py-2 rounded-xl text-[13px] font-light transition-all duration-200 flex items-center justify-center gap-1.5 ${
                   isActive
                     ? "glass-button-active text-primary"
-                    : "text-muted hover:text-secondary hover:bg-white/[0.04]"
+                    : "text-muted hover:text-secondary hover:bg-surface-low"
                 }`}
               >
                 <Icon className="w-3.5 h-3.5 shrink-0" strokeWidth={1.5} />

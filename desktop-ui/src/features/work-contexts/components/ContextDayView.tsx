@@ -58,7 +58,7 @@ export function ContextDayView({ date, isToday }: ContextDayViewProps) {
       <div className="flex-1 glass-card overflow-hidden flex flex-col">
         <div ref={scrollRef} className="flex-1 overflow-y-auto">
           {/* Header */}
-          <div className="sticky top-0 z-20 border-b border-border bg-[rgba(0,0,0,0.85)] px-4 py-1.5">
+          <div className="sticky top-0 z-20 border-b border-border bg-surface-floating px-4 py-1.5">
             <span className="text-[11px] text-muted font-medium">Work Contexts</span>
           </div>
 

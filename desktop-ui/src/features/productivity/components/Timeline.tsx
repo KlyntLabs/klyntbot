@@ -174,7 +174,7 @@ export function TimelineBar({ date }: TimelineBarProps) {
           </div>
         )}
 
-        <div className="relative h-9 rounded-lg bg-white/[0.08] overflow-hidden">
+        <div className="relative h-9 rounded-lg bg-surface-raised overflow-hidden">
           {blocks.map((b, idx) => (
             <div
               aria-hidden="true"

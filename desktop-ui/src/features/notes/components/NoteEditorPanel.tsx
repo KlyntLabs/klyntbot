@@ -75,7 +75,7 @@ export function NoteEditorPanel({
           onBlur={handleTitleBlur}
           onKeyDown={handleTitleKeyDown}
           data-placeholder="Untitled"
-          className="text-2xl font-bold text-white outline-none min-h-[1.5em] empty:before:content-[attr(data-placeholder)] empty:before:text-muted/50"
+          className="text-2xl font-bold text-primary outline-none min-h-[1.5em] empty:before:content-[attr(data-placeholder)] empty:before:text-muted/50"
         >
           {note.title}
         </div>

@@ -107,8 +107,8 @@ function GraphContextMenu({
           }}
           className={`w-full px-3 py-1.5 text-xs text-left transition-colors ${
             item.danger
-              ? "text-red-400 hover:bg-red-500/10"
-              : "text-secondary hover:bg-white/[0.06]"
+              ? "text-destructive hover:bg-destructive/10"
+              : "text-secondary hover:bg-surface-base"
           }`}
         >
           {item.label}
@@ -618,7 +618,7 @@ export function GraphView({ notes, activeNoteId, onSelectNote, onOpenInEditor }:
             <button
               type="button"
               onClick={zoomIn}
-              className="w-7 h-7 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-secondary hover:text-primary flex items-center justify-center transition-colors"
+              className="w-7 h-7 rounded-lg bg-surface-base hover:bg-surface-raised text-secondary hover:text-primary flex items-center justify-center transition-colors"
               aria-label="Zoom in"
             >
               <Plus className="w-3.5 h-3.5" />
@@ -626,7 +626,7 @@ export function GraphView({ notes, activeNoteId, onSelectNote, onOpenInEditor }:
             <button
               type="button"
               onClick={zoomOut}
-              className="w-7 h-7 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-secondary hover:text-primary flex items-center justify-center transition-colors"
+              className="w-7 h-7 rounded-lg bg-surface-base hover:bg-surface-raised text-secondary hover:text-primary flex items-center justify-center transition-colors"
               aria-label="Zoom out"
             >
               <Minus className="w-3.5 h-3.5" />
@@ -634,7 +634,7 @@ export function GraphView({ notes, activeNoteId, onSelectNote, onOpenInEditor }:
             <button
               type="button"
               onClick={resetView}
-              className="w-7 h-7 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-secondary hover:text-primary flex items-center justify-center transition-colors"
+              className="w-7 h-7 rounded-lg bg-surface-base hover:bg-surface-raised text-secondary hover:text-primary flex items-center justify-center transition-colors"
               aria-label="Reset view"
             >
               <Maximize2 className="w-3.5 h-3.5" />

@@ -241,9 +241,7 @@ impl AppCore {
             flashcard_repo: Some(::cognitive::FlashcardRepo::new(
                 storage_pool.inner().clone(),
             )),
-            persona_repo: Some(::cognitive::PersonaRepo::new(
-                storage_pool.inner().clone(),
-            )),
+            persona_repo: Some(::cognitive::PersonaRepo::new(storage_pool.inner().clone())),
         };
 
         // ── Background note embedding catch-up ────────────────────────────

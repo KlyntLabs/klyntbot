@@ -29,9 +29,7 @@ export function PersonaCard({ name, role, icon, tone, content }: PersonaCardProp
   const colors = getToneColor(tone);
 
   return (
-    <div
-      className={`glass-card border-l-2 ${colors.border} rounded-lg p-3 space-y-2`}
-    >
+    <div className={`glass-card border-l-2 ${colors.border} rounded-lg p-3 space-y-2`}>
       {/* Header */}
       <div className="flex items-center gap-2">
         <span

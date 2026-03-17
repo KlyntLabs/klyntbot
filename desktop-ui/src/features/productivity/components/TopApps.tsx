@@ -45,7 +45,7 @@ export function TopApps({ apps }: TopAppsProps) {
           return (
             <div
               key={app.appName}
-              className="group flex items-center gap-2.5 py-1 rounded-md px-1 -mx-1 hover:bg-white/[0.05] transition-colors"
+              className="group flex items-center gap-2.5 py-1 rounded-md px-1 -mx-1 hover:bg-surface-base transition-colors"
             >
               {/* Icon + pct */}
               <div className="flex items-center gap-1.5 w-14 flex-shrink-0">
@@ -65,7 +65,7 @@ export function TopApps({ apps }: TopAppsProps) {
               </span>
 
               {/* Bar */}
-              <div className="flex-1 h-2 rounded-full bg-white/[0.08] overflow-hidden relative">
+              <div className="flex-1 h-2 rounded-full bg-surface-raised overflow-hidden relative">
                 <div
                   className="h-full rounded-full transition-[width] duration-500"
                   style={{

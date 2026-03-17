@@ -52,11 +52,11 @@ export function ContextSearchDialog({ open, onClose, onSelect }: ContextSearchDi
 
   return createPortal(
     <>
-      <div className="fixed inset-0 z-50 bg-black/30" onClick={onClose} />
+      <div className="fixed inset-0 z-50 bg-overlay" onClick={onClose} />
       <div className="fixed inset-0 z-50 flex items-start justify-center pt-[20vh] pointer-events-none">
         <div className="glass-panel w-full max-w-lg pointer-events-auto rounded-2xl overflow-hidden">
           {/* Search input */}
-          <div className="flex items-center gap-3 px-4 py-3 border-b border-white/[0.08]">
+          <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
             <Search className="w-4 h-4 text-muted shrink-0" />
             <input
               ref={inputRef}
@@ -85,7 +85,7 @@ export function ContextSearchDialog({ open, onClose, onSelect }: ContextSearchDi
                     onSelect(ctx);
                     onClose();
                   }}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.06] transition-colors text-left"
+                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-surface-base transition-colors text-left"
                 >
                   <div
                     className="w-2.5 h-2.5 rounded-full shrink-0"

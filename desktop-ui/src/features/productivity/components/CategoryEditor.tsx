@@ -88,7 +88,7 @@ export function CategoryEditor({ category, onSaved, onDeleted }: CategoryEditorP
           <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: color }} />
           <h3 className="text-[13px] font-medium text-secondary">Edit Category</h3>
           {category.isSystem && (
-            <span className="text-[9px] font-light text-dim bg-white/[0.06] px-1.5 py-0.5 rounded">
+            <span className="text-[9px] font-light text-dim bg-surface-base px-1.5 py-0.5 rounded">
               System
             </span>
           )}
@@ -136,8 +136,8 @@ export function CategoryEditor({ category, onSaved, onDeleted }: CategoryEditorP
               onClick={() => setType(opt.value)}
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-light transition-colors ${
                 type === opt.value
-                  ? "bg-white/[0.08] text-primary"
-                  : "text-muted hover:bg-white/[0.04]"
+                  ? "bg-surface-raised text-primary"
+                  : "text-muted hover:bg-surface-low"
               }`}
             >
               <span
@@ -219,7 +219,7 @@ function TagListField({
         {items.map((item) => (
           <span
             key={item}
-            className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/[0.06] text-[11px] font-light text-secondary"
+            className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface-base text-[11px] font-light text-secondary"
           >
             {item}
             <button
@@ -244,7 +244,7 @@ function TagListField({
         <button
           type="button"
           onClick={add}
-          className="px-2 py-1 rounded-lg bg-white/[0.06] text-[11px] text-muted hover:text-primary transition-colors"
+          className="px-2 py-1 rounded-lg bg-surface-base text-[11px] text-muted hover:text-primary transition-colors"
         >
           Add
         </button>

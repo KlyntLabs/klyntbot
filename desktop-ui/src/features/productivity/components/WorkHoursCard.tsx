@@ -50,7 +50,7 @@ function SegmentedBar({ clampedPct, targetSecs }: { clampedPct: number; targetSe
 
   return (
     <div className="relative">
-      <div className="h-2 rounded-full bg-white/[0.08] overflow-hidden flex">
+      <div className="h-2 rounded-full bg-surface-raised overflow-hidden flex">
         {positioned.map((seg, i) => (
           <div
             key={seg.from}

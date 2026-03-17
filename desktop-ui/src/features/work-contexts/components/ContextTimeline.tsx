@@ -43,7 +43,7 @@ export function ContextTimeline({
       {rendered.map(({ block, idx, top, height, color, opacity }) => (
         <div
           key={`${block.startTime}-${block.contextId ?? "idle"}`}
-          className="absolute left-0 right-0 rounded-md border border-white/[0.06] cursor-pointer transition-all hover:brightness-125"
+          className="absolute left-0 right-0 rounded-md border border-border-subtle cursor-pointer transition-all hover:brightness-125"
           style={{
             top,
             height,

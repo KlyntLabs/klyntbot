@@ -33,13 +33,13 @@ interface PipelineEventRow {
 }
 
 const opColors: Record<string, string> = {
-  ADD: "bg-green-500/20 text-green-300",
-  add: "bg-green-500/20 text-green-300",
-  UPDATE: "bg-blue-500/20 text-blue-300",
-  update: "bg-blue-500/20 text-blue-300",
-  DELETE: "bg-red-500/20 text-red-300",
-  delete: "bg-red-500/20 text-red-300",
-  NOOP: "bg-white/[0.06] text-muted",
+  ADD: "bg-success/20 text-success",
+  add: "bg-success/20 text-success",
+  UPDATE: "bg-info/20 text-info",
+  update: "bg-info/20 text-info",
+  DELETE: "bg-destructive/20 text-destructive",
+  delete: "bg-destructive/20 text-destructive",
+  NOOP: "bg-surface-base text-muted",
 };
 
 export function PipelineTab() {
@@ -114,7 +114,7 @@ export function PipelineTab() {
             {extractions.map((e) => (
               <div
                 key={`ext-${e.ts}-${e.observation.slice(0, 20)}`}
-                className="p-3 bg-white/[0.04] rounded-lg border border-white/[0.08]"
+                className="p-3 bg-surface-low rounded-lg border border-border"
               >
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-[10px] text-muted font-mono">
@@ -145,7 +145,7 @@ export function PipelineTab() {
             {consolidations.map((c) => (
               <div
                 key={`con-${c.ts}-${c.fact.slice(0, 20)}`}
-                className="p-3 bg-white/[0.04] rounded-lg border border-white/[0.08]"
+                className="p-3 bg-surface-low rounded-lg border border-border"
               >
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-[10px] text-muted font-mono">
@@ -173,7 +173,7 @@ export function PipelineTab() {
       </div>
 
       {/* Pipeline stats summary */}
-      <div className="flex items-center gap-4 p-3 bg-white/[0.04] rounded-lg border border-white/[0.08]">
+      <div className="flex items-center gap-4 p-3 bg-surface-low rounded-lg border border-border">
         <span className="text-[11px] text-muted">
           Extractions: <span className="text-secondary">{extractions.length}</span>
         </span>
@@ -181,13 +181,13 @@ export function PipelineTab() {
           Consolidations: <span className="text-secondary">{consolidations.length}</span>
         </span>
         <span className="text-[11px] text-muted">
-          ADDs: <span className="text-green-400">{opCounts.ADD}</span>
+          ADDs: <span className="text-success">{opCounts.ADD}</span>
         </span>
         <span className="text-[11px] text-muted">
-          UPDATEs: <span className="text-blue-400">{opCounts.UPDATE}</span>
+          UPDATEs: <span className="text-info">{opCounts.UPDATE}</span>
         </span>
         <span className="text-[11px] text-muted">
-          DELETEs: <span className="text-red-400">{opCounts.DELETE}</span>
+          DELETEs: <span className="text-destructive">{opCounts.DELETE}</span>
         </span>
       </div>
     </div>

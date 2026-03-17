@@ -116,13 +116,13 @@ export function ActivityFeed() {
           return (
             <div
               key={key}
-              className={`flex items-center gap-2 py-1.5 ${isFirst ? "" : "border-t border-white/[0.04]"}`}
+              className={`flex items-center gap-2 py-1.5 ${isFirst ? "" : "border-t border-border-subtle"}`}
               style={isNew ? { animation: "fade-in 0.4s ease-out" } : undefined}
             >
               {/* App icon */}
               <div className="flex-shrink-0">
                 {e.isIdle ? (
-                  <span className="w-3.5 h-3.5 rounded-full bg-white/[0.08] block" />
+                  <span className="w-3.5 h-3.5 rounded-full bg-surface-raised block" />
                 ) : (
                   <AppIcon appName={name} color={color} />
                 )}

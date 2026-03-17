@@ -66,15 +66,10 @@ impl ContextSource for AnalysisPersonaContextSource {
         let selected: Vec<_> = personas.into_iter().take(4).collect();
 
         let mut output = String::from("# Analysis Perspectives\n\n");
-        output.push_str(
-            "The user is asking for analysis. Consider these expert perspectives:\n\n",
-        );
+        output.push_str("The user is asking for analysis. Consider these expert perspectives:\n\n");
 
         for p in &selected {
-            output.push_str(&format!(
-                "**{} ({}):** {}\n",
-                p.name, p.role, p.perspective
-            ));
+            output.push_str(&format!("**{} ({}):** {}\n", p.name, p.role, p.perspective));
         }
 
         output.push_str(

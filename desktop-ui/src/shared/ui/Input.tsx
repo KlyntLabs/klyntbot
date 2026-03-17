@@ -14,7 +14,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         "transition-colors focus:outline-none",
         variant === "glass"
           ? "glass-input text-primary placeholder:text-dim"
-          : "bg-surface-base border border-border text-primary placeholder:text-dim hover:border-white/15 focus:border-brand/50",
+          : "bg-surface-base border border-border text-primary placeholder:text-dim hover:border-border focus:border-brand/50",
         className,
       )}
       {...props}

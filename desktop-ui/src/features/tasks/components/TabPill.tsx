@@ -24,9 +24,7 @@ export const TabPill = memo(function TabPill({ tab, isActive }: TabPillProps) {
       tabIndex={0}
       aria-selected={isActive}
       className={`group flex items-center gap-1.5 whitespace-nowrap rounded-t-lg px-3.5 py-1.5 text-[13px] transition-colors cursor-pointer ${
-        isActive
-          ? "bg-surface-raised text-primary"
-          : "text-muted hover:text-primary"
+        isActive ? "bg-surface-raised text-primary" : "text-muted hover:text-primary"
       }`}
     >
       <span className="truncate max-w-[200px]">{label}</span>

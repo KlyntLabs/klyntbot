@@ -74,7 +74,7 @@ export function QuickCapturePage() {
             onChange={(e) => setContent(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Type a quick thought..."
-            className="w-full bg-transparent border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-primary placeholder:text-dim focus:outline-none focus:border-brand/40 resize-none"
+            className="w-full bg-transparent border border-border rounded-lg px-3 py-2 text-sm text-primary placeholder:text-dim focus:outline-none focus:border-brand/40 resize-none"
             rows={3}
           />
         )}

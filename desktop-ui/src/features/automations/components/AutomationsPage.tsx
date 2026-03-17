@@ -40,7 +40,7 @@ function OriginBadge({ origin }: { origin: CronOrigin }) {
 function ScheduleTypeBadge({ schedule }: { schedule: CronSchedule }) {
   const label = schedule.kind === "every" ? "Interval" : schedule.kind === "cron" ? "Cron" : "Once";
   return (
-    <span className="px-1.5 py-0.5 rounded text-[10px] font-light text-dim bg-white/[0.06]">
+    <span className="px-1.5 py-0.5 rounded text-[10px] font-light text-dim bg-surface-base">
       {label}
     </span>
   );
@@ -103,7 +103,7 @@ function InlineTextCell({
       onClick={startEdit}
       className={cn(
         "text-left truncate max-w-full",
-        editable && "cursor-text rounded px-1 -mx-1 transition-colors hover:bg-white/[0.06]",
+        editable && "cursor-text rounded px-1 -mx-1 transition-colors hover:bg-surface-base",
         className,
       )}
     >
@@ -254,7 +254,7 @@ function SchedulePanel({
         </div>
       )}
 
-      <div className="border-t border-white/[0.08]" />
+      <div className="border-t border-border" />
 
       <div className="flex flex-col gap-2">
         <span className="text-[11px] text-dim uppercase tracking-wider font-medium">Type</span>
@@ -280,9 +280,7 @@ function SchedulePanel({
               <span
                 className={cn(
                   "w-4 h-4 rounded-full border-2 transition-colors flex items-center justify-center",
-                  fields.mode === key
-                    ? "border-brand"
-                    : "border-white/20 group-hover:border-white/40",
+                  fields.mode === key ? "border-brand" : "border-border group-hover:border-border",
                 )}
               >
                 {fields.mode === key && <span className="w-2 h-2 rounded-full bg-brand" />}
@@ -342,7 +340,7 @@ function SchedulePanel({
                   "px-4 py-2 text-[13px] rounded-lg font-medium transition-colors",
                   fields.intervalUnit === u
                     ? "bg-brand/20 text-brand border border-brand/30"
-                    : "bg-white/[0.06] text-muted hover:text-secondary hover:bg-white/[0.1] border border-transparent",
+                    : "bg-surface-base text-muted hover:text-secondary hover:bg-surface-raised border border-transparent",
                 )}
               >
                 {u === "days" ? "Every Day" : "Every Week"}
@@ -367,7 +365,7 @@ function SchedulePanel({
                   "flex-1 py-2 rounded-lg text-[11px] font-semibold transition-colors",
                   fields.weekdays[i]
                     ? "bg-brand text-white"
-                    : "bg-white/[0.06] text-dim hover:text-muted hover:bg-white/[0.1]",
+                    : "bg-surface-base text-dim hover:text-muted hover:bg-surface-raised",
                 )}
               >
                 {day}
@@ -430,7 +428,7 @@ function InlineScheduleCell({
         onClick={handleOpen}
         className={cn(
           "text-[12px] font-light text-muted text-left truncate",
-          editable && "cursor-text rounded px-1 -mx-1 transition-colors hover:bg-white/[0.06]",
+          editable && "cursor-text rounded px-1 -mx-1 transition-colors hover:bg-surface-base",
         )}
       >
         {humanizeSchedule(schedule)}
@@ -452,7 +450,7 @@ function InlineScheduleCell({
               onKeyDown={(e) => e.stopPropagation()}
             >
               <SchedulePanel fields={fields} onChange={setFields} />
-              <div className="flex gap-3 mt-5 pt-4 border-t border-white/[0.08]">
+              <div className="flex gap-3 mt-5 pt-4 border-t border-border">
                 <button
                   type="button"
                   onClick={() => {
@@ -533,7 +531,7 @@ function AutomationCreateForm({
   };
 
   return (
-    <div className="border border-white/[0.08] rounded-xl p-4 bg-white/[0.04] space-y-3 mx-4 mt-3">
+    <div className="border border-border rounded-xl p-4 bg-surface-low space-y-3 mx-4 mt-3">
       <div className="flex items-center justify-between">
         <h3 className="text-[13px] font-medium text-secondary">New Automation</h3>
         <button type="button" onClick={onClose} className="text-dim hover:text-muted">
@@ -783,7 +781,7 @@ export function AutomationsPage() {
             <button
               type="button"
               onClick={() => handleRun(job.id)}
-              className="p-1 rounded text-dim hover:text-brand hover:bg-white/[0.06] transition-colors"
+              className="p-1 rounded text-dim hover:text-brand hover:bg-surface-base transition-colors"
               title="Run now"
             >
               <Play size={12} />
@@ -792,7 +790,7 @@ export function AutomationsPage() {
               <button
                 type="button"
                 onClick={() => handleDelete(job.id)}
-                className="p-1 rounded text-dim hover:text-destructive hover:bg-red-500/10 transition-colors"
+                className="p-1 rounded text-dim hover:text-destructive hover:bg-destructive/10 transition-colors"
                 title="Delete"
               >
                 <Trash2 size={12} />
@@ -854,7 +852,7 @@ export function AutomationsPage() {
               className={cn(
                 "px-3 py-1.5 rounded-lg text-[12px] font-light transition-colors",
                 originFilter === tab.key
-                  ? "bg-white/[0.12] text-primary"
+                  ? "bg-surface-highest text-primary"
                   : "text-muted hover:text-secondary",
               )}
             >
@@ -862,7 +860,7 @@ export function AutomationsPage() {
             </button>
           ))}
 
-          <div className="w-px h-5 bg-white/[0.08] mx-1" />
+          <div className="w-px h-5 bg-surface-raised mx-1" />
 
           <div className="relative">
             <Search

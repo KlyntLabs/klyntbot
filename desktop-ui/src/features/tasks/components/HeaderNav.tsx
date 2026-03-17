@@ -30,13 +30,9 @@ export default function HeaderNav() {
               key={`${entry.type}-${entry.targetId}`}
               className="flex items-center gap-1 min-w-0"
             >
-              {index > 0 && (
-                <span className="text-xs text-muted flex-shrink-0">›</span>
-              )}
+              {index > 0 && <span className="text-xs text-muted flex-shrink-0">›</span>}
               {isLast ? (
-                <span className="text-sm font-medium text-primary truncate">
-                  {entry.label}
-                </span>
+                <span className="text-sm font-medium text-primary truncate">{entry.label}</span>
               ) : (
                 <button
                   type="button"

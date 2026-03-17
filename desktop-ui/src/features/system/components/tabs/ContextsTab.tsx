@@ -37,7 +37,7 @@ export function ContextsTab() {
             className={`px-2.5 py-1 rounded-lg text-[11px] font-light transition-colors ${
               statusFilter === value
                 ? "glass-button-active text-primary"
-                : "text-muted hover:text-secondary hover:bg-white/[0.04]"
+                : "text-muted hover:text-secondary hover:bg-surface-low"
             }`}
           >
             {label}

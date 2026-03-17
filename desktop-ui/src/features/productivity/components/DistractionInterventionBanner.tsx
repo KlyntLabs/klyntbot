@@ -140,7 +140,7 @@ export function DistractionInterventionBanner() {
             onClick={handleNotDistraction}
             className={cn(
               "flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors",
-              "bg-white/[0.06] text-secondary border border-white/10 hover:bg-white/[0.1]",
+              "bg-surface-base text-secondary border border-border hover:bg-surface-raised",
             )}
           >
             Not a distraction
@@ -156,8 +156,8 @@ export function DistractionInterventionBanner() {
             className={cn(
               "flex-1 px-2 py-1.5 rounded-md font-medium transition-colors",
               snoozeCountdown > 0
-                ? "bg-white/[0.04] text-dim cursor-not-allowed"
-                : "bg-white/[0.06] text-secondary hover:bg-white/[0.1] border border-white/10",
+                ? "bg-surface-low text-dim cursor-not-allowed"
+                : "bg-surface-base text-secondary hover:bg-surface-raised border border-border",
             )}
           >
             {snoozeCountdown > 0 ? `${Math.ceil(snoozeCountdown / 60)}m snooze` : "5 more minutes"}
@@ -167,7 +167,7 @@ export function DistractionInterventionBanner() {
             onClick={handleEndFocus}
             className={cn(
               "flex-1 px-2 py-1.5 rounded-md font-medium transition-colors",
-              "text-muted hover:text-secondary hover:bg-white/[0.06]",
+              "text-muted hover:text-secondary hover:bg-surface-base",
             )}
           >
             End focus session

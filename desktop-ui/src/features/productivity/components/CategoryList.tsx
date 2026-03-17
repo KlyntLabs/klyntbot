@@ -50,7 +50,7 @@ export function CategoryList({ categories, selectedId, onSelect, onCreated }: Ca
         <button
           type="button"
           onClick={handleCreate}
-          className="p-1 rounded-md hover:bg-white/[0.06] text-muted hover:text-primary transition-colors"
+          className="p-1 rounded-md hover:bg-surface-base text-muted hover:text-primary transition-colors"
           title="Add category"
         >
           <Plus size={14} />
@@ -74,8 +74,8 @@ export function CategoryList({ categories, selectedId, onSelect, onCreated }: Ca
                 onClick={() => onSelect(cat.id)}
                 className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition-colors ${
                   isSelected
-                    ? "bg-white/[0.08] text-primary"
-                    : "text-secondary hover:bg-white/[0.04] hover:text-primary"
+                    ? "bg-surface-raised text-primary"
+                    : "text-secondary hover:bg-surface-low hover:text-primary"
                 }`}
               >
                 <span

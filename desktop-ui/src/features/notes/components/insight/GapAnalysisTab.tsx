@@ -31,9 +31,9 @@ function parseGaps(content: string): { markdown: string; gaps: Gap[] } {
 function SkeletonLoader() {
   return (
     <div className="space-y-3 animate-pulse">
-      <div className="h-3 bg-white/[0.04] rounded w-3/4" />
-      <div className="h-3 bg-white/[0.04] rounded w-full" />
-      <div className="h-3 bg-white/[0.04] rounded w-5/6" />
+      <div className="h-3 bg-surface-low rounded w-3/4" />
+      <div className="h-3 bg-surface-low rounded w-full" />
+      <div className="h-3 bg-surface-low rounded w-5/6" />
     </div>
   );
 }
@@ -51,7 +51,9 @@ export function GapAnalysisTab({ status, content, onCreateNote }: GapAnalysisTab
 
   if (status === "error") {
     return (
-      <p className="text-[11px] text-red-400">Failed to generate gap analysis. Try regenerating.</p>
+      <p className="text-[11px] text-destructive">
+        Failed to generate gap analysis. Try regenerating.
+      </p>
     );
   }
 
@@ -73,7 +75,7 @@ export function GapAnalysisTab({ status, content, onCreateNote }: GapAnalysisTab
               key={gap.topic}
               type="button"
               onClick={() => onCreateNote?.(gap.suggestedTitle, gap.description)}
-              className="w-full flex items-start gap-2 p-2 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] transition-colors text-left group"
+              className="w-full flex items-start gap-2 p-2 rounded-lg bg-surface-lowest hover:bg-surface-base transition-colors text-left group"
             >
               <FilePlus size={12} className="text-dim group-hover:text-brand mt-0.5 shrink-0" />
               <div>

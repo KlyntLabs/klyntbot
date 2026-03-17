@@ -72,7 +72,7 @@ export function AISuggestionsPanel({
                     key={item.note.id}
                     type="button"
                     onClick={() => onSelectNote(item.note.id)}
-                    className="flex flex-col gap-0.5 px-2 py-1 rounded text-left hover:bg-white/[0.06] transition-colors"
+                    className="flex flex-col gap-0.5 px-2 py-1 rounded text-left hover:bg-surface-base transition-colors"
                   >
                     <span className="text-[11px] text-secondary truncate">{item.note.title}</span>
                     <span className="text-[9px] text-dim truncate">{item.reason}</span>
@@ -87,7 +87,7 @@ export function AISuggestionsPanel({
           </div>
 
           {/* Link Suggestions */}
-          <div className="py-1.5 border-t border-white/[0.04]">
+          <div className="py-1.5 border-t border-border-subtle">
             <div className="text-[10px] font-medium text-dim uppercase tracking-wider mb-1">
               Link Suggestions
             </div>
@@ -98,7 +98,7 @@ export function AISuggestionsPanel({
                     key={item.note.id}
                     type="button"
                     onClick={() => onSelectNote(item.note.id)}
-                    className="flex flex-col gap-0.5 px-2 py-1 rounded text-left hover:bg-white/[0.06] transition-colors"
+                    className="flex flex-col gap-0.5 px-2 py-1 rounded text-left hover:bg-surface-base transition-colors"
                   >
                     <span className="text-[11px] text-secondary truncate">
                       Link to: {item.note.title}
@@ -113,7 +113,7 @@ export function AISuggestionsPanel({
           </div>
 
           {/* Suggested Tags */}
-          <div className="py-1.5 border-t border-white/[0.04]">
+          <div className="py-1.5 border-t border-border-subtle">
             <div className="text-[10px] font-medium text-dim uppercase tracking-wider mb-1">
               Suggested Tags
             </div>
@@ -138,12 +138,12 @@ export function AISuggestionsPanel({
           </div>
 
           {/* Action buttons */}
-          <div className="flex gap-1.5 mt-2 pt-2 border-t border-white/[0.04] relative">
+          <div className="flex gap-1.5 mt-2 pt-2 border-t border-border-subtle relative">
             <button
               type="button"
               onClick={() => onOpenInsight?.()}
               disabled={!noteId}
-              className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-white/[0.04] text-secondary hover:bg-white/[0.08] hover:text-primary transition-colors disabled:text-dim disabled:cursor-not-allowed"
+              className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-surface-low text-secondary hover:bg-surface-raised hover:text-primary transition-colors disabled:text-dim disabled:cursor-not-allowed"
             >
               <Brain size={10} />
               Insight Review
@@ -151,7 +151,7 @@ export function AISuggestionsPanel({
             <button
               type="button"
               disabled
-              className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-white/[0.04] text-dim cursor-not-allowed"
+              className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-surface-low text-dim cursor-not-allowed"
             >
               <MessageSquare size={10} />
               Ask AI
@@ -169,8 +169,8 @@ export function AISuggestionsPanel({
               disabled={!noteId || suggestions.linkSuggestions.length === 0}
               className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded-md transition-colors ${
                 noteId && suggestions.linkSuggestions.length > 0
-                  ? "bg-white/[0.06] text-secondary hover:bg-white/[0.10] hover:text-primary"
-                  : "bg-white/[0.04] text-dim cursor-not-allowed"
+                  ? "bg-surface-base text-secondary hover:bg-surface-raised hover:text-primary"
+                  : "bg-surface-low text-dim cursor-not-allowed"
               }`}
             >
               <Link2 size={10} />
@@ -188,7 +188,7 @@ export function AISuggestionsPanel({
                       insertWikiLink(item.note.id, item.note.title);
                       setShowLinkPicker(false);
                     }}
-                    className="w-full text-left px-3 py-1.5 text-[11px] text-secondary hover:bg-white/[0.06] hover:text-primary transition-colors truncate"
+                    className="w-full text-left px-3 py-1.5 text-[11px] text-secondary hover:bg-surface-base hover:text-primary transition-colors truncate"
                   >
                     [[{item.note.title}]]
                   </button>

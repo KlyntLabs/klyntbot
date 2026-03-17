@@ -50,7 +50,7 @@ export function DaySummary({
             {categories.map((cat) => (
               <span
                 key={cat}
-                className="px-2 py-0.5 rounded-md bg-white/[0.06] border border-white/[0.08] text-[10px] font-light text-dim capitalize"
+                className="px-2 py-0.5 rounded-md bg-surface-base border border-border text-[10px] font-light text-dim capitalize"
               >
                 {cat}
               </span>
@@ -63,7 +63,7 @@ export function DaySummary({
         type="button"
         onClick={onClose}
         aria-label="Close day summary"
-        className="p-1 rounded-lg text-dim hover:text-secondary hover:bg-white/[0.06] transition-colors shrink-0 text-[14px] leading-none"
+        className="p-1 rounded-lg text-dim hover:text-secondary hover:bg-surface-base transition-colors shrink-0 text-[14px] leading-none"
       >
         &times;
       </button>

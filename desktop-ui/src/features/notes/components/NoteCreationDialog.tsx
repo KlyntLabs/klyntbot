@@ -95,10 +95,10 @@ export function NoteCreationDialog({
       {/* Backdrop */}
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop dismiss pattern */}
       {/* biome-ignore lint/a11y/noStaticElementInteractions: backdrop dismiss */}
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="absolute inset-0 bg-overlay-heavy" onClick={onClose} />
 
       {/* Dialog */}
-      <div className="relative w-full max-w-[480px] mx-4 glass-panel rounded-2xl border border-white/[0.06] shadow-2xl">
+      <div className="relative w-full max-w-[480px] mx-4 glass-panel rounded-2xl border border-border-subtle shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between px-5 pt-4 pb-2">
           <h2 className="text-sm font-medium text-primary">New Note</h2>
@@ -127,7 +127,7 @@ export function NoteCreationDialog({
 
         {/* Similar notes */}
         {(similarNotes.length > 0 || searching) && (
-          <div className="border-t border-white/[0.06] px-5 py-3">
+          <div className="border-t border-border-subtle px-5 py-3">
             <div className="flex items-center gap-1.5 mb-2">
               <Sparkles size={12} className="text-brand" />
               <span className="text-[10px] uppercase tracking-wider text-muted">Similar notes</span>
@@ -141,7 +141,7 @@ export function NoteCreationDialog({
                     key={note.id}
                     type="button"
                     onClick={() => handleNavigate(note.id)}
-                    className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-left hover:bg-white/[0.06] transition-colors group"
+                    className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-left hover:bg-surface-base transition-colors group"
                   >
                     <FileText size={14} className="text-dim group-hover:text-muted shrink-0" />
                     <span className="text-sm text-secondary group-hover:text-primary truncate">
@@ -155,7 +155,7 @@ export function NoteCreationDialog({
         )}
 
         {/* Actions */}
-        <div className="border-t border-white/[0.06] px-5 py-3 flex items-center justify-between">
+        <div className="border-t border-border-subtle px-5 py-3 flex items-center justify-between">
           <button
             type="button"
             onClick={handleCreate}

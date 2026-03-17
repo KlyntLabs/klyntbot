@@ -42,10 +42,10 @@ export function SidebarWorkState({
             className={cn(
               "text-sm font-mono tabular-nums",
               focusSession.qualityScore > 0.7
-                ? "text-green-400"
+                ? "text-success"
                 : focusSession.qualityScore > 0.4
-                  ? "text-amber-400"
-                  : "text-red-400",
+                  ? "text-warning"
+                  : "text-destructive",
             )}
           >
             {focusSession.qualityScore.toFixed(2)}
@@ -55,9 +55,7 @@ export function SidebarWorkState({
       {focusSession.distractionCount != null && (
         <div className="flex items-center justify-between">
           <span className="text-xs text-muted">Distractions</span>
-          <span className="text-sm text-primary">
-            {focusSession.distractionCount}
-          </span>
+          <span className="text-sm text-primary">{focusSession.distractionCount}</span>
         </div>
       )}
       {focusSession.flowState != null && (
@@ -82,7 +80,7 @@ export function SidebarWorkState({
         <button
           type="button"
           onClick={onStopFocus}
-          className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs rounded border border-border text-red-400 hover:bg-red-400/10 transition-colors"
+          className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs rounded border border-border text-destructive hover:bg-destructive/10 transition-colors"
         >
           <Square className="size-3" />
           Stop
@@ -116,10 +114,10 @@ function FocusTimer({ focusedAt }: { focusedAt: string }) {
 function FlowBadge({ state }: { state: string }) {
   const color =
     state === "active"
-      ? "text-green-400"
+      ? "text-success"
       : state === "building"
-        ? "text-amber-400"
-        : "text-red-400";
+        ? "text-warning"
+        : "text-destructive";
 
   return (
     <span className={cn("text-xs px-1.5 py-0.5 rounded bg-surface-raised capitalize", color)}>
@@ -134,7 +132,7 @@ function QualitySparkline({ values }: { values: number[] }) {
     <div className="flex items-end gap-px h-8">
       {values.map((v, i) => {
         const height = `${(v / max) * 100}%`;
-        const color = v > 0.7 ? "bg-green-400/70" : v > 0.4 ? "bg-amber-400/70" : "bg-red-400/70";
+        const color = v > 0.7 ? "bg-success/70" : v > 0.4 ? "bg-warning/70" : "bg-destructive/70";
         return (
           <div key={`bar-${i}`} className={cn("flex-1 rounded-sm", color)} style={{ height }} />
         );

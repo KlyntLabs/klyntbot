@@ -52,9 +52,7 @@ export function IssueGrid({ issue }: { issue: Issue }) {
       >
         <div className="flex items-center gap-2">
           <issue.priority.icon className="size-4 text-muted" />
-          <span className="text-xs text-muted font-medium">
-            {issue.identifier}
-          </span>
+          <span className="text-xs text-muted font-medium">{issue.identifier}</span>
         </div>
         <p className="text-sm font-semibold line-clamp-2">{issue.title}</p>
         {issue.labels.length > 0 && (
@@ -64,9 +62,7 @@ export function IssueGrid({ issue }: { issue: Issue }) {
         )}
         {issue.project && <ProjectBadge project={issue.project} />}
         <div className="flex items-center justify-between">
-          <span className="text-xs text-muted">
-            {format(new Date(issue.createdAt), "MMM dd")}
-          </span>
+          <span className="text-xs text-muted">{format(new Date(issue.createdAt), "MMM dd")}</span>
           <AssigneeUser user={issue.assignee} />
         </div>
       </motion.div>

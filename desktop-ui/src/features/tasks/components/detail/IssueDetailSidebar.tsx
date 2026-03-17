@@ -19,9 +19,7 @@ export function IssueDetailSidebar({ detail, onClose }: IssueDetailSidebarProps)
   return (
     <div className="w-[260px] shrink-0 border-l border-border overflow-y-auto">
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-        <span className="text-xs font-medium text-muted uppercase tracking-wider">
-          Details
-        </span>
+        <span className="text-xs font-medium text-muted uppercase tracking-wider">Details</span>
         <button
           type="button"
           onClick={onClose}

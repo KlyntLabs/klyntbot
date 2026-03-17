@@ -86,7 +86,7 @@ export function ContextMenuItem({ children, onClick, destructive, icon }: Contex
       className={`w-[calc(100%-10px)] mx-[5px] px-2.5 py-[5px] text-[13px] font-normal rounded-md flex items-center gap-2.5 text-left transition-colors outline-none focus-visible:outline-none ${
         destructive
           ? "text-destructive hover:bg-destructive/[0.12] focus:bg-destructive/[0.12]"
-          : "text-secondary hover:bg-white/[0.08] focus:bg-white/[0.08] hover:text-primary focus:text-primary"
+          : "text-secondary hover:bg-surface-raised focus:bg-surface-raised hover:text-primary focus:text-primary"
       }`}
     >
       {icon && (
@@ -100,7 +100,7 @@ export function ContextMenuItem({ children, onClick, destructive, icon }: Contex
 // ── Separator ───────────────────────────────────────────────────────────
 
 export function ContextMenuSeparator() {
-  return <div className="h-px bg-white/[0.08] my-[5px] mx-2.5" />;
+  return <div className="h-px bg-surface-raised my-[5px] mx-2.5" />;
 }
 
 // ── Submenu trigger ─────────────────────────────────────────────────────
@@ -130,7 +130,7 @@ export function ContextMenuSubmenu({
         role="menuitem"
         tabIndex={-1}
         onClick={onToggle}
-        className="w-[calc(100%-10px)] mx-[5px] px-2.5 py-[5px] text-[13px] font-normal rounded-md flex items-center gap-2.5 text-left text-secondary hover:bg-white/[0.08] focus:bg-white/[0.08] hover:text-primary focus:text-primary transition-colors outline-none focus-visible:outline-none"
+        className="w-[calc(100%-10px)] mx-[5px] px-2.5 py-[5px] text-[13px] font-normal rounded-md flex items-center gap-2.5 text-left text-secondary hover:bg-surface-raised focus:bg-surface-raised hover:text-primary focus:text-primary transition-colors outline-none focus-visible:outline-none"
       >
         {icon && (
           <span className="w-4 h-4 flex items-center justify-center shrink-0 opacity-70">

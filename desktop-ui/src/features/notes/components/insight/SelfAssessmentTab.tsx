@@ -24,11 +24,11 @@ function SkeletonLoader() {
       {[0, 1, 2].map((i) => (
         <div
           key={i}
-          className="rounded-lg bg-white/[0.03] border border-white/[0.06] p-4 space-y-3"
+          className="rounded-lg bg-surface-lowest border border-border-subtle p-4 space-y-3"
         >
-          <div className="h-3 bg-white/[0.04] rounded w-3/4" />
-          <div className="h-3 bg-white/[0.04] rounded w-full" />
-          <div className="h-3 bg-white/[0.04] rounded w-1/2" />
+          <div className="h-3 bg-surface-low rounded w-3/4" />
+          <div className="h-3 bg-surface-low rounded w-full" />
+          <div className="h-3 bg-surface-low rounded w-1/2" />
         </div>
       ))}
     </div>
@@ -58,7 +58,7 @@ export function SelfAssessmentTab({
 
   if (status === "error") {
     return (
-      <p className="text-[11px] text-red-400">
+      <p className="text-[11px] text-destructive">
         Failed to generate quiz questions. Try regenerating.
       </p>
     );
@@ -92,11 +92,11 @@ export function SelfAssessmentTab({
         return (
           <div
             key={q.id}
-            className="rounded-lg bg-white/[0.03] border border-white/[0.06] p-4 space-y-3"
+            className="rounded-lg bg-surface-lowest border border-border-subtle p-4 space-y-3"
           >
             <div className="flex items-start justify-between gap-2">
               <span className="text-[12px] text-primary leading-relaxed">{q.question}</span>
-              <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/[0.06] text-dim shrink-0">
+              <span className="text-[9px] px-1.5 py-0.5 rounded bg-surface-base text-dim shrink-0">
                 {q.difficulty}
               </span>
             </div>
@@ -113,19 +113,19 @@ export function SelfAssessmentTab({
 
                   if (isRevealed) {
                     if (isCorrect) {
-                      choiceClass += "border-green-500/50 bg-green-500/10 text-primary";
+                      choiceClass += "border-success/50 bg-success/10 text-primary";
                     } else if (isSelected && !isCorrect) {
-                      choiceClass += "border-red-500/50 bg-red-500/10 text-primary";
+                      choiceClass += "border-destructive/50 bg-destructive/10 text-primary";
                     } else {
-                      choiceClass += "border-white/[0.06] bg-white/[0.02] text-dim";
+                      choiceClass += "border-border-subtle bg-surface-lowest text-dim";
                     }
                   } else {
                     if (isSelected) {
                       choiceClass +=
-                        "border-white/[0.15] bg-white/[0.08] text-primary hover:bg-white/[0.10]";
+                        "border-border bg-surface-raised text-primary hover:bg-surface-raised";
                     } else {
                       choiceClass +=
-                        "border-white/[0.06] bg-white/[0.03] text-secondary hover:bg-white/[0.06]";
+                        "border-border-subtle bg-surface-lowest text-secondary hover:bg-surface-base";
                     }
                   }
 
@@ -150,7 +150,7 @@ export function SelfAssessmentTab({
                 onChange={(e) => onAnswer(q.id, e.target.value)}
                 placeholder="Type your answer..."
                 disabled={isRevealed}
-                className="w-full bg-white/[0.04] border border-white/[0.08] rounded-md px-3 py-1.5 text-[11px] text-primary placeholder:text-dim focus:border-purple-400/50 focus:outline-none disabled:opacity-50"
+                className="w-full bg-surface-low border border-border rounded-md px-3 py-1.5 text-[11px] text-primary placeholder:text-dim focus:border-purple-400/50 focus:outline-none disabled:opacity-50"
               />
             )}
 
@@ -158,14 +158,14 @@ export function SelfAssessmentTab({
               <button
                 type="button"
                 onClick={() => onReveal(q.id)}
-                className="text-[10px] px-3 py-1 rounded-md bg-purple-500/20 text-purple-300 hover:bg-purple-500/30 transition-colors"
+                className="text-[10px] px-3 py-1 rounded-md bg-purple/20 text-purple hover:bg-purple/30 transition-colors"
               >
                 Check
               </button>
             )}
 
             {isRevealed && (
-              <div className="pt-2 border-t border-white/[0.04]">
+              <div className="pt-2 border-t border-border-subtle">
                 <div className="text-[10px] text-muted leading-relaxed">
                   <span className="font-medium text-secondary">Correct: </span>
                   {q.correctAnswer}

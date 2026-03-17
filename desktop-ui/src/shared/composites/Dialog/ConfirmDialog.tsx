@@ -29,7 +29,7 @@ export function ConfirmDialog({
           <button
             type="button"
             onClick={onClose}
-            className="px-3 py-1.5 text-[12px] text-muted hover:text-secondary rounded-md hover:bg-white/[0.06] transition-colors"
+            className="px-3 py-1.5 text-[12px] text-muted hover:text-secondary rounded-md hover:bg-surface-base transition-colors"
           >
             {cancelLabel}
           </button>

@@ -237,7 +237,7 @@ export function FinanceInvestments() {
                     key={p.id}
                     className={cn(
                       "glass-card p-4 cursor-pointer transition-colors",
-                      isSelected ? "ring-1 ring-brand bg-white/[0.06]" : "hover:bg-white/[0.06]",
+                      isSelected ? "ring-1 ring-brand bg-surface-base" : "hover:bg-surface-base",
                     )}
                     onClick={() => setSelectedPortfolio(isSelected ? null : p.id)}
                     onKeyDown={(e) => {
@@ -311,7 +311,7 @@ export function FinanceInvestments() {
                 }
               />
             </div>
-            <div className="grid grid-cols-[1fr_80px_80px_90px_80px_80px] gap-2 border-b border-white/[0.08] text-[10px] text-muted uppercase tracking-widest font-light px-4 py-2">
+            <div className="grid grid-cols-[1fr_80px_80px_90px_80px_80px] gap-2 border-b border-border text-[10px] text-muted uppercase tracking-widest font-light px-4 py-2">
               <div>Asset</div>
               <div className="text-right">Qty</div>
               <div className="text-right">Price</div>
@@ -324,14 +324,14 @@ export function FinanceInvestments() {
               return (
                 <div
                   key={inv.id}
-                  className="grid grid-cols-[1fr_80px_80px_90px_80px_80px] gap-2 items-center px-4 py-2.5 hover:bg-white/[0.06] transition-colors border-b border-white/[0.04] last:border-b-0"
+                  className="grid grid-cols-[1fr_80px_80px_90px_80px_80px] gap-2 items-center px-4 py-2.5 hover:bg-surface-base transition-colors border-b border-border-subtle last:border-b-0"
                 >
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="text-[12px] font-medium text-primary">
                         {inv.symbol ?? inv.name}
                       </span>
-                      <span className="px-1.5 py-0.5 text-[9px] font-light rounded bg-white/[0.06] text-dim">
+                      <span className="px-1.5 py-0.5 text-[9px] font-light rounded bg-surface-base text-dim">
                         {inv.assetType}
                       </span>
                     </div>

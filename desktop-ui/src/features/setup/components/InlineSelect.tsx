@@ -86,7 +86,7 @@ export function InlineSelect({
                   className={`block w-full text-left px-3 py-1.5 text-[13px] transition-colors ${
                     opt.value === value
                       ? "text-accent bg-accent/10"
-                      : "text-foreground hover:bg-white/[0.06]"
+                      : "text-foreground hover:bg-surface-base"
                   }`}
                 >
                   {opt.label}

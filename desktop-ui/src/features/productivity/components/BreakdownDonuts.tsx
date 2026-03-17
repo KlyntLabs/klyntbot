@@ -24,7 +24,7 @@ export function BreakdownDonuts({ segments, totalSecs }: BreakdownDonutsProps) {
       </div>
 
       {/* Stacked horizontal bar */}
-      <div className="h-3 rounded-full overflow-hidden bg-white/[0.06] flex">
+      <div className="h-3 rounded-full overflow-hidden bg-surface-base flex">
         {hasData ? (
           segments
             .filter((s) => s.value > 0)
@@ -39,7 +39,7 @@ export function BreakdownDonuts({ segments, totalSecs }: BreakdownDonutsProps) {
               />
             ))
         ) : (
-          <div className="h-full w-full rounded-full bg-white/[0.04]" />
+          <div className="h-full w-full rounded-full bg-surface-low" />
         )}
       </div>
 

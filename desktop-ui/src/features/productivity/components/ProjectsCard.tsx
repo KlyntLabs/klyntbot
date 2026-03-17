@@ -35,7 +35,7 @@ export function ProjectsCard({ projects, totalSecs }: ProjectsCardProps) {
               <span className="text-[11px] font-light text-secondary flex-1 truncate">
                 {p.displayName}
               </span>
-              <div className="flex-1 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+              <div className="flex-1 h-1.5 rounded-full bg-surface-base overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all duration-500"
                   style={{ width: `${pct}%`, backgroundColor: color }}

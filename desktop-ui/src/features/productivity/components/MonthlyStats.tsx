@@ -81,7 +81,7 @@ export function MonthlyStats({ yearMonth, summaries: current }: MonthlyStatsProp
         {rows.map((row, i) => (
           <div
             key={row.label}
-            className={`flex flex-col gap-1 py-3 ${i > 0 ? "border-t border-white/[0.04]" : ""}`}
+            className={`flex flex-col gap-1 py-3 ${i > 0 ? "border-t border-border-subtle" : ""}`}
           >
             <span className="text-[10px] font-light text-dim uppercase tracking-wider">
               {row.label}

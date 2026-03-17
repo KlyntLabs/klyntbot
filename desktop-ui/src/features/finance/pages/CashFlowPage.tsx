@@ -269,7 +269,7 @@ export function CashFlowPage() {
                 spellCheck={false}
               />
             </div>
-            <div className="flex gap-1 bg-white/[0.04] rounded-xl p-1" role="tablist">
+            <div className="flex gap-1 bg-surface-low rounded-xl p-1" role="tablist">
               {["all", "income", "expense", "transfer"].map((t) => (
                 <button
                   key={t}
@@ -327,7 +327,7 @@ export function CashFlowPage() {
                 return (
                   <div
                     key={tx.id}
-                    className="flex items-center gap-3 px-4 py-2 hover:bg-white/[0.06] transition-colors border-b border-white/[0.04] last:border-b-0"
+                    className="flex items-center gap-3 px-4 py-2 hover:bg-surface-base transition-colors border-b border-border-subtle last:border-b-0"
                   >
                     <span className="text-[10px] text-dim font-light w-10 flex-shrink-0 tabular-nums">
                       {tx.txDate.slice(5)}
@@ -337,7 +337,7 @@ export function CashFlowPage() {
                       {tx.counterparty ?? tx.notes ?? tx.txType}
                     </span>
                     {tx.category && (
-                      <span className="px-1.5 py-0.5 text-[9px] font-light rounded bg-white/[0.06] text-dim">
+                      <span className="px-1.5 py-0.5 text-[9px] font-light rounded bg-surface-base text-dim">
                         {tx.category}
                       </span>
                     )}
@@ -400,7 +400,7 @@ export function CashFlowPage() {
                   }}
                   className={cn(
                     "flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-colors",
-                    isSelected ? "bg-white/[0.08]" : "hover:bg-white/[0.04]",
+                    isSelected ? "bg-surface-raised" : "hover:bg-surface-low",
                   )}
                 >
                   <Icon className="w-3.5 h-3.5 text-muted" strokeWidth={1.5} />
@@ -443,7 +443,7 @@ export function CashFlowPage() {
               return (
                 <div
                   key={item.category}
-                  className="px-3 py-2 border-b border-white/[0.04] last:border-b-0"
+                  className="px-3 py-2 border-b border-border-subtle last:border-b-0"
                 >
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-1.5">
@@ -470,7 +470,7 @@ export function CashFlowPage() {
                       </span>
                     </div>
                   </div>
-                  <div className="h-1 bg-white/[0.06] rounded-full">
+                  <div className="h-1 bg-surface-base rounded-full">
                     <div
                       className="h-full rounded-full"
                       style={{ width: `${barWidth}%`, background: barColor }}
@@ -521,7 +521,7 @@ export function CashFlowPage() {
                     "flex-1 py-1.5 text-[12px] rounded-md border transition-colors capitalize",
                     txType === t
                       ? "border-brand/50 text-brand bg-brand/5"
-                      : "border-white/[0.08] text-muted bg-white/[0.06] hover:bg-white/[0.08]",
+                      : "border-border text-muted bg-surface-base hover:bg-surface-raised",
                   )}
                 >
                   {t}

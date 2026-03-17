@@ -416,10 +416,8 @@ async fn run_insight_pipeline(args: InsightPipelineArgs) {
     );
 
     if let Some(ref repo) = cache_repo {
-        let persona_ids_json = serde_json::to_string(
-            &personas.iter().map(|p| &p.id).collect::<Vec<_>>(),
-        )
-        .ok();
+        let persona_ids_json =
+            serde_json::to_string(&personas.iter().map(|p| &p.id).collect::<Vec<_>>()).ok();
         let _ = repo
             .upsert(
                 &note_id,

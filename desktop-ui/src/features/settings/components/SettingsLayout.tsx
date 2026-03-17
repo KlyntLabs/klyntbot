@@ -62,7 +62,7 @@ export function SettingsLayout({ children }: SettingsLayoutProps) {
                 className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-[13px] font-light transition-all duration-200 text-left ${
                   isActive
                     ? "glass-button-active text-primary"
-                    : "text-muted hover:bg-white/[0.05] hover:text-secondary"
+                    : "text-muted hover:bg-surface-base hover:text-secondary"
                 }`}
               >
                 <Icon className="w-4 h-4 flex-shrink-0" strokeWidth={1.5} />

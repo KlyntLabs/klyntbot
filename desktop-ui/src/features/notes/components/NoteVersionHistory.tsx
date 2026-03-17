@@ -68,7 +68,7 @@ export function NoteVersionHistory({ noteId, onRestore }: NoteVersionHistoryProp
             type="button"
             onClick={() => setPreviewId(v.id === previewId ? null : v.id)}
             className={`w-full flex gap-3 px-3 py-2.5 text-left transition-colors ${
-              v.id === previewId ? "bg-white/[0.06]" : "hover:bg-white/[0.03]"
+              v.id === previewId ? "bg-surface-base" : "hover:bg-surface-lowest"
             }`}
           >
             {/* Timeline dot */}

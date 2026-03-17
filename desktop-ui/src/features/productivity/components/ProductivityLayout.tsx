@@ -73,7 +73,7 @@ export function ProductivityLayout({ children, period, dateParam }: Productivity
               className={`px-3 py-1.5 rounded-xl text-[13px] font-light transition-all duration-200 ${
                 period === p.key
                   ? "glass-button-active text-primary"
-                  : "text-muted hover:text-secondary hover:bg-white/[0.04]"
+                  : "text-muted hover:text-secondary hover:bg-surface-low"
               }`}
             >
               {p.label}
@@ -85,7 +85,7 @@ export function ProductivityLayout({ children, period, dateParam }: Productivity
             className={`px-3 py-1.5 rounded-xl text-[13px] font-light transition-all duration-200 ${
               pathname.includes("/categories")
                 ? "glass-button-active text-primary"
-                : "text-muted hover:text-secondary hover:bg-white/[0.04]"
+                : "text-muted hover:text-secondary hover:bg-surface-low"
             }`}
           >
             Categories

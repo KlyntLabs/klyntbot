@@ -84,7 +84,7 @@ export function FireForm({ registerSave, onDirty }: FireFormProps) {
                     onDirty();
                   }}
                   placeholder="30"
-                  className="w-full px-3 py-2 text-[13px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-lg focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                  className="w-full px-3 py-2 text-[13px] text-primary bg-surface-base border border-border rounded-lg focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
                 />
               </label>
               <label className="flex-1">
@@ -99,7 +99,7 @@ export function FireForm({ registerSave, onDirty }: FireFormProps) {
                     onDirty();
                   }}
                   placeholder="45"
-                  className="w-full px-3 py-2 text-[13px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-lg focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                  className="w-full px-3 py-2 text-[13px] text-primary bg-surface-base border border-border rounded-lg focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
                 />
               </label>
             </div>
@@ -118,7 +118,7 @@ export function FireForm({ registerSave, onDirty }: FireFormProps) {
                   }}
                   placeholder="40000"
                   step="100"
-                  className="w-full px-3 py-2 text-[13px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-lg focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                  className="w-full px-3 py-2 text-[13px] text-primary bg-surface-base border border-border rounded-lg focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
                 />
               </label>
               <label className="flex-1">
@@ -133,7 +133,7 @@ export function FireForm({ registerSave, onDirty }: FireFormProps) {
                     onDirty();
                   }}
                   step="0.1"
-                  className="w-full px-3 py-2 text-[13px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-lg focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                  className="w-full px-3 py-2 text-[13px] text-primary bg-surface-base border border-border rounded-lg focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
                 />
               </label>
             </div>
@@ -147,7 +147,7 @@ export function FireForm({ registerSave, onDirty }: FireFormProps) {
                     className={`p-2.5 rounded-lg border cursor-pointer transition-colors ${
                       fireType === ft.value
                         ? "border-brand/50 bg-brand/[0.06]"
-                        : "border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.05]"
+                        : "border-border bg-surface-lowest hover:bg-surface-base"
                     }`}
                   >
                     <input

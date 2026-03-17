@@ -253,7 +253,7 @@ function DaySummary({
             ))}
             {intel.nudges.map((n, i) => (
               <div key={`n-${i}`} className="flex items-start gap-2 text-[11px]">
-                <Lightbulb className="w-3 h-3 text-amber-400 mt-0.5 shrink-0" />
+                <Lightbulb className="w-3 h-3 text-warning mt-0.5 shrink-0" />
                 <span className="text-secondary">{n.message}</span>
               </div>
             ))}

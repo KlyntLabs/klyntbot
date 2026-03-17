@@ -94,7 +94,7 @@ export function LauncherChat({ sessionKey, initialQuery, onBack, onExpand }: Lau
   return (
     <div className="flex flex-col" style={{ height: 568 }}>
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border-subtle">
         <button
           type="button"
           onClick={onBack}
@@ -228,7 +228,7 @@ export function LauncherChat({ sessionKey, initialQuery, onBack, onExpand }: Lau
       </div>
 
       {/* Footer */}
-      <div className="px-5 py-2.5 border-t border-white/[0.06]">
+      <div className="px-5 py-2.5 border-t border-border-subtle">
         <div className="flex items-center justify-between text-[11px] text-muted">
           <span className="flex items-center gap-1.5 font-light">
             <kbd className="px-1.5 py-0.5 glass-badge">Esc</kbd>

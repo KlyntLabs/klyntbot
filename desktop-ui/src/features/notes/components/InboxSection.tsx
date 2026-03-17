@@ -62,7 +62,7 @@ function InboxItemRow({
   onDiscard: () => void;
 }) {
   return (
-    <div className="flex flex-col gap-1 px-2 py-1.5 rounded-lg hover:bg-white/[0.04] transition-colors group">
+    <div className="flex flex-col gap-1 px-2 py-1.5 rounded-lg hover:bg-surface-low transition-colors group">
       <span className="text-xs text-secondary line-clamp-2">{item.content}</span>
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
         <button
@@ -77,7 +77,7 @@ function InboxItemRow({
         <button
           type="button"
           onClick={onDiscard}
-          className="flex items-center gap-1 text-[10px] text-dim hover:text-red-400 transition-colors ml-2"
+          className="flex items-center gap-1 text-[10px] text-dim hover:text-destructive transition-colors ml-2"
           title="Discard"
         >
           <Trash2 size={11} />

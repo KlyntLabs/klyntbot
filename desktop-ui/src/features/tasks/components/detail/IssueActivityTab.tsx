@@ -31,17 +31,13 @@ function ActivityEntry({ entry }: { entry: ActivityEntryType }) {
       <ActorAvatar type={entry.actorType} />
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline gap-2">
-          <span className="text-sm font-medium text-primary">
-            {entry.actorName}
-          </span>
+          <span className="text-sm font-medium text-primary">{entry.actorName}</span>
           <span className="text-sm text-muted">{entry.action}</span>
           <span className="ml-auto text-xs text-muted shrink-0">
             {formatActivityTime(entry.createdAt)}
           </span>
         </div>
-        {entry.detail && (
-          <p className="text-sm text-muted mt-0.5">{entry.detail}</p>
-        )}
+        {entry.detail && <p className="text-sm text-muted mt-0.5">{entry.detail}</p>}
       </div>
     </div>
   );

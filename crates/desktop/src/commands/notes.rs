@@ -557,12 +557,14 @@ pub(crate) async fn dispatch_dev(
             dev::val(core.note_insight_regenerate_tab(&id, &tab).await)
         }
         "note_insight_list_personas" => dev::val(core.note_insight_list_personas().await),
-        "note_insight_create_persona" => {
-            dev::val(core.note_insight_create_persona(try_field!(dev::parse_params(body))).await)
-        }
-        "note_insight_update_persona" => {
-            dev::val(core.note_insight_update_persona(try_field!(dev::parse_params(body))).await)
-        }
+        "note_insight_create_persona" => dev::val(
+            core.note_insight_create_persona(try_field!(dev::parse_params(body)))
+                .await,
+        ),
+        "note_insight_update_persona" => dev::val(
+            core.note_insight_update_persona(try_field!(dev::parse_params(body)))
+                .await,
+        ),
         "note_insight_delete_persona" => {
             let id = try_field!(dev::get_str(body, "id"));
             dev::val(core.note_insight_delete_persona(&id).await)
@@ -572,12 +574,14 @@ pub(crate) async fn dispatch_dev(
             let active = body.get("active").and_then(|v| v.as_bool()).unwrap_or(true);
             dev::val(core.note_insight_toggle_persona(&id, active).await)
         }
-        "note_insight_set_pins" => {
-            dev::val(core.note_insight_set_pins(try_field!(dev::parse_params(body))).await)
-        }
-        "note_insight_rate_persona" => {
-            dev::val(core.note_insight_rate_persona(try_field!(dev::parse_params(body))).await)
-        }
+        "note_insight_set_pins" => dev::val(
+            core.note_insight_set_pins(try_field!(dev::parse_params(body)))
+                .await,
+        ),
+        "note_insight_rate_persona" => dev::val(
+            core.note_insight_rate_persona(try_field!(dev::parse_params(body)))
+                .await,
+        ),
         "note_insight_auto_generate_persona" => {
             let note_id = try_field!(dev::get_str(body, "noteId"));
             dev::val(core.note_insight_auto_generate_persona(&note_id).await)

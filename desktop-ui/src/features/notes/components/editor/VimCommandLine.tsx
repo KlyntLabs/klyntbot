@@ -25,7 +25,7 @@ export function VimCommandLine({ prefix, onSubmit, onCancel }: VimCommandLinePro
   };
 
   return (
-    <div className="flex items-center gap-1.5 px-4 py-1.5 border-t border-white/[0.06] bg-black/20">
+    <div className="flex items-center gap-1.5 px-4 py-1.5 border-t border-border-subtle bg-overlay">
       <span className="font-mono text-xs text-muted select-none">{prefix}</span>
       <input
         ref={inputRef}

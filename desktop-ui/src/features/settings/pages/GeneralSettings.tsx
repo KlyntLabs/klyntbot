@@ -76,7 +76,7 @@ export function GeneralSettings() {
       </div>
 
       <div className="space-y-4">
-        <div className="bg-white/[0.04] rounded-lg border border-white/[0.08] p-4">
+        <div className="bg-surface-low rounded-lg border border-border p-4">
           <h3 className="text-[13px] font-medium text-secondary mb-3">System</h3>
           <div className="space-y-2">
             <div className="flex justify-between text-[13px]">
@@ -98,7 +98,7 @@ export function GeneralSettings() {
           </div>
         </div>
 
-        <div className="bg-white/[0.04] rounded-lg border border-white/[0.08] p-4">
+        <div className="bg-surface-low rounded-lg border border-border p-4">
           <h3 className="text-[13px] font-medium text-secondary mb-3">Agent defaults</h3>
           <div className="space-y-3">
             <label className="block">
@@ -108,7 +108,7 @@ export function GeneralSettings() {
                 value={currentModel}
                 onChange={(e) => setModel(e.target.value)}
                 placeholder="e.g. anthropic/claude-opus-4-5"
-                className="w-full px-3 py-1.5 text-[13px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-lg focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                className="w-full px-3 py-1.5 text-[13px] text-primary bg-surface-base border border-border rounded-lg focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
               />
             </label>
 
@@ -122,7 +122,7 @@ export function GeneralSettings() {
                   step="0.1"
                   min="0"
                   max="2"
-                  className="w-full px-3 py-1.5 text-[13px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-lg focus:outline-none focus:border-brand/50 transition-colors"
+                  className="w-full px-3 py-1.5 text-[13px] text-primary bg-surface-base border border-border rounded-lg focus:outline-none focus:border-brand/50 transition-colors"
                 />
               </label>
               <label className="flex-1">
@@ -133,7 +133,7 @@ export function GeneralSettings() {
                   onChange={(e) => setMaxTokens(e.target.value)}
                   step="256"
                   min="256"
-                  className="w-full px-3 py-1.5 text-[13px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-lg focus:outline-none focus:border-brand/50 transition-colors"
+                  className="w-full px-3 py-1.5 text-[13px] text-primary bg-surface-base border border-border rounded-lg focus:outline-none focus:border-brand/50 transition-colors"
                 />
               </label>
             </div>

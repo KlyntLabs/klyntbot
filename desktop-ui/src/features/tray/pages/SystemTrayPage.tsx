@@ -142,7 +142,7 @@ export function SystemTray() {
                   type="button"
                   onClick={() => handleCoachingFeedback(coachingNudge.id, "helpful")}
                   title="Helpful"
-                  className="h-6 px-2 flex items-center gap-1 rounded-md text-[10px] text-muted hover:text-success hover:bg-white/[0.06] transition-colors"
+                  className="h-6 px-2 flex items-center gap-1 rounded-md text-[10px] text-muted hover:text-success hover:bg-surface-base transition-colors"
                 >
                   <Check className="w-3 h-3" strokeWidth={2} />
                   Helpful
@@ -151,7 +151,7 @@ export function SystemTray() {
                   type="button"
                   onClick={() => handleCoachingFeedback(coachingNudge.id, "dismissed")}
                   title="Dismiss"
-                  className="h-6 px-2 flex items-center gap-1 rounded-md text-[10px] text-muted hover:text-secondary hover:bg-white/[0.06] transition-colors"
+                  className="h-6 px-2 flex items-center gap-1 rounded-md text-[10px] text-muted hover:text-secondary hover:bg-surface-base transition-colors"
                 >
                   <X className="w-3 h-3" strokeWidth={2} />
                   Dismiss
@@ -160,7 +160,7 @@ export function SystemTray() {
                   type="button"
                   onClick={() => handleCoachingFeedback(coachingNudge.id, "stop")}
                   title="Stop suggesting this"
-                  className="h-6 px-2 flex items-center gap-1 rounded-md text-[10px] text-muted hover:text-destructive hover:bg-white/[0.06] transition-colors"
+                  className="h-6 px-2 flex items-center gap-1 rounded-md text-[10px] text-muted hover:text-destructive hover:bg-surface-base transition-colors"
                 >
                   <XCircle className="w-3 h-3" strokeWidth={2} />
                   Stop
@@ -194,7 +194,7 @@ export function SystemTray() {
                     return (
                       <div
                         key={task.id}
-                        className={`flex items-center gap-2.5 py-1.5 px-2 rounded-lg border-l-2 border-y-0 border-r-0 hover:bg-white/[0.04] transition-colors ${taskIndicatorClass(task, done)}`}
+                        className={`flex items-center gap-2.5 py-1.5 px-2 rounded-lg border-l-2 border-y-0 border-r-0 hover:bg-surface-low transition-colors ${taskIndicatorClass(task, done)}`}
                       >
                         <Checkbox
                           checked={done}
@@ -276,7 +276,7 @@ export function SystemTray() {
               type="button"
               onClick={handleOpenDashboard}
               title="Open Dashboard"
-              className="w-7 h-7 flex items-center justify-center rounded-lg text-muted hover:text-secondary hover:bg-white/[0.06] transition-colors"
+              className="w-7 h-7 flex items-center justify-center rounded-lg text-muted hover:text-secondary hover:bg-surface-base transition-colors"
             >
               <Monitor className="w-3.5 h-3.5" strokeWidth={1.5} />
             </button>
@@ -284,7 +284,7 @@ export function SystemTray() {
               type="button"
               onClick={handleOpenSettings}
               title="Settings"
-              className="w-7 h-7 flex items-center justify-center rounded-lg text-muted hover:text-secondary hover:bg-white/[0.06] transition-colors"
+              className="w-7 h-7 flex items-center justify-center rounded-lg text-muted hover:text-secondary hover:bg-surface-base transition-colors"
             >
               <Settings className="w-3.5 h-3.5" strokeWidth={1.5} />
             </button>
@@ -292,7 +292,7 @@ export function SystemTray() {
               type="button"
               onClick={handleOpenGitHub}
               title="GitHub"
-              className="w-7 h-7 flex items-center justify-center rounded-lg text-muted hover:text-secondary hover:bg-white/[0.06] transition-colors"
+              className="w-7 h-7 flex items-center justify-center rounded-lg text-muted hover:text-secondary hover:bg-surface-base transition-colors"
             >
               <svg
                 className="w-3.5 h-3.5"
@@ -307,7 +307,7 @@ export function SystemTray() {
               type="button"
               onClick={handleQuit}
               title="Quit Klynt"
-              className="w-7 h-7 flex items-center justify-center rounded-lg text-muted hover:text-destructive hover:bg-white/[0.06] transition-colors"
+              className="w-7 h-7 flex items-center justify-center rounded-lg text-muted hover:text-destructive hover:bg-surface-base transition-colors"
             >
               <LogOut className="w-3.5 h-3.5" strokeWidth={1.5} />
             </button>

@@ -22,9 +22,7 @@ export function ProjectView({ projectId, tasksData }: ProjectViewProps) {
 
   if (projectIssues.length === 0) {
     return (
-      <div className="px-6 py-8 text-center text-sm text-muted">
-        No issues in this project
-      </div>
+      <div className="px-6 py-8 text-center text-sm text-muted">No issues in this project</div>
     );
   }
 

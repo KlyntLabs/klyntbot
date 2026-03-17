@@ -18,7 +18,7 @@ export function Toggle({ checked, onChange, disabled, size = "default", classNam
       className={cn(
         "relative rounded-full transition-colors disabled:opacity-50",
         isSmall ? "w-7 h-4" : "w-9 h-5",
-        checked ? "bg-brand" : "bg-white/[0.1]",
+        checked ? "bg-brand" : "bg-surface-raised",
         className,
       )}
     >

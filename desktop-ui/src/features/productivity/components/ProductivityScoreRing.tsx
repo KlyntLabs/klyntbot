@@ -21,7 +21,7 @@ export function ScoreBar({ label, value }: { label: string; value: number }) {
   return (
     <div className="flex items-center gap-1.5 text-[9px] font-light">
       <span className="w-[68px] text-muted text-right shrink-0 truncate">{label}</span>
-      <div className="flex-1 h-1 rounded-full bg-white/[0.08] overflow-hidden">
+      <div className="flex-1 h-1 rounded-full bg-surface-raised overflow-hidden">
         <div
           className="h-full rounded-full bg-brand/60 transition-[width]"
           style={{ width: `${pct}%` }}

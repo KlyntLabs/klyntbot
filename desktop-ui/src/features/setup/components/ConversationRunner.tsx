@@ -30,7 +30,11 @@ function StepDots({
           <div
             key={i}
             className={`rounded-full transition-all duration-300 ${
-              isActive ? "w-6 h-2 bg-brand" : isDone ? "w-2 h-2 bg-brand/60" : "w-2 h-2 bg-white/10"
+              isActive
+                ? "w-6 h-2 bg-brand"
+                : isDone
+                  ? "w-2 h-2 bg-brand/60"
+                  : "w-2 h-2 bg-surface-raised"
             }`}
           />
         );
@@ -60,7 +64,7 @@ function CompletedNode({
 
   if (isEditing) {
     return (
-      <div className="py-3 px-4 rounded-xl bg-white/[0.06] border border-white/[0.08]">
+      <div className="py-3 px-4 rounded-xl bg-surface-base border border-border">
         <div className="text-lg text-primary leading-relaxed">
           <span className="text-secondary">{before}</span>
           {renderInput(node, value, onResubmit, true)}
@@ -75,7 +79,7 @@ function CompletedNode({
     <button
       type="button"
       onClick={onClickEdit}
-      className="w-full text-left py-2 px-4 rounded-xl hover:bg-white/[0.04] transition-colors group"
+      className="w-full text-left py-2 px-4 rounded-xl hover:bg-surface-low transition-colors group"
     >
       <span className="text-[15px] text-muted">{before}</span>
       <span className="text-[15px] font-semibold text-primary group-hover:text-brand transition-colors">
@@ -255,7 +259,7 @@ export function ConversationRunner() {
         {/* Glass card container */}
         <div
           ref={containerRef}
-          className="glass-card rounded-2xl border border-white/[0.08] p-8"
+          className="glass-card rounded-2xl border border-border p-8"
           style={{ animation: "glass-appear 0.3s ease-out" }}
         >
           {/* Completed nodes (compact list) */}
@@ -284,7 +288,7 @@ export function ConversationRunner() {
 
           {/* Divider between completed and active */}
           {activeIndex > 0 && !isComplete && activeNode?.inputType !== "complex" && (
-            <div className="my-4 border-t border-white/[0.06]" />
+            <div className="my-4 border-t border-border-subtle" />
           )}
 
           {/* Active node — larger, prominent */}

@@ -218,15 +218,28 @@ Return ONLY the JSON object, no markdown fences, no explanation."#,
             .content
             .ok_or_else(|| ApiError::new("LLM_ERROR", "Empty response from LLM"))?;
 
-        let generated: serde_json::Value = serde_json::from_str(content.trim())
-            .map_err(|e| ApiError::new("PARSE_ERROR", format!("Failed to parse persona JSON: {e}")))?;
+        let generated: serde_json::Value = serde_json::from_str(content.trim()).map_err(|e| {
+            ApiError::new("PARSE_ERROR", format!("Failed to parse persona JSON: {e}"))
+        })?;
 
         let new_persona = cognitive::NewPersona {
             name: generated["name"].as_str().unwrap_or("Expert").to_string(),
-            role: generated["role"].as_str().unwrap_or("Domain Analyst").to_string(),
-            expertise: generated["expertise"].as_str().unwrap_or("General").to_string(),
-            perspective: generated["perspective"].as_str().unwrap_or("Balanced analysis").to_string(),
-            tone: generated["tone"].as_str().unwrap_or("analytical").to_string(),
+            role: generated["role"]
+                .as_str()
+                .unwrap_or("Domain Analyst")
+                .to_string(),
+            expertise: generated["expertise"]
+                .as_str()
+                .unwrap_or("General")
+                .to_string(),
+            perspective: generated["perspective"]
+                .as_str()
+                .unwrap_or("Balanced analysis")
+                .to_string(),
+            tone: generated["tone"]
+                .as_str()
+                .unwrap_or("analytical")
+                .to_string(),
             icon: generated["icon"].as_str().unwrap_or("🧠").to_string(),
             domains: generated["domains"]
                 .as_array()

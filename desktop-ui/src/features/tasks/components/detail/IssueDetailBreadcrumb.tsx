@@ -16,13 +16,9 @@ export function IssueDetailBreadcrumb() {
         const isLast = index === navStack.length - 1;
         return (
           <div key={`${entry.type}-${entry.targetId}`} className="flex items-center gap-1 min-w-0">
-            {index > 0 && (
-              <span className="text-xs text-muted shrink-0">›</span>
-            )}
+            {index > 0 && <span className="text-xs text-muted shrink-0">›</span>}
             {isLast ? (
-              <span className="text-xs font-medium text-primary truncate">
-                {entry.label}
-              </span>
+              <span className="text-xs font-medium text-primary truncate">{entry.label}</span>
             ) : (
               <button
                 type="button"

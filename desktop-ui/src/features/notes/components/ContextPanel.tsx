@@ -57,7 +57,7 @@ function MoreSection({ note }: { note: Note }) {
           </div>
 
           {/* Note Metadata */}
-          <div className="border-t border-white/[0.04] pt-2">
+          <div className="border-t border-border-subtle pt-2">
             <div className="text-[10px] font-medium text-dim uppercase tracking-wider mb-1.5">
               Metadata
             </div>
@@ -143,7 +143,7 @@ export function ContextPanel({
     return (
       <div
         style={{ width }}
-        className="border-l border-border flex flex-col flex-shrink-0 h-full bg-white/[0.02]"
+        className="border-l border-border flex flex-col flex-shrink-0 h-full bg-surface-lowest"
       />
     );
   }
@@ -153,7 +153,7 @@ export function ContextPanel({
     return (
       <div
         style={{ width }}
-        className="border-l border-border flex flex-col flex-shrink-0 h-full overflow-y-auto bg-white/[0.02]"
+        className="border-l border-border flex flex-col flex-shrink-0 h-full overflow-y-auto bg-surface-lowest"
       >
         <NotePreview note={note} onSelectNote={onSelectNote} />
       </div>
@@ -165,7 +165,7 @@ export function ContextPanel({
     return (
       <div
         style={{ width }}
-        className="border-l border-border flex flex-col flex-shrink-0 h-full bg-white/[0.02]"
+        className="border-l border-border flex flex-col flex-shrink-0 h-full bg-surface-lowest"
       >
         <InsightReviewPanel state={insightState} actions={insightActions} />
       </div>
@@ -176,7 +176,7 @@ export function ContextPanel({
   return (
     <div
       style={{ width }}
-      className="border-l border-border flex flex-col flex-shrink-0 h-full overflow-y-auto bg-white/[0.02]"
+      className="border-l border-border flex flex-col flex-shrink-0 h-full overflow-y-auto bg-surface-lowest"
     >
       <AISuggestionsPanel
         noteId={noteId}

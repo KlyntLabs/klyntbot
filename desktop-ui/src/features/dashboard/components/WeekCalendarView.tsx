@@ -384,7 +384,7 @@ function WeekNowLine() {
   const top = mins * PX_PER_MIN;
   return (
     <div className="absolute w-full pointer-events-none z-10" style={{ top }}>
-      <div className="border-t border-red-500" />
+      <div className="border-t border-destructive" />
     </div>
   );
 }

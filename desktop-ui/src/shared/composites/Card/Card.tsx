@@ -37,7 +37,7 @@ export function Card({
       className={cn(
         cardVariants[variant],
         cardPadding[padding],
-        interactive && "cursor-pointer transition-colors hover:border-white/20",
+        interactive && "cursor-pointer transition-colors hover:border-border",
         onClick && "cursor-pointer",
         className,
       )}

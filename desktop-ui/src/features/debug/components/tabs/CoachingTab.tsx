@@ -187,12 +187,12 @@ export function CoachingTab() {
       {/* Situation Gauges */}
       <div>
         <h2 className="text-[13px] font-medium text-secondary mb-3">User Situation</h2>
-        <div className="flex gap-4 items-start p-4 bg-white/[0.04] rounded-lg border border-white/[0.08]">
+        <div className="flex gap-4 items-start p-4 bg-surface-low rounded-lg border border-border">
           <Gauge label="Energy" value={situation.energyLevel} />
           <Gauge label="Focus" value={situation.focusState} />
-          <Gauge label="Deadline" value={situation.deadlinePressure} color="text-red-500" />
-          <Gauge label="Distraction" value={situation.distractionRisk} color="text-orange-500" />
-          <Gauge label="Receptivity" value={situation.coachingReceptivity} color="text-green-500" />
+          <Gauge label="Deadline" value={situation.deadlinePressure} color="text-destructive" />
+          <Gauge label="Distraction" value={situation.distractionRisk} color="text-brand" />
+          <Gauge label="Receptivity" value={situation.coachingReceptivity} color="text-success" />
           <div className="flex flex-col gap-1 ml-4 text-[11px]">
             <span className="text-muted">
               Hours active:{" "}
@@ -207,7 +207,7 @@ export function CoachingTab() {
               <span className="text-secondary">{situation.recentContextSwitches}</span>
             </span>
             {situation.taskAvoidanceDetected && (
-              <span className="text-orange-400 font-medium">Task avoidance detected</span>
+              <span className="text-brand font-medium">Task avoidance detected</span>
             )}
           </div>
         </div>
@@ -221,7 +221,7 @@ export function CoachingTab() {
           </h2>
           <div className="space-y-2">
             {interventions.map((iv) => (
-              <div key={iv.id} className="p-3 bg-white/[0.04] rounded-lg border border-brand/30">
+              <div key={iv.id} className="p-3 bg-surface-low rounded-lg border border-brand/30">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
@@ -236,7 +236,7 @@ export function CoachingTab() {
                     <button
                       type="button"
                       onClick={() => handleFeedback(iv.id, "helpful")}
-                      className="p-1.5 rounded hover:bg-green-500/20 text-muted hover:text-green-400 transition-colors"
+                      className="p-1.5 rounded hover:bg-success/20 text-muted hover:text-success transition-colors"
                       title="Helpful"
                     >
                       <Check className="w-3.5 h-3.5" />
@@ -244,7 +244,7 @@ export function CoachingTab() {
                     <button
                       type="button"
                       onClick={() => handleFeedback(iv.id, "dismissed")}
-                      className="p-1.5 rounded hover:bg-white/10 text-muted hover:text-secondary transition-colors"
+                      className="p-1.5 rounded hover:bg-surface-raised text-muted hover:text-secondary transition-colors"
                       title="Dismiss"
                     >
                       <X className="w-3.5 h-3.5" />
@@ -252,7 +252,7 @@ export function CoachingTab() {
                     <button
                       type="button"
                       onClick={() => handleFeedback(iv.id, "stop")}
-                      className="p-1.5 rounded hover:bg-red-500/20 text-muted hover:text-red-400 transition-colors"
+                      className="p-1.5 rounded hover:bg-destructive/20 text-muted hover:text-destructive transition-colors"
                       title="Stop suggesting"
                     >
                       <XCircle className="w-3.5 h-3.5" />
@@ -279,7 +279,7 @@ export function CoachingTab() {
                 <Trash2 className="w-3 h-3" /> Clear
               </button>
             </div>
-            <div className="p-3 bg-white/[0.04] rounded-lg border border-white/[0.08]">
+            <div className="p-3 bg-surface-low rounded-lg border border-border">
               <p className="text-[12px] text-muted">{signals.windowSize} signals in 30min window</p>
               {signals.triggers.length > 0 && (
                 <div className="mt-2 space-y-1">
@@ -302,15 +302,12 @@ export function CoachingTab() {
             <h3 className="text-[13px] font-medium text-secondary mb-2">Detected Patterns</h3>
             <div className="space-y-2">
               {patterns.map((p) => (
-                <div
-                  key={p.name}
-                  className="p-3 bg-white/[0.04] rounded-lg border border-white/[0.08]"
-                >
+                <div key={p.name} className="p-3 bg-surface-low rounded-lg border border-border">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-[12px] text-secondary font-medium">{p.name}</span>
                     <span className="text-[10px] text-muted">{p.signalCount} signals</span>
                   </div>
-                  <div className="w-full bg-white/[0.1] rounded-full h-1 mb-1">
+                  <div className="w-full bg-surface-raised rounded-full h-1 mb-1">
                     <div
                       className="bg-brand h-1 rounded-full"
                       style={{ width: `${p.confidence * 100}%` }}
@@ -330,7 +327,7 @@ export function CoachingTab() {
         <div className="space-y-4">
           <div>
             <h3 className="text-[13px] font-medium text-secondary mb-2">Intervention Router</h3>
-            <div className="p-3 bg-white/[0.04] rounded-lg border border-white/[0.08]">
+            <div className="p-3 bg-surface-low rounded-lg border border-border">
               <div className="flex gap-4 text-[12px]">
                 <span className="text-muted">
                   Hourly:{" "}
@@ -359,10 +356,10 @@ export function CoachingTab() {
                 <RefreshCw className="w-3 h-3" /> Reset All
               </button>
             </div>
-            <div className="bg-white/[0.04] rounded-lg border border-white/[0.08] overflow-hidden">
+            <div className="bg-surface-low rounded-lg border border-border overflow-hidden">
               <table className="w-full text-[12px]">
                 <thead>
-                  <tr className="border-b border-white/[0.06]">
+                  <tr className="border-b border-border-subtle">
                     <th className="text-left p-2 text-muted font-normal">Trigger</th>
                     <th className="text-left p-2 text-muted font-normal">Type</th>
                     <th className="text-left p-2 text-muted font-normal">Used</th>
@@ -372,7 +369,7 @@ export function CoachingTab() {
                 </thead>
                 <tbody>
                   {feedback.map((s) => (
-                    <tr key={s.strategyType} className="border-b border-white/[0.04]">
+                    <tr key={s.strategyType} className="border-b border-border-subtle">
                       <td className="p-2 text-secondary">{s.strategyType}</td>
                       <td className="p-2 text-muted">{s.domain}</td>
                       <td className="p-2 text-muted">{s.timesUsed}</td>

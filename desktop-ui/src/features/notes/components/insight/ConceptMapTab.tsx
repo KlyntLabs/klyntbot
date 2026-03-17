@@ -81,7 +81,9 @@ export function ConceptMapTab({ status, mermaid: mermaidCode, fallbackText }: Co
 
   if (status === "error") {
     return (
-      <p className="text-[11px] text-destructive">Failed to generate concept map. Try regenerating.</p>
+      <p className="text-[11px] text-destructive">
+        Failed to generate concept map. Try regenerating.
+      </p>
     );
   }
 

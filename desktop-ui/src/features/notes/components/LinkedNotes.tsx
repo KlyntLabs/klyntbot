@@ -25,7 +25,7 @@ export function LinkedNotes({ entityType, entityId }: LinkedNotesProps) {
             key={note.id}
             type="button"
             onClick={() => navigate(`/notes?noteId=${note.id}`)}
-            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left hover:bg-white/[0.04] transition-colors border-b border-white/[0.04] last:border-b-0"
+            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left hover:bg-surface-low transition-colors border-b border-border-subtle last:border-b-0"
           >
             <FileText className="w-3.5 h-3.5 text-brand shrink-0" strokeWidth={1.5} />
             <span className="text-[13px] font-light text-secondary truncate">{note.title}</span>

@@ -144,7 +144,7 @@ export function InvestmentsForm({ registerSave, onDirty }: InvestmentsFormProps)
               setPortfolioName(e.target.value);
               onDirty();
             }}
-            className="w-full px-3 py-2 text-[13px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-lg focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+            className="w-full px-3 py-2 text-[13px] text-primary bg-surface-base border border-border rounded-lg focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
           />
         </label>
 
@@ -152,16 +152,16 @@ export function InvestmentsForm({ registerSave, onDirty }: InvestmentsFormProps)
           {investments.map((inv) => (
             <div
               key={inv.key}
-              className="bg-white/[0.03] rounded-lg border border-white/[0.06] p-3 space-y-2"
+              className="bg-surface-lowest rounded-lg border border-border-subtle p-3 space-y-2"
             >
               <div className="flex items-center gap-2">
                 <select
                   value={inv.assetType}
                   onChange={(e) => updateInvestment(inv.key, { assetType: e.target.value })}
-                  className="w-28 px-2 py-1.5 text-[12px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                  className="w-28 px-2 py-1.5 text-[12px] text-primary bg-surface-base border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
                 >
                   {ASSET_TYPE_OPTIONS.map((t) => (
-                    <option key={t.value} value={t.value} className="bg-[#1a1a1a]">
+                    <option key={t.value} value={t.value} className="bg-surface-floating">
                       {t.label}
                     </option>
                   ))}
@@ -171,7 +171,7 @@ export function InvestmentsForm({ registerSave, onDirty }: InvestmentsFormProps)
                   value={inv.symbol}
                   onChange={(e) => updateInvestment(inv.key, { symbol: e.target.value })}
                   placeholder="Symbol (e.g. AAPL)"
-                  className="flex-1 px-2 py-1.5 text-[12px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                  className="flex-1 px-2 py-1.5 text-[12px] text-primary bg-surface-base border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
                 />
                 <button
                   type="button"
@@ -188,7 +188,7 @@ export function InvestmentsForm({ registerSave, onDirty }: InvestmentsFormProps)
                   onChange={(e) => updateInvestment(inv.key, { quantity: e.target.value })}
                   placeholder="Qty"
                   step="any"
-                  className="w-24 px-2 py-1.5 text-[12px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                  className="w-24 px-2 py-1.5 text-[12px] text-primary bg-surface-base border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
                 />
                 <input
                   type="number"
@@ -196,7 +196,7 @@ export function InvestmentsForm({ registerSave, onDirty }: InvestmentsFormProps)
                   onChange={(e) => updateInvestment(inv.key, { costBasis: e.target.value })}
                   placeholder="Cost basis"
                   step="0.01"
-                  className="flex-1 px-2 py-1.5 text-[12px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                  className="flex-1 px-2 py-1.5 text-[12px] text-primary bg-surface-base border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
                 />
               </div>
             </div>

@@ -253,13 +253,13 @@ export function PersonalizationSettings() {
               <select
                 value={editedProvider}
                 onChange={(e) => handleProviderChange(e.target.value)}
-                className="w-full px-3 py-1.5 text-[12px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                className="w-full px-3 py-1.5 text-[12px] text-primary bg-surface-base border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
               >
-                <option value="" className="bg-[#1a1a1a]">
+                <option value="" className="bg-surface-floating">
                   Auto-detect
                 </option>
                 {PROVIDERS.map((p) => (
-                  <option key={p.value} value={p.value} className="bg-[#1a1a1a]">
+                  <option key={p.value} value={p.value} className="bg-surface-floating">
                     {p.label}
                   </option>
                 ))}
@@ -288,7 +288,7 @@ export function PersonalizationSettings() {
                       setProviderEdits((prev) => ({ ...prev, apiBase: e.target.value }))
                     }
                     placeholder="Leave blank for default"
-                    className="w-full px-3 py-1.5 text-[12px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                    className="w-full px-3 py-1.5 text-[12px] text-primary bg-surface-base border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
                   />
                 </label>
               </>
@@ -301,7 +301,7 @@ export function PersonalizationSettings() {
                 value={editedModel}
                 onChange={(e) => setProviderEdits((prev) => ({ ...prev, model: e.target.value }))}
                 placeholder="e.g. anthropic/claude-opus-4-5"
-                className="w-full px-3 py-1.5 text-[12px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                className="w-full px-3 py-1.5 text-[12px] text-primary bg-surface-base border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
               />
             </label>
 
@@ -329,14 +329,14 @@ export function PersonalizationSettings() {
                     model: "",
                   }))
                 }
-                className="w-full px-3 py-1.5 text-[12px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                className="w-full px-3 py-1.5 text-[12px] text-primary bg-surface-base border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
               >
-                <option value="" className="bg-[#1a1a1a]">
+                <option value="" className="bg-surface-floating">
                   Same as main ({PROVIDERS.find((p) => p.value === editedProvider)?.label || "auto"}
                   )
                 </option>
                 {PROVIDERS.map((p) => (
-                  <option key={p.value} value={p.value} className="bg-[#1a1a1a]">
+                  <option key={p.value} value={p.value} className="bg-surface-floating">
                     {p.label}
                   </option>
                 ))}
@@ -351,13 +351,13 @@ export function PersonalizationSettings() {
                   onChange={(e) =>
                     setCognitiveEdits((prev) => ({ ...prev, model: e.target.value }))
                   }
-                  className="w-full px-3 py-1.5 text-[12px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                  className="w-full px-3 py-1.5 text-[12px] text-primary bg-surface-base border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
                 >
-                  <option value="" className="bg-[#1a1a1a]">
+                  <option value="" className="bg-surface-floating">
                     Same as main agent model
                   </option>
                   {cogModelOptions.map((m) => (
-                    <option key={m.value} value={m.value} className="bg-[#1a1a1a]">
+                    <option key={m.value} value={m.value} className="bg-surface-floating">
                       {m.label}
                       {m.recommended ? " ★ recommended" : ""}
                     </option>
@@ -371,14 +371,14 @@ export function PersonalizationSettings() {
                     setCognitiveEdits((prev) => ({ ...prev, model: e.target.value }))
                   }
                   placeholder="Leave blank to use main agent model"
-                  className="w-full px-3 py-1.5 text-[12px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                  className="w-full px-3 py-1.5 text-[12px] text-primary bg-surface-base border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
                 />
               )}
             </div>
 
             {hasCognitiveChanges && (
               <>
-                <p className="text-[10px] text-amber-400/80">Changes take effect after restart</p>
+                <p className="text-[10px] text-warning/80">Changes take effect after restart</p>
                 <SaveButton onClick={saveCognitive} saving={savingCognitive} />
               </>
             )}
@@ -414,7 +414,7 @@ export function PersonalizationSettings() {
                 }
                 step="60"
                 min="60"
-                className="w-full px-3 py-1.5 text-[12px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                className="w-full px-3 py-1.5 text-[12px] text-primary bg-surface-base border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
               />
             </label>
 
@@ -433,7 +433,7 @@ export function PersonalizationSettings() {
                   step="0.05"
                   min="0"
                   max="1"
-                  className="w-full px-3 py-1.5 text-[12px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                  className="w-full px-3 py-1.5 text-[12px] text-primary bg-surface-base border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
                 />
               </label>
               <label className="flex-1">
@@ -450,7 +450,7 @@ export function PersonalizationSettings() {
                   step="0.05"
                   min="0"
                   max="1"
-                  className="w-full px-3 py-1.5 text-[12px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                  className="w-full px-3 py-1.5 text-[12px] text-primary bg-surface-base border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
                 />
               </label>
             </div>
@@ -467,7 +467,7 @@ export function PersonalizationSettings() {
                   }))
                 }
                 min="1"
-                className="w-full px-3 py-1.5 text-[12px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                className="w-full px-3 py-1.5 text-[12px] text-primary bg-surface-base border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
               />
             </label>
 

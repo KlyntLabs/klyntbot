@@ -31,7 +31,7 @@ export function BudgetStrip({ budgets }: { budgets: FinanceBudgetUsage[] }) {
                 {p}%
               </span>
             </div>
-            <div className="h-1 bg-white/[0.06] rounded-full">
+            <div className="h-1 bg-surface-base rounded-full">
               <div
                 className="h-full rounded-full"
                 style={{

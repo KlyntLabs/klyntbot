@@ -141,7 +141,7 @@ export function NavigationSidebar({
 
   return (
     <div
-      className="flex flex-col gap-1 min-h-0 h-full bg-white/[0.02]"
+      className="flex flex-col gap-1 min-h-0 h-full bg-surface-lowest"
       onContextMenu={(e) => e.preventDefault()}
     >
       {/* 1. Search Bar */}
@@ -302,7 +302,7 @@ function SearchResultItem({
       type="button"
       onClick={() => onSelect(note.id)}
       className={`flex flex-col gap-0.5 px-2 py-1.5 rounded text-left w-full transition-colors ${
-        isSelected ? "bg-white/[0.08] text-primary" : "text-secondary hover:bg-white/[0.04]"
+        isSelected ? "bg-surface-raised text-primary" : "text-secondary hover:bg-surface-low"
       }`}
     >
       <span className="text-sm truncate">{note.title || "Untitled"}</span>

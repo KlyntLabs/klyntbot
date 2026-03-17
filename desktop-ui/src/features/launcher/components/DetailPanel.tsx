@@ -82,10 +82,10 @@ function KindTag({ label }: { label: string }) {
 
 function StatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
-    doing: "text-blue-400 bg-blue-400/10",
+    doing: "text-info bg-info/10",
     todo: "text-muted bg-surface-base",
-    blocked: "text-red-400 bg-red-400/10",
-    done: "text-green-400 bg-green-400/10",
+    blocked: "text-destructive bg-destructive/10",
+    done: "text-success bg-success/10",
   };
   const colorClass = colors[status] || colors.todo;
   return <span className={`text-xs px-2 py-0.5 rounded-full ${colorClass}`}>{status}</span>;
@@ -102,7 +102,7 @@ function ApplicationDetail({ item, kind }: { item: LauncherItem; kind: KindOf<"a
         )}
         <div>
           <div className="text-base text-foreground font-medium">{item.title}</div>
-          {kind.running && <span className="text-xs text-green-400">Running</span>}
+          {kind.running && <span className="text-xs text-success">Running</span>}
         </div>
       </div>
       <DetailField label="Path" value={kind.path} />

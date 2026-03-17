@@ -556,7 +556,7 @@ export function ChartTooltip({ active, payload, label }: ChartTooltipProps) {
           <span className="ml-auto tabular-nums">{p.value}h</span>
         </div>
       ))}
-      <div className="border-t border-white/[0.04] mt-1 pt-1 flex justify-between text-primary font-medium">
+      <div className="border-t border-border-subtle mt-1 pt-1 flex justify-between text-primary font-medium">
         <span>Total</span>
         <span className="tabular-nums">{total.toFixed(1)}h</span>
       </div>

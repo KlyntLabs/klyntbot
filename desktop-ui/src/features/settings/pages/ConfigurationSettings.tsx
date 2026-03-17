@@ -211,7 +211,10 @@ export function ConfigurationSettings() {
               const hasEdits = Object.keys(channelEdits[ch.key] ?? {}).length > 0;
 
               return (
-                <div key={ch.key} className="bg-white/[0.03] rounded-lg border border-white/[0.06]">
+                <div
+                  key={ch.key}
+                  className="bg-surface-lowest rounded-lg border border-border-subtle"
+                >
                   <div className="flex items-center gap-2 p-3">
                     <button
                       type="button"
@@ -234,7 +237,7 @@ export function ConfigurationSettings() {
                   </div>
 
                   {isExpanded && (
-                    <div className="px-3 pb-3 space-y-2 border-t border-white/[0.04] pt-2">
+                    <div className="px-3 pb-3 space-y-2 border-t border-border-subtle pt-2">
                       {ch.fields.map((field) => (
                         <div key={field.key}>
                           <span className="block text-[11px] text-muted mb-1">{field.label}</span>
@@ -250,7 +253,7 @@ export function ConfigurationSettings() {
                               value={String(getChannelValue(ch.key, field.key) || "")}
                               onChange={(e) => setChannelEdit(ch.key, field.key, e.target.value)}
                               placeholder={field.placeholder}
-                              className="w-full px-3 py-1.5 text-[12px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                              className="w-full px-3 py-1.5 text-[12px] text-primary bg-surface-base border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
                             />
                           )}
                         </div>
@@ -305,15 +308,15 @@ export function ConfigurationSettings() {
                 onChange={(e) =>
                   setToolEdits((prev) => ({ ...prev, "browser.trustLevel": e.target.value }))
                 }
-                className="w-full px-3 py-1.5 text-[12px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                className="w-full px-3 py-1.5 text-[12px] text-primary bg-surface-base border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
               >
-                <option value="strict" className="bg-[#1a1a1a]">
+                <option value="strict" className="bg-surface-floating">
                   Strict — confirm every write
                 </option>
-                <option value="autonomous" className="bg-[#1a1a1a]">
+                <option value="autonomous" className="bg-surface-floating">
                   Autonomous — confirm dangerous only
                 </option>
-                <option value="full" className="bg-[#1a1a1a]">
+                <option value="full" className="bg-surface-floating">
                   Full — no confirmations
                 </option>
               </select>
@@ -344,7 +347,7 @@ export function ConfigurationSettings() {
                     "host" in gatewayEdits ? gatewayEdits.host : (gateway.host ?? "127.0.0.1"),
                   )}
                   onChange={(e) => setGatewayEdits((prev) => ({ ...prev, host: e.target.value }))}
-                  className="w-full px-3 py-1.5 text-[12px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                  className="w-full px-3 py-1.5 text-[12px] text-primary bg-surface-base border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
                 />
               </label>
               <label className="w-28">
@@ -360,7 +363,7 @@ export function ConfigurationSettings() {
                       port: Number.parseInt(e.target.value, 10) || 0,
                     }))
                   }
-                  className="w-full px-3 py-1.5 text-[12px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                  className="w-full px-3 py-1.5 text-[12px] text-primary bg-surface-base border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
                 />
               </label>
             </div>

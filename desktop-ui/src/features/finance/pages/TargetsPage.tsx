@@ -262,8 +262,8 @@ export function FinanceTargets() {
                   className={cn(
                     "px-2.5 py-1 rounded-md text-[11px] font-light transition-colors",
                     goalTab === t.key
-                      ? "bg-white/[0.12] text-brand"
-                      : "text-muted hover:text-secondary hover:bg-white/[0.06]",
+                      ? "bg-surface-highest text-brand"
+                      : "text-muted hover:text-secondary hover:bg-surface-base",
                   )}
                 >
                   {t.label}
@@ -330,7 +330,7 @@ export function FinanceTargets() {
                           </span>
                         </div>
                       </div>
-                      <div className="h-1 bg-white/[0.06] rounded-full">
+                      <div className="h-1 bg-surface-base rounded-full">
                         <div
                           className="h-full rounded-full"
                           style={{
@@ -407,7 +407,7 @@ export function FinanceTargets() {
                             <span className="text-[12px] font-medium text-secondary truncate">
                               {l.name}
                             </span>
-                            <span className="text-[8px] font-light px-1.5 py-0.5 rounded-full bg-white/[0.06] text-dim flex-shrink-0">
+                            <span className="text-[8px] font-light px-1.5 py-0.5 rounded-full bg-surface-base text-dim flex-shrink-0">
                               {l.liabilityType.replaceAll("_", " ")}
                             </span>
                           </div>
@@ -429,7 +429,7 @@ export function FinanceTargets() {
                             </span>
                           </div>
                         </div>
-                        <div className="h-1 bg-white/[0.06] rounded-full">
+                        <div className="h-1 bg-surface-base rounded-full">
                           <div
                             className="h-full bg-success rounded-full"
                             style={{ width: `${paid}%`, transition: "width 0.5s ease" }}
@@ -466,7 +466,7 @@ export function FinanceTargets() {
                   })}
                 </div>
                 {liabilities.length > 0 && (
-                  <div className="mt-3 pt-2.5 border-t border-white/[0.08] flex justify-between">
+                  <div className="mt-3 pt-2.5 border-t border-border flex justify-between">
                     <span className="text-[10px] text-muted">Total Debt</span>
                     <span className="text-[11px] text-destructive tabular-nums">
                       {fmtCompact(convertTotal(totalRemaining), displayCur, hidden)}
@@ -499,7 +499,7 @@ export function FinanceTargets() {
               <Progress value={overallGoalPct} />
             </div>
             {activeGoals.length > 0 && (
-              <div className="space-y-2 pt-2 border-t border-white/[0.04]">
+              <div className="space-y-2 pt-2 border-t border-border-subtle">
                 {activeGoals.map((g, i) => {
                   const p = pct(g.currentAmount, g.targetAmount);
                   return (
@@ -536,7 +536,7 @@ export function FinanceTargets() {
               />
             </div>
             {liabilities.length > 0 && (
-              <div className="space-y-2 pt-2 border-t border-white/[0.04]">
+              <div className="space-y-2 pt-2 border-t border-border-subtle">
                 {liabilities.map((l, i) => {
                   const paid = pct(l.principal - l.remaining, l.principal);
                   return (
@@ -557,7 +557,7 @@ export function FinanceTargets() {
                     </div>
                   );
                 })}
-                <div className="pt-2 border-t border-white/[0.04] flex justify-between">
+                <div className="pt-2 border-t border-border-subtle flex justify-between">
                   <span className="text-[10px] text-muted font-light">Monthly Payments</span>
                   <span className="text-[10px] text-brand font-light tabular-nums">
                     {fmtCompact(convertTotal(liabMonthlyTotal), displayCur, hidden)}/mo

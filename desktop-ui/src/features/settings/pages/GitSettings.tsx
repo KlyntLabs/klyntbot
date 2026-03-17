@@ -8,7 +8,7 @@ export function GitSettings() {
         <p className="text-[13px] text-muted mt-1">Version control integration</p>
       </div>
 
-      <div className="bg-white/[0.04] rounded-lg border border-white/[0.08] p-8 flex flex-col items-center text-center">
+      <div className="bg-surface-low rounded-lg border border-border p-8 flex flex-col items-center text-center">
         <GitBranch className="w-8 h-8 text-dim mb-3" strokeWidth={1.5} />
         <p className="text-[13px] text-muted">Git integration coming soon</p>
       </div>

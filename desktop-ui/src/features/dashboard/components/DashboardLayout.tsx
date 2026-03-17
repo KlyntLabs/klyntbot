@@ -177,7 +177,9 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
               onClick={() => navigateToView(v.key)}
               className={cn(
                 "px-3.5 py-1 rounded-full text-xs font-medium transition-all",
-                mode === v.key ? "bg-surface-highest text-primary" : "text-muted hover:text-secondary",
+                mode === v.key
+                  ? "bg-surface-highest text-primary"
+                  : "text-muted hover:text-secondary",
               )}
             >
               {v.label}

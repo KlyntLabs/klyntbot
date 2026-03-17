@@ -194,10 +194,10 @@ export function MiniCalendar({
                 isSelected
                   ? "bg-brand text-white border-brand/40"
                   : isToday
-                    ? "bg-white/[0.10] text-brand border-brand/30"
+                    ? "bg-surface-raised text-brand border-brand/30"
                     : isCurrentMonth
-                      ? "bg-white/[0.04] text-secondary border-white/[0.06] hover:bg-white/[0.10] hover:border-white/[0.12]"
-                      : "text-muted/30 border-transparent hover:bg-white/[0.06]",
+                      ? "bg-surface-low text-secondary border-border-subtle hover:bg-surface-raised hover:border-border"
+                      : "text-muted/30 border-transparent hover:bg-surface-base",
               )}
             >
               {d.getDate()}
@@ -211,7 +211,7 @@ export function MiniCalendar({
         <button
           type="button"
           onClick={onClear}
-          className="w-full text-left mt-1.5 px-2 py-1 text-[11px] text-destructive rounded-lg hover:bg-white/[0.08] transition-colors"
+          className="w-full text-left mt-1.5 px-2 py-1 text-[11px] text-destructive rounded-lg hover:bg-surface-raised transition-colors"
         >
           Clear date
         </button>

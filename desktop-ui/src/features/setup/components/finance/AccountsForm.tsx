@@ -81,7 +81,7 @@ export function AccountsForm({ registerSave, onDirty }: AccountsFormProps) {
         {accounts.map((acc) => (
           <div
             key={acc.key}
-            className="bg-white/[0.03] rounded-lg border border-white/[0.06] p-3 space-y-2"
+            className="bg-surface-lowest rounded-lg border border-border-subtle p-3 space-y-2"
           >
             <div className="flex items-center gap-2">
               <input
@@ -89,7 +89,7 @@ export function AccountsForm({ registerSave, onDirty }: AccountsFormProps) {
                 value={acc.name}
                 onChange={(e) => updateAccount(acc.key, { name: e.target.value })}
                 placeholder="Account name"
-                className="flex-1 px-3 py-1.5 text-[12px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                className="flex-1 px-3 py-1.5 text-[12px] text-primary bg-surface-base border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
               />
               <button
                 type="button"
@@ -103,10 +103,10 @@ export function AccountsForm({ registerSave, onDirty }: AccountsFormProps) {
               <select
                 value={acc.accountType}
                 onChange={(e) => updateAccount(acc.key, { accountType: e.target.value })}
-                className="flex-1 px-2 py-1.5 text-[12px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                className="flex-1 px-2 py-1.5 text-[12px] text-primary bg-surface-base border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
               >
                 {ACCOUNT_TYPE_OPTIONS.map((t) => (
-                  <option key={t.value} value={t.value} className="bg-[#1a1a1a]">
+                  <option key={t.value} value={t.value} className="bg-surface-floating">
                     {t.label}
                   </option>
                 ))}
@@ -117,14 +117,14 @@ export function AccountsForm({ registerSave, onDirty }: AccountsFormProps) {
                 onChange={(e) => updateAccount(acc.key, { balance: e.target.value })}
                 placeholder="Balance"
                 step="0.01"
-                className="w-28 px-2 py-1.5 text-[12px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                className="w-28 px-2 py-1.5 text-[12px] text-primary bg-surface-base border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
               />
               <input
                 type="text"
                 value={acc.institution}
                 onChange={(e) => updateAccount(acc.key, { institution: e.target.value })}
                 placeholder="Institution"
-                className="flex-1 px-2 py-1.5 text-[12px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                className="flex-1 px-2 py-1.5 text-[12px] text-primary bg-surface-base border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
               />
             </div>
           </div>

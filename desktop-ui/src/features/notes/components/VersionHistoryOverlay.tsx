@@ -100,9 +100,9 @@ export function VersionHistoryOverlay({
       {/* Content */}
       <div className="relative flex w-full h-full">
         {/* Left side: Timeline (40%) */}
-        <div className="w-[40%] flex flex-col border-r border-white/[0.06]">
+        <div className="w-[40%] flex flex-col border-r border-border-subtle">
           {/* Header */}
-          <div className="shrink-0 flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
+          <div className="shrink-0 flex items-center justify-between px-5 py-4 border-b border-border-subtle">
             <h2 className="text-sm font-medium text-primary">Version History</h2>
             <button
               type="button"
@@ -131,7 +131,7 @@ export function VersionHistoryOverlay({
                     type="button"
                     onClick={() => setSelectedId(v.id)}
                     className={`w-full flex gap-3 px-5 py-3 text-left transition-colors ${
-                      v.id === selectedId ? "bg-white/[0.08]" : "hover:bg-white/[0.04]"
+                      v.id === selectedId ? "bg-surface-raised" : "hover:bg-surface-low"
                     }`}
                   >
                     {/* Timeline dot + line */}
@@ -144,7 +144,7 @@ export function VersionHistoryOverlay({
                         }`}
                       />
                       {i < versions.length - 1 && (
-                        <div className="w-px flex-1 min-h-[20px] bg-white/[0.08] mt-1" />
+                        <div className="w-px flex-1 min-h-[20px] bg-surface-raised mt-1" />
                       )}
                     </div>
 
@@ -169,7 +169,7 @@ export function VersionHistoryOverlay({
         {/* Right side: Preview (60%) */}
         <div className="w-[60%] flex flex-col">
           {/* Header with actions */}
-          <div className="shrink-0 flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
+          <div className="shrink-0 flex items-center justify-between px-5 py-4 border-b border-border-subtle">
             <div className="flex items-center gap-3">
               {selectedVersion && (
                 <button
@@ -190,8 +190,8 @@ export function VersionHistoryOverlay({
                   onClick={() => setShowDiff((prev) => !prev)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                     showDiff
-                      ? "bg-white/[0.1] text-primary"
-                      : "text-muted hover:text-secondary hover:bg-white/[0.06]"
+                      ? "bg-surface-raised text-primary"
+                      : "text-muted hover:text-secondary hover:bg-surface-base"
                   }`}
                 >
                   {showDiff ? "Hide diff" : "Show diff"}
@@ -215,9 +215,9 @@ export function VersionHistoryOverlay({
                       key={key}
                       className={
                         part.added
-                          ? "bg-green-500/20 text-green-300"
+                          ? "bg-success/20 text-success"
                           : part.removed
-                            ? "bg-red-500/20 text-red-300"
+                            ? "bg-destructive/20 text-destructive"
                             : "text-secondary"
                       }
                     >

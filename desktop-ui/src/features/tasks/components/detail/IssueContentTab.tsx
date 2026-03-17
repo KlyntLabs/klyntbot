@@ -59,16 +59,10 @@ function AcceptanceCriteria({ text }: { text: string }) {
           <ChevronRight className="size-4 text-muted" />
         )}
         Acceptance Criteria
-        {!expanded && (
-          <span className="text-muted font-normal truncate">
-            — {preview}
-          </span>
-        )}
+        {!expanded && <span className="text-muted font-normal truncate">— {preview}</span>}
       </button>
       {expanded && (
-        <div className="px-3 pb-3 text-sm text-primary whitespace-pre-wrap font-mono">
-          {text}
-        </div>
+        <div className="px-3 pb-3 text-sm text-primary whitespace-pre-wrap font-mono">{text}</div>
       )}
     </div>
   );
@@ -97,9 +91,7 @@ function SubIssuesList({ issues }: { issues: SubIssue[] }) {
                 {renderStatusIcon(issue.status)}
               </span>
               <PriorityIcon className="size-3.5 text-muted shrink-0" />
-              <span className="text-xs text-muted shrink-0">
-                {issue.identifier}
-              </span>
+              <span className="text-xs text-muted shrink-0">{issue.identifier}</span>
               <span className="truncate text-primary">{issue.title}</span>
             </button>
           );

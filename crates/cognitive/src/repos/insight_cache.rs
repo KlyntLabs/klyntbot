@@ -186,7 +186,16 @@ mod tests {
         let hash = "hash-001";
 
         let row = repo
-            .upsert(note_id, hash, Some("synthesis text"), None, None, None, None, None)
+            .upsert(
+                note_id,
+                hash,
+                Some("synthesis text"),
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
             .await
             .unwrap();
 
@@ -220,9 +229,18 @@ mod tests {
         let hash = "hash-002";
 
         // Create initial entry with synthesis only
-        repo.upsert(note_id, hash, Some("initial synthesis"), None, None, None, None, None)
-            .await
-            .unwrap();
+        repo.upsert(
+            note_id,
+            hash,
+            Some("initial synthesis"),
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
 
         // Update gap_analysis tab
         repo.update_tab(note_id, hash, "gap_analysis", "gap content")

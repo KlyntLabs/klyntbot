@@ -16,7 +16,7 @@ export function MonthlyPulse({ rows }: { rows: PulseRow[] }) {
           <div className="flex-1">
             <p className="text-[11px] text-secondary">{row.label}</p>
             <p className="text-[10px] text-dim mt-0.5">{row.hint}</p>
-            <div className="h-1 bg-white/[0.06] rounded-full mt-1.5">
+            <div className="h-1 bg-surface-base rounded-full mt-1.5">
               <div
                 className="h-full rounded-full"
                 style={{

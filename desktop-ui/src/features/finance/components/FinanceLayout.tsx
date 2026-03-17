@@ -49,7 +49,7 @@ export function FinanceLayout({
                 className={`flex-1 py-2 rounded-xl text-[13px] font-light transition-all duration-200 ${
                   isActive
                     ? "glass-button-active text-primary"
-                    : "text-muted hover:text-secondary hover:bg-white/[0.04]"
+                    : "text-muted hover:text-secondary hover:bg-surface-low"
                 }`}
               >
                 {item.label}

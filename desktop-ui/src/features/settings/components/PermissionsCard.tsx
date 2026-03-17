@@ -49,7 +49,7 @@ export function PermissionsCard() {
   };
 
   return (
-    <div className="bg-white/[0.04] rounded-lg border border-white/[0.08] p-4">
+    <div className="bg-surface-low rounded-lg border border-border p-4">
       <h3 className="text-[13px] font-medium text-secondary mb-1">macOS Permissions</h3>
       <p className="text-[11px] text-dim mb-4">
         These permissions are required for productivity tracking and smart distraction detection.
@@ -62,7 +62,7 @@ export function PermissionsCard() {
           const denied = status === false;
 
           return (
-            <div key={p.label} className="flex items-start gap-3 p-3 rounded-lg bg-white/[0.06]">
+            <div key={p.label} className="flex items-start gap-3 p-3 rounded-lg bg-surface-base">
               {/* Status icon */}
               <div className="flex-shrink-0 mt-0.5">
                 {granted ? (
@@ -92,7 +92,7 @@ export function PermissionsCard() {
                     />
                   </div>
                 ) : (
-                  <div className="w-5 h-5 rounded-full bg-white/[0.08]" />
+                  <div className="w-5 h-5 rounded-full bg-surface-raised" />
                 )}
               </div>
 

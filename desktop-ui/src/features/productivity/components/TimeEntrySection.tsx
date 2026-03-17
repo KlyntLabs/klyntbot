@@ -88,7 +88,7 @@ export function TimeEntrySection({ date }: TimeEntrySectionProps) {
         <button
           type="button"
           onClick={() => setShowForm(!showForm)}
-          className="w-6 h-6 rounded-md flex items-center justify-center text-muted hover:text-brand hover:bg-white/[0.08] transition-colors"
+          className="w-6 h-6 rounded-md flex items-center justify-center text-muted hover:text-brand hover:bg-surface-raised transition-colors"
         >
           <Plus className="w-3.5 h-3.5" />
         </button>
@@ -97,14 +97,14 @@ export function TimeEntrySection({ date }: TimeEntrySectionProps) {
       {showForm && (
         <div
           ref={formRef}
-          className="flex flex-col gap-2 p-3 bg-white/[0.02] rounded-lg border border-white/[0.08]"
+          className="flex flex-col gap-2 p-3 bg-surface-lowest rounded-lg border border-border"
         >
           <input
             type="text"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="What did you work on?"
-            className="w-full px-3 py-1.5 text-[13px] bg-white/[0.06] border border-white/[0.08] rounded-md text-primary placeholder:text-dim"
+            className="w-full px-3 py-1.5 text-[13px] bg-surface-base border border-border rounded-md text-primary placeholder:text-dim"
           />
           <div className="flex gap-2">
             <input
@@ -113,12 +113,12 @@ export function TimeEntrySection({ date }: TimeEntrySectionProps) {
               onChange={(e) => setDurationMins(e.target.value)}
               placeholder="Minutes"
               min={1}
-              className="w-24 px-3 py-1.5 text-[13px] bg-white/[0.06] border border-white/[0.08] rounded-md text-primary placeholder:text-dim"
+              className="w-24 px-3 py-1.5 text-[13px] bg-surface-base border border-border rounded-md text-primary placeholder:text-dim"
             />
             <select
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
-              className="flex-1 px-3 py-1.5 text-[13px] bg-white/[0.06] border border-white/[0.08] rounded-md text-primary"
+              className="flex-1 px-3 py-1.5 text-[13px] bg-surface-base border border-border rounded-md text-primary"
             >
               <option value="">No category</option>
               {categories.map((c) => (

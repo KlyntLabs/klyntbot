@@ -208,7 +208,7 @@ function VimToggleButton({
       className={`px-2 h-7 rounded-lg font-mono text-xs font-bold transition-all ${
         vimEnabled
           ? "bg-brand/15 text-brand shadow-[0_0_8px_rgba(249,115,22,0.12)]"
-          : "text-muted hover:text-primary hover:bg-white/[0.08]"
+          : "text-muted hover:text-primary hover:bg-surface-raised"
       }`}
     >
       Vi
@@ -241,8 +241,8 @@ export function EditorToolbar({
           title="Focus mode"
           className={`p-1.5 rounded-lg transition-all ${
             focusModeActive
-              ? "bg-white/[0.1] text-primary"
-              : "text-dim hover:text-secondary hover:bg-white/[0.04]"
+              ? "bg-surface-raised text-primary"
+              : "text-dim hover:text-secondary hover:bg-surface-low"
           }`}
         >
           <Expand className="w-3.5 h-3.5" strokeWidth={1.5} />
@@ -255,8 +255,8 @@ export function EditorToolbar({
           title="Graph mode"
           className={`p-1.5 rounded-lg transition-all ${
             graphModeActive
-              ? "bg-white/[0.1] text-primary"
-              : "text-dim hover:text-secondary hover:bg-white/[0.04]"
+              ? "bg-surface-raised text-primary"
+              : "text-dim hover:text-secondary hover:bg-surface-low"
           }`}
         >
           <GitGraph className="w-3.5 h-3.5" strokeWidth={1.5} />
@@ -269,8 +269,8 @@ export function EditorToolbar({
           title="Version history"
           className={`p-1.5 rounded-lg transition-all ${
             versionHistoryActive
-              ? "bg-white/[0.1] text-primary"
-              : "text-dim hover:text-secondary hover:bg-white/[0.04]"
+              ? "bg-surface-raised text-primary"
+              : "text-dim hover:text-secondary hover:bg-surface-low"
           }`}
         >
           <History className="w-3.5 h-3.5" strokeWidth={1.5} />
@@ -297,7 +297,7 @@ export function EditorToolbar({
     <div className="glass-toolbar rounded-lg px-2 py-1 flex items-center gap-0.5 flex-wrap">
       {groups.map((group, gi) => (
         <div key={gi} className="flex items-center gap-0.5">
-          {gi > 0 && <div className="w-px h-4 bg-white/[0.08] mx-1.5" />}
+          {gi > 0 && <div className="w-px h-4 bg-surface-raised mx-1.5" />}
           {group.map((btn) => {
             const Icon = btn.icon;
             const active = btn.isActive?.(editor) ?? false;
@@ -310,7 +310,7 @@ export function EditorToolbar({
                 className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
                   active
                     ? "bg-brand/15 text-brand shadow-[0_0_8px_rgba(249,115,22,0.12)]"
-                    : "text-muted hover:text-primary hover:bg-white/[0.08]"
+                    : "text-muted hover:text-primary hover:bg-surface-raised"
                 }`}
               >
                 <Icon className="w-3.5 h-3.5" strokeWidth={1.5} />
@@ -319,7 +319,7 @@ export function EditorToolbar({
           })}
         </div>
       ))}
-      <div className="w-px h-4 bg-white/[0.08] mx-1.5" />
+      <div className="w-px h-4 bg-surface-raised mx-1.5" />
       <VimToggleButton vimEnabled={vimEnabled} onToggleVim={onToggleVim} />
       {modeButtons}
     </div>

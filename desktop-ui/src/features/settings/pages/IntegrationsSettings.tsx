@@ -81,14 +81,14 @@ export function IntegrationsSettings() {
               <span className="text-[13px] text-secondary">
                 {hookStatus?.installed ? "Installed" : "Not installed"}
               </span>
-              {hookStatus?.installed && <span className="w-2 h-2 rounded-full bg-green-500" />}
+              {hookStatus?.installed && <span className="w-2 h-2 rounded-full bg-success" />}
             </div>
             {hookStatus?.installed ? (
               <button
                 type="button"
                 onClick={handleUninstall}
                 disabled={installing}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] rounded-lg text-muted hover:text-secondary hover:bg-white/[0.06] transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] rounded-lg text-muted hover:text-secondary hover:bg-surface-base transition-colors"
               >
                 <X className="w-3 h-3" />
                 Uninstall
@@ -117,14 +117,14 @@ export function IntegrationsSettings() {
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <span className="text-[13px] text-secondary">Endpoint</span>
-            <code className="text-[12px] text-muted bg-white/[0.06] px-2 py-0.5 rounded">
+            <code className="text-[12px] text-muted bg-surface-base px-2 py-0.5 rounded">
               http://127.0.0.1:3456/api/v1/ingest
             </code>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-[13px] text-secondary">Auth Token</span>
             <div className="flex items-center gap-2">
-              <code className="text-[12px] text-muted bg-white/[0.06] px-2 py-0.5 rounded max-w-[200px] truncate">
+              <code className="text-[12px] text-muted bg-surface-base px-2 py-0.5 rounded max-w-[200px] truncate">
                 {tokenVisible ? (token ?? "—") : "••••••••••••"}
               </code>
               <button
@@ -141,7 +141,7 @@ export function IntegrationsSettings() {
                 title="Copy token"
               >
                 {copied ? (
-                  <Check className="w-3.5 h-3.5 text-green-500" />
+                  <Check className="w-3.5 h-3.5 text-success" />
                 ) : (
                   <Copy className="w-3.5 h-3.5" />
                 )}

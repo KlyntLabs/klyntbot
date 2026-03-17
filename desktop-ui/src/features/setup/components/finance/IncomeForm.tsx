@@ -81,7 +81,7 @@ export function IncomeForm({ registerSave, onDirty }: IncomeFormProps) {
               className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
                 method === m.value
                   ? "border-brand/50 bg-brand/[0.06]"
-                  : "border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.05]"
+                  : "border-border bg-surface-lowest hover:bg-surface-base"
               }`}
             >
               <input
@@ -104,7 +104,7 @@ export function IncomeForm({ registerSave, onDirty }: IncomeFormProps) {
         </div>
 
         {method === "six_jar" && (
-          <div className="bg-white/[0.03] rounded-lg border border-white/[0.06] p-3 space-y-2">
+          <div className="bg-surface-lowest rounded-lg border border-border-subtle p-3 space-y-2">
             <div className="flex items-center justify-between mb-1">
               <span className="text-[12px] font-medium text-secondary">Jar ratios</span>
               <span

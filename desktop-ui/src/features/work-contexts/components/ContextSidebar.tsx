@@ -48,8 +48,8 @@ export function ContextSidebar({
                 onClick={() => onSelect(ctx)}
                 className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition-all ${
                   isActive
-                    ? "bg-white/[0.08] text-primary"
-                    : "text-secondary hover:bg-white/[0.04] hover:text-primary"
+                    ? "bg-surface-raised text-primary"
+                    : "text-secondary hover:bg-surface-low hover:text-primary"
                 }`}
               >
                 <div
@@ -60,7 +60,7 @@ export function ContextSidebar({
                   <p className="text-[12px] font-medium truncate">{ctx.title}</p>
                   <p className="text-[10px] text-muted">{isRecent ? "Active now" : `${ago} ago`}</p>
                 </div>
-                <span className="text-[10px] text-muted bg-white/[0.06] rounded-full px-1.5 py-0.5 shrink-0">
+                <span className="text-[10px] text-muted bg-surface-base rounded-full px-1.5 py-0.5 shrink-0">
                   {ctx.eventCount}
                 </span>
               </button>
@@ -70,7 +70,7 @@ export function ContextSidebar({
           <button
             type="button"
             onClick={onSearchClick}
-            className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[11px] text-muted hover:text-secondary hover:bg-white/[0.04] transition-colors mt-1"
+            className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[11px] text-muted hover:text-secondary hover:bg-surface-low transition-colors mt-1"
           >
             <Search className="w-3 h-3" />
             Search contexts…

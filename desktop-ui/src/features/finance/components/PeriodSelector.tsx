@@ -23,7 +23,7 @@ export function PeriodSelector({
           type="button"
           onClick={onPrev}
           aria-label="Previous period"
-          className="p-1.5 rounded-lg text-muted hover:text-secondary hover:bg-white/[0.06] transition-colors"
+          className="p-1.5 rounded-lg text-muted hover:text-secondary hover:bg-surface-base transition-colors"
         >
           <ChevronLeft className="w-4 h-4" strokeWidth={1.5} />
         </button>
@@ -34,13 +34,13 @@ export function PeriodSelector({
           type="button"
           onClick={onNext}
           aria-label="Next period"
-          className="p-1.5 rounded-lg text-muted hover:text-secondary hover:bg-white/[0.06] transition-colors"
+          className="p-1.5 rounded-lg text-muted hover:text-secondary hover:bg-surface-base transition-colors"
         >
           <ChevronRight className="w-4 h-4" strokeWidth={1.5} />
         </button>
       </div>
       <div
-        className="flex gap-1 bg-white/[0.04] rounded-xl p-1 border border-white/[0.06]"
+        className="flex gap-1 bg-surface-low rounded-xl p-1 border border-border-subtle"
         role="tablist"
       >
         {MODES.map((m) => (

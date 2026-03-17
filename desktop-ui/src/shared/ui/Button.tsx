@@ -12,7 +12,7 @@ const variants = {
   secondary: "bg-surface-base text-secondary hover:bg-surface-raised hover:text-primary",
   ghost: "text-muted hover:text-primary hover:bg-surface-base",
   destructive: "bg-destructive/10 text-destructive hover:bg-destructive/20",
-  outline: "border border-border text-secondary hover:text-primary hover:border-white/20",
+  outline: "border border-border text-secondary hover:text-primary hover:border-border",
 };
 
 const sizes = {

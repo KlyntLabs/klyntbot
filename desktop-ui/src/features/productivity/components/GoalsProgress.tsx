@@ -60,7 +60,7 @@ export function GoalsProgress() {
           <button
             type="button"
             onClick={() => setShowAdd(true)}
-            className="w-6 h-6 rounded-md flex items-center justify-center text-muted hover:text-brand hover:bg-white/[0.08] transition-colors"
+            className="w-6 h-6 rounded-md flex items-center justify-center text-muted hover:text-brand hover:bg-surface-raised transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
           </button>
@@ -84,7 +84,7 @@ export function GoalsProgress() {
                         {formatValue(g.metric, g.targetValue)} {metricLabel(g.metric)}
                       </span>
                       {g.projectId && (
-                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/[0.08] text-muted">
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-surface-raised text-muted">
                           {g.projectId}
                         </span>
                       )}
@@ -104,7 +104,7 @@ export function GoalsProgress() {
                       </button>
                     </div>
                   </div>
-                  <div className="h-1.5 rounded-full bg-white/[0.08] overflow-hidden">
+                  <div className="h-1.5 rounded-full bg-surface-raised overflow-hidden">
                     <div
                       className={`h-full rounded-full transition-[width] ${g.met ? "bg-success" : "bg-brand"}`}
                       style={{ width: `${pct}%` }}

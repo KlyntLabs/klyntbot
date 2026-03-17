@@ -60,13 +60,13 @@ export function InlineCheckboxList({
               className={`flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 border ${
                 isChecked
                   ? "bg-brand/8 border-brand/25 text-primary"
-                  : "bg-white/[0.03] border-white/[0.06] text-muted hover:bg-white/[0.06] hover:border-white/[0.1]"
+                  : "bg-surface-lowest border-border-subtle text-muted hover:bg-surface-base hover:border-border"
               }`}
             >
               {/* Checkbox */}
               <div
                 className={`w-[18px] h-[18px] rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all duration-200 ${
-                  isChecked ? "bg-brand border-brand" : "border-white/20"
+                  isChecked ? "bg-brand border-brand" : "border-border"
                 }`}
               >
                 {isChecked && <Check className="w-3 h-3 text-white" />}
@@ -79,7 +79,7 @@ export function InlineCheckboxList({
               {opt.detected !== undefined && (
                 <span
                   className={`text-[10px] font-medium px-1.5 py-0.5 rounded-md flex-shrink-0 ${
-                    opt.detected ? "bg-success/10 text-success" : "bg-white/5 text-dim"
+                    opt.detected ? "bg-success/10 text-success" : "bg-surface-base text-dim"
                   }`}
                 >
                   {opt.detected ? "Found" : "N/A"}

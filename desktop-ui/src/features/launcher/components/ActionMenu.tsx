@@ -99,7 +99,7 @@ export function ActionMenu() {
       onKeyDown={() => {}}
     >
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/40" />
+      <div className="absolute inset-0 bg-overlay" />
 
       {/* Menu */}
       <div

@@ -22,9 +22,9 @@ interface DomainEventRow {
 }
 
 const salienceColors: Record<string, string> = {
-  extract: "bg-green-500/20 text-green-300",
-  accumulate: "bg-yellow-500/20 text-yellow-300",
-  discard: "bg-white/[0.06] text-muted",
+  extract: "bg-success/20 text-success",
+  accumulate: "bg-warning/20 text-warning",
+  discard: "bg-surface-base text-muted",
 };
 
 const salienceBorders: Record<string, string> = {
@@ -90,7 +90,7 @@ export function EventsTab() {
             type="button"
             onClick={() => setFilters((f) => ({ ...f, [s]: !f[s] }))}
             className={`text-[11px] px-2 py-1 rounded transition-all ${
-              filters[s] ? salienceColors[s] : "bg-white/[0.04] text-muted"
+              filters[s] ? salienceColors[s] : "bg-surface-low text-muted"
             }`}
           >
             {s.charAt(0).toUpperCase() + s.slice(1)}

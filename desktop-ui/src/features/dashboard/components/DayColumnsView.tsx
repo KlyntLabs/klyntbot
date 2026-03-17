@@ -620,7 +620,7 @@ function NowLine({ pxPerMin }: { pxPerMin: number }) {
     <div className="absolute w-full pointer-events-none z-10" style={{ top, left: HOUR_GUTTER }}>
       <div className="flex items-center">
         <div className="w-2 h-2 rounded-full bg-destructive -ml-1" />
-        <div className="flex-1 border-t border-red-500" />
+        <div className="flex-1 border-t border-destructive" />
       </div>
     </div>
   );

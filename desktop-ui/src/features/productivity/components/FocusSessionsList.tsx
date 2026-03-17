@@ -35,7 +35,7 @@ export function FocusSessionsList({ date }: FocusSessionsListProps) {
           return (
             <div
               key={s.id}
-              className="flex items-center gap-3 py-2 border-b border-white/[0.04] last:border-b-0"
+              className="flex items-center gap-3 py-2 border-b border-border-subtle last:border-b-0"
             >
               <span className="text-[11px] font-light text-muted tabular-nums w-14">
                 {formatTime(s.startedAt)}

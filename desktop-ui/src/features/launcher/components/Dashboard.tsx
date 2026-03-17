@@ -179,7 +179,7 @@ function TasksWidget({
             key={task.id}
             type="button"
             onClick={() => onOpenTask?.(task.id)}
-            className="flex items-center gap-2.5 py-1 group w-full text-left rounded-md px-1 -mx-1 hover:bg-white/[0.04] active:bg-white/[0.06] transition-colors cursor-pointer"
+            className="flex items-center gap-2.5 py-1 group w-full text-left rounded-md px-1 -mx-1 hover:bg-surface-low active:bg-surface-base transition-colors cursor-pointer"
           >
             <div
               className={`w-[7px] h-[7px] rounded-full shrink-0 ring-1 ring-inset ring-white/10 ${

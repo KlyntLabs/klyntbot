@@ -20,7 +20,7 @@ export function SecretInput({ value, onChange, placeholder, className }: SecretI
         placeholder={placeholder}
         className={
           className ??
-          "w-full px-3 py-1.5 pr-9 text-[12px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+          "w-full px-3 py-1.5 pr-9 text-[12px] text-primary bg-surface-base border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
         }
       />
       <button

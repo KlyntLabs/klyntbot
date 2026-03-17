@@ -7,14 +7,10 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default:
-          "bg-primary text-background hover:bg-primary/90",
-        destructive:
-          "bg-destructive text-primary hover:bg-destructive/90",
-        outline:
-          "border border-border bg-background hover:bg-surface-raised hover:text-primary",
-        secondary:
-          "bg-surface-raised text-primary hover:bg-surface-raised/80",
+        default: "bg-primary text-background hover:bg-primary/90",
+        destructive: "bg-destructive text-primary hover:bg-destructive/90",
+        outline: "border border-border bg-background hover:bg-surface-raised hover:text-primary",
+        secondary: "bg-surface-raised text-primary hover:bg-surface-raised/80",
         ghost: "hover:bg-surface-raised hover:text-primary",
         link: "text-primary underline-offset-4 hover:underline",
       },

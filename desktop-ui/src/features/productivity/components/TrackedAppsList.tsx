@@ -145,7 +145,7 @@ export function TrackedAppsList({ apps, categories, onReassigned }: TrackedAppsL
           type="button"
           onClick={() => setShowUncategorized(!showUncategorized)}
           className={`text-[10px] font-light px-2 py-1 rounded-lg transition-colors ${
-            showUncategorized ? "bg-brand/20 text-brand" : "text-muted hover:bg-white/[0.04]"
+            showUncategorized ? "bg-brand/20 text-brand" : "text-muted hover:bg-surface-low"
           }`}
         >
           Uncategorized ({uncategorizedCount})
@@ -195,7 +195,7 @@ function TrackedAppRow({
   onCancel: () => void;
 }) {
   return (
-    <div className="flex items-center gap-2 px-1.5 py-1 rounded-md hover:bg-white/[0.03] group">
+    <div className="flex items-center gap-2 px-1.5 py-1 rounded-md hover:bg-surface-lowest group">
       {color ? (
         <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ backgroundColor: color }} />
       ) : (

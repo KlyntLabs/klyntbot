@@ -197,8 +197,7 @@ impl PersonaRepo {
     pub async fn create_auto(&self, persona: &NewPersona) -> Result<PersonaRow, sqlx::Error> {
         let id = Uuid::new_v4().to_string();
         let now = Utc::now().to_rfc3339();
-        let domains_json =
-            serde_json::to_string(&persona.domains).unwrap_or_else(|_| "[]".into());
+        let domains_json = serde_json::to_string(&persona.domains).unwrap_or_else(|_| "[]".into());
 
         sqlx::query(
             r#"
@@ -255,16 +254,17 @@ impl PersonaRepo {
             return Ok(None);
         };
         if existing.source == "builtin" {
-            return Err(sqlx::Error::Protocol(
-                "Cannot edit builtin persona".into(),
-            ));
+            return Err(sqlx::Error::Protocol("Cannot edit builtin persona".into()));
         }
 
         let now = Utc::now().to_rfc3339();
         let name = updates.name.as_deref().unwrap_or(&existing.name);
         let role = updates.role.as_deref().unwrap_or(&existing.role);
         let expertise = updates.expertise.as_deref().unwrap_or(&existing.expertise);
-        let perspective = updates.perspective.as_deref().unwrap_or(&existing.perspective);
+        let perspective = updates
+            .perspective
+            .as_deref()
+            .unwrap_or(&existing.perspective);
         let tone = updates.tone.as_deref().unwrap_or(&existing.tone);
         let icon = updates.icon.as_deref().unwrap_or(&existing.icon);
         let domains_json = if let Some(ref domains) = updates.domains {

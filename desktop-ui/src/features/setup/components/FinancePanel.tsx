@@ -83,7 +83,7 @@ export function FinancePanel({ onComplete }: FinancePanelProps) {
                 ? "bg-brand text-white"
                 : i < subStep
                   ? "bg-brand/20 text-brand"
-                  : "bg-white/[0.06] text-dim"
+                  : "bg-surface-base text-dim"
             }`}
           >
             {SUB_STEP_LABELS[step]}

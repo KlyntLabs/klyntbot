@@ -76,7 +76,7 @@ export function ContextDetailPanel({ open, onClose, detail }: ContextDetailPanel
                   onChange={(e) => setTitleDraft(e.target.value)}
                   onBlur={handleRename}
                   onKeyDown={(e) => e.key === "Enter" && handleRename()}
-                  className="w-full px-2 py-1 text-[14px] font-medium bg-white/[0.06] border border-white/[0.08] rounded-lg text-primary"
+                  className="w-full px-2 py-1 text-[14px] font-medium bg-surface-base border border-border rounded-lg text-primary"
                 />
               ) : (
                 <button
@@ -135,11 +135,11 @@ export function ContextDetailPanel({ open, onClose, detail }: ContextDetailPanel
           )}
 
           {/* Actions */}
-          <div className="flex items-center gap-2 pt-2 border-t border-white/[0.08]">
+          <div className="flex items-center gap-2 pt-2 border-t border-border">
             <button
               type="button"
               onClick={handleArchive}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] text-muted hover:text-secondary hover:bg-white/[0.06] transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] text-muted hover:text-secondary hover:bg-surface-base transition-colors"
             >
               <Archive className="w-3.5 h-3.5" />
               Archive
@@ -153,7 +153,7 @@ export function ContextDetailPanel({ open, onClose, detail }: ContextDetailPanel
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-white/[0.04] rounded-lg p-2.5 text-center">
+    <div className="bg-surface-low rounded-lg p-2.5 text-center">
       <p className="text-[14px] font-medium text-primary">{value}</p>
       <p className="text-[10px] text-muted mt-0.5">{label}</p>
     </div>
@@ -171,7 +171,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function ResourceRow({ resource }: { resource: WorkResource }) {
   return (
-    <div className="flex items-center gap-2 text-[12px] text-secondary py-1 px-1.5 rounded hover:bg-white/[0.04]">
+    <div className="flex items-center gap-2 text-[12px] text-secondary py-1 px-1.5 rounded hover:bg-surface-low">
       <ResourceIcon type={resource.resourceType} />
       <span className="truncate flex-1">{resource.resourceName}</span>
       <span className="text-[10px] text-muted shrink-0">{resource.accessCount}×</span>
@@ -181,7 +181,7 @@ function ResourceRow({ resource }: { resource: WorkResource }) {
 
 function EventRow({ event }: { event: ActivityEvent }) {
   return (
-    <div className="flex items-center gap-2 text-[11px] py-1 px-1.5 rounded hover:bg-white/[0.04]">
+    <div className="flex items-center gap-2 text-[11px] py-1 px-1.5 rounded hover:bg-surface-low">
       <span className="text-muted shrink-0 w-12 text-right">{formatTime(event.timestamp)}</span>
       <span className="text-secondary">{event.action}</span>
       {event.resourceName && (

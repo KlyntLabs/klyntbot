@@ -57,10 +57,7 @@ export function CreateIssueModal({ onCreateTask, areas }: CreateIssueModalProps)
         <div className="space-y-4 py-2">
           {/* Title */}
           <div className="space-y-2">
-            <label
-              htmlFor="issue-title"
-              className="text-sm font-medium text-primary"
-            >
+            <label htmlFor="issue-title" className="text-sm font-medium text-primary">
               Title <span className="text-destructive">*</span>
             </label>
             <input
