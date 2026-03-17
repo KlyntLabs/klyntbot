@@ -620,11 +620,34 @@ impl AgentLoopBuilder {
             let retriever: Arc<dyn context_engine::MemoryRetriever> = Arc::new(retriever);
 
             // Create InsightForge with the same retriever
-            let forge = context_engine::InsightForge::new(
-                context_engine::InsightForgeConfig::default(),
+            let forge_config = context_engine::InsightForgeConfig {
+                enabled: config.cognitive.insight_forge_enabled,
+                max_sub_queries: config.cognitive.insight_forge_max_sub_queries,
+                per_source_limit: config.cognitive.insight_forge_per_source_limit,
+                total_limit: config.cognitive.insight_forge_total_limit,
+                per_source_timeout_ms: config.cognitive.insight_forge_per_source_timeout_ms,
+                ..context_engine::InsightForgeConfig::default()
+            };
+            let mut forge = context_engine::InsightForge::new(
+                forge_config,
                 Arc::new(context_engine::HeuristicDecomposer),
                 Arc::clone(&retriever),
             );
+
+            // Register domain searchers
+            let note_repo_for_searcher =
+                feature_notes::repo::NoteRepo::new(storage_pool.inner().clone());
+            forge.add_searcher(Arc::new(
+                crate::domain_searchers::NoteSearcher::new(note_repo_for_searcher),
+            ));
+            forge.add_searcher(Arc::new(
+                crate::domain_searchers::TaskSearcher::new(repos.clone()),
+            ));
+            forge.add_searcher(Arc::new(
+                crate::domain_searchers::GraphSearcher::new(
+                    cognitive::repos::EntityRepo::new(storage_pool.inner().clone()),
+                ),
+            ));
 
             context_engine
                 .with_memory_retriever(retriever)
