@@ -18,7 +18,7 @@ function CollapsibleBox({ title, icon: Icon, children, defaultOpen = true }: Col
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-2 px-3 py-2 rounded-t-[var(--radius-2xl)] bg-white/[0.06]"
+        className="w-full flex items-center gap-2 px-3 py-2 rounded-t-[var(--radius-2xl)] bg-surface-base"
       >
         <Icon className="w-3 h-3 text-muted" strokeWidth={1.5} />
         <span className="flex-1 text-left text-[11px] font-medium text-secondary">{title}</span>
@@ -69,7 +69,7 @@ function AgentGroupLabel({ name }: { name: string }) {
 /** Skills popup shown on hover over an agent name in the Agents section. */
 function AgentSkillsPopup({ skills }: { skills: { name: string; trigger: string }[] }) {
   return (
-    <div className="absolute left-0 top-full mt-1 z-50 w-48 rounded-xl p-2.5 space-y-0.5 text-[10px] font-light bg-[#1a1a1e] border border-white/[0.10]">
+    <div className="absolute left-0 top-full mt-1 z-50 w-48 rounded-xl p-2.5 space-y-0.5 text-[10px] font-light bg-surface-floating border border-border">
       <div className="text-dim text-[9px] font-medium uppercase tracking-wider mb-1">Skills</div>
       {skills.map((skill) => {
         const isActive = skill.trigger === "always" || skill.trigger === "activated";
@@ -248,7 +248,7 @@ export function TransparencyPanel({ transparency }: TransparencyPanelProps) {
                   />
                 ))}
             {toolTokensTotal && toolTokensTotal > 0 && (
-              <div className="pt-1 mt-1 border-t border-white/[0.08] flex justify-between text-dim">
+              <div className="pt-1 mt-1 border-t border-border flex justify-between text-dim">
                 <span>Total I/O (est.)</span>
                 <span>~{formatTokens(toolTokensTotal)}</span>
               </div>

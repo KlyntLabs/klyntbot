@@ -12,8 +12,8 @@ interface ConceptMapTabProps {
 function SkeletonLoader() {
   return (
     <div className="space-y-4 animate-pulse">
-      <div className="h-40 bg-white/[0.04] rounded-lg" />
-      <div className="h-3 bg-white/[0.04] rounded w-1/2 mx-auto" />
+      <div className="h-40 bg-surface-low rounded-lg" />
+      <div className="h-3 bg-surface-low rounded w-1/2 mx-auto" />
     </div>
   );
 }
@@ -81,7 +81,7 @@ export function ConceptMapTab({ status, mermaid: mermaidCode, fallbackText }: Co
 
   if (status === "error") {
     return (
-      <p className="text-[11px] text-red-400">Failed to generate concept map. Try regenerating.</p>
+      <p className="text-[11px] text-destructive">Failed to generate concept map. Try regenerating.</p>
     );
   }
 
@@ -102,7 +102,7 @@ export function ConceptMapTab({ status, mermaid: mermaidCode, fallbackText }: Co
   if (mermaidCode) {
     return (
       <div className="space-y-3">
-        <div className="rounded-lg bg-white/[0.02] border border-white/[0.06] p-4">
+        <div className="rounded-lg bg-surface-lowest border border-border p-4">
           <MermaidRenderer code={mermaidCode} onError={handleRenderError} />
         </div>
         <CopyButton mermaidCode={mermaidCode} copied={copied} onCopy={handleCopy} />

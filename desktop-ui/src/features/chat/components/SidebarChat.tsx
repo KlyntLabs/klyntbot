@@ -98,7 +98,7 @@ export function SidebarChat({
               onClick={handlePin}
               aria-label="Pin to Chat threads"
               title="Pin to Chat threads"
-              className="w-7 h-7 rounded-lg flex items-center justify-center text-muted hover:text-secondary hover:bg-white/[0.06] transition-all"
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-muted hover:text-secondary hover:bg-surface-base transition-all"
             >
               <Pin className="w-3.5 h-3.5" strokeWidth={1.5} />
             </button>
@@ -107,7 +107,7 @@ export function SidebarChat({
             type="button"
             onClick={onClose}
             aria-label="Close chat"
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-muted hover:text-secondary hover:bg-white/[0.06] transition-all"
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-muted hover:text-secondary hover:bg-surface-base transition-all"
           >
             <X className="w-4 h-4" strokeWidth={1.5} />
           </button>
@@ -192,7 +192,7 @@ function SidebarChatInput({
           onClick={onSend}
           disabled={!input.trim() || isStreaming}
           aria-label="Send message"
-          className="w-10 h-10 rounded-xl bg-brand hover:bg-brand-hover disabled:bg-white/[0.06] disabled:text-muted flex items-center justify-center transition-all shrink-0"
+          className="w-10 h-10 rounded-xl bg-brand hover:bg-brand-hover disabled:bg-surface-base disabled:text-muted flex items-center justify-center transition-all shrink-0"
         >
           <Send className="w-4 h-4" strokeWidth={2} />
         </button>

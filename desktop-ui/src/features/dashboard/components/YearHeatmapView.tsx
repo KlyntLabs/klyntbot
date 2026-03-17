@@ -47,7 +47,7 @@ function buildMonthGrid(year: number, month: number): (string | null)[][] {
 }
 
 function intensityClass(secs: number, maxSecs: number): string {
-  if (secs === 0 || maxSecs === 0) return "bg-white/[0.03]";
+  if (secs === 0 || maxSecs === 0) return "bg-surface-lowest";
   const ratio = secs / maxSecs;
   if (ratio > 0.75) return "bg-timeline-focus/60";
   if (ratio > 0.5) return "bg-timeline-focus/40";
@@ -137,7 +137,7 @@ export function YearHeatmapView() {
         {/* Legend */}
         <div className="flex items-center gap-2 mt-4 justify-center">
           <span className="text-[10px] text-muted">Less focus</span>
-          <div className="w-3 h-3 rounded-[2px] bg-white/[0.03]" />
+          <div className="w-3 h-3 rounded-[2px] bg-surface-lowest" />
           <div className="w-3 h-3 rounded-[2px] bg-timeline-focus/10" />
           <div className="w-3 h-3 rounded-[2px] bg-timeline-focus/25" />
           <div className="w-3 h-3 rounded-[2px] bg-timeline-focus/40" />

@@ -261,7 +261,7 @@ export function ChatPage() {
 
       {/* Right Panel — Conversation */}
       <div className="flex-1 flex flex-col overflow-hidden rounded-xl relative">
-        <div className="flex items-center justify-between px-4 py-2 border-b border-white/[0.06]">
+        <div className="flex items-center justify-between px-4 py-2 border-b border-border-subtle">
           {resumeBanner ? (
             <div className="flex items-center gap-2 text-[12px]">
               <span className="text-brand font-medium">Resuming: {resumeBanner}</span>

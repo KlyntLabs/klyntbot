@@ -31,7 +31,7 @@ export function CoachingNudge({ isStreaming }: { isStreaming: boolean }) {
               type="button"
               onClick={() => handleFeedback(nudge.id, "helpful")}
               title="Helpful"
-              className="w-7 h-7 flex items-center justify-center rounded-lg text-muted hover:text-success hover:bg-white/[0.06] transition-colors"
+              className="w-7 h-7 flex items-center justify-center rounded-lg text-muted hover:text-success hover:bg-surface-base transition-colors"
             >
               <Check className="w-3.5 h-3.5" strokeWidth={2} />
             </button>
@@ -39,7 +39,7 @@ export function CoachingNudge({ isStreaming }: { isStreaming: boolean }) {
               type="button"
               onClick={() => handleFeedback(nudge.id, "dismissed")}
               title="Dismiss"
-              className="w-7 h-7 flex items-center justify-center rounded-lg text-muted hover:text-secondary hover:bg-white/[0.06] transition-colors"
+              className="w-7 h-7 flex items-center justify-center rounded-lg text-muted hover:text-secondary hover:bg-surface-base transition-colors"
             >
               <X className="w-3.5 h-3.5" strokeWidth={2} />
             </button>
@@ -47,7 +47,7 @@ export function CoachingNudge({ isStreaming }: { isStreaming: boolean }) {
               type="button"
               onClick={() => handleFeedback(nudge.id, "stop")}
               title="Stop suggesting this"
-              className="w-7 h-7 flex items-center justify-center rounded-lg text-muted hover:text-destructive hover:bg-white/[0.06] transition-colors"
+              className="w-7 h-7 flex items-center justify-center rounded-lg text-muted hover:text-destructive hover:bg-surface-base transition-colors"
             >
               <XCircle className="w-3.5 h-3.5" strokeWidth={2} />
             </button>

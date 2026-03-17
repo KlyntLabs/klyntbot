@@ -80,21 +80,21 @@ export function ThreadList({
         <button
           type="button"
           onClick={onNewThread}
-          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/[0.05] transition-all text-[12px] font-light text-muted hover:text-secondary"
+          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-surface-base transition-all text-[12px] font-light text-muted hover:text-secondary"
         >
           <Plus className="w-[13px] h-[13px]" strokeWidth={1.5} />
           New thread
         </button>
         <button
           type="button"
-          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/[0.05] transition-all text-[12px] font-light text-muted hover:text-secondary"
+          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-surface-base transition-all text-[12px] font-light text-muted hover:text-secondary"
         >
           <RotateCcw className="w-[13px] h-[13px]" strokeWidth={1.5} />
           Automations
         </button>
         <button
           type="button"
-          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/[0.05] transition-all text-[12px] font-light text-muted hover:text-secondary"
+          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-surface-base transition-all text-[12px] font-light text-muted hover:text-secondary"
         >
           <Settings className="w-[13px] h-[13px]" strokeWidth={1.5} />
           Skills and Apps

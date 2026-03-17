@@ -24,7 +24,7 @@ function CategoryBar({ summary }: { summary: ProductivitySummary }) {
   ].filter((s) => s.secs > 0);
 
   return (
-    <div className="flex h-1.5 rounded-full overflow-hidden bg-white/[0.06]">
+    <div className="flex h-1.5 rounded-full overflow-hidden bg-surface-base">
       {segments.map((seg) => (
         <div
           key={seg.key}
@@ -52,7 +52,7 @@ function MiniScore({ score }: { score: number | null }) {
         background: `conic-gradient(${color} ${clamped * 3.6}deg, rgba(255,255,255,0.06) 0deg)`,
       }}
     >
-      <div className="w-[18px] h-[18px] rounded-full bg-[rgba(0,0,0,0.85)] flex items-center justify-center">
+      <div className="w-[18px] h-[18px] rounded-full bg-surface-floating flex items-center justify-center">
         <span style={{ color }}>{Math.round(clamped)}</span>
       </div>
     </div>
@@ -70,7 +70,7 @@ function TopAppsMini({ summary }: { summary: ProductivitySummary }) {
       {apps.map((app) => (
         <div key={app.appName} className="flex items-center gap-2">
           <span className="text-[9px] text-muted truncate w-14">{app.appName}</span>
-          <div className="flex-1 h-1 rounded-full bg-white/[0.06] overflow-hidden">
+          <div className="flex-1 h-1 rounded-full bg-surface-base overflow-hidden">
             <div
               className="h-full rounded-full"
               style={{
@@ -96,12 +96,12 @@ export function ProductivityStrip({ summary }: ProductivityStripProps) {
   const productivePct = Math.round((summary.productiveSecs / summary.totalActiveSecs) * 100);
 
   return (
-    <div className="border-b border-border bg-white/[0.02]">
+    <div className="border-b border-border bg-surface-lowest">
       {/* Compact bar — always visible */}
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
-        className="w-full px-3 py-2 flex items-center gap-3 hover:bg-white/[0.03] transition-colors"
+        className="w-full px-3 py-2 flex items-center gap-3 hover:bg-surface-lowest transition-colors"
       >
         <MiniScore score={summary.productivityScore} />
 

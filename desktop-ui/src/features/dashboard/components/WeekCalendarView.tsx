@@ -243,7 +243,7 @@ export function WeekCalendarView() {
                 key={day}
                 onClick={() => navigate(`/day/${day}`)}
                 className={cn(
-                  "flex-1 text-center py-1.5 text-xs cursor-pointer hover:bg-white/[0.03] transition-colors",
+                  "flex-1 text-center py-1.5 text-xs cursor-pointer hover:bg-surface-lowest transition-colors",
                   day === today ? "text-brand font-semibold" : "text-muted",
                 )}
               >
@@ -318,7 +318,7 @@ export function WeekCalendarView() {
                           title={`${session.label}${appSuffix} · ${durationLabel}`}
                         >
                           {height > 20 && (
-                            <span className="text-[8px] text-white/90 font-medium px-1 truncate block leading-tight mt-0.5">
+                            <span className="text-[8px] text-primary font-medium px-1 truncate block leading-tight mt-0.5">
                               {session.label}
                             </span>
                           )}

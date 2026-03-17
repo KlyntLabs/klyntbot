@@ -19,7 +19,7 @@ export function PlanProgress({ steps, completedSteps, isStreaming }: PlanProgres
   const activeIndex = steps.findIndex((_, i) => !completedSet.has(i));
 
   return (
-    <div className="my-2 rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2.5">
+    <div className="my-2 rounded-lg border border-border bg-surface-lowest px-3 py-2.5">
       <div className="flex items-center gap-2 mb-2">
         <span className="text-[11px] font-medium text-secondary">Plan</span>
         <span className="text-[10px] font-light text-dim">

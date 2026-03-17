@@ -272,7 +272,7 @@ export function DayColumnsView({
         <div ref={scrollRef} className="flex-1 overflow-y-auto">
           {/* Sticky column headers — CSS grid ensures pixel-perfect alignment with tracks */}
           <div
-            className="sticky top-0 z-20 grid border-b border-border bg-[rgba(0,0,0,0.85)]"
+            className="sticky top-0 z-20 grid border-b border-border bg-surface-floating"
             style={{ gridTemplateColumns: gridTemplate }}
           >
             <div />
@@ -521,7 +521,7 @@ function ColumnEntry({
           "absolute left-1 right-1 rounded-md px-1.5 py-0.5 text-[11px] leading-tight overflow-hidden cursor-pointer transition-colors",
           isDue
             ? "border-l-2 border-l-[var(--timeline-todo)] bg-[var(--timeline-todo)]/15 hover:bg-[var(--timeline-todo)]/25"
-            : "border-l border-border bg-white/[0.04] hover:bg-white/[0.08]",
+            : "border-l border-border bg-surface-low hover:bg-surface-raised",
           isCompleted && "opacity-60 line-through",
           selected && "ring-1 ring-brand",
         )}
@@ -619,7 +619,7 @@ function NowLine({ pxPerMin }: { pxPerMin: number }) {
   return (
     <div className="absolute w-full pointer-events-none z-10" style={{ top, left: HOUR_GUTTER }}>
       <div className="flex items-center">
-        <div className="w-2 h-2 rounded-full bg-red-500 -ml-1" />
+        <div className="w-2 h-2 rounded-full bg-destructive -ml-1" />
         <div className="flex-1 border-t border-red-500" />
       </div>
     </div>

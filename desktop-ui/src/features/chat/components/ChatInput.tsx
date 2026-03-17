@@ -18,7 +18,7 @@ export function ChatInput({ input, isStreaming, onInputChange, onSend }: ChatInp
           <button
             type="button"
             aria-label="Add attachment"
-            className="w-8 h-8 flex items-center justify-center text-muted hover:text-secondary transition-colors shrink-0 rounded-lg hover:bg-white/[0.05]"
+            className="w-8 h-8 flex items-center justify-center text-muted hover:text-secondary transition-colors shrink-0 rounded-lg hover:bg-surface-base"
           >
             <Plus className="w-4 h-4" strokeWidth={1.5} />
           </button>
@@ -42,7 +42,7 @@ export function ChatInput({ input, isStreaming, onInputChange, onSend }: ChatInp
           <button
             type="button"
             aria-label="Voice input"
-            className="w-8 h-8 flex items-center justify-center text-muted hover:text-secondary transition-colors shrink-0 rounded-lg hover:bg-white/[0.05]"
+            className="w-8 h-8 flex items-center justify-center text-muted hover:text-secondary transition-colors shrink-0 rounded-lg hover:bg-surface-base"
           >
             <Mic className="w-4 h-4" strokeWidth={1.5} />
           </button>
@@ -51,7 +51,7 @@ export function ChatInput({ input, isStreaming, onInputChange, onSend }: ChatInp
             onClick={onSend}
             disabled={!input.trim() || isStreaming}
             aria-label="Send message"
-            className="w-9 h-9 rounded-full bg-brand hover:bg-brand-hover disabled:bg-white/[0.06] disabled:text-muted flex items-center justify-center transition-all shrink-0"
+            className="w-9 h-9 rounded-full bg-brand hover:bg-brand-hover disabled:bg-surface-base disabled:text-muted flex items-center justify-center transition-all shrink-0"
           >
             <Send className="w-4 h-4" strokeWidth={2} />
           </button>

@@ -38,7 +38,7 @@ export function ThreadButton({
             if (e.key === "Enter") onRenameConfirm();
             if (e.key === "Escape") onRenameCancel();
           }}
-          className="flex-1 min-w-0 bg-white/[0.12] text-primary text-[12px] font-light px-2 py-1 rounded border border-white/[0.08]"
+          className="flex-1 min-w-0 bg-surface-highest text-primary text-[12px] font-light px-2 py-1 rounded border border-border"
         />
         <button
           type="button"
@@ -67,8 +67,8 @@ export function ThreadButton({
       onContextMenu={(e) => onContextMenu(e, thread)}
       className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-[12px] font-light ${
         isActive
-          ? "bg-white/[0.12] text-primary"
-          : "text-muted hover:bg-white/[0.06] hover:text-secondary"
+          ? "bg-surface-highest text-primary"
+          : "text-muted hover:bg-surface-base hover:text-secondary"
       }`}
     >
       <MessageSquare className="w-3 h-3 shrink-0" strokeWidth={1.5} />

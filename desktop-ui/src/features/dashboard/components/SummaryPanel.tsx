@@ -139,7 +139,7 @@ function DaySummary({
                 />
                 <span className="text-[9px] text-dim">active</span>
               </div>
-              <div className="flex h-1 rounded-full overflow-hidden bg-white/[0.06] mt-1">
+              <div className="flex h-1 rounded-full overflow-hidden bg-surface-base mt-1">
                 {ps.productiveSecs > 0 && (
                   <div
                     className="h-full"
@@ -292,7 +292,7 @@ function TopAppsChart({
         return (
           <div key={app.appName} className="flex items-center gap-2">
             <span className="text-[11px] text-secondary truncate w-20 shrink-0">{app.appName}</span>
-            <div className="flex-1 h-[6px] rounded-full bg-white/[0.06] overflow-hidden">
+            <div className="flex-1 h-[6px] rounded-full bg-surface-base overflow-hidden">
               <div
                 className="h-full rounded-full"
                 style={{
