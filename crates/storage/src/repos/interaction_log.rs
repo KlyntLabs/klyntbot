@@ -89,19 +89,7 @@ impl InteractionLogRepo {
         Ok(rows)
     }
 
-    /// Delete interaction log entries older than `days` days. Returns count of deleted rows.
-    pub async fn delete_older_than(
-        &self,
-        days: i64,
-        now: chrono::DateTime<chrono::Utc>,
-    ) -> Result<u64, StorageError> {
-        let cutoff = now - chrono::Duration::days(days);
-        let result = sqlx::query("DELETE FROM interaction_log WHERE timestamp < ?1")
-            .bind(cutoff)
-            .execute(&self.pool)
-            .await?;
-        Ok(result.rows_affected())
-    }
+    delete_older_than_impl!("interaction_log", "timestamp");
 
     /// Total interaction count.
     pub async fn count(&self) -> Result<i64, StorageError> {

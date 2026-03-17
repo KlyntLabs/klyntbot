@@ -7,6 +7,7 @@ const INSIGHT_EVENTS = [
   "insight:tab-done",
   "insight:error",
   "insight:perspectives-meta",
+  "insight:changes-summary",
 ];
 
 /**

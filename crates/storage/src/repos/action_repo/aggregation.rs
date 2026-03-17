@@ -1,9 +1,10 @@
 //! Aggregation, analytics, recurring templates, and LLM context for `actions`.
 
 use crate::error::StorageError;
+use crate::repos::{compute_summary, ActionSummary};
 use crate::rows::action::ActionRow;
 
-use super::{ActionRepo, ActionSummary};
+use super::ActionRepo;
 
 impl ActionRepo {
     /// Count actions by status.
@@ -19,17 +20,7 @@ impl ActionRepo {
         .fetch_all(&self.pool)
         .await?;
 
-        let mut summary = ActionSummary::default();
-        for (status, count) in &rows {
-            match status.as_str() {
-                "todo" => summary.todo = *count,
-                "doing" => summary.doing = *count,
-                "done" => summary.done = *count,
-                _ => {}
-            }
-            summary.total += count;
-        }
-        Ok(summary)
+        Ok(compute_summary(&rows))
     }
 
     /// Aggregate task counts by status group (via status_labels JOIN).

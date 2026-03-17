@@ -83,14 +83,16 @@ impl OutcomeRepo {
         Ok(row)
     }
 
-    /// Delete learning outcomes older than `days` days. Returns count of deleted rows.
-    pub async fn delete_older_than(
+    delete_older_than_impl!("learning_outcomes", "created_at");
+
+    /// Delete enrichment feedback older than `days` days. Returns count of deleted rows.
+    pub async fn delete_enrichment_feedback_older_than(
         &self,
         days: i64,
-        now: chrono::DateTime<Utc>,
+        now: chrono::DateTime<chrono::Utc>,
     ) -> Result<u64, StorageError> {
         let cutoff = now - chrono::Duration::days(days);
-        let result = sqlx::query("DELETE FROM learning_outcomes WHERE created_at < ?1")
+        let result = sqlx::query("DELETE FROM enrichment_feedback WHERE timestamp < ?1")
             .bind(cutoff)
             .execute(&self.pool)
             .await?;

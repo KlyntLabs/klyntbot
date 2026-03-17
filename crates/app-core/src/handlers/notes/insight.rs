@@ -172,6 +172,49 @@ impl AppCore {
         drop(config);
 
         let emitter = emitter_override.unwrap_or_else(|| Arc::clone(&self.event_emitter));
+
+        // Fire "What's Changed" summary if a previous version exists
+        if let Some(ref service) = self.insight_service {
+            if let Ok(Some(prev)) = service.get_latest(note_id).await {
+                let prev_content: feature_insights::InsightContent =
+                    serde_json::from_str(&prev.content).unwrap_or_default();
+                if let Some(prev_synthesis) = prev_content.synthesis {
+                    let changes_emitter = emitter.clone();
+                    let changes_context = context_text.clone();
+                    let changes_provider = provider.clone();
+                    let changes_config = self.config.read().await;
+                    let changes_params = providers::cognitive_chat_params(&changes_config, 512);
+                    drop(changes_config);
+
+                    tokio::spawn(async move {
+                        let prompt = insight_prompts::changes_summary_prompt(
+                            &prev_synthesis,
+                            &changes_context,
+                        );
+                        let messages = vec![
+                            providers::Message::System { content: prompt },
+                            providers::Message::User {
+                                content: providers::UserContent::Text(
+                                    "Generate the changes summary now.".to_string(),
+                                ),
+                            },
+                        ];
+                        if let Ok(response) = changes_provider
+                            .chat(&messages, None, &changes_params)
+                            .await
+                        {
+                            if let Some(summary) = response.content {
+                                changes_emitter.emit_event(
+                                    "insight:changes-summary",
+                                    serde_json::json!({ "summary": summary }),
+                                );
+                            }
+                        }
+                    });
+                }
+            }
+        }
+
         let insight_service = self.insight_service.clone();
         let note_id_owned = note_id.to_string();
         let content_hash_clone = content_hash.clone();
@@ -314,6 +357,86 @@ impl AppCore {
             .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?;
 
         Ok(())
+    }
+
+    pub async fn note_insight_generate_scenario(
+        &self,
+        note_id: &str,
+    ) -> Result<ScenarioChallengeResponse, ApiError> {
+        let provider = self
+            .cognitive_provider
+            .as_ref()
+            .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "LLM provider not configured"))?;
+
+        let note = self
+            .note_repo
+            .get_note(note_id)
+            .await
+            .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?
+            .ok_or_else(|| ApiError::new("NOT_FOUND", "Note not found"))?;
+
+        let tags = self.note_repo.get_tags(note_id).await.unwrap_or_default();
+        let note_domains = insight_context::extract_note_domains(&tags);
+
+        let ctx_text = if let Some(ref service) = self.insight_service {
+            let scope: feature_insights::ScopeConfig = service
+                .get_latest(note_id)
+                .await
+                .ok()
+                .flatten()
+                .and_then(|l| serde_json::from_str(&l.scope_config).ok())
+                .unwrap_or_default();
+
+            let scope_ids = service.resolve_scope(note_id, &scope).await;
+            let mut related_notes = Vec::new();
+            for id in &scope_ids {
+                if let Ok(Some(n)) = self.note_repo.get_note(id).await {
+                    related_notes.push(n);
+                }
+            }
+
+            match service
+                .prepare_context(&note, &related_notes, &scope_ids, &scope, &note_domains)
+                .await
+            {
+                Ok(prepared) => prepared.context.text,
+                Err(_) => {
+                    let related = self.fetch_related_notes(note_id).await;
+                    insight_context::assemble_context(&note, &related, None).text
+                }
+            }
+        } else {
+            let related = self.fetch_related_notes(note_id).await;
+            insight_context::assemble_context(&note, &related, None).text
+        };
+
+        let config = self.config.read().await;
+        let params = providers::cognitive_chat_params(&config, 4096);
+        drop(config);
+
+        let prompt = insight_prompts::scenario_challenge_prompt(&ctx_text);
+        let messages = vec![
+            providers::Message::System { content: prompt },
+            providers::Message::User {
+                content: providers::UserContent::Text(
+                    "Generate the scenario challenge now.".to_string(),
+                ),
+            },
+        ];
+
+        let response = provider
+            .chat(&messages, None, &params)
+            .await
+            .map_err(|e| ApiError::new("LLM_ERROR", e.to_string()))?;
+
+        let content = response.content.unwrap_or_default();
+
+        serde_json::from_str::<ScenarioChallengeResponse>(&content).map_err(|e| {
+            ApiError::new(
+                "PARSE_ERROR",
+                format!("Failed to parse scenario response: {e}"),
+            )
+        })
     }
 
     pub async fn note_insight_regenerate_tab(

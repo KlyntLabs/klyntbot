@@ -2,8 +2,9 @@
 
 use std::collections::HashMap;
 
-use super::{TaskRepo, TaskSummary};
+use super::TaskRepo;
 use crate::error::StorageError;
+use crate::repos::{compute_summary, TaskSummary};
 use crate::rows::task::TaskRow;
 
 impl TaskRepo {
@@ -20,17 +21,7 @@ impl TaskRepo {
         .fetch_all(&self.pool)
         .await?;
 
-        let mut summary = TaskSummary::default();
-        for (status, count) in &rows {
-            match status.as_str() {
-                "todo" => summary.todo = *count,
-                "doing" => summary.doing = *count,
-                "done" => summary.done = *count,
-                _ => {}
-            }
-            summary.total += count;
-        }
-        Ok(summary)
+        Ok(compute_summary(&rows))
     }
 
     /// Aggregate task counts by status group (via status_labels JOIN).

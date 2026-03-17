@@ -93,7 +93,7 @@ impl VectorStore {
         // Group by id, track the latest timestamp for each.
         let mut latest: std::collections::HashMap<String, String> =
             std::collections::HashMap::new();
-        let mut duplicate_ids: Vec<String> = Vec::new();
+        let mut duplicate_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
 
         for batch in &batches {
             let id_col = batch
@@ -114,10 +114,7 @@ impl VectorStore {
                         e.insert(ts);
                     }
                     std::collections::hash_map::Entry::Occupied(mut e) => {
-                        // First time we see a duplicate for this id — record it.
-                        if !duplicate_ids.contains(&id) {
-                            duplicate_ids.push(id);
-                        }
+                        duplicate_ids.insert(id);
                         if ts > *e.get() {
                             e.insert(ts);
                         }

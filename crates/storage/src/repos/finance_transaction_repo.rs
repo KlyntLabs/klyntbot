@@ -172,12 +172,7 @@ impl FinanceTransactionRepo {
         }
 
         if let Some(ref query) = filter.query {
-            // Escape SQLite LIKE wildcards so user input is treated literally.
-            let escaped = query
-                .replace('\\', "\\\\")
-                .replace('%', "\\%")
-                .replace('_', "\\_");
-            let pattern = format!("%{escaped}%");
+            let pattern = format!("%{}%", crate::macros::escape_like(query));
             qb.push(" AND (notes LIKE ");
             qb.push_bind(pattern.clone());
             qb.push(" ESCAPE '\\' OR counterparty LIKE ");

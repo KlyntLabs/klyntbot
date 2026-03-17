@@ -140,6 +140,49 @@ Repeat for each persona. Separate each persona section with `---`.
     )
 }
 
+/// Generate a brief "What's Changed" summary comparing previous insight with current context.
+pub fn changes_summary_prompt(previous_synthesis: &str, current_context: &str) -> String {
+    format!(
+        r#"You are comparing a previous insight analysis with updated knowledge context to identify what's new or different.
+
+Previous synthesis:
+{previous_synthesis}
+
+Current knowledge context (may have new notes, updated content, or addressed gaps):
+{current_context}
+
+Respond with a single concise sentence (max 80 words) summarizing what has changed. Focus on:
+- New related notes discovered
+- Previous gaps that have been addressed
+- Significant content changes
+- New connections not seen before
+
+If nothing meaningful has changed, respond with exactly: "No significant changes since last review."
+
+Do NOT repeat the synthesis. Just describe what's different."#
+    )
+}
+
+/// Generate an applied scenario challenge based on the knowledge context.
+pub fn scenario_challenge_prompt(context: &str) -> String {
+    format!(
+        r#"You are a scenario designer for applied learning. Create a realistic scenario that tests the user's ability to apply concepts from their knowledge network.
+
+Requirements:
+- Concrete situation (not abstract)
+- Requires applying concepts from 2+ notes
+- 2-3 decision points where knowledge matters
+- The best approach should NOT be immediately obvious
+
+Respond ONLY with JSON (no markdown, no explanation):
+{{"title": "Short scenario title (5-10 words)", "situation": "2-3 paragraph setup describing the scenario in detail", "questions": ["Decision question 1", "Decision question 2", "Decision question 3"], "modelAnswer": "3-4 paragraph ideal response explaining the reasoning and how concepts from the notes apply", "sourceNotes": ["note title 1", "note title 2"], "difficultyScore": 0.7}}
+
+--- BEGIN KNOWLEDGE CONTEXT ---
+{context}
+--- END KNOWLEDGE CONTEXT ---"#
+    )
+}
+
 /// Format a list of PersonaRow entries into prompt blocks for the perspectives prompt.
 pub fn format_persona_blocks(personas: &[(String, String, String, String, String)]) -> String {
     personas

@@ -1,5 +1,8 @@
+import { ipc } from "@shared/hooks/useIpc";
 import { BookOpen } from "lucide-react";
+import { useCallback, useState } from "react";
 import type { QuizQuestion, TabStatus } from "../../hooks/useInsightReview";
+import { ScenarioChallenge, type ScenarioData } from "./ScenarioChallenge";
 
 interface SelfAssessmentTabProps {
   status: TabStatus;
@@ -10,6 +13,7 @@ interface SelfAssessmentTabProps {
     score: number;
     total: number;
   };
+  noteId: string | null;
   onAnswer: (questionId: string, answer: string) => void;
   onReveal: (questionId: string) => void;
   onRevealAll: () => void;
@@ -36,11 +40,31 @@ export function SelfAssessmentTab({
   status,
   questions,
   quizState,
+  noteId,
   onAnswer,
   onReveal,
   onRevealAll,
   onSaveFlashcards,
 }: SelfAssessmentTabProps) {
+  const [scenario, setScenario] = useState<ScenarioData | null>(null);
+  const [scenarioLoading, setScenarioLoading] = useState(false);
+
+  const answeredCount = Object.keys(quizState.answers).length;
+  const showScenarioButton = answeredCount >= questions.length * 0.5 && questions.length > 0;
+
+  const handleGenerateScenario = useCallback(async () => {
+    if (!noteId) return;
+    setScenarioLoading(true);
+    try {
+      const data = await ipc<ScenarioData>("note_insight_generate_scenario", { noteId });
+      setScenario(data);
+    } catch {
+      // Silently fail
+    } finally {
+      setScenarioLoading(false);
+    }
+  }, [noteId]);
+
   if (status === "idle") {
     return (
       <p className="text-[11px] text-dim italic">
@@ -169,6 +193,30 @@ export function SelfAssessmentTab({
           </div>
         );
       })}
+
+      {/* Scenario Challenge */}
+      {showScenarioButton && !scenario && (
+        <button
+          type="button"
+          onClick={handleGenerateScenario}
+          disabled={scenarioLoading}
+          className="flex items-center gap-1.5 text-[11px] text-brand hover:text-brand/80 transition-colors disabled:text-dim"
+        >
+          {scenarioLoading ? (
+            <>
+              <span className="w-3 h-3 border border-brand/40 border-t-brand rounded-full animate-spin" />
+              Generating scenario...
+            </>
+          ) : (
+            <>
+              <BookOpen size={12} />
+              Generate Applied Scenario
+            </>
+          )}
+        </button>
+      )}
+
+      {scenario && <ScenarioChallenge scenario={scenario} />}
 
       {questions.length > 0 && Object.keys(quizState.answers).length >= questions.length * 0.5 && (
         <button

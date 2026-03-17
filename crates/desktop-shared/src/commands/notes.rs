@@ -290,6 +290,19 @@ pub struct InsightEvolutionPoint {
     pub change_note: String,
 }
 
+// ── Scenario Challenge ───────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScenarioChallengeResponse {
+    pub title: String,
+    pub situation: String,
+    pub questions: Vec<String>,
+    pub model_answer: String,
+    pub source_notes: Vec<String>,
+    pub difficulty_score: f64,
+}
+
 // ── Insight Scope Config ─────────────────────────────────────────
 
 #[derive(Debug, Clone, Deserialize)]

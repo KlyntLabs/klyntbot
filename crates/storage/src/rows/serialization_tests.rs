@@ -8,9 +8,9 @@ mod tests {
     use chrono::{NaiveDate, Utc};
     use uuid::Uuid;
 
-    use crate::repos::action_repo::ActionSummary;
     use crate::repos::project_repo::ProjectWithStats;
     use crate::repos::strategy::{OverallStats, ToolStatsRow};
+    use crate::repos::ActionSummary;
     use crate::rows::action::{
         ActionAttachmentRow, ActionDependencyRow, ActionRow, ActionTimeEntryRow,
     };

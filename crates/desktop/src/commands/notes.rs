@@ -7,7 +7,7 @@ use desktop_shared::commands::{
     InsightVersionResponse, NoteCreateParams, NoteLinkResponse, NoteResponse,
     NoteSuggestionsResponse, NoteUpdateParams, NoteVersionResponse, NotebookCreateParams,
     NotebookResponse, NotebookUpdateParams, PersonaResponse, RatePersonaParams,
-    SetPersonaPinsParams, TabContent, UpdatePersonaParams,
+    ScenarioChallengeResponse, SetPersonaPinsParams, TabContent, UpdatePersonaParams,
 };
 use desktop_shared::errors::ApiError;
 use tauri::State;
@@ -352,6 +352,14 @@ pub async fn note_insight_get_version(
     state.note_insight_get_version(&insight_id).await
 }
 
+#[tauri::command]
+pub async fn note_insight_generate_scenario(
+    state: State<'_, Arc<AppCore>>,
+    note_id: String,
+) -> Result<ScenarioChallengeResponse, ApiError> {
+    state.note_insight_generate_scenario(&note_id).await
+}
+
 // ── Persona Management commands ───────────────────────────────────
 
 #[tauri::command]
@@ -458,6 +466,7 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "note_insight_list_versions",
     "note_insight_get_evolution",
     "note_insight_get_version",
+    "note_insight_generate_scenario",
     "note_insight_list_personas",
     "note_insight_create_persona",
     "note_insight_update_persona",
@@ -611,6 +620,10 @@ pub(crate) async fn dispatch_dev(
         "note_insight_get_version" => {
             let id = try_field!(dev::get_str(body, "insightId"));
             dev::val(core.note_insight_get_version(&id).await)
+        }
+        "note_insight_generate_scenario" => {
+            let id = try_field!(dev::get_str(body, "noteId"));
+            dev::val(core.note_insight_generate_scenario(&id).await)
         }
         "note_insight_list_personas" => dev::val(core.note_insight_list_personas().await),
         "note_insight_create_persona" => dev::val(

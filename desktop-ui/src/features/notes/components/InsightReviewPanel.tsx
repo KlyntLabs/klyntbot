@@ -23,6 +23,7 @@ import type {
 import { useInsightSSE } from "../hooks/useInsightSSE";
 import { useInsightVersions } from "../hooks/useInsightVersions";
 import { usePersonas } from "../hooks/usePersonas";
+import { ChangesBanner } from "./insight/ChangesBanner";
 import { ConceptMapTab } from "./insight/ConceptMapTab";
 import { GapAnalysisTab } from "./insight/GapAnalysisTab";
 import { InsightEvolutionChart } from "./insight/InsightEvolutionChart";
@@ -266,6 +267,9 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
         </div>
       )}
 
+      {/* What's Changed banner */}
+      {state.changesSummary && <ChangesBanner summary={state.changesSummary} />}
+
       {/* Tab bar */}
       <div className="flex border-b border-border shrink-0 overflow-x-auto">
         {TABS.map((tab) => {
@@ -339,6 +343,7 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
             status={state.tabs.assessment.status}
             questions={state.tabs.assessment.questions}
             quizState={state.quizState}
+            noteId={state.noteId}
             onAnswer={actions.answerQuestion}
             onReveal={actions.revealAnswer}
             onRevealAll={actions.revealAll}

@@ -48,6 +48,7 @@ export interface InsightReviewState {
     score: number;
     total: number;
   };
+  changesSummary: string | null;
 }
 
 export interface InsightReviewActions {
@@ -111,6 +112,7 @@ const INITIAL_STATE: InsightReviewState = {
     score: 0,
     total: 0,
   },
+  changesSummary: null,
 };
 
 // ---------------------------------------------------------------------------
@@ -215,6 +217,10 @@ export function useInsightReview(): [InsightReviewState, InsightReviewActions] {
         },
       },
     }));
+  });
+
+  useEvent<{ summary: string }>("insight:changes-summary", ({ summary }) => {
+    setState((prev) => ({ ...prev, changesSummary: summary }));
   });
 
   // -------------------------------------------------------------------------

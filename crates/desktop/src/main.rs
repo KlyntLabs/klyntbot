@@ -364,6 +364,7 @@ fn run_desktop_app() {
             commands::notes::note_insight_list_versions,
             commands::notes::note_insight_get_evolution,
             commands::notes::note_insight_get_version,
+            commands::notes::note_insight_generate_scenario,
             commands::notes::note_insight_list_personas,
             commands::notes::note_insight_create_persona,
             commands::notes::note_insight_update_persona,

@@ -36,7 +36,7 @@ pub mod tests;
 pub mod tool_usage;
 pub mod usage;
 
-pub use action_repo::{ActionFilter, ActionPatch, ActionRepo, ActionSummary};
+pub use action_repo::{ActionFilter, ActionPatch, ActionRepo};
 pub use agent_task::AgentTaskRepo;
 pub use area::AreaRepo;
 pub use coaching_strategy::{CoachingStrategyRepo, CoachingStrategyRow, UpsertCoachingStrategy};
@@ -65,9 +65,39 @@ pub use session_context::{SessionContextParams, SessionContextRepo};
 pub use status_workflow::StatusWorkflowRepo;
 pub use strategy::{OverallStats, StrategyRepo, ToolStatsRow};
 pub use task_group::TaskGroupRepo;
-pub use task_repo::{TaskFilter, TaskPatch, TaskRepo, TaskSummary};
+pub use task_repo::{TaskFilter, TaskPatch, TaskRepo};
 pub use tool_usage::ToolUsageRepo;
 pub use usage::UsageRepo;
+
+/// Aggregate counts by status — shared between actions and tasks.
+#[derive(Debug, Clone, Default, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ItemSummary {
+    pub todo: i64,
+    pub doing: i64,
+    pub done: i64,
+    pub total: i64,
+}
+
+/// Type alias for backwards compatibility.
+pub type ActionSummary = ItemSummary;
+/// Type alias for backwards compatibility.
+pub type TaskSummary = ItemSummary;
+
+/// Compute an [`ItemSummary`] from `(status, count)` rows.
+pub fn compute_summary(rows: &[(String, i64)]) -> ItemSummary {
+    let mut summary = ItemSummary::default();
+    for (status, count) in rows {
+        match status.as_str() {
+            "todo" => summary.todo = *count,
+            "doing" => summary.doing = *count,
+            "done" => summary.done = *count,
+            _ => {}
+        }
+        summary.total += count;
+    }
+    summary
+}
 
 /// Aggregate of all repository handles, constructed from a single `SqlitePool`.
 ///
@@ -147,21 +177,15 @@ impl Repos {
     /// - `enrichment_feedback`: 90 days
     pub async fn cleanup_analytics(&self) -> Result<u64, crate::error::StorageError> {
         let now = chrono::Utc::now();
-        let mut total = 0u64;
 
-        total += self.strategies.delete_older_than(90, now).await?;
-        total += self.outcomes.delete_older_than(30, now).await?;
-        total += self.interaction_log.delete_older_than(60, now).await?;
-        total += self.tool_usage.delete_older_than(90, now).await?;
+        let (a, b, c, d, e) = futures_util::try_join!(
+            self.strategies.delete_older_than(90, now),
+            self.outcomes.delete_older_than(30, now),
+            self.interaction_log.delete_older_than(60, now),
+            self.tool_usage.delete_older_than(90, now),
+            self.outcomes.delete_enrichment_feedback_older_than(90, now),
+        )?;
 
-        // enrichment_feedback
-        let cutoff_90 = now - chrono::Duration::days(90);
-        let result = sqlx::query("DELETE FROM enrichment_feedback WHERE timestamp < ?1")
-            .bind(cutoff_90)
-            .execute(&self.pool)
-            .await?;
-        total += result.rows_affected();
-
-        Ok(total)
+        Ok(a + b + c + d + e)
     }
 }

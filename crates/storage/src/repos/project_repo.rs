@@ -263,12 +263,14 @@ impl ProjectRepo {
 
     /// Get a project with aggregated task statistics.
     pub async fn get_with_stats(&self, id: &str) -> Result<Option<ProjectWithStats>, StorageError> {
-        let project = match self.get(id).await? {
+        let (project, counts) =
+            futures_util::try_join!(self.get(id), self.count_tasks_by_status(id),)?;
+
+        let project = match project {
             Some(p) => p,
             None => return Ok(None),
         };
 
-        let counts = self.count_tasks_by_status(id).await?;
         let mut stats = ProjectWithStats {
             project,
             task_count_todo: 0,
