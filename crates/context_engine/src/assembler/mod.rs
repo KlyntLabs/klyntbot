@@ -361,7 +361,11 @@ impl ContextEngine {
         let entries = if let Some(ref forge) = self.insight_forge {
             if forge.should_activate(&request.strategy, &request.message_text) {
                 forge
-                    .retrieve(&request.message_text, self.memory_retrieval_limit, None)
+                    .retrieve(
+                        &request.message_text,
+                        self.memory_retrieval_limit,
+                        request.session_key.as_deref(),
+                    )
                     .await
             } else {
                 retriever
@@ -538,8 +542,8 @@ mod tests {
             system_prompt: "You are a helpful assistant.".to_string(),
             strategy,
             tool_definitions,
-
             context_window,
+            session_key: None,
         }
     }
 
@@ -624,6 +628,7 @@ mod tests {
             tool_definitions: vec![],
 
             context_window: 128_000,
+            session_key: None,
         };
         let result = engine.assemble(request).await;
         // Should have at least the system message
@@ -679,6 +684,7 @@ mod tests {
             tool_definitions: vec![],
 
             context_window: 128_000,
+            session_key: None,
         };
         let result = engine.assemble(request).await;
         // ZeroCounter returns 0 for all text → token_count for user + system messages = 0
@@ -708,6 +714,7 @@ mod tests {
             tool_definitions: vec![],
 
             context_window: 128_000,
+            session_key: None,
         };
 
         let doubled = engine.assemble(make_req()).await;
@@ -762,6 +769,7 @@ mod tests {
             tool_definitions: vec![],
 
             context_window: 128_000,
+            session_key: None,
         };
 
         let result = engine.assemble(request).await;
@@ -810,6 +818,7 @@ mod tests {
             strategy: ExecutionStrategy::DirectResponse,
             tool_definitions: vec![],
             context_window: 128_000,
+            session_key: None,
         };
 
         let result = engine.assemble(request).await;
@@ -840,6 +849,7 @@ mod tests {
             },
             tool_definitions: vec![],
             context_window: 128_000,
+            session_key: None,
         };
 
         let result = engine.assemble(request).await;
@@ -862,6 +872,7 @@ mod tests {
             strategy: ExecutionStrategy::ToolAssisted { max_iterations: 5 },
             tool_definitions: vec![],
             context_window: 4096,
+            session_key: None,
         };
         let key1 = ContextEngine::compute_cache_key(&req);
         let key2 = ContextEngine::compute_cache_key(&req);
@@ -883,6 +894,7 @@ mod tests {
             tool_definitions: vec![],
 
             context_window: 128_000,
+            session_key: None,
         };
 
         let result = engine.assemble(request).await;
@@ -917,6 +929,7 @@ mod tests {
             strategy: ExecutionStrategy::DirectResponse,
             tool_definitions: vec![],
             context_window: 1000, // very small window — ~850 input budget
+            session_key: None,
         };
         let result = engine.assemble(request).await;
 
@@ -990,6 +1003,7 @@ mod tests {
             // system ≈ 2 tokens, history_budget ≈ 41, which is less than
             // all 20 messages (~70 tokens total).
             context_window: 50,
+            session_key: None,
         };
 
         engine.assemble(request).await;
@@ -1115,6 +1129,7 @@ mod tests {
             strategy: ExecutionStrategy::ToolAssisted { max_iterations: 5 },
             tool_definitions: vec![],
             context_window: 128_000,
+            session_key: None,
         };
 
         let result = engine.assemble(request).await;

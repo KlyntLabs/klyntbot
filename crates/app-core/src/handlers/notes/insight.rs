@@ -14,10 +14,13 @@ fn row_to_insight_response(row: feature_insights::InsightReviewRow) -> InsightRe
     let content: feature_insights::InsightContent =
         serde_json::from_str(&row.content).unwrap_or_default();
 
-    let self_assessment: Option<Vec<QuizQuestion>> = content
-        .self_assessment
-        .as_deref()
-        .and_then(|s| serde_json::from_str(s).ok());
+    let self_assessment: Option<Vec<QuizQuestion>> =
+        content.self_assessment.as_deref().and_then(|s| {
+            // Try parsing as-is first, then try stripping markdown fences
+            serde_json::from_str(s)
+                .or_else(|_| serde_json::from_str(&strip_markdown_fences(s)))
+                .ok()
+        });
 
     let persona_ids: Option<Vec<String>> = serde_json::from_str(&row.persona_ids).ok();
 
@@ -862,6 +865,24 @@ async fn stream_synthesis(
     }
 }
 
+/// Strip markdown code fences (```json...``` or ```...```) from LLM output.
+/// LLMs frequently wrap JSON responses in fences despite being told not to.
+fn strip_markdown_fences(content: &str) -> String {
+    let trimmed = content.trim();
+    if let Some(rest) = trimmed.strip_prefix("```") {
+        // Remove optional language tag (e.g. "json", "mermaid") on the first line
+        let rest = rest
+            .strip_prefix("json")
+            .or_else(|| rest.strip_prefix("mermaid"))
+            .unwrap_or(rest);
+        let rest = rest.trim_start_matches('\n');
+        if let Some(body) = rest.strip_suffix("```") {
+            return body.trim().to_string();
+        }
+    }
+    trimmed.to_string()
+}
+
 async fn generate_tab(
     provider: &providers::DynProvider,
     emitter: &Arc<dyn AppEventEmitter>,
@@ -880,7 +901,13 @@ async fn generate_tab(
 
     match provider.chat(&messages, None, params).await {
         Ok(response) => {
-            let content = response.content.unwrap_or_default();
+            let raw = response.content.unwrap_or_default();
+            // Strip markdown fences for JSON-producing tabs
+            let content = if tab_name == "assessment" || tab_name == "gaps" {
+                strip_markdown_fences(&raw)
+            } else {
+                raw
+            };
             emitter.emit_event(
                 "insight:tab-done",
                 serde_json::json!({ "tab": tab_name, "content": content }),

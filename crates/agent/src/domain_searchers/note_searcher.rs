@@ -32,7 +32,14 @@ impl DomainSearcher for NoteSearcher {
             .map(|(i, note)| {
                 let body = note.body.as_deref().unwrap_or("");
                 let body_preview = if body.len() > 500 {
-                    format!("{}...", &body[..500])
+                    // Find a safe UTF-8 boundary near byte 500
+                    let end = body
+                        .char_indices()
+                        .map(|(i, _)| i)
+                        .take_while(|&i| i <= 500)
+                        .last()
+                        .unwrap_or(body.len());
+                    format!("{}...", &body[..end])
                 } else {
                     body.to_string()
                 };

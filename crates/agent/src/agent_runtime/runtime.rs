@@ -335,6 +335,7 @@ impl AgentRuntime {
             strategy,
             tool_definitions: tool_definitions.to_vec(),
             context_window: self.config.context_window,
+            session_key: Some(common::SessionKey::new(&ctx.channel, &ctx.chat_id).to_string()),
         };
         let assemble_start = Instant::now();
         let assembled = self.context_engine.assemble(context_request).await;
@@ -817,6 +818,7 @@ impl tools::DelegationHandler for AgentRuntime {
             strategy,
             tool_definitions: vec![],
             context_window: self.config.context_window,
+            session_key: None, // delegation — no session tracking
         };
         let assembled = self.context_engine.assemble(context_request).await;
 

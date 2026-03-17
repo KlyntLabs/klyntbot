@@ -162,12 +162,21 @@ export function useInsightReview(): [InsightReviewState, InsightReviewActions] {
         tabs.gaps = { status: "done", content };
       } else if (tab === "assessment") {
         let questions: QuizQuestion[] = [];
+        // Strip markdown fences if present (LLMs often wrap JSON despite instructions)
+        let cleaned = content.trim();
+        if (cleaned.startsWith("```")) {
+          const endIdx = cleaned.lastIndexOf("```");
+          if (endIdx > 3) {
+            const firstNewline = cleaned.indexOf("\n");
+            cleaned = cleaned.slice(firstNewline + 1, endIdx).trim();
+          }
+        }
         try {
-          questions = JSON.parse(content) as QuizQuestion[];
+          questions = JSON.parse(cleaned) as QuizQuestion[];
         } catch {
           // malformed payload — keep empty
         }
-        tabs.assessment = { status: "done", questions };
+        tabs.assessment = { status: questions.length > 0 ? "done" : "error", questions };
       } else if (tab === "concept-map") {
         if (content.startsWith("FALLBACK:")) {
           tabs.conceptMap = {

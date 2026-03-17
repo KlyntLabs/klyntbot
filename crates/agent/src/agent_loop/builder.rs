@@ -48,6 +48,27 @@ use super::{AgentLoop, LastActiveChannel};
 ///     .build()
 ///     .await?;
 /// ```
+/// Adapter bridging `providers::DynProvider` → `context_engine::DecomposerLlm` trait.
+struct DecomposerLlmAdapter {
+    provider: DynProvider,
+    params: providers::ChatParams,
+}
+
+#[async_trait::async_trait]
+impl context_engine::DecomposerLlm for DecomposerLlmAdapter {
+    async fn generate(&self, prompt: &str) -> std::result::Result<String, String> {
+        let messages = vec![providers::Message::User {
+            content: providers::UserContent::Text(prompt.to_string()),
+        }];
+        let response = self
+            .provider
+            .chat(&messages, None, &self.params)
+            .await
+            .map_err(|e| e.to_string())?;
+        response.content.ok_or_else(|| "empty response".to_string())
+    }
+}
+
 pub struct AgentLoopBuilder {
     bus: Arc<MessageBus>,
     provider: DynProvider,
@@ -637,11 +658,20 @@ impl AgentLoopBuilder {
                 per_source_timeout_ms: config.cognitive.insight_forge_per_source_timeout_ms,
                 ..context_engine::InsightForgeConfig::default()
             };
-            let mut forge = context_engine::InsightForge::new(
-                forge_config,
-                Arc::new(context_engine::HeuristicDecomposer),
-                Arc::clone(&retriever),
-            );
+            // Use FallbackDecomposer if a cognitive provider is available
+            let decomposer: Arc<dyn context_engine::QueryDecomposer> =
+                if let Some(ref cp) = self.cognitive_provider {
+                    let llm_adapter = Arc::new(DecomposerLlmAdapter {
+                        provider: cp.clone(),
+                        params: providers::cognitive_chat_params(&config, 256),
+                    });
+                    let llm_decomposer = Arc::new(context_engine::LlmDecomposer::new(llm_adapter));
+                    Arc::new(context_engine::FallbackDecomposer::new(llm_decomposer, 3))
+                } else {
+                    Arc::new(context_engine::HeuristicDecomposer)
+                };
+            let mut forge =
+                context_engine::InsightForge::new(forge_config, decomposer, Arc::clone(&retriever));
 
             // Register domain searchers
             let note_repo_for_searcher =
@@ -652,9 +682,22 @@ impl AgentLoopBuilder {
             forge.add_searcher(Arc::new(crate::domain_searchers::TaskSearcher::new(
                 repos.clone(),
             )));
+            let entity_repo = cognitive::repos::EntityRepo::new(storage_pool.inner().clone());
             forge.add_searcher(Arc::new(crate::domain_searchers::GraphSearcher::new(
-                cognitive::repos::EntityRepo::new(storage_pool.inner().clone()),
+                entity_repo.clone(),
             )));
+            forge.add_searcher(Arc::new(crate::domain_searchers::FinanceSearcher::new(
+                repos.clone(),
+            )));
+
+            // One-time entity backfill from pre-existing SPO facts (non-blocking)
+            tokio::spawn(async move {
+                match entity_repo.backfill_from_facts().await {
+                    Ok(0) => {}
+                    Ok(n) => tracing::info!("Backfilled {n} entities from SPO facts"),
+                    Err(e) => tracing::debug!("Entity backfill error (non-fatal): {e}"),
+                }
+            });
 
             context_engine
                 .with_memory_retriever(retriever)

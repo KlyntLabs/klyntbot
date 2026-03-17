@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use async_trait::async_trait;
 
 /// Trait for decomposing a user query into sub-queries for multi-dimensional retrieval.
@@ -79,6 +81,41 @@ impl QueryDecomposer for HeuristicDecomposer {
         }
 
         sub_queries
+    }
+}
+
+/// Tries the heuristic decomposer first; if it produces fewer than
+/// `min_heuristic_queries` sub-queries, falls back to the LLM decomposer.
+///
+/// Note: The current `HeuristicDecomposer` produces ≥3 sub-queries for any
+/// message ≥20 chars (the InsightForge activation threshold), so the LLM
+/// fallback rarely fires with `min_heuristic_queries = 3`. This is by
+/// design — the heuristic handles the common case at zero cost. Set
+/// `min_heuristic_queries` higher (e.g. 6) to exercise the LLM path.
+pub struct FallbackDecomposer {
+    heuristic: HeuristicDecomposer,
+    llm: Arc<dyn QueryDecomposer>,
+    min_heuristic_queries: usize,
+}
+
+impl FallbackDecomposer {
+    pub fn new(llm: Arc<dyn QueryDecomposer>, min_heuristic_queries: usize) -> Self {
+        Self {
+            heuristic: HeuristicDecomposer,
+            llm,
+            min_heuristic_queries,
+        }
+    }
+}
+
+#[async_trait]
+impl QueryDecomposer for FallbackDecomposer {
+    async fn decompose(&self, query: &str, context_hint: Option<&str>) -> Vec<String> {
+        let heuristic_result = self.heuristic.decompose(query, context_hint).await;
+        if heuristic_result.len() >= self.min_heuristic_queries {
+            return heuristic_result;
+        }
+        self.llm.decompose(query, context_hint).await
     }
 }
 

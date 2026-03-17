@@ -1,10 +1,12 @@
 pub mod circuit_breaker;
 pub mod decomposer;
 pub mod domain_searcher;
+pub mod llm_decomposer;
 
 pub use circuit_breaker::CircuitBreaker;
-pub use decomposer::{HeuristicDecomposer, QueryDecomposer};
+pub use decomposer::{FallbackDecomposer, HeuristicDecomposer, QueryDecomposer};
 pub use domain_searcher::DomainSearcher;
+pub use llm_decomposer::{DecomposerLlm, LlmDecomposer};
 
 use std::collections::HashMap;
 use std::sync::Arc;

@@ -25,25 +25,59 @@ impl DomainSearcher for GraphSearcher {
             Err(_) => return Vec::new(),
         };
 
-        entities
-            .into_iter()
-            .take(limit)
-            .enumerate()
-            .map(|(i, entity)| {
-                let desc = entity.description.as_deref().unwrap_or("no description");
-                MemoryEntry {
-                    id: entity.id.clone(),
-                    content: format!(
-                        "[Entity: {} ({})] {} (seen {} times)",
-                        entity.name, entity.entity_type, desc, entity.mention_count
-                    ),
-                    score: 1.0 / (1.0 + i as f64),
-                    source: MemorySource::Domain {
-                        name: "graph".into(),
-                    },
-                    raw_score: entity.mention_count as f64,
+        let mut entries = Vec::new();
+
+        for (i, entity) in entities.iter().take(limit / 2).enumerate() {
+            let desc = entity.description.as_deref().unwrap_or("no description");
+            entries.push(MemoryEntry {
+                id: entity.id.clone(),
+                content: format!(
+                    "[Entity: {} ({})] {} (seen {} times)",
+                    entity.name, entity.entity_type, desc, entity.mention_count
+                ),
+                score: 1.0 / (1.0 + i as f64),
+                source: MemorySource::Domain {
+                    name: "graph".into(),
+                },
+                raw_score: entity.mention_count as f64,
+            });
+
+            // Expand 1-hop neighborhood for the top match only
+            if i == 0 {
+                if let Ok(Some(hood)) = self.entity_repo.get_neighborhood(&entity.id, 1).await {
+                    for (j, neighbor) in hood.neighbors.iter().enumerate() {
+                        if entries.len() >= limit {
+                            break;
+                        }
+                        let rel_type = hood
+                            .relationships
+                            .iter()
+                            .find(|r| {
+                                r.target_entity_id == neighbor.id
+                                    || r.source_entity_id == neighbor.id
+                            })
+                            .map(|r| r.relationship_type.as_str())
+                            .unwrap_or("related");
+
+                        let n_desc = neighbor.description.as_deref().unwrap_or("");
+                        entries.push(MemoryEntry {
+                            id: neighbor.id.clone(),
+                            content: format!(
+                                "[Connected: {} ({}) — {} → {}] {}",
+                                neighbor.name, neighbor.entity_type, rel_type, entity.name, n_desc
+                            ),
+                            score: 0.5 / (1.0 + j as f64),
+                            source: MemorySource::Domain {
+                                name: "graph".into(),
+                            },
+                            raw_score: neighbor.mention_count as f64,
+                        });
+                    }
                 }
-            })
-            .collect()
+            }
+        }
+
+        entries.truncate(limit);
+        entries
     }
 }

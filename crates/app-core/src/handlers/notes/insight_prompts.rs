@@ -63,8 +63,8 @@ For each question, include:
 
 Questions should test understanding, not memorization. Include questions that require connecting ideas across multiple notes.
 
-Respond ONLY with a JSON array (no markdown, no explanation):
-[{{"id": "q1", "type": "multiple_choice", "question": "...", "choices": ["A", "B", "C", "D"], "correct_answer": "...", "explanation": "...", "source_notes": ["note title"], "difficulty": "medium", "difficulty_score": 0.5}}]
+Respond ONLY with a JSON array (no markdown fences, no explanation):
+[{{"id": "q1", "type": "multiple_choice", "question": "...", "choices": ["A", "B", "C", "D"], "correctAnswer": "...", "explanation": "...", "sourceNotes": ["note title"], "difficulty": "medium", "difficultyScore": 0.5}}]
 
 --- BEGIN KNOWLEDGE CONTEXT ---
 {context}

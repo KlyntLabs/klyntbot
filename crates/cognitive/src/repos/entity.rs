@@ -371,6 +371,43 @@ impl EntityRepo {
         .await
     }
 
+    /// Backfill entities from existing SPO facts.
+    ///
+    /// For each unique subject in `semantic_facts` that doesn't already have
+    /// an entity, creates an entity with type inferred from predicates.
+    /// Runs once at startup; idempotent.
+    pub async fn backfill_from_facts(&self) -> Result<u32, sqlx::Error> {
+        let result = sqlx::query(
+            r#"
+            INSERT OR IGNORE INTO entities (id, name, entity_type, description, source, first_seen_at, last_seen_at, mention_count, created_at, updated_at)
+            SELECT
+                lower(hex(randomblob(16))),
+                TRIM(subject),
+                CASE
+                    WHEN GROUP_CONCAT(predicate) LIKE '%works_on%' OR GROUP_CONCAT(predicate) LIKE '%project%' THEN 'project'
+                    WHEN GROUP_CONCAT(predicate) LIKE '%uses%' OR GROUP_CONCAT(predicate) LIKE '%tool%' THEN 'technology'
+                    WHEN GROUP_CONCAT(predicate) LIKE '%knows%' OR GROUP_CONCAT(predicate) LIKE '%person%' THEN 'person'
+                    ELSE 'concept'
+                END,
+                NULL,
+                'backfill',
+                MIN(created_at),
+                MAX(created_at),
+                COUNT(*),
+                MIN(created_at),
+                MIN(created_at)
+            FROM semantic_facts
+            WHERE subject != 'user'
+              AND LOWER(TRIM(subject)) NOT IN (SELECT LOWER(name) FROM entities)
+            GROUP BY LOWER(TRIM(subject))
+            "#,
+        )
+        .execute(&self.pool)
+        .await?;
+
+        Ok(result.rows_affected() as u32)
+    }
+
     // ── Helpers ─────────────────────────────────────────────────
 
     async fn get_entities_by_ids(&self, ids: &[String]) -> Result<Vec<EntityRow>, sqlx::Error> {

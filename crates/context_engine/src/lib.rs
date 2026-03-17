@@ -17,8 +17,8 @@ pub use history_compressor::{
     CompressedHistory, CompressorConfig, CompressorMode, HistoryCompressor, HistorySummary,
 };
 pub use insight_forge::{
-    CircuitBreaker, DomainSearcher, HeuristicDecomposer, InsightForge, InsightForgeConfig,
-    QueryDecomposer,
+    CircuitBreaker, DecomposerLlm, DomainSearcher, FallbackDecomposer, HeuristicDecomposer,
+    InsightForge, InsightForgeConfig, LlmDecomposer, QueryDecomposer,
 };
 pub use inventory::{ContextInventory, ContextInventoryItem, ContextItemStatus};
 pub use memory_retriever::{MemoryEntry, MemoryRetriever, MemorySource};

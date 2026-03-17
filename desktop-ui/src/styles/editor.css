@@ -63,7 +63,7 @@
 }
 
 .editor-content em {
-  color: var(--color-secondary);
+  color: var(--color-muted-foreground);
   font-style: italic;
 }
 

@@ -73,6 +73,16 @@ export function SelfAssessmentTab({
     );
   }
 
+  if ((status === "done" || status === "error") && questions.length === 0) {
+    return (
+      <div className="space-y-2">
+        <p className="text-[11px] text-muted-foreground">
+          Quiz questions couldn't be generated. Try regenerating this tab.
+        </p>
+      </div>
+    );
+  }
+
   if (status === "loading") {
     return <SkeletonLoader />;
   }
