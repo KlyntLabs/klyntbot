@@ -47,7 +47,7 @@ function Slider({
           value={value}
           onChange={(e) => onChange(Number(e.target.value))}
           style={{ WebkitAppearance: "none", appearance: "none", background: "transparent" }}
-          className="relative z-10 w-full h-5 cursor-pointer outline-none [&::-webkit-slider-thumb]:w-[12px] [&::-webkit-slider-thumb]:h-[12px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:bg-brand [&::-webkit-slider-thumb]:shadow-[0_1px_3px_rgba(0,0,0,0.3)] [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-background [&::-webkit-slider-thumb]:transition-transform [&::-webkit-slider-thumb]:hover:scale-110"
+          className="relative z-10 w-full h-5 cursor-pointer outline-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:bg-brand [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-background"
         />
       </div>
       <span className="text-[10px] text-muted tabular-nums w-[36px] text-right shrink-0">
@@ -74,13 +74,13 @@ function Toggle({
         role="switch"
         aria-checked={checked}
         onClick={() => onChange(!checked)}
-        className={`relative w-9 h-5 rounded-full transition-colors shrink-0 ${
+        className={`relative w-[34px] h-[18px] rounded-full transition-colors shrink-0 ${
           checked ? "bg-brand" : "bg-surface-raised"
         }`}
       >
         <span
-          className={`absolute top-[3px] w-[14px] h-[14px] rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,0.25)] transition-transform ${
-            checked ? "translate-x-[18px]" : "translate-x-[3px]"
+          className={`absolute top-[3px] w-3 h-3 rounded-full bg-background transition-all ${
+            checked ? "left-[19px]" : "left-[3px]"
           }`}
         />
       </button>

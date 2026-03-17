@@ -247,16 +247,16 @@ const TreeRow = memo(function TreeRow({
       onDragLeave={onDragLeave}
       onDrop={(e) => onDrop(e, item)}
       onDragEnd={onDragEnd}
-      className={`flex items-center gap-1 py-1 px-1 rounded text-sm cursor-default select-none outline-none transition-colors ${
+      className={`flex items-center gap-2 py-1.5 pr-2 rounded-lg text-[12px] font-light cursor-default select-none outline-none transition-all ${
         isDragging ? "opacity-40" : ""
       } ${
         isDropTarget
           ? "bg-brand/[0.12] ring-1 ring-brand/40"
           : isSelected
-            ? "bg-surface-raised text-primary"
-            : "text-secondary hover:bg-surface-low"
+            ? "bg-surface-highest text-primary"
+            : "text-muted hover:bg-surface-base hover:text-secondary"
       }`}
-      style={{ paddingLeft: `${item.depth * INDENT + 4}px` }}
+      style={{ paddingLeft: `${item.depth * INDENT + 8}px` }}
     >
       {/* Chevron for folders */}
       {isFolder && (
@@ -287,12 +287,12 @@ const TreeRow = memo(function TreeRow({
       ) : isFolder ? (
         item.isExpanded ? (
           <FolderOpen
-            className={`w-3.5 h-3.5 shrink-0 ${item.color ? "" : "text-brand/60"}`}
+            className={`w-3.5 h-3.5 shrink-0 ${item.color ? "" : "text-muted"}`}
             style={item.color ? { color: item.color } : undefined}
           />
         ) : (
           <FolderClosed
-            className={`w-3.5 h-3.5 shrink-0 ${item.color ? "" : "text-brand/60"}`}
+            className={`w-3.5 h-3.5 shrink-0 ${item.color ? "" : "text-muted"}`}
             style={item.color ? { color: item.color } : undefined}
           />
         )
@@ -300,7 +300,7 @@ const TreeRow = memo(function TreeRow({
         <Pin className="w-3 h-3 shrink-0 text-brand" />
       ) : (
         <FileText
-          className={`w-3.5 h-3.5 shrink-0 ${item.color ? "" : "text-dim"}`}
+          className={`w-3.5 h-3.5 shrink-0 ${item.color ? "" : "text-muted"}`}
           style={item.color ? { color: item.color } : undefined}
         />
       )}
@@ -315,7 +315,7 @@ const TreeRow = memo(function TreeRow({
             }
           }}
           defaultValue={item.title}
-          className="flex-1 min-w-0 text-sm bg-surface-base border border-brand/40 rounded-md px-1.5 py-0.5 text-primary focus:outline-none"
+          className="flex-1 min-w-0 text-[12px] bg-surface-base border border-brand/40 rounded-md px-1.5 py-0.5 text-primary focus:outline-none"
           onBlur={(e) => onCommitRename(item, e.currentTarget.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") e.currentTarget.blur();
@@ -327,7 +327,7 @@ const TreeRow = memo(function TreeRow({
         />
       ) : (
         <span
-          className={`truncate flex-1 ${
+          className={`truncate flex-1 ${isFolder ? "font-medium" : ""} ${
             item.title === "Untitled" || item.title === "New Folder" ? "text-dim italic" : ""
           }`}
         >
@@ -337,12 +337,12 @@ const TreeRow = memo(function TreeRow({
 
       {/* Note count for folders */}
       {isFolder && !isRenaming && item.noteCount != null && item.noteCount > 0 && (
-        <span className="text-[10px] text-dim shrink-0 mr-1">{item.noteCount}</span>
+        <span className="text-[10px] text-muted shrink-0">{item.noteCount}</span>
       )}
 
       {/* Date badge for notes */}
       {isNote && item.updatedAt && !isRenaming && (
-        <span className="text-[10px] text-dim shrink-0 mr-1">
+        <span className="text-[10px] text-muted shrink-0">
           {formatDate(item.updatedAt.slice(0, 10))}
         </span>
       )}
@@ -749,13 +749,13 @@ export function NotebookTree({
   return (
     <div className="flex flex-col min-h-0 flex-1" onContextMenu={handleBlankContextMenu}>
       {/* Header */}
-      <div className="flex items-center justify-between px-2 pb-1">
-        <span className="text-[10px] uppercase tracking-wider text-dim">Notebooks</span>
+      <div className="flex items-center justify-between px-4 pb-1 pt-3">
+        <span className="text-[10px] uppercase tracking-wider text-muted font-medium">Notebooks</span>
         <div className="flex items-center gap-0.5">
           <button
             type="button"
             onClick={() => onCreateNote()}
-            className="w-5 h-5 rounded-md flex items-center justify-center text-dim hover:text-primary hover:bg-surface-base transition-colors"
+            className="w-5 h-5 rounded-md flex items-center justify-center text-dim hover:text-secondary hover:bg-surface-base transition-all"
             aria-label="New note"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -763,7 +763,7 @@ export function NotebookTree({
           <button
             type="button"
             onClick={() => onCreateNotebook()}
-            className="w-5 h-5 rounded-md flex items-center justify-center text-dim hover:text-primary hover:bg-surface-base transition-colors"
+            className="w-5 h-5 rounded-md flex items-center justify-center text-dim hover:text-secondary hover:bg-surface-base transition-all"
             aria-label="New notebook"
           >
             <FolderPlus className="w-3.5 h-3.5" />
@@ -775,7 +775,7 @@ export function NotebookTree({
       <div
         role="tree"
         aria-label="Notebook tree"
-        className="flex-1 overflow-y-auto flex flex-col min-h-0"
+        className="flex-1 overflow-y-auto flex flex-col min-h-0 px-3"
       >
         {items.map((item) => (
           <TreeRow
@@ -1012,7 +1012,7 @@ function TreeContextMenu({
               }}
               className={`w-5 h-5 rounded-full border transition-transform hover:scale-125 ${
                 activeColor === color && color !== null
-                  ? "ring-2 ring-white/60 ring-offset-1 ring-offset-black"
+                  ? "ring-2 ring-primary/60 ring-offset-1 ring-offset-surface-lowest"
                   : ""
               } ${!color ? "border-border bg-transparent" : "border-transparent"}`}
               style={color ? { backgroundColor: color } : undefined}

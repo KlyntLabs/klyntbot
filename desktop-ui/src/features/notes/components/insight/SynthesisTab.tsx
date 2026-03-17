@@ -33,7 +33,20 @@ export function SynthesisTab({ status, content }: SynthesisTabProps) {
     );
   }
 
-  // streaming or done
+  // streaming with no content yet — show generating indicator
+  if (status === "streaming" && !content) {
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <span className="inline-block w-1.5 h-3.5 bg-purple animate-pulse rounded-sm" />
+          <span className="text-[11px] text-muted animate-pulse">Generating synthesis...</span>
+        </div>
+        <SkeletonLoader />
+      </div>
+    );
+  }
+
+  // streaming with content, or done
   return (
     <div className="text-[12px] text-secondary leading-relaxed">
       <MarkdownContent content={content} />

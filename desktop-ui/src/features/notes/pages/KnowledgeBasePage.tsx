@@ -13,7 +13,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import { ContextPanel } from "../components/ContextPanel";
 import { GraphView } from "../components/GraphView";
-import { NavigationSidebar, type NavigationSidebarHandle } from "../components/NavigationSidebar";
+import { NavigationSidebar } from "../components/NavigationSidebar";
 import { NoteCreationDialog } from "../components/NoteCreationDialog";
 import { NoteEditorPanel } from "../components/NoteEditorPanel";
 import { NoteFinder } from "../components/NoteFinder";
@@ -87,7 +87,6 @@ export default function KnowledgeBasePage() {
   const leftWidthRef = useRef(leftWidth);
   const rightWidthRef = useRef(rightWidth);
   const containerRef = useRef<HTMLDivElement>(null);
-  const searchRef = useRef<NavigationSidebarHandle>(null);
 
   // Pre-select note from URL search params (e.g. /notes?noteId=xxx)
   useEffect(() => {
@@ -404,7 +403,6 @@ export default function KnowledgeBasePage() {
               notebooks={notebooks}
               notes={notes}
               selectedNoteId={selectedNoteId}
-              searchRef={searchRef}
               autoRenameId={autoRenameId}
               onAutoRenameDone={() => setAutoRenameId(null)}
               onSelectNote={setSelectedNoteId}
