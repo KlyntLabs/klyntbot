@@ -699,6 +699,17 @@ impl AgentLoopBuilder {
                 }
             });
 
+            // One-time entity backfill from note_entity_mentions (non-blocking)
+            let entity_repo2 =
+                cognitive::repos::EntityRepo::new(storage_pool.inner().clone());
+            tokio::spawn(async move {
+                match entity_repo2.backfill_from_note_mentions().await {
+                    Ok(0) => {}
+                    Ok(n) => tracing::info!("Backfilled {n} entities from note mentions"),
+                    Err(e) => tracing::debug!("Note mention backfill error (non-fatal): {e}"),
+                }
+            });
+
             context_engine
                 .with_memory_retriever(retriever)
                 .with_insight_forge(forge)

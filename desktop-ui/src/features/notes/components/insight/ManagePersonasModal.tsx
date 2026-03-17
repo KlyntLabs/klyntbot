@@ -5,6 +5,7 @@ import type { Persona, PersonaActions } from "../../hooks/usePersonas";
 interface ManagePersonasModalProps {
   personas: Persona[];
   actions: PersonaActions;
+  noteId: string | null;
   onClose: () => void;
 }
 
@@ -19,9 +20,16 @@ const TONE_OPTIONS = [
   "formal",
 ];
 
-export function ManagePersonasModal({ personas, actions, onClose }: ManagePersonasModalProps) {
+export function ManagePersonasModal({
+  personas,
+  actions,
+  noteId,
+  onClose,
+}: ManagePersonasModalProps) {
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [pinnedIds, setPinnedIds] = useState<Set<string> | null>(null);
+  const [autoGenerating, setAutoGenerating] = useState(false);
   const [form, setForm] = useState({
     name: "",
     role: "",
@@ -112,6 +120,25 @@ export function ManagePersonasModal({ personas, actions, onClose }: ManagePerson
                 />
                 <span className="text-[9px] text-dim">Active</span>
               </label>
+              {noteId && (
+                <label className="flex items-center gap-1 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={pinnedIds?.has(p.id) ?? false}
+                    onChange={(e) => {
+                      // Lazily initialize from empty on first interaction
+                      const current = pinnedIds ?? new Set<string>();
+                      const next = new Set(current);
+                      if (e.target.checked) next.add(p.id);
+                      else next.delete(p.id);
+                      setPinnedIds(next);
+                      if (noteId) actions.setPins(noteId, [...next]);
+                    }}
+                    className="w-3 h-3 accent-amber-400"
+                  />
+                  <span className="text-[9px] text-dim">Pin</span>
+                </label>
+              )}
               {p.source !== "builtin" && (
                 <button
                   type="button"
@@ -217,6 +244,23 @@ export function ManagePersonasModal({ personas, actions, onClose }: ManagePerson
             >
               <Plus size={10} />
               Create Persona
+            </button>
+          )}
+          {noteId && !showCreate && (
+            <button
+              type="button"
+              disabled={autoGenerating}
+              onClick={async () => {
+                setAutoGenerating(true);
+                try {
+                  await actions.autoGenerate(noteId);
+                } finally {
+                  setAutoGenerating(false);
+                }
+              }}
+              className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-purple-400/10 text-purple-300 hover:bg-purple-400/20 disabled:opacity-50"
+            >
+              {autoGenerating ? "Generating..." : "Auto-generate"}
             </button>
           )}
           <div className="flex-1" />

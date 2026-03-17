@@ -245,6 +245,23 @@ pub struct InsightSaveFlashcardsParams {
     pub questions: Vec<QuizQuestion>,
 }
 
+// ── Flashcard Review ──────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeckSummaryResponse {
+    pub name: String,
+    pub card_count: i64,
+    pub due_count: i64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FlashcardReviewParams {
+    pub card_id: String,
+    pub quality: String, // "again" | "hard" | "good" | "easy"
+}
+
 // ── Insight Quiz ─────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Deserialize)]

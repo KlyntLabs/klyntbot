@@ -127,7 +127,9 @@ impl AppCore {
 
         // NoteRow doesn't carry tags — fetch them separately
         let tags = self.note_repo.get_tags(note_id).await.unwrap_or_default();
-        let note_domains = insight_context::extract_note_domains(&tags);
+        let entity_repo = cognitive::repos::EntityRepo::new(self.storage_pool.inner().clone());
+        let note_domains =
+            insight_context::extract_note_domains(&tags, Some(&entity_repo)).await;
 
         // Build context via InsightService pipeline (merge check + cognitive injection)
         let (context_text, note_title, parent_insight_id) =
@@ -312,23 +314,7 @@ impl AppCore {
 
         Ok(rows
             .into_iter()
-            .map(|r| FlashcardResponse {
-                id: r.id,
-                deck: r.deck,
-                question: r.question,
-                answer: r.answer,
-                card_type: r.card_type,
-                choices: r
-                    .choices
-                    .as_deref()
-                    .and_then(|s| serde_json::from_str(s).ok()),
-                stability: r.stability,
-                difficulty: r.difficulty,
-                due_at: r.due_at,
-                state: r.state,
-                review_count: r.review_count,
-                created_at: r.created_at,
-            })
+            .map(super::flashcard::flashcard_to_response)
             .collect())
     }
 
@@ -379,7 +365,9 @@ impl AppCore {
             .ok_or_else(|| ApiError::new("NOT_FOUND", "Note not found"))?;
 
         let tags = self.note_repo.get_tags(note_id).await.unwrap_or_default();
-        let note_domains = insight_context::extract_note_domains(&tags);
+        let entity_repo = cognitive::repos::EntityRepo::new(self.storage_pool.inner().clone());
+        let note_domains =
+            insight_context::extract_note_domains(&tags, Some(&entity_repo)).await;
 
         let ctx_text = if let Some(ref service) = self.insight_service {
             let scope: feature_insights::ScopeConfig = service
@@ -462,7 +450,9 @@ impl AppCore {
         // Use InsightService pipeline for consistent context quality.
         // Fetch tags + domains once (reused for both context building and persona selection).
         let tags = self.note_repo.get_tags(note_id).await.unwrap_or_default();
-        let note_domains = insight_context::extract_note_domains(&tags);
+        let entity_repo = cognitive::repos::EntityRepo::new(self.storage_pool.inner().clone());
+        let note_domains =
+            insight_context::extract_note_domains(&tags, Some(&entity_repo)).await;
 
         // Cache latest insight for both scope config and tab update
         let latest_insight = if let Some(ref service) = self.insight_service {

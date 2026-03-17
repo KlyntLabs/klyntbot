@@ -437,10 +437,12 @@ impl BackgroundConsolidationService {
                             for (candidate, op) in candidates.iter().zip(ops.iter()) {
                                 if let crate::types::MemoryOp::Update { id: _, old_id } = op {
                                     let new = &candidate.candidate;
-                                    if new.confidence < 0.7 || new.source != "user_stated" {
-                                        continue;
-                                    }
                                     if let Ok(Some(old_fact)) = repo.get(old_id).await {
+                                        if old_fact.confidence < 0.7
+                                            || old_fact.source != "user_stated"
+                                        {
+                                            continue;
+                                        }
                                         if old_fact.object != new.object
                                             && !is_same_session(
                                                 &old_fact.recorded_at,
@@ -467,34 +469,60 @@ impl BackgroundConsolidationService {
                                 crate::types::MemoryOp::Add { .. }
                                 | crate::types::MemoryOp::Update { .. } => {
                                     let fact = &candidate.candidate;
+
+                                    // Infer entity type from predicate (once, reused for both subject and object)
+                                    let entity_type = infer_entity_type(&fact.predicate);
+
                                     // Upsert subject as entity
-                                    let _ = entity_repo
+                                    let subj = entity_repo
                                         .upsert_entity(&crate::repos::NewEntity {
                                             name: fact.subject.clone(),
-                                            entity_type: "concept".to_string(),
+                                            entity_type: entity_type.clone(),
                                             description: None,
                                             source: "extracted".to_string(),
                                             source_id: Some(fact.id.clone()),
                                             metadata: None,
                                         })
                                         .await;
+
                                     // Upsert object as entity (skip numeric/short values)
-                                    if fact.object.len() > 2
+                                    let obj = if fact.object.len() > 2
                                         && fact.object.len() < 100
                                         && !fact
                                             .object
                                             .chars()
                                             .all(|c| c.is_ascii_digit() || c == '.')
                                     {
-                                        let _ = entity_repo
+                                        entity_repo
                                             .upsert_entity(&crate::repos::NewEntity {
                                                 name: fact.object.clone(),
-                                                entity_type: "concept".to_string(),
+                                                entity_type: entity_type,
                                                 description: None,
                                                 source: "extracted".to_string(),
                                                 source_id: Some(fact.id.clone()),
                                                 metadata: None,
                                             })
+                                            .await
+                                            .ok()
+                                    } else {
+                                        None
+                                    };
+
+                                    // Create relationship between subject and object entities
+                                    if let (Ok(s), Some(o)) = (subj, obj) {
+                                        let _ = entity_repo
+                                            .upsert_relationship(
+                                                &crate::repos::NewRelationship {
+                                                    source_entity_id: s.id,
+                                                    target_entity_id: o.id,
+                                                    relationship_type: fact.predicate.clone(),
+                                                    evidence: Some(format!(
+                                                        "{} {} {}",
+                                                        fact.subject, fact.predicate, fact.object
+                                                    )),
+                                                    source: "extracted".to_string(),
+                                                },
+                                            )
                                             .await;
                                     }
                                 }
@@ -985,6 +1013,40 @@ fn is_same_session(recorded_at: &str, session_start: &str) -> bool {
         .unwrap_or_default();
     let start = chrono::DateTime::parse_from_rfc3339(session_start).unwrap_or_default();
     (recorded - start).num_seconds().abs() < 300
+}
+
+/// Infer entity type from predicate keywords.
+/// Applied to both subject and object sides — the predicate determines type regardless of position.
+fn infer_entity_type(predicate: &str) -> String {
+    let p = predicate.to_lowercase();
+    if p.contains("person")
+        || p.contains("manages")
+        || p.contains("hired")
+        || p.contains("reports_to")
+    {
+        return "person".to_string();
+    }
+    if p.contains("project")
+        || p.contains("works_on")
+        || p.contains("contributes_to")
+    {
+        return "project".to_string();
+    }
+    if p.contains("uses")
+        || p.contains("tool")
+        || p.contains("technology")
+        || p.contains("framework")
+        || p.contains("is_a_technology")
+    {
+        return "technology".to_string();
+    }
+    if p.contains("organization")
+        || p.contains("company")
+        || p.contains("employer")
+    {
+        return "organization".to_string();
+    }
+    "concept".to_string()
 }
 
 /// Convert a MemoryOp to a string label for the debug dashboard.

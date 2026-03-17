@@ -7,6 +7,7 @@ import {
   FilePlus,
   History,
   RefreshCw,
+  RotateCcw,
   Settings2,
   Sliders,
   Sparkles,
@@ -26,6 +27,7 @@ import { useInsightVersions } from "../hooks/useInsightVersions";
 import { usePersonas } from "../hooks/usePersonas";
 import { ChangesBanner } from "./insight/ChangesBanner";
 import { ConceptMapTab } from "./insight/ConceptMapTab";
+import { FlashcardReview } from "./insight/FlashcardReview";
 import { GapAnalysisTab } from "./insight/GapAnalysisTab";
 import { InsightEvolutionChart } from "./insight/InsightEvolutionChart";
 import {
@@ -103,6 +105,7 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
   const [showHistory, setShowHistory] = useState(false);
   const [showScope, setShowScope] = useState(false);
   const [scopeConfig, setScopeConfig] = useState<ScopeConfig>(DEFAULT_SCOPE);
+  const [showFlashcardReview, setShowFlashcardReview] = useState(false);
   const [allPersonas, personaActions] = usePersonas();
   const evolution = useInsightEvolution();
   const versions = useInsightVersions();
@@ -308,7 +311,7 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
 
       {/* Content area */}
       <div className="flex-1 overflow-y-auto p-4 min-h-0">
-        {(activeStatus === "idle" || activeStatus === "error") ? (
+        {activeStatus === "idle" || activeStatus === "error" ? (
           <div className="flex flex-col items-center justify-center h-full gap-3">
             <p className="text-[11px] text-dim">
               {activeStatus === "error" ? "Generation failed" : "No content generated yet"}
@@ -403,6 +406,15 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
               Save as Deck
             </button>
           )}
+        <button
+          type="button"
+          onClick={() => setShowFlashcardReview(true)}
+          className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-white/[0.04] text-muted-foreground hover:text-foreground hover:bg-white/[0.06]"
+          title="Review due flashcards"
+        >
+          <RotateCcw size={10} />
+          Review
+        </button>
         {hasActiveContent && (
           <button
             type="button"
@@ -424,10 +436,16 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
           {copied ? "Copied!" : "Copy"}
         </button>
       </div>
+      {showFlashcardReview && (
+        <div className="absolute inset-0 z-30 bg-surface-base/95 rounded-xl overflow-y-auto">
+          <FlashcardReview onClose={() => setShowFlashcardReview(false)} />
+        </div>
+      )}
       {showPersonaManager && (
         <ManagePersonasModal
           personas={allPersonas}
           actions={personaActions}
+          noteId={state.noteId}
           onClose={() => setShowPersonaManager(false)}
         />
       )}

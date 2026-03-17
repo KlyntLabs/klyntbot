@@ -1,5 +1,6 @@
 mod converters;
 mod crud;
+mod flashcard;
 mod inbox;
 mod insight;
 mod insight_context;

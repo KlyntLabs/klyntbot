@@ -46,6 +46,26 @@ pub fn assemble_context(
 }
 
 /// Extract domain hints from a note's tags for persona selection.
-pub fn extract_note_domains(tags: &[String]) -> Vec<String> {
-    tags.iter().map(|t| t.to_lowercase()).collect()
+/// Optionally enriches with entity types from the knowledge graph.
+pub async fn extract_note_domains(
+    tags: &[String],
+    entity_repo: Option<&cognitive::repos::EntityRepo>,
+) -> Vec<String> {
+    let mut domains: Vec<String> = tags.iter().map(|t| t.to_lowercase()).collect();
+
+    // Enrich: look up each tag in the entity graph and add entity_type as a domain
+    if let Some(repo) = entity_repo {
+        for tag in tags {
+            if let Ok(entities) = repo.find_by_name(tag).await {
+                for entity in &entities {
+                    let et = entity.entity_type.to_lowercase();
+                    if !domains.contains(&et) {
+                        domains.push(et);
+                    }
+                }
+            }
+        }
+    }
+
+    domains
 }

@@ -293,6 +293,88 @@ impl EntityRepo {
         }))
     }
 
+    /// Get entities related to `entity_id`, optionally filtered by relationship type.
+    /// Returns the related entities (not the center entity itself).
+    pub async fn get_related_entities(
+        &self,
+        entity_id: &str,
+        rel_type: Option<&str>,
+    ) -> Result<Vec<EntityRow>, sqlx::Error> {
+        let rels = match rel_type {
+            Some(rt) => {
+                sqlx::query_as::<_, RelationshipRow>(
+                    "SELECT * FROM entity_relationships WHERE (source_entity_id = ?1 OR target_entity_id = ?1) AND relationship_type = ?2",
+                )
+                .bind(entity_id)
+                .bind(rt)
+                .fetch_all(&self.pool)
+                .await?
+            }
+            None => self.get_relationships(entity_id).await?,
+        };
+
+        let mut neighbor_ids: Vec<String> = rels
+            .iter()
+            .map(|r| {
+                if r.source_entity_id == entity_id {
+                    r.target_entity_id.clone()
+                } else {
+                    r.source_entity_id.clone()
+                }
+            })
+            .collect();
+        neighbor_ids.sort();
+        neighbor_ids.dedup();
+
+        self.get_entities_by_ids(&neighbor_ids).await
+    }
+
+    /// Find shortest path between two entities via BFS, up to `max_depth` hops.
+    /// Returns the relationship edges along the path, or empty vec if no path found.
+    pub async fn find_path(
+        &self,
+        from: &str,
+        to: &str,
+        max_depth: u8,
+    ) -> Result<Vec<RelationshipRow>, sqlx::Error> {
+        if from == to {
+            return Ok(Vec::new());
+        }
+
+        let mut queue: std::collections::VecDeque<(String, Vec<RelationshipRow>)> =
+            std::collections::VecDeque::new();
+        let mut visited: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+        visited.insert(from.to_string());
+        queue.push_back((from.to_string(), Vec::new()));
+
+        while let Some((current, path)) = queue.pop_front() {
+            if path.len() >= max_depth as usize {
+                continue;
+            }
+            let rels = self.get_relationships(&current).await?;
+            for rel in rels {
+                let neighbor = if rel.source_entity_id == current {
+                    rel.target_entity_id.clone()
+                } else {
+                    rel.source_entity_id.clone()
+                };
+                if visited.contains(neighbor.as_str()) {
+                    continue;
+                }
+                let mut new_path = path.clone();
+                new_path.push(rel);
+                if neighbor == to {
+                    return Ok(new_path);
+                }
+                visited.insert(neighbor.clone());
+                queue.push_back((neighbor, new_path));
+            }
+        }
+
+        Ok(Vec::new())
+    }
+
     /// Merge `source_id` entity into `target_id`: repoint all relationships,
     /// sum mention_count, delete the source entity.
     pub async fn merge_entities(
@@ -406,6 +488,75 @@ impl EntityRepo {
         .await?;
 
         Ok(result.rows_affected() as u32)
+    }
+
+    /// Backfill entities from `note_entity_mentions` joined against tasks/projects for names.
+    /// Creates entities for referenced tasks and projects that don't already exist in the graph.
+    /// Idempotent: uses INSERT OR IGNORE keyed on LOWER(name).
+    pub async fn backfill_from_note_mentions(&self) -> Result<u32, sqlx::Error> {
+        let mut total = 0u32;
+
+        // Tasks: join note_entity_mentions against tasks for title
+        let r1 = sqlx::query(
+            r#"
+            INSERT OR IGNORE INTO entities (id, name, entity_type, description, source, source_id,
+                first_seen_at, last_seen_at, mention_count, created_at, updated_at)
+            SELECT
+                lower(hex(randomblob(16))),
+                t.title,
+                'task',
+                NULL,
+                'backfill',
+                nem.entity_id,
+                COALESCE(t.created_at, datetime('now')),
+                COALESCE(t.created_at, datetime('now')),
+                COUNT(*),
+                COALESCE(t.created_at, datetime('now')),
+                COALESCE(t.created_at, datetime('now'))
+            FROM note_entity_mentions nem
+            JOIN tasks t ON nem.entity_id = t.id
+            WHERE nem.entity_type = 'task'
+              AND LOWER(TRIM(t.title)) NOT IN (SELECT LOWER(name) FROM entities)
+            GROUP BY nem.entity_id
+            "#,
+        )
+        .execute(&self.pool)
+        .await;
+        if let Ok(r) = r1 {
+            total += r.rows_affected() as u32;
+        }
+
+        // Projects: join against projects for title
+        let r2 = sqlx::query(
+            r#"
+            INSERT OR IGNORE INTO entities (id, name, entity_type, description, source, source_id,
+                first_seen_at, last_seen_at, mention_count, created_at, updated_at)
+            SELECT
+                lower(hex(randomblob(16))),
+                p.title,
+                'project',
+                NULL,
+                'backfill',
+                nem.entity_id,
+                COALESCE(p.created_at, datetime('now')),
+                COALESCE(p.created_at, datetime('now')),
+                COUNT(*),
+                COALESCE(p.created_at, datetime('now')),
+                COALESCE(p.created_at, datetime('now'))
+            FROM note_entity_mentions nem
+            JOIN projects p ON nem.entity_id = p.id
+            WHERE nem.entity_type = 'project'
+              AND LOWER(TRIM(p.title)) NOT IN (SELECT LOWER(name) FROM entities)
+            GROUP BY nem.entity_id
+            "#,
+        )
+        .execute(&self.pool)
+        .await;
+        if let Ok(r) = r2 {
+            total += r.rows_affected() as u32;
+        }
+
+        Ok(total)
     }
 
     // ── Helpers ─────────────────────────────────────────────────

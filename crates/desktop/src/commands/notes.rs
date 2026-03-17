@@ -1,13 +1,14 @@
 use std::sync::Arc;
 
 use desktop_shared::commands::{
-    BacklinkResponse, CreatePersonaParams, FlashcardResponse, HybridSearchResponse,
-    InboxCreateParams, InboxItemResponse, InsightEvolutionResponse, InsightQuizSubmitParams,
-    InsightReviewResponse, InsightReviewStarted, InsightSaveFlashcardsParams,
-    InsightVersionResponse, NoteCreateParams, NoteLinkResponse, NoteResponse,
-    NoteSuggestionsResponse, NoteUpdateParams, NoteVersionResponse, NotebookCreateParams,
-    NotebookResponse, NotebookUpdateParams, PersonaResponse, RatePersonaParams,
-    ScenarioChallengeResponse, SetPersonaPinsParams, TabContent, UpdatePersonaParams,
+    BacklinkResponse, CreatePersonaParams, DeckSummaryResponse, FlashcardResponse,
+    FlashcardReviewParams, HybridSearchResponse, InboxCreateParams, InboxItemResponse,
+    InsightEvolutionResponse, InsightQuizSubmitParams, InsightReviewResponse, InsightReviewStarted,
+    InsightSaveFlashcardsParams, InsightVersionResponse, NoteCreateParams, NoteLinkResponse,
+    NoteResponse, NoteSuggestionsResponse, NoteUpdateParams, NoteVersionResponse,
+    NotebookCreateParams, NotebookResponse, NotebookUpdateParams, PersonaResponse,
+    RatePersonaParams, ScenarioChallengeResponse, SetPersonaPinsParams, TabContent,
+    UpdatePersonaParams,
 };
 use desktop_shared::errors::ApiError;
 use tauri::State;
@@ -426,6 +427,32 @@ pub async fn note_insight_auto_generate_persona(
     state.note_insight_auto_generate_persona(&note_id).await
 }
 
+// ── Flashcard Review commands ───────────────────────────────────
+
+#[tauri::command]
+pub async fn flashcard_list_decks(
+    state: State<'_, Arc<AppCore>>,
+) -> Result<Vec<DeckSummaryResponse>, ApiError> {
+    state.flashcard_list_decks().await
+}
+
+#[tauri::command]
+pub async fn flashcard_get_due(
+    state: State<'_, Arc<AppCore>>,
+    deck: String,
+    limit: Option<i64>,
+) -> Result<Vec<FlashcardResponse>, ApiError> {
+    state.flashcard_get_due(&deck, limit.unwrap_or(10)).await
+}
+
+#[tauri::command]
+pub async fn flashcard_record_review(
+    state: State<'_, Arc<AppCore>>,
+    params: FlashcardReviewParams,
+) -> Result<FlashcardResponse, ApiError> {
+    state.flashcard_record_review(params).await
+}
+
 // ── Dev server dispatch ─────────────────────────────────────────────
 
 #[cfg(test)]
@@ -475,6 +502,9 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "note_insight_set_pins",
     "note_insight_rate_persona",
     "note_insight_auto_generate_persona",
+    "flashcard_list_decks",
+    "flashcard_get_due",
+    "flashcard_record_review",
 ];
 
 #[cfg(debug_assertions)]
@@ -654,6 +684,16 @@ pub(crate) async fn dispatch_dev(
         "note_insight_auto_generate_persona" => {
             let note_id = try_field!(dev::get_str(body, "noteId"));
             dev::val(core.note_insight_auto_generate_persona(&note_id).await)
+        }
+        "flashcard_list_decks" => dev::val(core.flashcard_list_decks().await),
+        "flashcard_get_due" => {
+            let deck: String = try_field!(dev::get_str(body, "deck"));
+            let limit: Option<i64> = dev::get(body, "limit");
+            dev::val(core.flashcard_get_due(&deck, limit.unwrap_or(10)).await)
+        }
+        "flashcard_record_review" => {
+            let params: FlashcardReviewParams = try_field!(dev::parse_params(body));
+            dev::val(core.flashcard_record_review(params).await)
         }
         _ => return None,
     })
