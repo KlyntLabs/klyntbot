@@ -61,6 +61,7 @@ export interface ActivityEntry {
 
 export interface Suggestion {
   id: string;
+  suggestionType: string;
   title: string;
   description: string;
   confidence: number;

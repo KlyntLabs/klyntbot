@@ -1,9 +1,10 @@
+import { ipc } from "@shared/hooks/useIpc";
 import { useMutation } from "@shared/hooks/useMutation";
 import { useQuery } from "@shared/hooks/useQuery";
 import { EMPTY_TIMELINE_RESPONSE } from "@shared/types";
 import type { TimelineResponse } from "@shared/types/common";
 import type { Area, Task, TaskUpdateParams } from "@shared/types/tasks";
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useStatusWorkflow } from "../contexts/StatusWorkflowContext";
 import {
   type ActivityEntry,
@@ -15,6 +16,7 @@ import {
   priorityToNumber,
   type SubIssue,
   type Suggestion,
+  type SuggestionStatus,
   statusToMutationParams,
   type TaskMemory,
   type TaskState,
@@ -71,7 +73,7 @@ export function useIssueDetail(
   const { labels } = useStatusWorkflow();
 
   // Core task data
-  const { data: rawTask } = useQuery<Task | null>("task_get", { id: issueId }, null);
+  const { data: rawTask, refetch } = useQuery<Task | null>("task_get", { id: issueId }, null);
 
   const task: DetailTask = useMemo(
     () => (rawTask ? taskToDetailTask(rawTask, projectMap, areaMap, labels) : PLACEHOLDER_TASK),
@@ -163,13 +165,55 @@ export function useIssueDetail(
     [issueId, updateMutation],
   );
 
-  // Stubbed features (future backend support)
-  const suggestions: Suggestion[] = [];
+  // AI suggestions
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+
+  const fetchSuggestions = useCallback(async () => {
+    setSuggestionsLoading(true);
+    try {
+      const results = await ipc<
+        Array<{
+          id: string;
+          suggestionType: string;
+          title: string;
+          description: string | null;
+          confidence: number;
+          status: string;
+          createdAt: string;
+        }>
+      >("task_get_suggestions", { taskId: task.id });
+      setSuggestions(
+        results.map((s) => ({
+          id: s.id,
+          suggestionType: s.suggestionType,
+          title: s.title,
+          description: s.description ?? "",
+          confidence: s.confidence,
+          status: s.status as SuggestionStatus,
+        })),
+      );
+    } finally {
+      setSuggestionsLoading(false);
+    }
+  }, [task.id]);
+
+  const applySuggestion = useCallback(
+    async (id: string) => {
+      await ipc("task_apply_suggestion", { suggestionId: id });
+      await fetchSuggestions();
+      refetch();
+    },
+    [fetchSuggestions, refetch],
+  );
+
+  const dismissSuggestion = useCallback(async (id: string) => {
+    await ipc("task_dismiss_suggestion", { suggestionId: id });
+    setSuggestions((prev) => prev.filter((s) => s.id !== id));
+  }, []);
+
   const taskMemory: TaskMemory | null = null;
   const focusSession: FocusSession | null = buildFocusSession(task);
-
-  const dismissSuggestion = useCallback((_id: string) => {}, []);
-  const applySuggestion = useCallback((_id: string) => {}, []);
 
   // Focus mutations
   const endFocusMutation = useMutation<Task | null, { id: string }>("task_end_focus", "params");
@@ -184,6 +228,8 @@ export function useIssueDetail(
     taskState,
     activity,
     suggestions,
+    suggestionsLoading,
+    fetchSuggestions,
     focusSession,
     subIssues,
     taskMemory,

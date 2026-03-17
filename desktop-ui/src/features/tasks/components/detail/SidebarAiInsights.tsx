@@ -9,6 +9,8 @@ interface SidebarAiInsightsProps {
   taskMemory: TaskMemory | null;
   onApply: (id: string) => void;
   onDismiss: (id: string) => void;
+  onFetchSuggestions: () => void;
+  suggestionsLoading: boolean;
 }
 
 export function SidebarAiInsights({
@@ -17,6 +19,8 @@ export function SidebarAiInsights({
   taskMemory,
   onApply,
   onDismiss,
+  onFetchSuggestions,
+  suggestionsLoading,
 }: SidebarAiInsightsProps) {
   return (
     <div className="px-4 py-3 space-y-4">
@@ -29,6 +33,19 @@ export function SidebarAiInsights({
       ) : (
         <SuggestionsList suggestions={suggestions} onApply={onApply} onDismiss={onDismiss} />
       )}
+
+      {taskState !== "completed" &&
+        suggestions.filter((s) => s.status === "pending").length === 0 && (
+          <button
+            type="button"
+            onClick={onFetchSuggestions}
+            disabled={suggestionsLoading}
+            className="w-full flex items-center justify-center gap-1.5 text-xs px-3 py-1.5 rounded-md border border-purple-500/30 text-purple-300 hover:bg-purple-500/10 transition-colors disabled:opacity-50"
+          >
+            <Sparkles className="size-3" />
+            {suggestionsLoading ? "Analyzing..." : "Get Suggestions"}
+          </button>
+        )}
 
       {taskState !== "completed" && taskState !== "new" && taskMemory && (
         <TaskMemorySection memory={taskMemory} />
