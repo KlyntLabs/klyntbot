@@ -1,10 +1,12 @@
 use std::sync::Arc;
 
 use desktop_shared::commands::{
-    BacklinkResponse, FlashcardResponse, HybridSearchResponse, InboxCreateParams,
-    InboxItemResponse, InsightReviewResponse, InsightReviewStarted, InsightSaveFlashcardsParams,
-    NoteCreateParams, NoteLinkResponse, NoteResponse, NoteSuggestionsResponse, NoteUpdateParams,
-    NoteVersionResponse, NotebookCreateParams, NotebookResponse, NotebookUpdateParams, TabContent,
+    BacklinkResponse, CreatePersonaParams, FlashcardResponse, HybridSearchResponse,
+    InboxCreateParams, InboxItemResponse, InsightReviewResponse, InsightReviewStarted,
+    InsightSaveFlashcardsParams, NoteCreateParams, NoteLinkResponse, NoteResponse,
+    NoteSuggestionsResponse, NoteUpdateParams, NoteVersionResponse, NotebookCreateParams,
+    NotebookResponse, NotebookUpdateParams, PersonaResponse, RatePersonaParams,
+    SetPersonaPinsParams, TabContent, UpdatePersonaParams,
 };
 use desktop_shared::errors::ApiError;
 use tauri::State;
@@ -314,6 +316,64 @@ pub async fn note_insight_regenerate_tab(
     state.note_insight_regenerate_tab(&note_id, &tab).await
 }
 
+// ── Persona Management commands ───────────────────────────────────
+
+#[tauri::command]
+pub async fn note_insight_list_personas(
+    state: State<'_, Arc<AppCore>>,
+) -> Result<Vec<PersonaResponse>, ApiError> {
+    state.note_insight_list_personas().await
+}
+
+#[tauri::command]
+pub async fn note_insight_create_persona(
+    state: State<'_, Arc<AppCore>>,
+    params: CreatePersonaParams,
+) -> Result<PersonaResponse, ApiError> {
+    state.note_insight_create_persona(params).await
+}
+
+#[tauri::command]
+pub async fn note_insight_update_persona(
+    state: State<'_, Arc<AppCore>>,
+    params: UpdatePersonaParams,
+) -> Result<PersonaResponse, ApiError> {
+    state.note_insight_update_persona(params).await
+}
+
+#[tauri::command]
+pub async fn note_insight_delete_persona(
+    state: State<'_, Arc<AppCore>>,
+    id: String,
+) -> Result<(), ApiError> {
+    state.note_insight_delete_persona(&id).await
+}
+
+#[tauri::command]
+pub async fn note_insight_toggle_persona(
+    state: State<'_, Arc<AppCore>>,
+    id: String,
+    active: bool,
+) -> Result<(), ApiError> {
+    state.note_insight_toggle_persona(&id, active).await
+}
+
+#[tauri::command]
+pub async fn note_insight_set_pins(
+    state: State<'_, Arc<AppCore>>,
+    params: SetPersonaPinsParams,
+) -> Result<(), ApiError> {
+    state.note_insight_set_pins(params).await
+}
+
+#[tauri::command]
+pub async fn note_insight_rate_persona(
+    state: State<'_, Arc<AppCore>>,
+    params: RatePersonaParams,
+) -> Result<(), ApiError> {
+    state.note_insight_rate_persona(params).await
+}
+
 // ── Dev server dispatch ─────────────────────────────────────────────
 
 #[cfg(test)]
@@ -350,6 +410,13 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "note_insight_cache_get",
     "note_insight_save_flashcards",
     "note_insight_regenerate_tab",
+    "note_insight_list_personas",
+    "note_insight_create_persona",
+    "note_insight_update_persona",
+    "note_insight_delete_persona",
+    "note_insight_toggle_persona",
+    "note_insight_set_pins",
+    "note_insight_rate_persona",
 ];
 
 #[cfg(debug_assertions)]
@@ -479,6 +546,28 @@ pub(crate) async fn dispatch_dev(
             let id = try_field!(dev::get_str(body, "noteId"));
             let tab = try_field!(dev::get_str(body, "tab"));
             dev::val(core.note_insight_regenerate_tab(&id, &tab).await)
+        }
+        "note_insight_list_personas" => dev::val(core.note_insight_list_personas().await),
+        "note_insight_create_persona" => {
+            dev::val(core.note_insight_create_persona(try_field!(dev::parse_params(body))).await)
+        }
+        "note_insight_update_persona" => {
+            dev::val(core.note_insight_update_persona(try_field!(dev::parse_params(body))).await)
+        }
+        "note_insight_delete_persona" => {
+            let id = try_field!(dev::get_str(body, "id"));
+            dev::val(core.note_insight_delete_persona(&id).await)
+        }
+        "note_insight_toggle_persona" => {
+            let id = try_field!(dev::get_str(body, "id"));
+            let active = body.get("active").and_then(|v| v.as_bool()).unwrap_or(true);
+            dev::val(core.note_insight_toggle_persona(&id, active).await)
+        }
+        "note_insight_set_pins" => {
+            dev::val(core.note_insight_set_pins(try_field!(dev::parse_params(body))).await)
+        }
+        "note_insight_rate_persona" => {
+            dev::val(core.note_insight_rate_persona(try_field!(dev::parse_params(body))).await)
         }
         _ => return None,
     })
