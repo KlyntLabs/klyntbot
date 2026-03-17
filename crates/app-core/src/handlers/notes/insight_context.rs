@@ -7,6 +7,7 @@
 use feature_notes::models::NoteRow;
 
 /// Assembled context ready for prompt injection.
+#[allow(dead_code)]
 pub struct InsightContext {
     pub text: String,
     pub note_title: String,
