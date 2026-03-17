@@ -31,7 +31,7 @@ crates/context_engine/src/
         reasoner.rs         -- GraphReasoning (PageRank), TextRanker, SkylineRanker
         synthesizer.rs      -- Map, Reduce, SubQueryExecutor
     retrieval_planner/
-        mod.rs              -- RetrievalPlanner, QueryCategory, RetrievalPlan
+        mod.rs              -- RetrievalPlanner, QueryCategory, RetrievalPlan (all in one file)
         classifier.rs       -- Heuristic + LLM-fallback query classification
     insight_forge/
         bookrag_searcher.rs -- BookRAGSearcher (DomainSearcher impl)
@@ -40,8 +40,11 @@ crates/cognitive/src/
     repos/
         book_tree.rs        -- Concrete BookTreeRepo (SQLite)
         gt_link.rs          -- Concrete GTLinkRepo (SQLite)
+
+crates/cognitive/
     migrations/
         002_book_index_tables.sql -- DDL for book_tree_nodes, entity_tree_links, FTS5, triggers
+        (NOTE: migrations/ is at crate root, NOT under src/)
 
 crates/agent/src/
     adapters/
@@ -57,7 +60,7 @@ crates/cognitive/src/repos/mod.rs:1-28         -- Add pub mod book_tree, gt_link
 crates/cognitive/src/repos/entity.rs:380-441   -- Add GT-Link migration in merge_entities
 crates/storage/src/vector_store/schemas.rs:82-93 -- Add entity_embedding_schema
 crates/storage/src/vector_store/mod.rs:92-94   -- Add ensure_table("entity_embeddings")
-crates/bus/src/domain_events.rs:208-215        -- Add NoteContentChanged, NoteDeleted, TaskHierarchyChanged
+crates/bus/src/domain_events.rs (after line 215) -- Add NoteContentChanged, NoteDeleted, TaskHierarchyChanged (APPEND after existing note events, do NOT replace them)
 crates/config/src/schema/cognitive.rs:7-107    -- Add BookIndexConfig nested struct
 crates/agent/src/agent_loop/builder.rs:689-691 -- Wire BookRAGSearcher via book_index_wiring
 crates/agent/src/adapters/mod.rs:1-18          -- Add pub mod book_index_wiring
@@ -68,14 +71,14 @@ crates/agent/src/adapters/mod.rs:1-18          -- Add pub mod book_index_wiring
 ## Task 1: Storage Foundation — SQLite Tables + LanceDB Schema
 
 **Files:**
-- Create: `crates/cognitive/src/migrations/002_book_index_tables.sql`
+- Create: `crates/cognitive/migrations/002_book_index_tables.sql`
 - Modify: `crates/cognitive/src/repos/mod.rs:52-60`
 - Modify: `crates/storage/src/vector_store/schemas.rs:82-93`
 - Modify: `crates/storage/src/vector_store/mod.rs:92-94`
 
 - [ ] **Step 1: Write the migration SQL**
 
-Create `crates/cognitive/src/migrations/002_book_index_tables.sql`:
+Create `crates/cognitive/migrations/002_book_index_tables.sql`:
 
 ```sql
 -- BookIndex tree nodes (hierarchical document structure)
@@ -148,7 +151,7 @@ FeatureMigration {
     feature_name: "cognitive".to_string(),
     version: 5,
     description: "Add BookIndex tree nodes and GT-Link tables".to_string(),
-    sql: include_str!("../migrations/002_book_index_tables.sql").to_string(),
+    sql: include_str!("../../migrations/002_book_index_tables.sql").to_string(),
 }
 ```
 
@@ -668,24 +671,32 @@ Expected: PASS
 
 - [ ] **Step 8: Add GT-Link migration to EntityRepo::merge_entities**
 
-In `crates/cognitive/src/repos/entity.rs`, inside `merge_entities()` transaction (before the source entity DELETE at ~line 430), add:
+In `crates/cognitive/src/repos/entity.rs`, inside `merge_entities()` transaction (before the source entity DELETE at ~line 430), add GT-Link migration. Use a conditional check so existing tests that don't have the `entity_tree_links` table still pass:
 
 ```rust
-// Migrate GT-Links before deleting source entity
-sqlx::query(
-    "INSERT OR IGNORE INTO entity_tree_links (entity_id, tree_node_id, created_at)
-     SELECT ?, tree_node_id, created_at FROM entity_tree_links WHERE entity_id = ?"
-)
-.bind(target_id)
-.bind(source_id)
-.execute(&mut *tx)
-.await?;
+// Migrate GT-Links before deleting source entity (table may not exist in older test pools)
+let table_exists: (i64,) = sqlx::query_as(
+    "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='entity_tree_links'"
+).fetch_one(&mut *tx).await?;
 
-sqlx::query("DELETE FROM entity_tree_links WHERE entity_id = ?")
+if table_exists.0 > 0 {
+    sqlx::query(
+        "INSERT OR IGNORE INTO entity_tree_links (entity_id, tree_node_id, created_at)
+         SELECT ?, tree_node_id, created_at FROM entity_tree_links WHERE entity_id = ?"
+    )
+    .bind(target_id)
     .bind(source_id)
     .execute(&mut *tx)
     .await?;
+
+    sqlx::query("DELETE FROM entity_tree_links WHERE entity_id = ?")
+        .bind(source_id)
+        .execute(&mut *tx)
+        .await?;
+}
 ```
+
+**Important:** Also update the `cognitive_test_pool()` helper (or equivalent shared test setup) in `crates/cognitive/src/repos/mod.rs` to run migration v5 alongside v4, so all test pools have the `entity_tree_links` table available. This prevents FK errors in tests that interact with both old and new tables.
 
 - [ ] **Step 9: Register new modules in repos/mod.rs**
 
@@ -817,10 +828,14 @@ mod tests {
 
     #[test]
     fn pagerank_single_node() {
+        // pagerank_scores takes node IDs, edge tuples (from, to, weight), and seed IDs.
+        // This is the implementation-friendly signature (NOT the spec's EntityRow-based one).
+        // The spec's EntityRow/RelationshipRow types are mapped to these primitives
+        // in the GraphReasoning operator before calling pagerank_scores.
         let scores = pagerank_scores(
-            &["a".into()],
+            &["a"],
             &[],       // no edges
-            &["a".into()],
+            &["a"],
             0.85, 20,
         );
         assert!((scores["a"] - 1.0).abs() < 0.01);
@@ -830,9 +845,9 @@ mod tests {
     fn pagerank_seeded() {
         // a -> b -> c, seed on a
         let scores = pagerank_scores(
-            &["a".into(), "b".into(), "c".into()],
-            &[("a".into(), "b".into(), 1.0), ("b".into(), "c".into(), 1.0)],
-            &["a".into()],
+            &["a", "b", "c"],
+            &[("a", "b", 1.0), ("b", "c", 1.0)],
+            &["a"],
             0.85, 20,
         );
         assert!(scores["a"] > scores["b"]);
@@ -1025,7 +1040,7 @@ Expected: all PASS
 
 - [ ] **Step 5: Implement RetrievalPlanner (mod.rs)**
 
-Write `crates/context_engine/src/retrieval_planner/mod.rs`: `RetrievalPlanner` with `plan()` method that calls `classify_heuristic`, then `generate_plan()` which returns operator vectors per category.
+Write `crates/context_engine/src/retrieval_planner/mod.rs`: `RetrievalPlanner` with `plan()` method that calls `classify_heuristic`, then `generate_plan()` which returns operator vectors per category. The struct holds `pub book_index: Arc<BookIndex>` (public field) so `BookRAGSearcher` can access it for `has_content()` checks and to pass into `OperatorContext`.
 
 - [ ] **Step 6: Implement BookRAGSearcher**
 
@@ -1080,19 +1095,53 @@ TaskHierarchyChanged {
 
 In `crates/config/src/schema/cognitive.rs`, add the struct and a field:
 
+Define all config types WITHIN the `config` crate (L1) — do NOT import from `context_engine` (L3):
+
 ```rust
+// In crates/config/src/schema/cognitive.rs
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BookIndexConfig {
     #[serde(default = "default_true")]
     pub enabled: bool,
     #[serde(default)]
-    pub entity_resolution: EntityResolutionConfigSerde,
+    pub entity_resolution: BookEntityResolutionConfig,
     #[serde(default)]
-    pub retrieval: BookRetrievalConfigSerde,
+    pub retrieval: BookRetrievalConfig,
 }
 
-// ... with Default impl and sub-structs for serde
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BookEntityResolutionConfig {
+    #[serde(default = "default_top_k")]
+    pub top_k: usize,           // default: 10
+    #[serde(default = "default_gradient_threshold")]
+    pub gradient_threshold: f64, // default: 0.6
+    #[serde(default = "default_min_similarity")]
+    pub min_similarity: f64,     // default: 0.3
+    #[serde(default)]
+    pub use_llm_disambiguation: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BookRetrievalConfig {
+    #[serde(default = "default_max_nodes")]
+    pub max_nodes: usize,           // default: 50
+    #[serde(default = "default_max_map_nodes")]
+    pub max_map_nodes: usize,       // default: 10
+    #[serde(default = "default_operator_timeout_ms")]
+    pub operator_timeout_ms: u64,   // default: 600
+    #[serde(default = "default_pagerank_damping")]
+    pub pagerank_damping: f64,      // default: 0.85
+    #[serde(default = "default_pagerank_iterations")]
+    pub pagerank_iterations: u32,   // default: 20
+}
+
+// Add Default impls + default_* helper functions for serde
+// These are independent types in the config crate, NOT imported from context_engine.
+// The agent wiring code converts them via .into() when constructing BookIndex.
 ```
 
 Add `pub book_index: BookIndexConfig` to `CognitiveConfig` with `#[serde(default)]`.
@@ -1124,7 +1173,7 @@ In `crates/agent/src/adapters/book_index_wiring.rs`:
 
 ```rust
 use context_engine::book_index::BookEmbedder;
-use tools::embedding::EmbeddingEngine;
+use tools::EmbeddingEngine;
 // ...
 
 pub struct BookEmbedderAdapter {
@@ -1208,11 +1257,14 @@ In `crates/agent/src/agent_loop/builder.rs`, after the existing `forge.add_searc
 
 ```rust
 // BookRAG integration
+// NOTE: entity_repo may already be moved into a tokio::spawn by this point.
+// Construct a fresh EntityRepo from the pool, same pattern as entity_repo2 in builder.
 if config.cognitive.book_index.enabled {
+    let book_entity_repo = cognitive::EntityRepo::new(pool.inner().clone());
     let tree_repo = Arc::new(SqliteBookTreeRepo::new(pool.inner().clone()));
     let gt_link_repo = Arc::new(SqliteGTLinkRepo::new(pool.inner().clone()));
     let book_index = book_index_wiring::build_book_index(
-        tree_repo, entity_repo.clone(), gt_link_repo, embedding_engine.clone(),
+        tree_repo, book_entity_repo, gt_link_repo, embedding_engine.clone(),
     );
     let bookrag_searcher = book_index_wiring::build_bookrag_searcher(
         book_index, provider.clone(), &config.cognitive.book_index.retrieval.into(),
@@ -1280,6 +1332,8 @@ fn parse_code_blocks() {
 - [ ] **Step 3: Implement parse_markdown_to_tree**
 
 Line-by-line parser: detect heading lines (`^#{1,6}\s`), code fences (` ``` `), and treat everything else as Text. Track heading stack for parent assignment. Generate UUID for each node.
+
+**Import note:** `TreeNode`, `TreeNodeType`, `SourceType` are defined in `context_engine::book_index::types`. The `cognitive` crate already depends on `context_engine` (confirmed in Cargo.toml), so `use context_engine::book_index::types::*;` is valid and not a layer violation.
 
 - [ ] **Step 4: Run tests**
 
