@@ -5,6 +5,7 @@ interface PerspectivesTabProps {
   status: TabStatus;
   content: string;
   personas: PersonaMeta[];
+  noteId?: string | null;
 }
 
 /** Parse the perspectives markdown into per-persona sections by splitting on `---` and `## ` headings. */
@@ -44,7 +45,7 @@ function SkeletonLoader() {
   );
 }
 
-export function PerspectivesTab({ status, content, personas }: PerspectivesTabProps) {
+export function PerspectivesTab({ status, content, personas, noteId }: PerspectivesTabProps) {
   if (status === "idle") {
     return (
       <p className="text-[11px] text-dim italic">
@@ -93,6 +94,8 @@ export function PerspectivesTab({ status, content, personas }: PerspectivesTabPr
               icon={persona.icon}
               tone={persona.tone}
               content={section}
+              noteId={noteId ?? undefined}
+              personaId={persona.id}
             />
           ),
       )}

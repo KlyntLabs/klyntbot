@@ -320,6 +320,33 @@ pub struct ScenarioChallengeResponse {
     pub difficulty_score: f64,
 }
 
+// ── Changes Summary ──────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChangesSummaryResponse {
+    pub summary: String,
+}
+
+// ── Knowledge Growth ─────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct KnowledgeGrowthResponse {
+    pub new_facts_count: usize,
+    pub updated_facts_count: usize,
+    pub superseded_facts_count: usize,
+    pub by_domain: Vec<DomainCount>,
+    pub period_days: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DomainCount {
+    pub domain: String,
+    pub count: usize,
+}
+
 // ── Insight Scope Config ─────────────────────────────────────────
 
 #[derive(Debug, Clone, Deserialize)]
@@ -392,4 +419,31 @@ pub struct SetPersonaPinsParams {
 pub struct RatePersonaParams {
     pub id: String,
     pub helpful: bool,
+}
+
+// ── Persona Chat ────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PersonaChatParams {
+    pub note_id: String,
+    pub persona_id: String,
+    pub persona_name: String,
+    pub persona_role: String,
+    pub persona_tone: String,
+    pub user_message: String,
+    pub history: Vec<PersonaChatMessage>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PersonaChatMessage {
+    pub role: String,
+    pub content: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PersonaChatResponse {
+    pub reply: String,
 }

@@ -1,4 +1,7 @@
 import { MarkdownContent } from "@features/chat/components/MarkdownContent";
+import { MessageCircle } from "lucide-react";
+import { useState } from "react";
+import { PersonaChat } from "./PersonaChat";
 
 interface PersonaCardProps {
   name: string;
@@ -6,6 +9,8 @@ interface PersonaCardProps {
   icon: string;
   tone: string;
   content: string;
+  noteId?: string;
+  personaId?: string;
 }
 
 const TONE_COLORS: Record<string, { border: string; bg: string }> = {
@@ -25,8 +30,17 @@ function getToneColor(tone: string) {
   return TONE_COLORS[tone] ?? { border: "border-l-gray-400/60", bg: "bg-gray-400/10" };
 }
 
-export function PersonaCard({ name, role, icon, tone, content }: PersonaCardProps) {
+export function PersonaCard({
+  name,
+  role,
+  icon,
+  tone,
+  content,
+  noteId,
+  personaId,
+}: PersonaCardProps) {
   const colors = getToneColor(tone);
+  const [showChat, setShowChat] = useState(false);
 
   return (
     <div className={`glass-card border-l-2 ${colors.border} rounded-lg p-3 space-y-2`}>
@@ -47,6 +61,29 @@ export function PersonaCard({ name, role, icon, tone, content }: PersonaCardProp
       <div className="text-[12px] text-muted-foreground leading-relaxed">
         <MarkdownContent content={content} />
       </div>
+
+      {/* Inline chat toggle + chat */}
+      {noteId && personaId && (
+        <>
+          <button
+            type="button"
+            onClick={() => setShowChat((p) => !p)}
+            className="flex items-center gap-1 text-[10px] text-purple hover:text-purple/80 transition-colors"
+          >
+            <MessageCircle size={10} />
+            {showChat ? "Hide chat" : "Ask this persona"}
+          </button>
+          {showChat && (
+            <PersonaChat
+              noteId={noteId}
+              personaId={personaId}
+              personaName={name}
+              personaRole={role}
+              personaTone={tone}
+            />
+          )}
+        </>
+      )}
     </div>
   );
 }

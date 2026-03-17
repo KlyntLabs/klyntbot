@@ -269,6 +269,102 @@ impl AppCore {
         Ok(Some(row_to_insight_response(row)))
     }
 
+    /// Knowledge growth metrics from the cognitive fact store.
+    pub async fn note_insight_knowledge_growth(
+        &self,
+        days: u32,
+    ) -> Result<KnowledgeGrowthResponse, ApiError> {
+        let fact_repo = cognitive::repos::SemanticFactRepo::new(self.storage_pool.inner().clone());
+        let temporal = cognitive::TemporalService::new(fact_repo);
+        let since = chrono::Utc::now() - chrono::Duration::days(i64::from(days));
+        let summary = temporal
+            .change_summary(since, None)
+            .await
+            .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?;
+
+        let by_domain = summary
+            .by_domain
+            .into_iter()
+            .map(|(domain, count)| DomainCount { domain, count })
+            .collect();
+
+        Ok(KnowledgeGrowthResponse {
+            new_facts_count: summary.new_facts.len(),
+            updated_facts_count: summary.updated_facts.len(),
+            superseded_facts_count: summary.superseded_facts.len(),
+            by_domain,
+            period_days: days,
+        })
+    }
+
+    /// Generate a "What's Changed" summary comparing current note context to the last insight.
+    pub async fn note_insight_changes_summary(
+        &self,
+        note_id: &str,
+    ) -> Result<Option<ChangesSummaryResponse>, ApiError> {
+        let service = match &self.insight_service {
+            Some(s) => s,
+            None => return Ok(None),
+        };
+
+        let latest = match service.get_latest(note_id).await.ok().flatten() {
+            Some(r) => r,
+            None => return Ok(None),
+        };
+
+        if latest.version < 2 {
+            return Ok(None);
+        }
+
+        let prev_content: feature_insights::InsightContent =
+            serde_json::from_str(&latest.content).unwrap_or_default();
+        let prev_synthesis = match prev_content.synthesis {
+            Some(s) => s,
+            None => return Ok(None),
+        };
+
+        let note = self
+            .note_repo
+            .get_note(note_id)
+            .await
+            .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?
+            .ok_or_else(|| ApiError::new("NOT_FOUND", "Note not found"))?;
+
+        let related_notes = self.fetch_related_notes(note_id).await;
+        let ctx = insight_context::assemble_context(&note, &related_notes, None);
+
+        let provider = self
+            .cognitive_provider
+            .as_ref()
+            .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "LLM provider not configured"))?;
+
+        let config = self.config.read().await;
+        let params = providers::cognitive_chat_params(&config, 512);
+        drop(config);
+
+        let prompt = insight_prompts::changes_summary_prompt(&prev_synthesis, &ctx.text);
+        let messages = vec![
+            providers::Message::System { content: prompt },
+            providers::Message::User {
+                content: providers::UserContent::Text(
+                    "Generate the changes summary now.".to_string(),
+                ),
+            },
+        ];
+
+        let response = provider
+            .chat(&messages, None, &params)
+            .await
+            .map_err(|e| ApiError::new("LLM_ERROR", e.to_string()))?;
+
+        match response.content {
+            Some(summary) if !summary.contains("No significant changes") => {
+                Ok(Some(ChangesSummaryResponse { summary }))
+            }
+            _ => Ok(None),
+        }
+    }
+
     /// Save quiz questions as flashcards with FSRS init.
     pub async fn insight_save_flashcards(
         &self,
@@ -419,8 +515,9 @@ impl AppCore {
             .map_err(|e| ApiError::new("LLM_ERROR", e.to_string()))?;
 
         let content = response.content.unwrap_or_default();
+        let cleaned = strip_markdown_fences(&content);
 
-        serde_json::from_str::<ScenarioChallengeResponse>(&content).map_err(|e| {
+        serde_json::from_str::<ScenarioChallengeResponse>(&cleaned).map_err(|e| {
             ApiError::new(
                 "PARSE_ERROR",
                 format!("Failed to parse scenario response: {e}"),
@@ -694,7 +791,10 @@ impl AppCore {
         ids
     }
 
-    async fn fetch_related_notes(&self, note_id: &str) -> Vec<feature_notes::models::NoteRow> {
+    pub(crate) async fn fetch_related_notes(
+        &self,
+        note_id: &str,
+    ) -> Vec<feature_notes::models::NoteRow> {
         let backlinks = self
             .note_repo
             .get_backlinks_with_context(note_id)

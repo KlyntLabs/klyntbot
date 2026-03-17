@@ -48,18 +48,20 @@ export function SelfAssessmentTab({
 }: SelfAssessmentTabProps) {
   const [scenario, setScenario] = useState<ScenarioData | null>(null);
   const [scenarioLoading, setScenarioLoading] = useState(false);
+  const [scenarioError, setScenarioError] = useState(false);
 
   const answeredCount = Object.keys(quizState.answers).length;
   const showScenarioButton = answeredCount >= questions.length * 0.5 && questions.length > 0;
 
   const handleGenerateScenario = useCallback(async () => {
     if (!noteId) return;
+    setScenarioError(false);
     setScenarioLoading(true);
     try {
       const data = await ipc<ScenarioData>("note_insight_generate_scenario", { noteId });
       setScenario(data);
     } catch {
-      // Silently fail
+      setScenarioError(true);
     } finally {
       setScenarioLoading(false);
     }
@@ -224,6 +226,9 @@ export function SelfAssessmentTab({
             </>
           )}
         </button>
+      )}
+      {scenarioError && !scenario && (
+        <p className="text-[10px] text-destructive mt-1">Failed to generate scenario. Try again.</p>
       )}
 
       {scenario && <ScenarioChallenge scenario={scenario} />}

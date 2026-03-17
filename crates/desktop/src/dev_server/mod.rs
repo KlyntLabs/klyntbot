@@ -204,6 +204,7 @@ mod tests {
             commands::cron::DEV_COMMANDS,
             commands::capture::DEV_COMMANDS,
             commands::work_context::DEV_COMMANDS,
+            commands::entities::DEV_COMMANDS,
             commands::entity_links::DEV_COMMANDS,
             commands::project_sources::DEV_COMMANDS,
             commands::project_memories::DEV_COMMANDS,

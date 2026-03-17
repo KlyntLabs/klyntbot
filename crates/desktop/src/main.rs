@@ -365,6 +365,8 @@ fn run_desktop_app() {
             commands::notes::note_insight_get_evolution,
             commands::notes::note_insight_get_version,
             commands::notes::note_insight_generate_scenario,
+            commands::notes::note_insight_changes_summary,
+            commands::notes::note_insight_knowledge_growth,
             commands::notes::note_insight_list_personas,
             commands::notes::note_insight_create_persona,
             commands::notes::note_insight_update_persona,
@@ -373,6 +375,7 @@ fn run_desktop_app() {
             commands::notes::note_insight_set_pins,
             commands::notes::note_insight_rate_persona,
             commands::notes::note_insight_auto_generate_persona,
+            commands::notes::note_insight_persona_chat,
             commands::notes::flashcard_list_decks,
             commands::notes::flashcard_get_due,
             commands::notes::flashcard_record_review,
@@ -390,6 +393,10 @@ fn run_desktop_app() {
             commands::projects::project_archive,
             commands::projects::project_update_instructions,
             commands::projects::project_update_role,
+            // Entities (knowledge graph)
+            commands::entities::entity_search,
+            commands::entities::entity_merge,
+            commands::entities::entity_get_neighborhood,
             // Entity Links
             commands::entity_links::entity_link_create,
             commands::entity_links::entity_link_delete,

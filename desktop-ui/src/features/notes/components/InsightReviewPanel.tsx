@@ -26,6 +26,7 @@ import { useInsightSSE } from "../hooks/useInsightSSE";
 import { useInsightVersions } from "../hooks/useInsightVersions";
 import { usePersonas } from "../hooks/usePersonas";
 import { ChangesBanner } from "./insight/ChangesBanner";
+import { KnowledgeGrowthMetrics } from "./insight/KnowledgeGrowthMetrics";
 import { ConceptMapTab } from "./insight/ConceptMapTab";
 import { FlashcardReview } from "./insight/FlashcardReview";
 import { GapAnalysisTab } from "./insight/GapAnalysisTab";
@@ -256,6 +257,9 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
       {/* What's Changed banner */}
       {state.changesSummary && <ChangesBanner summary={state.changesSummary} />}
 
+      {/* Knowledge growth metrics */}
+      <KnowledgeGrowthMetrics isOpen={state.isOpen} />
+
       {/* Tab bar */}
       <div className="flex border-b border-border shrink-0 overflow-x-auto">
         {TABS.map((tab) => {
@@ -364,6 +368,7 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
                 status={state.tabs.perspectives.status}
                 content={state.tabs.perspectives.content}
                 personas={state.tabs.perspectives.personas}
+                noteId={state.noteId}
               />
             )}
           </>

@@ -169,6 +169,23 @@ Existing capabilities reused as-is:
 - `merge_entities(source_id, target_id)` — transactional consolidation
 - `get_related_entities(entity_id, rel_type)` — typed relationship traversal
 
+**GT-Link safety during entity merge:** When `merge_entities(source_id, target_id)` runs, any
+`entity_tree_links` pointing to `source_id` must be migrated to `target_id` within the same
+transaction, BEFORE the source entity is deleted. The `ON DELETE CASCADE` on the FK handles
+cleanup if migration fails, but the correct path is:
+
+```sql
+-- Within merge_entities transaction, BEFORE deleting source:
+INSERT OR IGNORE INTO entity_tree_links (entity_id, tree_node_id, created_at)
+    SELECT ?, tree_node_id, created_at FROM entity_tree_links WHERE entity_id = ?;
+    -- params: (target_id, source_id)
+DELETE FROM entity_tree_links WHERE entity_id = ?;
+    -- params: (source_id)
+```
+
+This must be added to `EntityRepo::merge_entities()` during implementation. `INSERT OR IGNORE`
+handles the case where target already has a link to the same tree node (composite PK dedup).
+
 ### 1.3 GT-Link `M: V -> P(N)` — Entity-to-Node Mapping
 
 A junction table that bidirectionally maps entities to the tree nodes where they appear.
@@ -366,9 +383,11 @@ pub struct OperatorContext {
     pub book_index: Arc<BookIndex>,
     pub llm: Arc<dyn OperatorLlm>,  // Local trait, not providers::LlmProvider
 
-    // Safety
-    pub max_nodes: usize,        // default: 50
-    pub token_budget: usize,     // for Map/Reduce LLM calls
+    // Safety & guardrails
+    pub max_nodes: usize,           // default: 50
+    pub max_map_nodes: usize,       // max nodes to send through Map (default: 10)
+    pub token_budget: usize,        // for Map/Reduce LLM calls
+    pub operator_timeout: Duration, // per-operator timeout (default: 600ms)
 }
 
 #[derive(Clone)]
@@ -393,8 +412,8 @@ pub struct ScoredNode {
 | `GraphReasoning` | Reasoner | No | PageRank on entity subgraph -> map scores to nodes via GT-Link |
 | `TextRanker` | Reasoner | No | Embed query, score each node by cosine similarity |
 | `SkylineRanker` | Reasoner | No | Pareto frontier on (graph_score, text_score) |
-| `SubQueryExecutor` | Composite | Varies | Run SingleHop pipeline per sub-query (for MultiHop) |
-| `Map` | Synthesizer | Yes | Per-node LLM call for partial answer |
+| `SubQueryExecutor` | Composite | Varies | Run SingleHop pipeline per sub-query in parallel (`tokio::join_all`) |
+| `Map` | Synthesizer | Yes | Per-node LLM call for partial answer; capped at `ctx.max_map_nodes` (default: 10); runs nodes in parallel via `join_all` with per-call token limit from `ctx.token_budget / max_map_nodes` |
 | `Reduce` | Synthesizer | Yes | Aggregate partial answers into final response |
 
 ### PageRank (In-process, Small Subgraphs)
@@ -541,12 +560,19 @@ impl DomainSearcher for BookRAGSearcher {
         };
         if plan.category == QueryCategory::PassThrough { return vec![]; }
 
-        // 2. Execute: run operator pipeline (catch errors per-operator)
+        // 2. Execute: run operator pipeline with per-operator timeout
         let mut ctx = OperatorContext::new(query, &self.planner.book_index);
         for op in &plan.operators {
-            if let Err(e) = op.execute(&mut ctx).await {
-                tracing::warn!("BookRAG operator '{}' failed: {e}", op.name());
-                return vec![];
+            match tokio::time::timeout(ctx.operator_timeout, op.execute(&mut ctx)).await {
+                Ok(Ok(_)) => {}
+                Ok(Err(e)) => {
+                    tracing::warn!("BookRAG operator '{}' failed: {e}", op.name());
+                    break; // Return partial results rather than empty
+                }
+                Err(_) => {
+                    tracing::warn!("BookRAG operator '{}' timed out", op.name());
+                    break; // Return partial results
+                }
             }
         }
 
@@ -593,41 +619,46 @@ Tree builds are triggered by domain events, following the same pattern as `Backg
 
 ### Event-driven Updates
 
-**Important:** The actual `bus::DomainEvent` variants don't carry full content or project IDs.
-`NoteUpdated` has `{ note_id, title }` (no content field). Task events (`TaskStatusChanged`,
-`TaskFieldUpdated`, `TaskPriorityChanged`) don't carry `project_id`. The handler must fetch
-data from repos using the IDs provided in events.
+**Critical design decision:** The current `bus::DomainEvent` variants are insufficient for
+BookIndex updates — `NoteUpdated` lacks `content`, task events lack `project_id`, and delete
+events don't exist. Rather than refetching from repos (anti-pattern: race condition between
+event emission and fetch), we extend `DomainEvent` with content-carrying variants.
+
+**New DomainEvent variants to add:**
 
 ```rust
-// In BackgroundConsolidationService or a new BookIndexUpdater:
+// In bus::DomainEvent — new variants for BookIndex
+NoteContentChanged { note_id: String, content: String },
+NoteDeleted { note_id: String },
+TaskHierarchyChanged { project_id: String },
+```
+
+These are emitted by the note/task tools alongside existing events. `NoteContentChanged` carries
+the full content atomically — no race between event and repo fetch. `TaskHierarchyChanged` is
+emitted on any task create/update/delete that affects a project's tree structure.
+
+**Event handler:**
+
+```rust
+// In BookIndexUpdater (new background service, subscribes to DomainEventBus):
 match event {
-    DomainEvent::NoteUpdated { note_id, .. } => {
-        // NoteUpdated only has note_id + title — fetch content from NoteRepo
-        if let Ok(Some(note)) = note_repo.get(&note_id).await {
-            book_index.delete_source_tree(SourceType::Note, &note_id).await?;
-            book_index.build_from_note(&note_id, &note.content).await?;
-        }
+    DomainEvent::NoteContentChanged { note_id, content } => {
+        // Content carried in event — no refetch needed, zero race condition
+        book_index.delete_source_tree(SourceType::Note, &note_id).await?;
+        book_index.build_from_note(&note_id, &content).await?;
     }
-    // NOTE: DomainEvent::NoteDeleted does not exist yet.
-    // Must be added to bus::DomainEvent during implementation.
     DomainEvent::NoteDeleted { note_id } => {
         book_index.delete_source_tree(SourceType::Note, &note_id).await?;
     }
-    // Task events don't carry project_id — look up the task to find its project
-    DomainEvent::TaskStatusChanged { task_id, .. }
-    | DomainEvent::TaskFieldUpdated { task_id, .. }
-    | DomainEvent::TaskPriorityChanged { task_id, .. } => {
-        if let Ok(Some(task)) = task_repo.get(&task_id).await {
-            if let Some(project_id) = &task.project_id {
-                book_index.build_from_task_hierarchy(project_id).await?;
-            }
-        }
+    DomainEvent::TaskHierarchyChanged { project_id } => {
+        book_index.build_from_task_hierarchy(&project_id).await?;
     }
+    _ => {}
 }
 ```
 
-**Note:** New `DomainEvent` variants (e.g., `NoteCreated`, `TaskCreated`) may need to be added
-to `bus::DomainEvent` if they don't already exist. Check the actual enum definition during implementation.
+**Backward compatibility:** Existing event handlers that listen for `NoteUpdated` etc. are
+unaffected — the new variants are additive.
 
 ### Markdown Parser
 

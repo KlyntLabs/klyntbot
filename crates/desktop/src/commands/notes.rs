@@ -1,14 +1,15 @@
 use std::sync::Arc;
 
 use desktop_shared::commands::{
-    BacklinkResponse, CreatePersonaParams, DeckSummaryResponse, FlashcardResponse,
-    FlashcardReviewParams, HybridSearchResponse, InboxCreateParams, InboxItemResponse,
-    InsightEvolutionResponse, InsightQuizSubmitParams, InsightReviewResponse, InsightReviewStarted,
-    InsightSaveFlashcardsParams, InsightVersionResponse, NoteCreateParams, NoteLinkResponse,
-    NoteResponse, NoteSuggestionsResponse, NoteUpdateParams, NoteVersionResponse,
-    NotebookCreateParams, NotebookResponse, NotebookUpdateParams, PersonaResponse,
-    RatePersonaParams, ScenarioChallengeResponse, SetPersonaPinsParams, TabContent,
-    UpdatePersonaParams,
+    BacklinkResponse, ChangesSummaryResponse, CreatePersonaParams, DeckSummaryResponse,
+    FlashcardResponse, FlashcardReviewParams, HybridSearchResponse, InboxCreateParams,
+    InboxItemResponse, InsightEvolutionResponse, InsightQuizSubmitParams, InsightReviewResponse,
+    InsightReviewStarted, InsightSaveFlashcardsParams, InsightVersionResponse,
+    KnowledgeGrowthResponse, NoteCreateParams, NoteLinkResponse, NoteResponse,
+    NoteSuggestionsResponse, NoteUpdateParams, NoteVersionResponse, NotebookCreateParams,
+    NotebookResponse, NotebookUpdateParams, PersonaChatParams, PersonaChatResponse,
+    PersonaResponse, RatePersonaParams, ScenarioChallengeResponse, SetPersonaPinsParams,
+    TabContent, UpdatePersonaParams,
 };
 use desktop_shared::errors::ApiError;
 use tauri::State;
@@ -361,6 +362,22 @@ pub async fn note_insight_generate_scenario(
     state.note_insight_generate_scenario(&note_id).await
 }
 
+#[tauri::command]
+pub async fn note_insight_changes_summary(
+    state: State<'_, Arc<AppCore>>,
+    note_id: String,
+) -> Result<Option<ChangesSummaryResponse>, ApiError> {
+    state.note_insight_changes_summary(&note_id).await
+}
+
+#[tauri::command]
+pub async fn note_insight_knowledge_growth(
+    state: State<'_, Arc<AppCore>>,
+    days: Option<u32>,
+) -> Result<KnowledgeGrowthResponse, ApiError> {
+    state.note_insight_knowledge_growth(days.unwrap_or(7)).await
+}
+
 // ── Persona Management commands ───────────────────────────────────
 
 #[tauri::command]
@@ -425,6 +442,14 @@ pub async fn note_insight_auto_generate_persona(
     note_id: String,
 ) -> Result<PersonaResponse, ApiError> {
     state.note_insight_auto_generate_persona(&note_id).await
+}
+
+#[tauri::command]
+pub async fn note_insight_persona_chat(
+    state: State<'_, Arc<AppCore>>,
+    params: PersonaChatParams,
+) -> Result<PersonaChatResponse, ApiError> {
+    state.note_insight_persona_chat(&params).await
 }
 
 // ── Flashcard Review commands ───────────────────────────────────
@@ -494,6 +519,8 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "note_insight_get_evolution",
     "note_insight_get_version",
     "note_insight_generate_scenario",
+    "note_insight_changes_summary",
+    "note_insight_knowledge_growth",
     "note_insight_list_personas",
     "note_insight_create_persona",
     "note_insight_update_persona",
@@ -502,6 +529,7 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "note_insight_set_pins",
     "note_insight_rate_persona",
     "note_insight_auto_generate_persona",
+    "note_insight_persona_chat",
     "flashcard_list_decks",
     "flashcard_get_due",
     "flashcard_record_review",
@@ -655,6 +683,14 @@ pub(crate) async fn dispatch_dev(
             let id = try_field!(dev::get_str(body, "noteId"));
             dev::val(core.note_insight_generate_scenario(&id).await)
         }
+        "note_insight_changes_summary" => {
+            let id = try_field!(dev::get_str(body, "noteId"));
+            dev::val(core.note_insight_changes_summary(&id).await)
+        }
+        "note_insight_knowledge_growth" => {
+            let days: Option<u32> = dev::get(body, "days");
+            dev::val(core.note_insight_knowledge_growth(days.unwrap_or(7)).await)
+        }
         "note_insight_list_personas" => dev::val(core.note_insight_list_personas().await),
         "note_insight_create_persona" => dev::val(
             core.note_insight_create_persona(try_field!(dev::parse_params(body)))
@@ -684,6 +720,10 @@ pub(crate) async fn dispatch_dev(
         "note_insight_auto_generate_persona" => {
             let note_id = try_field!(dev::get_str(body, "noteId"));
             dev::val(core.note_insight_auto_generate_persona(&note_id).await)
+        }
+        "note_insight_persona_chat" => {
+            let params: PersonaChatParams = try_field!(dev::parse_params(body));
+            dev::val(core.note_insight_persona_chat(&params).await)
         }
         "flashcard_list_decks" => dev::val(core.flashcard_list_decks().await),
         "flashcard_get_due" => {

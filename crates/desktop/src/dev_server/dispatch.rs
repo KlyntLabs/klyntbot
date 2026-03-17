@@ -48,6 +48,9 @@ pub(super) async fn dispatch(
     if let Some(r) = commands::projects::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }
+    if let Some(r) = commands::entities::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
     if let Some(r) = commands::entity_links::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }

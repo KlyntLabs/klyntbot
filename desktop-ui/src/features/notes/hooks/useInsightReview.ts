@@ -278,6 +278,15 @@ export function useInsightReview(): [InsightReviewState, InsightReviewActions] {
         });
         if (cached) {
           applyCachedContent(cached, { insightReviewId: cached.insightReviewId });
+
+          // Fire "What's Changed" summary (best-effort, non-blocking)
+          ipc<{ summary: string } | null>("note_insight_changes_summary", { noteId })
+            .then((result) => {
+              if (result?.summary) {
+                setState((prev) => ({ ...prev, changesSummary: result.summary }));
+              }
+            })
+            .catch(() => {});
         }
       } catch {
         // No cache — all tabs stay "idle"
