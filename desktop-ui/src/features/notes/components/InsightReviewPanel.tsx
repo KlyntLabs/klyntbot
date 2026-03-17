@@ -9,6 +9,7 @@ import {
   RefreshCw,
   Settings2,
   Sliders,
+  Sparkles,
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -105,6 +106,7 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
   const [allPersonas, personaActions] = usePersonas();
   const evolution = useInsightEvolution();
   const versions = useInsightVersions();
+  const activeStatus = tabStatus(state, state.activeTab);
   useInsightSSE(state.isOpen);
 
   // Lazy-fetch evolution + versions only when History panel is shown
@@ -225,25 +227,6 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
         </button>
         <button
           type="button"
-          onClick={() => {
-            if (state.noteId) {
-              void actions.open(state.noteId, {
-                scopeType: scopeConfig.scopeType,
-                radius: scopeConfig.radius,
-                includeCognitive: scopeConfig.includeCognitive,
-                deepDive: scopeConfig.deepDive,
-              });
-            }
-          }}
-          disabled={!state.noteId}
-          className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-accent text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors disabled:text-dim disabled:cursor-not-allowed"
-          title="Regenerate all tabs with current scope"
-        >
-          <RefreshCw size={10} />
-          Regenerate
-        </button>
-        <button
-          type="button"
           onClick={() => actions.close()}
           className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
           aria-label="Close Insight Review"
@@ -325,44 +308,62 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
 
       {/* Content area */}
       <div className="flex-1 overflow-y-auto p-4 min-h-0">
-        {state.activeTab === "synthesis" && (
-          <SynthesisTab
-            status={state.tabs.synthesis.status}
-            content={state.tabs.synthesis.content}
-          />
-        )}
-        {state.activeTab === "gaps" && (
-          <GapAnalysisTab
-            status={state.tabs.gaps.status}
-            content={state.tabs.gaps.content}
-            onCreateNote={handleCreateDeepDiveNote}
-          />
-        )}
-        {state.activeTab === "assessment" && (
-          <SelfAssessmentTab
-            status={state.tabs.assessment.status}
-            questions={state.tabs.assessment.questions}
-            quizState={state.quizState}
-            noteId={state.noteId}
-            onAnswer={actions.answerQuestion}
-            onReveal={actions.revealAnswer}
-            onRevealAll={actions.revealAll}
-            onSaveFlashcards={actions.saveFlashcards}
-          />
-        )}
-        {state.activeTab === "concept-map" && (
-          <ConceptMapTab
-            status={state.tabs.conceptMap.status}
-            mermaid={state.tabs.conceptMap.mermaid}
-            fallbackText={state.tabs.conceptMap.fallbackText}
-          />
-        )}
-        {state.activeTab === "perspectives" && (
-          <PerspectivesTab
-            status={state.tabs.perspectives.status}
-            content={state.tabs.perspectives.content}
-            personas={state.tabs.perspectives.personas}
-          />
+        {(activeStatus === "idle" || activeStatus === "error") ? (
+          <div className="flex flex-col items-center justify-center h-full gap-3">
+            <p className="text-[11px] text-dim">
+              {activeStatus === "error" ? "Generation failed" : "No content generated yet"}
+            </p>
+            <button
+              type="button"
+              onClick={() => actions.regenerateTab(state.activeTab)}
+              className="flex items-center gap-1.5 text-[11px] px-3 py-1.5 rounded-md bg-purple/20 text-purple hover:bg-purple/30 transition-colors"
+            >
+              <Sparkles size={12} />
+              Generate {TABS.find((t) => t.id === state.activeTab)?.label}
+            </button>
+          </div>
+        ) : (
+          <>
+            {state.activeTab === "synthesis" && (
+              <SynthesisTab
+                status={state.tabs.synthesis.status}
+                content={state.tabs.synthesis.content}
+              />
+            )}
+            {state.activeTab === "gaps" && (
+              <GapAnalysisTab
+                status={state.tabs.gaps.status}
+                content={state.tabs.gaps.content}
+                onCreateNote={handleCreateDeepDiveNote}
+              />
+            )}
+            {state.activeTab === "assessment" && (
+              <SelfAssessmentTab
+                status={state.tabs.assessment.status}
+                questions={state.tabs.assessment.questions}
+                quizState={state.quizState}
+                noteId={state.noteId}
+                onAnswer={actions.answerQuestion}
+                onReveal={actions.revealAnswer}
+                onRevealAll={actions.revealAll}
+                onSaveFlashcards={actions.saveFlashcards}
+              />
+            )}
+            {state.activeTab === "concept-map" && (
+              <ConceptMapTab
+                status={state.tabs.conceptMap.status}
+                mermaid={state.tabs.conceptMap.mermaid}
+                fallbackText={state.tabs.conceptMap.fallbackText}
+              />
+            )}
+            {state.activeTab === "perspectives" && (
+              <PerspectivesTab
+                status={state.tabs.perspectives.status}
+                content={state.tabs.perspectives.content}
+                personas={state.tabs.perspectives.personas}
+              />
+            )}
+          </>
         )}
       </div>
 
@@ -402,6 +403,16 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
               Save as Deck
             </button>
           )}
+        {hasActiveContent && (
+          <button
+            type="button"
+            onClick={() => actions.regenerateTab(state.activeTab)}
+            className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-accent text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors"
+            title="Regenerate this tab"
+          >
+            <RefreshCw size={10} />
+          </button>
+        )}
         <button
           type="button"
           onClick={handleCopy}

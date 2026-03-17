@@ -52,8 +52,11 @@ export interface InsightReviewState {
 }
 
 export interface InsightReviewActions {
-  open: (noteId: string, scopeConfig?: Record<string, unknown>) => Promise<void>;
-  applyCachedContent: (cached: InsightReviewCachedResponse) => void;
+  open: (noteId: string) => Promise<void>;
+  applyCachedContent: (
+    cached: InsightReviewCachedResponse,
+    extraState?: Partial<InsightReviewState>,
+  ) => void;
   close: () => void;
   switchTab: (tab: TabId) => void;
   regenerateTab: (tab: TabId) => Promise<void>;
@@ -66,12 +69,6 @@ export interface InsightReviewActions {
 // ---------------------------------------------------------------------------
 // Local IPC response types
 // ---------------------------------------------------------------------------
-
-interface InsightReviewStartedResponse {
-  insightReviewId: string;
-  contentHash: string;
-  cached: boolean;
-}
 
 export interface InsightReviewCachedResponse {
   insightReviewId: string;
@@ -87,6 +84,20 @@ export interface InsightReviewCachedResponse {
 interface TabContentResponse {
   tab: string;
   content: string;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function parseConceptMap(raw: string | null): {
+  mermaid: string;
+  fallbackText: string;
+} {
+  if (!raw) return { mermaid: "", fallbackText: "" };
+  if (raw.startsWith("FALLBACK:"))
+    return { mermaid: "", fallbackText: raw.slice("FALLBACK:".length) };
+  return { mermaid: raw, fallbackText: "" };
 }
 
 // ---------------------------------------------------------------------------
@@ -178,15 +189,7 @@ export function useInsightReview(): [InsightReviewState, InsightReviewActions] {
         }
         tabs.assessment = { status: questions.length > 0 ? "done" : "error", questions };
       } else if (tab === "concept-map") {
-        if (content.startsWith("FALLBACK:")) {
-          tabs.conceptMap = {
-            status: "done",
-            mermaid: "",
-            fallbackText: content.slice("FALLBACK:".length),
-          };
-        } else {
-          tabs.conceptMap = { status: "done", mermaid: content, fallbackText: "" };
-        }
+        tabs.conceptMap = { status: "done", ...parseConceptMap(content) };
       } else if (tab === "perspectives") {
         tabs.perspectives = { ...tabs.perspectives, status: "done", content };
       }
@@ -237,76 +240,47 @@ export function useInsightReview(): [InsightReviewState, InsightReviewActions] {
   // -------------------------------------------------------------------------
 
   // Shared helper: apply cached insight content to tab state
-  const applyCachedContent = useCallback((cached: InsightReviewCachedResponse) => {
-    setState((prev) => {
-      const tabs = { ...prev.tabs };
-
-      tabs.synthesis = { status: "done", content: cached.synthesis ?? "" };
-      tabs.gaps = { status: "done", content: cached.gapAnalysis ?? "" };
-      tabs.assessment = {
-        status: "done",
-        questions: cached.selfAssessment ?? [],
-      };
-
-      const cm = cached.conceptMap ?? "";
-      if (cm.startsWith("FALLBACK:")) {
-        tabs.conceptMap = {
-          status: "done",
-          mermaid: "",
-          fallbackText: cm.slice("FALLBACK:".length),
-        };
-      } else {
-        tabs.conceptMap = { status: "done", mermaid: cm, fallbackText: "" };
-      }
-
-      tabs.perspectives = {
-        status: cached.perspectives ? "done" : "idle",
-        content: cached.perspectives ?? "",
-        personas: [],
-      };
-
-      return { ...prev, tabs };
-    });
-  }, []);
-
-  const open = useCallback(
-    async (noteId: string, scopeConfig?: Record<string, unknown>) => {
-      setState({
-        ...INITIAL_STATE,
-        isOpen: true,
-        noteId,
-        tabs: {
-          synthesis: { status: "loading", content: "" },
-          gaps: { status: "loading", content: "" },
-          assessment: { status: "loading", questions: [] },
-          conceptMap: { status: "loading", mermaid: "", fallbackText: "" },
-          perspectives: { status: "loading", content: "", personas: [] },
-        },
-      });
-
-      const args: Record<string, unknown> = { noteId };
-      if (scopeConfig) args.scopeConfig = scopeConfig;
-
-      const response = await ipc<InsightReviewStartedResponse>("note_insight_review", args);
-
+  // Only marks tabs as "done" if they have content; leaves empty tabs "idle"
+  const applyCachedContent = useCallback(
+    (cached: InsightReviewCachedResponse, extraState?: Partial<InsightReviewState>) => {
       setState((prev) => ({
         ...prev,
-        insightReviewId: response.insightReviewId,
-        contentHash: response.contentHash,
+        ...extraState,
+        tabs: {
+          synthesis: cached.synthesis
+            ? { status: "done" as const, content: cached.synthesis }
+            : { status: "idle" as const, content: "" },
+          gaps: cached.gapAnalysis
+            ? { status: "done" as const, content: cached.gapAnalysis }
+            : { status: "idle" as const, content: "" },
+          assessment: cached.selfAssessment?.length
+            ? { status: "done" as const, questions: cached.selfAssessment }
+            : { status: "idle" as const, questions: [] },
+          conceptMap: cached.conceptMap
+            ? { status: "done" as const, ...parseConceptMap(cached.conceptMap) }
+            : { status: "idle" as const, mermaid: "", fallbackText: "" },
+          perspectives: cached.perspectives
+            ? { status: "done" as const, content: cached.perspectives, personas: [] }
+            : { status: "idle" as const, content: "", personas: [] },
+        },
       }));
+    },
+    [],
+  );
 
-      if (response.cached) {
-        const cached = await ipc<InsightReviewCachedResponse>("note_insight_cache_get", { noteId });
-        applyCachedContent(cached);
-      } else {
-        setState((prev) => ({
-          ...prev,
-          tabs: {
-            ...prev.tabs,
-            synthesis: { status: "streaming", content: "" },
-            perspectives: { status: "loading", content: "", personas: [] },
-          },
-        }));
+  const open = useCallback(
+    async (noteId: string) => {
+      setState({ ...INITIAL_STATE, isOpen: true, noteId });
+
+      try {
+        const cached = await ipc<InsightReviewCachedResponse | null>("note_insight_cache_get", {
+          noteId,
+        });
+        if (cached) {
+          applyCachedContent(cached, { insightReviewId: cached.insightReviewId });
+        }
+      } catch {
+        // No cache — all tabs stay "idle"
       }
     },
     [applyCachedContent],
@@ -361,19 +335,7 @@ export function useInsightReview(): [InsightReviewState, InsightReviewActions] {
           }
           tabs.assessment = { status: "done", questions };
         } else if (response.tab === "concept-map") {
-          if (response.content.startsWith("FALLBACK:")) {
-            tabs.conceptMap = {
-              status: "done",
-              mermaid: "",
-              fallbackText: response.content.slice("FALLBACK:".length),
-            };
-          } else {
-            tabs.conceptMap = {
-              status: "done",
-              mermaid: response.content,
-              fallbackText: "",
-            };
-          }
+          tabs.conceptMap = { status: "done", ...parseConceptMap(response.content) };
         } else if (response.tab === "perspectives") {
           tabs.perspectives = { ...tabs.perspectives, status: "done", content: response.content };
         }

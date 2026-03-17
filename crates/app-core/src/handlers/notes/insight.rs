@@ -544,11 +544,51 @@ impl AppCore {
             .await
             .map_err(|e| ApiError::new("LLM_ERROR", e.to_string()))?;
 
-        let content = response.content.unwrap_or_default();
+        let raw_content = response.content.unwrap_or_default();
+        // Only strip fences for JSON-producing tabs (matching generate_tab pipeline behavior)
+        let content = if tab == "assessment" || tab == "gaps" {
+            strip_markdown_fences(&raw_content)
+        } else {
+            raw_content
+        };
 
-        if let (Some(ref service), Some(ref latest)) = (&self.insight_service, &latest_insight) {
-            if let Err(e) = service.update_tab(&latest.id, tab, &content).await {
-                tracing::warn!("failed to persist regenerated tab {tab}: {e}");
+        if let Some(ref service) = self.insight_service {
+            if let Some(ref latest) = latest_insight {
+                // Update existing insight record
+                if let Err(e) = service.update_tab(&latest.id, tab, &content).await {
+                    tracing::warn!("failed to persist regenerated tab {tab}: {e}");
+                }
+            } else {
+                // No existing insight — create one with just this tab (lazy init).
+                // Invalid tabs are already rejected by the prompt match above.
+                let mut insight_content = feature_insights::InsightContent::default();
+                match tab {
+                    "synthesis" => insight_content.synthesis = Some(content.clone()),
+                    "gaps" => insight_content.gap_analysis = Some(content.clone()),
+                    "assessment" => insight_content.self_assessment = Some(content.clone()),
+                    "concept-map" => insight_content.concept_map = Some(content.clone()),
+                    "perspectives" => insight_content.perspectives = Some(content.clone()),
+                    _ => unreachable!("invalid tab already rejected"),
+                }
+                let input_hash = feature_insights::InsightService::compute_input_hash(
+                    &note.title,
+                    &note.body,
+                    &[],
+                );
+                if let Err(e) = service
+                    .store_insight(
+                        note_id,
+                        &insight_content,
+                        &input_hash,
+                        &feature_insights::ScopeConfig::default(),
+                        &[],
+                        None,
+                        &[],
+                    )
+                    .await
+                {
+                    tracing::warn!("failed to create insight for tab {tab}: {e}");
+                }
             }
         }
 
