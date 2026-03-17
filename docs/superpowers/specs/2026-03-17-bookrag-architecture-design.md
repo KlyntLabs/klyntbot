@@ -92,7 +92,7 @@ pub enum SourceType {
 }
 ```
 
-**Storage:** SQLite table `book_tree_nodes` with indexes on `parent_id`, `source_type + source_id`, and `level`. FTS5 table `book_tree_nodes_fts` for keyword search within nodes.
+**Storage:** SQLite table `book_tree_nodes` with indexes on `parent_id`, `source_type + source_id`, and `level`. FTS5 table `book_tree_nodes_fts` for keyword search within nodes. Sync triggers keep FTS5 in sync with the base table.
 
 ```sql
 CREATE TABLE book_tree_nodes (
@@ -120,6 +120,29 @@ CREATE VIRTUAL TABLE book_tree_nodes_fts USING fts5(
     content_rowid='rowid',
     tokenize='porter'
 );
+
+-- FTS5 sync triggers (required for content= external content tables)
+CREATE TRIGGER book_tree_nodes_ai AFTER INSERT ON book_tree_nodes BEGIN
+    INSERT INTO book_tree_nodes_fts(rowid, title, content)
+    VALUES (new.rowid, new.title, new.content);
+END;
+
+CREATE TRIGGER book_tree_nodes_ad AFTER DELETE ON book_tree_nodes BEGIN
+    INSERT INTO book_tree_nodes_fts(book_tree_nodes_fts, rowid, title, content)
+    VALUES ('delete', old.rowid, old.title, old.content);
+END;
+
+CREATE TRIGGER book_tree_nodes_au AFTER UPDATE ON book_tree_nodes BEGIN
+    INSERT INTO book_tree_nodes_fts(book_tree_nodes_fts, rowid, title, content)
+    VALUES ('delete', old.rowid, old.title, old.content);
+    INSERT INTO book_tree_nodes_fts(rowid, title, content)
+    VALUES (new.rowid, new.title, new.content);
+END;
+
+-- Auto-update updated_at on UPDATE
+CREATE TRIGGER book_tree_nodes_update_ts AFTER UPDATE ON book_tree_nodes BEGIN
+    UPDATE book_tree_nodes SET updated_at = datetime('now') WHERE id = new.id;
+END;
 ```
 
 **Tree construction:**
@@ -167,7 +190,8 @@ pub struct BookIndex {
     entity_repo: EntityRepo,
     gt_link_repo: GTLinkRepo,
     vector_store: VectorStore,
-    embedder: Arc<dyn EmbeddingEngine>,
+    embedder: Arc<dyn TextEmbedder>,  // cognitive::TextEmbedder trait, NOT the concrete EmbeddingEngine
+    has_content: AtomicBool,          // Cached flag, set true after first successful build
 }
 
 impl BookIndex {
@@ -175,7 +199,7 @@ impl BookIndex {
     pub async fn build_from_note(&self, note_id: &str, content: &str) -> Result<()>;
     pub async fn build_from_task_hierarchy(&self, project_id: &str) -> Result<()>;
     pub async fn rebuild_all(&self) -> Result<()>;
-    pub fn has_content(&self) -> bool;  // Cached check
+    pub fn has_content(&self) -> bool;  // Reads self.has_content AtomicBool (set true after first build)
 
     // Tree navigation
     pub async fn get_subtree(&self, node_id: &str) -> Result<Vec<TreeNode>>;
@@ -204,14 +228,16 @@ Enhancement to the existing `EntityRepo` that replaces simple name matching with
 
 For each new entity `v_n` extracted during indexing:
 
-1. Embed `v_n` (name + description) using the existing `EmbeddingEngine`
-2. Vector search `top_k` candidates from entity embeddings in LanceDB
+1. Embed `v_n` (name + ": " + description) using the existing `TextEmbedder` trait
+2. Vector search `top_k` candidates from `entity_embeddings` table in LanceDB (`{data_dir}/lance/`)
 3. Sort candidates by cosine similarity descending
-4. **Gradient walk**: iterate sorted scores; while `score[i] > score[i-1] / g`, add to selection set; break on sharp drop
+4. **Gradient walk**: iterate sorted scores starting from index 1. For each candidate, check if `score[i] < score[i-1] / g`. If yes, a sharp drop is detected — the gradient point is at index `i`. All candidates before index `i` (i.e., `scores[0..i]`) form the "selection set" of potential merge targets.
 5. Decision:
-   - All candidates passed gradient check (no drop) -> **Case A: new entity** (uniformly low similarity)
-   - Gradient found, 1 match -> **merge** via existing `merge_entities()`
-   - Gradient found, multiple matches -> LLM disambiguation (optional, falls back to highest score)
+   - `detect_gradient` returns `None` (all candidates passed, no drop) -> **Case A: new entity** (uniformly low similarity to all existing entities)
+   - `detect_gradient` returns `Some(i)` where `i == 1` (one match before drop) -> **merge** `v_n` into `candidates[0]` via existing `merge_entities()`
+   - `detect_gradient` returns `Some(i)` where `i > 1` (multiple close matches) -> if `use_llm_disambiguation` is true, call LLM to pick the correct match from `candidates[0..i]`; otherwise merge into `candidates[0]` (highest score)
+
+Additionally: if `scores[0] < min_similarity`, skip gradient walk entirely and treat as new entity (the best match is too dissimilar to be an alias).
 
 ### API
 
@@ -221,7 +247,7 @@ impl EntityRepo {
         &self,
         new_entity: &NewEntity,
         vector_store: &VectorStore,
-        embedder: &dyn EmbeddingEngine,
+        embedder: &dyn TextEmbedder,  // cognitive::TextEmbedder, not concrete EmbeddingEngine
         config: &EntityResolutionConfig,
     ) -> Result<EntityRow>;
 }
@@ -299,6 +325,14 @@ pub enum OperatorType {
 ### OperatorContext (Mutable Pipeline State)
 
 ```rust
+/// Local trait for LLM calls within the operator pipeline.
+/// Avoids a direct dependency on `providers` crate (layer violation).
+/// Follows the same pattern as `DecomposerLlm` in InsightForge.
+#[async_trait]
+pub trait OperatorLlm: Send + Sync {
+    async fn complete(&self, system: &str, prompt: &str) -> Result<String>;
+}
+
 pub struct OperatorContext {
     // Query
     pub query: String,
@@ -314,7 +348,7 @@ pub struct OperatorContext {
 
     // Resources
     pub book_index: Arc<BookIndex>,
-    pub provider: Arc<dyn LlmProvider>,
+    pub llm: Arc<dyn OperatorLlm>,  // Local trait, not providers::LlmProvider
 
     // Safety
     pub max_nodes: usize,        // default: 50
@@ -367,10 +401,22 @@ Standard iterative PageRank with personalized teleportation to seed entities. ~3
 ```rust
 /// Retain only non-dominated nodes across (graph_score, text_score).
 /// Node A dominates B if A >= B on all dimensions with at least one strict >.
-pub fn skyline_filter(nodes: &mut Vec<ScoredNode>) {
-    nodes.retain(|candidate| {
-        !nodes.iter().any(|other| dominates(other, candidate))
-    });
+/// Computes frontier into a new Vec to avoid double-borrow (retain+iter on same slice).
+pub fn skyline_filter(nodes: &[ScoredNode]) -> Vec<ScoredNode> {
+    nodes.iter()
+        .filter(|candidate| {
+            !nodes.iter().any(|other| {
+                !std::ptr::eq(*candidate, other) && dominates(other, candidate)
+            })
+        })
+        .cloned()
+        .collect()
+}
+
+fn dominates(a: &ScoredNode, b: &ScoredNode) -> bool {
+    a.graph_score >= b.graph_score
+        && a.text_score >= b.text_score
+        && (a.graph_score > b.graph_score || a.text_score > b.text_score)
 }
 ```
 
@@ -401,21 +447,34 @@ Classification is heuristic-first (keyword detection), with LLM fallback for amb
 ### Plan Generation
 
 ```rust
+// NOTE: Pseudocode showing plan structure. Actual Rust impl will use
+// Box::new(Extract::new()) as Box<dyn Operator>, etc.
 impl RetrievalPlanner {
     pub async fn plan(&self, query: &str) -> Result<RetrievalPlan>;
 
     fn generate_plan(&self, query: &str, category: QueryCategory) -> Vec<Box<dyn Operator>> {
         match category {
-            SingleHop => vec![
-                Extract, SelectByEntity, GraphReasoning, TextRanker, SkylineRanker, Reduce
+            QueryCategory::SingleHop => vec![
+                Box::new(Extract::new()),
+                Box::new(SelectByEntity::new()),
+                Box::new(GraphReasoning::new()),
+                Box::new(TextRanker::new()),
+                Box::new(SkylineRanker::new()),
+                Box::new(Reduce::new()),
             ],
-            MultiHop => vec![
-                Decompose, SubQueryExecutor(single_hop_pipeline), Map, Reduce
+            QueryCategory::MultiHop => vec![
+                Box::new(Decompose::new()),
+                Box::new(SubQueryExecutor::new(self.single_hop_pipeline())),
+                Box::new(Map::new()),
+                Box::new(Reduce::new()),
             ],
-            GlobalAggregation => vec![
-                FilterModal, FilterRange, Map, Reduce
+            QueryCategory::GlobalAggregation => vec![
+                Box::new(FilterModal::from_query(query)),
+                Box::new(FilterRange::from_query(query)),
+                Box::new(Map::new()),
+                Box::new(Reduce::new()),
             ],
-            PassThrough => vec![],
+            QueryCategory::PassThrough => vec![],
         }
     }
 }
@@ -447,15 +506,30 @@ pub struct BookRAGSearcher {
 impl DomainSearcher for BookRAGSearcher {
     fn domain_name(&self) -> &str { "book_index" }
 
+    // NOTE: DomainSearcher::search returns Vec<MemoryEntry>, NOT Result.
+    // Operator errors must be caught and logged, returning empty vec on failure.
     async fn search(&self, query: &str, limit: usize) -> Vec<MemoryEntry> {
-        // 1. Plan: classify query + generate operators
-        let plan = self.planner.plan(query).await;
-        if plan.category == PassThrough { return vec![]; }
+        if !self.planner.book_index.has_content() {
+            return vec![];
+        }
 
-        // 2. Execute: run operator pipeline
+        // 1. Plan: classify query + generate operators
+        let plan = match self.planner.plan(query).await {
+            Ok(p) => p,
+            Err(e) => {
+                tracing::warn!("BookRAG planning failed: {e}");
+                return vec![];
+            }
+        };
+        if plan.category == QueryCategory::PassThrough { return vec![]; }
+
+        // 2. Execute: run operator pipeline (catch errors per-operator)
         let mut ctx = OperatorContext::new(query, &self.planner.book_index);
         for op in &plan.operators {
-            op.execute(&mut ctx).await?;
+            if let Err(e) = op.execute(&mut ctx).await {
+                tracing::warn!("BookRAG operator '{}' failed: {e}", op.name());
+                return vec![];
+            }
         }
 
         // 3. Convert: ScoredNode -> MemoryEntry
@@ -496,22 +570,39 @@ Tree builds are triggered by domain events, following the same pattern as `Backg
 
 ### Event-driven Updates
 
+**Important:** The actual `bus::DomainEvent` variants don't carry full content or project IDs.
+`NoteUpdated` has `{ note_id, title }` (no content field). Task events (`TaskStatusChanged`,
+`TaskFieldUpdated`, `TaskPriorityChanged`) don't carry `project_id`. The handler must fetch
+data from repos using the IDs provided in events.
+
 ```rust
 // In BackgroundConsolidationService or a new BookIndexUpdater:
 match event {
-    DomainEvent::NoteUpdated { note_id, content } => {
-        book_index.delete_source_tree(SourceType::Note, &note_id).await?;
-        book_index.build_from_note(&note_id, &content).await?;
+    DomainEvent::NoteUpdated { note_id, .. } => {
+        // NoteUpdated only has note_id + title — fetch content from NoteRepo
+        if let Ok(Some(note)) = note_repo.get(&note_id).await {
+            book_index.delete_source_tree(SourceType::Note, &note_id).await?;
+            book_index.build_from_note(&note_id, &note.content).await?;
+        }
     }
     DomainEvent::NoteDeleted { note_id } => {
         book_index.delete_source_tree(SourceType::Note, &note_id).await?;
     }
-    DomainEvent::TaskCreated { project_id, .. } |
-    DomainEvent::TaskUpdated { project_id, .. } => {
-        book_index.build_from_task_hierarchy(&project_id).await?;
+    // Task events don't carry project_id — look up the task to find its project
+    DomainEvent::TaskStatusChanged { task_id, .. }
+    | DomainEvent::TaskFieldUpdated { task_id, .. }
+    | DomainEvent::TaskPriorityChanged { task_id, .. } => {
+        if let Ok(Some(task)) = task_repo.get(&task_id).await {
+            if let Some(project_id) = &task.project_id {
+                book_index.build_from_task_hierarchy(project_id).await?;
+            }
+        }
     }
 }
 ```
+
+**Note:** New `DomainEvent` variants (e.g., `NoteCreated`, `TaskCreated`) may need to be added
+to `bus::DomainEvent` if they don't already exist. Check the actual enum definition during implementation.
 
 ### Markdown Parser
 
@@ -547,7 +638,10 @@ Built once at boot from compiled skill YAML sections. Rebuilt only when skills c
 | `book_tree_nodes_fts` | FTS5 for keyword search in nodes |
 | `entity_tree_links` | GT-Link junction (entity <-> tree node) |
 
-### New LanceDB Table
+### New LanceDB Table (in `{data_dir}/lance/`, managed by existing `VectorStore`)
+
+The `entity_embeddings` table must be registered in `VectorStore::connect()` via `ensure_table()`
+so it participates in the same managed LanceDB store as all other vector tables.
 
 | Table | Purpose |
 |-------|---------|
@@ -564,13 +658,19 @@ Built once at boot from compiled skill YAML sections. Rebuilt only when skills c
 
 ## Module Structure
 
+**Layer constraint:** `context_engine` is L3 and cannot depend on `cognitive` (L5) or `storage` (L2)
+directly for concrete repo types. The BookIndex modules use **dependency inversion**: traits defined
+in `context_engine` are implemented by adapters in `agent` (L5), which wires everything together.
+This follows the existing pattern (`MemoryRetriever` trait in `context_engine`, implemented in
+`cognitive`, wired in `agent_loop/builder.rs`).
+
 ```
 crates/context_engine/src/
     book_index/
-        mod.rs              -- BookIndex orchestrator
-        tree.rs             -- TreeNode, BookTreeRepo, markdown parser
-        gt_link.rs          -- GTLinkRepo, entity-to-node mapping
-        entity_resolution.rs -- Gradient-based ER (Algorithm 1)
+        mod.rs              -- BookIndex orchestrator (uses trait objects, not concrete repos)
+        tree.rs             -- TreeNode types, BookTreeRepo trait (abstract)
+        gt_link.rs          -- GTLinkRepo trait (abstract), GTLink types
+        entity_resolution.rs -- Gradient-based ER algorithm (Algorithm 1)
         types.rs            -- TreeNodeType, SourceType, ScoredNode, configs
     operators/
         mod.rs              -- Operator trait, OperatorType, OperatorContext, pipeline executor
@@ -586,7 +686,23 @@ crates/context_engine/src/
         bookrag_searcher.rs -- NEW: BookRAGSearcher (DomainSearcher impl)
         mod.rs              -- EXISTING: add bookrag_searcher to module
         ... (existing files unchanged)
+
+crates/cognitive/src/
+    repos/
+        book_tree.rs        -- NEW: Concrete BookTreeRepo impl (SQLite)
+        gt_link.rs          -- NEW: Concrete GTLinkRepo impl (SQLite)
+    adapters/
+        book_index_adapter.rs -- NEW: Implements context_engine traits with concrete repos
+
+crates/agent/src/
+    adapters/
+        book_index_wiring.rs -- NEW: Constructs BookIndex with concrete impls, registers BookRAGSearcher
 ```
+
+**Pattern**: `context_engine` defines `BookTreeRepo` and `GTLinkRepo` as `#[async_trait] pub trait`s.
+`cognitive` implements them with SQLite. `agent/builder.rs` wires the concrete impls into `BookIndex`
+via `Arc<dyn BookTreeRepo>` and `Arc<dyn GTLinkRepo>`. Same for `OperatorLlm` (implemented in `agent`
+as an adapter over `DynProvider`).
 
 ## What's NOT Changing
 
@@ -601,6 +717,23 @@ crates/context_engine/src/
 - Config schema (new fields added, no breaking changes)
 
 ## Config Additions
+
+A new `BookIndexConfig` struct is needed inside `CognitiveConfig`, following the existing
+`#[serde(rename_all = "camelCase")]` pattern. The existing `CognitiveConfig` uses flat fields,
+so this nested struct is an intentional departure for the new subsystem.
+
+```rust
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BookIndexConfig {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    #[serde(default)]
+    pub entity_resolution: EntityResolutionConfig,
+    #[serde(default)]
+    pub retrieval: BookRetrievalConfig,
+}
+```
 
 ```json
 {
@@ -632,6 +765,8 @@ crates/context_engine/src/
 | Gradient-based ER may merge entities that shouldn't be merged | Conservative threshold (g=0.6); min_similarity floor (0.3); entity merge is reversible (split operation can be added later) |
 | Small subgraph PageRank may not converge for disconnected components | Seed-based personalized PageRank handles disconnected components naturally (isolated nodes get low scores) |
 | Tree rebuilds on every note edit | Delete-then-rebuild is fast for typical note sizes (30-50 nodes); SQLite handles this in <10ms |
+| Trait indirection for layer compliance adds complexity | Follows the existing `MemoryRetriever` / `DecomposerLlm` pattern — proven in the codebase |
+| DomainEvent variants may be insufficient for tree updates | Check actual `bus::DomainEvent` enum during implementation; add new variants if needed |
 
 ## Success Criteria
 
