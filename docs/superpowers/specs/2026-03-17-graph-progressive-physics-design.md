@@ -33,24 +33,25 @@ This pattern is used by Neo4j Bloom, yEd, and modern Obsidian graph plugins for 
 ### Cache key
 
 ```
-key = `${viewMode}-${graphFingerprint}-${leidenVersion}`
+key = `${viewMode}-${graphFingerprint}`
 ```
 
 - `graphFingerprint`: Hash of `sorted(nodeIds) + sorted(edgePairs)` — changes when structure changes
-- `leidenVersion`: Timestamp from `graph_communities.last_computed`
 - Cache miss or fingerprint mismatch triggers full fCoSE
+- **Future extension:** When Leiden community detection is implemented, add `leidenVersion` to the key to invalidate on community recomputation
 
 ### Layout lifecycle
 
 ```
 Graph mounts
-  -> Compute fingerprint + leidenVersion
+  -> Compute fingerprint
   -> Cache HIT:
       - Apply cached positions via "preset" layout (instant)
+      - Compound parents auto-compute bounds from children (no need to cache them)
       - If user drags -> switch to Cola interactive (seamless handoff)
   -> Cache MISS:
       - Run fCoSE (max 2500 iterations)
-      - Snapshot ALL positions (leaf nodes + compound parents)
+      - Snapshot leaf node positions only (compound parents are auto-computed)
       - Write to IndexedDB
 
 Node added/removed (or edge change):
@@ -63,7 +64,7 @@ Cola interactive mode (drag / Live Physics toggle):
   -> Start Cola from current cached positions (no jump)
   -> User drags freely (Cola physics)
   -> When user stops (or exits mode) -> snapshot final positions back to cache
-  -> Auto-switch back to fCoSE for next render
+  -> Next fCoSE run (if needed) starts from cached positions
 
 Settings change (repulsion, gravity, etc.):
   -> Full fCoSE re-layout (user explicitly requested)
@@ -72,8 +73,8 @@ Settings change (repulsion, gravity, etc.):
 
 ### Compound node handling
 
-- Cache stores both leaf node positions **and** compound parent bounds
-- When Leiden communities change -> invalidate only affected view modes (partial clear)
+- Cache stores **leaf node positions only** — Cytoscape auto-computes compound parent bounds from children's bounding boxes. Caching compound positions is unnecessary and would be overridden.
+- When cluster membership changes (e.g., note moved between notebooks), the fingerprint changes -> cache miss for affected nodes
 
 ### Invalidation & fallback
 
@@ -87,7 +88,7 @@ Settings change (repulsion, gravity, etc.):
 ### Hub selection (center node)
 
 1. **Active note** — if user navigated from a specific note, that note is the hub
-2. **Most connected** — node with the highest link count
+2. **Most connected** — node with the highest link count (tiebreaker: alphabetical by title for deterministic selection across reopens)
 3. **Fallback** — first note of the first notebook (alphabetical)
 
 ### BFS wave generation (computed once per data load)
@@ -114,83 +115,95 @@ Wave N+1: Orphan nodes (no edges) — placed in outer arc
 
 #### Cache-MISS path (first load or structure change — layout required)
 
-- Wave 0: add hub -> run fCoSE (trivial)
-- Wave 1: add neighbors -> fCoSE with hub pinned
+- Wave 0: add hub -> run fCoSE (trivial, 1 node)
+- Wave 1: add neighbors -> fCoSE with hub pinned via `fixedNodeConstraint`
 - Wave 2: add next ring -> fCoSE with waves 0-1 pinned
+- **Critical:** all incremental fCoSE passes must use `randomize: false` + `quality: "proof"` to prevent spectral re-initialization. Without this, fCoSE recalculates positions from scratch each wave instead of building on previous placements.
 - Each wave waits ~150ms settle time before the next wave
 - After final wave: snapshot all positions -> save to cache
 - Orphans: appear last, arranged loosely in an outer arc
 
 ### Performance guard (>= 800 nodes)
 
-- Limit animated waves to **max 5 waves**
-- Remaining nodes (wave 6+) appear in a single batch (still stagger opacity)
+- Limit animated waves to **waves 0-4** (5 total, zero-indexed)
+- All remaining nodes (wave 5+) appear in a single batch (still stagger opacity)
 - Reduce fCoSE iterations progressively:
-  - Wave 0-2: 2500
-  - Wave 3-4: 1500
-  - Batch: 1000
+  - Waves 0-2: 2500 iterations
+  - Waves 3-4: 1500 iterations
+  - Final batch: 1000 iterations
 - Disable animation entirely if user enables "Instant load" in Settings
 
 ### Visual polish
 
 - Nodes scale from 0.7->1.0 on reveal (subtle "grow" effect)
 - Edges fade in smoothly when both connected nodes are visible
-- Viewport gently auto-fits after each wave to keep revealed nodes in view
+- Viewport gently auto-fits after each wave — but only if the user has not manually panned/zoomed since the reveal started (check via a `userInteracted` flag set on `viewport` events)
 - Subtle pulse effect on the hub node (wave 0) during the first 800ms
 
 ---
 
 ## Section 3: Interactive Cola Physics (Drag & Live Mode)
 
+### API reality: how cytoscape-cola actually works
+
+**Important:** cytoscape-cola is a Cytoscape layout extension that wraps the `webcola` (WebCoLa) library. Key differences from fCoSE:
+
+- Cola does **not** have `fixedNodeConstraint`. To pin nodes, use Cytoscape's native `node.lock()` / `node.unlock()` API, which prevents locked nodes from being moved by any layout.
+- cytoscape-cola as a standard layout runs once via `layout.run()` and fires `layoutstop`. For **continuous ticking** (live physics), we must either:
+  - Use `infinite: true` in the layout options (keeps the simulation running indefinitely)
+  - Or access the underlying webcola adapter via the layout's internal API for fine-grained tick control
+- The `infinite: true` approach is simpler and sufficient for our needs — it keeps Cola's force simulation running until explicitly stopped via `layout.stop()`.
+
 ### Mode 1: Auto-activate on drag (default, always on)
 
 When user grabs any node:
 
-1. Pause fCoSE (positions already cached)
-2. Spin up **scoped Cola** on the dragged node + N-hop neighborhood:
+1. Ensure no layout is currently running (check `layout.stopped()` or cancel any active animated layout)
+2. **Lock all out-of-scope nodes** via `cy.nodes().lock()` — this prevents Cola from moving them
+3. **Unlock the scoped neighborhood** (dragged node + N-hop neighbors):
    - N = 2 for graphs < 800 nodes
    - N = 1 for graphs >= 800 (performance guard)
    - Scope capped at viewport + 1-hop buffer (`cy.extent()`)
-3. Cola config (tuned for knowledge graphs):
+4. Start Cola layout with `infinite: true` on the full graph (only unlocked nodes will move):
    - `handleDisconnected: false`
-   - `fixedNodeConstraint` on every node outside the scope
-   - Spring stiffness: 0.04 (gentle pull)
-   - Repulsion: derived from user settings
-   - Damping: 0.7 (quick settle)
-4. During drag: Cola ticks continuously — neighbors drift naturally
-5. On release:
-   - Cola runs ~300ms settle time
+   - `edgeLength` derived from `settings.linkDistance`
+   - `nodeSpacing: 10`
+   - `unconstrainedIterations: 50`, `userConstraintIterations: 100`
+5. During drag: Cola ticks continuously — unlocked neighbors drift naturally toward equilibrium
+6. On release:
+   - Let Cola run ~300ms settle time (alpha decays naturally)
+   - Call `layout.stop()` to halt simulation
+   - `cy.nodes().unlock()` — restore all nodes to normal state
    - Snapshot all moved positions -> update cache
-   - Destroy Cola instance (free memory)
 
 ### Mode 2: "Live Physics" toggle (prominent toolbar icon)
 
 When enabled:
 
-1. Cola runs continuously on **viewport-visible nodes + 1-hop buffer**
-2. Graph gently "breathes" — nodes repel/attract in real time
-3. User can drag freely; whole visible clusters respond
-4. Performance guard: Cola only ticks nodes inside `cy.extent()` + buffer
-5. Auto-pause after 30s idle (fade to static with 200ms transition) — resume instantly on mouse move
-6. On disable: snapshot -> cache
+1. Lock all nodes outside the viewport + 1-hop buffer (`cy.extent()`)
+2. Start Cola with `infinite: true` — simulation runs continuously on unlocked (visible) nodes
+3. Graph gently "breathes" — nodes repel/attract in real time
+4. User can drag freely; whole visible clusters respond
+5. On viewport pan/zoom: update lock set (lock newly off-screen nodes, unlock newly visible ones) — debounce at 100ms
+6. Auto-pause after 30s idle: call `layout.stop()`, fade to static (200ms transition) — resume on mouse move by restarting layout
+7. On disable: `layout.stop()`, unlock all, snapshot -> cache
 
 ### Transition smoothness (critical)
 
-- Cola always initializes from current rendered positions (zero jump)
-- When Cola stops, nodes stay exactly where Cola left them
+- Cola initializes from current rendered positions via Cytoscape's existing node positions (zero jump — Cola reads `node.position()` as starting state)
+- When Cola stops, nodes stay exactly where Cola left them (positions are already applied to Cytoscape elements)
 - Position cache remains the single source of truth for both fCoSE and Cola
 
 ### Connected-feel tuning (same sliders work for both layouts)
 
-- Spring stiffness: 0.04
-- Spring length: derived from `settings.linkDistance`
-- Repulsion: derived from `settings.repulsion`
-- **Semantic boost:** edges with high semantic similarity (>0.65) or AI-highlighted edges get 1.5x stronger springs
+- Edge length: derived from `settings.linkDistance`
+- Node spacing (repulsion proxy): derived from `settings.repulsion`
+- **Future extension:** When semantic similarity scores are added to the edge data model, edges with similarity > 0.65 can get shorter `edgeLength` values (1.5x stronger pull). Currently edges only carry duplicate-link weight (1/1.8/2.8), which is used as-is.
 
 ### Edge case: dragging a hub node (10+ connections)
 
-- Cap Cola scope to the 8 strongest connections (by edge weight)
-- Remaining neighbors get a lighter "nudge" via position interpolation (no full physics)
+- Cap the unlocked scope to the 8 strongest connections (by edge weight)
+- Remaining neighbors stay locked but get a gentle animated nudge via `node.animate({ position })` — manually computed as a 15-20px shift toward the dragged node's new position, with 200ms ease-in-out
 
 ### Visual feedback during Cola
 
@@ -213,9 +226,9 @@ When enabled:
 
 - Fingerprint changes (edge list is part of hash)
 - Add/remove the edge element from Cytoscape via `cy.add()` / `cy.remove()` (no `cy.json()`)
-- Run **scoped Cola** on the two endpoints + their 1-hop neighbors (~150ms)
-- All other nodes stay pinned via cache
-- Snapshot affected positions -> update cache
+- Lock all nodes except the two endpoints + their 1-hop neighbors
+- Run Cola with `infinite: false` (one-shot settle, ~150ms)
+- Unlock all, snapshot affected positions -> update cache
 
 #### C) New note created (node added)
 
@@ -229,14 +242,16 @@ When enabled:
 #### D) Note deleted (node removed)
 
 - Remove node + its edges from Cytoscape via `cy.remove()`
-- Run scoped Cola on the gap area (former neighbors settle inward slightly)
-- Update cache (remove deleted node, snapshot new neighbor positions)
+- Lock all nodes except the former neighbors (they settle inward slightly)
+- Run Cola with `infinite: false` (one-shot settle)
+- Unlock all, update cache (remove deleted node, snapshot new neighbor positions)
 
 #### E) Note moved between notebooks
 
 - Remove from old compound -> add to new compound
-- Run scoped Cola only on the two compounds + their 1-hop neighbors
-- No full re-layout
+- Lock all nodes except those in the two affected compounds + their 1-hop neighbors
+- Run Cola with `infinite: false` (one-shot settle)
+- Unlock all, snapshot -> cache
 
 #### F) View mode switch (Full -> By Notebook -> By Tag)
 
@@ -245,11 +260,11 @@ When enabled:
 - If target view has no cache -> full fCoSE + progressive reveal (Section 2 cache-miss path)
 - No cross-contamination between view caches
 
-#### G) Cluster/community membership changes
+#### G) Cluster/community membership changes (future)
 
-- Leiden recomputation -> `leidenVersion` in cache key changes -> cache miss
+- When Leiden community detection is implemented: community version change -> fingerprint change -> cache miss
 - Full fCoSE re-layout with progressive reveal
-- This is rare (only when user triggers community recompute)
+- Currently clusters are notebook-based only (computed client-side)
 
 ### Element diffing strategy (replaces `cy.json({ elements })`)
 
@@ -316,4 +331,5 @@ If multiple changes happen within < 200ms (e.g., bulk import or AI auto-linking)
 | IndexedDB not available (private browsing) | Fallback to localStorage with 800-node cap |
 | fCoSE + Cola position desync | Single position cache as source of truth; both read/write to same store |
 | Progressive reveal feels slow on large graphs | Cap at 5 animated waves; "Instant load" escape hatch in settings |
-| Compound parent bounds drift after Cola moves children | Re-compute compound bounds on Cola snapshot |
+| Compound parent bounds drift after Cola moves children | Cytoscape auto-computes compound bounds from children — no manual intervention needed |
+| cytoscape-cola `infinite: true` CPU usage | Auto-stop after 30s idle; use `node.lock()` to minimize active simulation scope |
