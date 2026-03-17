@@ -96,6 +96,8 @@ impl AppCore {
             notification_dispatcher,
             proactive_handler,
             suggestion_applier,
+            decomposition_handler,
+            forecast_handler,
         } = cron::init_cron(
             &config,
             &repos,
@@ -239,8 +241,8 @@ impl AppCore {
             launcher_engine,
             proactive_handler,
             suggestion_applier,
-            decomposition_handler: None,
-            forecast_handler: None,
+            decomposition_handler,
+            forecast_handler,
         };
 
         // ── Background note embedding catch-up ────────────────────────────
