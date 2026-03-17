@@ -140,7 +140,7 @@ export function GraphView({
       />
 
       <div className="flex-1 relative min-h-0">
-        <div ref={containerRef} className="absolute inset-0" />
+        <div ref={containerRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
 
         <GraphLegend clusters={clusters} onHighlight={handleLegendHighlight} />
 
