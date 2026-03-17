@@ -1,9 +1,10 @@
 import { Bot, ChevronDown, Sparkles, Zap } from "lucide-react";
 import { useState } from "react";
-import type { Suggestion, TaskMemory, TaskState } from "../../lib/mappers";
+import type { DetailTask, Suggestion, TaskMemory, TaskState } from "../../lib/mappers";
 import { SectionLabel } from "./SectionLabel";
 
 interface SidebarAiInsightsProps {
+  task: DetailTask;
   taskState: TaskState;
   suggestions: Suggestion[];
   taskMemory: TaskMemory | null;
@@ -14,6 +15,7 @@ interface SidebarAiInsightsProps {
 }
 
 export function SidebarAiInsights({
+  task,
   taskState,
   suggestions,
   taskMemory,
@@ -29,7 +31,7 @@ export function SidebarAiInsights({
       {taskState === "completed" && taskMemory ? (
         <WhatAiLearned memory={taskMemory} />
       ) : taskState === "new" && suggestions.filter((s) => s.status === "pending").length === 0 ? (
-        <WhyThisTaskNow />
+        <WhyThisTaskNow task={task} />
       ) : (
         <SuggestionsList suggestions={suggestions} onApply={onApply} onDismiss={onDismiss} />
       )}
@@ -140,12 +142,75 @@ function SuggestionCard({
   );
 }
 
-function WhyThisTaskNow() {
-  const reasons = [
-    { icon: Zap, text: "High priority — P1" },
-    { icon: Zap, text: "Due in 2 days" },
-    { icon: Zap, text: "Matches your current energy window" },
-  ];
+interface TaskReason {
+  icon: typeof Zap;
+  text: string;
+  weight: number;
+}
+
+function computeReasons(task: DetailTask): TaskReason[] {
+  const reasons: TaskReason[] = [];
+  const now = new Date();
+
+  // Priority
+  if (task.priority?.id === "urgent") {
+    reasons.push({ icon: Zap, text: "P1 — highest priority", weight: 100 });
+  } else if (task.priority?.id === "high") {
+    reasons.push({ icon: Zap, text: "P2 — high priority", weight: 80 });
+  }
+
+  // Due date
+  if (task.dueDate) {
+    const due = new Date(task.dueDate);
+    const diffDays = Math.floor((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    if (diffDays < 0) {
+      const absDays = Math.abs(diffDays);
+      reasons.push({
+        icon: Zap,
+        text: `Overdue by ${absDays} day${absDays !== 1 ? "s" : ""}`,
+        weight: 95,
+      });
+    } else if (diffDays === 0) {
+      reasons.push({ icon: Zap, text: "Due today", weight: 90 });
+    } else if (diffDays <= 3) {
+      reasons.push({
+        icon: Zap,
+        text: `Due in ${diffDays} day${diffDays !== 1 ? "s" : ""}`,
+        weight: 70,
+      });
+    }
+  }
+
+  // Focus momentum
+  if (task.focusedAt) {
+    reasons.push({ icon: Zap, text: "You're already in flow", weight: 85 });
+  }
+
+  // Energy match
+  if (task.energyLevel) {
+    const hour = now.getHours();
+    const currentEnergy =
+      hour >= 6 && hour < 12 ? "high" : hour >= 12 && hour < 17 ? "medium" : "low";
+    if (task.energyLevel === currentEnergy) {
+      reasons.push({
+        icon: Zap,
+        text: "Matches your current energy window",
+        weight: 60,
+      });
+    }
+  }
+
+  // Quick win
+  if (task.complexityScore != null && task.complexityScore <= 30) {
+    reasons.push({ icon: Zap, text: "Quick win — low complexity", weight: 50 });
+  }
+
+  return reasons.sort((a, b) => b.weight - a.weight).slice(0, 3);
+}
+
+function WhyThisTaskNow({ task }: { task: DetailTask }) {
+  const reasons = computeReasons(task);
+  if (reasons.length === 0) return null;
 
   return (
     <div className="space-y-2">

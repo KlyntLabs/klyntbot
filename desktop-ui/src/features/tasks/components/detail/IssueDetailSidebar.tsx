@@ -55,6 +55,7 @@ export function IssueDetailSidebar({ detail, onClose }: IssueDetailSidebarProps)
           />
         )}
         <SidebarAiInsights
+          task={detail.task}
           taskState={taskState}
           suggestions={detail.suggestions}
           taskMemory={detail.taskMemory}
