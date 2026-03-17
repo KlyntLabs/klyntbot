@@ -44,12 +44,12 @@ export function useCytoscapeTheme(): { stylesheet: Stylesheet[]; isLight: boolea
   }, []);
 
   return useMemo(() => {
-    const light = isLightTheme();
-    const textPrimary = resolveColor("--text-primary", light ? "#000000" : "#f0f2f5");
-    const textSecondary = resolveColor("--text-secondary", light ? "#525252" : "#c8cdd4");
-    const border = resolveColor("--border", light ? "#d4d4d4" : "rgba(255,255,255,0.1)");
+    const light = themeKey === "retro";
+    const textPrimary = light ? "#000000" : "#f0f2f5";
+    const textSecondary = light ? "#525252" : "#c8cdd4";
+    const border = light ? "#d4d4d4" : "rgba(255,255,255,0.1)";
     const edgeColor = light ? "#d4d4d4" : "rgba(255,255,255,0.15)";
-    const brand = resolveColor("--brand", light ? "#ca8a04" : "#f97316");
+    const brand = light ? "#ca8a04" : "#f97316";
 
     const stylesheet: Stylesheet[] = [
       // ── Compound parents — invisible (clustering via node color + legend) ──
