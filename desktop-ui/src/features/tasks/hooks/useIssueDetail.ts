@@ -208,8 +208,9 @@ export function useIssueDetail(
           status: s.status as SuggestionStatus,
         })),
       );
-    } catch (e) {
-      setAiError(String(e));
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : typeof e === "object" && e !== null ? JSON.stringify(e) : String(e);
+      setAiError(msg);
     } finally {
       setSuggestionsLoading(false);
     }
@@ -244,8 +245,9 @@ export function useIssueDetail(
         setDecompositionResult(result);
         setDecompositionOpen(true);
       }
-    } catch (e) {
-      setAiError(String(e));
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : typeof e === "object" && e !== null ? JSON.stringify(e) : String(e);
+      setAiError(msg);
     }
   }, [task.id, refetch]);
 
@@ -279,8 +281,10 @@ export function useIssueDetail(
     try {
       const result = await ipc<TaskForecast>("task_forecast", { taskId: task.id });
       setForecast(result);
-    } catch {
+    } catch (e: unknown) {
       setForecast(null);
+      const msg = e instanceof Error ? e.message : typeof e === "object" && e !== null ? JSON.stringify(e) : String(e);
+      setAiError(msg);
     } finally {
       setForecastLoading(false);
     }
