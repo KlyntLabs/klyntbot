@@ -29,19 +29,23 @@ export function NotePicker({ onSelect, onCancel }: NotePickerProps) {
     return () => document.removeEventListener("keydown", handler);
   }, [onCancel]);
 
+  const requestIdRef = useRef(0);
   const search = useCallback(async (q: string) => {
     if (q.trim().length < 2) {
       setResults([]);
       return;
     }
+    const id = ++requestIdRef.current;
     setLoading(true);
     try {
       const notes = await ipc<Note[]>("note_search", { query: q });
+      if (id !== requestIdRef.current) return; // stale response
       setResults(notes.slice(0, 10));
     } catch {
+      if (id !== requestIdRef.current) return;
       setResults([]);
     } finally {
-      setLoading(false);
+      if (id === requestIdRef.current) setLoading(false);
     }
   }, []);
 

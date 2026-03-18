@@ -1,4 +1,6 @@
 use crate::types::{CardGenerationContext, GeneratedCard};
+use common::helpers::strip_llm_fences;
+use common::truncate_chars;
 use tracing::warn;
 
 /// Build the system + user messages for card generation.
@@ -42,9 +44,9 @@ Respond ONLY with a JSON array. No markdown fences, no explanation, no preamble.
 /// Handles common LLM quirks: markdown fences around JSON, trailing commas (via serde),
 /// and individual card validation (skips malformed cards rather than failing entirely).
 pub fn parse_generated_cards(response: &str) -> Result<Vec<GeneratedCard>, String> {
-    let cleaned = strip_json_fences(response);
+    let cleaned = strip_llm_fences(response);
 
-    let cards: Vec<GeneratedCard> = serde_json::from_str(&cleaned)
+    let cards: Vec<GeneratedCard> = serde_json::from_str(cleaned)
         .map_err(|e| format!("Failed to parse card generation response: {e}"))?;
 
     // Filter out cards with empty front/back
@@ -78,40 +80,13 @@ pub fn summarize_existing_cards(cards: &[(String, String)]) -> Option<String> {
         .iter()
         .take(30) // Cap at 30 to avoid prompt overflow
         .map(|(front, back)| {
-            let front_truncated = truncate(front, 80);
-            let back_truncated = truncate(back, 80);
+            let front_truncated = truncate_chars(front, 80, "…");
+            let back_truncated = truncate_chars(back, 80, "…");
             format!("- Q: {} → A: {}", front_truncated, back_truncated)
         })
         .collect();
 
     Some(summary.join("\n"))
-}
-
-fn strip_json_fences(s: &str) -> String {
-    let trimmed = s.trim();
-    if let Some(rest) = trimmed.strip_prefix("```json") {
-        rest.strip_suffix("```")
-            .unwrap_or(rest)
-            .trim()
-            .to_string()
-    } else if let Some(rest) = trimmed.strip_prefix("```") {
-        rest.strip_suffix("```")
-            .unwrap_or(rest)
-            .trim()
-            .to_string()
-    } else {
-        trimmed.to_string()
-    }
-}
-
-fn truncate(s: &str, max_chars: usize) -> String {
-    let mut chars = s.chars();
-    let truncated: String = chars.by_ref().take(max_chars).collect();
-    if chars.next().is_some() {
-        format!("{truncated}…")
-    } else {
-        truncated
-    }
 }
 
 #[cfg(test)]

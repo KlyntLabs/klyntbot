@@ -14,6 +14,23 @@ export default function LearnPage() {
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const cardGen = useCardGeneration();
   const [cardGenOpen, setCardGenOpen] = useState(false);
+  const { generateFromNote, generateFromText } = cardGen;
+
+  const handleGenerateFromNote = useCallback(
+    (noteId: string) => {
+      setCardGenOpen(true);
+      generateFromNote(noteId);
+    },
+    [generateFromNote],
+  );
+
+  const handleGenerateFromText = useCallback(
+    (text: string) => {
+      setCardGenOpen(true);
+      generateFromText(text);
+    },
+    [generateFromText],
+  );
 
   const handleStartReview = useCallback((deck?: string) => {
     setReviewDeck(deck);
@@ -47,14 +64,8 @@ export default function LearnPage() {
       <DashboardHome
         onStartReview={handleStartReview}
         onQuickAdd={() => setQuickAddOpen(true)}
-        onGenerateFromNote={(noteId) => {
-          setCardGenOpen(true);
-          cardGen.generateFromNote(noteId);
-        }}
-        onGenerateFromText={(text) => {
-          setCardGenOpen(true);
-          cardGen.generateFromText(text);
-        }}
+        onGenerateFromNote={handleGenerateFromNote}
+        onGenerateFromText={handleGenerateFromText}
         generating={cardGen.generating}
       />
       <QuickAdd

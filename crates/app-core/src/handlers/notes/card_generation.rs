@@ -27,7 +27,7 @@ impl AppCore {
                     .note_repo
                     .get_note(nid)
                     .await
-                    .map_err(|e| ApiError::new("NOT_FOUND", e.to_string()))?
+                    .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?
                     .ok_or_else(|| ApiError::new("NOT_FOUND", "Note not found"))?;
                 (note.title.clone(), note.body.clone(), Some(nid.clone()))
             }

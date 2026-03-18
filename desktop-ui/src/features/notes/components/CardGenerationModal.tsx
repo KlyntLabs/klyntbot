@@ -174,7 +174,7 @@ export function CardGenerationModal({
           {generating && (
             <div className="flex flex-col items-center justify-center py-12 gap-3">
               <Loader2 size={24} className="text-brand animate-spin" strokeWidth={1.5} />
-              <p className="text-sm text-muted-foreground">Generating cards from your note...</p>
+              <p className="text-sm text-muted-foreground">Generating cards...</p>
             </div>
           )}
 
@@ -187,7 +187,7 @@ export function CardGenerationModal({
           {!generating &&
             previews.map((card, i) => (
               <CardPreviewRow
-                key={`${card.front.slice(0, 20)}-${i}`}
+                key={i}
                 card={card}
                 index={i}
                 isApproved={approved.has(i)}

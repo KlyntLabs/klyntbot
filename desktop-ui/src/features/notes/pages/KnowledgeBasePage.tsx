@@ -257,17 +257,18 @@ export default function KnowledgeBasePage() {
     [deleteInboxItem],
   );
 
+  const { generateFromNote, generateFromText } = cardGen;
   const handleGenerateCards = useCallback(
     (selectedText?: string) => {
       if (!selectedNote) return;
       setCardGenOpen(true);
       if (selectedText) {
-        cardGen.generateFromText(selectedText, selectedNote.title);
+        generateFromText(selectedText, selectedNote.title);
       } else {
-        cardGen.generateFromNote(selectedNote.id);
+        generateFromNote(selectedNote.id);
       }
     },
-    [selectedNote, cardGen.generateFromNote, cardGen.generateFromText],
+    [selectedNote, generateFromNote, generateFromText],
   );
 
   // ── Resize logic (left sidebar) ───────────────────────────────────────
