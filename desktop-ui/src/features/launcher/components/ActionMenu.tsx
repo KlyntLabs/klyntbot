@@ -99,7 +99,7 @@ export function ActionMenu() {
       onKeyDown={() => {}}
     >
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/40" />
+      <div className="absolute inset-0 bg-overlay" />
 
       {/* Menu */}
       <div
@@ -111,7 +111,9 @@ export function ActionMenu() {
       >
         {/* Header */}
         <div className="px-4 py-2.5 border-b border-border">
-          <div className="text-xs text-muted uppercase tracking-wider mb-0.5">Actions</div>
+          <div className="text-xs text-muted-foreground uppercase tracking-wider mb-0.5">
+            Actions
+          </div>
           <div className="text-sm text-foreground truncate">{item.title}</div>
         </div>
 
@@ -122,20 +124,24 @@ export function ActionMenu() {
               key={action.label}
               type="button"
               className={`w-full flex items-center gap-3 px-4 py-2 text-left transition-colors duration-100 ${
-                index === focusedIndex ? "bg-surface-raised" : "hover:bg-surface-raised/50"
+                index === focusedIndex ? "bg-muted" : "hover:bg-muted/50"
               }`}
               onClick={() => executeAction(index)}
               onMouseEnter={() => setFocusedIndex(index)}
             >
-              <span className="text-xs text-muted w-4 text-center shrink-0">{index + 1}</span>
+              <span className="text-xs text-muted-foreground w-4 text-center shrink-0">
+                {index + 1}
+              </span>
               <span className="text-sm text-foreground flex-1">{action.label}</span>
-              {action.shortcut && <span className="text-[10px] text-muted">{action.shortcut}</span>}
+              {action.shortcut && (
+                <span className="text-[10px] text-muted-foreground">{action.shortcut}</span>
+              )}
             </button>
           ))}
         </div>
 
         {/* Footer hint */}
-        <div className="px-4 py-1.5 border-t border-border text-[10px] text-muted">
+        <div className="px-4 py-1.5 border-t border-border text-[10px] text-muted-foreground">
           1-9 quick select &middot; &uarr;&darr; navigate &middot; Esc close
         </div>
       </div>

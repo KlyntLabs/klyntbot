@@ -42,10 +42,13 @@ fn hash_value_into(value: &serde_json::Value, hasher: &mut impl Hasher) {
         serde_json::Value::Null => {}
         serde_json::Value::Bool(b) => b.hash(hasher),
         serde_json::Value::Number(n) => {
-            // Hash the canonical string representation of the number
-            // to avoid f64 hashing issues while staying allocation-free.
-            for byte in n.to_string().bytes() {
-                byte.hash(hasher);
+            // Hash numeric representation directly to avoid string allocation.
+            if let Some(i) = n.as_i64() {
+                i.hash(hasher);
+            } else if let Some(u) = n.as_u64() {
+                u.hash(hasher);
+            } else if let Some(f) = n.as_f64() {
+                f.to_bits().hash(hasher);
             }
         }
         serde_json::Value::String(s) => s.hash(hasher),

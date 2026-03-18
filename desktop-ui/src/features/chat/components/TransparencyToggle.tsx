@@ -16,7 +16,7 @@ export function TransparencyToggle({ enabled, onToggle }: TransparencyToggleProp
       className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${
         enabled
           ? "bg-brand/10 text-brand hover:bg-brand/20"
-          : "text-muted hover:bg-white/[0.06] hover:text-secondary"
+          : "text-muted-foreground hover:bg-accent hover:text-foreground"
       }`}
       title={enabled ? "Hide transparency data" : "Show transparency data"}
     >

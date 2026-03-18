@@ -213,6 +213,18 @@ pub enum DomainEvent {
         note_id: String,
         title: String,
     },
+    NoteContentChanged {
+        note_id: String,
+        content: String,
+    },
+    NoteDeleted {
+        note_id: String,
+    },
+
+    // -- Task hierarchy (BookIndex) --
+    TaskHierarchyChanged {
+        project_id: String,
+    },
 
     // -- Chat --
     ChatTurnCompleted {
@@ -250,6 +262,15 @@ pub enum DomainEvent {
         pattern_key: String,
         sample_count: i32,
         detail: String,
+    },
+
+    // -- Contradiction detection (Phase 3 prep) --
+    ContradictionDetected {
+        existing_subject: String,
+        existing_predicate: String,
+        existing_object: String,
+        new_object: String,
+        confidence: f64,
     },
 }
 

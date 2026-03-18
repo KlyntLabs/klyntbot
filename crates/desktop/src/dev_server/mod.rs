@@ -32,6 +32,7 @@ pub(super) type SseChannels = Arc<DashMap<String, broadcast::Sender<(String, Val
 pub(super) struct DevState {
     pub(super) core: Arc<AppCore>,
     pub(super) sse_channels: SseChannels,
+    pub(super) insight_tx: broadcast::Sender<(String, Value)>,
 }
 
 /// Bridges `AppEventEmitter` to a tokio broadcast channel for SSE streaming.
@@ -48,8 +49,13 @@ impl AppEventEmitter for SseEmitter {
 /// Start the dev HTTP server on port 3456.
 pub async fn start(core: Arc<AppCore>) {
     let sse_channels: SseChannels = Arc::new(DashMap::new());
+    let (insight_tx, _) = broadcast::channel(256);
 
-    let state = DevState { core, sse_channels };
+    let state = DevState {
+        core,
+        sse_channels,
+        insight_tx,
+    };
 
     let app = Router::new()
         .route(
@@ -59,6 +65,10 @@ pub async fn start(core: Arc<AppCore>) {
         .route(
             "/api/cognitive/stream",
             axum::routing::get(streaming::cognitive_sse_handler),
+        )
+        .route(
+            "/api/insight/events",
+            axum::routing::get(streaming::insight_sse_handler),
         )
         .route("/api/v1/ingest", post(ingest::ingest_handler))
         .route("/api/v1/ingest/batch", post(ingest::ingest_batch_handler))
@@ -194,6 +204,7 @@ mod tests {
             commands::cron::DEV_COMMANDS,
             commands::capture::DEV_COMMANDS,
             commands::work_context::DEV_COMMANDS,
+            commands::entities::DEV_COMMANDS,
             commands::entity_links::DEV_COMMANDS,
             commands::project_sources::DEV_COMMANDS,
             commands::project_memories::DEV_COMMANDS,

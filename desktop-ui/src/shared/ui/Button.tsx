@@ -9,10 +9,10 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variants = {
   primary: "bg-brand text-white hover:bg-brand-hover active:bg-brand/80",
-  secondary: "bg-surface-base text-secondary hover:bg-surface-raised hover:text-primary",
-  ghost: "text-muted hover:text-primary hover:bg-surface-base",
+  secondary: "bg-accent text-muted-foreground hover:bg-muted hover:text-foreground",
+  ghost: "text-muted-foreground hover:text-foreground hover:bg-accent",
   destructive: "bg-destructive/10 text-destructive hover:bg-destructive/20",
-  outline: "border border-border text-secondary hover:text-primary hover:border-white/20",
+  outline: "border border-border text-muted-foreground hover:text-foreground hover:border-border",
 };
 
 const sizes = {

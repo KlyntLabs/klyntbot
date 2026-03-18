@@ -24,16 +24,16 @@ export function ContextSidebar({
       <button
         type="button"
         onClick={() => setCollapsed(!collapsed)}
-        className="flex items-center justify-between px-1 py-1.5 text-[11px] font-medium text-dim uppercase tracking-wider hover:text-muted transition-colors"
+        className="flex items-center justify-between px-1 py-1.5 text-[11px] font-medium text-dim uppercase tracking-wider hover:text-muted-foreground transition-colors"
       >
         <span>Work Contexts</span>
-        <span className="text-[10px] text-muted">{collapsed ? "▸" : "▾"}</span>
+        <span className="text-[10px] text-muted-foreground">{collapsed ? "▸" : "▾"}</span>
       </button>
 
       {!collapsed && (
         <div className="flex flex-col gap-0.5">
           {contexts.length === 0 && (
-            <p className="text-[11px] text-muted px-1 py-2">No active contexts</p>
+            <p className="text-[11px] text-muted-foreground px-1 py-2">No active contexts</p>
           )}
           {contexts.map((ctx) => {
             const isActive = selectedId === ctx.id;
@@ -48,8 +48,8 @@ export function ContextSidebar({
                 onClick={() => onSelect(ctx)}
                 className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition-all ${
                   isActive
-                    ? "bg-white/[0.08] text-primary"
-                    : "text-secondary hover:bg-white/[0.04] hover:text-primary"
+                    ? "bg-muted text-foreground"
+                    : "text-muted-foreground hover:bg-card hover:text-foreground"
                 }`}
               >
                 <div
@@ -58,9 +58,11 @@ export function ContextSidebar({
                 />
                 <div className="flex-1 min-w-0">
                   <p className="text-[12px] font-medium truncate">{ctx.title}</p>
-                  <p className="text-[10px] text-muted">{isRecent ? "Active now" : `${ago} ago`}</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {isRecent ? "Active now" : `${ago} ago`}
+                  </p>
                 </div>
-                <span className="text-[10px] text-muted bg-white/[0.06] rounded-full px-1.5 py-0.5 shrink-0">
+                <span className="text-[10px] text-muted-foreground bg-accent rounded-full px-1.5 py-0.5 shrink-0">
                   {ctx.eventCount}
                 </span>
               </button>
@@ -70,7 +72,7 @@ export function ContextSidebar({
           <button
             type="button"
             onClick={onSearchClick}
-            className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[11px] text-muted hover:text-secondary hover:bg-white/[0.04] transition-colors mt-1"
+            className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[11px] text-muted-foreground hover:text-foreground hover:bg-card transition-colors mt-1"
           >
             <Search className="w-3 h-3" />
             Search contexts…

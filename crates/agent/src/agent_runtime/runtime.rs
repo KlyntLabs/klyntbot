@@ -15,6 +15,7 @@ use tokio::sync::RwLock;
 use tools::RoutingContext;
 use tracing::{debug, warn};
 
+use super::scenario;
 use crate::events::AgentEvent;
 
 use crate::execution::ExecutionParams;
@@ -300,12 +301,15 @@ impl AgentRuntime {
             }
         }
 
-        // Step 4: Override max_iterations from agent profile
-        if let crate::intent_pipeline::types::ExecutionMode::Reactive {
-            ref mut max_iterations,
-        } = analysis.mode
-        {
-            *max_iterations = (*max_iterations).min(profile.max_iterations());
+        // Step 4: Cap max_iterations from agent profile (skip for orchestrator —
+        // the orchestration boost in step 3b must not be clipped by the profile cap)
+        if !analysis.needs_orchestration {
+            if let crate::intent_pipeline::types::ExecutionMode::Reactive {
+                ref mut max_iterations,
+            } = analysis.mode
+            {
+                *max_iterations = (*max_iterations).min(profile.max_iterations());
+            }
         }
 
         // Step 5: Confidence check — downgrade to Direct mode for low-confidence
@@ -332,6 +336,7 @@ impl AgentRuntime {
             strategy,
             tool_definitions: tool_definitions.to_vec(),
             context_window: self.config.context_window,
+            session_key: Some(common::SessionKey::new(&ctx.channel, &ctx.chat_id).to_string()),
         };
         let assemble_start = Instant::now();
         let assembled = self.context_engine.assemble(context_request).await;
@@ -397,23 +402,34 @@ impl AgentRuntime {
         // Step 7c: Chain-of-thought planning for complex tasks
         // Threshold 4: triggers for multi-step requests (3+ tools + sequential deps)
         const COT_COMPLEXITY_THRESHOLD: u8 = 4;
+        let complexity_score = analysis.signals.complexity_score();
 
         let planning_prompt = match analysis.mode {
             crate::intent_pipeline::types::ExecutionMode::Reactive { .. }
-                if analysis.signals.complexity_score() >= COT_COMPLEXITY_THRESHOLD =>
+                if analysis.signals.has_hypothetical =>
             {
-                let prompt = build_planning_prompt(message, &filtered_tools);
-                if let Some(ref tx) = event_tx {
-                    let _ = tx
-                        .send(AgentEvent::PlanningStarted {
-                            complexity_score: analysis.signals.complexity_score(),
-                        })
-                        .await;
-                }
-                Some(prompt)
+                // Scenario reasoning — use specialized prompt
+                Some(scenario::build_scenario_prompt(
+                    message,
+                    &filtered_tools,
+                    self.config.scenario_max_graph_depth,
+                ))
+            }
+            crate::intent_pipeline::types::ExecutionMode::Reactive { .. }
+                if complexity_score >= COT_COMPLEXITY_THRESHOLD =>
+            {
+                Some(build_planning_prompt(message, &filtered_tools))
             }
             _ => None,
         };
+
+        if planning_prompt.is_some() {
+            if let Some(ref tx) = event_tx {
+                let _ = tx
+                    .send(AgentEvent::PlanningStarted { complexity_score })
+                    .await;
+            }
+        }
 
         // Step 8: Execute via router
         if let Some(ref tx) = event_tx {
@@ -462,31 +478,32 @@ impl AgentRuntime {
 
         let mode_name = router_result.final_mode.clone();
 
-        // Step 10: Record usage + strategy
+        // Step 10: Record usage + strategy + interaction in parallel (independent DB writes)
         let pipeline_elapsed_ms = pipeline_start.elapsed().as_millis() as u64;
-        self.record_usage(
+        let usage_fut = self.record_usage(
             &router_result,
             &mode_name,
             ctx,
             &event_tx,
             pipeline_elapsed_ms,
-        )
-        .await;
-        self.record_strategy(&analysis, &router_result, &validation, ctx, pipeline_start)
-            .await;
-
-        // Record interaction for behavioral pattern learning
-        if let Some(ref recorder) = self.interaction_recorder {
-            let tools_used: Vec<&str> = router_result.tool_name.as_deref().into_iter().collect();
-            recorder
-                .record(
-                    &agent_name,
-                    &tools_used,
-                    ctx.channel.as_str(),
-                    pipeline_elapsed_ms,
-                )
-                .await;
-        }
+        );
+        let strategy_fut =
+            self.record_strategy(&analysis, &router_result, &validation, ctx, pipeline_start);
+        let interaction_fut = async {
+            if let Some(ref recorder) = self.interaction_recorder {
+                let tools_used: Vec<&str> =
+                    router_result.tool_name.as_deref().into_iter().collect();
+                recorder
+                    .record(
+                        &agent_name,
+                        &tools_used,
+                        ctx.channel.as_str(),
+                        pipeline_elapsed_ms,
+                    )
+                    .await;
+            }
+        };
+        tokio::join!(usage_fut, strategy_fut, interaction_fut);
 
         let final_content = std::mem::take(&mut validation.filtered_content);
 
@@ -813,6 +830,7 @@ impl tools::DelegationHandler for AgentRuntime {
             strategy,
             tool_definitions: vec![],
             context_window: self.config.context_window,
+            session_key: None, // delegation — no session tracking
         };
         let assembled = self.context_engine.assemble(context_request).await;
 
@@ -899,7 +917,10 @@ impl tools::DelegationHandler for AgentRuntime {
 fn build_planning_prompt(user_message: &str, tools: &[serde_json::Value]) -> String {
     let tool_names: Vec<&str> = tools.iter().filter_map(tool_def_name).collect();
     format!(
-        "This is a complex request. Before executing, create a step-by-step plan.\n\
+        "This is a complex request. Before executing:\n\
+         1. Briefly consider the optimistic, skeptical, and practical angles.\n\
+         2. Synthesize into a balanced approach.\n\
+         3. Then create a step-by-step plan.\n\
          \n\
          User request: {user_message}\n\
          Available tools: [{}]\n\

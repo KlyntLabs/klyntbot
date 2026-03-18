@@ -125,7 +125,7 @@ function DaySummary({
             {/* Active time + ratio bar */}
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="text-sm font-semibold text-primary tabular-nums">
+                <span className="text-sm font-semibold text-foreground tabular-nums">
                   {formatHumanDuration(ps.totalActiveSecs)}
                 </span>
                 <TrendArrow
@@ -139,7 +139,7 @@ function DaySummary({
                 />
                 <span className="text-[9px] text-dim">active</span>
               </div>
-              <div className="flex h-1 rounded-full overflow-hidden bg-white/[0.06] mt-1">
+              <div className="flex h-1 rounded-full overflow-hidden bg-accent mt-1">
                 {ps.productiveSecs > 0 && (
                   <div
                     className="h-full"
@@ -154,7 +154,7 @@ function DaySummary({
                     className="h-full"
                     style={{
                       width: `${(ps.neutralSecs / ps.totalActiveSecs) * 100}%`,
-                      backgroundColor: "var(--text-muted)",
+                      backgroundColor: "var(--text-muted-foreground)",
                     }}
                   />
                 )}
@@ -189,7 +189,7 @@ function DaySummary({
             )}
             {/* Deep Work */}
             {ps.deepWorkBlocks > 0 && (
-              <div className="flex items-center justify-between text-xs text-muted px-1 mt-2">
+              <div className="flex items-center justify-between text-xs text-muted-foreground px-1 mt-2">
                 <span>
                   {ps.deepWorkBlocks} deep work block{ps.deepWorkBlocks !== 1 ? "s" : ""}
                 </span>
@@ -199,7 +199,7 @@ function DaySummary({
 
             {/* Recovery Time */}
             {ps.avgRecoverySecs != null && (
-              <div className="text-xs text-muted px-1 mt-1">
+              <div className="text-xs text-muted-foreground px-1 mt-1">
                 Avg recovery: {Math.round(ps.avgRecoverySecs)}s
               </div>
             )}
@@ -209,14 +209,16 @@ function DaySummary({
 
       {/* Fallback when no productivity data */}
       {!hasProductivity && (
-        <section className="text-sm font-semibold text-primary">
+        <section className="text-sm font-semibold text-foreground">
           {formatHumanDuration(summary.totalTrackedSecs)} tracked
         </section>
       )}
 
       {/* ── 3. LLM suggestion ── */}
       {intel?.focusRecommendation && (
-        <p className="text-[10px] text-muted italic leading-relaxed">{intel.focusRecommendation}</p>
+        <p className="text-[10px] text-muted-foreground italic leading-relaxed">
+          {intel.focusRecommendation}
+        </p>
       )}
 
       {/* ── 4. Weekly sparkline ── */}
@@ -247,14 +249,14 @@ function DaySummary({
           <div className="flex flex-col gap-2">
             {intel.patterns.map((p, i) => (
               <div key={`p-${i}`} className="flex items-start gap-2 text-[11px]">
-                <Brain className="w-3 h-3 text-muted mt-0.5 shrink-0" />
-                <span className="text-secondary">{p}</span>
+                <Brain className="w-3 h-3 text-muted-foreground mt-0.5 shrink-0" />
+                <span className="text-muted-foreground">{p}</span>
               </div>
             ))}
             {intel.nudges.map((n, i) => (
               <div key={`n-${i}`} className="flex items-start gap-2 text-[11px]">
-                <Lightbulb className="w-3 h-3 text-amber-400 mt-0.5 shrink-0" />
-                <span className="text-secondary">{n.message}</span>
+                <Lightbulb className="w-3 h-3 text-warning mt-0.5 shrink-0" />
+                <span className="text-muted-foreground">{n.message}</span>
               </div>
             ))}
           </div>
@@ -264,7 +266,7 @@ function DaySummary({
       {/* ── 7. AI Summary ── */}
       {ps?.aiSummary && (
         <section className="rounded-lg bg-brand/[0.06] border border-brand/15 p-2.5">
-          <p className="text-[11px] text-secondary leading-relaxed">{ps.aiSummary}</p>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">{ps.aiSummary}</p>
         </section>
       )}
 
@@ -291,8 +293,10 @@ function TopAppsChart({
         const pct = maxSecs > 0 ? (app.durationSecs / maxSecs) * 100 : 0;
         return (
           <div key={app.appName} className="flex items-center gap-2">
-            <span className="text-[11px] text-secondary truncate w-20 shrink-0">{app.appName}</span>
-            <div className="flex-1 h-[6px] rounded-full bg-white/[0.06] overflow-hidden">
+            <span className="text-[11px] text-muted-foreground truncate w-20 shrink-0">
+              {app.appName}
+            </span>
+            <div className="flex-1 h-[6px] rounded-full bg-accent overflow-hidden">
               <div
                 className="h-full rounded-full"
                 style={{
@@ -387,10 +391,14 @@ function SessionDetail({ session, onClose }: { session: SessionBlock; onClose: (
   return (
     <div className="w-80 px-4 py-3 flex flex-col gap-3 overflow-y-auto shrink-0">
       <div className="flex items-center justify-between">
-        <h3 className="text-xs font-semibold text-muted uppercase tracking-wider">
+        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
           Activity Session
         </h3>
-        <button type="button" onClick={onClose} className="text-muted hover:text-secondary">
+        <button
+          type="button"
+          onClick={onClose}
+          className="text-muted-foreground hover:text-foreground"
+        >
           <X className="w-4 h-4" />
         </button>
       </div>
@@ -398,12 +406,12 @@ function SessionDetail({ session, onClose }: { session: SessionBlock; onClose: (
       {/* Session header */}
       <div className="flex items-center gap-2">
         <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: session.color }} />
-        <span className="text-sm font-medium text-primary">{session.label}</span>
+        <span className="text-sm font-medium text-foreground">{session.label}</span>
       </div>
 
       {/* Intelligence description */}
       {matched?.description && (
-        <p className="text-xs text-secondary leading-relaxed">{matched.description}</p>
+        <p className="text-xs text-muted-foreground leading-relaxed">{matched.description}</p>
       )}
 
       {/* Quality score + Category badge row */}
@@ -439,20 +447,24 @@ function SessionDetail({ session, onClose }: { session: SessionBlock; onClose: (
           {matched.categoryPurity != null && (
             <>
               <span className="text-dim">Focus purity</span>
-              <span className="text-secondary tabular-nums text-right">
+              <span className="text-muted-foreground tabular-nums text-right">
                 {Math.round(matched.categoryPurity * 100)}%
               </span>
             </>
           )}
           <span className="text-dim">Context switches</span>
-          <span className="text-secondary tabular-nums text-right">{matched.contextSwitches}</span>
+          <span className="text-muted-foreground tabular-nums text-right">
+            {matched.contextSwitches}
+          </span>
           <span className="text-dim">Distractions</span>
-          <span className="text-secondary tabular-nums text-right">{matched.distractionCount}</span>
+          <span className="text-muted-foreground tabular-nums text-right">
+            {matched.distractionCount}
+          </span>
         </div>
       )}
 
       {/* Time info */}
-      <div className="text-xs text-muted space-y-1">
+      <div className="text-xs text-muted-foreground space-y-1">
         <div>
           {fmt(startH, startM)} – {fmt(endH, endM)}
         </div>
@@ -462,7 +474,7 @@ function SessionDetail({ session, onClose }: { session: SessionBlock; onClose: (
       {/* App breakdown */}
       {session.appBreakdown.length > 0 && (
         <div>
-          <h4 className="text-xs font-medium text-muted mb-2">Apps in this session</h4>
+          <h4 className="text-xs font-medium text-muted-foreground mb-2">Apps in this session</h4>
           <div className="flex flex-col gap-2">
             {session.appBreakdown.map((app) => {
               const appCatColor = resolveActivityColor(app.catType, false);
@@ -472,7 +484,7 @@ function SessionDetail({ session, onClose }: { session: SessionBlock; onClose: (
                     className="w-1.5 h-1.5 rounded-full shrink-0"
                     style={{ backgroundColor: appCatColor }}
                   />
-                  <span className="text-xs text-secondary truncate flex-1">{app.app}</span>
+                  <span className="text-xs text-muted-foreground truncate flex-1">{app.app}</span>
                   <span className="text-[10px] text-dim tabular-nums">
                     {formatHumanDuration(app.dur)}
                   </span>
@@ -502,20 +514,26 @@ function EntryDetail({
   return (
     <div className="w-80 px-4 py-3 flex flex-col gap-3 overflow-y-auto shrink-0">
       <div className="flex items-center justify-between">
-        <h3 className="text-xs font-semibold text-muted uppercase tracking-wider">Details</h3>
-        <button type="button" onClick={onClose} className="text-muted hover:text-secondary">
+        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+          Details
+        </h3>
+        <button
+          type="button"
+          onClick={onClose}
+          className="text-muted-foreground hover:text-foreground"
+        >
           <X className="w-4 h-4" />
         </button>
       </div>
 
       <div className="flex items-center gap-2">
         <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: entry.color }} />
-        <span className="text-sm font-medium text-primary">{entry.title}</span>
+        <span className="text-sm font-medium text-foreground">{entry.title}</span>
       </div>
 
-      {entry.description && <p className="text-xs text-muted">{entry.description}</p>}
+      {entry.description && <p className="text-xs text-muted-foreground">{entry.description}</p>}
 
-      <div className="text-xs text-muted space-y-1">
+      <div className="text-xs text-muted-foreground space-y-1">
         <div>Started: {new Date(entry.startedAt).toLocaleTimeString()}</div>
         {entry.endedAt && <div>Ended: {new Date(entry.endedAt).toLocaleTimeString()}</div>}
         {entry.durationSecs != null && entry.durationSecs > 0 && (

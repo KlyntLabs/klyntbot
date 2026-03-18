@@ -20,8 +20,8 @@ export function ScoreBar({ label, value }: { label: string; value: number }) {
   const pct = Math.round(Math.min(Math.max(value, 0), 1) * 100);
   return (
     <div className="flex items-center gap-1.5 text-[9px] font-light">
-      <span className="w-[68px] text-muted text-right shrink-0 truncate">{label}</span>
-      <div className="flex-1 h-1 rounded-full bg-white/[0.08] overflow-hidden">
+      <span className="w-[68px] text-muted-foreground text-right shrink-0 truncate">{label}</span>
+      <div className="flex-1 h-1 rounded-full bg-muted overflow-hidden">
         <div
           className="h-full rounded-full bg-brand/60 transition-[width]"
           style={{ width: `${pct}%` }}
@@ -120,25 +120,25 @@ export function ProductivityScoreRing({ score, size = 110, summary }: Productivi
             <div className="flex flex-col gap-1.5 text-[10px]">
               {focusRatio != null && (
                 <div className="flex justify-between">
-                  <span className="text-muted">Focus time</span>
-                  <span className="text-primary tabular-nums">
+                  <span className="text-muted-foreground">Focus time</span>
+                  <span className="text-foreground tabular-nums">
                     {focusRatio}% ({formatHumanDuration(summary.productiveSecs)})
                   </span>
                 </div>
               )}
               <div className="flex justify-between">
-                <span className="text-muted">Context switches</span>
-                <span className="text-primary tabular-nums">{summary.contextSwitches}</span>
+                <span className="text-muted-foreground">Context switches</span>
+                <span className="text-foreground tabular-nums">{summary.contextSwitches}</span>
               </div>
               {qualityAvg != null && (
                 <div className="flex justify-between">
-                  <span className="text-muted">Session quality</span>
-                  <span className="text-primary tabular-nums">{qualityAvg}%</span>
+                  <span className="text-muted-foreground">Session quality</span>
+                  <span className="text-foreground tabular-nums">{qualityAvg}%</span>
                 </div>
               )}
               {distractionRatio != null && (
                 <div className="flex justify-between">
-                  <span className="text-muted">Distraction</span>
+                  <span className="text-muted-foreground">Distraction</span>
                   <span className="text-destructive tabular-nums">{distractionRatio}%</span>
                 </div>
               )}

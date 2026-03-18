@@ -11,14 +11,14 @@ export function DetailPanel() {
       <div className="flex items-center gap-2 px-4 py-2 border-b border-border">
         <button
           type="button"
-          className="text-xs text-muted hover:text-foreground transition-colors px-1.5 py-0.5 rounded hover:bg-surface-raised"
+          className="text-xs text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded hover:bg-muted"
           onClick={() => {
             useLauncherStore.getState().setDetailItem(null);
             useLauncherStore.getState().setMode("search");
           }}
         >
           &larr; Back
-          <span className="ml-1 text-muted/60">Tab</span>
+          <span className="ml-1 text-muted-foreground/60">Tab</span>
         </button>
         <span className="text-sm text-foreground truncate">{item.title}</span>
       </div>
@@ -66,7 +66,7 @@ function DetailField({ label, value }: { label: string; value: string | null | u
   if (!value) return null;
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="text-[10px] text-muted uppercase tracking-wider">{label}</span>
+      <span className="text-[10px] text-muted-foreground uppercase tracking-wider">{label}</span>
       <span className="text-sm text-foreground break-all">{value}</span>
     </div>
   );
@@ -74,7 +74,7 @@ function DetailField({ label, value }: { label: string; value: string | null | u
 
 function KindTag({ label }: { label: string }) {
   return (
-    <span className="text-[10px] text-muted px-1.5 py-0.5 rounded bg-surface-base inline-block">
+    <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 rounded bg-accent inline-block">
       {label}
     </span>
   );
@@ -82,10 +82,10 @@ function KindTag({ label }: { label: string }) {
 
 function StatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
-    doing: "text-blue-400 bg-blue-400/10",
-    todo: "text-muted bg-surface-base",
-    blocked: "text-red-400 bg-red-400/10",
-    done: "text-green-400 bg-green-400/10",
+    doing: "text-info bg-info/10",
+    todo: "text-muted-foreground bg-accent",
+    blocked: "text-destructive bg-destructive/10",
+    done: "text-success bg-success/10",
   };
   const colorClass = colors[status] || colors.todo;
   return <span className={`text-xs px-2 py-0.5 rounded-full ${colorClass}`}>{status}</span>;
@@ -102,7 +102,7 @@ function ApplicationDetail({ item, kind }: { item: LauncherItem; kind: KindOf<"a
         )}
         <div>
           <div className="text-base text-foreground font-medium">{item.title}</div>
-          {kind.running && <span className="text-xs text-green-400">Running</span>}
+          {kind.running && <span className="text-xs text-success">Running</span>}
         </div>
       </div>
       <DetailField label="Path" value={kind.path} />
@@ -119,7 +119,7 @@ function FileDetail({ item, kind }: { item: LauncherItem; kind: KindOf<"file"> }
       <div className="flex items-center gap-2">
         <KindTag label={kind.kind.charAt(0).toUpperCase() + kind.kind.slice(1)} />
         {kind.kind === "code" && (
-          <span className="text-[10px] text-muted">Open in Editor &mdash; Enter</span>
+          <span className="text-[10px] text-muted-foreground">Open in Editor &mdash; Enter</span>
         )}
       </div>
       {item.subtitle && <DetailField label="Info" value={item.subtitle} />}
@@ -133,7 +133,7 @@ function ContentMatchDetail({ item, kind }: { item: LauncherItem; kind: KindOf<"
       <div className="text-base text-foreground font-medium">{item.title}</div>
       <DetailField label="File" value={kind.path} />
       <DetailField label="Line" value={String(kind.line)} />
-      <div className="bg-surface-base rounded p-3 text-xs text-foreground font-mono whitespace-pre-wrap">
+      <div className="bg-accent rounded p-3 text-xs text-foreground font-mono whitespace-pre-wrap">
         {kind.preview}
       </div>
       <KindTag label="Content Match" />
@@ -147,7 +147,7 @@ function TaskDetail({ item, kind }: { item: LauncherItem; kind: KindOf<"task"> }
       <div className="text-base text-foreground font-medium">{item.title}</div>
       <div className="flex items-center gap-2">
         <StatusBadge status={kind.status} />
-        {item.subtitle && <span className="text-xs text-muted">{item.subtitle}</span>}
+        {item.subtitle && <span className="text-xs text-muted-foreground">{item.subtitle}</span>}
       </div>
       {item.subtitle && <DetailField label="Description" value={item.subtitle} />}
       <KindTag label="Task" />
@@ -160,7 +160,9 @@ function NoteDetail({ item, kind }: { item: LauncherItem; kind: KindOf<"note"> }
     <div className="flex flex-col gap-3">
       <div className="text-base text-foreground font-medium">{item.title}</div>
       {kind.preview && (
-        <div className="text-sm text-muted leading-relaxed whitespace-pre-wrap">{kind.preview}</div>
+        <div className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+          {kind.preview}
+        </div>
       )}
       <KindTag label="Note" />
     </div>
@@ -170,9 +172,9 @@ function NoteDetail({ item, kind }: { item: LauncherItem; kind: KindOf<"note"> }
 function CalculatorDetail({ kind }: { item: LauncherItem; kind: KindOf<"calculator"> }) {
   return (
     <div className="flex flex-col gap-4">
-      <div className="text-sm text-muted font-mono">{kind.expression}</div>
+      <div className="text-sm text-muted-foreground font-mono">{kind.expression}</div>
       <div className="text-3xl text-foreground font-mono font-medium">{kind.result}</div>
-      <span className="text-[10px] text-muted">Copied to clipboard on Enter</span>
+      <span className="text-[10px] text-muted-foreground">Copied to clipboard on Enter</span>
       <KindTag label="Calculator" />
     </div>
   );

@@ -22,7 +22,7 @@ export function AssigneeUser({ user }: AssigneeUserProps) {
   }
   return (
     <div className="size-6 flex items-center justify-center">
-      <CircleUserRound className="size-5 text-muted" />
+      <CircleUserRound className="size-5 text-muted-foreground" />
     </div>
   );
 }

@@ -562,6 +562,37 @@ async fn ensure_cron_jobs(
     Ok(())
 }
 
+/// Refresh insight progress snapshots for all notes with insights.
+pub async fn refresh_insight_progress(
+    svc: &feature_insights::InsightService,
+    note_repo: &feature_notes::repo::NoteRepo,
+) -> Result<Option<String>, String> {
+    let mut refreshed = 0u32;
+
+    let all_notes = note_repo
+        .list_notes(None)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    for note in &all_notes {
+        if let Ok(Some(latest)) = svc.get_latest(&note.id).await {
+            if let Err(e) = svc.compute_progress(&latest.id, &note.body, None).await {
+                tracing::debug!("progress refresh failed for {}: {e}", note.id);
+            } else {
+                refreshed += 1;
+            }
+        }
+    }
+
+    if refreshed > 0 {
+        Ok(Some(format!(
+            "Refreshed {refreshed} insight progress snapshots"
+        )))
+    } else {
+        Ok(None)
+    }
+}
+
 /// Parse "HH:MM" to cron expression "M H * * *".
 fn parse_time_to_cron(time_str: &str) -> Option<String> {
     let parts: Vec<&str> = time_str.split(':').collect();

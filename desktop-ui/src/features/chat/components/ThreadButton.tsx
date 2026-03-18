@@ -38,7 +38,7 @@ export function ThreadButton({
             if (e.key === "Enter") onRenameConfirm();
             if (e.key === "Escape") onRenameCancel();
           }}
-          className="flex-1 min-w-0 bg-white/[0.12] text-primary text-[12px] font-light px-2 py-1 rounded border border-white/[0.08]"
+          className="flex-1 min-w-0 bg-muted text-foreground text-[12px] font-light px-2 py-1 rounded border border-border"
         />
         <button
           type="button"
@@ -52,7 +52,7 @@ export function ThreadButton({
           type="button"
           onClick={onRenameCancel}
           aria-label="Cancel rename"
-          className="text-muted hover:text-secondary shrink-0"
+          className="text-muted-foreground hover:text-foreground shrink-0"
         >
           <X className="w-3.5 h-3.5" strokeWidth={2} />
         </button>
@@ -67,8 +67,8 @@ export function ThreadButton({
       onContextMenu={(e) => onContextMenu(e, thread)}
       className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-[12px] font-light ${
         isActive
-          ? "bg-white/[0.12] text-primary"
-          : "text-muted hover:bg-white/[0.06] hover:text-secondary"
+          ? "bg-muted text-foreground"
+          : "text-muted-foreground hover:bg-accent hover:text-foreground"
       }`}
     >
       <MessageSquare className="w-3 h-3 shrink-0" strokeWidth={1.5} />

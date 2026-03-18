@@ -149,12 +149,15 @@ export function MonthCalendarView() {
   return (
     <div className="flex gap-2 h-full">
       <div className="flex-1 glass-card p-3 flex flex-col overflow-hidden">
-        {loading && <div className="text-xs text-muted mb-1">Loading...</div>}
+        {loading && <div className="text-xs text-muted-foreground mb-1">Loading...</div>}
 
         {/* Day-of-week header */}
         <div className="grid grid-cols-7 mb-1">
           {DAY_LABELS.map((label) => (
-            <div key={label} className="text-center text-[10px] text-muted font-medium py-1">
+            <div
+              key={label}
+              className="text-center text-[10px] text-muted-foreground font-medium py-1"
+            >
               {label}
             </div>
           ))}
@@ -182,8 +185,8 @@ export function MonthCalendarView() {
                     onClick={() => navigate(`/day/${cell.date}`)}
                     className={cn(
                       "rounded-lg p-1.5 flex flex-col items-start text-left transition-colors min-h-[64px]",
-                      "hover:bg-white/[0.05] cursor-pointer",
-                      cell.isCurrentMonth ? "text-primary" : "text-muted/40",
+                      "hover:bg-accent cursor-pointer",
+                      cell.isCurrentMonth ? "text-foreground" : "text-muted-foreground/40",
                       cell.date === today && "ring-1 ring-brand/50",
                       cell.date === focusedDate && cell.date !== today && "ring-1 ring-white/30",
                     )}
@@ -202,7 +205,7 @@ export function MonthCalendarView() {
                         {cell.day}
                       </span>
                       {stats.focusSecs > 0 && (
-                        <span className="text-[8px] text-muted/60">
+                        <span className="text-[8px] text-muted-foreground/60">
                           {formatHumanDuration(stats.focusSecs)}
                         </span>
                       )}
@@ -211,7 +214,7 @@ export function MonthCalendarView() {
                     {/* Activity bar — proportional to active time */}
                     {stats.activeSecs > 0 && (
                       <div className="w-full mt-auto flex flex-col gap-0.5">
-                        <div className="w-full h-[3px] rounded-full bg-white/[0.06] overflow-hidden">
+                        <div className="w-full h-[3px] rounded-full bg-accent overflow-hidden">
                           <div
                             className="h-full rounded-full"
                             style={{
@@ -221,7 +224,7 @@ export function MonthCalendarView() {
                             }}
                           />
                         </div>
-                        <span className="text-[8px] text-secondary/50">
+                        <span className="text-[8px] text-muted-foreground/50">
                           {formatHumanDuration(stats.activeSecs)}
                         </span>
                       </div>

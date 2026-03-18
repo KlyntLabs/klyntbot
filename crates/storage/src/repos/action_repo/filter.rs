@@ -107,11 +107,7 @@ impl ActionRepo {
         query: &str,
         limit: Option<i64>,
     ) -> Result<Vec<ActionRow>, StorageError> {
-        let escaped = query
-            .replace('\\', "\\\\")
-            .replace('%', "\\%")
-            .replace('_', "\\_");
-        let pattern = format!("%{escaped}%");
+        let pattern = format!("%{}%", crate::macros::escape_like(query));
         let effective_limit = limit.unwrap_or(i64::MAX);
         let rows = sqlx::query_as::<_, ActionRow>(
             r#"

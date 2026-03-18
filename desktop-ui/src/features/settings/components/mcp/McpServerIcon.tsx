@@ -7,7 +7,11 @@ export function McpServerIcon({ name, className = "w-5 h-5" }: McpServerIconProp
   const icon = icons[name];
   if (!icon) {
     // Fallback: first two letters
-    return <span className="text-[11px] font-medium text-muted uppercase">{name.slice(0, 2)}</span>;
+    return (
+      <span className="text-[11px] font-medium text-muted-foreground uppercase">
+        {name.slice(0, 2)}
+      </span>
+    );
   }
   return (
     <svg viewBox={icon.viewBox} className={className} fill="currentColor" aria-hidden="true">

@@ -155,11 +155,12 @@ impl AppCore {
         &self,
         start_date: String,
         end_date: String,
+        tz_offset_mins: Option<i32>,
     ) -> Result<Vec<HourlyBreakdownResponse>, ApiError> {
         let repos = self.productivity_repos()?;
         let rows = repos
             .buckets
-            .aggregate_by_hour(&start_date, &end_date)
+            .aggregate_by_hour(&start_date, &end_date, tz_offset_mins.unwrap_or(0))
             .await
             .map_err(map_prod_err)?;
         Ok(rows

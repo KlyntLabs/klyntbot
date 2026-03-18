@@ -1,5 +1,11 @@
 mod converters;
 mod crud;
+mod flashcard;
 mod inbox;
+mod insight;
+mod insight_context;
+mod insight_personas;
+mod insight_prompts;
 mod notebooks;
+mod persona_chat;
 mod suggestions;

@@ -23,26 +23,23 @@ export function PeriodSelector({
           type="button"
           onClick={onPrev}
           aria-label="Previous period"
-          className="p-1.5 rounded-lg text-muted hover:text-secondary hover:bg-white/[0.06] transition-colors"
+          className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
         >
           <ChevronLeft className="w-4 h-4" strokeWidth={1.5} />
         </button>
-        <span className="text-[14px] font-medium text-primary min-w-[160px] text-center">
+        <span className="text-[14px] font-medium text-foreground min-w-[160px] text-center">
           {label}
         </span>
         <button
           type="button"
           onClick={onNext}
           aria-label="Next period"
-          className="p-1.5 rounded-lg text-muted hover:text-secondary hover:bg-white/[0.06] transition-colors"
+          className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
         >
           <ChevronRight className="w-4 h-4" strokeWidth={1.5} />
         </button>
       </div>
-      <div
-        className="flex gap-1 bg-white/[0.04] rounded-xl p-1 border border-white/[0.06]"
-        role="tablist"
-      >
+      <div className="flex gap-1 bg-card rounded-xl p-1 border border-border-subtle" role="tablist">
         {MODES.map((m) => (
           <button
             key={m}
@@ -51,7 +48,9 @@ export function PeriodSelector({
             aria-selected={m === mode}
             onClick={() => onSetMode(m)}
             className={`px-3 py-1.5 rounded-lg text-[11px] font-light transition-all capitalize ${
-              m === mode ? "glass-button-active text-primary" : "text-muted hover:text-secondary"
+              m === mode
+                ? "glass-button-active text-foreground"
+                : "text-muted-foreground hover:text-foreground"
             }`}
           >
             {m}

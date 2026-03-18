@@ -17,14 +17,14 @@ export function BreakdownDonuts({ segments, totalSecs }: BreakdownDonutsProps) {
   return (
     <div className="glass-card p-4 flex flex-col gap-3">
       <div className="flex items-baseline justify-between">
-        <h2 className="text-[13px] font-medium text-secondary">Breakdown</h2>
+        <h2 className="text-[13px] font-medium text-muted-foreground">Breakdown</h2>
         <span className="text-[10px] font-light text-dim tabular-nums">
           {formatLongDuration(totalSecs)} total
         </span>
       </div>
 
       {/* Stacked horizontal bar */}
-      <div className="h-3 rounded-full overflow-hidden bg-white/[0.06] flex">
+      <div className="h-3 rounded-full overflow-hidden bg-accent flex">
         {hasData ? (
           segments
             .filter((s) => s.value > 0)
@@ -39,7 +39,7 @@ export function BreakdownDonuts({ segments, totalSecs }: BreakdownDonutsProps) {
               />
             ))
         ) : (
-          <div className="h-full w-full rounded-full bg-white/[0.04]" />
+          <div className="h-full w-full rounded-full bg-card" />
         )}
       </div>
 
@@ -53,8 +53,8 @@ export function BreakdownDonuts({ segments, totalSecs }: BreakdownDonutsProps) {
                 className="w-2 h-2 rounded-[3px] flex-shrink-0"
                 style={{ backgroundColor: s.color }}
               />
-              <span className="text-[11px] font-light text-secondary flex-1">{s.name}</span>
-              <span className="text-[11px] font-medium text-primary tabular-nums">{pct}%</span>
+              <span className="text-[11px] font-light text-muted-foreground flex-1">{s.name}</span>
+              <span className="text-[11px] font-medium text-foreground tabular-nums">{pct}%</span>
               <span className="text-[10px] font-light text-dim tabular-nums w-12 text-right">
                 {formatHumanDuration(s.value)}
               </span>

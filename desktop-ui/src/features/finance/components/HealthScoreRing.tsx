@@ -46,7 +46,7 @@ export function HealthScoreRing({ health }: { health: HealthScore }) {
             x={60}
             y={54}
             textAnchor="middle"
-            className="fill-primary text-[30px]"
+            className="fill-foreground text-[30px]"
             style={{ fontWeight: 200, fontVariantNumeric: "tabular-nums" }}
           >
             {health.score}
@@ -55,7 +55,7 @@ export function HealthScoreRing({ health }: { health: HealthScore }) {
             x={60}
             y={70}
             textAnchor="middle"
-            className="fill-muted text-[9px]"
+            className="fill-muted-foreground text-[9px]"
             style={{ letterSpacing: "0.05em" }}
           >
             HEALTH
@@ -69,10 +69,10 @@ export function HealthScoreRing({ health }: { health: HealthScore }) {
         {health.factors.map((f) => (
           <div key={f.name} className="mb-2.5 last:mb-0">
             <div className="flex justify-between text-[11px] mb-1">
-              <span className="text-secondary">{f.name}</span>
+              <span className="text-muted-foreground">{f.name}</span>
               <span style={{ color: f.color }}>{f.value}%</span>
             </div>
-            <div className="h-1 bg-white/[0.06] rounded-full">
+            <div className="h-1 bg-accent rounded-full">
               <div
                 className="h-full rounded-full"
                 style={{ width: `${f.value}%`, background: f.color, transition: "width 0.8s ease" }}

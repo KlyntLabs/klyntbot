@@ -71,7 +71,7 @@ export function Donut({
             x={cx}
             y={cy + 10}
             textAnchor="middle"
-            className="fill-primary text-[13px]"
+            className="fill-foreground text-[13px]"
             style={{ fontWeight: 300 }}
           >
             {value}

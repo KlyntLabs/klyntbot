@@ -56,11 +56,11 @@ export function GoalsProgress() {
     <>
       <div className="glass-card p-4 flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-[13px] font-medium text-secondary">Goals</h2>
+          <h2 className="text-[13px] font-medium text-muted-foreground">Goals</h2>
           <button
             type="button"
             onClick={() => setShowAdd(true)}
-            className="w-6 h-6 rounded-md flex items-center justify-center text-muted hover:text-brand hover:bg-white/[0.08] transition-colors"
+            className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-brand hover:bg-muted transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
           </button>
@@ -80,31 +80,31 @@ export function GoalsProgress() {
                       <span className={g.met ? "text-success" : "text-brand"}>
                         {g.met ? "MET" : "IN PROGRESS"}
                       </span>
-                      <span className="text-primary">
+                      <span className="text-foreground">
                         {formatValue(g.metric, g.targetValue)} {metricLabel(g.metric)}
                       </span>
                       {g.projectId && (
-                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/[0.08] text-muted">
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
                           {g.projectId}
                         </span>
                       )}
                       <span className="text-dim">({g.goalType})</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-muted tabular-nums">
+                      <span className="text-muted-foreground tabular-nums">
                         {formatValue(g.metric, g.currentValue)} /{" "}
                         {formatValue(g.metric, g.targetValue)}
                       </span>
                       <button
                         type="button"
                         onClick={() => handleDelete(g.id)}
-                        className="w-5 h-5 rounded flex items-center justify-center text-transparent group-hover:text-muted hover:!text-destructive transition-colors"
+                        className="w-5 h-5 rounded flex items-center justify-center text-transparent group-hover:text-muted-foreground hover:!text-destructive transition-colors"
                       >
                         <Trash2 className="w-3 h-3" />
                       </button>
                     </div>
                   </div>
-                  <div className="h-1.5 rounded-full bg-white/[0.08] overflow-hidden">
+                  <div className="h-1.5 rounded-full bg-muted overflow-hidden">
                     <div
                       className={`h-full rounded-full transition-[width] ${g.met ? "bg-success" : "bg-brand"}`}
                       style={{ width: `${pct}%` }}

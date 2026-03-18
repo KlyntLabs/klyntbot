@@ -52,14 +52,14 @@ export function FireForm({ registerSave, onDirty }: FireFormProps) {
 
   return (
     <div>
-      <h3 className="text-[14px] font-medium text-secondary mb-1">FIRE Planning</h3>
+      <h3 className="text-[14px] font-medium text-muted-foreground mb-1">FIRE Planning</h3>
       <p className="text-[11px] text-dim mb-4">
         Financial Independence, Retire Early. Track your path to freedom.
       </p>
 
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <span className="text-[13px] text-secondary">Enable FIRE tracking</span>
+          <span className="text-[13px] text-muted-foreground">Enable FIRE tracking</span>
           <Toggle
             checked={enabled}
             onChange={(v) => {
@@ -73,7 +73,7 @@ export function FireForm({ registerSave, onDirty }: FireFormProps) {
           <>
             <div className="flex gap-3">
               <label className="flex-1">
-                <span className="block text-[12px] font-medium text-secondary mb-1.5">
+                <span className="block text-[12px] font-medium text-muted-foreground mb-1.5">
                   Current age
                 </span>
                 <input
@@ -84,11 +84,11 @@ export function FireForm({ registerSave, onDirty }: FireFormProps) {
                     onDirty();
                   }}
                   placeholder="30"
-                  className="w-full px-3 py-2 text-[13px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-lg focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                  className="w-full px-3 py-2 text-[13px] text-foreground bg-accent border border-border rounded-lg focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
                 />
               </label>
               <label className="flex-1">
-                <span className="block text-[12px] font-medium text-secondary mb-1.5">
+                <span className="block text-[12px] font-medium text-muted-foreground mb-1.5">
                   Target retirement age
                 </span>
                 <input
@@ -99,14 +99,14 @@ export function FireForm({ registerSave, onDirty }: FireFormProps) {
                     onDirty();
                   }}
                   placeholder="45"
-                  className="w-full px-3 py-2 text-[13px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-lg focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                  className="w-full px-3 py-2 text-[13px] text-foreground bg-accent border border-border rounded-lg focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
                 />
               </label>
             </div>
 
             <div className="flex gap-3">
               <label className="flex-1">
-                <span className="block text-[12px] font-medium text-secondary mb-1.5">
+                <span className="block text-[12px] font-medium text-muted-foreground mb-1.5">
                   Annual expenses
                 </span>
                 <input
@@ -118,11 +118,11 @@ export function FireForm({ registerSave, onDirty }: FireFormProps) {
                   }}
                   placeholder="40000"
                   step="100"
-                  className="w-full px-3 py-2 text-[13px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-lg focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                  className="w-full px-3 py-2 text-[13px] text-foreground bg-accent border border-border rounded-lg focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
                 />
               </label>
               <label className="flex-1">
-                <span className="block text-[12px] font-medium text-secondary mb-1.5">
+                <span className="block text-[12px] font-medium text-muted-foreground mb-1.5">
                   Safe withdrawal rate (%)
                 </span>
                 <input
@@ -133,13 +133,15 @@ export function FireForm({ registerSave, onDirty }: FireFormProps) {
                     onDirty();
                   }}
                   step="0.1"
-                  className="w-full px-3 py-2 text-[13px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-lg focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                  className="w-full px-3 py-2 text-[13px] text-foreground bg-accent border border-border rounded-lg focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
                 />
               </label>
             </div>
 
             <div>
-              <span className="block text-[12px] font-medium text-secondary mb-2">FIRE type</span>
+              <span className="block text-[12px] font-medium text-muted-foreground mb-2">
+                FIRE type
+              </span>
               <div className="grid grid-cols-2 gap-2">
                 {FIRE_TYPES.map((ft) => (
                   <label
@@ -147,7 +149,7 @@ export function FireForm({ registerSave, onDirty }: FireFormProps) {
                     className={`p-2.5 rounded-lg border cursor-pointer transition-colors ${
                       fireType === ft.value
                         ? "border-brand/50 bg-brand/[0.06]"
-                        : "border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.05]"
+                        : "border-border bg-card hover:bg-accent"
                     }`}
                   >
                     <input
@@ -161,7 +163,7 @@ export function FireForm({ registerSave, onDirty }: FireFormProps) {
                       }}
                       className="sr-only"
                     />
-                    <span className="text-[12px] font-medium text-primary">{ft.label}</span>
+                    <span className="text-[12px] font-medium text-foreground">{ft.label}</span>
                     <p className="text-[10px] text-dim mt-0.5">{ft.desc}</p>
                   </label>
                 ))}
@@ -170,7 +172,7 @@ export function FireForm({ registerSave, onDirty }: FireFormProps) {
 
             {fireNumber > 0 && (
               <div className="bg-brand/[0.08] border border-brand/20 rounded-lg p-3 text-center">
-                <span className="text-[11px] text-muted">Your FIRE number</span>
+                <span className="text-[11px] text-muted-foreground">Your FIRE number</span>
                 <p className="text-[18px] font-semibold text-brand mt-1">
                   ${fireNumber.toLocaleString()}
                 </p>

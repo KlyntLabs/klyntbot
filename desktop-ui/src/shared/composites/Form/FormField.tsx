@@ -21,12 +21,12 @@ export function FormField({
   return (
     <div className={cn("space-y-1.5", className)}>
       {label && (
-        <label className="text-xs font-medium text-secondary">
+        <label className="text-xs font-medium text-muted-foreground">
           {label}
           {required && <span className="text-destructive ml-0.5">*</span>}
         </label>
       )}
-      {description && <p className="text-xs text-muted">{description}</p>}
+      {description && <p className="text-xs text-muted-foreground">{description}</p>}
       {children}
       {error && <p className="text-xs text-destructive">{error}</p>}
     </div>

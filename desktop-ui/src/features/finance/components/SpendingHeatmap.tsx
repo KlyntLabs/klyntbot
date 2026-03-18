@@ -83,7 +83,7 @@ export function SpendingHeatmap({
                   onSelectDay(isSelected ? null : date);
                 }
               }}
-              className="aspect-square flex items-center justify-center rounded-md text-[11px] font-light text-secondary cursor-pointer transition-colors hover:brightness-125 select-none"
+              className="aspect-square flex items-center justify-center rounded-md text-[11px] font-light text-muted-foreground cursor-pointer transition-colors hover:brightness-125 select-none"
               style={{
                 backgroundColor: HEATMAP_COLORS[level],
                 outline: isSelected

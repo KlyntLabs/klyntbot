@@ -483,7 +483,7 @@ export function resolveActivityColor(categoryType: string | undefined, isIdle: b
   if (isIdle) return "var(--surface-highest)";
   if (categoryType === "productive") return "var(--success)";
   if (categoryType === "distracting") return "var(--destructive)";
-  if (categoryType === "neutral") return "var(--text-muted)";
+  if (categoryType === "neutral") return "var(--text-muted-foreground)";
   return "var(--brand)";
 }
 
@@ -538,7 +538,7 @@ export function buildBreakdownSegments(
 /** Productivity legend items for bar charts. */
 export const PRODUCTIVITY_LEGEND = [
   { label: "Productive", color: "var(--success)" },
-  { label: "Neutral", color: "var(--text-muted)" },
+  { label: "Neutral", color: "var(--text-muted-foreground)" },
   { label: "Distracting", color: "var(--destructive)" },
 ] as const;
 
@@ -567,15 +567,15 @@ export function ChartTooltip({ active, payload, label }: ChartTooltipProps) {
         boxShadow: "var(--shadow-tooltip)",
       }}
     >
-      <div className="font-medium text-primary mb-1">{label}</div>
+      <div className="font-medium text-foreground mb-1">{label}</div>
       {payload.map((p: TooltipPayloadEntry) => (
-        <div key={p.dataKey} className="flex items-center gap-2 text-muted font-light">
+        <div key={p.dataKey} className="flex items-center gap-2 text-muted-foreground font-light">
           <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: p.fill }} />
           <span className="capitalize">{p.dataKey}</span>
           <span className="ml-auto tabular-nums">{p.value}h</span>
         </div>
       ))}
-      <div className="border-t border-white/[0.04] mt-1 pt-1 flex justify-between text-primary font-medium">
+      <div className="border-t border-border-subtle mt-1 pt-1 flex justify-between text-foreground font-medium">
         <span>Total</span>
         <span className="tabular-nums">{total.toFixed(1)}h</span>
       </div>

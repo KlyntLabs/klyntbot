@@ -30,7 +30,7 @@ function StepDots({
           <div
             key={i}
             className={`rounded-full transition-all duration-300 ${
-              isActive ? "w-6 h-2 bg-brand" : isDone ? "w-2 h-2 bg-brand/60" : "w-2 h-2 bg-white/10"
+              isActive ? "w-6 h-2 bg-brand" : isDone ? "w-2 h-2 bg-brand/60" : "w-2 h-2 bg-muted"
             }`}
           />
         );
@@ -60,11 +60,11 @@ function CompletedNode({
 
   if (isEditing) {
     return (
-      <div className="py-3 px-4 rounded-xl bg-white/[0.06] border border-white/[0.08]">
-        <div className="text-lg text-primary leading-relaxed">
-          <span className="text-secondary">{before}</span>
+      <div className="py-3 px-4 rounded-xl bg-accent border border-border">
+        <div className="text-lg text-foreground leading-relaxed">
+          <span className="text-muted-foreground">{before}</span>
           {renderInput(node, value, onResubmit, true)}
-          <span className="text-secondary">{after}</span>
+          <span className="text-muted-foreground">{after}</span>
         </div>
       </div>
     );
@@ -75,13 +75,13 @@ function CompletedNode({
     <button
       type="button"
       onClick={onClickEdit}
-      className="w-full text-left py-2 px-4 rounded-xl hover:bg-white/[0.04] transition-colors group"
+      className="w-full text-left py-2 px-4 rounded-xl hover:bg-accent transition-colors group"
     >
-      <span className="text-[15px] text-muted">{before}</span>
-      <span className="text-[15px] font-semibold text-primary group-hover:text-brand transition-colors">
+      <span className="text-[15px] text-muted-foreground">{before}</span>
+      <span className="text-[15px] font-semibold text-foreground group-hover:text-brand transition-colors">
         {displayValue}
       </span>
-      <span className="text-[15px] text-muted">{after}</span>
+      <span className="text-[15px] text-muted-foreground">{after}</span>
     </button>
   );
 }
@@ -244,7 +244,7 @@ export function ConversationRunner() {
             <span className="text-2xl font-bold text-brand">K</span>
           </div>
           {!isComplete && (
-            <h1 className="text-2xl font-semibold text-primary tracking-tight">
+            <h1 className="text-2xl font-semibold text-foreground tracking-tight">
               {activeIndex === 0 && !Object.keys(transcript).length
                 ? "Welcome to Klynt"
                 : "Setting up"}
@@ -255,7 +255,7 @@ export function ConversationRunner() {
         {/* Glass card container */}
         <div
           ref={containerRef}
-          className="glass-card rounded-2xl border border-white/[0.08] p-8"
+          className="glass-card rounded-2xl border border-border p-8"
           style={{ animation: "glass-appear 0.3s ease-out" }}
         >
           {/* Completed nodes (compact list) */}
@@ -284,13 +284,13 @@ export function ConversationRunner() {
 
           {/* Divider between completed and active */}
           {activeIndex > 0 && !isComplete && activeNode?.inputType !== "complex" && (
-            <div className="my-4 border-t border-white/[0.06]" />
+            <div className="my-4 border-t border-border-subtle" />
           )}
 
           {/* Active node — larger, prominent */}
           {activeNode && !isComplete && activeNode.inputType !== "complex" && (
             <div className="py-2" style={{ animation: "fade-in-up 0.3s ease-out" }}>
-              <div className="text-xl text-primary leading-relaxed">
+              <div className="text-xl text-foreground leading-relaxed">
                 <TypewriterText
                   text={activeNode.prompt}
                   onComplete={setAnimationComplete}
@@ -313,7 +313,7 @@ export function ConversationRunner() {
 
           {/* Saving */}
           {isSaving && (
-            <div className="mt-3 flex items-center gap-2 text-muted">
+            <div className="mt-3 flex items-center gap-2 text-muted-foreground">
               <div className="w-3 h-3 border-2 border-muted/30 border-t-muted rounded-full animate-spin" />
               <span className="text-sm">Saving...</span>
             </div>
@@ -335,8 +335,8 @@ export function ConversationRunner() {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <h2 className="text-2xl font-semibold text-primary mb-2">You're all set!</h2>
-              <p className="text-secondary text-base mb-6">
+              <h2 className="text-2xl font-semibold text-foreground mb-2">You're all set!</h2>
+              <p className="text-muted-foreground text-base mb-6">
                 Klynt is ready to help you stay productive.
               </p>
               <button

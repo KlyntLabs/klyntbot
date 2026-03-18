@@ -25,8 +25,8 @@ export function VimCommandLine({ prefix, onSubmit, onCancel }: VimCommandLinePro
   };
 
   return (
-    <div className="flex items-center gap-1.5 px-4 py-1.5 border-t border-white/[0.06] bg-black/20">
-      <span className="font-mono text-xs text-muted select-none">{prefix}</span>
+    <div className="flex items-center gap-1.5 px-4 py-1.5 border-t border-border-subtle bg-overlay">
+      <span className="font-mono text-xs text-muted-foreground select-none">{prefix}</span>
       <input
         ref={inputRef}
         type="text"
@@ -34,7 +34,7 @@ export function VimCommandLine({ prefix, onSubmit, onCancel }: VimCommandLinePro
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={handleKeyDown}
         onBlur={onCancel}
-        className="flex-1 bg-transparent text-xs font-mono text-primary outline-none placeholder:text-dim"
+        className="flex-1 bg-transparent text-xs font-mono text-foreground outline-none placeholder:text-dim"
         placeholder={prefix === "/" ? "Search..." : "Command..."}
       />
     </div>

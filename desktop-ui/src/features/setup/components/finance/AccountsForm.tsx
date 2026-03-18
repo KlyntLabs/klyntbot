@@ -74,14 +74,14 @@ export function AccountsForm({ registerSave, onDirty }: AccountsFormProps) {
 
   return (
     <div>
-      <h3 className="text-[14px] font-medium text-secondary mb-1">Accounts</h3>
+      <h3 className="text-[14px] font-medium text-muted-foreground mb-1">Accounts</h3>
       <p className="text-[11px] text-dim mb-4">Add your bank accounts. You can add more later.</p>
 
       <div className="space-y-2 max-h-[240px] overflow-y-auto pr-1">
         {accounts.map((acc) => (
           <div
             key={acc.key}
-            className="bg-white/[0.03] rounded-lg border border-white/[0.06] p-3 space-y-2"
+            className="bg-card rounded-lg border border-border-subtle p-3 space-y-2"
           >
             <div className="flex items-center gap-2">
               <input
@@ -89,7 +89,7 @@ export function AccountsForm({ registerSave, onDirty }: AccountsFormProps) {
                 value={acc.name}
                 onChange={(e) => updateAccount(acc.key, { name: e.target.value })}
                 placeholder="Account name"
-                className="flex-1 px-3 py-1.5 text-[12px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                className="flex-1 px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
               />
               <button
                 type="button"
@@ -103,10 +103,10 @@ export function AccountsForm({ registerSave, onDirty }: AccountsFormProps) {
               <select
                 value={acc.accountType}
                 onChange={(e) => updateAccount(acc.key, { accountType: e.target.value })}
-                className="flex-1 px-2 py-1.5 text-[12px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                className="flex-1 px-2 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
               >
                 {ACCOUNT_TYPE_OPTIONS.map((t) => (
-                  <option key={t.value} value={t.value} className="bg-[#1a1a1a]">
+                  <option key={t.value} value={t.value} className="bg-popover">
                     {t.label}
                   </option>
                 ))}
@@ -117,14 +117,14 @@ export function AccountsForm({ registerSave, onDirty }: AccountsFormProps) {
                 onChange={(e) => updateAccount(acc.key, { balance: e.target.value })}
                 placeholder="Balance"
                 step="0.01"
-                className="w-28 px-2 py-1.5 text-[12px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                className="w-28 px-2 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
               />
               <input
                 type="text"
                 value={acc.institution}
                 onChange={(e) => updateAccount(acc.key, { institution: e.target.value })}
                 placeholder="Institution"
-                className="flex-1 px-2 py-1.5 text-[12px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                className="flex-1 px-2 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
               />
             </div>
           </div>
@@ -134,7 +134,7 @@ export function AccountsForm({ registerSave, onDirty }: AccountsFormProps) {
       <button
         type="button"
         onClick={addAccount}
-        className="flex items-center gap-1.5 mt-3 text-[12px] text-muted hover:text-secondary transition-colors"
+        className="flex items-center gap-1.5 mt-3 text-[12px] text-muted-foreground hover:text-foreground transition-colors"
       >
         <Plus className="w-3.5 h-3.5" />
         Add account

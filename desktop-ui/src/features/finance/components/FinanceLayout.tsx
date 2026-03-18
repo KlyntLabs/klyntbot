@@ -48,8 +48,8 @@ export function FinanceLayout({
                 onClick={() => navigate(item.path)}
                 className={`flex-1 py-2 rounded-xl text-[13px] font-light transition-all duration-200 ${
                   isActive
-                    ? "glass-button-active text-primary"
-                    : "text-muted hover:text-secondary hover:bg-white/[0.04]"
+                    ? "glass-button-active text-foreground"
+                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
                 }`}
               >
                 {item.label}

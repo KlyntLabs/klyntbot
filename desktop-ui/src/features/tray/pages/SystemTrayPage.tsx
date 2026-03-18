@@ -118,7 +118,7 @@ export function SystemTray() {
   useWindowAutoResize(contentRef, { width: 320, maxHeight: MAX_TRAY_HEIGHT });
 
   return (
-    <div className="w-screen text-primary">
+    <div className="w-screen text-foreground">
       <div
         ref={contentRef}
         className="w-full glass-floating overflow-hidden"
@@ -133,7 +133,7 @@ export function SystemTray() {
             <div className="px-4 py-3" style={{ animation: "nudge-slide-in 0.25s ease-out" }}>
               <div className="flex items-start gap-2.5">
                 <Lightbulb className="w-3.5 h-3.5 text-info shrink-0 mt-0.5" strokeWidth={1.5} />
-                <p className="flex-1 text-[12px] text-secondary font-light leading-relaxed">
+                <p className="flex-1 text-[12px] text-muted-foreground font-light leading-relaxed">
                   {coachingNudge.message}
                 </p>
               </div>
@@ -142,7 +142,7 @@ export function SystemTray() {
                   type="button"
                   onClick={() => handleCoachingFeedback(coachingNudge.id, "helpful")}
                   title="Helpful"
-                  className="h-6 px-2 flex items-center gap-1 rounded-md text-[10px] text-muted hover:text-success hover:bg-white/[0.06] transition-colors"
+                  className="h-6 px-2 flex items-center gap-1 rounded-md text-[10px] text-muted-foreground hover:text-success hover:bg-accent transition-colors"
                 >
                   <Check className="w-3 h-3" strokeWidth={2} />
                   Helpful
@@ -151,7 +151,7 @@ export function SystemTray() {
                   type="button"
                   onClick={() => handleCoachingFeedback(coachingNudge.id, "dismissed")}
                   title="Dismiss"
-                  className="h-6 px-2 flex items-center gap-1 rounded-md text-[10px] text-muted hover:text-secondary hover:bg-white/[0.06] transition-colors"
+                  className="h-6 px-2 flex items-center gap-1 rounded-md text-[10px] text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
                 >
                   <X className="w-3 h-3" strokeWidth={2} />
                   Dismiss
@@ -160,7 +160,7 @@ export function SystemTray() {
                   type="button"
                   onClick={() => handleCoachingFeedback(coachingNudge.id, "stop")}
                   title="Stop suggesting this"
-                  className="h-6 px-2 flex items-center gap-1 rounded-md text-[10px] text-muted hover:text-destructive hover:bg-white/[0.06] transition-colors"
+                  className="h-6 px-2 flex items-center gap-1 rounded-md text-[10px] text-muted-foreground hover:text-destructive hover:bg-accent transition-colors"
                 >
                   <XCircle className="w-3 h-3" strokeWidth={2} />
                   Stop
@@ -179,11 +179,11 @@ export function SystemTray() {
               <div className="mx-4 glass-divider" />
               <div className="px-4 py-3 overflow-y-auto max-h-[240px]">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-[11px] text-muted font-light uppercase tracking-wider">
+                  <span className="text-[11px] text-muted-foreground font-light uppercase tracking-wider">
                     Today
                   </span>
                   {activeCount > 0 && (
-                    <span className="glass-badge px-2 py-0.5 text-[10px] text-muted font-light">
+                    <span className="glass-badge px-2 py-0.5 text-[10px] text-muted-foreground font-light">
                       {activeCount}
                     </span>
                   )}
@@ -194,7 +194,7 @@ export function SystemTray() {
                     return (
                       <div
                         key={task.id}
-                        className={`flex items-center gap-2.5 py-1.5 px-2 rounded-lg border-l-2 border-y-0 border-r-0 hover:bg-white/[0.04] transition-colors ${taskIndicatorClass(task, done)}`}
+                        className={`flex items-center gap-2.5 py-1.5 px-2 rounded-lg border-l-2 border-y-0 border-r-0 hover:bg-accent transition-colors ${taskIndicatorClass(task, done)}`}
                       >
                         <Checkbox
                           checked={done}
@@ -207,8 +207,8 @@ export function SystemTray() {
                             done
                               ? "text-dim line-through"
                               : task.isOverdue
-                                ? "text-primary"
-                                : "text-secondary"
+                                ? "text-foreground"
+                                : "text-muted-foreground"
                           }`}
                         >
                           {task.title}
@@ -221,7 +221,7 @@ export function SystemTray() {
                         {!done && task.dueDisplay && (
                           <span
                             className={`text-[10px] font-light flex-shrink-0 ${
-                              task.isOverdue ? "text-destructive" : "text-muted"
+                              task.isOverdue ? "text-destructive" : "text-muted-foreground"
                             }`}
                           >
                             {task.dueDisplay}
@@ -240,7 +240,7 @@ export function SystemTray() {
             <>
               <div className="mx-4 glass-divider" />
               <div className="px-4 py-3">
-                <span className="text-[11px] text-muted font-light uppercase tracking-wider">
+                <span className="text-[11px] text-muted-foreground font-light uppercase tracking-wider">
                   Upcoming
                 </span>
                 <div className="mt-2 space-y-2">
@@ -251,7 +251,7 @@ export function SystemTray() {
                         style={{ backgroundColor: event.color ?? "var(--brand)" }}
                       />
                       <div className="flex-1 min-w-0">
-                        <p className="text-[12px] font-light text-secondary truncate">
+                        <p className="text-[12px] font-light text-muted-foreground truncate">
                           {event.title}
                         </p>
                       </div>
@@ -276,7 +276,7 @@ export function SystemTray() {
               type="button"
               onClick={handleOpenDashboard}
               title="Open Dashboard"
-              className="w-7 h-7 flex items-center justify-center rounded-lg text-muted hover:text-secondary hover:bg-white/[0.06] transition-colors"
+              className="w-7 h-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
             >
               <Monitor className="w-3.5 h-3.5" strokeWidth={1.5} />
             </button>
@@ -284,7 +284,7 @@ export function SystemTray() {
               type="button"
               onClick={handleOpenSettings}
               title="Settings"
-              className="w-7 h-7 flex items-center justify-center rounded-lg text-muted hover:text-secondary hover:bg-white/[0.06] transition-colors"
+              className="w-7 h-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
             >
               <Settings className="w-3.5 h-3.5" strokeWidth={1.5} />
             </button>
@@ -292,7 +292,7 @@ export function SystemTray() {
               type="button"
               onClick={handleOpenGitHub}
               title="GitHub"
-              className="w-7 h-7 flex items-center justify-center rounded-lg text-muted hover:text-secondary hover:bg-white/[0.06] transition-colors"
+              className="w-7 h-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
             >
               <svg
                 className="w-3.5 h-3.5"
@@ -307,7 +307,7 @@ export function SystemTray() {
               type="button"
               onClick={handleQuit}
               title="Quit Klynt"
-              className="w-7 h-7 flex items-center justify-center rounded-lg text-muted hover:text-destructive hover:bg-white/[0.06] transition-colors"
+              className="w-7 h-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-destructive hover:bg-accent transition-colors"
             >
               <LogOut className="w-3.5 h-3.5" strokeWidth={1.5} />
             </button>

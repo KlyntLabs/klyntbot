@@ -39,7 +39,7 @@ export function LauncherInput() {
         </div>
       ) : (
         <svg
-          className="w-5 h-5 text-muted shrink-0"
+          className="w-5 h-5 text-muted-foreground shrink-0"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -61,7 +61,7 @@ export function LauncherInput() {
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Search apps, tasks, notes, or ask AI..."
-        className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted outline-none"
+        className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
         spellCheck={false}
         autoComplete="off"
       />
@@ -69,7 +69,7 @@ export function LauncherInput() {
         <button
           type="button"
           onClick={() => setQuery("")}
-          className="text-muted hover:text-foreground text-xs"
+          className="text-muted-foreground hover:text-foreground text-xs"
         >
           ESC
         </button>

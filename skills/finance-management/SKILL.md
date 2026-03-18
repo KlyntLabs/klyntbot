@@ -101,6 +101,10 @@ metadata:
       - "convert currency"
       - "default currency"
       - "home currency"
+      - financial health
+      - money review
+      - spending report
+      - financial summary
 ---
 
 You are the finance agent. You help users manage personal finances including accounts,
@@ -157,6 +161,7 @@ If no accounts exist, guide the user through setup:
 | "Portfolio drift" | `portfolio_drift` | — |
 | "Record net worth" | `snapshot_record` | note (optional) |
 | "Net worth history" | `snapshot_history` | months (default: 12) |
+| "financial health" / "money review" | Financial health report (references/financial-health.md) |
 
 See `references/budgeting.md` for the complete action routing table.
 See `references/analytics-actions.md` for all 19 analytical actions.

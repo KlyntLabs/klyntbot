@@ -47,7 +47,7 @@ function buildMonthGrid(year: number, month: number): (string | null)[][] {
 }
 
 function intensityClass(secs: number, maxSecs: number): string {
-  if (secs === 0 || maxSecs === 0) return "bg-white/[0.03]";
+  if (secs === 0 || maxSecs === 0) return "bg-card";
   const ratio = secs / maxSecs;
   if (ratio > 0.75) return "bg-timeline-focus/60";
   if (ratio > 0.5) return "bg-timeline-focus/40";
@@ -86,21 +86,23 @@ export function YearHeatmapView() {
   return (
     <div className="flex gap-2 h-full">
       <div className="flex-1 glass-card p-4 overflow-y-auto">
-        {loading && <div className="text-xs text-muted mb-2">Loading...</div>}
+        {loading && <div className="text-xs text-muted-foreground mb-2">Loading...</div>}
 
         <div className="grid grid-cols-3 gap-4">
           {Array.from({ length: 12 }, (_, monthIdx) => {
             const weeks = buildMonthGrid(year, monthIdx);
             return (
               <div key={monthIdx}>
-                <div className="text-xs font-medium text-muted mb-1.5">{MONTH_NAMES[monthIdx]}</div>
+                <div className="text-xs font-medium text-muted-foreground mb-1.5">
+                  {MONTH_NAMES[monthIdx]}
+                </div>
 
                 {/* Day-of-week labels */}
                 <div className="grid grid-cols-7 gap-px mb-0.5">
                   {DAY_LABELS.map((label, i) => (
                     <div
                       key={`${monthIdx}-label-${i}`}
-                      className="text-[8px] text-muted/50 text-center"
+                      className="text-[8px] text-muted-foreground/50 text-center"
                     >
                       {label}
                     </div>
@@ -136,13 +138,13 @@ export function YearHeatmapView() {
 
         {/* Legend */}
         <div className="flex items-center gap-2 mt-4 justify-center">
-          <span className="text-[10px] text-muted">Less focus</span>
-          <div className="w-3 h-3 rounded-[2px] bg-white/[0.03]" />
+          <span className="text-[10px] text-muted-foreground">Less focus</span>
+          <div className="w-3 h-3 rounded-[2px] bg-card" />
           <div className="w-3 h-3 rounded-[2px] bg-timeline-focus/10" />
           <div className="w-3 h-3 rounded-[2px] bg-timeline-focus/25" />
           <div className="w-3 h-3 rounded-[2px] bg-timeline-focus/40" />
           <div className="w-3 h-3 rounded-[2px] bg-timeline-focus/60" />
-          <span className="text-[10px] text-muted">More focus</span>
+          <span className="text-[10px] text-muted-foreground">More focus</span>
         </div>
       </div>
 

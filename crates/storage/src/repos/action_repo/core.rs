@@ -80,23 +80,7 @@ impl ActionRepo {
         self.get(id).await?.ok_or_not_found(&format!("action {id}"))
     }
 
-    /// Fetch actions by a list of IDs. Missing IDs are silently skipped.
-    pub async fn get_by_ids(&self, ids: &[String]) -> Result<Vec<ActionRow>, StorageError> {
-        if ids.is_empty() {
-            return Ok(Vec::new());
-        }
-        let mut qb = sqlx::QueryBuilder::<sqlx::Sqlite>::new("SELECT * FROM actions WHERE id IN (");
-        let mut sep = qb.separated(", ");
-        for id in ids {
-            sep.push_bind(id);
-        }
-        qb.push(")");
-        let rows = qb
-            .build_query_as::<ActionRow>()
-            .fetch_all(&self.pool)
-            .await?;
-        Ok(rows)
-    }
+    get_by_ids_impl!("actions", ActionRow);
 
     /// Update mutable fields on an action. Only non-None fields are overwritten.
     pub async fn update(&self, patch: &ActionPatch) -> Result<ActionRow, StorageError> {

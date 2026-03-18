@@ -48,6 +48,27 @@ use super::{AgentLoop, LastActiveChannel};
 ///     .build()
 ///     .await?;
 /// ```
+/// Adapter bridging `providers::DynProvider` → `context_engine::DecomposerLlm` trait.
+struct DecomposerLlmAdapter {
+    provider: DynProvider,
+    params: providers::ChatParams,
+}
+
+#[async_trait::async_trait]
+impl context_engine::DecomposerLlm for DecomposerLlmAdapter {
+    async fn generate(&self, prompt: &str) -> std::result::Result<String, String> {
+        let messages = vec![providers::Message::User {
+            content: providers::UserContent::Text(prompt.to_string()),
+        }];
+        let response = self
+            .provider
+            .chat(&messages, None, &self.params)
+            .await
+            .map_err(|e| e.to_string())?;
+        response.content.ok_or_else(|| "empty response".to_string())
+    }
+}
+
 pub struct AgentLoopBuilder {
     bus: Arc<MessageBus>,
     provider: DynProvider,
@@ -268,6 +289,15 @@ impl AgentLoopBuilder {
             Box::new(PageContextSource::new(repos.clone())),
         ];
 
+        // Analysis persona context source (DB personas for analysis queries)
+        if let Some(ref pool) = self.pool {
+            sources.push(Box::new(
+                crate::context_sources::analysis_persona::AnalysisPersonaContextSource::new(
+                    cognitive::repos::PersonaRepo::new(pool.clone()),
+                ),
+            ));
+        }
+
         // Cognitive context source (optional — requires real pool).
         // These are hoisted so UnifiedMemoryService can use them outside the block.
         let mut cognitive_fact_repo: Option<cognitive::SemanticFactRepo> = None;
@@ -320,6 +350,7 @@ impl AgentLoopBuilder {
                     relevance_weight_importance: config.cognitive.relevance_weight_importance,
                     relevance_weight_frequency: config.cognitive.relevance_weight_frequency,
                     relevance_weight_situation: config.cognitive.relevance_weight_situation,
+                    relevance_weight_temporal: config.cognitive.relevance_weight_temporal,
                 };
 
                 // Hoist for UnifiedMemoryService wiring below
@@ -395,6 +426,7 @@ impl AgentLoopBuilder {
                             failed_obs_repo: Some(failed_obs_repo),
                             promote_threshold: config.cognitive.accumulate_promote_threshold,
                             min_days: config.cognitive.accumulate_min_days,
+                            domain_bus: self.domain_event_bus.clone(),
                         },
                     );
                     info!("Cognitive background consolidation service started");
@@ -604,7 +636,7 @@ impl AgentLoopBuilder {
                 None
             };
 
-        // ── Wire automatic memory retrieval (UnifiedMemoryService) ───
+        // ── Wire memory retrieval + InsightForge ─────────────────────
         let context_engine = if let Some(fact_repo) = cognitive_fact_repo {
             let mut retriever = cognitive::UnifiedMemoryService::new(fact_repo)
                 .with_recall_opt(recall_service.clone())
@@ -615,7 +647,158 @@ impl AgentLoopBuilder {
             if let Some(ref sit) = self.user_situation {
                 retriever = retriever.with_situation(Arc::clone(sit));
             }
-            context_engine.with_memory_retriever(Arc::new(retriever))
+            let retriever: Arc<dyn context_engine::MemoryRetriever> = Arc::new(retriever);
+
+            // Create InsightForge with the same retriever
+            let forge_config = context_engine::InsightForgeConfig {
+                enabled: config.cognitive.insight_forge_enabled,
+                max_sub_queries: config.cognitive.insight_forge_max_sub_queries,
+                per_source_limit: config.cognitive.insight_forge_per_source_limit,
+                total_limit: config.cognitive.insight_forge_total_limit,
+                per_source_timeout_ms: config.cognitive.insight_forge_per_source_timeout_ms,
+                ..context_engine::InsightForgeConfig::default()
+            };
+            // Use FallbackDecomposer if a cognitive provider is available
+            let decomposer: Arc<dyn context_engine::QueryDecomposer> =
+                if let Some(ref cp) = self.cognitive_provider {
+                    let llm_adapter = Arc::new(DecomposerLlmAdapter {
+                        provider: cp.clone(),
+                        params: providers::cognitive_chat_params(&config, 256),
+                    });
+                    let llm_decomposer = Arc::new(context_engine::LlmDecomposer::new(llm_adapter));
+                    Arc::new(context_engine::FallbackDecomposer::new(llm_decomposer, 3))
+                } else {
+                    Arc::new(context_engine::HeuristicDecomposer)
+                };
+            let mut forge =
+                context_engine::InsightForge::new(forge_config, decomposer, Arc::clone(&retriever));
+
+            // Register domain searchers
+            let note_repo_for_searcher =
+                feature_notes::repo::NoteRepo::new(storage_pool.inner().clone());
+            forge.add_searcher(Arc::new(crate::domain_searchers::NoteSearcher::new(
+                note_repo_for_searcher,
+            )));
+            forge.add_searcher(Arc::new(crate::domain_searchers::TaskSearcher::new(
+                repos.clone(),
+            )));
+            let entity_repo = cognitive::repos::EntityRepo::new(storage_pool.inner().clone());
+            forge.add_searcher(Arc::new(crate::domain_searchers::GraphSearcher::new(
+                entity_repo.clone(),
+            )));
+            forge.add_searcher(Arc::new(crate::domain_searchers::FinanceSearcher::new(
+                repos.clone(),
+            )));
+
+            // BookRAG integration
+            if config.cognitive.book_index.enabled {
+                let book_entity_repo =
+                    cognitive::repos::EntityRepo::new(storage_pool.inner().clone());
+                let tree_repo = Arc::new(cognitive::repos::SqliteBookTreeRepo::new(
+                    storage_pool.inner().clone(),
+                ));
+                let gt_link_repo = Arc::new(cognitive::repos::SqliteGTLinkRepo::new(
+                    storage_pool.inner().clone(),
+                ));
+                let book_index = crate::adapters::book_index_wiring::build_book_index(
+                    tree_repo.clone(),
+                    book_entity_repo,
+                    gt_link_repo.clone(),
+                    embedding_engine.clone(),
+                );
+                let bookrag_searcher = crate::adapters::book_index_wiring::build_bookrag_searcher(
+                    book_index.clone(),
+                    provider.clone(),
+                    &config.cognitive.book_index.retrieval,
+                );
+                forge.add_searcher(bookrag_searcher);
+
+                // Build entity extractor for GT-Link population
+                let entity_extractor = crate::adapters::book_index_wiring::build_entity_extractor(
+                    cognitive::repos::EntityRepo::new(storage_pool.inner().clone()),
+                    gt_link_repo.clone(),
+                    provider.clone(),
+                    &config,
+                );
+
+                // Start BookIndex updater (listens for NoteContentChanged/NoteDeleted/TaskHierarchyChanged)
+                if let Some(ref domain_bus) = self.domain_event_bus {
+                    let updater_rx = domain_bus.subscribe();
+                    let task_repo_for_updater =
+                        storage::TaskRepo::new(storage_pool.inner().clone());
+                    let project_repo_for_updater =
+                        storage::ProjectRepo::new(storage_pool.inner().clone());
+                    let _updater = crate::adapters::book_index_updater::BookIndexUpdater::start(
+                        updater_rx,
+                        tree_repo.clone(),
+                        book_index.clone(),
+                        CancellationToken::new(),
+                        Some(entity_extractor.clone()),
+                        Some(task_repo_for_updater),
+                        Some(project_repo_for_updater),
+                    );
+                    info!("BookIndex updater started");
+                }
+
+                // Build skill trees at startup (non-blocking)
+                let tree_repo_for_skills = tree_repo.clone();
+                tokio::spawn(async move {
+                    match crate::adapters::book_index_skill_builder::build_all_skill_trees(
+                        tree_repo_for_skills.as_ref(),
+                    )
+                    .await
+                    {
+                        Ok(checksum) => {
+                            tracing::info!("BookIndex: skill trees built (checksum: {checksum})")
+                        }
+                        Err(e) => tracing::warn!("BookIndex: skill tree build failed: {e}"),
+                    }
+                });
+
+                // Backfill existing notes (non-blocking)
+                let note_repo_for_backfill =
+                    feature_notes::repo::NoteRepo::new(storage_pool.inner().clone());
+                let tree_repo_for_backfill = tree_repo.clone();
+                let book_index_for_backfill = book_index.clone();
+                let extractor_for_backfill = entity_extractor.clone();
+                tokio::spawn(async move {
+                    match crate::adapters::book_index_backfill::backfill_existing_notes(
+                        &note_repo_for_backfill,
+                        tree_repo_for_backfill.as_ref(),
+                        &book_index_for_backfill,
+                        Some(&extractor_for_backfill),
+                    )
+                    .await
+                    {
+                        Ok(0) => {}
+                        Ok(n) => tracing::info!("BookIndex: backfilled {n} existing notes"),
+                        Err(e) => tracing::warn!("BookIndex backfill failed: {e}"),
+                    }
+                });
+            }
+
+            // One-time entity backfill from pre-existing SPO facts (non-blocking)
+            tokio::spawn(async move {
+                match entity_repo.backfill_from_facts().await {
+                    Ok(0) => {}
+                    Ok(n) => tracing::info!("Backfilled {n} entities from SPO facts"),
+                    Err(e) => tracing::debug!("Entity backfill error (non-fatal): {e}"),
+                }
+            });
+
+            // One-time entity backfill from note_entity_mentions (non-blocking)
+            let entity_repo2 = cognitive::repos::EntityRepo::new(storage_pool.inner().clone());
+            tokio::spawn(async move {
+                match entity_repo2.backfill_from_note_mentions().await {
+                    Ok(0) => {}
+                    Ok(n) => tracing::info!("Backfilled {n} entities from note mentions"),
+                    Err(e) => tracing::debug!("Note mention backfill error (non-fatal): {e}"),
+                }
+            });
+
+            context_engine
+                .with_memory_retriever(retriever)
+                .with_insight_forge(forge)
         } else {
             context_engine
         };
@@ -1146,6 +1329,7 @@ impl AgentLoopBuilder {
             max_response_tokens: config.agents.defaults.max_tokens as usize,
             channel: "unknown".to_string(),
             provider_name: provider.name().to_string(),
+            scenario_max_graph_depth: config.scenario.max_graph_depth,
         };
 
         // ── Interaction recorder ──────────────────────────────────────────

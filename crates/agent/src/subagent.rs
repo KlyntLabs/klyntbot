@@ -79,6 +79,15 @@ impl SubagentProfile {
             Self::Analyst => "You are an analyst. Reason about the information provided. You have read-only file access but no web tools.",
         }
     }
+
+    /// Tool description for the system prompt.
+    pub fn tool_description(&self) -> &'static str {
+        match self {
+            Self::General => "- Read and write files in the workspace\n- Search file contents (grep) and find files by pattern (glob)\n- Search the web and fetch web pages",
+            Self::Research => "- Read files in the workspace (read-only)\n- Search file contents (grep) and find files by pattern (glob)\n- Search the web and fetch web pages",
+            Self::Analyst => "- Read files in the workspace (read-only)\n- Search file contents (grep) and find files by pattern (glob)",
+        }
+    }
 }
 
 /// Tracks a running subagent for cancel/status operations.
@@ -490,9 +499,10 @@ async fn run_subagent_task(
 
     match outcome {
         EngineResult::Complete { content, .. } => Ok(("ok".to_string(), content)),
-        EngineResult::Escalate { .. } => {
-            unreachable!("subagents always use ReactiveEngine which never produces Escalate")
-        }
+        EngineResult::Escalate { .. } => Err(Box::new(common::KlyntbotError::Tool(
+            common::ToolError::ExecutionFailed("subagent unexpectedly escalated".to_string()),
+        ))
+            as Box<dyn std::error::Error + Send + Sync>),
     }
 }
 
@@ -502,15 +512,7 @@ fn build_subagent_prompt(
     task: &str,
     profile: SubagentProfile,
 ) -> String {
-    let tool_description = match profile {
-        SubagentProfile::General => {
-            "- Read and write files in the workspace\n- Search file contents (grep) and find files by pattern (glob)\n- Search the web and fetch web pages"
-        }
-        SubagentProfile::Research => {
-            "- Read files in the workspace (read-only)\n- Search file contents (grep) and find files by pattern (glob)\n- Search the web and fetch web pages"
-        }
-        SubagentProfile::Analyst => "- Read files in the workspace (read-only)\n- Search file contents (grep) and find files by pattern (glob)",
-    };
+    let tool_description = profile.tool_description();
 
     format!(
         r#"# Subagent

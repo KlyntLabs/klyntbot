@@ -21,7 +21,7 @@ export function IssueLine({ issue }: IssueLineProps) {
   return (
     <IssueContextMenu issue={issue}>
       <div
-        className="group flex items-center gap-2 px-4 py-2 border-b border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))]/50 transition-colors cursor-pointer"
+        className="group flex items-center gap-2 px-4 py-2 border-b border-border hover:bg-accent/50 transition-colors cursor-pointer"
         onClick={() => navigateInPlace("issue", issue.id, issue.identifier)}
       >
         {/* Priority — stop propagation so clicking it doesn't navigate */}
@@ -30,9 +30,7 @@ export function IssueLine({ issue }: IssueLineProps) {
         </div>
 
         {/* Identifier */}
-        <span className="text-xs text-[hsl(var(--muted-foreground))] w-[72px] shrink-0">
-          {issue.identifier}
-        </span>
+        <span className="text-xs text-muted-foreground w-[72px] shrink-0">{issue.identifier}</span>
 
         {/* Status — stop propagation */}
         <div onClick={(e) => e.stopPropagation()}>
@@ -40,9 +38,7 @@ export function IssueLine({ issue }: IssueLineProps) {
         </div>
 
         {/* Title */}
-        <span className="text-sm text-[hsl(var(--foreground))] truncate flex-1 min-w-0">
-          {issue.title}
-        </span>
+        <span className="text-sm text-foreground truncate flex-1 min-w-0">{issue.title}</span>
 
         {/* Labels */}
         <div className="hidden lg:flex items-center gap-1 shrink-0">
@@ -57,7 +53,7 @@ export function IssueLine({ issue }: IssueLineProps) {
         )}
 
         {/* Date */}
-        <span className="text-xs text-[hsl(var(--muted-foreground))] w-[60px] shrink-0 text-right">
+        <span className="text-xs text-muted-foreground w-[60px] shrink-0 text-right">
           {createdDate}
         </span>
 

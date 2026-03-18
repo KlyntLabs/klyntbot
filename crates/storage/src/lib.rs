@@ -24,7 +24,7 @@ pub use vector_store::{sanitize_predicate_value, CognitiveFactParams, VectorStor
 // ── Actions / Tasks / Projects ──────────────────────────────────────
 pub use repos::action_repo::TimeEntryWithTask;
 pub use repos::{ActionFilter, ActionPatch, ActionRepo, ActionSummary};
-pub use repos::{CustomColumnRepo, TaskGroupRepo};
+pub use repos::{CustomColumnRepo, ItemSummary, TaskGroupRepo};
 pub use repos::{EntityLinkRepo, ProjectSourceRepo};
 pub use repos::{ProjectFilter, ProjectPatch, ProjectRepo, ProjectWithStats};
 pub use repos::{TaskFilter, TaskPatch, TaskRepo, TaskSummary};

@@ -29,7 +29,7 @@ export function TokenBadge({ transparency, isStreaming }: TokenBadgeProps) {
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
-        className="ml-auto flex items-center gap-1.5 text-[10px] font-light text-dim hover:text-muted transition-colors"
+        className="ml-auto flex items-center gap-1.5 text-[10px] font-light text-dim hover:text-muted-foreground transition-colors"
       >
         <span>
           {"\u2191"}
@@ -51,50 +51,56 @@ export function TokenBadge({ transparency, isStreaming }: TokenBadgeProps) {
       </button>
 
       {expanded && (
-        <div className="mt-1.5 p-2.5 rounded-lg bg-white/[0.06] border border-white/[0.08] text-[10px] font-light space-y-1">
-          <div className="flex justify-between text-muted">
+        <div className="mt-1.5 p-2.5 rounded-lg bg-accent border border-border text-[10px] font-light space-y-1">
+          <div className="flex justify-between text-muted-foreground">
             <span>Input tokens</span>
-            <span className="text-secondary">{usage.promptTokens.toLocaleString()}</span>
+            <span className="text-muted-foreground">{usage.promptTokens.toLocaleString()}</span>
           </div>
-          <div className="flex justify-between text-muted">
+          <div className="flex justify-between text-muted-foreground">
             <span>Output tokens</span>
-            <span className="text-secondary">{usage.completionTokens.toLocaleString()}</span>
+            <span className="text-muted-foreground">{usage.completionTokens.toLocaleString()}</span>
           </div>
           {usage.cacheReadTokens > 0 && (
-            <div className="flex justify-between text-muted">
+            <div className="flex justify-between text-muted-foreground">
               <span>Cache read</span>
-              <span className="text-secondary">{usage.cacheReadTokens.toLocaleString()}</span>
+              <span className="text-muted-foreground">
+                {usage.cacheReadTokens.toLocaleString()}
+              </span>
             </div>
           )}
           {usage.cacheWriteTokens > 0 && (
-            <div className="flex justify-between text-muted">
+            <div className="flex justify-between text-muted-foreground">
               <span>Cache write</span>
-              <span className="text-secondary">{usage.cacheWriteTokens.toLocaleString()}</span>
+              <span className="text-muted-foreground">
+                {usage.cacheWriteTokens.toLocaleString()}
+              </span>
             </div>
           )}
           {transparency.toolTokensTotal && transparency.toolTokensTotal > 0 && (
-            <div className="flex justify-between text-muted">
+            <div className="flex justify-between text-muted-foreground">
               <span>Tool I/O (est.)</span>
-              <span className="text-secondary">~{formatTokens(transparency.toolTokensTotal)}</span>
+              <span className="text-muted-foreground">
+                ~{formatTokens(transparency.toolTokensTotal)}
+              </span>
             </div>
           )}
           {cost && (
             <>
-              <div className="border-t border-white/[0.08] my-1" />
-              <div className="flex justify-between text-muted">
+              <div className="border-t border-border my-1" />
+              <div className="flex justify-between text-muted-foreground">
                 <span>Model</span>
-                <span className="text-secondary">{cost.model}</span>
+                <span className="text-muted-foreground">{cost.model}</span>
               </div>
-              <div className="flex justify-between text-muted">
+              <div className="flex justify-between text-muted-foreground">
                 <span>Cost</span>
-                <span className="text-secondary">{formatCost(cost.estimatedUsd)}</span>
+                <span className="text-muted-foreground">{formatCost(cost.estimatedUsd)}</span>
               </div>
             </>
           )}
           {timing?.totalMs && timing.totalMs > 0 && (
-            <div className="flex justify-between text-muted">
+            <div className="flex justify-between text-muted-foreground">
               <span>Latency</span>
-              <span className="text-secondary">{formatDuration(timing.totalMs)}</span>
+              <span className="text-muted-foreground">{formatDuration(timing.totalMs)}</span>
             </div>
           )}
         </div>

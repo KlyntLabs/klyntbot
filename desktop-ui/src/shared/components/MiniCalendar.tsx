@@ -131,7 +131,9 @@ export function MiniCalendar({
               onClick={() => onSelect(s.iso)}
               className={cn(
                 "px-2 py-0.5 text-[11px] rounded-lg transition-all",
-                value === s.iso ? "glass-button-active text-brand" : "glass-button text-muted",
+                value === s.iso
+                  ? "glass-button-active text-brand"
+                  : "glass-button text-muted-foreground",
               )}
             >
               {s.label}
@@ -146,18 +148,18 @@ export function MiniCalendar({
           type="button"
           onClick={prevMonth}
           aria-label="Previous month"
-          className="w-6 h-6 flex items-center justify-center glass-button rounded-lg text-muted hover:text-secondary transition-colors"
+          className="w-6 h-6 flex items-center justify-center glass-button rounded-lg text-muted-foreground hover:text-foreground transition-colors"
         >
           <ChevronLeft className="w-3.5 h-3.5" strokeWidth={1.5} />
         </button>
-        <span className="text-[12px] font-medium text-secondary">
+        <span className="text-[12px] font-medium text-muted-foreground">
           {MONTH_NAMES[viewMonth]} {viewYear}
         </span>
         <button
           type="button"
           onClick={nextMonth}
           aria-label="Next month"
-          className="w-6 h-6 flex items-center justify-center glass-button rounded-lg text-muted hover:text-secondary transition-colors"
+          className="w-6 h-6 flex items-center justify-center glass-button rounded-lg text-muted-foreground hover:text-foreground transition-colors"
         >
           <ChevronRight className="w-3.5 h-3.5" strokeWidth={1.5} />
         </button>
@@ -168,7 +170,7 @@ export function MiniCalendar({
         {WEEKDAYS.map((d) => (
           <div
             key={d}
-            className="h-6 flex items-center justify-center text-[10px] font-medium text-muted"
+            className="h-6 flex items-center justify-center text-[10px] font-medium text-muted-foreground"
           >
             {d}
           </div>
@@ -194,10 +196,10 @@ export function MiniCalendar({
                 isSelected
                   ? "bg-brand text-white border-brand/40"
                   : isToday
-                    ? "bg-white/[0.10] text-brand border-brand/30"
+                    ? "bg-muted text-brand border-brand/30"
                     : isCurrentMonth
-                      ? "bg-white/[0.04] text-secondary border-white/[0.06] hover:bg-white/[0.10] hover:border-white/[0.12]"
-                      : "text-muted/30 border-transparent hover:bg-white/[0.06]",
+                      ? "bg-card text-muted-foreground border-border-subtle hover:bg-muted hover:border-border"
+                      : "text-muted-foreground/30 border-transparent hover:bg-accent",
               )}
             >
               {d.getDate()}
@@ -211,7 +213,7 @@ export function MiniCalendar({
         <button
           type="button"
           onClick={onClear}
-          className="w-full text-left mt-1.5 px-2 py-1 text-[11px] text-destructive rounded-lg hover:bg-white/[0.08] transition-colors"
+          className="w-full text-left mt-1.5 px-2 py-1 text-[11px] text-destructive rounded-lg hover:bg-muted transition-colors"
         >
           Clear date
         </button>

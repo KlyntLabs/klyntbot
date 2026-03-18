@@ -81,14 +81,14 @@ export function TimeEntrySection({ date }: TimeEntrySectionProps) {
   return (
     <div className="glass-card p-4 flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-[13px] font-medium text-secondary flex items-center gap-2">
-          <Clock className="w-3.5 h-3.5 text-muted" />
+        <h2 className="text-[13px] font-medium text-muted-foreground flex items-center gap-2">
+          <Clock className="w-3.5 h-3.5 text-muted-foreground" />
           Time Entries
         </h2>
         <button
           type="button"
           onClick={() => setShowForm(!showForm)}
-          className="w-6 h-6 rounded-md flex items-center justify-center text-muted hover:text-brand hover:bg-white/[0.08] transition-colors"
+          className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-brand hover:bg-muted transition-colors"
         >
           <Plus className="w-3.5 h-3.5" />
         </button>
@@ -97,14 +97,14 @@ export function TimeEntrySection({ date }: TimeEntrySectionProps) {
       {showForm && (
         <div
           ref={formRef}
-          className="flex flex-col gap-2 p-3 bg-white/[0.02] rounded-lg border border-white/[0.08]"
+          className="flex flex-col gap-2 p-3 bg-card rounded-lg border border-border"
         >
           <input
             type="text"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="What did you work on?"
-            className="w-full px-3 py-1.5 text-[13px] bg-white/[0.06] border border-white/[0.08] rounded-md text-primary placeholder:text-dim"
+            className="w-full px-3 py-1.5 text-[13px] bg-accent border border-border rounded-md text-foreground placeholder:text-dim"
           />
           <div className="flex gap-2">
             <input
@@ -113,12 +113,12 @@ export function TimeEntrySection({ date }: TimeEntrySectionProps) {
               onChange={(e) => setDurationMins(e.target.value)}
               placeholder="Minutes"
               min={1}
-              className="w-24 px-3 py-1.5 text-[13px] bg-white/[0.06] border border-white/[0.08] rounded-md text-primary placeholder:text-dim"
+              className="w-24 px-3 py-1.5 text-[13px] bg-accent border border-border rounded-md text-foreground placeholder:text-dim"
             />
             <select
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
-              className="flex-1 px-3 py-1.5 text-[13px] bg-white/[0.06] border border-white/[0.08] rounded-md text-primary"
+              className="flex-1 px-3 py-1.5 text-[13px] bg-accent border border-border rounded-md text-foreground"
             >
               <option value="">No category</option>
               {categories.map((c) => (
@@ -149,7 +149,7 @@ export function TimeEntrySection({ date }: TimeEntrySectionProps) {
               className="group flex items-center justify-between py-1.5 text-[12px] font-light"
             >
               <div className="flex items-center gap-2">
-                <span className="text-primary">{e.description}</span>
+                <span className="text-foreground">{e.description}</span>
                 {e.categoryId && (
                   <span className="text-dim">
                     {categories.find((c) => c.id === e.categoryId)?.name}
@@ -157,13 +157,13 @@ export function TimeEntrySection({ date }: TimeEntrySectionProps) {
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-muted tabular-nums">
+                <span className="text-muted-foreground tabular-nums">
                   {formatHumanDuration(e.durationSecs)}
                 </span>
                 <button
                   type="button"
                   onClick={() => handleDelete(e.id)}
-                  className="w-5 h-5 rounded flex items-center justify-center text-transparent group-hover:text-muted hover:!text-destructive transition-colors"
+                  className="w-5 h-5 rounded flex items-center justify-center text-transparent group-hover:text-muted-foreground hover:!text-destructive transition-colors"
                 >
                   <Trash2 className="w-3 h-3" />
                 </button>

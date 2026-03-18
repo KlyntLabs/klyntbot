@@ -466,9 +466,10 @@ pub async fn productivity_hourly_breakdown(
     state: State<'_, Arc<AppCore>>,
     start_date: String,
     end_date: String,
+    tz_offset_mins: Option<i32>,
 ) -> Result<Vec<HourlyBreakdownResponse>, ApiError> {
     state
-        .productivity_hourly_breakdown(start_date, end_date)
+        .productivity_hourly_breakdown(start_date, end_date, tz_offset_mins)
         .await
 }
 
@@ -698,8 +699,12 @@ pub(crate) async fn dispatch_dev(
             let start_date = try_field!(dev::get_str(body, "start_date"));
             let end_date = try_field!(dev::get_str(body, "end_date"));
             dev::val(
-                core.productivity_hourly_breakdown(start_date, end_date)
-                    .await,
+                core.productivity_hourly_breakdown(
+                    start_date,
+                    end_date,
+                    dev::get(body, "tz_offset_mins"),
+                )
+                .await,
             )
         }
         _ => return None,

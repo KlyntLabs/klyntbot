@@ -261,14 +261,14 @@ export function ChatPage() {
 
       {/* Right Panel — Conversation */}
       <div className="flex-1 flex flex-col overflow-hidden rounded-xl relative">
-        <div className="flex items-center justify-between px-4 py-2 border-b border-white/[0.06]">
+        <div className="flex items-center justify-between px-4 py-2 border-b border-border-subtle">
           {resumeBanner ? (
             <div className="flex items-center gap-2 text-[12px]">
               <span className="text-brand font-medium">Resuming: {resumeBanner}</span>
               <button
                 type="button"
                 onClick={() => setResumeBanner(null)}
-                className="text-muted hover:text-secondary"
+                className="text-muted-foreground hover:text-foreground"
               >
                 ×
               </button>
@@ -283,7 +283,7 @@ export function ChatPage() {
           <div className="max-w-3xl mx-auto">
             {chat.messages.length === 0 && !chat.isStreaming ? (
               <div className="flex flex-col items-center justify-center py-20">
-                <p className="text-muted text-sm font-light">Start a conversation</p>
+                <p className="text-muted-foreground text-sm font-light">Start a conversation</p>
                 <p className="text-dim text-xs font-light mt-1">
                   Ask Klynt anything about your tasks, projects, or schedule
                 </p>

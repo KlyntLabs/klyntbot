@@ -23,7 +23,7 @@ const RESOURCE_ICONS: Record<string, typeof FileText> = {
 
 function ResourceIcon({ type }: { type: string }) {
   const Icon = RESOURCE_ICONS[type] ?? FileText;
-  return <Icon className="w-3.5 h-3.5 text-muted shrink-0" strokeWidth={1.5} />;
+  return <Icon className="w-3.5 h-3.5 text-muted-foreground shrink-0" strokeWidth={1.5} />;
 }
 
 export function ContextDetailPanel({ open, onClose, detail }: ContextDetailPanelProps) {
@@ -59,7 +59,7 @@ export function ContextDetailPanel({ open, onClose, detail }: ContextDetailPanel
   return (
     <SlidePanel open={open} onClose={onClose} title="Context Detail" width={460}>
       {!ctx ? (
-        <p className="text-[13px] text-muted">No context selected</p>
+        <p className="text-[13px] text-muted-foreground">No context selected</p>
       ) : (
         <div className="flex flex-col gap-5">
           {/* Header */}
@@ -76,22 +76,22 @@ export function ContextDetailPanel({ open, onClose, detail }: ContextDetailPanel
                   onChange={(e) => setTitleDraft(e.target.value)}
                   onBlur={handleRename}
                   onKeyDown={(e) => e.key === "Enter" && handleRename()}
-                  className="w-full px-2 py-1 text-[14px] font-medium bg-white/[0.06] border border-white/[0.08] rounded-lg text-primary"
+                  className="w-full px-2 py-1 text-[14px] font-medium bg-accent border border-border rounded-lg text-foreground"
                 />
               ) : (
                 <button
                   type="button"
-                  className="text-[14px] font-medium text-primary hover:text-brand transition-colors flex items-center gap-1.5"
+                  className="text-[14px] font-medium text-foreground hover:text-brand transition-colors flex items-center gap-1.5"
                   onClick={() => {
                     setTitleDraft(ctx.title);
                     setEditingTitle(true);
                   }}
                 >
                   {ctx.title}
-                  <Edit3 className="w-3 h-3 text-muted" />
+                  <Edit3 className="w-3 h-3 text-muted-foreground" />
                 </button>
               )}
-              <p className="text-[11px] text-muted mt-0.5">
+              <p className="text-[11px] text-muted-foreground mt-0.5">
                 {ctx.contextType} · {ctx.status}
               </p>
             </div>
@@ -135,11 +135,11 @@ export function ContextDetailPanel({ open, onClose, detail }: ContextDetailPanel
           )}
 
           {/* Actions */}
-          <div className="flex items-center gap-2 pt-2 border-t border-white/[0.08]">
+          <div className="flex items-center gap-2 pt-2 border-t border-border">
             <button
               type="button"
               onClick={handleArchive}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] text-muted hover:text-secondary hover:bg-white/[0.06] transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
             >
               <Archive className="w-3.5 h-3.5" />
               Archive
@@ -153,9 +153,9 @@ export function ContextDetailPanel({ open, onClose, detail }: ContextDetailPanel
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-white/[0.04] rounded-lg p-2.5 text-center">
-      <p className="text-[14px] font-medium text-primary">{value}</p>
-      <p className="text-[10px] text-muted mt-0.5">{label}</p>
+    <div className="bg-card rounded-lg p-2.5 text-center">
+      <p className="text-[14px] font-medium text-foreground">{value}</p>
+      <p className="text-[10px] text-muted-foreground mt-0.5">{label}</p>
     </div>
   );
 }
@@ -163,7 +163,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h4 className="text-[12px] font-medium text-secondary mb-2">{title}</h4>
+      <h4 className="text-[12px] font-medium text-muted-foreground mb-2">{title}</h4>
       {children}
     </div>
   );
@@ -171,21 +171,23 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function ResourceRow({ resource }: { resource: WorkResource }) {
   return (
-    <div className="flex items-center gap-2 text-[12px] text-secondary py-1 px-1.5 rounded hover:bg-white/[0.04]">
+    <div className="flex items-center gap-2 text-[12px] text-muted-foreground py-1 px-1.5 rounded hover:bg-card">
       <ResourceIcon type={resource.resourceType} />
       <span className="truncate flex-1">{resource.resourceName}</span>
-      <span className="text-[10px] text-muted shrink-0">{resource.accessCount}×</span>
+      <span className="text-[10px] text-muted-foreground shrink-0">{resource.accessCount}×</span>
     </div>
   );
 }
 
 function EventRow({ event }: { event: ActivityEvent }) {
   return (
-    <div className="flex items-center gap-2 text-[11px] py-1 px-1.5 rounded hover:bg-white/[0.04]">
-      <span className="text-muted shrink-0 w-12 text-right">{formatTime(event.timestamp)}</span>
-      <span className="text-secondary">{event.action}</span>
+    <div className="flex items-center gap-2 text-[11px] py-1 px-1.5 rounded hover:bg-card">
+      <span className="text-muted-foreground shrink-0 w-12 text-right">
+        {formatTime(event.timestamp)}
+      </span>
+      <span className="text-muted-foreground">{event.action}</span>
       {event.resourceName && (
-        <span className="text-muted truncate flex-1">{event.resourceName}</span>
+        <span className="text-muted-foreground truncate flex-1">{event.resourceName}</span>
       )}
       {event.appName && <span className="text-dim text-[10px] shrink-0">{event.appName}</span>}
     </div>

@@ -22,7 +22,7 @@ export function SidebarWorkState({
     return (
       <div className="px-4 py-3">
         <SectionLabel>Session Summary</SectionLabel>
-        <p className="text-sm text-[hsl(var(--muted-foreground))] mt-1">
+        <p className="text-sm text-muted-foreground mt-1">
           Total tracked: {formatElapsed(task.totalTrackedSecs)}
         </p>
       </div>
@@ -37,15 +37,15 @@ export function SidebarWorkState({
       <FocusTimer focusedAt={task.focusedAt} />
       {focusSession.qualityScore != null && (
         <div className="flex items-center justify-between">
-          <span className="text-xs text-[hsl(var(--muted-foreground))]">Quality</span>
+          <span className="text-xs text-muted-foreground">Quality</span>
           <span
             className={cn(
               "text-sm font-mono tabular-nums",
               focusSession.qualityScore > 0.7
-                ? "text-green-400"
+                ? "text-success"
                 : focusSession.qualityScore > 0.4
-                  ? "text-amber-400"
-                  : "text-red-400",
+                  ? "text-warning"
+                  : "text-destructive",
             )}
           >
             {focusSession.qualityScore.toFixed(2)}
@@ -54,15 +54,13 @@ export function SidebarWorkState({
       )}
       {focusSession.distractionCount != null && (
         <div className="flex items-center justify-between">
-          <span className="text-xs text-[hsl(var(--muted-foreground))]">Distractions</span>
-          <span className="text-sm text-[hsl(var(--foreground))]">
-            {focusSession.distractionCount}
-          </span>
+          <span className="text-xs text-muted-foreground">Distractions</span>
+          <span className="text-sm text-foreground">{focusSession.distractionCount}</span>
         </div>
       )}
       {focusSession.flowState != null && (
         <div className="flex items-center justify-between">
-          <span className="text-xs text-[hsl(var(--muted-foreground))]">Flow</span>
+          <span className="text-xs text-muted-foreground">Flow</span>
           <FlowBadge state={focusSession.flowState} />
         </div>
       )}
@@ -74,7 +72,7 @@ export function SidebarWorkState({
           type="button"
           disabled
           title="Coming soon"
-          className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs rounded border border-[hsl(var(--border))] text-[hsl(var(--foreground))] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs rounded border border-border text-foreground disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           <Pause className="size-3" />
           Pause
@@ -82,7 +80,7 @@ export function SidebarWorkState({
         <button
           type="button"
           onClick={onStopFocus}
-          className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs rounded border border-[hsl(var(--border))] text-red-400 hover:bg-red-400/10 transition-colors"
+          className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs rounded border border-border text-destructive hover:bg-destructive/10 transition-colors"
         >
           <Square className="size-3" />
           Stop
@@ -107,7 +105,7 @@ function FocusTimer({ focusedAt }: { focusedAt: string }) {
   }, [focusedAt]);
 
   return (
-    <div className="text-2xl font-mono tabular-nums text-[hsl(var(--foreground))] text-center">
+    <div className="text-2xl font-mono tabular-nums text-foreground text-center">
       {formatElapsed(elapsed)}
     </div>
   );
@@ -116,15 +114,13 @@ function FocusTimer({ focusedAt }: { focusedAt: string }) {
 function FlowBadge({ state }: { state: string }) {
   const color =
     state === "active"
-      ? "text-green-400"
+      ? "text-success"
       : state === "building"
-        ? "text-amber-400"
-        : "text-red-400";
+        ? "text-warning"
+        : "text-destructive";
 
   return (
-    <span className={cn("text-xs px-1.5 py-0.5 rounded bg-[hsl(var(--accent))] capitalize", color)}>
-      {state}
-    </span>
+    <span className={cn("text-xs px-1.5 py-0.5 rounded bg-muted capitalize", color)}>{state}</span>
   );
 }
 
@@ -134,7 +130,7 @@ function QualitySparkline({ values }: { values: number[] }) {
     <div className="flex items-end gap-px h-8">
       {values.map((v, i) => {
         const height = `${(v / max) * 100}%`;
-        const color = v > 0.7 ? "bg-green-400/70" : v > 0.4 ? "bg-amber-400/70" : "bg-red-400/70";
+        const color = v > 0.7 ? "bg-success/70" : v > 0.4 ? "bg-warning/70" : "bg-destructive/70";
         return (
           <div key={`bar-${i}`} className={cn("flex-1 rounded-sm", color)} style={{ height }} />
         );

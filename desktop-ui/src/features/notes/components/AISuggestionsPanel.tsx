@@ -1,11 +1,12 @@
 import { tagBgColor, tagColor } from "@shared/lib/tagColor";
-import { ChevronDown, ChevronRight, Link2, MessageSquare, Zap } from "lucide-react";
+import { Brain, ChevronDown, ChevronRight, Link2, MessageSquare } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNoteSuggestions } from "../hooks/useNoteSuggestions";
 
 interface AISuggestionsPanelProps {
   noteId: string | null;
   onSelectNote: (id: string) => void;
+  onOpenInsight?: () => void;
 }
 
 const ACCENT = "rgba(167, 139, 250, 0.85)";
@@ -15,7 +16,11 @@ function insertWikiLink(noteId: string, title: string) {
   window.dispatchEvent(new CustomEvent("insert-wiki-link", { detail: { noteId, title } }));
 }
 
-export function AISuggestionsPanel({ noteId, onSelectNote }: AISuggestionsPanelProps) {
+export function AISuggestionsPanel({
+  noteId,
+  onSelectNote,
+  onOpenInsight,
+}: AISuggestionsPanelProps) {
   const { suggestions } = useNoteSuggestions(noteId);
   const [collapsed, setCollapsed] = useState(false);
   const [showLinkPicker, setShowLinkPicker] = useState(false);
@@ -42,7 +47,7 @@ export function AISuggestionsPanel({ noteId, onSelectNote }: AISuggestionsPanelP
       <button
         type="button"
         onClick={() => setCollapsed(!collapsed)}
-        className="w-full flex items-center gap-1.5 px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-muted hover:text-secondary transition-colors"
+        className="w-full flex items-center gap-1.5 px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
       >
         {collapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
         <span style={{ color: ACCENT }}>AI Suggestions</span>
@@ -67,9 +72,11 @@ export function AISuggestionsPanel({ noteId, onSelectNote }: AISuggestionsPanelP
                     key={item.note.id}
                     type="button"
                     onClick={() => onSelectNote(item.note.id)}
-                    className="flex flex-col gap-0.5 px-2 py-1 rounded text-left hover:bg-white/[0.06] transition-colors"
+                    className="flex flex-col gap-0.5 px-2 py-1 rounded text-left hover:bg-accent transition-colors"
                   >
-                    <span className="text-[11px] text-secondary truncate">{item.note.title}</span>
+                    <span className="text-[11px] text-muted-foreground truncate">
+                      {item.note.title}
+                    </span>
                     <span className="text-[9px] text-dim truncate">{item.reason}</span>
                   </button>
                 ))}
@@ -82,7 +89,7 @@ export function AISuggestionsPanel({ noteId, onSelectNote }: AISuggestionsPanelP
           </div>
 
           {/* Link Suggestions */}
-          <div className="py-1.5 border-t border-white/[0.04]">
+          <div className="py-1.5 border-t border-border-subtle">
             <div className="text-[10px] font-medium text-dim uppercase tracking-wider mb-1">
               Link Suggestions
             </div>
@@ -93,9 +100,9 @@ export function AISuggestionsPanel({ noteId, onSelectNote }: AISuggestionsPanelP
                     key={item.note.id}
                     type="button"
                     onClick={() => onSelectNote(item.note.id)}
-                    className="flex flex-col gap-0.5 px-2 py-1 rounded text-left hover:bg-white/[0.06] transition-colors"
+                    className="flex flex-col gap-0.5 px-2 py-1 rounded text-left hover:bg-accent transition-colors"
                   >
-                    <span className="text-[11px] text-secondary truncate">
+                    <span className="text-[11px] text-muted-foreground truncate">
                       Link to: {item.note.title}
                     </span>
                     <span className="text-[9px] text-dim truncate">{item.reason}</span>
@@ -108,7 +115,7 @@ export function AISuggestionsPanel({ noteId, onSelectNote }: AISuggestionsPanelP
           </div>
 
           {/* Suggested Tags */}
-          <div className="py-1.5 border-t border-white/[0.04]">
+          <div className="py-1.5 border-t border-border-subtle">
             <div className="text-[10px] font-medium text-dim uppercase tracking-wider mb-1">
               Suggested Tags
             </div>
@@ -133,19 +140,20 @@ export function AISuggestionsPanel({ noteId, onSelectNote }: AISuggestionsPanelP
           </div>
 
           {/* Action buttons */}
-          <div className="flex gap-1.5 mt-2 pt-2 border-t border-white/[0.04] relative">
+          <div className="flex gap-1.5 mt-2 pt-2 border-t border-border-subtle relative">
             <button
               type="button"
-              disabled
-              className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-white/[0.04] text-dim cursor-not-allowed"
+              onClick={() => onOpenInsight?.()}
+              disabled={!noteId}
+              className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-accent text-muted-foreground hover:bg-accent/80 hover:text-foreground transition-colors disabled:text-dim disabled:cursor-not-allowed"
             >
-              <Zap size={10} />
-              Synthesize
+              <Brain size={10} />
+              Insight Review
             </button>
             <button
               type="button"
               disabled
-              className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-white/[0.04] text-dim cursor-not-allowed"
+              className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-accent text-dim cursor-not-allowed"
             >
               <MessageSquare size={10} />
               Ask AI
@@ -163,8 +171,8 @@ export function AISuggestionsPanel({ noteId, onSelectNote }: AISuggestionsPanelP
               disabled={!noteId || suggestions.linkSuggestions.length === 0}
               className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded-md transition-colors ${
                 noteId && suggestions.linkSuggestions.length > 0
-                  ? "bg-white/[0.06] text-secondary hover:bg-white/[0.10] hover:text-primary"
-                  : "bg-white/[0.04] text-dim cursor-not-allowed"
+                  ? "bg-accent text-muted-foreground hover:bg-accent/80 hover:text-foreground"
+                  : "bg-accent text-dim cursor-not-allowed"
               }`}
             >
               <Link2 size={10} />
@@ -182,7 +190,7 @@ export function AISuggestionsPanel({ noteId, onSelectNote }: AISuggestionsPanelP
                       insertWikiLink(item.note.id, item.note.title);
                       setShowLinkPicker(false);
                     }}
-                    className="w-full text-left px-3 py-1.5 text-[11px] text-secondary hover:bg-white/[0.06] hover:text-primary transition-colors truncate"
+                    className="w-full text-left px-3 py-1.5 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground transition-colors truncate"
                   >
                     [[{item.note.title}]]
                   </button>

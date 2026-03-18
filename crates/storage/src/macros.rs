@@ -85,3 +85,118 @@ macro_rules! crud_repo {
         }
     };
 }
+
+/// Generate `focus`, `unfocus`, and `list_focused` methods for a repo.
+///
+/// Both `ActionRepo` and `TaskRepo` have identical focus-slot logic — only
+/// the table name and row type differ.
+macro_rules! focus_impl {
+    ($repo:ty, $table:expr, $row:ty) => {
+        impl $repo {
+            /// Focus an item. Returns true if the focus was set, false if at max_slots.
+            pub async fn focus(
+                &self,
+                id: &str,
+                max_slots: i64,
+                deadline: Option<chrono::DateTime<chrono::Utc>>,
+            ) -> Result<bool, $crate::error::StorageError> {
+                let result = sqlx::query(concat!(
+                    "UPDATE ", $table,
+                    " SET focused_at = datetime('now'), focus_deadline = ?3, updated_at = datetime('now')",
+                    " WHERE id = ?1 AND focused_at IS NULL",
+                    " AND (SELECT COUNT(*) FROM ", $table, " WHERE focused_at IS NOT NULL) < ?2",
+                ))
+                .bind(id)
+                .bind(max_slots)
+                .bind(deadline)
+                .execute(&self.pool)
+                .await?;
+                Ok(result.rows_affected() > 0)
+            }
+
+            /// Unfocus an item.
+            pub async fn unfocus(&self, id: &str) -> Result<bool, $crate::error::StorageError> {
+                let result = sqlx::query(concat!(
+                    "UPDATE ", $table,
+                    " SET focused_at = NULL, focus_deadline = NULL, updated_at = datetime('now') WHERE id = ?1",
+                ))
+                .bind(id)
+                .execute(&self.pool)
+                .await?;
+                Ok(result.rows_affected() > 0)
+            }
+
+            /// List currently focused items.
+            pub async fn list_focused(&self) -> Result<Vec<$row>, $crate::error::StorageError> {
+                let rows = sqlx::query_as::<_, $row>(
+                    concat!("SELECT * FROM ", $table, " WHERE focused_at IS NOT NULL ORDER BY focused_at"),
+                )
+                .fetch_all(&self.pool)
+                .await?;
+                Ok(rows)
+            }
+        }
+    };
+}
+
+/// Generate a `delete_older_than` retention method.
+///
+/// Four repos (`StrategyRepo`, `OutcomeRepo`, `InteractionLogRepo`, `ToolUsageRepo`)
+/// have byte-for-byte identical implementations of this pattern.
+macro_rules! delete_older_than_impl {
+    ($table:expr, $ts_col:expr) => {
+        /// Delete rows older than `days` days. Returns count of deleted rows.
+        pub async fn delete_older_than(
+            &self,
+            days: i64,
+            now: chrono::DateTime<chrono::Utc>,
+        ) -> Result<u64, $crate::error::StorageError> {
+            let cutoff = now - chrono::Duration::days(days);
+            let result = sqlx::query(concat!("DELETE FROM ", $table, " WHERE ", $ts_col, " < ?1"))
+                .bind(cutoff)
+                .execute(&self.pool)
+                .await?;
+            Ok(result.rows_affected())
+        }
+    };
+}
+
+/// Generate a `get_by_ids` batch-fetch method.
+///
+/// Both `ActionRepo` and `TaskRepo` have identical implementations: early-return
+/// on empty, build an IN-clause with `QueryBuilder`, `fetch_all`.
+macro_rules! get_by_ids_impl {
+    ($table:expr, $row:ty) => {
+        /// Fetch rows by a list of IDs. Missing IDs are silently skipped.
+        pub async fn get_by_ids(
+            &self,
+            ids: &[String],
+        ) -> Result<Vec<$row>, $crate::error::StorageError> {
+            if ids.is_empty() {
+                return Ok(Vec::new());
+            }
+            let mut qb = sqlx::QueryBuilder::<sqlx::Sqlite>::new(concat!(
+                "SELECT * FROM ",
+                $table,
+                " WHERE id IN ("
+            ));
+            let mut sep = qb.separated(", ");
+            for id in ids {
+                sep.push_bind(id);
+            }
+            qb.push(")");
+            let rows = qb.build_query_as::<$row>().fetch_all(&self.pool).await?;
+            Ok(rows)
+        }
+    };
+}
+
+/// Escape a string for use in a SQL `LIKE` pattern (with `\` as escape char).
+///
+/// Used by `search_by_keyword` in both `ActionRepo` and `TaskRepo`, and also
+/// in `FinanceTransactionRepo`.
+pub fn escape_like(s: &str) -> String {
+    s.replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_")
+}

@@ -9,48 +9,107 @@
   --font-weight-normal: 400;
   --font-weight-light: 300;
 
-  /* ── Shape ─────────────────────────────────── */
-  --radius: 0.75rem;
+  /* ── Core (shadcn/ui system) ─────────────── */
+  --background: oklch(0 0 0);
+  --foreground: oklch(0.9461 0 0);
+  --card: oklch(0.1448 0 0);
+  --card-foreground: oklch(1 0 0);
+  --popover: oklch(0.1448 0 0);
+  --popover-foreground: oklch(0.9461 0 0);
+  --primary: oklch(0.9461 0 0);
+  --primary-foreground: oklch(0 0 0);
+  --secondary: oklch(0.2478 0 0);
+  --secondary-foreground: oklch(0.9461 0 0);
+  --muted: oklch(0.2891 0 0);
+  --muted-foreground: oklch(0.726 0.0011 17.1843);
+  --accent: oklch(0.2478 0 0);
+  --accent-foreground: oklch(1 0 0);
+  --destructive: oklch(0.5809 0.2273 25.0926);
+  --destructive-foreground: oklch(0 0 0);
+  --border: oklch(0.2809 0 0);
+  --input: oklch(0.1448 0 0);
+  --ring: oklch(0.9461 0 0);
 
-  /* ── Background ────────────────────────────── */
-  --background: #000000;
+  /* Sidebar */
+  --sidebar: oklch(0 0 0);
+  --sidebar-foreground: oklch(1 0 0);
+  --sidebar-primary: oklch(0.9461 0 0);
+  --sidebar-primary-foreground: oklch(0 0 0);
+  --sidebar-accent: oklch(0 0 0);
+  --sidebar-accent-foreground: oklch(1 0 0);
+  --sidebar-border: oklch(0.2931 0 0);
+  --sidebar-ring: oklch(0.9461 0 0);
 
-  /* ── Surface staircase (Tahoe glass tiers) ─── */
-  --surface-lowest: rgba(255, 255, 255, 0.025);
-  --surface-low: rgba(255, 255, 255, 0.04);
-  --surface-base: rgba(255, 255, 255, 0.06);
-  --surface-raised: rgba(255, 255, 255, 0.09);
-  --surface-highest: rgba(255, 255, 255, 0.13);
+  /* Surface */
+  --surface: oklch(0 0 0);
+  --surface-foreground: oklch(0.9461 0 0);
 
-  /* ── Text hierarchy ────────────────────────── */
-  --text-primary: #f0f2f5;
-  --text-secondary: #c8cdd4;
-  --text-muted: #7d8590;
-  --text-dim: #5a616b;
+  /* Code */
+  --code: oklch(0 0 0);
+  --code-foreground: oklch(0.9461 0 0);
+  --code-highlight: oklch(0 0 0);
+  --code-number: oklch(0.6376 0.0012 17.1889);
 
-  /* ── Brand ─────────────────────────────────── */
-  --brand: #f97316;
-  --brand-hover: #fb923c;
-  --brand-glow: rgba(249, 115, 22, 0.25);
+  /* Selection */
+  --selection: oklch(0.7952 0 0);
+  --selection-foreground: oklch(0 0 0);
 
-  /* ── Semantic ──────────────────────────────── */
+  /* Charts */
+  --chart-1: oklch(0.9461 0 0);
+  --chart-2: oklch(0.6184 0.1464 248.8545);
+  --chart-3: oklch(0.7155 0 0);
+  --chart-4: oklch(0.431 0.1262 251.2413);
+  --chart-5: oklch(0.4223 0.1672 309.7734);
+
+  /* Shape */
+  --radius: 10px;
+
+  /* Shadow system */
+  --shadow-2xs: 0px 2px 4px 0px oklch(0 0 0 / 0.05);
+  --shadow-xs: 0px 2px 4px 0px oklch(0 0 0 / 0.05);
+  --shadow-sm: 0px 2px 4px 0px oklch(0 0 0 / 0.1), 0px 1px 2px -1px oklch(0 0 0 / 0.1);
+  --shadow: 0px 2px 4px 0px oklch(0 0 0 / 0.1), 0px 1px 2px -1px oklch(0 0 0 / 0.1);
+  --shadow-md: 0px 2px 4px 0px oklch(0 0 0 / 0.1), 0px 2px 4px -1px oklch(0 0 0 / 0.1);
+  --shadow-lg: 0px 2px 4px 0px oklch(0 0 0 / 0.1), 0px 4px 6px -1px oklch(0 0 0 / 0.1);
+  --shadow-xl: 0px 2px 4px 0px oklch(0 0 0 / 0.1), 0px 8px 10px -1px oklch(0 0 0 / 0.1);
+  --shadow-2xl: 0px 2px 4px 0px oklch(0 0 0 / 0.25);
+
+  /* ── Legacy Tahoe tokens ─────────────────── */
+
+  /* Surface staircase */
+  --surface-lowest: oklch(0.209 0 0);
+  --surface-low: oklch(0.2178 0 0);
+  --surface-base: oklch(0.2264 0 0);
+  --surface-raised: oklch(0.285 0 0);
+  --surface-highest: oklch(0.3132 0 0);
+
+  /* Text hierarchy */
+  --text-primary: oklch(0.9642 0 0);
+  --text-secondary: oklch(0.84 0 0);
+  --text-muted: oklch(0.7324 0.0011 17.184);
+  --text-dim: oklch(0.4313 0 0);
+
+  /* Brand */
+  --brand: oklch(0.6962 0.1942 23.6149);
+  --brand-hover: oklch(0.7552 0.1466 23.6271);
+  --brand-glow: oklch(0.6962 0.1942 23.6149 / 0.25);
+
+  /* Semantic */
   --success: #34d399;
-  --destructive: #f43f5e;
   --info: #60a5fa;
   --warning: #fbbf24;
   --purple: #a78bfa;
 
-  /* ── Origin badges ───────────────────────────── */
+  /* Origin badges */
   --origin-system: #60a5fa;
   --origin-ai: #a78bfa;
   --origin-user: #34d399;
   --origin-plugin: #fbbf24;
 
-  /* ── Border ────────────────────────────────── */
-  --border: rgba(255, 255, 255, 0.08);
-  --border-subtle: rgba(255, 255, 255, 0.04);
+  /* Border */
+  --border-subtle: oklch(0.285 0 0);
 
-  /* ── Timeline / Dashboard ──────────────────── */
+  /* Timeline / Dashboard */
   --timeline-app-productive: oklch(0.72 0.15 145);
   --timeline-app-distracting: oklch(0.65 0.18 25);
   --timeline-app-neutral: oklch(0.55 0.02 250);
@@ -70,15 +129,15 @@
   --timeline-dot-task-done: oklch(0.65 0.18 155);
   --timeline-dot-finance: oklch(0.78 0.16 85);
 
-  /* ── Overlay ───────────────────────────────── */
+  /* Overlay */
   --overlay: rgba(0, 0, 0, 0.25);
   --overlay-heavy: rgba(0, 0, 0, 0.45);
 
-  /* ── Shadows ─────────────────────────────── */
+  /* Shadows */
   --shadow-tooltip: 0 4px 20px rgba(0, 0, 0, 0.35);
 
-  /* ── Floating / glass (Tahoe Liquid Glass) ── */
-  --surface-floating: rgba(10, 10, 10, 0.92);
+  /* Floating / glass (Tahoe Liquid Glass) */
+  --surface-floating: oklch(0.2178 0 0 / 0.92);
 
   /* Glass material — primary tier */
   --surface-glass: rgba(255, 255, 255, 0.08);
@@ -99,29 +158,73 @@
   --surface-glass-elevated: rgba(255, 255, 255, 0.14);
 
   /* Glass material — tint tier (for colored glass) */
-  --glass-tint-brand: rgba(249, 115, 22, 0.08);
+  --glass-tint-brand: oklch(0.6962 0.1942 23.6149 / 0.08);
   --glass-tint-info: rgba(96, 165, 250, 0.06);
   --glass-tint-success: rgba(52, 211, 153, 0.06);
-  --glass-tint-destructive: rgba(244, 63, 94, 0.06);
+  --glass-tint-destructive: oklch(0.6813 0.1818 0.9701 / 0.06);
 }
 
 @theme inline {
-  /* Background */
+  /* ── New shadcn/ui tokens ──────────────────────────────────────────────── */
   --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
 
-  /* Surface staircase */
-  --color-surface-lowest: var(--surface-lowest);
-  --color-surface-low: var(--surface-low);
-  --color-surface-base: var(--surface-base);
-  --color-surface-raised: var(--surface-raised);
-  --color-surface-highest: var(--surface-highest);
-  --color-surface-floating: var(--surface-floating);
-  --color-surface-glass: var(--surface-glass);
+  /* Sidebar */
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
 
-  /* Text hierarchy */
-  --color-primary: var(--text-primary);
-  --color-secondary: var(--text-secondary);
-  --color-muted: var(--text-muted);
+  /* Code */
+  --color-code: var(--code);
+  --color-code-foreground: var(--code-foreground);
+  --color-code-highlight: var(--code-highlight);
+  --color-code-number: var(--code-number);
+
+  /* Selection */
+  --color-selection: var(--selection);
+  --color-selection-foreground: var(--selection-foreground);
+
+  /* Charts */
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  /* Shadows */
+  --shadow-2xs: var(--shadow-2xs);
+  --shadow-xs: var(--shadow-xs);
+  --shadow-sm: var(--shadow-sm);
+  --shadow: var(--shadow);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-xl: var(--shadow-xl);
+  --shadow-2xl: var(--shadow-2xl);
+
+  /* ── Full shadcn/ui tokens ───────────────────────────────────────────── */
+  --color-primary: var(--primary);
+  --color-secondary: var(--secondary);
+  --color-muted: var(--muted);
+
+  /* App-specific (no shadcn equivalent) */
   --color-dim: var(--text-dim);
 
   /* Brand */
@@ -130,7 +233,6 @@
 
   /* Semantic */
   --color-success: var(--success);
-  --color-destructive: var(--destructive);
   --color-info: var(--info);
   --color-warning: var(--warning);
   --color-purple: var(--purple);
@@ -169,9 +271,9 @@
   --color-timeline-dot-task-done: var(--timeline-dot-task-done);
   --color-timeline-dot-finance: var(--timeline-dot-finance);
 
-  /* Radius — Tahoe uses larger, pill-like radii */
-  --radius-sm: calc(var(--radius) - 6px);
-  --radius-md: calc(var(--radius) - 4px);
+  /* Radius */
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
   --radius-2xl: calc(var(--radius) + 8px);
@@ -184,7 +286,7 @@
   }
 
   body {
-    @apply bg-background text-primary;
+    @apply bg-background text-foreground;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     background-image:
@@ -258,266 +360,6 @@
   [tabindex="0"]:focus-visible {
     outline: 2px solid color-mix(in srgb, var(--brand) 40%, transparent);
     outline-offset: 2px;
-  }
-}
-
-/* ── Glass materials ─────────────────────────
-   Tahoe-inspired glassmorphism tiers.
-   Each tier increases translucency + blur.
-   Uses @apply for backdrop-filter composition. */
-@layer utilities {
-  /* Primary glass — dropdowns, popovers, dialogs */
-  .glass-panel {
-    @apply backdrop-blur-[80px] backdrop-saturate-[1.6];
-    background: var(--surface-glass);
-    border: 1px solid var(--glass-border);
-    border-radius: var(--radius-xl);
-    box-shadow: var(--glass-shadow);
-    padding: var(--glass-padding);
-  }
-
-  /* Sidebar glass — standalone rounded panel */
-  .glass-sidebar {
-    @apply backdrop-blur-[100px] backdrop-saturate-[1.8];
-    background: var(--surface-glass-sidebar);
-    border: 1px solid var(--glass-border);
-    border-radius: var(--radius-xl);
-  }
-
-  /* Toolbar glass — standalone rounded bar */
-  .glass-toolbar {
-    @apply backdrop-blur-[60px] backdrop-saturate-150;
-    background: rgba(255, 255, 255, 0.07);
-    border: 1px solid var(--glass-border);
-    border-radius: var(--radius-xl);
-  }
-
-  /* Input glass — subtle translucency for form elements */
-  .glass-input {
-    @apply backdrop-blur-[40px] backdrop-saturate-[1.3];
-    background: var(--surface-glass-subtle);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: var(--radius-xl);
-    transition:
-      background 0.2s ease,
-      border-color 0.2s ease,
-      box-shadow 0.2s ease;
-  }
-
-  .glass-input:focus-within {
-    background: var(--surface-glass-subtle-hover);
-    border-color: rgba(255, 255, 255, 0.14);
-  }
-
-  /* Button glass — interactive glass element */
-  .glass-button {
-    @apply backdrop-blur-[30px] backdrop-saturate-[1.2];
-    background: var(--surface-glass-subtle);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: var(--radius-lg);
-    transition: all 0.2s ease;
-  }
-
-  .glass-button:hover {
-    background: var(--surface-glass-subtle-hover);
-    border-color: rgba(255, 255, 255, 0.12);
-  }
-
-  .glass-button:active,
-  .glass-button-active {
-    background: var(--surface-glass-elevated);
-    border-color: rgba(255, 255, 255, 0.18);
-  }
-
-  /* Floating glass — popover windows (launcher, tray) over desktop.
-     Dark frosted glass that matches the main app's dark theme. */
-  .glass-floating {
-    @apply backdrop-blur-[80px] backdrop-saturate-[1.8];
-    background: rgba(10, 10, 14, 0.82);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: var(--radius-xl);
-    box-shadow: none;
-    padding: var(--glass-padding);
-  }
-
-  /* When native vibrancy handles the blur (Tauri + macOS), disable the
-     CSS backdrop-filter (it flickers on transparent webview windows) and
-     lighten the overlay so the native material shows through. */
-  :root[data-vibrancy] .glass-floating {
-    -webkit-backdrop-filter: none;
-    backdrop-filter: none;
-    background: rgba(10, 10, 14, 0.45);
-  }
-
-  /* Dropdown glass — in-app floating menus / popovers.
-     More translucent than glass-floating so backdrop-blur is visible
-     over the app's own dark content (unlike native windows which blur
-     the desktop). */
-  .glass-dropdown {
-    @apply backdrop-blur-[80px] backdrop-saturate-[1.8];
-    background: rgba(10, 10, 14, 0.75);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: var(--radius-xl);
-    box-shadow:
-      0 8px 32px rgba(0, 0, 0, 0.5),
-      inset 0 1px 0 rgba(255, 255, 255, 0.06);
-    padding: var(--glass-padding);
-  }
-
-  /* Card glass — content cards with subtle depth */
-  .glass-card {
-    @apply backdrop-blur-[50px] backdrop-saturate-150;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    border-radius: var(--radius-xl);
-  }
-
-  /* Compact variant — tighter radius for sidebar/small cards */
-  .glass-card-sm {
-    @apply backdrop-blur-[50px] backdrop-saturate-150;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    border-radius: var(--radius-lg);
-  }
-
-  /* Message bubble glass — chat bubbles */
-  .glass-bubble {
-    @apply backdrop-blur-[40px] backdrop-saturate-[1.4];
-    background: rgba(255, 255, 255, 0.07);
-    border: 1px solid rgba(255, 255, 255, 0.09);
-    border-radius: var(--radius-2xl);
-  }
-
-  /* User message bubble — dark gray glass */
-  .glass-bubble-user {
-    @apply backdrop-blur-[40px] backdrop-saturate-[1.4];
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: var(--radius-2xl);
-  }
-
-  /* Context menu — macOS-native dark frosted glass */
-  .context-menu {
-    @apply backdrop-blur-[80px] backdrop-saturate-[1.8];
-    background: rgba(22, 22, 24, 0.88);
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    border-radius: 10px;
-    box-shadow:
-      0 8px 40px rgba(0, 0, 0, 0.55),
-      0 2px 8px rgba(0, 0, 0, 0.3),
-      inset 0 0.5px 0 rgba(255, 255, 255, 0.06);
-  }
-
-  /* Badge glass — small pill elements */
-  .glass-badge {
-    @apply backdrop-blur-[20px];
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: var(--radius-pill);
-  }
-
-  /* Divider glass — horizontal separator */
-  .glass-divider {
-    height: 1px;
-    background: linear-gradient(
-      90deg,
-      transparent 0%,
-      rgba(255, 255, 255, 0.08) 20%,
-      rgba(255, 255, 255, 0.08) 80%,
-      transparent 100%
-    );
-  }
-
-  .tabular-nums {
-    font-variant-numeric: tabular-nums;
-  }
-
-  /* Note card — interactive card with hover lift */
-  /* Kill expensive backdrop-filter during panel resize for smooth drag */
-  .resizing .glass-panel,
-  .resizing .glass-input {
-    @apply backdrop-blur-none backdrop-saturate-100;
-  }
-
-  .resizing * {
-    pointer-events: none;
-  }
-
-  .note-card {
-    border-radius: var(--radius-lg);
-    transition:
-      background 0.18s ease,
-      transform 0.18s ease,
-      box-shadow 0.18s ease;
-  }
-
-  .note-card:hover {
-    background: rgba(255, 255, 255, 0.04);
-    transform: translateY(-1px);
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
-  }
-
-  .note-card-active {
-    background: rgba(255, 255, 255, 0.07);
-    box-shadow:
-      inset 3px 0 0 0 var(--brand),
-      0 2px 12px rgba(0, 0, 0, 0.12);
-  }
-
-  /* Tag pill — colored glass badge for tags */
-  .tag-pill {
-    @apply backdrop-blur-[10px];
-    display: inline-flex;
-    align-items: center;
-    gap: 2px;
-    font-size: 10px;
-    padding: 1px 8px;
-    border-radius: var(--radius-pill);
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    color: var(--text-muted);
-    transition:
-      background 0.15s ease,
-      color 0.15s ease;
-  }
-
-  .tag-pill:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: var(--text-secondary);
-  }
-
-  .tag-pill-active {
-    background: color-mix(in srgb, var(--brand) 18%, transparent);
-    border-color: color-mix(in srgb, var(--brand) 25%, transparent);
-    color: var(--brand);
-  }
-
-  /* Version timeline dot */
-  .version-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.12);
-    border: 1.5px solid rgba(255, 255, 255, 0.2);
-    transition: all 0.15s ease;
-    flex-shrink: 0;
-  }
-
-  .version-dot-active {
-    background: var(--brand);
-    border-color: var(--brand);
-    box-shadow: 0 0 8px color-mix(in srgb, var(--brand) 40%, transparent);
-  }
-
-  /* Version timeline line */
-  .version-line {
-    width: 1.5px;
-    flex-shrink: 0;
-    background: linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.1) 0%,
-      rgba(255, 255, 255, 0.04) 100%
-    );
   }
 }
 

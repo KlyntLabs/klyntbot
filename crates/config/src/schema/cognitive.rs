@@ -80,6 +80,34 @@ pub struct CognitiveConfig {
     /// Relevance weight for situational boost (default: 0.25).
     #[serde(default = "default_w_situation")]
     pub relevance_weight_situation: f64,
+
+    /// Relevance weight for temporal recency (default: 0.05).
+    #[serde(default = "default_w_temporal")]
+    pub relevance_weight_temporal: f64,
+
+    /// Whether InsightForge multi-dimensional retrieval is enabled (default: true).
+    #[serde(default = "default_insight_forge_enabled")]
+    pub insight_forge_enabled: bool,
+
+    /// Max sub-queries for InsightForge decomposer (default: 5).
+    #[serde(default = "default_insight_forge_max_sub_queries")]
+    pub insight_forge_max_sub_queries: usize,
+
+    /// Max results per source per sub-query (default: 5).
+    #[serde(default = "default_insight_forge_per_source_limit")]
+    pub insight_forge_per_source_limit: usize,
+
+    /// Hard cap on total InsightForge results (default: 15).
+    #[serde(default = "default_insight_forge_total_limit")]
+    pub insight_forge_total_limit: usize,
+
+    /// Timeout ms for each domain searcher (default: 800).
+    #[serde(default = "default_insight_forge_per_source_timeout_ms")]
+    pub insight_forge_per_source_timeout_ms: u64,
+
+    /// BookIndex configuration for hierarchical retrieval.
+    #[serde(default)]
+    pub book_index: BookIndexConfig,
 }
 
 impl Default for CognitiveConfig {
@@ -104,6 +132,13 @@ impl Default for CognitiveConfig {
             relevance_weight_importance: default_w_importance(),
             relevance_weight_frequency: default_w_frequency(),
             relevance_weight_situation: default_w_situation(),
+            relevance_weight_temporal: default_w_temporal(),
+            insight_forge_enabled: default_insight_forge_enabled(),
+            insight_forge_max_sub_queries: default_insight_forge_max_sub_queries(),
+            insight_forge_per_source_limit: default_insight_forge_per_source_limit(),
+            insight_forge_total_limit: default_insight_forge_total_limit(),
+            insight_forge_per_source_timeout_ms: default_insight_forge_per_source_timeout_ms(),
+            book_index: BookIndexConfig::default(),
         }
     }
 }
@@ -146,4 +181,126 @@ fn default_w_frequency() -> f64 {
 }
 fn default_w_situation() -> f64 {
     0.25
+}
+fn default_w_temporal() -> f64 {
+    0.05
+}
+fn default_insight_forge_enabled() -> bool {
+    true
+}
+fn default_insight_forge_max_sub_queries() -> usize {
+    5
+}
+fn default_insight_forge_per_source_limit() -> usize {
+    5
+}
+fn default_insight_forge_total_limit() -> usize {
+    15
+}
+fn default_insight_forge_per_source_timeout_ms() -> u64 {
+    800
+}
+
+// -- BookIndex config types (defined in config crate L1, not imported from context_engine L3) --
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BookIndexConfig {
+    #[serde(default = "default_book_index_enabled")]
+    pub enabled: bool,
+    #[serde(default)]
+    pub entity_resolution: BookEntityResolutionConfig,
+    #[serde(default)]
+    pub retrieval: BookRetrievalCfg,
+}
+
+impl Default for BookIndexConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_book_index_enabled(),
+            entity_resolution: BookEntityResolutionConfig::default(),
+            retrieval: BookRetrievalCfg::default(),
+        }
+    }
+}
+
+fn default_book_index_enabled() -> bool {
+    true
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BookEntityResolutionConfig {
+    #[serde(default = "default_er_top_k")]
+    pub top_k: usize,
+    #[serde(default = "default_gradient_threshold")]
+    pub gradient_threshold: f64,
+    #[serde(default = "default_er_min_similarity")]
+    pub min_similarity: f64,
+    #[serde(default)]
+    pub use_llm_disambiguation: bool,
+}
+
+impl Default for BookEntityResolutionConfig {
+    fn default() -> Self {
+        Self {
+            top_k: default_er_top_k(),
+            gradient_threshold: default_gradient_threshold(),
+            min_similarity: default_er_min_similarity(),
+            use_llm_disambiguation: false,
+        }
+    }
+}
+
+fn default_er_top_k() -> usize {
+    10
+}
+fn default_gradient_threshold() -> f64 {
+    0.6
+}
+fn default_er_min_similarity() -> f64 {
+    0.3
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BookRetrievalCfg {
+    #[serde(default = "default_max_nodes")]
+    pub max_nodes: usize,
+    #[serde(default = "default_max_map_nodes")]
+    pub max_map_nodes: usize,
+    #[serde(default = "default_operator_timeout_ms")]
+    pub operator_timeout_ms: u64,
+    #[serde(default = "default_pagerank_damping")]
+    pub pagerank_damping: f64,
+    #[serde(default = "default_pagerank_iterations")]
+    pub pagerank_iterations: u32,
+}
+
+impl Default for BookRetrievalCfg {
+    fn default() -> Self {
+        Self {
+            max_nodes: default_max_nodes(),
+            max_map_nodes: default_max_map_nodes(),
+            operator_timeout_ms: default_operator_timeout_ms(),
+            pagerank_damping: default_pagerank_damping(),
+            pagerank_iterations: default_pagerank_iterations(),
+        }
+    }
+}
+
+fn default_max_nodes() -> usize {
+    50
+}
+fn default_max_map_nodes() -> usize {
+    10
+}
+fn default_operator_timeout_ms() -> u64 {
+    600
+}
+fn default_pagerank_damping() -> f64 {
+    0.85
+}
+fn default_pagerank_iterations() -> u32 {
+    20
 }

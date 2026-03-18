@@ -102,6 +102,12 @@ pub struct AppCore {
     pub decomposition_handler: Option<Arc<dyn feature_tasks::DecompositionHandler>>,
     /// Forecast handler (None when tasks AI is not configured).
     pub forecast_handler: Option<Arc<dyn feature_tasks::ForecastHandler>>,
+    /// Insight service for versioned insight reviews (None when cognitive feature unavailable).
+    pub insight_service: Option<Arc<feature_insights::InsightService>>,
+    /// Flashcard repo for FSRS spaced repetition (None when cognitive feature unavailable).
+    pub flashcard_repo: Option<cognitive::FlashcardRepo>,
+    /// Persona repo for Insight Review personas (None when cognitive feature unavailable).
+    pub persona_repo: Option<cognitive::PersonaRepo>,
 }
 
 impl AppCore {

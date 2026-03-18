@@ -43,7 +43,7 @@ export function ContextTimeline({
       {rendered.map(({ block, idx, top, height, color, opacity }) => (
         <div
           key={`${block.startTime}-${block.contextId ?? "idle"}`}
-          className="absolute left-0 right-0 rounded-md border border-white/[0.06] cursor-pointer transition-all hover:brightness-125"
+          className="absolute left-0 right-0 rounded-md border border-border-subtle cursor-pointer transition-all hover:brightness-125"
           style={{
             top,
             height,
@@ -63,13 +63,13 @@ export function ContextTimeline({
           {/* Tooltip */}
           {hoveredIdx === idx && (
             <div className="absolute left-full ml-2 top-0 z-50 glass-dropdown px-3 py-2 min-w-[180px] pointer-events-none">
-              <p className="text-[12px] font-medium text-primary">
+              <p className="text-[12px] font-medium text-foreground">
                 {block.isIdle ? "Idle" : (block.contextTitle ?? "Unassigned")}
               </p>
-              <p className="text-[11px] text-muted mt-0.5">
+              <p className="text-[11px] text-muted-foreground mt-0.5">
                 {formatTime(block.startTime)} – {formatTime(block.endTime)}
               </p>
-              <p className="text-[11px] text-muted">
+              <p className="text-[11px] text-muted-foreground">
                 {block.eventCount} event{block.eventCount !== 1 ? "s" : ""}
               </p>
             </div>

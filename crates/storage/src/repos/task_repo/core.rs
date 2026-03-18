@@ -99,20 +99,7 @@ impl TaskRepo {
         self.get(id).await?.ok_or_not_found(&format!("task {id}"))
     }
 
-    /// Fetch tasks by a list of IDs. Missing IDs are silently skipped.
-    pub async fn get_by_ids(&self, ids: &[String]) -> Result<Vec<TaskRow>, StorageError> {
-        if ids.is_empty() {
-            return Ok(Vec::new());
-        }
-        let mut qb = sqlx::QueryBuilder::<sqlx::Sqlite>::new("SELECT * FROM tasks WHERE id IN (");
-        let mut sep = qb.separated(", ");
-        for id in ids {
-            sep.push_bind(id);
-        }
-        qb.push(")");
-        let rows = qb.build_query_as::<TaskRow>().fetch_all(&self.pool).await?;
-        Ok(rows)
-    }
+    get_by_ids_impl!("tasks", TaskRow);
 
     /// Update mutable fields on a task. Only non-None fields are overwritten.
     pub async fn update(&self, patch: &TaskPatch) -> Result<TaskRow, StorageError> {
@@ -347,11 +334,7 @@ impl TaskRepo {
         query: &str,
         limit: Option<i64>,
     ) -> Result<Vec<TaskRow>, StorageError> {
-        let escaped = query
-            .replace('\\', "\\\\")
-            .replace('%', "\\%")
-            .replace('_', "\\_");
-        let pattern = format!("%{escaped}%");
+        let pattern = format!("%{}%", crate::macros::escape_like(query));
         let effective_limit = limit.unwrap_or(i64::MAX);
         let rows = sqlx::query_as::<_, TaskRow>(
             r#"

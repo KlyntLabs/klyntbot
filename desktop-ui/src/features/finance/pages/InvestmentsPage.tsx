@@ -182,19 +182,25 @@ export function FinanceInvestments() {
       {/* ── Stats row ─────────────────────────────────── */}
       <div className="grid grid-cols-4 gap-4 mb-4">
         <Card compact className="p-4">
-          <p className="text-[10px] text-muted uppercase tracking-widest mb-1">Total Value</p>
-          <p className="text-[24px] font-light text-primary tabular-nums">
+          <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">
+            Total Value
+          </p>
+          <p className="text-[24px] font-light text-foreground tabular-nums">
             {fmtCompact(convertTotal(totalValue), displayCur, hidden)}
           </p>
         </Card>
         <Card compact className="p-4">
-          <p className="text-[10px] text-muted uppercase tracking-widest mb-1">Cost Basis</p>
-          <p className="text-[24px] font-light text-muted tabular-nums">
+          <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">
+            Cost Basis
+          </p>
+          <p className="text-[24px] font-light text-muted-foreground tabular-nums">
             {fmtCompact(convertTotal(totalCost), displayCur, hidden)}
           </p>
         </Card>
         <Card compact className="p-4">
-          <p className="text-[10px] text-muted uppercase tracking-widest mb-1">Total Return</p>
+          <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">
+            Total Return
+          </p>
           <p
             className={cn(
               "text-[24px] font-light tabular-nums",
@@ -206,8 +212,10 @@ export function FinanceInvestments() {
           </p>
         </Card>
         <Card compact className="p-4">
-          <p className="text-[10px] text-muted uppercase tracking-widest mb-1">Holdings</p>
-          <p className="text-[24px] font-light text-primary">{investments.length}</p>
+          <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">
+            Holdings
+          </p>
+          <p className="text-[24px] font-light text-foreground">{investments.length}</p>
         </Card>
       </div>
 
@@ -237,7 +245,7 @@ export function FinanceInvestments() {
                     key={p.id}
                     className={cn(
                       "glass-card p-4 cursor-pointer transition-colors",
-                      isSelected ? "ring-1 ring-brand bg-white/[0.06]" : "hover:bg-white/[0.06]",
+                      isSelected ? "ring-1 ring-brand bg-accent" : "hover:bg-accent",
                     )}
                     onClick={() => setSelectedPortfolio(isSelected ? null : p.id)}
                     onKeyDown={(e) => {
@@ -252,7 +260,9 @@ export function FinanceInvestments() {
                           className="w-2.5 h-2.5 rounded-full"
                           style={{ backgroundColor: COLORS[i % COLORS.length] }}
                         />
-                        <span className="text-[13px] font-medium text-secondary">{p.name}</span>
+                        <span className="text-[13px] font-medium text-muted-foreground">
+                          {p.name}
+                        </span>
                       </div>
                       <div className="flex items-center gap-1">
                         {r >= 0 ? (
@@ -271,7 +281,7 @@ export function FinanceInvestments() {
                         </span>
                       </div>
                     </div>
-                    <p className="text-[18px] font-light text-primary tabular-nums">
+                    <p className="text-[18px] font-light text-foreground tabular-nums">
                       {fmtMoney(p.totalValue, p.currency, hidden)}
                     </p>
                     <div className="flex items-center gap-2 mt-1">
@@ -311,7 +321,7 @@ export function FinanceInvestments() {
                 }
               />
             </div>
-            <div className="grid grid-cols-[1fr_80px_80px_90px_80px_80px] gap-2 border-b border-white/[0.08] text-[10px] text-muted uppercase tracking-widest font-light px-4 py-2">
+            <div className="grid grid-cols-[1fr_80px_80px_90px_80px_80px] gap-2 border-b border-border text-[10px] text-muted-foreground uppercase tracking-widest font-light px-4 py-2">
               <div>Asset</div>
               <div className="text-right">Qty</div>
               <div className="text-right">Price</div>
@@ -324,29 +334,29 @@ export function FinanceInvestments() {
               return (
                 <div
                   key={inv.id}
-                  className="grid grid-cols-[1fr_80px_80px_90px_80px_80px] gap-2 items-center px-4 py-2.5 hover:bg-white/[0.06] transition-colors border-b border-white/[0.04] last:border-b-0"
+                  className="grid grid-cols-[1fr_80px_80px_90px_80px_80px] gap-2 items-center px-4 py-2.5 hover:bg-accent transition-colors border-b border-border-subtle last:border-b-0"
                 >
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-[12px] font-medium text-primary">
+                      <span className="text-[12px] font-medium text-foreground">
                         {inv.symbol ?? inv.name}
                       </span>
-                      <span className="px-1.5 py-0.5 text-[9px] font-light rounded bg-white/[0.06] text-dim">
+                      <span className="px-1.5 py-0.5 text-[9px] font-light rounded bg-accent text-dim">
                         {inv.assetType}
                       </span>
                     </div>
                     <p className="text-[9px] text-dim font-light truncate">{inv.name}</p>
                   </div>
-                  <span className="text-right text-[11px] text-muted font-light tabular-nums">
+                  <span className="text-right text-[11px] text-muted-foreground font-light tabular-nums">
                     {inv.quantity}
                   </span>
-                  <span className="text-right text-[11px] text-muted font-light tabular-nums">
+                  <span className="text-right text-[11px] text-muted-foreground font-light tabular-nums">
                     {inv.currentPrice != null
                       ? fmtMoney(inv.currentPrice, inv.marketCurrency ?? inv.currency, hidden)
                       : "—"}
                   </span>
                   <div className="text-right">
-                    <span className="text-[12px] text-primary font-light tabular-nums">
+                    <span className="text-[12px] text-foreground font-light tabular-nums">
                       {inv.currentValue != null
                         ? fmtMoney(inv.currentValue, inv.marketCurrency ?? inv.currency, hidden)
                         : "—"}

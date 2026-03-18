@@ -20,12 +20,12 @@ export class IssueDetailErrorBoundary extends Component<Props, State> {
     if (this.state.error) {
       return (
         <div className="flex flex-col items-center justify-center h-full gap-3 px-6 py-8">
-          <AlertTriangle className="size-8 text-[hsl(var(--muted-foreground))]" />
-          <p className="text-sm text-[hsl(var(--muted-foreground))]">Failed to load issue detail</p>
+          <AlertTriangle className="size-8 text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">Failed to load issue detail</p>
           <button
             type="button"
             onClick={() => this.setState({ error: null })}
-            className="text-xs px-3 py-1.5 rounded border border-[hsl(var(--border))] text-[hsl(var(--foreground))] hover:bg-[hsl(var(--accent))] transition-colors"
+            className="text-xs px-3 py-1.5 rounded border border-border text-foreground hover:bg-accent transition-colors"
           >
             Retry
           </button>

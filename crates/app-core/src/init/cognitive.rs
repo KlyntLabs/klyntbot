@@ -16,6 +16,12 @@ pub(super) async fn init_cognitive(
     activity_svc: &Arc<activity_log::ActivityIngestionService>,
     shutdown_token: &CancellationToken,
 ) {
+    // Seed builtin personas (idempotent, safe on every startup)
+    let persona_repo = cognitive::repos::PersonaRepo::new(storage_pool.inner().clone());
+    if let Err(e) = persona_repo.seed_builtins().await {
+        warn!("Failed to seed builtin personas: {e}");
+    }
+
     // Phase 3: Auto-generate ingestion token on first startup if missing.
     if config.capture.ingestion_api.enabled && config.capture.ingestion_api.token.is_none() {
         config.capture.ingestion_api.token = Some(uuid::Uuid::new_v4().to_string());

@@ -111,11 +111,11 @@ export function DistractionOverlay() {
 
             {/* App info */}
             <div>
-              <div className="text-[15px] font-medium text-primary">
+              <div className="text-[15px] font-medium text-foreground">
                 You switched to {intervention.appName}
               </div>
               {titleExcerpt && (
-                <div className="text-[12px] text-muted mt-1 truncate">
+                <div className="text-[12px] text-muted-foreground mt-1 truncate">
                   &ldquo;{titleExcerpt}&rdquo;
                 </div>
               )}
@@ -162,14 +162,14 @@ export function DistractionOverlay() {
               <button
                 type="button"
                 onClick={handleAllowTemp}
-                className="flex-1 px-3 py-2.5 rounded-xl text-[12px] font-medium glass-button text-muted hover:text-primary"
+                className="flex-1 px-3 py-2.5 rounded-xl text-[12px] font-medium glass-button text-muted-foreground hover:text-foreground"
               >
                 Allow briefly
               </button>
               <button
                 type="button"
                 onClick={handleAllowSession}
-                className="flex-1 px-3 py-2.5 rounded-xl text-[12px] font-medium glass-button text-muted hover:text-primary"
+                className="flex-1 px-3 py-2.5 rounded-xl text-[12px] font-medium glass-button text-muted-foreground hover:text-foreground"
               >
                 This is work
               </button>

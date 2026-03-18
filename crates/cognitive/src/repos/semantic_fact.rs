@@ -14,6 +14,11 @@ impl SemanticFactRepo {
         Self { pool }
     }
 
+    /// Access the underlying pool (needed by sibling repos in the same service).
+    pub fn pool(&self) -> &sqlx::SqlitePool {
+        &self.pool
+    }
+
     /// Insert or replace a semantic fact.
     pub async fn upsert(&self, fact: &SemanticFact) -> Result<(), sqlx::Error> {
         sqlx::query(
@@ -321,6 +326,106 @@ impl SemanticFactRepo {
         .execute(&self.pool)
         .await?;
         Ok(result.rows_affected())
+    }
+
+    /// Find all facts (including superseded) with matching subject and predicate.
+    pub async fn find_by_subject_predicate(
+        &self,
+        subject: &str,
+        predicate: &str,
+    ) -> Result<Vec<SemanticFact>, sqlx::Error> {
+        sqlx::query_as::<_, SemanticFact>(
+            "SELECT * FROM semantic_facts WHERE subject = ?1 AND predicate = ?2 ORDER BY valid_from DESC",
+        )
+        .bind(subject)
+        .bind(predicate)
+        .fetch_all(&self.pool)
+        .await
+    }
+
+    /// Find archived facts with matching subject and predicate.
+    /// Must list columns explicitly because archive has an extra `archived_at` column.
+    pub async fn search_archived_by_subject_predicate(
+        &self,
+        subject: &str,
+        predicate: &str,
+    ) -> Result<Vec<SemanticFact>, sqlx::Error> {
+        sqlx::query_as::<_, SemanticFact>(
+            "SELECT id, domain, subject, predicate, object, confidence, source, \
+             valid_from, valid_until, recorded_at, superseded_at, superseded_by, \
+             stability, last_accessed, access_count, project_id, memory_type \
+             FROM semantic_facts_archive WHERE subject = ?1 AND predicate = ?2 ORDER BY valid_from DESC",
+        )
+        .bind(subject)
+        .bind(predicate)
+        .fetch_all(&self.pool)
+        .await
+    }
+
+    /// List facts created since a given timestamp that have not been superseded.
+    /// Optionally filtered to specific domains.
+    pub async fn list_created_since(
+        &self,
+        since: &str,
+        domains: Option<&[&str]>,
+    ) -> Result<Vec<SemanticFact>, sqlx::Error> {
+        if let Some(domains) = domains {
+            if domains.is_empty() {
+                return Ok(Vec::new());
+            }
+            let placeholders: Vec<String> =
+                (2..=domains.len() + 1).map(|i| format!("?{i}")).collect();
+            let sql = format!(
+                "SELECT * FROM semantic_facts WHERE recorded_at >= ?1 AND superseded_at IS NULL \
+                 AND domain IN ({}) ORDER BY recorded_at DESC",
+                placeholders.join(", ")
+            );
+            let mut query = sqlx::query_as::<_, SemanticFact>(&sql).bind(since);
+            for d in domains {
+                query = query.bind(*d);
+            }
+            query.fetch_all(&self.pool).await
+        } else {
+            sqlx::query_as::<_, SemanticFact>(
+                "SELECT * FROM semantic_facts WHERE recorded_at >= ?1 AND superseded_at IS NULL ORDER BY recorded_at DESC",
+            )
+            .bind(since)
+            .fetch_all(&self.pool)
+            .await
+        }
+    }
+
+    /// List facts superseded since a given timestamp.
+    /// Optionally filtered to specific domains.
+    pub async fn list_superseded_since(
+        &self,
+        since: &str,
+        domains: Option<&[&str]>,
+    ) -> Result<Vec<SemanticFact>, sqlx::Error> {
+        if let Some(domains) = domains {
+            if domains.is_empty() {
+                return Ok(Vec::new());
+            }
+            let placeholders: Vec<String> =
+                (2..=domains.len() + 1).map(|i| format!("?{i}")).collect();
+            let sql = format!(
+                "SELECT * FROM semantic_facts WHERE superseded_at >= ?1 \
+                 AND domain IN ({}) ORDER BY superseded_at DESC",
+                placeholders.join(", ")
+            );
+            let mut query = sqlx::query_as::<_, SemanticFact>(&sql).bind(since);
+            for d in domains {
+                query = query.bind(*d);
+            }
+            query.fetch_all(&self.pool).await
+        } else {
+            sqlx::query_as::<_, SemanticFact>(
+                "SELECT * FROM semantic_facts WHERE superseded_at >= ?1 ORDER BY superseded_at DESC",
+            )
+            .bind(since)
+            .fetch_all(&self.pool)
+            .await
+        }
     }
 
     /// Move superseded facts older than N days to the archive table.

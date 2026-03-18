@@ -47,26 +47,24 @@ function AcceptanceCriteria({ text }: { text: string }) {
   const preview = lines[0] ?? "";
 
   return (
-    <div className="border border-[hsl(var(--border))] rounded-md">
+    <div className="border border-border rounded-md">
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
-        className="flex items-center gap-2 w-full px-3 py-2 text-sm font-medium text-[hsl(var(--foreground))] hover:bg-[hsl(var(--accent))]/50 transition-colors"
+        className="flex items-center gap-2 w-full px-3 py-2 text-sm font-medium text-foreground hover:bg-accent/50 transition-colors"
       >
         {expanded ? (
-          <ChevronDown className="size-4 text-[hsl(var(--muted-foreground))]" />
+          <ChevronDown className="size-4 text-muted-foreground" />
         ) : (
-          <ChevronRight className="size-4 text-[hsl(var(--muted-foreground))]" />
+          <ChevronRight className="size-4 text-muted-foreground" />
         )}
         Acceptance Criteria
         {!expanded && (
-          <span className="text-[hsl(var(--muted-foreground))] font-normal truncate">
-            — {preview}
-          </span>
+          <span className="text-muted-foreground font-normal truncate">— {preview}</span>
         )}
       </button>
       {expanded && (
-        <div className="px-3 pb-3 text-sm text-[hsl(var(--foreground))] whitespace-pre-wrap font-mono">
+        <div className="px-3 pb-3 text-sm text-foreground whitespace-pre-wrap font-mono">
           {text}
         </div>
       )}
@@ -81,19 +79,19 @@ function SubIssuesList({ issues, onDecompose }: { issues: SubIssue[]; onDecompos
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-sm font-medium text-[hsl(var(--foreground))]">
+        <h3 className="text-sm font-medium text-foreground">
           Sub-issues ({completedCount}/{issues.length} done)
         </h3>
         <button
           type="button"
           onClick={onDecompose}
-          className="flex items-center gap-1 text-xs text-purple-300 hover:text-purple-200 transition-colors"
+          className="flex items-center gap-1 text-xs text-purple hover:text-purple/80 transition-colors"
         >
           <Bot className="size-3" />
           Break Down
         </button>
       </div>
-      <div className="border border-[hsl(var(--border))] rounded-md divide-y divide-[hsl(var(--border))]">
+      <div className="border border-border rounded-md divide-y divide-border">
         {issues.map((issue) => {
           const PriorityIcon = issue.priority.icon;
           return (
@@ -101,16 +99,14 @@ function SubIssuesList({ issues, onDecompose }: { issues: SubIssue[]; onDecompos
               key={issue.id}
               type="button"
               onClick={() => navigateInPlace("issue", issue.id, issue.identifier)}
-              className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-[hsl(var(--accent))]/50 transition-colors text-left"
+              className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-accent/50 transition-colors text-left"
             >
               <span className="flex items-center justify-center size-4">
                 {renderStatusIcon(issue.status)}
               </span>
-              <PriorityIcon className="size-3.5 text-[hsl(var(--muted-foreground))] shrink-0" />
-              <span className="text-xs text-[hsl(var(--muted-foreground))] shrink-0">
-                {issue.identifier}
-              </span>
-              <span className="truncate text-[hsl(var(--foreground))]">{issue.title}</span>
+              <PriorityIcon className="size-3.5 text-muted-foreground shrink-0" />
+              <span className="text-xs text-muted-foreground shrink-0">{issue.identifier}</span>
+              <span className="truncate text-foreground">{issue.title}</span>
             </button>
           );
         })}

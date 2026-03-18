@@ -32,6 +32,8 @@ pub struct ContextRequest {
     pub tool_definitions: Vec<serde_json::Value>,
     /// Model context window size (varies per model).
     pub context_window: usize,
+    /// Optional session key for per-session circuit-breaker tracking in InsightForge.
+    pub session_key: Option<String>,
 }
 
 /// The assembled context ready to send to the LLM.

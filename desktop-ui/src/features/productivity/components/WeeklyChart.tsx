@@ -23,7 +23,7 @@ export function WeeklyChart({ summaries }: WeeklyChartProps) {
   return (
     <div className="glass-card p-4 flex flex-col gap-3 col-span-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-[13px] font-medium text-secondary">Weekly Overview</h2>
+        <h2 className="text-[13px] font-medium text-muted-foreground">Weekly Overview</h2>
         <div className="flex items-center gap-3">
           {PRODUCTIVITY_LEGEND.map((item) => (
             <span
@@ -57,7 +57,7 @@ export function WeeklyChart({ summaries }: WeeklyChartProps) {
               cursor={{ fill: "var(--surface-raised)", radius: 4 }}
             />
             <Bar dataKey="productive" stackId="a" fill="var(--success)" radius={[0, 0, 0, 0]} />
-            <Bar dataKey="neutral" stackId="a" fill="var(--text-muted)" />
+            <Bar dataKey="neutral" stackId="a" fill="var(--text-muted-foreground)" />
             <Bar
               dataKey="distracting"
               stackId="a"

@@ -86,9 +86,9 @@ export function CategoryEditor({ category, onSaved, onDeleted }: CategoryEditorP
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: color }} />
-          <h3 className="text-[13px] font-medium text-secondary">Edit Category</h3>
+          <h3 className="text-[13px] font-medium text-muted-foreground">Edit Category</h3>
           {category.isSystem && (
-            <span className="text-[9px] font-light text-dim bg-white/[0.06] px-1.5 py-0.5 rounded">
+            <span className="text-[9px] font-light text-dim bg-accent px-1.5 py-0.5 rounded">
               System
             </span>
           )}
@@ -116,7 +116,9 @@ export function CategoryEditor({ category, onSaved, onDeleted }: CategoryEditorP
 
       {/* Name */}
       <div className="flex flex-col gap-1">
-        <span className="text-[10px] font-medium text-muted uppercase tracking-wider">Name</span>
+        <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+          Name
+        </span>
         <input
           type="text"
           value={name}
@@ -127,7 +129,9 @@ export function CategoryEditor({ category, onSaved, onDeleted }: CategoryEditorP
 
       {/* Type */}
       <div className="flex flex-col gap-1">
-        <span className="text-[10px] font-medium text-muted uppercase tracking-wider">Type</span>
+        <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+          Type
+        </span>
         <div className="flex gap-1.5">
           {TYPE_OPTIONS.map((opt) => (
             <button
@@ -136,8 +140,8 @@ export function CategoryEditor({ category, onSaved, onDeleted }: CategoryEditorP
               onClick={() => setType(opt.value)}
               className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-light transition-colors ${
                 type === opt.value
-                  ? "bg-white/[0.08] text-primary"
-                  : "text-muted hover:bg-white/[0.04]"
+                  ? "bg-muted text-foreground"
+                  : "text-muted-foreground hover:bg-card"
               }`}
             >
               <span
@@ -152,7 +156,7 @@ export function CategoryEditor({ category, onSaved, onDeleted }: CategoryEditorP
 
       {/* Color */}
       <div className="flex flex-col gap-1.5">
-        <span className="text-[10px] font-medium text-muted uppercase tracking-wider flex items-center gap-1">
+        <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
           <Palette size={10} />
           Color
         </span>
@@ -214,18 +218,20 @@ function TagListField({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-[10px] font-medium text-muted uppercase tracking-wider">{label}</span>
+      <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+        {label}
+      </span>
       <div className="flex flex-wrap gap-1">
         {items.map((item) => (
           <span
             key={item}
-            className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-white/[0.06] text-[11px] font-light text-secondary"
+            className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-accent text-[11px] font-light text-muted-foreground"
           >
             {item}
             <button
               type="button"
               onClick={() => onRemove(item)}
-              className="text-muted hover:text-destructive"
+              className="text-muted-foreground hover:text-destructive"
             >
               <X size={10} />
             </button>
@@ -244,7 +250,7 @@ function TagListField({
         <button
           type="button"
           onClick={add}
-          className="px-2 py-1 rounded-lg bg-white/[0.06] text-[11px] text-muted hover:text-primary transition-colors"
+          className="px-2 py-1 rounded-lg bg-accent text-[11px] text-muted-foreground hover:text-foreground transition-colors"
         >
           Add
         </button>

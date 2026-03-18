@@ -75,12 +75,12 @@ interface CompactionResult {
 const DOMAINS = ["identity", "energy", "work", "finance", "learning", "preferences"] as const;
 
 const domainColors: Record<string, string> = {
-  identity: "bg-purple-500/20 text-purple-300",
-  energy: "bg-yellow-500/20 text-yellow-300",
-  work: "bg-blue-500/20 text-blue-300",
-  finance: "bg-green-500/20 text-green-300",
-  learning: "bg-orange-500/20 text-orange-300",
-  preferences: "bg-pink-500/20 text-pink-300",
+  identity: "bg-purple/20 text-purple",
+  energy: "bg-warning/20 text-warning",
+  work: "bg-info/20 text-info",
+  finance: "bg-success/20 text-success",
+  learning: "bg-brand/20 text-brand",
+  preferences: "bg-purple/20 text-purple",
 };
 
 export function MemoryTab() {
@@ -162,7 +162,7 @@ export function MemoryTab() {
     <div className="space-y-6">
       {/* UserModel Summary Cards */}
       <div>
-        <h2 className="text-[13px] font-medium text-secondary mb-3">User Model</h2>
+        <h2 className="text-[13px] font-medium text-muted-foreground mb-3">User Model</h2>
         <div className="grid grid-cols-3 gap-3">
           {domainCards.map(({ domain, count, preview }) => (
             <button
@@ -172,18 +172,18 @@ export function MemoryTab() {
               className={`text-left p-3 rounded-lg border transition-all ${
                 domainFilter === domain
                   ? "border-brand/50 bg-brand/10"
-                  : "border-white/[0.08] bg-white/[0.04] hover:bg-white/[0.06]"
+                  : "border-border bg-card hover:bg-accent"
               }`}
             >
               <div className="flex items-center justify-between mb-1">
                 <span className={`text-[11px] px-1.5 py-0.5 rounded ${domainColors[domain]}`}>
                   {domain}
                 </span>
-                <span className="text-[11px] text-muted">{count} facts</span>
+                <span className="text-[11px] text-muted-foreground">{count} facts</span>
               </div>
               <div className="space-y-0.5 mt-2">
                 {preview.slice(0, 2).map((p) => (
-                  <p key={p} className="text-[11px] text-muted truncate">
+                  <p key={p} className="text-[11px] text-muted-foreground truncate">
                     {p}
                   </p>
                 ))}
@@ -196,65 +196,68 @@ export function MemoryTab() {
       {/* Semantic Facts Table */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-[13px] font-medium text-secondary">
-            Semantic Facts {domainFilter && <span className="text-muted">({domainFilter})</span>}
+          <h2 className="text-[13px] font-medium text-muted-foreground">
+            Semantic Facts{" "}
+            {domainFilter && <span className="text-muted-foreground">({domainFilter})</span>}
           </h2>
           <button
             type="button"
-            className="flex items-center gap-1 text-[11px] text-muted hover:text-secondary"
+            className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
           >
             <Plus className="w-3 h-3" /> Add Fact
           </button>
         </div>
-        <div className="bg-white/[0.04] rounded-lg border border-white/[0.08] overflow-hidden">
+        <div className="bg-card rounded-lg border border-border overflow-hidden">
           <table className="w-full text-[12px]">
             <thead>
-              <tr className="border-b border-white/[0.06]">
-                <th className="text-left p-2 text-muted font-normal">Domain</th>
-                <th className="text-left p-2 text-muted font-normal">Subject</th>
-                <th className="text-left p-2 text-muted font-normal">Predicate</th>
-                <th className="text-left p-2 text-muted font-normal">Object</th>
-                <th className="text-left p-2 text-muted font-normal">Conf</th>
-                <th className="text-left p-2 text-muted font-normal">Stab</th>
-                <th className="text-left p-2 text-muted font-normal">Retr</th>
-                <th className="text-left p-2 text-muted font-normal">Accessed</th>
-                <th className="text-left p-2 text-muted font-normal" />
+              <tr className="border-b border-border-subtle">
+                <th className="text-left p-2 text-muted-foreground font-normal">Domain</th>
+                <th className="text-left p-2 text-muted-foreground font-normal">Subject</th>
+                <th className="text-left p-2 text-muted-foreground font-normal">Predicate</th>
+                <th className="text-left p-2 text-muted-foreground font-normal">Object</th>
+                <th className="text-left p-2 text-muted-foreground font-normal">Conf</th>
+                <th className="text-left p-2 text-muted-foreground font-normal">Stab</th>
+                <th className="text-left p-2 text-muted-foreground font-normal">Retr</th>
+                <th className="text-left p-2 text-muted-foreground font-normal">Accessed</th>
+                <th className="text-left p-2 text-muted-foreground font-normal" />
               </tr>
             </thead>
             <tbody>
               {facts.map((f) => (
                 <tr
                   key={f.id}
-                  className={`border-b border-white/[0.04] hover:bg-white/[0.02] ${
+                  className={`border-b border-border-subtle hover:bg-card ${
                     f.retrievability < 0.3 ? "opacity-40" : ""
                   }`}
                 >
                   <td className="p-2">
                     <span
-                      className={`text-[10px] px-1 py-0.5 rounded ${domainColors[f.domain] ?? "text-muted"}`}
+                      className={`text-[10px] px-1 py-0.5 rounded ${domainColors[f.domain] ?? "text-muted-foreground"}`}
                     >
                       {f.domain}
                     </span>
                   </td>
-                  <td className="p-2 text-secondary">{f.subject}</td>
-                  <td className="p-2 text-secondary">{f.predicate}</td>
-                  <td className="p-2 text-primary">{f.object}</td>
+                  <td className="p-2 text-muted-foreground">{f.subject}</td>
+                  <td className="p-2 text-muted-foreground">{f.predicate}</td>
+                  <td className="p-2 text-foreground">{f.object}</td>
                   <td className="p-2">
-                    <div className="w-12 bg-white/[0.1] rounded-full h-1.5">
+                    <div className="w-12 bg-muted rounded-full h-1.5">
                       <div
                         className="bg-brand h-1.5 rounded-full"
                         style={{ width: `${f.confidence * 100}%` }}
                       />
                     </div>
                   </td>
-                  <td className="p-2 text-muted">{f.stability.toFixed(1)}</td>
-                  <td className="p-2 text-muted">{(f.retrievability * 100).toFixed(0)}%</td>
-                  <td className="p-2 text-muted">{f.accessCount}x</td>
+                  <td className="p-2 text-muted-foreground">{f.stability.toFixed(1)}</td>
+                  <td className="p-2 text-muted-foreground">
+                    {(f.retrievability * 100).toFixed(0)}%
+                  </td>
+                  <td className="p-2 text-muted-foreground">{f.accessCount}x</td>
                   <td className="p-2">
                     <button
                       type="button"
                       onClick={() => handleDeleteFact(f.id)}
-                      className="text-muted hover:text-red-400"
+                      className="text-muted-foreground hover:text-destructive"
                     >
                       <Trash2 className="w-3 h-3" />
                     </button>
@@ -263,7 +266,7 @@ export function MemoryTab() {
               ))}
               {facts.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="p-4 text-center text-muted">
+                  <td colSpan={9} className="p-4 text-center text-muted-foreground">
                     No facts found
                   </td>
                 </tr>
@@ -275,56 +278,62 @@ export function MemoryTab() {
 
       {/* Episodic Memories */}
       <div>
-        <h2 className="text-[13px] font-medium text-secondary mb-3">Episodic Memories</h2>
+        <h2 className="text-[13px] font-medium text-muted-foreground mb-3">Episodic Memories</h2>
         <div className="space-y-2">
           {episodic.map((m) => (
-            <div key={m.id} className="p-3 bg-white/[0.04] rounded-lg border border-white/[0.08]">
+            <div key={m.id} className="p-3 bg-card rounded-lg border border-border">
               <div className="flex items-center gap-2 mb-1">
                 <span
-                  className={`text-[10px] px-1 py-0.5 rounded ${domainColors[m.domain] ?? "text-muted"}`}
+                  className={`text-[10px] px-1 py-0.5 rounded ${domainColors[m.domain] ?? "text-muted-foreground"}`}
                 >
                   {m.domain}
                 </span>
-                <span className="text-[10px] text-muted">{m.occurredAt}</span>
-                <span className="text-[10px] text-muted">imp: {m.importance.toFixed(2)}</span>
+                <span className="text-[10px] text-muted-foreground">{m.occurredAt}</span>
+                <span className="text-[10px] text-muted-foreground">
+                  imp: {m.importance.toFixed(2)}
+                </span>
               </div>
-              <p className="text-[12px] text-secondary">{m.content}</p>
-              {m.summary && <p className="text-[11px] text-muted mt-1">{m.summary}</p>}
+              <p className="text-[12px] text-muted-foreground">{m.content}</p>
+              {m.summary && <p className="text-[11px] text-muted-foreground mt-1">{m.summary}</p>}
             </div>
           ))}
-          {episodic.length === 0 && <p className="text-[12px] text-muted">No episodic memories</p>}
+          {episodic.length === 0 && (
+            <p className="text-[12px] text-muted-foreground">No episodic memories</p>
+          )}
         </div>
       </div>
 
       {/* Procedural Rules */}
       <div>
-        <h2 className="text-[13px] font-medium text-secondary mb-3">Procedural Rules</h2>
-        <div className="bg-white/[0.04] rounded-lg border border-white/[0.08] overflow-hidden">
+        <h2 className="text-[13px] font-medium text-muted-foreground mb-3">Procedural Rules</h2>
+        <div className="bg-card rounded-lg border border-border overflow-hidden">
           <table className="w-full text-[12px]">
             <thead>
-              <tr className="border-b border-white/[0.06]">
-                <th className="text-left p-2 text-muted font-normal">Domain</th>
-                <th className="text-left p-2 text-muted font-normal">Rule</th>
-                <th className="text-left p-2 text-muted font-normal">Conf</th>
-                <th className="text-left p-2 text-muted font-normal">Signals</th>
-                <th className="text-left p-2 text-muted font-normal">Active</th>
+              <tr className="border-b border-border-subtle">
+                <th className="text-left p-2 text-muted-foreground font-normal">Domain</th>
+                <th className="text-left p-2 text-muted-foreground font-normal">Rule</th>
+                <th className="text-left p-2 text-muted-foreground font-normal">Conf</th>
+                <th className="text-left p-2 text-muted-foreground font-normal">Signals</th>
+                <th className="text-left p-2 text-muted-foreground font-normal">Active</th>
               </tr>
             </thead>
             <tbody>
               {rules.map((r) => (
-                <tr key={r.id} className="border-b border-white/[0.04]">
+                <tr key={r.id} className="border-b border-border-subtle">
                   <td className="p-2">
                     <span
-                      className={`text-[10px] px-1 py-0.5 rounded ${domainColors[r.domain] ?? "text-muted"}`}
+                      className={`text-[10px] px-1 py-0.5 rounded ${domainColors[r.domain] ?? "text-muted-foreground"}`}
                     >
                       {r.domain}
                     </span>
                   </td>
-                  <td className="p-2 text-secondary">{r.ruleText}</td>
-                  <td className="p-2 text-muted">{r.confidence.toFixed(2)}</td>
-                  <td className="p-2 text-muted">{r.signalCount}</td>
+                  <td className="p-2 text-muted-foreground">{r.ruleText}</td>
+                  <td className="p-2 text-muted-foreground">{r.confidence.toFixed(2)}</td>
+                  <td className="p-2 text-muted-foreground">{r.signalCount}</td>
                   <td className="p-2">
-                    <span className={`text-[10px] ${r.active ? "text-green-400" : "text-red-400"}`}>
+                    <span
+                      className={`text-[10px] ${r.active ? "text-success" : "text-destructive"}`}
+                    >
                       {r.active ? "ON" : "OFF"}
                     </span>
                   </td>
@@ -332,7 +341,7 @@ export function MemoryTab() {
               ))}
               {rules.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="p-4 text-center text-muted">
+                  <td colSpan={5} className="p-4 text-center text-muted-foreground">
                     No rules
                   </td>
                 </tr>
@@ -343,18 +352,18 @@ export function MemoryTab() {
       </div>
 
       {/* Stats Bar */}
-      <div className="flex items-center gap-4 p-3 bg-white/[0.04] rounded-lg border border-white/[0.08]">
-        <span className="text-[11px] text-muted">
-          Active: <span className="text-secondary">{stats.activeFacts}</span>
+      <div className="flex items-center gap-4 p-3 bg-card rounded-lg border border-border">
+        <span className="text-[11px] text-muted-foreground">
+          Active: <span className="text-muted-foreground">{stats.activeFacts}</span>
         </span>
-        <span className="text-[11px] text-muted">
-          Archived: <span className="text-secondary">{stats.archivedFacts}</span>
+        <span className="text-[11px] text-muted-foreground">
+          Archived: <span className="text-muted-foreground">{stats.archivedFacts}</span>
         </span>
-        <span className="text-[11px] text-muted">
-          Episodic: <span className="text-secondary">{stats.episodicCount}</span>
+        <span className="text-[11px] text-muted-foreground">
+          Episodic: <span className="text-muted-foreground">{stats.episodicCount}</span>
         </span>
-        <span className="text-[11px] text-muted">
-          Rules: <span className="text-secondary">{stats.rulesCount}</span>
+        <span className="text-[11px] text-muted-foreground">
+          Rules: <span className="text-muted-foreground">{stats.rulesCount}</span>
         </span>
         <div className="flex-1" />
         <button

@@ -139,12 +139,18 @@ impl AppCore {
             extract_links_and_mentions(self, &id, &created).await?;
         }
 
-        // Emit domain event for timeline tracking
+        // Emit domain events for timeline tracking + BookIndex
         if let Ok(bus) = self.domain_event_bus() {
             bus.publish(bus::DomainEvent::NoteCreated {
                 note_id: id.clone(),
                 title: created.title.clone(),
             });
+            if !created.body.is_empty() {
+                bus.publish(bus::DomainEvent::NoteContentChanged {
+                    note_id: id.clone(),
+                    content: created.body.clone(),
+                });
+            }
         }
 
         // Fire-and-forget embedding for the new note
@@ -197,12 +203,18 @@ impl AppCore {
             extract_links_and_mentions(self, &params.id, &updated).await?;
         }
 
-        // Emit domain event for timeline tracking
+        // Emit domain events for timeline tracking + BookIndex
         if let Ok(bus) = self.domain_event_bus() {
             bus.publish(bus::DomainEvent::NoteUpdated {
                 note_id: params.id.clone(),
                 title: updated.title.clone(),
             });
+            if params.body.is_some() || params.body_html.is_some() {
+                bus.publish(bus::DomainEvent::NoteContentChanged {
+                    note_id: params.id.clone(),
+                    content: updated.body.clone(),
+                });
+            }
         }
 
         // Fire-and-forget embedding for the updated note
@@ -233,6 +245,14 @@ impl AppCore {
             .delete_note(&id)
             .await
             .map_err(map_storage_err)?;
+
+        if deleted {
+            if let Ok(bus) = self.domain_event_bus() {
+                bus.publish(bus::DomainEvent::NoteDeleted {
+                    note_id: id.clone(),
+                });
+            }
+        }
 
         let updates = if deleted {
             vec![EntityUpdate {

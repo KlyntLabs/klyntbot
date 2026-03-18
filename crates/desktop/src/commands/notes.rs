@@ -1,9 +1,15 @@
 use std::sync::Arc;
 
 use desktop_shared::commands::{
-    BacklinkResponse, HybridSearchResponse, InboxCreateParams, InboxItemResponse, NoteCreateParams,
-    NoteLinkResponse, NoteResponse, NoteSuggestionsResponse, NoteUpdateParams, NoteVersionResponse,
-    NotebookCreateParams, NotebookResponse, NotebookUpdateParams,
+    BacklinkResponse, ChangesSummaryResponse, CreatePersonaParams, DeckSummaryResponse,
+    FlashcardResponse, FlashcardReviewParams, HybridSearchResponse, InboxCreateParams,
+    InboxItemResponse, InsightEvolutionResponse, InsightQuizSubmitParams, InsightReviewResponse,
+    InsightReviewStarted, InsightSaveFlashcardsParams, InsightVersionResponse,
+    KnowledgeGrowthResponse, NoteCreateParams, NoteLinkResponse, NoteResponse,
+    NoteSuggestionsResponse, NoteUpdateParams, NoteVersionResponse, NotebookCreateParams,
+    NotebookResponse, NotebookUpdateParams, PersonaChatParams, PersonaChatResponse,
+    PersonaResponse, RatePersonaParams, ScenarioChallengeResponse, SetPersonaPinsParams,
+    TabContent, UpdatePersonaParams,
 };
 use desktop_shared::errors::ApiError;
 use tauri::State;
@@ -278,6 +284,200 @@ pub async fn inbox_delete(state: State<'_, Arc<AppCore>>, id: String) -> Result<
     state.inbox_delete(&id).await
 }
 
+// ── Insight Review commands ─────────────────────────────────────────
+
+#[tauri::command]
+pub async fn note_insight_review(
+    state: State<'_, Arc<AppCore>>,
+    note_id: String,
+    scope_config: Option<desktop_shared::commands::InsightScopeConfigParams>,
+) -> Result<InsightReviewStarted, ApiError> {
+    state
+        .note_insight_review(&note_id, scope_config.as_ref(), None)
+        .await
+}
+
+#[tauri::command]
+pub async fn note_insight_cache_get(
+    state: State<'_, Arc<AppCore>>,
+    note_id: String,
+) -> Result<Option<InsightReviewResponse>, ApiError> {
+    state.note_insight_cache_get(&note_id).await
+}
+
+#[tauri::command]
+pub async fn note_insight_save_flashcards(
+    state: State<'_, Arc<AppCore>>,
+    params: InsightSaveFlashcardsParams,
+) -> Result<Vec<FlashcardResponse>, ApiError> {
+    state.insight_save_flashcards(params).await
+}
+
+#[tauri::command]
+pub async fn note_insight_submit_quiz(
+    state: State<'_, Arc<AppCore>>,
+    params: InsightQuizSubmitParams,
+) -> Result<(), ApiError> {
+    state.note_insight_submit_quiz(&params).await
+}
+
+#[tauri::command]
+pub async fn note_insight_regenerate_tab(
+    state: State<'_, Arc<AppCore>>,
+    note_id: String,
+    tab: String,
+) -> Result<TabContent, ApiError> {
+    state.note_insight_regenerate_tab(&note_id, &tab).await
+}
+
+#[tauri::command]
+pub async fn note_insight_list_versions(
+    state: State<'_, Arc<AppCore>>,
+    note_id: String,
+) -> Result<Vec<InsightVersionResponse>, ApiError> {
+    state.note_insight_list_versions(&note_id).await
+}
+
+#[tauri::command]
+pub async fn note_insight_get_evolution(
+    state: State<'_, Arc<AppCore>>,
+    note_id: String,
+) -> Result<InsightEvolutionResponse, ApiError> {
+    state.note_insight_get_evolution(&note_id).await
+}
+
+#[tauri::command]
+pub async fn note_insight_get_version(
+    state: State<'_, Arc<AppCore>>,
+    insight_id: String,
+) -> Result<InsightReviewResponse, ApiError> {
+    state.note_insight_get_version(&insight_id).await
+}
+
+#[tauri::command]
+pub async fn note_insight_generate_scenario(
+    state: State<'_, Arc<AppCore>>,
+    note_id: String,
+) -> Result<ScenarioChallengeResponse, ApiError> {
+    state.note_insight_generate_scenario(&note_id).await
+}
+
+#[tauri::command]
+pub async fn note_insight_changes_summary(
+    state: State<'_, Arc<AppCore>>,
+    note_id: String,
+) -> Result<Option<ChangesSummaryResponse>, ApiError> {
+    state.note_insight_changes_summary(&note_id).await
+}
+
+#[tauri::command]
+pub async fn note_insight_knowledge_growth(
+    state: State<'_, Arc<AppCore>>,
+    days: Option<u32>,
+) -> Result<KnowledgeGrowthResponse, ApiError> {
+    state.note_insight_knowledge_growth(days.unwrap_or(7)).await
+}
+
+// ── Persona Management commands ───────────────────────────────────
+
+#[tauri::command]
+pub async fn note_insight_list_personas(
+    state: State<'_, Arc<AppCore>>,
+) -> Result<Vec<PersonaResponse>, ApiError> {
+    state.note_insight_list_personas().await
+}
+
+#[tauri::command]
+pub async fn note_insight_create_persona(
+    state: State<'_, Arc<AppCore>>,
+    params: CreatePersonaParams,
+) -> Result<PersonaResponse, ApiError> {
+    state.note_insight_create_persona(params).await
+}
+
+#[tauri::command]
+pub async fn note_insight_update_persona(
+    state: State<'_, Arc<AppCore>>,
+    params: UpdatePersonaParams,
+) -> Result<PersonaResponse, ApiError> {
+    state.note_insight_update_persona(params).await
+}
+
+#[tauri::command]
+pub async fn note_insight_delete_persona(
+    state: State<'_, Arc<AppCore>>,
+    id: String,
+) -> Result<(), ApiError> {
+    state.note_insight_delete_persona(&id).await
+}
+
+#[tauri::command]
+pub async fn note_insight_toggle_persona(
+    state: State<'_, Arc<AppCore>>,
+    id: String,
+    active: bool,
+) -> Result<(), ApiError> {
+    state.note_insight_toggle_persona(&id, active).await
+}
+
+#[tauri::command]
+pub async fn note_insight_set_pins(
+    state: State<'_, Arc<AppCore>>,
+    params: SetPersonaPinsParams,
+) -> Result<(), ApiError> {
+    state.note_insight_set_pins(params).await
+}
+
+#[tauri::command]
+pub async fn note_insight_rate_persona(
+    state: State<'_, Arc<AppCore>>,
+    params: RatePersonaParams,
+) -> Result<(), ApiError> {
+    state.note_insight_rate_persona(params).await
+}
+
+#[tauri::command]
+pub async fn note_insight_auto_generate_persona(
+    state: State<'_, Arc<AppCore>>,
+    note_id: String,
+) -> Result<PersonaResponse, ApiError> {
+    state.note_insight_auto_generate_persona(&note_id).await
+}
+
+#[tauri::command]
+pub async fn note_insight_persona_chat(
+    state: State<'_, Arc<AppCore>>,
+    params: PersonaChatParams,
+) -> Result<PersonaChatResponse, ApiError> {
+    state.note_insight_persona_chat(&params).await
+}
+
+// ── Flashcard Review commands ───────────────────────────────────
+
+#[tauri::command]
+pub async fn flashcard_list_decks(
+    state: State<'_, Arc<AppCore>>,
+) -> Result<Vec<DeckSummaryResponse>, ApiError> {
+    state.flashcard_list_decks().await
+}
+
+#[tauri::command]
+pub async fn flashcard_get_due(
+    state: State<'_, Arc<AppCore>>,
+    deck: String,
+    limit: Option<i64>,
+) -> Result<Vec<FlashcardResponse>, ApiError> {
+    state.flashcard_get_due(&deck, limit.unwrap_or(10)).await
+}
+
+#[tauri::command]
+pub async fn flashcard_record_review(
+    state: State<'_, Arc<AppCore>>,
+    params: FlashcardReviewParams,
+) -> Result<FlashcardResponse, ApiError> {
+    state.flashcard_record_review(params).await
+}
+
 // ── Dev server dispatch ─────────────────────────────────────────────
 
 #[cfg(test)]
@@ -310,6 +510,29 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "inbox_create",
     "inbox_list",
     "inbox_delete",
+    "note_insight_review",
+    "note_insight_cache_get",
+    "note_insight_save_flashcards",
+    "note_insight_submit_quiz",
+    "note_insight_regenerate_tab",
+    "note_insight_list_versions",
+    "note_insight_get_evolution",
+    "note_insight_get_version",
+    "note_insight_generate_scenario",
+    "note_insight_changes_summary",
+    "note_insight_knowledge_growth",
+    "note_insight_list_personas",
+    "note_insight_create_persona",
+    "note_insight_update_persona",
+    "note_insight_delete_persona",
+    "note_insight_toggle_persona",
+    "note_insight_set_pins",
+    "note_insight_rate_persona",
+    "note_insight_auto_generate_persona",
+    "note_insight_persona_chat",
+    "flashcard_list_decks",
+    "flashcard_get_due",
+    "flashcard_record_review",
 ];
 
 #[cfg(debug_assertions)]
@@ -420,6 +643,97 @@ pub(crate) async fn dispatch_dev(
         "inbox_delete" => {
             let id = try_field!(dev::get_str(body, "id"));
             dev::val(core.inbox_delete(&id).await)
+        }
+        // note_insight_review is handled inline in dev_server/dispatch.rs
+        // (needs SSE emitter injection, like chat_send)
+        "note_insight_cache_get" => {
+            let id = try_field!(dev::get_str(body, "noteId"));
+            dev::val(core.note_insight_cache_get(&id).await)
+        }
+        "note_insight_save_flashcards" => dev::val(
+            core.insight_save_flashcards(try_field!(dev::parse_params::<
+                desktop_shared::commands::InsightSaveFlashcardsParams,
+            >(body)))
+                .await,
+        ),
+        "note_insight_submit_quiz" => dev::val(
+            core.note_insight_submit_quiz(&try_field!(dev::parse_params::<
+                desktop_shared::commands::InsightQuizSubmitParams,
+            >(body)))
+                .await,
+        ),
+        "note_insight_regenerate_tab" => {
+            let id = try_field!(dev::get_str(body, "noteId"));
+            let tab = try_field!(dev::get_str(body, "tab"));
+            dev::val(core.note_insight_regenerate_tab(&id, &tab).await)
+        }
+        "note_insight_list_versions" => {
+            let id = try_field!(dev::get_str(body, "noteId"));
+            dev::val(core.note_insight_list_versions(&id).await)
+        }
+        "note_insight_get_evolution" => {
+            let id = try_field!(dev::get_str(body, "noteId"));
+            dev::val(core.note_insight_get_evolution(&id).await)
+        }
+        "note_insight_get_version" => {
+            let id = try_field!(dev::get_str(body, "insightId"));
+            dev::val(core.note_insight_get_version(&id).await)
+        }
+        "note_insight_generate_scenario" => {
+            let id = try_field!(dev::get_str(body, "noteId"));
+            dev::val(core.note_insight_generate_scenario(&id).await)
+        }
+        "note_insight_changes_summary" => {
+            let id = try_field!(dev::get_str(body, "noteId"));
+            dev::val(core.note_insight_changes_summary(&id).await)
+        }
+        "note_insight_knowledge_growth" => {
+            let days: Option<u32> = dev::get(body, "days");
+            dev::val(core.note_insight_knowledge_growth(days.unwrap_or(7)).await)
+        }
+        "note_insight_list_personas" => dev::val(core.note_insight_list_personas().await),
+        "note_insight_create_persona" => dev::val(
+            core.note_insight_create_persona(try_field!(dev::parse_params(body)))
+                .await,
+        ),
+        "note_insight_update_persona" => dev::val(
+            core.note_insight_update_persona(try_field!(dev::parse_params(body)))
+                .await,
+        ),
+        "note_insight_delete_persona" => {
+            let id = try_field!(dev::get_str(body, "id"));
+            dev::val(core.note_insight_delete_persona(&id).await)
+        }
+        "note_insight_toggle_persona" => {
+            let id = try_field!(dev::get_str(body, "id"));
+            let active = body.get("active").and_then(|v| v.as_bool()).unwrap_or(true);
+            dev::val(core.note_insight_toggle_persona(&id, active).await)
+        }
+        "note_insight_set_pins" => dev::val(
+            core.note_insight_set_pins(try_field!(dev::parse_params(body)))
+                .await,
+        ),
+        "note_insight_rate_persona" => dev::val(
+            core.note_insight_rate_persona(try_field!(dev::parse_params(body)))
+                .await,
+        ),
+        "note_insight_auto_generate_persona" => {
+            let note_id = try_field!(dev::get_str(body, "noteId"));
+            dev::val(core.note_insight_auto_generate_persona(&note_id).await)
+        }
+        "note_insight_persona_chat" => {
+            let params: PersonaChatParams = try_field!(dev::parse_params(body));
+            dev::val(core.note_insight_persona_chat(&params).await)
+        }
+        "flashcard_list_decks" => dev::val(core.flashcard_list_decks().await),
+        "flashcard_get_due" => {
+            let deck: String = try_field!(dev::get_str(body, "deck"));
+            let limit: Option<i64> = dev::get(body, "limit");
+            dev::val(core.flashcard_get_due(&deck, limit.unwrap_or(10)).await)
+        }
+        "flashcard_record_review" => {
+            let params: FlashcardReviewParams = try_field!(dev::parse_params(body));
+            dev::val(core.flashcard_record_review(params).await)
         }
         _ => return None,
     })

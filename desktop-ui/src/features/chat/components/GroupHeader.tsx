@@ -20,7 +20,7 @@ export function GroupHeader({
       type="button"
       onClick={() => onToggle(groupKey)}
       aria-expanded={isExpanded}
-      className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/[0.06] transition-colors text-[12px] font-light text-muted hover:text-secondary"
+      className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-accent transition-colors text-[12px] font-light text-muted-foreground hover:text-foreground"
     >
       <Icon className="w-3.5 h-3.5" strokeWidth={1.5} />
       <span className="flex-1 text-left">{label}</span>

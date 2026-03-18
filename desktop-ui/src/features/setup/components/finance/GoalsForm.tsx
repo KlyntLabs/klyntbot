@@ -86,7 +86,7 @@ export function GoalsForm({ registerSave, onDirty }: GoalsFormProps) {
 
   return (
     <div>
-      <h3 className="text-[14px] font-medium text-secondary mb-1">Financial Goals</h3>
+      <h3 className="text-[14px] font-medium text-muted-foreground mb-1">Financial Goals</h3>
       <p className="text-[11px] text-dim mb-4">
         Set targets for savings, debt payoff, or investments.
       </p>
@@ -95,7 +95,7 @@ export function GoalsForm({ registerSave, onDirty }: GoalsFormProps) {
         {goals.map((goal) => (
           <div
             key={goal.key}
-            className="bg-white/[0.03] rounded-lg border border-white/[0.06] p-3 space-y-2"
+            className="bg-card rounded-lg border border-border-subtle p-3 space-y-2"
           >
             <div className="flex items-center gap-2">
               <input
@@ -103,7 +103,7 @@ export function GoalsForm({ registerSave, onDirty }: GoalsFormProps) {
                 value={goal.name}
                 onChange={(e) => updateGoal(goal.key, { name: e.target.value })}
                 placeholder="Goal name"
-                className="flex-1 px-3 py-1.5 text-[12px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                className="flex-1 px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
               />
               <button
                 type="button"
@@ -117,10 +117,10 @@ export function GoalsForm({ registerSave, onDirty }: GoalsFormProps) {
               <select
                 value={goal.goalType}
                 onChange={(e) => updateGoal(goal.key, { goalType: e.target.value })}
-                className="flex-1 px-2 py-1.5 text-[12px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                className="flex-1 px-2 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
               >
                 {GOAL_TYPE_OPTIONS.map((t) => (
-                  <option key={t.value} value={t.value} className="bg-[#1a1a1a]">
+                  <option key={t.value} value={t.value} className="bg-popover">
                     {t.label}
                   </option>
                 ))}
@@ -131,7 +131,7 @@ export function GoalsForm({ registerSave, onDirty }: GoalsFormProps) {
                 onChange={(e) => updateGoal(goal.key, { targetAmount: e.target.value })}
                 placeholder="Target amount"
                 step="0.01"
-                className="w-32 px-2 py-1.5 text-[12px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                className="w-32 px-2 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
               />
             </div>
             <div className="flex gap-2">
@@ -139,7 +139,7 @@ export function GoalsForm({ registerSave, onDirty }: GoalsFormProps) {
                 type="date"
                 value={goal.deadline}
                 onChange={(e) => updateGoal(goal.key, { deadline: e.target.value })}
-                className="flex-1 px-2 py-1.5 text-[12px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                className="flex-1 px-2 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
               />
               <input
                 type="number"
@@ -147,7 +147,7 @@ export function GoalsForm({ registerSave, onDirty }: GoalsFormProps) {
                 onChange={(e) => updateGoal(goal.key, { monthlyContribution: e.target.value })}
                 placeholder="Monthly contribution"
                 step="0.01"
-                className="flex-1 px-2 py-1.5 text-[12px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                className="flex-1 px-2 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
               />
             </div>
           </div>
@@ -157,7 +157,7 @@ export function GoalsForm({ registerSave, onDirty }: GoalsFormProps) {
       <button
         type="button"
         onClick={addGoal}
-        className="flex items-center gap-1.5 mt-3 text-[12px] text-muted hover:text-secondary transition-colors"
+        className="flex items-center gap-1.5 mt-3 text-[12px] text-muted-foreground hover:text-foreground transition-colors"
       >
         <Plus className="w-3.5 h-3.5" />
         Add goal

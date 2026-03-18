@@ -48,13 +48,13 @@ export function FinanceBasicsForm({ registerSave, onDirty }: FinanceBasicsFormPr
 
   return (
     <div>
-      <h3 className="text-[14px] font-medium text-secondary mb-4">Basics</h3>
+      <h3 className="text-[14px] font-medium text-muted-foreground mb-4">Basics</h3>
 
       <div className="space-y-4">
         <div>
           <label
             htmlFor="fin-currency"
-            className="block text-[12px] font-medium text-secondary mb-1.5"
+            className="block text-[12px] font-medium text-muted-foreground mb-1.5"
           >
             Default currency
           </label>
@@ -65,10 +65,10 @@ export function FinanceBasicsForm({ registerSave, onDirty }: FinanceBasicsFormPr
               setCurrency(e.target.value);
               onDirty();
             }}
-            className="w-full px-3 py-2 text-[13px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-lg focus:outline-none focus:border-brand/50 transition-colors"
+            className="w-full px-3 py-2 text-[13px] text-foreground bg-accent border border-border rounded-lg focus:outline-none focus:border-brand/50 transition-colors"
           >
             {CURRENCIES.map((c) => (
-              <option key={c} value={c} className="bg-[#1a1a1a]">
+              <option key={c} value={c} className="bg-popover">
                 {c}
               </option>
             ))}
@@ -76,7 +76,7 @@ export function FinanceBasicsForm({ registerSave, onDirty }: FinanceBasicsFormPr
         </div>
 
         <div>
-          <span className="block text-[12px] font-medium text-secondary mb-2">
+          <span className="block text-[12px] font-medium text-muted-foreground mb-2">
             Proactivity level
           </span>
           <div className="space-y-2">
@@ -86,7 +86,7 @@ export function FinanceBasicsForm({ registerSave, onDirty }: FinanceBasicsFormPr
                 className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
                   proactivity === level.value
                     ? "border-brand/50 bg-brand/[0.06]"
-                    : "border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.05]"
+                    : "border-border bg-card hover:bg-accent"
                 }`}
               >
                 <input
@@ -101,7 +101,7 @@ export function FinanceBasicsForm({ registerSave, onDirty }: FinanceBasicsFormPr
                   className="mt-0.5 accent-brand"
                 />
                 <div>
-                  <span className="text-[13px] font-medium text-primary">{level.label}</span>
+                  <span className="text-[13px] font-medium text-foreground">{level.label}</span>
                   <p className="text-[11px] text-dim mt-0.5">{level.desc}</p>
                 </div>
               </label>

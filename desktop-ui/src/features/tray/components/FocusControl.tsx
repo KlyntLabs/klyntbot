@@ -26,7 +26,7 @@ const WARNING_SECS = 30;
 type Timer = ReturnType<typeof useFocusTimer>;
 
 const ICON_BTN =
-  "w-8 h-8 rounded-full border border-white/[0.1] flex items-center justify-center text-muted hover:text-secondary hover:border-white/[0.2] transition-colors";
+  "w-8 h-8 rounded-full border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-border transition-colors";
 
 function PauseResumeButton({ timer }: { timer: Timer }) {
   return (
@@ -72,8 +72,8 @@ function QuickDistractionLog({ onLog }: { onLog: (cat: string) => void }) {
           key={c.value}
           type="button"
           onClick={() => onLog(c.value)}
-          className="px-2 py-0.5 text-[10px] rounded-md bg-surface-raised/30
-                     text-muted hover:text-foreground transition-colors"
+          className="px-2 py-0.5 text-[10px] rounded-md bg-muted/30
+                     text-muted-foreground hover:text-foreground transition-colors"
         >
           {c.label}
         </button>
@@ -94,7 +94,7 @@ function TodayStats({
   const timeStr = formatHumanDuration(stats.totalMins * 60);
 
   return (
-    <div className="text-center text-[10px] text-muted">
+    <div className="text-center text-[10px] text-muted-foreground">
       Today: {stats.sessions} session{stats.sessions !== 1 ? "s" : ""} · {timeStr}
       {stats.avgQuality != null && <span> · {(stats.avgQuality * 100).toFixed(0)}% quality</span>}
     </div>
@@ -264,7 +264,7 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
                   onBlur={handleEditSave}
                   min={1}
                   max={480}
-                  className="w-16 text-center text-[36px] font-extralight tabular-nums text-primary bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  className="w-16 text-center text-[36px] font-extralight tabular-nums text-foreground bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
                 <span className="text-[12px] text-dim font-light">min</span>
               </div>
@@ -276,7 +276,7 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
               disabled={isActive || isBreakPending}
               className={`cursor-pointer disabled:cursor-default ${paused ? "animate-pulse" : ""}`}
             >
-              <span className="text-[36px] font-extralight tabular-nums text-primary leading-none">
+              <span className="text-[36px] font-extralight tabular-nums text-foreground leading-none">
                 {timeDisplay}
               </span>
             </button>
@@ -288,18 +288,18 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
               <div
                 key={`dot-${i}`}
                 className={`w-[6px] h-[6px] rounded-full transition-colors duration-300 ${
-                  i < filledDots ? "bg-brand" : "bg-white/[0.15]"
+                  i < filledDots ? "bg-brand" : "bg-muted"
                 }`}
               />
             ))}
           </div>
 
-          <span className="text-[10px] text-muted uppercase tracking-[0.2em] mt-1.5 font-light">
+          <span className="text-[10px] text-muted-foreground uppercase tracking-[0.2em] mt-1.5 font-light">
             {phaseLabel}
           </span>
 
           {timer.actionTitle && phase === "focus" && (
-            <p className="text-[10px] text-muted truncate max-w-[120px] mt-0.5">
+            <p className="text-[10px] text-muted-foreground truncate max-w-[120px] mt-0.5">
               {timer.actionTitle}
             </p>
           )}
@@ -318,7 +318,7 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
                 ${
                   timer.activePreset === preset.label
                     ? "bg-brand/20 text-brand border border-brand/30"
-                    : "bg-surface-raised/30 text-muted hover:text-foreground border border-transparent"
+                    : "bg-muted/30 text-muted-foreground hover:text-foreground border border-transparent"
                 }`}
             >
               {preset.label} {preset.focusDuration}/{preset.shortBreak}
@@ -349,7 +349,7 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
             checked={settings.dndEnabled}
             onCheckedChange={(v) => timer.updateSettings({ dndEnabled: v })}
           />
-          <span className="text-[11px] text-muted font-light">Do Not Disturb</span>
+          <span className="text-[11px] text-muted-foreground font-light">Do Not Disturb</span>
         </label>
       )}
 
@@ -363,7 +363,7 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
                 type="button"
                 onClick={timer.skipBreak}
                 disabled={loading}
-                className="px-4 py-2 rounded-full bg-white/[0.08] text-[11px] uppercase tracking-[0.15em] text-primary font-light hover:bg-white/[0.12] transition-colors disabled:opacity-50"
+                className="px-4 py-2 rounded-full bg-muted text-[11px] uppercase tracking-[0.15em] text-foreground font-light hover:bg-muted transition-colors disabled:opacity-50"
               >
                 Skip
               </button>
@@ -371,7 +371,7 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
                 type="button"
                 onClick={() => timer.stop()}
                 disabled={loading}
-                className="px-4 py-2 rounded-full bg-white/[0.08] text-[11px] uppercase tracking-[0.15em] text-red-400 font-light hover:bg-red-500/[0.10] transition-colors disabled:opacity-50"
+                className="px-4 py-2 rounded-full bg-muted text-[11px] uppercase tracking-[0.15em] text-destructive font-light hover:bg-destructive/10 transition-colors disabled:opacity-50"
               >
                 Stop
               </button>
@@ -384,7 +384,7 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
                 type="button"
                 onClick={timer.takeBreak}
                 disabled={loading}
-                className="px-4 py-2 rounded-full bg-white/[0.08] text-[11px] uppercase tracking-[0.15em] text-primary font-light hover:bg-white/[0.12] transition-colors disabled:opacity-50"
+                className="px-4 py-2 rounded-full bg-muted text-[11px] uppercase tracking-[0.15em] text-foreground font-light hover:bg-muted transition-colors disabled:opacity-50"
               >
                 Break
               </button>
@@ -392,7 +392,7 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
                 type="button"
                 onClick={() => timer.stop()}
                 disabled={loading}
-                className="px-4 py-2 rounded-full bg-white/[0.08] text-[11px] uppercase tracking-[0.15em] text-red-400 font-light hover:bg-red-500/[0.10] transition-colors disabled:opacity-50"
+                className="px-4 py-2 rounded-full bg-muted text-[11px] uppercase tracking-[0.15em] text-destructive font-light hover:bg-destructive/10 transition-colors disabled:opacity-50"
               >
                 Stop
               </button>
@@ -404,7 +404,7 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
                 type="button"
                 onClick={timer.start}
                 disabled={loading}
-                className="px-8 py-2 rounded-full bg-white/[0.08] text-[11px] uppercase tracking-[0.15em] text-primary font-light hover:bg-white/[0.12] transition-colors disabled:opacity-50"
+                className="px-8 py-2 rounded-full bg-muted text-[11px] uppercase tracking-[0.15em] text-foreground font-light hover:bg-muted transition-colors disabled:opacity-50"
               >
                 Start
               </button>
@@ -428,7 +428,7 @@ function CoachingDebrief({ message, onDismiss }: { message: string; onDismiss: (
         <button
           type="button"
           onClick={onDismiss}
-          className="text-muted hover:text-foreground shrink-0"
+          className="text-muted-foreground hover:text-foreground shrink-0"
         >
           <X className="w-3 h-3" />
         </button>
@@ -473,7 +473,7 @@ function WarningBanner({ timer, isFocus }: { timer: Timer; isFocus: boolean }) {
           type="button"
           onClick={() => timer.stop()}
           disabled={timer.loading}
-          className="px-2.5 py-1.5 text-[10px] rounded-full bg-white/[0.06] text-secondary font-light hover:bg-white/[0.10] transition-colors disabled:opacity-50"
+          className="px-2.5 py-1.5 text-[10px] rounded-full bg-accent text-muted-foreground font-light hover:bg-muted transition-colors disabled:opacity-50"
         >
           End now
         </button>
@@ -489,7 +489,7 @@ function BreakPendingActions({ timer, cycleComplete }: { timer: Timer; cycleComp
 
   return (
     <div className="flex flex-col items-center gap-2 mt-3 animate-fade-in">
-      <p className="text-[11px] text-muted font-light text-center">
+      <p className="text-[11px] text-muted-foreground font-light text-center">
         {cycleComplete
           ? `Great cycle! ${breakMins}m break starting soon`
           : `${breakMins}m break starting soon`}
@@ -502,7 +502,7 @@ function BreakPendingActions({ timer, cycleComplete }: { timer: Timer; cycleComp
             type="button"
             onClick={() => timer.extendWork(mins)}
             disabled={timer.loading}
-            className="px-2 py-1.5 text-[10px] rounded-full bg-white/[0.06] text-secondary font-light hover:bg-white/[0.10] transition-colors disabled:opacity-50"
+            className="px-2 py-1.5 text-[10px] rounded-full bg-accent text-muted-foreground font-light hover:bg-muted transition-colors disabled:opacity-50"
           >
             +{mins}m work
           </button>
@@ -513,7 +513,7 @@ function BreakPendingActions({ timer, cycleComplete }: { timer: Timer; cycleComp
           type="button"
           onClick={timer.startBreak}
           disabled={timer.loading}
-          className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-white/[0.08] text-[10px] uppercase tracking-[0.1em] text-primary font-light hover:bg-white/[0.12] transition-colors disabled:opacity-50"
+          className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-muted text-[10px] uppercase tracking-[0.1em] text-foreground font-light hover:bg-muted transition-colors disabled:opacity-50"
         >
           <Coffee className="w-3 h-3" strokeWidth={1.5} />
           Start Break
@@ -522,7 +522,7 @@ function BreakPendingActions({ timer, cycleComplete }: { timer: Timer; cycleComp
           type="button"
           onClick={() => timer.stop()}
           disabled={timer.loading}
-          className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-white/[0.06] text-[10px] uppercase tracking-[0.1em] text-secondary font-light hover:bg-white/[0.10] transition-colors disabled:opacity-50"
+          className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-accent text-[10px] uppercase tracking-[0.1em] text-muted-foreground font-light hover:bg-muted transition-colors disabled:opacity-50"
         >
           <Square className="w-3 h-3" strokeWidth={1.5} />
           Stop
@@ -550,12 +550,12 @@ function FocusSettingsPanel({
       {/* Header */}
       <div className="flex items-center mb-5">
         <div className="flex-1" />
-        <span className="text-[15px] font-light text-primary">Settings</span>
+        <span className="text-[15px] font-light text-foreground">Settings</span>
         <div className="flex-1 flex justify-end">
           <button
             type="button"
             onClick={onClose}
-            className="w-7 h-7 rounded-full border border-white/[0.1] flex items-center justify-center text-muted hover:text-secondary hover:border-white/[0.2] transition-colors"
+            className="w-7 h-7 rounded-full border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-border transition-colors"
           >
             <X className="w-3.5 h-3.5" strokeWidth={1.5} />
           </button>
@@ -563,12 +563,14 @@ function FocusSettingsPanel({
       </div>
 
       {/* Tab switcher */}
-      <div className="flex p-0.5 rounded-full bg-white/[0.06] mb-5">
+      <div className="flex p-0.5 rounded-full bg-accent mb-5">
         <button
           type="button"
           onClick={() => setTab("duration")}
           className={`flex-1 py-1.5 rounded-full text-[10px] uppercase tracking-[0.12em] font-light transition-colors ${
-            tab === "duration" ? "bg-white/[0.12] text-primary" : "text-muted hover:text-secondary"
+            tab === "duration"
+              ? "bg-muted text-foreground"
+              : "text-muted-foreground hover:text-foreground"
           }`}
         >
           Duration
@@ -578,8 +580,8 @@ function FocusSettingsPanel({
           onClick={() => setTab("notifications")}
           className={`flex-1 py-1.5 rounded-full text-[10px] uppercase tracking-[0.12em] font-light transition-colors ${
             tab === "notifications"
-              ? "bg-white/[0.12] text-primary"
-              : "text-muted hover:text-secondary"
+              ? "bg-muted text-foreground"
+              : "text-muted-foreground hover:text-foreground"
           }`}
         >
           Notifications
@@ -618,21 +620,21 @@ function FocusSettingsPanel({
       ) : (
         <div className="space-y-1">
           <div className="flex items-center justify-between py-2.5">
-            <span className="text-[13px] text-secondary font-light">Sound</span>
+            <span className="text-[13px] text-muted-foreground font-light">Sound</span>
             <Checkbox
               checked={settings.soundEnabled}
               onCheckedChange={(v) => onUpdate({ soundEnabled: !!v })}
             />
           </div>
           <div className="flex items-center justify-between py-2.5">
-            <span className="text-[13px] text-secondary font-light">Notification</span>
+            <span className="text-[13px] text-muted-foreground font-light">Notification</span>
             <Checkbox
               checked={settings.notificationEnabled}
               onCheckedChange={(v) => onUpdate({ notificationEnabled: !!v })}
             />
           </div>
           <div className="flex items-center justify-between py-2.5">
-            <span className="text-[13px] text-secondary font-light">Do Not Disturb</span>
+            <span className="text-[13px] text-muted-foreground font-light">Do Not Disturb</span>
             <Checkbox
               checked={settings.dndEnabled}
               onCheckedChange={(v) => onUpdate({ dndEnabled: v })}
@@ -679,7 +681,7 @@ function SettingRow({
 
   return (
     <div className="flex items-center justify-between py-2.5">
-      <span className="text-[13px] text-secondary font-light">{label}</span>
+      <span className="text-[13px] text-muted-foreground font-light">{label}</span>
       {editing ? (
         <form
           onSubmit={(e) => {
@@ -696,7 +698,7 @@ function SettingRow({
             onBlur={save}
             min={min}
             max={max}
-            className="w-10 text-right text-[13px] font-light text-primary bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            className="w-10 text-right text-[13px] font-light text-foreground bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
           />
           <span className="text-[11px] text-dim font-light">{unit}</span>
         </form>
@@ -704,7 +706,7 @@ function SettingRow({
         <button
           type="button"
           onClick={startEdit}
-          className="flex items-center gap-1.5 text-muted hover:text-secondary transition-colors"
+          className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors"
         >
           <span className="text-[13px] font-light tabular-nums">
             {String(value).padStart(2, "0")}

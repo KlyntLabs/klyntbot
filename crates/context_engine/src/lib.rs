@@ -1,8 +1,12 @@
 pub mod assembler;
+pub mod book_index;
 pub mod budget;
 pub mod history_compressor;
+pub mod insight_forge;
 pub mod inventory;
 pub mod memory_retriever;
+pub mod operators;
+pub mod retrieval_planner;
 pub mod source;
 pub mod summary_provider;
 pub mod token_counter;
@@ -14,6 +18,10 @@ pub use assembler::{AssembledContext, ContextEngine, ContextRequest, ExecutionSt
 pub use budget::{BudgetAllocator, BudgetConfig, BudgetReport, Priority};
 pub use history_compressor::{
     CompressedHistory, CompressorConfig, CompressorMode, HistoryCompressor, HistorySummary,
+};
+pub use insight_forge::{
+    CircuitBreaker, DecomposerLlm, DomainSearcher, FallbackDecomposer, HeuristicDecomposer,
+    InsightForge, InsightForgeConfig, LlmDecomposer, QueryDecomposer,
 };
 pub use inventory::{ContextInventory, ContextInventoryItem, ContextItemStatus};
 pub use memory_retriever::{MemoryEntry, MemoryRetriever, MemorySource};

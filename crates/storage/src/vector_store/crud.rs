@@ -192,6 +192,63 @@ impl VectorStore {
         Ok(())
     }
 
+    /// Fetch a raw embedding vector by ID from a table.
+    ///
+    /// Returns None if the ID is not found. Used for computing cosine
+    /// similarity between specific embeddings (e.g., semantic drift).
+    pub async fn get_embedding(
+        &self,
+        table: &str,
+        id: &str,
+    ) -> Result<Option<Vec<f32>>, StorageError> {
+        let tbl = self
+            .db
+            .open_table(table)
+            .execute()
+            .await
+            .map_err(|e| StorageError::Vector(format!("open table {table}: {e}")))?;
+
+        let predicate = format!("id = '{}'", sanitize_predicate_value(id)?);
+
+        let results = tbl
+            .query()
+            .only_if(predicate)
+            .execute()
+            .await
+            .map_err(|e| StorageError::Vector(format!("query {table} by id: {e}")))?;
+
+        let batches: Vec<RecordBatch> = results
+            .try_collect()
+            .await
+            .map_err(|e| StorageError::Vector(format!("collect results: {e}")))?;
+
+        for batch in &batches {
+            if batch.num_rows() == 0 {
+                continue;
+            }
+            let vector_col = batch
+                .column_by_name("vector")
+                .ok_or_else(|| StorageError::Vector("missing vector column".to_string()))?;
+
+            let list_arr = vector_col
+                .as_any()
+                .downcast_ref::<FixedSizeListArray>()
+                .ok_or_else(|| {
+                    StorageError::Vector("vector column is not FixedSizeList".to_string())
+                })?;
+
+            let value_arr = list_arr.value(0);
+            let values = value_arr
+                .as_any()
+                .downcast_ref::<Float32Array>()
+                .ok_or_else(|| StorageError::Vector("vector values are not Float32".to_string()))?;
+
+            return Ok(Some(values.values().to_vec()));
+        }
+
+        Ok(None)
+    }
+
     /// Count the number of rows in a table.
     pub async fn count(&self, table: &str) -> Result<usize, StorageError> {
         let tbl = self

@@ -59,7 +59,7 @@ export function QuickCapturePage() {
   return (
     <div className="h-screen w-screen flex items-center justify-center p-4" data-tauri-drag-region>
       <div className="w-full glass-panel rounded-xl p-4 flex flex-col gap-3">
-        <div className="flex items-center gap-2 text-sm text-secondary">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Inbox className="w-4 h-4 text-brand" />
           <span className="font-medium">Quick Capture</span>
           <span className="ml-auto text-[10px] text-dim">Enter to save · Esc to close</span>
@@ -74,7 +74,7 @@ export function QuickCapturePage() {
             onChange={(e) => setContent(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Type a quick thought..."
-            className="w-full bg-transparent border border-white/[0.08] rounded-lg px-3 py-2 text-sm text-primary placeholder:text-dim focus:outline-none focus:border-brand/40 resize-none"
+            className="w-full bg-transparent border border-border rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-dim focus:outline-none focus:border-brand/40 resize-none"
             rows={3}
           />
         )}

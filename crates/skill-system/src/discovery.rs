@@ -53,11 +53,13 @@ pub const BUILTIN_SKILL_REFERENCES: &[(&str, &str, &str)] = &[
     include_skill_reference!("task-management", "project-management"),
     include_skill_reference!("task-management", "weekly-review"),
     include_skill_reference!("task-management", "retrospective"),
+    include_skill_reference!("task-management", "reports"),
     include_skill_reference!("finance-management", "budgeting"),
     include_skill_reference!("finance-management", "spending-intelligence"),
     include_skill_reference!("finance-management", "analytics-actions"),
     include_skill_reference!("finance-management", "fire-planning"),
     include_skill_reference!("finance-management", "portfolio-analysis"),
+    include_skill_reference!("finance-management", "financial-health"),
     include_skill_reference!("automation", "cron"),
     include_skill_reference!("communication", "messaging"),
     include_skill_reference!("communication", "notification"),
@@ -506,6 +508,13 @@ mod tests {
         assert!(prompt.contains("type=\"skill\""));
         assert!(prompt.contains("<description>"));
         assert!(prompt.contains("</available_skills>"));
+    }
+
+    #[test]
+    fn test_builtin_references_include_reports() {
+        let ref_map = builtin_reference_map();
+        assert!(ref_map.contains_key("builtin::task-management/references/reports.md"));
+        assert!(ref_map.contains_key("builtin::finance-management/references/financial-health.md"));
     }
 
     #[test]

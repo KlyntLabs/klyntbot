@@ -1,6 +1,6 @@
 //! Repository for the `tool_usage` table.
 
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use sqlx::SqlitePool;
 
 use crate::error::StorageError;
@@ -40,19 +40,7 @@ impl ToolUsageRepo {
         Ok(())
     }
 
-    /// Delete records older than the given cutoff. Returns rows deleted.
-    pub async fn delete_older_than(
-        &self,
-        days: i64,
-        now: DateTime<Utc>,
-    ) -> Result<u64, StorageError> {
-        let cutoff = now - chrono::Duration::days(days);
-        let result = sqlx::query("DELETE FROM tool_usage WHERE created_at < ?1")
-            .bind(cutoff)
-            .execute(&self.pool)
-            .await?;
-        Ok(result.rows_affected())
-    }
+    delete_older_than_impl!("tool_usage", "created_at");
 
     /// Aggregate tool usage stats grouped by tool name.
     pub async fn aggregate_by_tool(

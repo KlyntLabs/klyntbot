@@ -46,8 +46,8 @@ function StatCard({
         <Icon className="w-4.5 h-4.5" strokeWidth={1.5} style={{ color: accent ?? "#6B7280" }} />
       </div>
       <div>
-        <p className="text-lg font-semibold text-primary leading-tight">{value}</p>
-        <p className="text-[11px] text-muted">{label}</p>
+        <p className="text-lg font-semibold text-foreground leading-tight">{value}</p>
+        <p className="text-[11px] text-muted-foreground">{label}</p>
       </div>
     </div>
   );
@@ -73,7 +73,7 @@ function Slider({
   const display = format ? format(value) : value.toFixed(2);
   return (
     <div className="flex items-center gap-3">
-      <span className="text-[12px] text-secondary w-40 shrink-0">{label}</span>
+      <span className="text-[12px] text-muted-foreground w-40 shrink-0">{label}</span>
       <input
         type="range"
         min={min}
@@ -83,7 +83,9 @@ function Slider({
         onChange={(e) => onChange(Number(e.target.value))}
         className="flex-1 accent-accent"
       />
-      <span className="text-[12px] text-muted w-12 text-right tabular-nums">{display}</span>
+      <span className="text-[12px] text-muted-foreground w-12 text-right tabular-nums">
+        {display}
+      </span>
     </div>
   );
 }
@@ -185,7 +187,7 @@ export function InferenceTab() {
         <button
           type="button"
           onClick={() => refetch()}
-          className="mt-2 text-[11px] text-muted hover:text-secondary transition-colors"
+          className="mt-2 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
         >
           Refresh
         </button>
@@ -210,7 +212,7 @@ export function InferenceTab() {
             />
 
             <div className="border-t border-border my-3" />
-            <p className="text-[11px] text-muted">Scoring weights (should sum to 1.0)</p>
+            <p className="text-[11px] text-muted-foreground">Scoring weights (should sum to 1.0)</p>
 
             <Slider
               label="Semantic Weight"

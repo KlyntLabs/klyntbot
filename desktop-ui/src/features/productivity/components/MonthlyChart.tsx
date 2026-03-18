@@ -22,7 +22,7 @@ export function MonthlyChart({ summaries }: MonthlyChartProps) {
   return (
     <div className="glass-card p-4 flex flex-col gap-3 col-span-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-[13px] font-medium text-secondary">Monthly Overview</h2>
+        <h2 className="text-[13px] font-medium text-muted-foreground">Monthly Overview</h2>
         <div className="flex items-center gap-3">
           {PRODUCTIVITY_LEGEND.map((item) => (
             <span
@@ -57,7 +57,7 @@ export function MonthlyChart({ summaries }: MonthlyChartProps) {
               cursor={{ fill: "var(--surface-raised)", radius: 2 }}
             />
             <Bar dataKey="productive" stackId="a" fill="var(--success)" />
-            <Bar dataKey="neutral" stackId="a" fill="var(--text-muted)" />
+            <Bar dataKey="neutral" stackId="a" fill="var(--text-muted-foreground)" />
             <Bar
               dataKey="distracting"
               stackId="a"

@@ -105,14 +105,20 @@ impl BucketRepo {
         Ok(row.map(|r| (r.productive, r.neutral, r.distracting, r.idle, r.switches)))
     }
 
+    /// Aggregate activity buckets by local hour.
+    ///
+    /// `tz_offset_mins` is the JS `getTimezoneOffset()` value (minutes behind UTC,
+    /// e.g. UTC+7 → −420). The hour is shifted from UTC to local before grouping.
     pub async fn aggregate_by_hour(
         &self,
         start_date: &str,
         end_date: &str,
+        tz_offset_mins: i32,
     ) -> common::Result<Vec<HourlyRow>> {
         let rows = sqlx::query_as::<_, HourlyRow>(
             r#"SELECT
-                   CAST(strftime('%H', bucket_start) AS INTEGER) as hour,
+                   CAST(((CAST(strftime('%H', bucket_start) AS INTEGER) * 60
+                          - ?3 + 1440) % 1440) / 60 AS INTEGER) as hour,
                    COALESCE(SUM(productive_secs), 0) as productive_secs,
                    COALESCE(SUM(neutral_secs), 0) as neutral_secs,
                    COALESCE(SUM(distracting_secs), 0) as distracting_secs,
@@ -125,6 +131,7 @@ impl BucketRepo {
         )
         .bind(start_date)
         .bind(end_date)
+        .bind(tz_offset_mins)
         .fetch_all(&self.pool)
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
@@ -282,7 +289,7 @@ mod tests {
         }
 
         let rows = repo
-            .aggregate_by_hour("2026-03-06", "2026-03-06")
+            .aggregate_by_hour("2026-03-06", "2026-03-06", 0)
             .await
             .unwrap();
         assert_eq!(rows.len(), 2); // hours 10 and 14

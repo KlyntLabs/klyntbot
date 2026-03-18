@@ -249,11 +249,11 @@ export function DayColumnsView({
         {/* Context color ribbon — subtle work context indicator per hour */}
         <ContextRibbon date={date} />
 
-        {loading && <div className="px-4 py-2 text-xs text-muted">Loading...</div>}
+        {loading && <div className="px-4 py-2 text-xs text-muted-foreground">Loading...</div>}
 
         {/* Zoom indicator — shown when zoomed away from default */}
         {hourHeight !== DEFAULT_HOUR_HEIGHT && (
-          <div className="px-3 py-1 flex items-center justify-between border-b border-border text-[10px] text-muted">
+          <div className="px-3 py-1 flex items-center justify-between border-b border-border text-[10px] text-muted-foreground">
             <span className="tabular-nums">
               Zoom: {Math.round((hourHeight / DEFAULT_HOUR_HEIGHT) * 100)}%
             </span>
@@ -272,14 +272,14 @@ export function DayColumnsView({
         <div ref={scrollRef} className="flex-1 overflow-y-auto">
           {/* Sticky column headers — CSS grid ensures pixel-perfect alignment with tracks */}
           <div
-            className="sticky top-0 z-20 grid border-b border-border bg-[rgba(0,0,0,0.85)]"
+            className="sticky top-0 z-20 grid border-b border-border bg-popover"
             style={{ gridTemplateColumns: gridTemplate }}
           >
             <div />
             {visibleColumns.map((col) => (
               <div
                 key={col.key}
-                className="text-[11px] text-muted font-medium py-1.5 px-1.5 border-r border-border last:border-r-0 flex items-center gap-1.5 truncate min-w-0"
+                className="text-[11px] text-muted-foreground font-medium py-1.5 px-1.5 border-r border-border last:border-r-0 flex items-center gap-1.5 truncate min-w-0"
               >
                 <span
                   className="w-1.5 h-1.5 rounded-full shrink-0"
@@ -305,7 +305,7 @@ export function DayColumnsView({
                   aria-valuemax={h === 0 ? MAX_HOUR_HEIGHT : undefined}
                   aria-valuenow={h === 0 ? hourHeight : undefined}
                   tabIndex={h === 0 ? 0 : undefined}
-                  className="text-[10px] text-muted text-right pr-2 select-none cursor-ns-resize"
+                  className="text-[10px] text-muted-foreground text-right pr-2 select-none cursor-ns-resize"
                   style={{ width: HOUR_GUTTER }}
                   onMouseDown={handleGutterMouseDown}
                   onKeyDown={
@@ -425,7 +425,7 @@ export function DayColumnsView({
             <button
               type="button"
               onClick={() => setFeedExpanded(!feedExpanded)}
-              className="flex items-center gap-2 px-3 py-2 text-xs text-muted hover:text-secondary transition-colors w-full"
+              className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors w-full"
             >
               {feedExpanded ? (
                 <ChevronDown className="w-3.5 h-3.5" />
@@ -497,9 +497,9 @@ function ColumnEntry({
         style={{ top, height }}
         title={entry.title}
       >
-        <span className="text-secondary truncate block">{entry.title}</span>
+        <span className="text-muted-foreground truncate block">{entry.title}</span>
         {height > 28 && (
-          <span className="text-muted text-[10px] truncate block">
+          <span className="text-muted-foreground text-[10px] truncate block">
             {dur > 0 && `${formatHumanDuration(dur)} · `}
             {timeStr}
           </span>
@@ -521,16 +521,18 @@ function ColumnEntry({
           "absolute left-1 right-1 rounded-md px-1.5 py-0.5 text-[11px] leading-tight overflow-hidden cursor-pointer transition-colors",
           isDue
             ? "border-l-2 border-l-[var(--timeline-todo)] bg-[var(--timeline-todo)]/15 hover:bg-[var(--timeline-todo)]/25"
-            : "border-l border-border bg-white/[0.04] hover:bg-white/[0.08]",
+            : "border-l border-border bg-card hover:bg-muted",
           isCompleted && "opacity-60 line-through",
           selected && "ring-1 ring-brand",
         )}
         style={{ top, height: Math.max(height, 20) }}
         title={entry.title}
       >
-        <span className="text-secondary truncate block">{entry.title}</span>
+        <span className="text-muted-foreground truncate block">{entry.title}</span>
         {isDue && status && height > 28 && (
-          <span className="text-muted text-[10px] truncate block capitalize">{status}</span>
+          <span className="text-muted-foreground text-[10px] truncate block capitalize">
+            {status}
+          </span>
         )}
       </button>
     );
@@ -575,7 +577,7 @@ function ColumnEntry({
         onClick={onClick}
         className={cn(
           "absolute left-1 right-1 flex items-center gap-1 text-[10px] cursor-pointer transition-colors",
-          "text-muted hover:text-secondary",
+          "text-muted-foreground hover:text-muted-foreground",
           selected && "text-brand",
         )}
         style={{ top }}
@@ -596,7 +598,7 @@ function ColumnEntry({
       type="button"
       onClick={onClick}
       className={cn(
-        "absolute left-1 right-1 flex items-center gap-1 text-[10px] text-muted hover:text-secondary cursor-pointer transition-colors",
+        "absolute left-1 right-1 flex items-center gap-1 text-[10px] text-muted-foreground hover:text-muted-foreground cursor-pointer transition-colors",
         selected && "text-brand",
       )}
       style={{ top }}
@@ -619,8 +621,8 @@ function NowLine({ pxPerMin }: { pxPerMin: number }) {
   return (
     <div className="absolute w-full pointer-events-none z-10" style={{ top, left: HOUR_GUTTER }}>
       <div className="flex items-center">
-        <div className="w-2 h-2 rounded-full bg-red-500 -ml-1" />
-        <div className="flex-1 border-t border-red-500" />
+        <div className="w-2 h-2 rounded-full bg-destructive -ml-1" />
+        <div className="flex-1 border-t border-destructive" />
       </div>
     </div>
   );

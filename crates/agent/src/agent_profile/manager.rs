@@ -2,22 +2,9 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use super::{AgentProfile, AgentSkill};
+use common::helpers::cosine_similarity;
 
-/// Cosine similarity between two equal-length vectors. Returns 0.0 on empty or mismatched input.
-fn cosine_similarity(a: &[f32], b: &[f32]) -> f64 {
-    if a.is_empty() || a.len() != b.len() {
-        return 0.0;
-    }
-    let dot: f32 = a.iter().zip(b).map(|(x, y)| x * y).sum();
-    let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
-    let norm_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
-    if norm_a == 0.0 || norm_b == 0.0 {
-        0.0
-    } else {
-        (dot / (norm_a * norm_b)) as f64
-    }
-}
+use super::{AgentProfile, AgentSkill};
 
 // Built-in agents compiled at build time
 macro_rules! include_agent {
@@ -311,7 +298,7 @@ impl AgentManager {
                 continue;
             }
             let blended = kw_score * 0.7 + sem_score * 0.3;
-            if best.is_none_or(|(_, s)| blended > s) {
+            if best.map_or(true, |(_, s)| blended > s) {
                 best = Some((name.as_str(), blended));
             }
         }

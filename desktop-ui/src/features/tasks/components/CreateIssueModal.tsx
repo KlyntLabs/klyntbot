@@ -57,11 +57,8 @@ export function CreateIssueModal({ onCreateTask, areas }: CreateIssueModalProps)
         <div className="space-y-4 py-2">
           {/* Title */}
           <div className="space-y-2">
-            <label
-              htmlFor="issue-title"
-              className="text-sm font-medium text-[hsl(var(--foreground))]"
-            >
-              Title <span className="text-[hsl(var(--destructive))]">*</span>
+            <label htmlFor="issue-title" className="text-sm font-medium text-foreground">
+              Title <span className="text-destructive">*</span>
             </label>
             <input
               id="issue-title"
@@ -69,14 +66,14 @@ export function CreateIssueModal({ onCreateTask, areas }: CreateIssueModalProps)
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Issue title"
-              className="w-full px-3 py-2 text-sm rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))]"
+              className="w-full px-3 py-2 text-sm rounded-md border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-brand"
               autoFocus
             />
           </div>
 
           {/* Status */}
           <div className="space-y-2">
-            <span className="text-sm font-medium text-[hsl(var(--foreground))]">Status</span>
+            <span className="text-sm font-medium text-foreground">Status</span>
             <div className="flex flex-wrap gap-1.5">
               {statuses.map((s) => (
                 <button
@@ -85,8 +82,8 @@ export function CreateIssueModal({ onCreateTask, areas }: CreateIssueModalProps)
                   onClick={() => setSelectedStatus(s)}
                   className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs border transition-colors ${
                     selectedStatus?.id === s.id
-                      ? "border-[hsl(var(--primary))] bg-[hsl(var(--primary))]/10 text-[hsl(var(--foreground))]"
-                      : "border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))]"
+                      ? "border-primary bg-primary/10 text-foreground"
+                      : "border-border text-muted-foreground hover:bg-accent"
                   }`}
                 >
                   <span className="flex items-center">{renderStatusIcon(s)}</span>
@@ -98,7 +95,7 @@ export function CreateIssueModal({ onCreateTask, areas }: CreateIssueModalProps)
 
           {/* Priority */}
           <div className="space-y-2">
-            <span className="text-sm font-medium text-[hsl(var(--foreground))]">Priority</span>
+            <span className="text-sm font-medium text-foreground">Priority</span>
             <div className="flex flex-wrap gap-1.5">
               {priorities.map((p) => {
                 const Icon = p.icon;
@@ -109,8 +106,8 @@ export function CreateIssueModal({ onCreateTask, areas }: CreateIssueModalProps)
                     onClick={() => setSelectedPriority(p)}
                     className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs border transition-colors ${
                       selectedPriority?.id === p.id
-                        ? "border-[hsl(var(--primary))] bg-[hsl(var(--primary))]/10 text-[hsl(var(--foreground))]"
-                        : "border-[hsl(var(--border))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))]"
+                        ? "border-primary bg-primary/10 text-foreground"
+                        : "border-border text-muted-foreground hover:bg-accent"
                     }`}
                   >
                     <Icon className="size-3.5" />

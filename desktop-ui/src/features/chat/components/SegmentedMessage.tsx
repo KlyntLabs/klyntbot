@@ -82,7 +82,7 @@ function CompletedToolSegment({ segment, nested }: { segment: ToolSegment; neste
       {expanded && (
         <div className="mt-1 ml-5 space-y-1">
           {formattedResult && (
-            <pre className="p-2 text-[11px] font-light text-secondary bg-white/[0.06] border border-white/[0.08] rounded-lg overflow-x-auto whitespace-pre-wrap break-words">
+            <pre className="p-2 text-[11px] font-light text-muted-foreground bg-accent border border-border rounded-lg overflow-x-auto whitespace-pre-wrap break-words">
               {formattedResult}
             </pre>
           )}
@@ -130,7 +130,7 @@ function DelegateGroup({ delegate, subTools }: { delegate: ToolSegment; subTools
         )}
       </button>
       {expanded && (
-        <div className="ml-5 border-l border-white/[0.08]/40 pl-2">
+        <div className="ml-5 border-l border-border/40 pl-2">
           {subTools.map((child) => (
             <CompletedToolSegment
               key={`sub-${child.name}-${child.durationMs}`}
@@ -293,7 +293,7 @@ export function SegmentedMessage({
         <div className="my-1.5">
           <ActiveToolIndicator name="delegate" />
           {(trailingSubTools.length > 0 || subAgentActiveTools.length > 0) && (
-            <div className="ml-5 border-l border-white/[0.08]/40 pl-2">
+            <div className="ml-5 border-l border-border/40 pl-2">
               {trailingSubTools.map((seg) => (
                 <CompletedToolSegment
                   key={`sub-done-${seg.name}-${seg.durationMs}`}

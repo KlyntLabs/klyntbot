@@ -48,20 +48,20 @@ function SkeletonRows<T>({
   return (
     <>
       {Array.from({ length: count }, (_, i) => (
-        <tr key={`skel-${i}`} className="border-b border-white/[0.04]">
+        <tr key={`skel-${i}`} className="border-b border-border-subtle">
           {expandable && (
             <td className="px-3 py-2.5 w-8">
-              <div className="w-3 h-3 rounded animate-pulse bg-white/[0.08]" />
+              <div className="w-3 h-3 rounded animate-pulse bg-muted" />
             </td>
           )}
           {hasPrefix && (
             <td className="px-2 py-2.5 w-10">
-              <div className="w-7 h-4 rounded-full animate-pulse bg-white/[0.08]" />
+              <div className="w-7 h-4 rounded-full animate-pulse bg-muted" />
             </td>
           )}
           {columns.map((col) => (
             <td key={col.key} className={cn("px-5 py-2.5", col.width)}>
-              <div className="h-4 rounded animate-pulse bg-white/[0.08]" />
+              <div className="h-4 rounded animate-pulse bg-muted" />
             </td>
           ))}
         </tr>
@@ -94,7 +94,7 @@ export function DataTable<T>({
     <div className={cn("overflow-hidden", className)}>
       <table className="w-full border-collapse">
         <thead>
-          <tr className="border-b border-white/[0.06] text-[11px] text-muted font-light text-left bg-white/[0.03]">
+          <tr className="border-b border-border-subtle text-[11px] text-muted-foreground font-light text-left bg-card">
             {expandable && <th className="px-3 py-2.5 w-8 font-light" />}
             {renderRowPrefix && <th className="px-2 py-2.5 w-10 font-light" />}
             {columns.map((col) => (
@@ -193,9 +193,9 @@ function DataTableRow<T>({
         onClick={isInteractive ? handleClick : undefined}
         onKeyDown={isInteractive ? (e) => e.key === "Enter" && handleClick() : undefined}
         className={cn(
-          "transition-colors border-b border-white/[0.04] last:border-b-0 whitespace-nowrap",
-          isInteractive && "hover:bg-white/[0.04] cursor-pointer",
-          !isInteractive && "hover:bg-white/[0.02]",
+          "transition-colors border-b border-border-subtle last:border-b-0 whitespace-nowrap",
+          isInteractive && "hover:bg-accent cursor-pointer",
+          !isInteractive && "hover:bg-card",
           rowClassName?.(item),
         )}
       >
@@ -232,7 +232,7 @@ function DataTableRow<T>({
         ))}
       </tr>
       {isExpanded && renderExpanded && (
-        <tr className="border-b border-white/[0.04]">
+        <tr className="border-b border-border-subtle">
           <td colSpan={totalCols} className="p-0">
             {renderExpanded(item)}
           </td>

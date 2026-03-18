@@ -158,8 +158,8 @@ export function McpServersSettings() {
   return (
     <div>
       <div className="mb-8">
-        <h2 className="text-lg font-medium text-primary">MCP servers</h2>
-        <p className="text-[13px] text-muted mt-1">
+        <h2 className="text-lg font-medium text-foreground">MCP servers</h2>
+        <p className="text-[13px] text-muted-foreground mt-1">
           Connect external tools and data sources via the Model Context Protocol
         </p>
       </div>
@@ -167,7 +167,7 @@ export function McpServersSettings() {
       {/* Custom servers */}
       <div className="mb-8">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-[13px] font-medium text-secondary">Custom servers</h3>
+          <h3 className="text-[13px] font-medium text-muted-foreground">Custom servers</h3>
           <button
             type="button"
             onClick={handleOpenAdd}
@@ -179,9 +179,9 @@ export function McpServersSettings() {
         </div>
 
         {customServers.length === 0 ? (
-          <div className="bg-white/[0.04] rounded-lg border border-white/[0.08] p-8 flex flex-col items-center text-center">
+          <div className="bg-card rounded-lg border border-border p-8 flex flex-col items-center text-center">
             <Plug className="w-8 h-8 text-dim mb-3" strokeWidth={1.5} />
-            <p className="text-[13px] text-muted">No custom MCP servers connected</p>
+            <p className="text-[13px] text-muted-foreground">No custom MCP servers connected</p>
             <p className="text-[11px] text-dim mt-1">
               Add a server manually or install one from the recommended list below
             </p>
@@ -206,7 +206,7 @@ export function McpServersSettings() {
       {/* Recommended servers */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-[13px] font-medium text-secondary">Recommended servers</h3>
+          <h3 className="text-[13px] font-medium text-muted-foreground">Recommended servers</h3>
         </div>
 
         <div className="space-y-1.5">

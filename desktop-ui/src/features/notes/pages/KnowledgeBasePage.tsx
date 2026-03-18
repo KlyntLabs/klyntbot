@@ -13,12 +13,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import { ContextPanel } from "../components/ContextPanel";
 import { GraphView } from "../components/GraphView";
-import { NavigationSidebar, type NavigationSidebarHandle } from "../components/NavigationSidebar";
+import { NavigationSidebar } from "../components/NavigationSidebar";
 import { NoteCreationDialog } from "../components/NoteCreationDialog";
 import { NoteEditorPanel } from "../components/NoteEditorPanel";
 import { NoteFinder } from "../components/NoteFinder";
 import { VersionHistoryOverlay } from "../components/VersionHistoryOverlay";
 import { useInbox } from "../hooks/useInbox";
+import { useInsightReview } from "../hooks/useInsightReview";
 
 type ViewMode = "editor" | "graph";
 type LayoutMode = "three-panel" | "focus";
@@ -36,7 +37,7 @@ function ViewModeToggle({
         type="button"
         aria-label="Editor view"
         onClick={() => onChange("editor")}
-        className={`p-1.5 rounded-md transition-colors ${viewMode === "editor" ? "bg-white/10 text-primary" : "text-muted hover:text-secondary"}`}
+        className={`p-1.5 rounded-md transition-colors ${viewMode === "editor" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}
       >
         <PenLine size={16} />
       </button>
@@ -44,7 +45,7 @@ function ViewModeToggle({
         type="button"
         aria-label="Graph view"
         onClick={() => onChange("graph")}
-        className={`p-1.5 rounded-md transition-colors ${viewMode === "graph" ? "bg-white/10 text-primary" : "text-muted hover:text-secondary"}`}
+        className={`p-1.5 rounded-md transition-colors ${viewMode === "graph" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}
       >
         <GitGraph size={16} />
       </button>
@@ -71,6 +72,20 @@ export default function KnowledgeBasePage() {
   const [showNoteFinder, setShowNoteFinder] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
 
+  // ── Insight Review ────────────────────────────────────────────────────
+  const [insightState, insightActions] = useInsightReview();
+  const insightStateRef = useRef(insightState);
+  insightStateRef.current = insightState;
+  const insightActionsRef = useRef(insightActions);
+  insightActionsRef.current = insightActions;
+
+  // ── Sync Insight Review panel when switching notes ────────────────────
+  useEffect(() => {
+    if (insightState.isOpen && selectedNoteId && selectedNoteId !== insightState.noteId) {
+      void insightActions.open(selectedNoteId);
+    }
+  }, [selectedNoteId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Sidebar widths (imperatively managed for perf) ────────────────────
   const [leftWidth, setLeftWidth] = useState(220);
   const [rightWidth, setRightWidth] = useState(260);
@@ -79,7 +94,6 @@ export default function KnowledgeBasePage() {
   const leftWidthRef = useRef(leftWidth);
   const rightWidthRef = useRef(rightWidth);
   const containerRef = useRef<HTMLDivElement>(null);
-  const searchRef = useRef<NavigationSidebarHandle>(null);
 
   // Pre-select note from URL search params (e.g. /notes?noteId=xxx)
   useEffect(() => {
@@ -97,6 +111,17 @@ export default function KnowledgeBasePage() {
   }, [notes]);
 
   const selectedNote = selectedNoteId ? noteMap.get(selectedNoteId) : undefined;
+
+  // ── Insight derived state ─────────────────────────────────────────────
+  const insightOpen = insightState.isOpen;
+  const insightPanelWidth = useMemo(() => {
+    const container = containerRef.current;
+    if (!container) return 480;
+    // Leave at least 300px for the editor + left sidebar space
+    const available = container.clientWidth - leftWidth - 20;
+    return Math.max(360, Math.min(640, available * 0.65));
+  }, [leftWidth, insightOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+  const effectiveRightWidth = insightOpen ? insightPanelWidth : rightWidth;
 
   // ── Mutations ─────────────────────────────────────────────────────────
   const { mutate: createNote } = useMutation<Note, NoteCreateParams>("note_create", "params");
@@ -293,6 +318,13 @@ export default function KnowledgeBasePage() {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // Escape: close Insight Review (no mod key needed)
+      if (e.key === "Escape" && insightStateRef.current.isOpen) {
+        e.preventDefault();
+        insightActionsRef.current.close();
+        return;
+      }
+
       const mod = e.metaKey || e.ctrlKey;
       if (!mod) return;
 
@@ -318,6 +350,14 @@ export default function KnowledgeBasePage() {
         // Cmd+Shift+G → toggle view mode
         e.preventDefault();
         setViewMode((prev) => (prev === "editor" ? "graph" : "editor"));
+      } else if ((e.key === "i" || e.key === "I") && e.shiftKey) {
+        // Cmd+Shift+I → toggle Insight Review
+        e.preventDefault();
+        if (insightStateRef.current.isOpen) {
+          insightActionsRef.current.close();
+        } else if (selectedNoteIdRef.current) {
+          void insightActionsRef.current.open(selectedNoteIdRef.current);
+        }
       } else if (e.key === "l" && !e.shiftKey) {
         // Cmd+L → insert top AI-suggested link at cursor
         e.preventDefault();
@@ -370,7 +410,6 @@ export default function KnowledgeBasePage() {
               notebooks={notebooks}
               notes={notes}
               selectedNoteId={selectedNoteId}
-              searchRef={searchRef}
               autoRenameId={autoRenameId}
               onAutoRenameDone={() => setAutoRenameId(null)}
               onSelectNote={setSelectedNoteId}
@@ -410,6 +449,7 @@ export default function KnowledgeBasePage() {
             </div>
             <GraphView
               notes={notes}
+              notebooks={notebooks}
               activeNoteId={selectedNoteId}
               onSelectNote={setSelectedNoteId}
               onOpenInEditor={(id) => {
@@ -439,16 +479,14 @@ export default function KnowledgeBasePage() {
               <ViewModeToggle viewMode={viewMode} onChange={setViewMode} />
             </div>
             <div className="flex-1 flex flex-col items-center justify-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-white/[0.04] flex items-center justify-center">
+              <div className="w-12 h-12 rounded-2xl bg-card flex items-center justify-center">
                 <FileText className="w-6 h-6 text-dim" strokeWidth={1.5} />
               </div>
               <div className="text-center">
-                <div className="text-muted text-sm">Select a note to view</div>
+                <div className="text-muted-foreground text-sm">Select a note to view</div>
                 <div className="text-dim text-xs mt-1">
                   or press{" "}
-                  <kbd className="px-1.5 py-0.5 rounded bg-white/[0.06] text-[10px] font-mono">
-                    Cmd+N
-                  </kbd>{" "}
+                  <kbd className="px-1.5 py-0.5 rounded bg-accent text-[10px] font-mono">Cmd+N</kbd>{" "}
                   to create one
                 </div>
               </div>
@@ -457,8 +495,8 @@ export default function KnowledgeBasePage() {
         )}
       </div>
 
-      {/* Right resize handle */}
-      {showRightPanel && (
+      {/* Right resize handle — hidden when insight panel is open */}
+      {showRightPanel && !insightOpen && (
         <div
           onPointerDown={onRightResizeStart}
           className="w-1 shrink-0 cursor-col-resize group flex items-center justify-center"
@@ -469,15 +507,25 @@ export default function KnowledgeBasePage() {
 
       {/* Right panel — ContextPanel */}
       {showRightPanel && (
-        <div ref={rightRef} className="h-full">
+        <div
+          ref={rightRef}
+          className="h-full transition-[width] duration-300 ease-in-out"
+          style={{ width: effectiveRightWidth }}
+        >
           <ContextPanel
-            width={rightWidth}
+            width={effectiveRightWidth}
             noteId={selectedNoteId}
             isGraphMode={isGraphMode}
             note={selectedNote ?? null}
             notes={notes}
             onSelectNote={setSelectedNoteId}
             onExpandGraph={() => setViewMode("graph")}
+            insightOpen={insightOpen}
+            insightState={insightState}
+            insightActions={insightActions}
+            onOpenInsight={() => {
+              if (selectedNoteId) void insightActions.open(selectedNoteId);
+            }}
           />
         </div>
       )}

@@ -44,9 +44,7 @@ export function IssueContextMenu({ issue, children }: IssueContextMenuProps) {
             }}
           >
             Copy ID
-            <span className="ml-auto text-xs text-[hsl(var(--muted-foreground))]">
-              {issue.identifier}
-            </span>
+            <span className="ml-auto text-xs text-muted-foreground">{issue.identifier}</span>
           </ContextMenuItem>
           <ContextMenuItem
             onSelect={() => {
@@ -80,9 +78,7 @@ export function IssueContextMenu({ issue, children }: IssueContextMenuProps) {
                 <span className="mr-2 flex items-center">{renderStatusIcon(s)}</span>
                 {s.name}
                 {issue.status.id === s.id && (
-                  <span className="ml-auto text-xs text-[hsl(var(--muted-foreground))]">
-                    Current
-                  </span>
+                  <span className="ml-auto text-xs text-muted-foreground">Current</span>
                 )}
               </ContextMenuItem>
             ))}
@@ -92,7 +88,7 @@ export function IssueContextMenu({ issue, children }: IssueContextMenuProps) {
         {/* Priority submenu */}
         <ContextMenuSub>
           <ContextMenuSubTrigger>
-            <issue.priority.icon className="mr-2 h-4 w-4 text-[hsl(var(--muted-foreground))]" />
+            <issue.priority.icon className="mr-2 h-4 w-4 text-muted-foreground" />
             Priority
           </ContextMenuSubTrigger>
           <ContextMenuSubContent className="w-48">
@@ -106,12 +102,10 @@ export function IssueContextMenu({ issue, children }: IssueContextMenuProps) {
                     refetch();
                   }}
                 >
-                  <Icon className="mr-2 h-4 w-4 text-[hsl(var(--muted-foreground))]" />
+                  <Icon className="mr-2 h-4 w-4 text-muted-foreground" />
                   {p.name}
                   {issue.priority.id === p.id && (
-                    <span className="ml-auto text-xs text-[hsl(var(--muted-foreground))]">
-                      Current
-                    </span>
+                    <span className="ml-auto text-xs text-muted-foreground">Current</span>
                   )}
                 </ContextMenuItem>
               );
@@ -122,7 +116,7 @@ export function IssueContextMenu({ issue, children }: IssueContextMenuProps) {
         <ContextMenuSeparator />
 
         <ContextMenuItem
-          className="text-[hsl(var(--destructive))]"
+          className="text-destructive"
           onSelect={async () => {
             await deleteTask.mutate({ id: issue.id });
             refetch();

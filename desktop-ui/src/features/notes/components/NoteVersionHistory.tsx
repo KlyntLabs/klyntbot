@@ -50,7 +50,7 @@ export function NoteVersionHistory({ noteId, onRestore }: NoteVersionHistoryProp
   return (
     <div className="w-64 glass-panel rounded-2xl flex flex-col min-h-0">
       <div className="px-3 py-2.5 border-b border-border">
-        <h3 className="text-xs font-medium text-secondary tracking-wide">Version History</h3>
+        <h3 className="text-xs font-medium text-muted-foreground tracking-wide">Version History</h3>
       </div>
 
       <div className="flex-1 overflow-y-auto">
@@ -68,7 +68,7 @@ export function NoteVersionHistory({ noteId, onRestore }: NoteVersionHistoryProp
             type="button"
             onClick={() => setPreviewId(v.id === previewId ? null : v.id)}
             className={`w-full flex gap-3 px-3 py-2.5 text-left transition-colors ${
-              v.id === previewId ? "bg-white/[0.06]" : "hover:bg-white/[0.03]"
+              v.id === previewId ? "bg-accent" : "hover:bg-card"
             }`}
           >
             {/* Timeline dot */}
@@ -79,7 +79,7 @@ export function NoteVersionHistory({ noteId, onRestore }: NoteVersionHistoryProp
             {/* Content */}
             <div className="flex-1 min-w-0">
               <div
-                className={`text-xs ${v.id === previewId ? "text-primary font-medium" : "font-light text-secondary"}`}
+                className={`text-xs ${v.id === previewId ? "text-foreground font-medium" : "font-light text-muted-foreground"}`}
               >
                 {formatTime(v.createdAt)}
               </div>

@@ -72,6 +72,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "session",
+ "sha2",
  "skill-system",
  "sqlx",
  "storage",
@@ -251,6 +252,7 @@ version = "0.1.0"
 dependencies = [
  "activity-log",
  "agent",
+ "async-trait",
  "base64 0.22.1",
  "bus",
  "channels",
@@ -263,6 +265,7 @@ dependencies = [
  "dirs",
  "feature-coaching",
  "feature-finance",
+ "feature-insights",
  "feature-launcher",
  "feature-notes",
  "feature-productivity",
@@ -277,6 +280,7 @@ dependencies = [
  "session",
  "shellexpand",
  "skill-system",
+ "sqlx",
  "storage",
  "tempfile",
  "tokio",
@@ -1797,6 +1801,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "common",
+ "dashmap",
  "futures-util",
  "providers",
  "serde",
@@ -3698,6 +3703,28 @@ dependencies = [
  "tools-core",
  "tracing",
  "urlencoding",
+ "uuid",
+]
+
+[[package]]
+name = "feature-insights"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "cognitive",
+ "common",
+ "feature-notes",
+ "futures-util",
+ "providers",
+ "serde",
+ "serde_json",
+ "sha2",
+ "sqlx",
+ "storage",
+ "tokio",
+ "tools-core",
+ "tracing",
  "uuid",
 ]
 

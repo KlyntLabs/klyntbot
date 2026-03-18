@@ -199,6 +199,7 @@ pub struct BackgroundServiceConfig {
     pub failed_obs_repo: Option<FailedObservationRepo>,
     pub promote_threshold: usize,
     pub min_days: usize,
+    pub domain_bus: Option<Arc<bus::DomainEventBus>>,
 }
 
 /// Background service that processes domain events into cognitive memory.
@@ -223,6 +224,7 @@ impl BackgroundConsolidationService {
             failed_obs_repo,
             promote_threshold,
             min_days,
+            domain_bus,
         } = config;
         let cancel_clone = cancel.clone();
         let handle = tokio::spawn(async move {
@@ -256,6 +258,8 @@ impl BackgroundConsolidationService {
             let mut dlq_reprocess_ids: Vec<String> = Vec::new();
             // Accumulator promotions — separate from DLQ to avoid index corruption
             let mut promotion_queue: Vec<Observation> = Vec::new();
+
+            let session_start = chrono::Utc::now().to_rfc3339();
 
             loop {
                 // Collect batch (3s window, max 10 events)
@@ -427,6 +431,102 @@ impl BackgroundConsolidationService {
                             embedder.as_deref(),
                         )
                         .await;
+
+                        // ── Contradiction detection ──────────────────────────
+                        if let Some(ref bus) = domain_bus {
+                            for (candidate, op) in candidates.iter().zip(ops.iter()) {
+                                if let crate::types::MemoryOp::Update { id: _, old_id } = op {
+                                    let new = &candidate.candidate;
+                                    if let Ok(Some(old_fact)) = repo.get(old_id).await {
+                                        if old_fact.confidence < 0.7
+                                            || old_fact.source != "user_stated"
+                                        {
+                                            continue;
+                                        }
+                                        if old_fact.object != new.object
+                                            && !is_same_session(
+                                                &old_fact.recorded_at,
+                                                &session_start,
+                                            )
+                                        {
+                                            bus.publish(DomainEvent::ContradictionDetected {
+                                                existing_subject: old_fact.subject.clone(),
+                                                existing_predicate: old_fact.predicate.clone(),
+                                                existing_object: old_fact.object.clone(),
+                                                new_object: new.object.clone(),
+                                                confidence: new.confidence,
+                                            });
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // ── Entity extraction from new facts ──────────────────
+                        let entity_repo = crate::repos::EntityRepo::new(repo.pool().clone());
+                        for (candidate, op) in candidates.iter().zip(ops.iter()) {
+                            match op {
+                                crate::types::MemoryOp::Add { .. }
+                                | crate::types::MemoryOp::Update { .. } => {
+                                    let fact = &candidate.candidate;
+
+                                    // Infer entity type from predicate (once, reused for both subject and object)
+                                    let entity_type = infer_entity_type(&fact.predicate);
+
+                                    // Upsert subject as entity
+                                    let subj = entity_repo
+                                        .upsert_entity(&crate::repos::NewEntity {
+                                            name: fact.subject.clone(),
+                                            entity_type: entity_type.clone(),
+                                            description: None,
+                                            source: "extracted".to_string(),
+                                            source_id: Some(fact.id.clone()),
+                                            metadata: None,
+                                        })
+                                        .await;
+
+                                    // Upsert object as entity (skip numeric/short values)
+                                    let obj = if fact.object.len() > 2
+                                        && fact.object.len() < 100
+                                        && !fact
+                                            .object
+                                            .chars()
+                                            .all(|c| c.is_ascii_digit() || c == '.')
+                                    {
+                                        entity_repo
+                                            .upsert_entity(&crate::repos::NewEntity {
+                                                name: fact.object.clone(),
+                                                entity_type,
+                                                description: None,
+                                                source: "extracted".to_string(),
+                                                source_id: Some(fact.id.clone()),
+                                                metadata: None,
+                                            })
+                                            .await
+                                            .ok()
+                                    } else {
+                                        None
+                                    };
+
+                                    // Create relationship between subject and object entities
+                                    if let (Ok(s), Some(o)) = (subj, obj) {
+                                        let _ = entity_repo
+                                            .upsert_relationship(&crate::repos::NewRelationship {
+                                                source_entity_id: s.id,
+                                                target_entity_id: o.id,
+                                                relationship_type: fact.predicate.clone(),
+                                                evidence: Some(format!(
+                                                    "{} {} {}",
+                                                    fact.subject, fact.predicate, fact.object
+                                                )),
+                                                source: "extracted".to_string(),
+                                            })
+                                            .await;
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
                     }
 
                     // Self-healing: drain dead-letter if LLM is healthy (no fallbacks this batch)
@@ -896,7 +996,52 @@ fn event_type_key(event: &DomainEvent) -> String {
         DomainEvent::TaskStatusChanged { .. } => "TaskStatusChanged".into(),
         DomainEvent::TaskPriorityChanged { .. } => "TaskPriorityChanged".into(),
         DomainEvent::TaskFieldUpdated { .. } => "TaskFieldUpdated".into(),
+        DomainEvent::ContradictionDetected { .. } => "ContradictionDetected".into(),
+        DomainEvent::NoteContentChanged { .. } => "NoteContentChanged".into(),
+        DomainEvent::NoteDeleted { .. } => "NoteDeleted".into(),
+        DomainEvent::TaskHierarchyChanged { .. } => "TaskHierarchyChanged".into(),
     }
+}
+
+/// Check if a fact was recorded in the current session.
+fn is_same_session(recorded_at: &str, session_start: &str) -> bool {
+    let recorded = chrono::DateTime::parse_from_rfc3339(recorded_at)
+        .or_else(|_| {
+            recorded_at
+                .parse::<chrono::NaiveDateTime>()
+                .map(|ndt| ndt.and_utc().fixed_offset())
+        })
+        .unwrap_or_default();
+    let start = chrono::DateTime::parse_from_rfc3339(session_start).unwrap_or_default();
+    (recorded - start).num_seconds().abs() < 300
+}
+
+/// Infer entity type from predicate keywords.
+/// Applied to both subject and object sides — the predicate determines type regardless of position.
+fn infer_entity_type(predicate: &str) -> String {
+    let p = predicate.to_lowercase();
+    if p.contains("person")
+        || p.contains("manages")
+        || p.contains("hired")
+        || p.contains("reports_to")
+    {
+        return "person".to_string();
+    }
+    if p.contains("project") || p.contains("works_on") || p.contains("contributes_to") {
+        return "project".to_string();
+    }
+    if p.contains("uses")
+        || p.contains("tool")
+        || p.contains("technology")
+        || p.contains("framework")
+        || p.contains("is_a_technology")
+    {
+        return "technology".to_string();
+    }
+    if p.contains("organization") || p.contains("company") || p.contains("employer") {
+        return "organization".to_string();
+    }
+    "concept".to_string()
 }
 
 /// Convert a MemoryOp to a string label for the debug dashboard.

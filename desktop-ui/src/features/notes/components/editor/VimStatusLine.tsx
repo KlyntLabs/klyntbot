@@ -14,7 +14,7 @@ const MODE_LABELS: Record<VimMode, string> = {
 
 export function VimStatusLine({ mode }: VimStatusLineProps) {
   return (
-    <span className="font-mono text-xs text-secondary tracking-wide select-none">
+    <span className="font-mono text-xs text-muted-foreground tracking-wide select-none">
       {MODE_LABELS[mode]}
     </span>
   );

@@ -306,3 +306,159 @@ CREATE TABLE IF NOT EXISTS failed_observations (
 
 CREATE INDEX IF NOT EXISTS idx_failed_observations_eligible
     ON failed_observations(retry_count, next_retry_at);
+
+-- ── Unified Knowledge Graph ─────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS entities (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    entity_type TEXT NOT NULL,
+    description TEXT,
+    source TEXT NOT NULL DEFAULT 'extracted',
+    source_id TEXT,
+    first_seen_at TEXT NOT NULL,
+    last_seen_at TEXT NOT NULL,
+    mention_count INTEGER NOT NULL DEFAULT 1,
+    metadata JSON,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_entities_type ON entities(entity_type);
+CREATE INDEX IF NOT EXISTS idx_entities_name ON entities(name);
+
+CREATE VIRTUAL TABLE IF NOT EXISTS entities_fts USING fts5(
+    name, description,
+    content='entities',
+    content_rowid='rowid',
+    tokenize='porter unicode61'
+);
+
+CREATE TRIGGER IF NOT EXISTS entities_ai AFTER INSERT ON entities BEGIN
+    INSERT INTO entities_fts(rowid, name, description)
+    VALUES (new.rowid, new.name, COALESCE(new.description, ''));
+END;
+
+CREATE TRIGGER IF NOT EXISTS entities_ad AFTER DELETE ON entities BEGIN
+    INSERT INTO entities_fts(entities_fts, rowid, name, description)
+    VALUES ('delete', old.rowid, old.name, COALESCE(old.description, ''));
+END;
+
+CREATE TRIGGER IF NOT EXISTS entities_au AFTER UPDATE ON entities BEGIN
+    INSERT INTO entities_fts(entities_fts, rowid, name, description)
+    VALUES ('delete', old.rowid, old.name, COALESCE(old.description, ''));
+    INSERT INTO entities_fts(rowid, name, description)
+    VALUES (new.rowid, new.name, COALESCE(new.description, ''));
+END;
+
+CREATE TABLE IF NOT EXISTS entity_relationships (
+    id TEXT PRIMARY KEY,
+    source_entity_id TEXT NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
+    target_entity_id TEXT NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
+    relationship_type TEXT NOT NULL,
+    strength REAL NOT NULL DEFAULT 0.5,
+    evidence TEXT,
+    valid_from TEXT,
+    valid_until TEXT,
+    source TEXT NOT NULL DEFAULT 'extracted',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_relationships_source ON entity_relationships(source_entity_id);
+CREATE INDEX IF NOT EXISTS idx_relationships_target ON entity_relationships(target_entity_id);
+CREATE INDEX IF NOT EXISTS idx_relationships_type ON entity_relationships(relationship_type);
+
+-- ── Persona Registry ────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS insight_personas (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    role TEXT NOT NULL,
+    expertise TEXT NOT NULL,
+    perspective TEXT NOT NULL,
+    tone TEXT NOT NULL DEFAULT 'analytical',
+    icon TEXT NOT NULL DEFAULT '🧠',
+    source TEXT NOT NULL DEFAULT 'builtin',
+    domains JSON NOT NULL DEFAULT '[]',
+    is_active INTEGER NOT NULL DEFAULT 1,
+    relevance_score REAL NOT NULL DEFAULT 0.5,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_personas_source ON insight_personas(source);
+CREATE INDEX IF NOT EXISTS idx_personas_active ON insight_personas(is_active);
+
+CREATE TABLE IF NOT EXISTS insight_persona_pins (
+    note_id TEXT NOT NULL,
+    persona_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (note_id, persona_id)
+);
+
+-- ── Flashcards (FSRS spaced repetition) ─────────────────────────
+
+CREATE TABLE IF NOT EXISTS flashcards (
+    id TEXT PRIMARY KEY,
+    source_note_id TEXT,
+    source_session_id TEXT,
+    insight_review_id TEXT,
+    deck TEXT NOT NULL DEFAULT 'general',
+    question TEXT NOT NULL,
+    answer TEXT NOT NULL,
+    card_type TEXT NOT NULL DEFAULT 'short_answer',
+    choices JSON,
+    stability REAL NOT NULL DEFAULT 1.0,
+    difficulty REAL NOT NULL DEFAULT 0.5,
+    due_at TEXT,
+    last_reviewed_at TEXT,
+    review_count INTEGER NOT NULL DEFAULT 0,
+    lapses INTEGER NOT NULL DEFAULT 0,
+    state TEXT NOT NULL DEFAULT 'new',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_flashcards_source_note ON flashcards(source_note_id);
+CREATE INDEX IF NOT EXISTS idx_flashcards_due ON flashcards(due_at);
+CREATE INDEX IF NOT EXISTS idx_flashcards_deck ON flashcards(deck);
+CREATE INDEX IF NOT EXISTS idx_flashcards_insight ON flashcards(insight_review_id);
+
+-- ── Insight Reviews (versioned, replaces old insight_review_cache) ──────────
+
+DROP TABLE IF EXISTS insight_review_cache;
+
+CREATE TABLE IF NOT EXISTS insight_reviews (
+    id                  TEXT PRIMARY KEY,
+    note_id             TEXT NOT NULL,
+    version             INTEGER NOT NULL DEFAULT 1,
+    generated_at        TEXT NOT NULL,
+    content             TEXT NOT NULL,
+    input_hash          TEXT NOT NULL,
+    scope_config        TEXT NOT NULL DEFAULT '{"scopeType":"backlinks","radius":0.72,"nodeIds":[],"includeCognitive":true,"deepDive":false,"mergeThreshold":0.6}',
+    persona_ids         TEXT NOT NULL DEFAULT '[]',
+    parent_insight_id   TEXT REFERENCES insight_reviews(id),
+    token_cost_usd      REAL,
+    superseded_at       TEXT,
+    UNIQUE(note_id, version)
+);
+
+CREATE INDEX IF NOT EXISTS idx_insight_reviews_note ON insight_reviews(note_id, version);
+CREATE INDEX IF NOT EXISTS idx_insight_reviews_hash ON insight_reviews(input_hash);
+CREATE INDEX IF NOT EXISTS idx_insight_reviews_parent ON insight_reviews(parent_insight_id);
+
+CREATE TABLE IF NOT EXISTS insight_progress_snapshots (
+    id                  TEXT PRIMARY KEY,
+    insight_review_id   TEXT NOT NULL REFERENCES insight_reviews(id) ON DELETE CASCADE,
+    version             INTEGER NOT NULL,
+    flashcard_success   REAL NOT NULL DEFAULT 0.0,
+    semantic_drift      REAL NOT NULL DEFAULT 0.0,
+    gap_closure         REAL NOT NULL DEFAULT 0.0,
+    quiz_score          REAL NOT NULL DEFAULT 0.0,
+    overall_progress    REAL NOT NULL DEFAULT 0.0,
+    computed_at         TEXT NOT NULL,
+    UNIQUE(insight_review_id, version)
+);
+
+CREATE INDEX IF NOT EXISTS idx_progress_insight ON insight_progress_snapshots(insight_review_id, version);

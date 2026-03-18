@@ -150,19 +150,8 @@ fn tokenize(text: &str) -> Vec<String> {
         .collect()
 }
 
-fn cosine_similarity(a: &[f32], b: &[f32]) -> f64 {
-    if a.is_empty() || a.len() != b.len() {
-        return 0.0;
-    }
-    let dot: f32 = a.iter().zip(b).map(|(x, y)| x * y).sum();
-    let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
-    let norm_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
-    if norm_a == 0.0 || norm_b == 0.0 {
-        0.0
-    } else {
-        (dot / (norm_a * norm_b)) as f64
-    }
-}
+// Re-use canonical implementation from common crate.
+use common::helpers::cosine_similarity;
 
 #[cfg(test)]
 mod tests {
@@ -214,5 +203,28 @@ mod tests {
         let router = SkillRouter::new(&catalog);
         let selected = router.select_orchestrator("search the web for me", &catalog);
         assert_eq!(selected.skill_type, SkillType::Orchestrator);
+    }
+
+    #[test]
+    fn test_report_triggers_route_to_task_management() {
+        let builtin: Vec<(String, String)> = crate::discovery::BUILTIN_SKILLS
+            .iter()
+            .map(|(n, c)| (n.to_string(), c.to_string()))
+            .collect();
+        let source = SkillSource::BuiltIn(builtin);
+        let catalog = SkillCatalog::discover_sync(&[source]).unwrap();
+        let router = SkillRouter::new(&catalog);
+
+        let pkg = router.select_orchestrator("weekly report", &catalog);
+        assert_eq!(
+            pkg.name, "task-management",
+            "weekly report should route to task-management"
+        );
+
+        let pkg = router.select_orchestrator("finance report", &catalog);
+        assert_eq!(
+            pkg.name, "finance-management",
+            "finance report should route to finance-management"
+        );
     }
 }

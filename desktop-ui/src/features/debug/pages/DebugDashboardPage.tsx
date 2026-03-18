@@ -60,8 +60,8 @@ export function DebugDashboardPage() {
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex-1 py-2 rounded-xl text-[13px] font-light transition-all duration-200 flex items-center justify-center gap-1.5 ${
                   isActive
-                    ? "glass-button-active text-primary"
-                    : "text-muted hover:text-secondary hover:bg-white/[0.04]"
+                    ? "glass-button-active text-foreground"
+                    : "text-muted-foreground hover:text-foreground hover:bg-card"
                 }`}
               >
                 <Icon className="w-3.5 h-3.5" strokeWidth={1.5} />

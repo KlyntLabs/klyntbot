@@ -211,7 +211,7 @@ export function FinanceTargets() {
           <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">
             Active Goals
           </p>
-          <p className="text-[24px] font-light text-primary">{activeGoals.length}</p>
+          <p className="text-[24px] font-light text-foreground">{activeGoals.length}</p>
         </Card>
         <Card compact className="p-4">
           <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">
@@ -262,8 +262,8 @@ export function FinanceTargets() {
                   className={cn(
                     "px-2.5 py-1 rounded-md text-[11px] font-light transition-colors",
                     goalTab === t.key
-                      ? "bg-white/[0.12] text-brand"
-                      : "text-muted hover:text-secondary hover:bg-white/[0.06]",
+                      ? "bg-muted text-brand"
+                      : "text-muted-foreground hover:text-foreground hover:bg-accent",
                   )}
                 >
                   {t.label}
@@ -289,7 +289,7 @@ export function FinanceTargets() {
                             style={{ color: COLORS[i % COLORS.length] }}
                             strokeWidth={1.5}
                           />
-                          <span className="text-[12px] font-medium text-secondary truncate">
+                          <span className="text-[12px] font-medium text-muted-foreground truncate">
                             {g.name}
                           </span>
                           <span
@@ -330,7 +330,7 @@ export function FinanceTargets() {
                           </span>
                         </div>
                       </div>
-                      <div className="h-1 bg-white/[0.06] rounded-full">
+                      <div className="h-1 bg-accent rounded-full">
                         <div
                           className="h-full rounded-full"
                           style={{
@@ -404,10 +404,10 @@ export function FinanceTargets() {
                               className="w-3.5 h-3.5 flex-shrink-0 text-destructive/60"
                               strokeWidth={1.5}
                             />
-                            <span className="text-[12px] font-medium text-secondary truncate">
+                            <span className="text-[12px] font-medium text-muted-foreground truncate">
                               {l.name}
                             </span>
-                            <span className="text-[8px] font-light px-1.5 py-0.5 rounded-full bg-white/[0.06] text-dim flex-shrink-0">
+                            <span className="text-[8px] font-light px-1.5 py-0.5 rounded-full bg-accent text-dim flex-shrink-0">
                               {l.liabilityType.replaceAll("_", " ")}
                             </span>
                           </div>
@@ -429,7 +429,7 @@ export function FinanceTargets() {
                             </span>
                           </div>
                         </div>
-                        <div className="h-1 bg-white/[0.06] rounded-full">
+                        <div className="h-1 bg-accent rounded-full">
                           <div
                             className="h-full bg-success rounded-full"
                             style={{ width: `${paid}%`, transition: "width 0.5s ease" }}
@@ -466,8 +466,8 @@ export function FinanceTargets() {
                   })}
                 </div>
                 {liabilities.length > 0 && (
-                  <div className="mt-3 pt-2.5 border-t border-white/[0.08] flex justify-between">
-                    <span className="text-[10px] text-muted">Total Debt</span>
+                  <div className="mt-3 pt-2.5 border-t border-border flex justify-between">
+                    <span className="text-[10px] text-muted-foreground">Total Debt</span>
                     <span className="text-[11px] text-destructive tabular-nums">
                       {fmtCompact(convertTotal(totalRemaining), displayCur, hidden)}
                     </span>
@@ -482,7 +482,9 @@ export function FinanceTargets() {
         <div className="w-72 flex-shrink-0 sticky top-0 self-start space-y-4">
           {/* Goal Progress overview */}
           <Card compact className="p-4">
-            <p className="text-[10px] text-muted uppercase tracking-widest mb-3">Goal Progress</p>
+            <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-3">
+              Goal Progress
+            </p>
             <div className="flex items-center justify-center mb-3">
               <Donut
                 segments={goalSegs}
@@ -493,13 +495,13 @@ export function FinanceTargets() {
             </div>
             <div className="mb-2">
               <div className="flex justify-between mb-1">
-                <span className="text-[10px] text-muted font-light">Overall</span>
+                <span className="text-[10px] text-muted-foreground font-light">Overall</span>
                 <span className="text-[10px] text-brand font-light">{overallGoalPct}%</span>
               </div>
               <Progress value={overallGoalPct} />
             </div>
             {activeGoals.length > 0 && (
-              <div className="space-y-2 pt-2 border-t border-white/[0.04]">
+              <div className="space-y-2 pt-2 border-t border-border-subtle">
                 {activeGoals.map((g, i) => {
                   const p = pct(g.currentAmount, g.targetAmount);
                   return (
@@ -510,11 +512,11 @@ export function FinanceTargets() {
                             className="w-1.5 h-1.5 rounded-full flex-shrink-0"
                             style={{ backgroundColor: COLORS[i % COLORS.length] }}
                           />
-                          <span className="text-[10px] text-muted font-light truncate max-w-[120px]">
+                          <span className="text-[10px] text-muted-foreground font-light truncate max-w-[120px]">
                             {g.name}
                           </span>
                         </div>
-                        <span className="text-[10px] text-secondary font-light">{p}%</span>
+                        <span className="text-[10px] text-muted-foreground font-light">{p}%</span>
                       </div>
                       <Progress value={p} />
                     </div>
@@ -526,7 +528,9 @@ export function FinanceTargets() {
 
           {/* Debt Breakdown */}
           <Card compact className="p-4">
-            <p className="text-[10px] text-muted uppercase tracking-widest mb-3">Debt Breakdown</p>
+            <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-3">
+              Debt Breakdown
+            </p>
             <div className="flex items-center justify-center mb-3">
               <Donut
                 segments={liabSegs}
@@ -536,7 +540,7 @@ export function FinanceTargets() {
               />
             </div>
             {liabilities.length > 0 && (
-              <div className="space-y-2 pt-2 border-t border-white/[0.04]">
+              <div className="space-y-2 pt-2 border-t border-border-subtle">
                 {liabilities.map((l, i) => {
                   const paid = pct(l.principal - l.remaining, l.principal);
                   return (
@@ -547,18 +551,22 @@ export function FinanceTargets() {
                             className="w-1.5 h-1.5 rounded-full flex-shrink-0"
                             style={{ backgroundColor: COLORS[i % COLORS.length] }}
                           />
-                          <span className="text-[10px] text-muted font-light truncate max-w-[120px]">
+                          <span className="text-[10px] text-muted-foreground font-light truncate max-w-[120px]">
                             {l.name}
                           </span>
                         </div>
-                        <span className="text-[10px] text-secondary font-light">{paid}%</span>
+                        <span className="text-[10px] text-muted-foreground font-light">
+                          {paid}%
+                        </span>
                       </div>
                       <Progress value={paid} />
                     </div>
                   );
                 })}
-                <div className="pt-2 border-t border-white/[0.04] flex justify-between">
-                  <span className="text-[10px] text-muted font-light">Monthly Payments</span>
+                <div className="pt-2 border-t border-border-subtle flex justify-between">
+                  <span className="text-[10px] text-muted-foreground font-light">
+                    Monthly Payments
+                  </span>
                   <span className="text-[10px] text-brand font-light tabular-nums">
                     {fmtCompact(convertTotal(liabMonthlyTotal), displayCur, hidden)}/mo
                   </span>

@@ -243,14 +243,14 @@ export function WeekCalendarView() {
                 key={day}
                 onClick={() => navigate(`/day/${day}`)}
                 className={cn(
-                  "flex-1 text-center py-1.5 text-xs cursor-pointer hover:bg-white/[0.03] transition-colors",
-                  day === today ? "text-brand font-semibold" : "text-muted",
+                  "flex-1 text-center py-1.5 text-xs cursor-pointer hover:bg-card transition-colors",
+                  day === today ? "text-brand font-semibold" : "text-muted-foreground",
                 )}
               >
                 <div>{DAY_LABELS[i]}</div>
                 <div className="text-[10px]">{new Date(`${day}T00:00:00`).getDate()}</div>
                 {activeSecs > 0 && (
-                  <div className="text-[9px] text-secondary/60 mt-0.5">
+                  <div className="text-[9px] text-muted-foreground/60 mt-0.5">
                     {formatHumanDuration(activeSecs)}
                   </div>
                 )}
@@ -259,7 +259,7 @@ export function WeekCalendarView() {
           })}
         </div>
 
-        {loading && <div className="px-4 py-1 text-xs text-muted">Loading...</div>}
+        {loading && <div className="px-4 py-1 text-xs text-muted-foreground">Loading...</div>}
 
         <div ref={scrollRef} className="flex-1 overflow-y-auto">
           <div className="relative" style={{ height: TOTAL_HEIGHT }}>
@@ -271,7 +271,7 @@ export function WeekCalendarView() {
                 style={{ top: h * HOUR_HEIGHT }}
               >
                 <div
-                  className="text-[9px] text-muted text-right pr-1 select-none"
+                  className="text-[9px] text-muted-foreground text-right pr-1 select-none"
                   style={{ width: HOUR_GUTTER }}
                 >
                   {formatHour(h)}
@@ -318,7 +318,7 @@ export function WeekCalendarView() {
                           title={`${session.label}${appSuffix} · ${durationLabel}`}
                         >
                           {height > 20 && (
-                            <span className="text-[8px] text-white/90 font-medium px-1 truncate block leading-tight mt-0.5">
+                            <span className="text-[8px] text-foreground font-medium px-1 truncate block leading-tight mt-0.5">
                               {session.label}
                             </span>
                           )}
@@ -384,7 +384,7 @@ function WeekNowLine() {
   const top = mins * PX_PER_MIN;
   return (
     <div className="absolute w-full pointer-events-none z-10" style={{ top }}>
-      <div className="border-t border-red-500" />
+      <div className="border-t border-destructive" />
     </div>
   );
 }

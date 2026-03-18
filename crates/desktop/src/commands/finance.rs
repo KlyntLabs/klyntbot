@@ -4,7 +4,7 @@ use std::sync::Arc;
 use desktop_shared::commands::{
     FinanceAccountCreateParams, FinanceAccountUpdateParams, FinanceBudgetCreateParams,
     FinanceBudgetUpdateParams, FinanceCategoryReportResponse, FinanceDailySpendingResponse,
-    FinanceGoalCreateParams, FinanceGoalUpdateParams,
+    FinanceDateRangeParams, FinanceGoalCreateParams, FinanceGoalUpdateParams,
     FinanceInvestmentCreateParams, FinanceInvestmentUpdateParams, FinanceLiabilityCreateParams,
     FinanceLiabilityUpdateParams, FinanceMonthlySummaryResponse, FinanceNetWorthResponse,
     FinancePeriodSummaryResponse, FinancePortfolioCreateParams, FinancePortfolioResponse,

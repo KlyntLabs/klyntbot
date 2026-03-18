@@ -98,7 +98,7 @@ export function MessageList({
         >
           {msg.role === "user" ? (
             <div className="max-w-[85%] glass-bubble-user px-5 py-3.5">
-              <p className="text-[13px] font-light whitespace-pre-wrap leading-relaxed text-primary">
+              <p className="text-[13px] font-light whitespace-pre-wrap leading-relaxed text-foreground">
                 {msg.content}
               </p>
             </div>
@@ -190,7 +190,7 @@ export function MessageList({
               endRef.current?.scrollIntoView({ behavior: "smooth" });
               setUserScrolledUp(false);
             }}
-            className="glass-badge px-4 py-2 text-[11px] text-muted font-light hover:text-secondary hover:bg-white/[0.08] transition-all"
+            className="glass-badge px-4 py-2 text-[11px] text-muted-foreground font-light hover:text-foreground hover:bg-muted transition-all"
             aria-label="Scroll to bottom"
           >
             Scroll to bottom

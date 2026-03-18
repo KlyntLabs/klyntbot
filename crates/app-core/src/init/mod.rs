@@ -111,16 +111,47 @@ impl AppCore {
         .await?;
 
         // ── Note embedding handler (before vector_store is moved into agent) ──
+        let embedding_engine = Arc::new(tools::embedding_engine::EmbeddingEngine::new());
         let note_embedding_handler: Option<
             Arc<dyn feature_notes::handlers::embedding::NoteEmbeddingHandler>,
         > = if let Some(ref vs) = vector_store {
-            let engine = Arc::new(tools::embedding_engine::EmbeddingEngine::new());
             Some(Arc::new(
-                ::agent::adapters::note_embedding::NoteEmbeddingAdapter::new(engine, vs.clone()),
+                ::agent::adapters::note_embedding::NoteEmbeddingAdapter::new(
+                    Arc::clone(&embedding_engine),
+                    vs.clone(),
+                ),
             ))
         } else {
             None
         };
+
+        // ── Insight embedder (reuses the same EmbeddingEngine) ──
+        let insight_embedder: Arc<dyn feature_insights::InsightEmbedder> =
+            if let Some(ref vs) = vector_store {
+                Arc::new(crate::adapters::insight_embedder::InsightEmbedderImpl::new(
+                    Arc::clone(&embedding_engine),
+                    vs.clone(),
+                ))
+            } else {
+                Arc::new(feature_insights::NoopInsightEmbedder)
+            };
+
+        // ── Cognitive accessor for insight context injection ──
+        let cognitive_accessor: Arc<dyn feature_insights::CognitiveAccessor> = Arc::new(
+            crate::adapters::cognitive_accessor::CognitiveAccessorImpl::new(
+                ::cognitive::SemanticFactRepo::new(storage_pool.inner().clone()),
+                ::cognitive::EpisodicMemoryRepo::new(storage_pool.inner().clone()),
+                ::cognitive::ProceduralRuleRepo::new(storage_pool.inner().clone()),
+                ::cognitive::repos::EntityRepo::new(storage_pool.inner().clone()),
+            ),
+        );
+
+        // ── Scope resolver for insight context ──
+        let scope_resolver: Arc<dyn feature_insights::ScopeResolver> =
+            Arc::new(crate::adapters::scope_resolver::ScopeResolverImpl::new(
+                note_repo.clone(),
+                vector_store.clone(),
+            ));
 
         // ── Phase 3: Agent ───────────────────────────────────────────────
         let agent::AgentResult {
@@ -243,7 +274,56 @@ impl AppCore {
             suggestion_applier,
             decomposition_handler,
             forecast_handler,
+            insight_service: {
+                let insight_repo =
+                    feature_insights::InsightReviewRepo::new(storage_pool.inner().clone());
+                Some(Arc::new(feature_insights::InsightService::new(
+                    insight_repo.clone(),
+                    feature_insights::InsightProgressRepo::new(storage_pool.inner().clone()),
+                    scope_resolver,
+                    feature_insights::SmartMergeEngine::new(insight_repo),
+                    feature_insights::PromptBuilder::new(Arc::clone(&cognitive_accessor)),
+                    cognitive_accessor,
+                    Arc::new(
+                        crate::adapters::flashcard_accessor::FlashcardAccessorImpl::new(
+                            storage_pool.inner().clone(),
+                        ),
+                    ),
+                    insight_embedder,
+                    feature_insights::ProgressWeights::default(),
+                )))
+            },
+            flashcard_repo: Some(::cognitive::FlashcardRepo::new(
+                storage_pool.inner().clone(),
+            )),
+            persona_repo: Some(::cognitive::PersonaRepo::new(storage_pool.inner().clone())),
         };
+
+        // ── Background insight progress refresh (daily) ──────────────────
+        if let Some(ref insight_svc) = core.insight_service {
+            let svc = Arc::clone(insight_svc);
+            let note_repo_clone = core.note_repo.clone();
+            let token = shutdown_token.clone();
+            tokio::spawn(async move {
+                // Initial delay so the app finishes starting
+                tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+                loop {
+                    if token.is_cancelled() {
+                        break;
+                    }
+                    match cron::refresh_insight_progress(&svc, &note_repo_clone).await {
+                        Ok(Some(msg)) => info!("{msg}"),
+                        Ok(None) => {}
+                        Err(e) => tracing::debug!("insight progress refresh error: {e}"),
+                    }
+                    // Sleep ~24 hours (86400 seconds)
+                    tokio::select! {
+                        _ = tokio::time::sleep(std::time::Duration::from_secs(86400)) => {}
+                        _ = token.cancelled() => break,
+                    }
+                }
+            });
+        }
 
         // ── Background note embedding catch-up ────────────────────────────
         if let Some(ref handler) = core.note_embedding_handler {

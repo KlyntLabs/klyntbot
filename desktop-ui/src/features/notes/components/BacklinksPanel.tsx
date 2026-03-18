@@ -20,7 +20,7 @@ export function BacklinksPanel({ noteId, onSelectNote }: BacklinksPanelProps) {
       <button
         type="button"
         onClick={() => setCollapsed(!collapsed)}
-        className="w-full flex items-center gap-1.5 px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-muted hover:text-secondary transition-colors"
+        className="w-full flex items-center gap-1.5 px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
       >
         {collapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
         <span>Backlinks ({backlinks.length})</span>
@@ -37,10 +37,10 @@ export function BacklinksPanel({ noteId, onSelectNote }: BacklinksPanelProps) {
                   key={bl.note.id}
                   type="button"
                   onClick={() => onSelectNote(bl.note.id)}
-                  className="w-full text-left rounded-md px-2 py-1.5 hover:bg-white/[0.04] transition-colors group"
+                  className="w-full text-left rounded-md px-2 py-1.5 hover:bg-accent transition-colors group"
                 >
                   <div className="flex items-center gap-1.5">
-                    <span className="text-[12px] text-secondary group-hover:text-primary truncate flex-1">
+                    <span className="text-[12px] text-muted-foreground group-hover:text-foreground truncate flex-1">
                       {bl.note.title}
                     </span>
                     <span className="text-[10px] text-dim shrink-0">
@@ -72,7 +72,7 @@ export function BacklinksPanel({ noteId, onSelectNote }: BacklinksPanelProps) {
           )}
 
           {/* Unlinked Mentions */}
-          <div className="mt-3 pt-2 border-t border-white/[0.04]">
+          <div className="mt-3 pt-2 border-t border-border-subtle">
             <div className="text-[10px] font-medium text-dim uppercase tracking-wider mb-1">
               Unlinked Mentions ({unlinkedMentions.length})
             </div>
@@ -83,7 +83,7 @@ export function BacklinksPanel({ noteId, onSelectNote }: BacklinksPanelProps) {
                     key={note.id}
                     type="button"
                     onClick={() => onSelectNote(note.id)}
-                    className="text-[11px] text-secondary hover:text-primary text-left px-1 py-0.5 rounded hover:bg-white/[0.04] truncate transition-colors"
+                    className="text-[11px] text-muted-foreground hover:text-foreground text-left px-1 py-0.5 rounded hover:bg-accent truncate transition-colors"
                   >
                     {note.title}
                   </button>

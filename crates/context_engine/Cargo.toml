@@ -15,6 +15,7 @@ async-trait = { workspace = true }
 sha2 = "0.10"
 futures-util.workspace = true
 tiktoken-rs = "0.6"
+dashmap.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }

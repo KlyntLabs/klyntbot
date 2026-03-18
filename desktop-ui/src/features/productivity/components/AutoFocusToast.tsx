@@ -45,12 +45,12 @@ export function AutoFocusToast() {
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="text-[12px] font-medium text-primary">Focus session detected</span>
+            <span className="text-[12px] font-medium text-foreground">Focus session detected</span>
             <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-success/15 text-success font-medium">
               {ratio}% productive
             </span>
           </div>
-          <p className="text-[11px] font-light text-muted mt-0.5">
+          <p className="text-[11px] font-light text-muted-foreground mt-0.5">
             {session.durationMins}min in {session.dominantApp}
           </p>
         </div>
@@ -67,7 +67,7 @@ export function AutoFocusToast() {
           <button
             type="button"
             onClick={handleDismiss}
-            className="text-[11px] font-medium px-3 py-1.5 rounded-lg bg-[var(--surface-glass-subtle)] text-muted hover:bg-[var(--surface-glass-subtle-hover)] transition-colors"
+            className="text-[11px] font-medium px-3 py-1.5 rounded-lg bg-[var(--surface-glass-subtle)] text-muted-foreground hover:bg-[var(--surface-glass-subtle-hover)] transition-colors"
           >
             Dismiss
           </button>

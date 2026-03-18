@@ -48,13 +48,11 @@ export function IssueGrid({ issue }: { issue: Issue }) {
         onPointerDown={handlePointerDown}
         onClick={handleClick}
         layoutId={`issue-grid-${issue.identifier}`}
-        className={`bg-[hsl(var(--background))] rounded-md shadow-xs border border-[hsl(var(--border))]/50 p-3 cursor-pointer space-y-2 ${isDragging ? "opacity-50 cursor-grabbing" : ""}`}
+        className={`bg-background rounded-md shadow-xs border border-border/50 p-3 cursor-pointer space-y-2 ${isDragging ? "opacity-50 cursor-grabbing" : ""}`}
       >
         <div className="flex items-center gap-2">
-          <issue.priority.icon className="size-4 text-[hsl(var(--muted-foreground))]" />
-          <span className="text-xs text-[hsl(var(--muted-foreground))] font-medium">
-            {issue.identifier}
-          </span>
+          <issue.priority.icon className="size-4 text-muted-foreground" />
+          <span className="text-xs text-muted-foreground font-medium">{issue.identifier}</span>
         </div>
         <p className="text-sm font-semibold line-clamp-2">{issue.title}</p>
         {issue.labels.length > 0 && (
@@ -64,7 +62,7 @@ export function IssueGrid({ issue }: { issue: Issue }) {
         )}
         {issue.project && <ProjectBadge project={issue.project} />}
         <div className="flex items-center justify-between">
-          <span className="text-xs text-[hsl(var(--muted-foreground))]">
+          <span className="text-xs text-muted-foreground">
             {format(new Date(issue.createdAt), "MMM dd")}
           </span>
           <AssigneeUser user={issue.assignee} />

@@ -61,7 +61,7 @@ export function LinkInsertDialog({ type, isOpen, onClose, onInsert }: LinkInsert
       }}
     >
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/50" />
+      <div className="absolute inset-0 bg-overlay-heavy" />
 
       {/* Dialog */}
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: stopPropagation on dialog panel */}
@@ -71,12 +71,12 @@ export function LinkInsertDialog({ type, isOpen, onClose, onInsert }: LinkInsert
         role="dialog"
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 className="text-sm font-semibold text-primary mb-3">
+        <h3 className="text-sm font-semibold text-foreground mb-3">
           {type === "image" ? "Insert Image" : "Insert Link"}
         </h3>
 
         <form onSubmit={handleSubmit}>
-          <label className="block text-xs text-muted mb-1.5" htmlFor="link-url-input">
+          <label className="block text-xs text-muted-foreground mb-1.5" htmlFor="link-url-input">
             {type === "image" ? "Image URL" : "URL"}
           </label>
           <input
@@ -89,12 +89,12 @@ export function LinkInsertDialog({ type, isOpen, onClose, onInsert }: LinkInsert
               setPreviewError(false);
             }}
             placeholder={type === "image" ? "https://example.com/image.png" : "https://example.com"}
-            className="w-full px-3 py-2 text-sm rounded-lg bg-white/[0.06] border border-white/[0.08] text-primary placeholder:text-dim outline-none focus:border-brand/40 transition-colors"
+            className="w-full px-3 py-2 text-sm rounded-lg bg-accent border border-border text-foreground placeholder:text-dim outline-none focus:border-brand/40 transition-colors"
           />
 
           {/* Image preview */}
           {type === "image" && url.trim() && (
-            <div className="mt-3 rounded-lg overflow-hidden bg-white/[0.04] flex items-center justify-center min-h-[80px] max-h-[160px]">
+            <div className="mt-3 rounded-lg overflow-hidden bg-card flex items-center justify-center min-h-[80px] max-h-[160px]">
               {!previewError ? (
                 <img
                   src={url.trim()}
@@ -113,7 +113,7 @@ export function LinkInsertDialog({ type, isOpen, onClose, onInsert }: LinkInsert
             <button
               type="button"
               onClick={onClose}
-              className="px-3 py-1.5 text-xs rounded-lg text-muted hover:text-secondary hover:bg-white/[0.06] transition-colors"
+              className="px-3 py-1.5 text-xs rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
             >
               Cancel
             </button>
