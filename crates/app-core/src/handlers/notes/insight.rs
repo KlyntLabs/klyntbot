@@ -404,22 +404,21 @@ impl AppCore {
             .iter()
             .map(|q| {
                 let (stability, difficulty) = match q.difficulty.as_str() {
-                    "easy" => (4.0, 0.3),
-                    "hard" => (0.8, 0.7),
-                    _ => (2.0, 0.5),
+                    "easy" => (4.0, 3.0),
+                    "hard" => (0.8, 7.0),
+                    _ => (2.0, 5.0),
                 };
                 cognitive::NewFlashcard {
                     source_note_id: Some(params.note_id.clone()),
-                    insight_review_id: Some(params.insight_review_id.clone()),
+                    source_context: None,
                     deck: params.deck_name.clone(),
-                    question: q.question.clone(),
-                    answer: q.correct_answer.clone(),
-                    card_type: if q.question_type == "multiple_choice" {
-                        cognitive::CardType::MultipleChoice
-                    } else {
-                        cognitive::CardType::ShortAnswer
-                    },
-                    choices: q.choices.as_ref().map(|c| serde_json::json!(c)),
+                    front: q.question.clone(),
+                    back: q.correct_answer.clone(),
+                    card_type: cognitive::CardType::Basic,
+                    cloze_data: None,
+                    vocab_data: None,
+                    image_data: None,
+                    tags: vec![],
                     stability,
                     difficulty,
                 }

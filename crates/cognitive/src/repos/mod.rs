@@ -23,7 +23,7 @@ pub use episodic_memory::EpisodicMemoryRepo;
 pub use event_log::EventLogRepo;
 pub use failed_observation::FailedObservationRepo;
 pub use flashcard::{
-    CardType, DeckSummary, FlashcardRepo, FlashcardRow, NewFlashcard, ReviewQuality,
+    CardType, DeckSummary, FlashcardRepo, FlashcardRow, NewFlashcard, ReviewLogEntry, ReviewQuality,
 };
 pub use gt_link::SqliteGTLinkRepo;
 #[allow(deprecated)]
@@ -60,13 +60,13 @@ pub fn cognitive_migrations() -> Vec<FeatureMigration> {
     vec![
         FeatureMigration {
             feature_name: "cognitive".to_string(),
-            version: 4,
-            description: "Cognitive memory system tables + versioned insight reviews".to_string(),
+            version: 6,
+            description: "FSRS-5 flashcard schema + review_log + fsrs_parameters".to_string(),
             sql: include_str!("../../migrations/001_cognitive_tables.sql").to_string(),
         },
         FeatureMigration {
             feature_name: "cognitive".to_string(),
-            version: 5,
+            version: 7,
             description: "Add BookIndex tree nodes and GT-Link tables".to_string(),
             sql: include_str!("../../migrations/002_book_index_tables.sql").to_string(),
         },

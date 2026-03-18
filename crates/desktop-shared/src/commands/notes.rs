@@ -240,15 +240,21 @@ pub struct TabContent {
 pub struct FlashcardResponse {
     pub id: String,
     pub deck: String,
-    pub question: String,
-    pub answer: String,
+    pub front: String,
+    pub back: String,
     pub card_type: String,
-    pub choices: Option<serde_json::Value>,
+    pub cloze_data: Option<serde_json::Value>,
+    pub vocab_data: Option<serde_json::Value>,
+    pub image_data: Option<serde_json::Value>,
+    pub tags: serde_json::Value,
+    pub source_note_id: Option<String>,
+    pub source_context: Option<String>,
     pub stability: f64,
     pub difficulty: f64,
     pub due_at: Option<String>,
     pub state: String,
     pub review_count: i64,
+    pub recall_speed_ms: Option<i64>,
     pub created_at: String,
 }
 
@@ -276,6 +282,7 @@ pub struct DeckSummaryResponse {
 pub struct FlashcardReviewParams {
     pub card_id: String,
     pub quality: String, // "again" | "hard" | "good" | "easy"
+    pub recall_speed_ms: Option<i64>,
 }
 
 // ── Insight Quiz ─────────────────────────────────────────────────

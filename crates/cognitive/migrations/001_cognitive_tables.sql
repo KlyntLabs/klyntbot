@@ -397,25 +397,29 @@ CREATE TABLE IF NOT EXISTS insight_persona_pins (
     PRIMARY KEY (note_id, persona_id)
 );
 
--- ── Flashcards (FSRS spaced repetition) ─────────────────────────
+-- ── Flashcards (FSRS-5 spaced repetition) ─────────────────────────
 
 CREATE TABLE IF NOT EXISTS flashcards (
     id TEXT PRIMARY KEY,
     source_note_id TEXT,
-    source_session_id TEXT,
-    insight_review_id TEXT,
+    source_context TEXT,
     deck TEXT NOT NULL DEFAULT 'general',
-    question TEXT NOT NULL,
-    answer TEXT NOT NULL,
-    card_type TEXT NOT NULL DEFAULT 'short_answer',
-    choices JSON,
+    front TEXT NOT NULL,
+    back TEXT NOT NULL,
+    card_type TEXT NOT NULL DEFAULT 'basic',
+    cloze_data TEXT,
+    vocab_data TEXT,
+    image_data TEXT,
+    tags TEXT NOT NULL DEFAULT '[]',
     stability REAL NOT NULL DEFAULT 1.0,
-    difficulty REAL NOT NULL DEFAULT 0.5,
+    difficulty REAL NOT NULL DEFAULT 5.0,
     due_at TEXT,
     last_reviewed_at TEXT,
     review_count INTEGER NOT NULL DEFAULT 0,
     lapses INTEGER NOT NULL DEFAULT 0,
     state TEXT NOT NULL DEFAULT 'new',
+    suspended INTEGER NOT NULL DEFAULT 0,
+    recall_speed_ms INTEGER,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -423,7 +427,36 @@ CREATE TABLE IF NOT EXISTS flashcards (
 CREATE INDEX IF NOT EXISTS idx_flashcards_source_note ON flashcards(source_note_id);
 CREATE INDEX IF NOT EXISTS idx_flashcards_due ON flashcards(due_at);
 CREATE INDEX IF NOT EXISTS idx_flashcards_deck ON flashcards(deck);
-CREATE INDEX IF NOT EXISTS idx_flashcards_insight ON flashcards(insight_review_id);
+CREATE INDEX IF NOT EXISTS idx_flashcards_state ON flashcards(state);
+
+-- ── FSRS-5 personal parameters ───────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS fsrs_parameters (
+    id TEXT PRIMARY KEY DEFAULT 'local',
+    weights TEXT NOT NULL,
+    desired_retention REAL NOT NULL DEFAULT 0.9,
+    trained_at TEXT,
+    review_count INTEGER NOT NULL DEFAULT 0
+);
+
+INSERT OR IGNORE INTO fsrs_parameters (id, weights)
+VALUES ('local', '[0.40255,1.18385,3.173,15.69105,7.1949,0.5345,1.4604,0.0046,1.54575,0.1192,1.01925,1.9395,0.11,0.29605,2.2698,0.2315,2.9898,0.51655,0.6621]');
+
+-- ── Review log (feeds FSRS-5 weight training) ────────────────────
+
+CREATE TABLE IF NOT EXISTS review_log (
+    id TEXT PRIMARY KEY,
+    card_id TEXT NOT NULL REFERENCES flashcards(id) ON DELETE CASCADE,
+    rating INTEGER NOT NULL,
+    elapsed_days REAL NOT NULL,
+    scheduled_days REAL NOT NULL,
+    recall_speed_ms INTEGER,
+    state TEXT NOT NULL,
+    reviewed_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_review_log_card ON review_log(card_id);
+CREATE INDEX IF NOT EXISTS idx_review_log_reviewed ON review_log(reviewed_at);
 
 -- ── Insight Reviews (versioned, replaces old insight_review_cache) ──────────
 
