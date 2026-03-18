@@ -1,11 +1,13 @@
 import { Plus, Settings2, Trash2, X } from "lucide-react";
 import { useCallback, useState } from "react";
 import type { Persona, PersonaActions } from "../../hooks/usePersonas";
+import { useSquads } from "../../hooks/useSquads";
 
 interface ManagePersonasModalProps {
   personas: Persona[];
   actions: PersonaActions;
   noteId: string | null;
+  squadId?: string | null;
   onClose: () => void;
 }
 
@@ -24,12 +26,14 @@ export function ManagePersonasModal({
   personas,
   actions,
   noteId,
+  squadId,
   onClose,
 }: ManagePersonasModalProps) {
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
   const [pinnedIds, setPinnedIds] = useState<Set<string> | null>(null);
   const [autoGenerating, setAutoGenerating] = useState(false);
+  const { addMember } = useSquads();
   const [form, setForm] = useState({
     name: "",
     role: "",
@@ -44,7 +48,7 @@ export function ManagePersonasModal({
     if (!form.name.trim() || !form.role.trim()) return;
     setCreating(true);
     try {
-      await actions.create({
+      const newPersona = await actions.create({
         name: form.name,
         role: form.role,
         expertise: form.expertise,
@@ -56,6 +60,14 @@ export function ManagePersonasModal({
           .map((d) => d.trim().toLowerCase())
           .filter(Boolean),
       });
+      if (squadId && newPersona) {
+        await addMember({
+          squadId,
+          personaId: newPersona.id,
+          roleInSquad: "member",
+          sortOrder: 0,
+        });
+      }
       setShowCreate(false);
       setForm({
         name: "",
@@ -69,7 +81,7 @@ export function ManagePersonasModal({
     } finally {
       setCreating(false);
     }
-  }, [form, actions]);
+  }, [form, actions, squadId, addMember]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">

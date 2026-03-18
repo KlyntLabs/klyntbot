@@ -8,7 +8,6 @@ import {
   History,
   RefreshCw,
   RotateCcw,
-  Settings2,
   Sliders,
   Sparkles,
   X,
@@ -40,6 +39,8 @@ import { KnowledgeGrowthMetrics } from "./insight/KnowledgeGrowthMetrics";
 import { ManagePersonasModal } from "./insight/ManagePersonasModal";
 import { PerspectivesTab } from "./insight/PerspectivesTab";
 import { SelfAssessmentTab } from "./insight/SelfAssessmentTab";
+import { SquadManager } from "./insight/SquadManager";
+import { SquadPicker } from "./insight/SquadPicker";
 import { SynthesisTab } from "./insight/SynthesisTab";
 
 // ---------------------------------------------------------------------------
@@ -103,6 +104,7 @@ function tabStatus(state: InsightReviewState, tabId: TabId): TabStatus {
 export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) {
   const [copied, setCopied] = useState(false);
   const [showPersonaManager, setShowPersonaManager] = useState(false);
+  const [showSquadManager, setShowSquadManager] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showScope, setShowScope] = useState(false);
   const [scopeConfig, setScopeConfig] = useState<ScopeConfig>(DEFAULT_SCOPE);
@@ -221,14 +223,11 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
         >
           <History size={12} />
         </button>
-        <button
-          type="button"
-          onClick={() => setShowPersonaManager(true)}
-          className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-          title="Manage Personas"
-        >
-          <Settings2 size={12} />
-        </button>
+        <SquadPicker
+          selectedSquadId={state.squadId}
+          onSelect={(id) => actions.setSquadId(id)}
+          onManage={() => setShowSquadManager(true)}
+        />
         <button
           type="button"
           onClick={() => actions.close()}
@@ -368,7 +367,10 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
                 status={state.tabs.perspectives.status}
                 content={state.tabs.perspectives.content}
                 personas={state.tabs.perspectives.personas}
+                personaPerspectives={state.tabs.perspectives.personaPerspectives}
                 noteId={state.noteId}
+                squadId={state.squadId}
+                onSquadChange={(id) => actions.setSquadId(id)}
               />
             )}
           </>
@@ -451,8 +453,12 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
           personas={allPersonas}
           actions={personaActions}
           noteId={state.noteId}
+          squadId={state.squadId}
           onClose={() => setShowPersonaManager(false)}
         />
+      )}
+      {showSquadManager && (
+        <SquadManager open={showSquadManager} onClose={() => setShowSquadManager(false)} />
       )}
     </div>
   );

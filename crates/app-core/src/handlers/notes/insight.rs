@@ -973,7 +973,7 @@ async fn run_insight_pipeline(args: InsightPipelineArgs) {
                             "insight:persona-perspective",
                             serde_json::json!({
                                 "personaId": persona_id,
-                                "name": name,
+                                "personaName": name,
                                 "content": content,
                             }),
                         );

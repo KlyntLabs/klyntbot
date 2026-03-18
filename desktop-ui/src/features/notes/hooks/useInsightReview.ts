@@ -40,7 +40,12 @@ export interface InsightReviewState {
     gaps: { status: TabStatus; content: string };
     assessment: { status: TabStatus; questions: QuizQuestion[] };
     conceptMap: { status: TabStatus; mermaid: string; fallbackText: string };
-    perspectives: { status: TabStatus; content: string; personas: PersonaMeta[] };
+    perspectives: {
+      status: TabStatus;
+      content: string;
+      personas: PersonaMeta[];
+      personaPerspectives: Record<string, string>;
+    };
   };
   quizState: {
     answers: Record<string, string>;
@@ -48,6 +53,7 @@ export interface InsightReviewState {
     score: number;
     total: number;
   };
+  squadId: string | null;
   changesSummary: string | null;
 }
 
@@ -64,6 +70,7 @@ export interface InsightReviewActions {
   answerQuestion: (questionId: string, answer: string) => void;
   revealAnswer: (questionId: string) => void;
   revealAll: () => void;
+  setSquadId: (squadId: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -117,7 +124,7 @@ const INITIAL_STATE: InsightReviewState = {
     gaps: { status: "idle", content: "" },
     assessment: { status: "idle", questions: [] },
     conceptMap: { status: "idle", mermaid: "", fallbackText: "" },
-    perspectives: { status: "idle", content: "", personas: [] },
+    perspectives: { status: "idle", content: "", personas: [], personaPerspectives: {} },
   },
   quizState: {
     answers: {},
@@ -125,6 +132,7 @@ const INITIAL_STATE: InsightReviewState = {
     score: 0,
     total: 0,
   },
+  squadId: null,
   changesSummary: null,
 };
 
@@ -233,6 +241,26 @@ export function useInsightReview(): [InsightReviewState, InsightReviewActions] {
     }));
   });
 
+  useEvent<{ personaId: string; personaName: string; content: string }>(
+    "insight:persona-perspective",
+    ({ personaId, content }) => {
+      setState((prev) => ({
+        ...prev,
+        tabs: {
+          ...prev.tabs,
+          perspectives: {
+            ...prev.tabs.perspectives,
+            status: "streaming",
+            personaPerspectives: {
+              ...prev.tabs.perspectives.personaPerspectives,
+              [personaId]: content,
+            },
+          },
+        },
+      }));
+    },
+  );
+
   useEvent<{ summary: string }>("insight:changes-summary", ({ summary }) => {
     setState((prev) => ({ ...prev, changesSummary: summary }));
   });
@@ -266,8 +294,9 @@ export function useInsightReview(): [InsightReviewState, InsightReviewActions] {
                 status: "done" as const,
                 content: cached.perspectives,
                 personas: cached.personas ?? [],
+                personaPerspectives: {},
               }
-            : { status: "idle" as const, content: "", personas: [] },
+            : { status: "idle" as const, content: "", personas: [], personaPerspectives: {} },
         },
       }));
     },
@@ -323,7 +352,7 @@ export function useInsightReview(): [InsightReviewState, InsightReviewActions] {
         } else if (tab === "concept-map") {
           tabs.conceptMap = { ...tabs.conceptMap, status: "loading" };
         } else if (tab === "perspectives") {
-          tabs.perspectives = { ...tabs.perspectives, status: "loading" };
+          tabs.perspectives = { ...tabs.perspectives, status: "loading", personaPerspectives: {} };
         }
 
         return { ...prev, tabs };
@@ -332,6 +361,7 @@ export function useInsightReview(): [InsightReviewState, InsightReviewActions] {
       const response = await ipc<TabContentResponse>("note_insight_regenerate_tab", {
         noteId: state.noteId,
         tab,
+        squadId: state.squadId,
       });
 
       setState((prev) => {
@@ -356,13 +386,14 @@ export function useInsightReview(): [InsightReviewState, InsightReviewActions] {
             status: "done",
             content: response.content,
             personas: response.personas ?? prev.tabs.perspectives.personas,
+            personaPerspectives: prev.tabs.perspectives.personaPerspectives,
           };
         }
 
         return { ...prev, tabs };
       });
     },
-    [state.noteId],
+    [state.noteId, state.squadId],
   );
 
   const saveFlashcards = useCallback(
@@ -455,6 +486,10 @@ export function useInsightReview(): [InsightReviewState, InsightReviewActions] {
     }
   }, []);
 
+  const setSquadId = useCallback((squadId: string) => {
+    setState((prev) => ({ ...prev, squadId }));
+  }, []);
+
   const actions: InsightReviewActions = {
     open,
     applyCachedContent,
@@ -465,6 +500,7 @@ export function useInsightReview(): [InsightReviewState, InsightReviewActions] {
     answerQuestion,
     revealAnswer,
     revealAll,
+    setSquadId,
   };
 
   return [state, actions];
