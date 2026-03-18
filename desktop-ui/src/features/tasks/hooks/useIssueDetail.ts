@@ -1,9 +1,11 @@
+import { ipc } from "@shared/hooks/useIpc";
 import { useMutation } from "@shared/hooks/useMutation";
 import { useQuery } from "@shared/hooks/useQuery";
 import { EMPTY_TIMELINE_RESPONSE } from "@shared/types";
 import type { TimelineResponse } from "@shared/types/common";
 import type { Area, Task, TaskUpdateParams } from "@shared/types/tasks";
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
+import type { DecompositionResult } from "../components/detail/DecompositionPanel";
 import { useStatusWorkflow } from "../contexts/StatusWorkflowContext";
 import {
   type ActivityEntry,
@@ -15,6 +17,7 @@ import {
   priorityToNumber,
   type SubIssue,
   type Suggestion,
+  type SuggestionStatus,
   statusToMutationParams,
   type TaskMemory,
   type TaskState,
@@ -32,6 +35,16 @@ export type {
   TaskMemory,
   ActivityEntry,
 };
+
+export interface TaskForecast {
+  estimatedMinutes: number;
+  confidenceLow: number;
+  confidenceHigh: number;
+  methodology: string;
+  sampleSize: number;
+  dataQuality: string;
+  risks: Array<{ kind: string; description: string; impactMinutes: number | null }>;
+}
 
 const PLACEHOLDER_TASK: DetailTask = {
   id: "",
@@ -58,6 +71,7 @@ const PLACEHOLDER_TASK: DetailTask = {
   totalTrackedSecs: 0,
   focusedAt: null,
   acceptanceCriteria: null,
+  complexityScore: null,
   completed: false,
   createdAt: "",
   updatedAt: "",
@@ -71,7 +85,7 @@ export function useIssueDetail(
   const { labels } = useStatusWorkflow();
 
   // Core task data
-  const { data: rawTask } = useQuery<Task | null>("task_get", { id: issueId }, null);
+  const { data: rawTask, refetch } = useQuery<Task | null>("task_get", { id: issueId }, null);
 
   const task: DetailTask = useMemo(
     () => (rawTask ? taskToDetailTask(rawTask, projectMap, areaMap, labels) : PLACEHOLDER_TASK),
@@ -163,13 +177,135 @@ export function useIssueDetail(
     [issueId, updateMutation],
   );
 
-  // Stubbed features (future backend support)
-  const suggestions: Suggestion[] = [];
+  // AI suggestions
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+
+  const [aiError, setAiError] = useState<string | null>(null);
+
+  const fetchSuggestions = useCallback(async () => {
+    setSuggestionsLoading(true);
+    setAiError(null);
+    try {
+      const results = await ipc<
+        Array<{
+          id: string;
+          suggestionType: string;
+          title: string;
+          description: string | null;
+          confidence: number;
+          status: string;
+          createdAt: string;
+        }>
+      >("task_get_suggestions", { taskId: task.id });
+      setSuggestions(
+        results.map((s) => ({
+          id: s.id,
+          suggestionType: s.suggestionType,
+          title: s.title,
+          description: s.description ?? "",
+          confidence: s.confidence,
+          status: s.status as SuggestionStatus,
+        })),
+      );
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : typeof e === "object" && e !== null ? JSON.stringify(e) : String(e);
+      setAiError(msg);
+    } finally {
+      setSuggestionsLoading(false);
+    }
+  }, [task.id]);
+
+  const applySuggestion = useCallback(
+    async (id: string) => {
+      await ipc("task_apply_suggestion", { suggestionId: id });
+      await fetchSuggestions();
+      refetch();
+    },
+    [fetchSuggestions, refetch],
+  );
+
+  const dismissSuggestion = useCallback(async (id: string) => {
+    await ipc("task_dismiss_suggestion", { suggestionId: id });
+    setSuggestions((prev) => prev.filter((s) => s.id !== id));
+  }, []);
+
+  // Decomposition
+  const [decompositionResult, setDecompositionResult] = useState<DecompositionResult | null>(null);
+  const [decompositionOpen, setDecompositionOpen] = useState(false);
+  const [decompositionApplying, setDecompositionApplying] = useState(false);
+  const [decompositionLoading, setDecompositionLoading] = useState(false);
+
+  const openDecomposition = useCallback(() => {
+    setDecompositionOpen(true);
+    setDecompositionResult(null);
+    setAiError(null);
+  }, []);
+
+  const decompose = useCallback(async () => {
+    setAiError(null);
+    setDecompositionLoading(true);
+    try {
+      const result = await ipc<DecompositionResult>("task_decompose", { taskId: task.id });
+      if (result.autoApplied) {
+        setDecompositionOpen(false);
+        refetch();
+      } else {
+        setDecompositionResult(result);
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : typeof e === "object" && e !== null ? JSON.stringify(e) : String(e);
+      setAiError(msg);
+    } finally {
+      setDecompositionLoading(false);
+    }
+  }, [task.id, refetch]);
+
+  const applyDecomposition = useCallback(
+    async (id: string) => {
+      setDecompositionApplying(true);
+      try {
+        await ipc("task_apply_decomposition", { decompositionId: id });
+        setDecompositionOpen(false);
+        setDecompositionResult(null);
+        refetch();
+      } finally {
+        setDecompositionApplying(false);
+      }
+    },
+    [refetch],
+  );
+
+  const closeDecomposition = useCallback(() => {
+    setDecompositionOpen(false);
+    setDecompositionResult(null);
+  }, []);
+
+  const rejectDecomposition = useCallback(async (id: string) => {
+    await ipc("task_reject_decomposition", { decompositionId: id });
+    closeDecomposition();
+  }, [closeDecomposition]);
+
+  // Forecast
+  const [forecast, setForecast] = useState<TaskForecast | null>(null);
+  const [forecastLoading, setForecastLoading] = useState(false);
+
+  const fetchForecast = useCallback(async () => {
+    setForecastLoading(true);
+    try {
+      const result = await ipc<TaskForecast>("task_forecast", { taskId: task.id });
+      setForecast(result);
+    } catch (e: unknown) {
+      setForecast(null);
+      const msg = e instanceof Error ? e.message : typeof e === "object" && e !== null ? JSON.stringify(e) : String(e);
+      setAiError(msg);
+    } finally {
+      setForecastLoading(false);
+    }
+  }, [task.id]);
+
   const taskMemory: TaskMemory | null = null;
   const focusSession: FocusSession | null = buildFocusSession(task);
-
-  const dismissSuggestion = useCallback((_id: string) => {}, []);
-  const applySuggestion = useCallback((_id: string) => {}, []);
 
   // Focus mutations
   const endFocusMutation = useMutation<Task | null, { id: string }>("task_end_focus", "params");
@@ -184,6 +320,8 @@ export function useIssueDetail(
     taskState,
     activity,
     suggestions,
+    suggestionsLoading,
+    fetchSuggestions,
     focusSession,
     subIssues,
     taskMemory,
@@ -191,5 +329,18 @@ export function useIssueDetail(
     dismissSuggestion,
     applySuggestion,
     stopFocus,
+    decompositionResult,
+    decompositionOpen,
+    decompositionLoading,
+    decompositionApplying,
+    openDecomposition,
+    decompose,
+    applyDecomposition,
+    rejectDecomposition,
+    closeDecomposition,
+    forecast,
+    forecastLoading,
+    fetchForecast,
+    aiError,
   };
 }

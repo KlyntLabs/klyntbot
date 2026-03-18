@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Klyntbot AI System Architecture</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0a0f; color: #e0e0e0; font-family: 'Inter', -apple-system, sans-serif; overflow-x: hidden; }
+
+  .header { text-align: center; padding: 40px 20px 20px; }
+  .header h1 { font-size: 28px; font-weight: 300; color: #fff; letter-spacing: 1px; }
+  .header p { font-size: 13px; color: #888; margin-top: 8px; font-weight: 300; }
+
+  .tabs { display: flex; justify-content: center; gap: 8px; padding: 16px 20px; flex-wrap: wrap; }
+  .tab { padding: 8px 20px; border-radius: 20px; border: 1px solid #ffffff10; background: #ffffff06; color: #999; font-size: 12px; cursor: pointer; transition: all 0.3s; font-weight: 400; }
+  .tab:hover { background: #ffffff10; color: #ccc; }
+  .tab.active { background: #f97316; color: #fff; border-color: #f97316; }
+
+  .canvas { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+  /* Flow diagram */
+  .flow { display: flex; flex-direction: column; align-items: center; gap: 0; }
+  .flow-node { position: relative; width: 100%; max-width: 800px; }
+  .flow-box { background: #12121a; border: 1px solid #ffffff10; border-radius: 12px; padding: 20px 24px; transition: all 0.3s; cursor: pointer; }
+  .flow-box:hover { border-color: #f9731640; background: #15151f; }
+  .flow-box.expanded { border-color: #f97316; }
+  .flow-box .label { font-size: 11px; color: #f97316; font-weight: 500; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px; }
+  .flow-box .title { font-size: 16px; font-weight: 400; color: #fff; }
+  .flow-box .desc { font-size: 12px; color: #888; margin-top: 4px; line-height: 1.6; font-weight: 300; }
+  .flow-box .detail { display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid #ffffff08; font-size: 12px; color: #aaa; line-height: 1.7; }
+  .flow-box.expanded .detail { display: block; }
+  .flow-box .detail code { background: #ffffff0a; padding: 2px 6px; border-radius: 4px; font-size: 11px; color: #f97316; }
+
+  .arrow { width: 2px; height: 32px; background: linear-gradient(to bottom, #f9731660, #f9731620); margin: 0 auto; position: relative; }
+  .arrow::after { content: ''; position: absolute; bottom: -4px; left: 50%; transform: translateX(-50%); border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid #f9731640; }
+
+  .parallel-group { display: flex; gap: 12px; width: 100%; max-width: 800px; }
+  .parallel-group .flow-box { flex: 1; }
+
+  .branch { display: flex; gap: 16px; width: 100%; max-width: 800px; }
+  .branch .flow-node { flex: 1; }
+  .branch-label { text-align: center; font-size: 10px; color: #666; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px; }
+
+  /* Layer diagram */
+  .layers { display: flex; flex-direction: column; gap: 8px; max-width: 900px; margin: 0 auto; }
+  .layer-row { display: flex; align-items: stretch; gap: 0; }
+  .layer-label { width: 40px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 500; color: #666; }
+  .layer-items { flex: 1; display: flex; gap: 6px; flex-wrap: wrap; padding: 8px; background: #12121a; border: 1px solid #ffffff08; border-radius: 8px; }
+  .layer-item { padding: 6px 12px; background: #ffffff06; border-radius: 6px; font-size: 11px; color: #ccc; border: 1px solid #ffffff08; transition: all 0.2s; cursor: default; font-weight: 300; }
+  .layer-item:hover { border-color: #f9731640; color: #fff; }
+  .layer-item.highlight { background: #f9731615; border-color: #f97316; color: #f97316; }
+
+  /* Memory diagram */
+  .memory-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; max-width: 900px; margin: 20px auto; }
+  .memory-card { background: #12121a; border: 1px solid #ffffff10; border-radius: 12px; padding: 20px; }
+  .memory-card h3 { font-size: 14px; font-weight: 400; color: #fff; margin-bottom: 4px; }
+  .memory-card .type { font-size: 10px; color: #f97316; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+  .memory-card p { font-size: 12px; color: #888; line-height: 1.6; font-weight: 300; }
+  .memory-card .example { margin-top: 10px; background: #ffffff06; border-radius: 6px; padding: 8px 12px; font-size: 11px; color: #aaa; font-family: monospace; }
+
+  .retrieval-flow { max-width: 900px; margin: 24px auto 0; background: #12121a; border: 1px solid #ffffff10; border-radius: 12px; padding: 24px; }
+  .retrieval-flow h3 { font-size: 14px; font-weight: 400; color: #fff; margin-bottom: 16px; }
+  .retrieval-steps { display: flex; align-items: center; gap: 0; flex-wrap: wrap; justify-content: center; }
+  .r-step { background: #ffffff06; border: 1px solid #ffffff10; border-radius: 8px; padding: 10px 16px; font-size: 11px; color: #ccc; text-align: center; min-width: 120px; }
+  .r-step .r-label { font-size: 9px; color: #f97316; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .r-arrow { color: #f97316; font-size: 16px; padding: 0 4px; flex-shrink: 0; }
+
+  /* Agent profiles */
+  .agents-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; max-width: 900px; margin: 20px auto; }
+  .agent-card { background: #12121a; border: 1px solid #ffffff10; border-radius: 12px; padding: 20px; transition: all 0.3s; }
+  .agent-card:hover { border-color: #f9731640; }
+  .agent-card .agent-name { font-size: 15px; font-weight: 400; color: #fff; margin-bottom: 2px; }
+  .agent-card .agent-role { font-size: 11px; color: #f97316; margin-bottom: 10px; }
+  .agent-card .agent-detail { font-size: 11px; color: #888; line-height: 1.6; font-weight: 300; }
+  .agent-card .agent-tools { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 4px; }
+  .agent-card .tool-tag { padding: 2px 8px; background: #ffffff06; border-radius: 4px; font-size: 10px; color: #999; border: 1px solid #ffffff08; }
+  .agent-card .tool-tag.mcp { border-color: #22c55e40; color: #22c55e; }
+
+  /* ReAct loop */
+  .react-container { max-width: 800px; margin: 20px auto; }
+  .react-loop { background: #12121a; border: 1px solid #ffffff10; border-radius: 12px; padding: 24px; position: relative; }
+  .react-loop h3 { font-size: 14px; font-weight: 400; color: #fff; margin-bottom: 16px; }
+  .react-steps { display: flex; flex-direction: column; gap: 0; }
+  .react-step { display: flex; align-items: flex-start; gap: 14px; padding: 12px 0; }
+  .react-step:not(:last-child) { border-bottom: 1px solid #ffffff06; }
+  .react-num { width: 28px; height: 28px; border-radius: 50%; background: #f9731615; color: #f97316; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500; flex-shrink: 0; }
+  .react-content { flex: 1; }
+  .react-content .step-title { font-size: 13px; color: #fff; font-weight: 400; }
+  .react-content .step-desc { font-size: 11px; color: #888; margin-top: 3px; line-height: 1.5; font-weight: 300; }
+  .loop-indicator { margin-top: 16px; text-align: center; padding: 10px; border: 1px dashed #f9731630; border-radius: 8px; font-size: 11px; color: #f97316; }
+
+  .outcomes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 16px; }
+  .outcome { padding: 12px; background: #ffffff04; border-radius: 8px; border: 1px solid #ffffff08; }
+  .outcome .o-label { font-size: 10px; color: #22c55e; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .outcome.escalate .o-label { color: #eab308; }
+  .outcome.error .o-label { color: #ef4444; }
+  .outcome p { font-size: 11px; color: #888; line-height: 1.5; font-weight: 300; }
+
+  /* Tool system */
+  .tool-section { max-width: 900px; margin: 20px auto; }
+  .tool-flow { background: #12121a; border: 1px solid #ffffff10; border-radius: 12px; padding: 24px; margin-bottom: 16px; }
+  .tool-flow h3 { font-size: 14px; font-weight: 400; color: #fff; margin-bottom: 12px; }
+  .tool-code { background: #0a0a12; border-radius: 8px; padding: 16px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #ccc; line-height: 1.8; overflow-x: auto; }
+  .tool-code .kw { color: #f97316; }
+  .tool-code .str { color: #22c55e; }
+  .tool-code .cmt { color: #555; }
+  .tool-code .type { color: #60a5fa; }
+
+  .hidden { display: none; }
+
+  @media (max-width: 768px) {
+    .parallel-group, .branch { flex-direction: column; }
+    .memory-grid { grid-template-columns: 1fr; }
+    .agents-grid { grid-template-columns: 1fr; }
+    .outcomes { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Klyntbot AI System Architecture</h1>
+  <p>Click any node to expand details &bull; Switch tabs to explore subsystems</p>
+</div>
+
+<div class="tabs">
+  <div class="tab active" data-tab="pipeline">Full Pipeline</div>
+  <div class="tab" data-tab="layers">Crate Layers</div>
+  <div class="tab" data-tab="agents">Agent Profiles</div>
+  <div class="tab" data-tab="react">ReAct Loop</div>
+  <div class="tab" data-tab="memory">Memory System</div>
+  <div class="tab" data-tab="tools">Tool System</div>
+</div>
+
+<div class="canvas">
+
+  <!-- TAB: Full Pipeline -->
+  <div class="tab-content" id="tab-pipeline">
+    <div class="flow">
+
+      <div class="flow-node">
+        <div class="flow-box" onclick="toggle(this)">
+          <div class="label">Entry Point</div>
+          <div class="title">Platform Message</div>
+          <div class="desc">User sends message via Telegram, Discord, Slack, or Email</div>
+          <div class="detail">
+            Each platform channel runs in its own Tokio task via <code>ChannelManager::start_all()</code>.
+            Messages become <code>InboundMessage { channel, chat_id, sender_id, content, kind }</code> and are published to the <code>MessageBus</code> (mpsc channel).
+            Session key = <code>channel:chat_id</code> (e.g., <code>telegram:12345</code>).
+          </div>
+        </div>
+      </div>
+      <div class="arrow"></div>
+
+      <div class="flow-node">
+        <div class="flow-box" onclick="toggle(this)">
+          <div class="label">Coordinator</div>
+          <div class="title">AgentLoop::process_message()</div>
+          <div class="desc">Main processing loop &mdash; session management, pipeline orchestration, event publishing</div>
+          <div class="detail">
+            <strong>Sequence:</strong><br>
+            1. Validate message size<br>
+            2. Short-circuit emoji reactions (satisfaction scoring)<br>
+            3. Get/create session via <code>SessionManager</code><br>
+            4. Append user message to session history<br>
+            5. Fire-and-forget: embed message into LanceDB (conversation recall)<br>
+            6. Fire-and-forget: log to activity log<br>
+            7. Call <code>run_pipeline()</code> &rarr; delegates to <code>AgentRuntime</code><br>
+            8. Save assistant response to session<br>
+            9. Publish <code>ChatTurnCompleted</code> domain event<br>
+            10. Send <code>OutboundMessage</code> back to platform
+          </div>
+        </div>
+      </div>
+      <div class="arrow"></div>
+
+      <div class="flow-node">
+        <div class="flow-box" onclick="toggle(this)">
+          <div class="label">Step 1</div>
+          <div class="title">Agent Selection</div>
+          <div class="desc">AgentManager matches message to one of 5 agent profiles via weighted trigger keywords</div>
+          <div class="detail">
+            <code>AgentManager::match_agent(message)</code> scores each agent's triggers against the message. Longer triggers get higher weight (word count). Falls back to <code>general</code> if no triggers match.<br><br>
+            Agents: <code>general</code> (fallback), <code>task</code>, <code>finance</code>, <code>automation</code>, <code>communication</code>
+          </div>
+        </div>
+      </div>
+      <div class="arrow"></div>
+
+      <div class="flow-node">
+        <div class="flow-box" onclick="toggle(this)">
+          <div class="label">Step 2-3</div>
+          <div class="title">Profile Activation + MCP Filtering</div>
+          <div class="desc">Set active profile into shared state; filter MCP tools to agent's allowed list</div>
+          <div class="detail">
+            The active profile is written to <code>Arc&lt;RwLock&lt;Option&lt;Arc&lt;AgentProfile&gt;&gt;&gt;&gt;</code>, read by <code>AgentContextSource</code> during context assembly.<br><br>
+            MCP tools are filtered per-agent: <code>["*"]</code> = all servers, <code>["google-calendar"]</code> = specific server only.
+          </div>
+        </div>
+      </div>
+      <div class="arrow"></div>
+
+      <div class="flow-node">
+        <div class="flow-box" onclick="toggle(this)">
+          <div class="label">Step 4</div>
+          <div class="title">Intent Classification</div>
+          <div class="desc">Two-stage analysis: zero-cost heuristics first (~70% of messages), LLM classifier for ambiguous cases</div>
+          <div class="detail">
+            <strong>Heuristic Stage (microseconds):</strong><br>
+            &bull; Greeting &rarr; Direct, confidence 0.95<br>
+            &bull; Short message (&lt;20 chars) &rarr; Direct, 0.85<br>
+            &bull; Task verbs (create/add/delete) &rarr; Reactive low budget, 0.90<br>
+            &bull; Question pattern (what is/how does) &rarr; Direct, 0.90<br>
+            &bull; Complex workflows &rarr; Reactive high budget, 0.85<br><br>
+            <strong>LLM Classifier (only if heuristics return None):</strong><br>
+            Lightweight call using <code>classifier_model</code> &rarr; returns <code>IntentAnalysis { mode, confidence, needs_orchestration }</code><br><br>
+            If <code>needs_orchestration</code> = true, agent is overridden to <code>general</code> with restricted tools (ask_user, memory, delegate).
+          </div>
+        </div>
+      </div>
+      <div class="arrow"></div>
+
+      <div class="flow-node">
+        <div class="flow-box" onclick="toggle(this)">
+          <div class="label">Step 5-6</div>
+          <div class="title">Confidence Check + Context Assembly</div>
+          <div class="desc">Downgrade low-confidence Reactive to Direct; assemble system prompt, memories, and history within token budget</div>
+          <div class="detail">
+            <strong>Confidence Downgrade:</strong> If confidence &lt; threshold &rarr; force Direct mode to save tokens.<br><br>
+            <strong>Context Assembly (<code>ContextEngine::assemble</code>):</strong><br>
+            1. Build system prompt from ~11 context sources in parallel (Bootstrap, Identity, Agent, Persona, Todo, Project, Area, Productivity, etc.)<br>
+            2. Retrieve memories via <code>UnifiedMemoryService</code> (semantic facts + conversation recall, RRF-merged)<br>
+            3. Compress history to fit remaining token budget<br>
+            4. SHA-256 cache (LRU, capacity 8) avoids redundant assembly<br><br>
+            Budget priority: SystemPrompt &gt; Tools &gt; Memory &gt; History
+          </div>
+        </div>
+      </div>
+      <div class="arrow"></div>
+
+      <div class="flow-node">
+        <div class="flow-box" onclick="toggle(this)">
+          <div class="label">Step 7</div>
+          <div class="title">Tool Preparation</div>
+          <div class="desc">Filter tools to agent's allowed list; inject delegation tool if needed; add CoT planning for complex requests</div>
+          <div class="detail">
+            &bull; <code>filter_tools_for_profile()</code> retains only tools in agent's <code>tools</code> list (empty = full access)<br>
+            &bull; <code>ask_user</code> is always included<br>
+            &bull; If agent has <code>can_delegate_to</code> + depth &lt; 2 &rarr; inject <code>DelegationTool</code><br>
+            &bull; If complexity_score &ge; 4 &rarr; prepend chain-of-thought planning prompt
+          </div>
+        </div>
+      </div>
+      <div class="arrow"></div>
+
+      <div class="flow-node" style="margin-bottom: 8px;">
+        <div style="text-align: center; font-size: 11px; color: #666; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px;">Step 8 &mdash; Execution Router</div>
+        <div class="branch">
+          <div class="flow-node">
+            <div class="branch-label">Direct Mode</div>
+            <div class="flow-box" onclick="toggle(this)">
+              <div class="title" style="font-size: 14px;">DirectEngine</div>
+              <div class="desc">Single LLM call, no tools</div>
+              <div class="detail">
+                One call to <code>provider.chat()</code>. If the LLM unexpectedly returns tool calls (misclassification), returns <code>EngineResult::Escalate</code> &rarr; retried with ReactiveEngine. Tokens from the failed attempt are combined.
+              </div>
+            </div>
+          </div>
+          <div class="flow-node">
+            <div class="branch-label">Reactive Mode</div>
+            <div class="flow-box" onclick="toggle(this)">
+              <div class="title" style="font-size: 14px;">ReactiveEngine</div>
+              <div class="desc">ReAct loop: think &rarr; act &rarr; observe</div>
+              <div class="detail">
+                Iterates up to <code>max_iterations</code> (10&ndash;30). Each cycle: LLM call &rarr; if tool calls, execute all concurrently (semaphore=10) &rarr; append results &rarr; next iteration. Hash-based duplicate tool call prevention. If max iterations hit &rarr; forced synthesis call with no tools.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="arrow"></div>
+
+      <div class="flow-node">
+        <div class="flow-box" onclick="toggle(this)">
+          <div class="label">Step 9-10</div>
+          <div class="title">Validate + Record</div>
+          <div class="desc">Validate response; record cost, strategy, and interaction patterns for learning</div>
+          <div class="detail">
+            &bull; <code>ResponseValidator</code> checks response length and content<br>
+            &bull; <code>CostTracker::record()</code> persists token usage to SQL (per-model pricing)<br>
+            &bull; <code>StrategyRepo</code> records pipeline outcome<br>
+            &bull; <code>InteractionRecorder</code> records behavioral patterns for the learning system<br>
+            &bull; Budget alerts at 80% and 100% of <code>monthly_budget_usd</code>
+          </div>
+        </div>
+      </div>
+      <div class="arrow"></div>
+
+      <div class="flow-node">
+        <div class="flow-box">
+          <div class="label">Output</div>
+          <div class="title">Response to User</div>
+          <div class="desc">OutboundMessage dispatched back to the originating platform channel</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- TAB: Crate Layers -->
+  <div class="tab-content hidden" id="tab-layers">
+    <p style="text-align:center; font-size:12px; color:#666; margin-bottom:20px;">9 layers, dependencies flow strictly upward. Highlighted = AI-core crates.</p>
+    <div class="layers">
+      <div class="layer-row">
+        <div class="layer-label">L8</div>
+        <div class="layer-items">
+          <div class="layer-item">klyntbot <span style="color:#666">(facade)</span></div>
+        </div>
+      </div>
+      <div class="layer-row">
+        <div class="layer-label">L7</div>
+        <div class="layer-items">
+          <div class="layer-item highlight">app-core</div>
+          <div class="layer-item">desktop-shared</div>
+          <div class="layer-item">desktop</div>
+        </div>
+      </div>
+      <div class="layer-row">
+        <div class="layer-label">L6</div>
+        <div class="layer-items">
+          <div class="layer-item highlight">mcp</div>
+        </div>
+      </div>
+      <div class="layer-row">
+        <div class="layer-label">L5</div>
+        <div class="layer-items">
+          <div class="layer-item highlight">agent</div>
+          <div class="layer-item highlight">cognitive</div>
+          <div class="layer-item">channels</div>
+        </div>
+      </div>
+      <div class="layer-row">
+        <div class="layer-label">L4</div>
+        <div class="layer-items">
+          <div class="layer-item highlight">tools</div>
+          <div class="layer-item">feature-todo</div>
+          <div class="layer-item">feature-finance</div>
+          <div class="layer-item">feature-notes</div>
+          <div class="layer-item">feature-productivity</div>
+          <div class="layer-item">feature-coaching</div>
+          <div class="layer-item">plugin-runtime</div>
+        </div>
+      </div>
+      <div class="layer-row">
+        <div class="layer-label">L3</div>
+        <div class="layer-items">
+          <div class="layer-item highlight">providers</div>
+          <div class="layer-item highlight">session</div>
+          <div class="layer-item">scheduling</div>
+          <div class="layer-item highlight">context_engine</div>
+        </div>
+      </div>
+      <div class="layer-row">
+        <div class="layer-label">L2</div>
+        <div class="layer-items">
+          <div class="layer-item">storage</div>
+          <div class="layer-item">domain</div>
+        </div>
+      </div>
+      <div class="layer-row">
+        <div class="layer-label">L1</div>
+        <div class="layer-items">
+          <div class="layer-item">config</div>
+          <div class="layer-item">bus</div>
+          <div class="layer-item highlight">tools-core</div>
+          <div class="layer-item highlight">tools-core-macros</div>
+        </div>
+      </div>
+      <div class="layer-row">
+        <div class="layer-label">L0</div>
+        <div class="layer-items">
+          <div class="layer-item">common</div>
+        </div>
+      </div>
+    </div>
+    <p style="text-align:center; font-size:11px; color:#555; margin-top:16px;">Orange = AI-core crates &bull; 26 crates total across 9 layers</p>
+  </div>
+
+  <!-- TAB: Agent Profiles -->
+  <div class="tab-content hidden" id="tab-agents">
+    <p style="text-align:center; font-size:12px; color:#666; margin-bottom:20px;">5 built-in agents compiled via <code style="background:#ffffff0a;padding:2px 6px;border-radius:4px;font-size:11px;color:#f97316;">include_str!</code> &mdash; selected by weighted trigger matching before intent classification</p>
+    <div class="agents-grid">
+      <div class="agent-card">
+        <div class="agent-name">General</div>
+        <div class="agent-role">Fallback / Orchestrator</div>
+        <div class="agent-detail">Handles all unmatched messages. When orchestrating, gets restricted to ask_user, memory, and delegate tools only. Max 10 iterations.</div>
+        <div class="agent-tools">
+          <span class="tool-tag">all tools</span>
+          <span class="tool-tag mcp">MCP: *</span>
+        </div>
+      </div>
+      <div class="agent-card">
+        <div class="agent-name">Task</div>
+        <div class="agent-role">Task & Project Management</div>
+        <div class="agent-detail">Triggers: todo, task, project, calendar, notes, deadline, plan, checklist. Max 12 iterations for complex task workflows.</div>
+        <div class="agent-tools">
+          <span class="tool-tag">task</span>
+          <span class="tool-tag">project</span>
+          <span class="tool-tag">notes</span>
+          <span class="tool-tag">okr</span>
+          <span class="tool-tag mcp">google-calendar</span>
+        </div>
+      </div>
+      <div class="agent-card">
+        <div class="agent-name">Finance</div>
+        <div class="agent-role">Budget & Expense Tracking</div>
+        <div class="agent-detail">Triggers: budget, expense, spend, income, savings, transaction, portfolio, investment. Max 10 iterations.</div>
+        <div class="agent-tools">
+          <span class="tool-tag">finance tools</span>
+          <span class="tool-tag">ask_user</span>
+        </div>
+      </div>
+      <div class="agent-card">
+        <div class="agent-name">Automation</div>
+        <div class="agent-role">Scheduling & Cron Jobs</div>
+        <div class="agent-detail">Triggers: remind, schedule, cron, automate, recurring, timer. Max 10 iterations.</div>
+        <div class="agent-tools">
+          <span class="tool-tag">automation</span>
+          <span class="tool-tag">scheduling</span>
+        </div>
+      </div>
+      <div class="agent-card">
+        <div class="agent-name">Communication</div>
+        <div class="agent-role">Cross-Platform Messaging</div>
+        <div class="agent-detail">Triggers: message, email, send, notify, broadcast. Max 10 iterations.</div>
+        <div class="agent-tools">
+          <span class="tool-tag">message</span>
+          <span class="tool-tag">ask_user</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="max-width:900px; margin:24px auto 0; background:#12121a; border:1px solid #ffffff10; border-radius:12px; padding:24px;">
+      <h3 style="font-size:14px; font-weight:400; color:#fff; margin-bottom:12px;">Agent Selection Flow</h3>
+      <div class="retrieval-steps">
+        <div class="r-step"><div class="r-label">Input</div>User message</div>
+        <div class="r-arrow">&rarr;</div>
+        <div class="r-step"><div class="r-label">Match</div>Trigger scoring<br><span style="font-size:10px;color:#666;">(word count weight)</span></div>
+        <div class="r-arrow">&rarr;</div>
+        <div class="r-step"><div class="r-label">Result</div>Best match<br><span style="font-size:10px;color:#666;">or general fallback</span></div>
+        <div class="r-arrow">&rarr;</div>
+        <div class="r-step"><div class="r-label">Override?</div>needs_orchestration<br><span style="font-size:10px;color:#666;">&rarr; force general</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: ReAct Loop -->
+  <div class="tab-content hidden" id="tab-react">
+    <div class="react-container">
+      <div class="react-loop">
+        <h3>Reactive Engine &mdash; ReAct Loop</h3>
+        <div class="react-steps">
+          <div class="react-step">
+            <div class="react-num">1</div>
+            <div class="react-content">
+              <div class="step-title">LLM Call</div>
+              <div class="step-desc"><code style="background:#ffffff0a;padding:2px 6px;border-radius:4px;font-size:10px;color:#f97316;">provider.chat_stream(messages, tools)</code> &mdash; sends system prompt + history + tool schemas. Streams tokens via <code style="background:#ffffff0a;padding:2px 6px;border-radius:4px;font-size:10px;color:#f97316;">ContentChunk</code> events.</div>
+            </div>
+          </div>
+          <div class="react-step">
+            <div class="react-num">2</div>
+            <div class="react-content">
+              <div class="step-title">Check Response</div>
+              <div class="step-desc">If text only &rarr; <strong>FinalResponse</strong> (done). If fabricated tool output &rarr; inject correction, retry. If tool calls &rarr; continue to step 3.</div>
+            </div>
+          </div>
+          <div class="react-step">
+            <div class="react-num">3</div>
+            <div class="react-content">
+              <div class="step-title">Dedup Check</div>
+              <div class="step-desc">Hash each tool call as <code style="background:#ffffff0a;padding:2px 6px;border-radius:4px;font-size:10px;color:#f97316;">tool_name|args_hash</code>. Duplicates get synthetic "already called" result without re-executing.</div>
+            </div>
+          </div>
+          <div class="react-step">
+            <div class="react-num">4</div>
+            <div class="react-content">
+              <div class="step-title">Execute Tools</div>
+              <div class="step-desc">All tool calls run <strong>concurrently</strong> via <code style="background:#ffffff0a;padding:2px 6px;border-radius:4px;font-size:10px;color:#f97316;">join_all</code> with Semaphore(10). Each has a configurable timeout. Emits <code style="background:#ffffff0a;padding:2px 6px;border-radius:4px;font-size:10px;color:#f97316;">ToolStart</code>/<code style="background:#ffffff0a;padding:2px 6px;border-radius:4px;font-size:10px;color:#f97316;">ToolEnd</code> events.</div>
+            </div>
+          </div>
+          <div class="react-step">
+            <div class="react-num">5</div>
+            <div class="react-content">
+              <div class="step-title">Append Results</div>
+              <div class="step-desc">Tool results added as <code style="background:#ffffff0a;padding:2px 6px;border-radius:4px;font-size:10px;color:#f97316;">Message::tool(id, name, result)</code> to conversation history. Loop back to step 1.</div>
+            </div>
+          </div>
+        </div>
+        <div class="loop-indicator">
+          &#x21bb; Repeats for up to max_iterations (10&ndash;30, based on complexity score)
+        </div>
+      </div>
+
+      <div style="margin-top:16px;">
+        <div class="outcomes">
+          <div class="outcome">
+            <div class="o-label">Final Response</div>
+            <p>LLM returns text without tool calls. Loop ends, response sent to user.</p>
+          </div>
+          <div class="outcome escalate">
+            <div class="o-label">Max Iterations</div>
+            <p>Budget exhausted. Forced synthesis call with NO tools &rarr; LLM must produce text summary.</p>
+          </div>
+          <div class="outcome escalate">
+            <div class="o-label">Direct &rarr; Escalate</div>
+            <p>DirectEngine gets tool calls. Auto-escalates to ReactiveEngine. Tokens combined.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: Memory System -->
+  <div class="tab-content hidden" id="tab-memory">
+    <div class="memory-grid">
+      <div class="memory-card">
+        <h3>Semantic Facts</h3>
+        <div class="type">Long-term Knowledge</div>
+        <p>Subject-predicate-object triples with confidence scores and spaced-repetition decay. Stored in SQLite + LanceDB vectors.</p>
+        <div class="example">user: editor = neovim (confidence: 0.92)</div>
+      </div>
+      <div class="memory-card">
+        <h3>Episodic Memories</h3>
+        <div class="type">Conversation Snapshots</div>
+        <p>Temporal conversation summaries with context. Enable recall of past interactions and their outcomes.</p>
+        <div class="example">2024-03-10: discussed migration plan for API v2</div>
+      </div>
+      <div class="memory-card">
+        <h3>Procedural Rules</h3>
+        <div class="type">Learned Behaviors</div>
+        <p>Behavioral patterns extracted by the L5 cognitive pipeline. Adjusts agent behavior over time.</p>
+        <div class="example">when user says "quick" &rarr; prefer Direct mode</div>
+      </div>
+    </div>
+
+    <div class="retrieval-flow">
+      <h3>Unified Memory Retrieval Pipeline</h3>
+      <div class="retrieval-steps">
+        <div class="r-step"><div class="r-label">Query</div>User message</div>
+        <div class="r-arrow">&rarr;</div>
+        <div class="r-step"><div class="r-label">Vector</div>LanceDB<br>similarity</div>
+        <div class="r-arrow">+</div>
+        <div class="r-step"><div class="r-label">BM25</div>Full-text<br>search</div>
+        <div class="r-arrow">&rarr;</div>
+        <div class="r-step"><div class="r-label">Hybrid</div>RRF merge<br><span style="font-size:10px;color:#666">k=60.0</span></div>
+        <div class="r-arrow">&rarr;</div>
+        <div class="r-step"><div class="r-label">Dedup</div>Facts win over<br>overlapping recalls</div>
+        <div class="r-arrow">&rarr;</div>
+        <div class="r-step"><div class="r-label">Output</div>Scored<br>memories</div>
+      </div>
+      <p style="text-align:center; font-size:11px; color:#555; margin-top:16px;">Background consolidation triggered by <code style="background:#ffffff0a;padding:2px 6px;border-radius:4px;font-size:10px;color:#f97316;">ChatTurnCompleted</code> domain event &mdash; async fact extraction without blocking response</p>
+    </div>
+  </div>
+
+  <!-- TAB: Tool System -->
+  <div class="tab-content hidden" id="tab-tools">
+    <div class="tool-section">
+      <div class="tool-flow">
+        <h3>Derive-Based Tool Definition</h3>
+        <div class="tool-code">
+<span class="cmt">// Auto-generates JSON Schema, execute() bridge, and from_args()</span>
+<span class="kw">#[derive(Tool)]</span>
+<span class="kw">#[tool(</span>name = <span class="str">"create_task"</span>, description = <span class="str">"Create a new task"</span><span class="kw">)]</span>
+<span class="kw">struct</span> <span class="type">CreateTask</span> { registry: <span class="type">Arc&lt;ToolRegistry&gt;</span> }
+
+<span class="kw">#[derive(ToolParams)]</span>
+<span class="kw">struct</span> <span class="type">CreateTaskParams</span> {
+    <span class="cmt">/// The task title</span>
+    title: <span class="type">String</span>,
+    <span class="cmt">/// Optional project to assign to</span>
+    project_id: <span class="type">Option&lt;String&gt;</span>,
+}
+
+<span class="kw">impl</span> <span class="type">ToolExecute</span> <span class="kw">for</span> <span class="type">CreateTask</span> {
+    <span class="kw">async fn</span> execute(&self, args: <span class="type">CreateTaskParams</span>, ctx: &<span class="type">RoutingContext</span>) -> <span class="type">Result&lt;String&gt;</span> {
+        <span class="cmt">// Business logic here</span>
+    }
+}
+        </div>
+      </div>
+
+      <div class="tool-flow">
+        <h3>Tool Execution Flow</h3>
+        <div class="retrieval-steps">
+          <div class="r-step"><div class="r-label">LLM</div>Returns<br>tool_calls[]</div>
+          <div class="r-arrow">&rarr;</div>
+          <div class="r-step"><div class="r-label">Registry</div>prepare()<br>lookup + validate</div>
+          <div class="r-arrow">&rarr;</div>
+          <div class="r-step"><div class="r-label">Concurrent</div>join_all()<br>semaphore(10)</div>
+          <div class="r-arrow">&rarr;</div>
+          <div class="r-step"><div class="r-label">Execute</div>Tool::execute()<br>with RoutingContext</div>
+          <div class="r-arrow">&rarr;</div>
+          <div class="r-step"><div class="r-label">Result</div>Message::tool()<br>back to LLM</div>
+        </div>
+      </div>
+
+      <div class="tool-flow">
+        <h3>FeaturePackage System</h3>
+        <p style="font-size:12px; color:#888; line-height:1.7; font-weight:300;">
+          Each <code style="background:#ffffff0a;padding:2px 6px;border-radius:4px;font-size:11px;color:#f97316;">feature-*</code> crate implements <code style="background:#ffffff0a;padding:2px 6px;border-radius:4px;font-size:11px;color:#f97316;">FeaturePackage</code> &mdash; bundles tools + SQL migrations + config section + health check. Registered by <code style="background:#ffffff0a;padding:2px 6px;border-radius:4px;font-size:11px;color:#f97316;">app-core</code> during initialization.
+        </p>
+        <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:12px;">
+          <div class="layer-item">feature-todo</div>
+          <div class="layer-item">feature-finance</div>
+          <div class="layer-item">feature-notes</div>
+          <div class="layer-item">feature-productivity</div>
+          <div class="layer-item">feature-coaching</div>
+          <div class="layer-item">plugin-runtime <span style="color:#666">(WASM)</span></div>
+        </div>
+      </div>
+
+      <div class="tool-flow">
+        <h3>MCP Tools</h3>
+        <p style="font-size:12px; color:#888; line-height:1.7; font-weight:300;">
+          MCP tools are discovered via <code style="background:#ffffff0a;padding:2px 6px;border-radius:4px;font-size:11px;color:#f97316;">tools/list</code> JSON-RPC, wrapped as <code style="background:#ffffff0a;padding:2px 6px;border-radius:4px;font-size:11px;color:#f97316;">McpTool</code> (implements standard <code style="background:#ffffff0a;padding:2px 6px;border-radius:4px;font-size:11px;color:#f97316;">Tool</code> trait), and namespaced as <code style="background:#ffffff0a;padding:2px 6px;border-radius:4px;font-size:11px;color:#f97316;">mcp_{server}_{tool}</code>.
+          Two transports: stdio (local) and HTTP (remote). Hot reconnect supported via <code style="background:#ffffff0a;padding:2px 6px;border-radius:4px;font-size:11px;color:#f97316;">unregister_by_prefix()</code> + re-registration.
+        </p>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  function toggle(el) {
+    el.classList.toggle('expanded');
+  }
+
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+      tab.classList.add('active');
+      document.getElementById('tab-' + tab.dataset.tab).classList.remove('hidden');
+    });
+  });
+</script>
+
+</body>
+</html>

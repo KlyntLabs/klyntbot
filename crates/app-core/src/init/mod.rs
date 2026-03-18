@@ -94,6 +94,10 @@ impl AppCore {
         let cron::CronResult {
             cron_service,
             notification_dispatcher,
+            proactive_handler,
+            suggestion_applier,
+            decomposition_handler,
+            forecast_handler,
         } = cron::init_cron(
             &config,
             &repos,
@@ -266,6 +270,10 @@ impl AppCore {
             event_emitter: event_emitter.unwrap_or_else(|| Arc::new(NoopEmitter)),
             note_embedding_handler,
             launcher_engine,
+            proactive_handler,
+            suggestion_applier,
+            decomposition_handler,
+            forecast_handler,
             insight_service: {
                 let insight_repo =
                     feature_insights::InsightReviewRepo::new(storage_pool.inner().clone());

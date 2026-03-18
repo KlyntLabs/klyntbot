@@ -45,6 +45,7 @@ export interface DetailTask {
   totalTrackedSecs: number;
   focusedAt: string | null;
   acceptanceCriteria: string | null;
+  complexityScore: number | null;
   completed: boolean;
   createdAt: string;
   updatedAt: string;
@@ -61,6 +62,7 @@ export interface ActivityEntry {
 
 export interface Suggestion {
   id: string;
+  suggestionType: string;
   title: string;
   description: string;
   confidence: number;
@@ -303,6 +305,7 @@ export function taskToDetailTask(
     totalTrackedSecs: task.totalTrackedSecs ?? 0,
     focusedAt: task.focusedAt ?? null,
     acceptanceCriteria: task.acceptanceCriteria ?? null,
+    complexityScore: task.complexityScore ?? null,
     completed: task.completed,
     createdAt: task.createdAt ?? "",
     updatedAt: task.updatedAt ?? "",

@@ -1,6 +1,6 @@
 use desktop_shared::commands::{
-    ObjectiveResponse, ProjectResponse, TaskCreateParams, TaskResponse, TaskUpdateParams,
-    TodayTaskResponse,
+    DecompositionResponse, ObjectiveResponse, ProjectResponse, SuggestionResponse,
+    TaskCreateParams, TaskForecastResponse, TaskResponse, TaskUpdateParams, TodayTaskResponse,
 };
 use desktop_shared::errors::ApiError;
 use std::sync::Arc;
@@ -127,6 +127,71 @@ pub async fn objective_list(
     state.objective_list_for_tasks(project_id).await
 }
 
+#[tauri::command]
+pub async fn task_get_suggestions(
+    state: State<'_, Arc<AppCore>>,
+    task_id: String,
+) -> Result<Vec<SuggestionResponse>, ApiError> {
+    state.task_get_suggestions(task_id).await
+}
+
+#[tauri::command]
+pub async fn task_apply_suggestion(
+    state: State<'_, Arc<AppCore>>,
+    app: tauri::AppHandle,
+    suggestion_id: String,
+) -> Result<TaskResponse, ApiError> {
+    let (response, updates) = state.task_apply_suggestion(suggestion_id).await?;
+    super::emit_updates(&app, &updates);
+    Ok(response)
+}
+
+#[tauri::command]
+pub async fn task_dismiss_suggestion(
+    state: State<'_, Arc<AppCore>>,
+    suggestion_id: String,
+) -> Result<(), ApiError> {
+    state.task_dismiss_suggestion(suggestion_id).await
+}
+
+#[tauri::command]
+pub async fn task_decompose(
+    state: State<'_, Arc<AppCore>>,
+    app: tauri::AppHandle,
+    task_id: String,
+) -> Result<DecompositionResponse, ApiError> {
+    let (response, updates) = state.task_decompose(task_id).await?;
+    super::emit_updates(&app, &updates);
+    Ok(response)
+}
+
+#[tauri::command]
+pub async fn task_apply_decomposition(
+    state: State<'_, Arc<AppCore>>,
+    app: tauri::AppHandle,
+    decomposition_id: String,
+) -> Result<Vec<TaskResponse>, ApiError> {
+    let (response, updates) = state.task_apply_decomposition(decomposition_id).await?;
+    super::emit_updates(&app, &updates);
+    Ok(response)
+}
+
+#[tauri::command]
+pub async fn task_reject_decomposition(
+    state: State<'_, Arc<AppCore>>,
+    decomposition_id: String,
+) -> Result<(), ApiError> {
+    state.task_reject_decomposition(decomposition_id).await
+}
+
+#[tauri::command]
+pub async fn task_forecast(
+    state: State<'_, Arc<AppCore>>,
+    task_id: String,
+) -> Result<TaskForecastResponse, ApiError> {
+    state.task_forecast(task_id).await
+}
+
 // ── Dev server dispatch ─────────────────────────────────────────────
 
 #[cfg(test)]
@@ -143,6 +208,13 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "objective_list",
     "task_start_focus",
     "task_end_focus",
+    "task_get_suggestions",
+    "task_apply_suggestion",
+    "task_dismiss_suggestion",
+    "task_decompose",
+    "task_apply_decomposition",
+    "task_reject_decomposition",
+    "task_forecast",
 ];
 
 #[cfg(debug_assertions)]
@@ -199,6 +271,33 @@ pub(crate) async fn dispatch_dev(
                 Ok(None) => dev::val(Ok::<_, ApiError>(None::<TaskResponse>)),
                 Err(e) => dev::val(Err::<Option<TaskResponse>, _>(e)),
             }
+        }
+        "task_get_suggestions" => {
+            let task_id = try_field!(dev::get_str(body, "taskId"));
+            dev::val(core.task_get_suggestions(task_id).await)
+        }
+        "task_apply_suggestion" => {
+            let suggestion_id = try_field!(dev::get_str(body, "suggestionId"));
+            dev::val_rh(core.task_apply_suggestion(suggestion_id).await)
+        }
+        "task_dismiss_suggestion" => {
+            let suggestion_id = try_field!(dev::get_str(body, "suggestionId"));
+            dev::val(core.task_dismiss_suggestion(suggestion_id).await)
+        }
+        "task_decompose" => dev::val_rh(
+            core.task_decompose(try_field!(dev::get_str(body, "taskId")))
+                .await,
+        ),
+        "task_apply_decomposition" => dev::val_rh(
+            core.task_apply_decomposition(try_field!(dev::get_str(body, "decompositionId")))
+                .await,
+        ),
+        "task_reject_decomposition" => dev::val(
+            core.task_reject_decomposition(try_field!(dev::get_str(body, "decompositionId")))
+                .await,
+        ),
+        "task_forecast" => {
+            dev::val(core.task_forecast(try_field!(dev::get_str(body, "taskId"))).await)
         }
         _ => return None,
     })

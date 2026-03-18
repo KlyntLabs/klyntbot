@@ -66,4 +66,15 @@ impl TaskRepo {
         .await?;
         Ok(result.rows_affected() > 0)
     }
+
+    /// Reject a pending decomposition.
+    pub async fn reject_decomposition(&self, id: &str) -> Result<bool, StorageError> {
+        let result = sqlx::query(
+            "UPDATE task_decompositions SET status = 'rejected', applied_at = datetime('now') WHERE id = ?1 AND status = 'pending'",
+        )
+        .bind(id)
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected() > 0)
+    }
 }

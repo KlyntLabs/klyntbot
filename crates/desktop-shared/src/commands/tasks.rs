@@ -53,6 +53,68 @@ pub struct TaskCreateParams {
     pub estimated_minutes: Option<i32>,
 }
 
+// ── AI Suggestion ───────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SuggestionResponse {
+    pub id: String,
+    pub suggestion_type: String,
+    pub title: String,
+    pub description: Option<String>,
+    pub confidence: f64,
+    pub status: String,
+    pub created_at: String,
+}
+
+// ── AI Decomposition ────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DecompositionResponse {
+    pub id: String,
+    pub confidence: f64,
+    pub reasoning: String,
+    pub subtasks: Vec<PlannedSubtaskResponse>,
+    pub total_estimated_mins: Option<i32>,
+    pub warnings: Vec<String>,
+    pub auto_applied: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlannedSubtaskResponse {
+    pub temp_id: String,
+    pub title: String,
+    pub description: Option<String>,
+    pub estimated_minutes: Option<i32>,
+    pub energy_level: Option<String>,
+    pub priority: Option<i16>,
+    pub children: Vec<PlannedSubtaskResponse>,
+}
+
+// ── AI Forecast ────────────────────────────────────────────────────────
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct TaskForecastResponse {
+    pub estimated_minutes: i32,
+    pub confidence_low: i32,
+    pub confidence_high: i32,
+    pub methodology: String,
+    pub sample_size: u32,
+    pub data_quality: String,
+    pub risks: Vec<ForecastRiskResponse>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ForecastRiskResponse {
+    pub kind: String,
+    pub description: String,
+    pub impact_minutes: Option<i32>,
+}
+
 // ── Today Task (tray view) ──────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

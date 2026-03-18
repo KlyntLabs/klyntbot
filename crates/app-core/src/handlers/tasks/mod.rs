@@ -1,8 +1,11 @@
 mod converters;
 mod crud;
+mod decomposition;
 pub mod focus;
+mod forecast;
 pub mod proactive;
 mod queries;
+mod suggestions;
 
 // Re-exports required by sibling handler files
 pub(crate) use converters::{kr_to_response, objective_to_response, priority_label, row_to_task};

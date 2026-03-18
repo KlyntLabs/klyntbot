@@ -2,8 +2,7 @@ use std::sync::Arc;
 
 use bus::{DomainEventBus, MessageBus};
 use feature_tasks::handlers::suggestion_applier::SuggestionApplier;
-use feature_tasks::ProactiveHandler;
-use feature_tasks::TasksConfig;
+use feature_tasks::{DecompositionHandler, ForecastHandler, ProactiveHandler, TasksConfig};
 use scheduling::CronService;
 use storage::Repos;
 use tracing::{error, info, warn};
@@ -12,6 +11,10 @@ use tracing::{error, info, warn};
 pub(super) struct CronResult {
     pub cron_service: Arc<CronService>,
     pub notification_dispatcher: Arc<agent::NotificationDispatcher>,
+    pub proactive_handler: Option<Arc<dyn feature_tasks::ProactiveHandler>>,
+    pub suggestion_applier: Option<Arc<dyn SuggestionApplier>>,
+    pub decomposition_handler: Option<Arc<dyn DecompositionHandler>>,
+    pub forecast_handler: Option<Arc<dyn ForecastHandler>>,
 }
 
 pub const JOB_PROACTIVE_SCAN: &str = "proactive_scan";
@@ -47,6 +50,25 @@ pub(super) async fn init_cron(
         ),
     });
 
+    // Build AI decomposition and forecast handlers.
+    let decomposition_handler: Option<Arc<dyn DecompositionHandler>> = {
+        let task_repo = repos.tasks.clone();
+        Some(Arc::new(agent::handlers::LlmDecompositionHandler::new(
+            provider.clone(),
+            config.agents.defaults.model.clone(),
+            task_repo,
+            Some(Arc::clone(domain_event_bus)),
+        )))
+    };
+    let forecast_handler: Option<Arc<dyn ForecastHandler>> = {
+        let task_repo = repos.tasks.clone();
+        Some(Arc::new(agent::handlers::LlmForecastHandler::new(
+            provider.clone(),
+            config.agents.defaults.model.clone(),
+            task_repo,
+        )))
+    };
+
     // Build the proactive handler and applier for the cron job.
     // Uses its own LlmProactiveHandler instance (domain_bus=None — event emission
     // happens in run_proactive_scan after persist, not inside the handler).
@@ -65,6 +87,10 @@ pub(super) async fn init_cron(
             task_repo,
         )))
     };
+
+    // Clone handlers before they're moved into cron closures so AppCore can hold refs too.
+    let proactive_handler_out = Some(proactive_handler.clone());
+    let suggestion_applier_out = suggestion_applier.clone();
 
     register_cron_callbacks(
         &mut cron_service,
@@ -88,6 +114,10 @@ pub(super) async fn init_cron(
     Ok(CronResult {
         cron_service,
         notification_dispatcher,
+        proactive_handler: proactive_handler_out,
+        suggestion_applier: suggestion_applier_out,
+        decomposition_handler,
+        forecast_handler,
     })
 }
 
