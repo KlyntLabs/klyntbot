@@ -1,8 +1,8 @@
 # Persona Squads & Agent Evolution — Design Spec
 
 **Date:** 2026-03-18
-**Status:** Approved
-**Phase:** 1 (Insight Review), 2 (Chat Mode), 3 (Multi-Agent — future)
+**Status:** Approved (Phase 1 only; Phase 2+3 are directional)
+**Scope:** Phase 1 (Insight Review) — fully specified. Phase 2 (Chat Mode) and Phase 3 (Multi-Agent) are directional outlines for future specs.
 
 ## Problem
 
@@ -77,7 +77,7 @@ Introduce **Squads** (reusable persona groups) with **Persona Skills** (agent-li
 | Column       | Type    | Notes                                         |
 |--------------|---------|-----------------------------------------------|
 | squad_id     | TEXT    | FK → squads.id                                |
-| persona_id   | TEXT    | FK → personas.id                              |
+| persona_id   | TEXT    | FK → insight_personas.id                      |
 | role_in_squad| TEXT    | e.g., "lead", "reviewer", "advisor"           |
 | sort_order   | INTEGER | Display/execution order                       |
 | PRIMARY KEY  |         | (squad_id, persona_id)                        |
@@ -95,62 +95,67 @@ Existing fields unchanged. New fields added:
 
 ### New Types
 
-| Type                    | Crate        | Purpose                                           |
-|-------------------------|--------------|----------------------------------------------------|
-| `SquadRow`              | cognitive    | DB row for squads table                            |
-| `SquadMemberRow`        | cognitive    | DB row for squad_members join table                |
-| `SquadRepo`             | cognitive    | CRUD + resolve_squad() + seed_builtins()           |
-| `PersonaSkillMetadata`  | cognitive    | Parsed persona skill metadata                      |
-| `SkillType::Persona`    | skill-system | New variant alongside Skill and Orchestrator       |
-| `PersonaPerspectiveSource` | agent     | ContextSource impl for persona skill injection     |
-| `SquadExecutor`         | agent        | Phase 2: fan-out to persona calls + synthesis      |
+| Type                       | Crate          | Purpose                                            |
+|----------------------------|----------------|----------------------------------------------------|
+| `SquadRow`                 | `cognitive`    | DB row for squads table                            |
+| `SquadMemberRow`           | `cognitive`    | DB row for squad_members join table                |
+| `SquadRepo`                | `cognitive`    | CRUD + resolve_squad() + seed_builtins()           |
+| `PersonaSkillMetadata`     | `skill-system` | Parsed persona skill metadata (lives in L3 to avoid circular dep with cognitive at L5) |
+| `SkillType::Persona`       | `skill-system` | New variant alongside Skill and Orchestrator       |
+| `PersonaPerspectiveSource` | `agent`        | ContextSource impl — replaces `AnalysisPersonaContextSource` |
+| `SquadExecutor`            | `agent`        | Phase 2: fan-out to persona calls + synthesis      |
+
+**Dependency note:** `PersonaSkillMetadata` lives in `skill-system` (L3), not `cognitive` (L5). The `cognitive` crate stores raw deserialized fields on `PersonaRow` (the flat columns: `questioning_style`, `cognitive_bias`, `analysis_frameworks` as JSON text). The `skill-system` crate parses PERSONA.md files into `PersonaSkillMetadata` which includes the full body + references. `app-core` (L7) can depend on both crates and translate between them.
 
 ## Storage Layout
 
 ### Builtin (compiled via `include_str!`)
 
+**Flat persona registry + squad references by name.** Shared personas (e.g., Skeptic used in General Analysis + Research) are defined once in a flat `personas/` directory. SQUAD.md files reference personas by name, not by filesystem path. This avoids symlinks (which `include_str!` handles inconsistently cross-platform) and file duplication.
+
 ```
 squads/
 ├── general-analysis/
-│   ├── SQUAD.md
-│   └── personas/
-│       ├── skeptic/
-│       │   ├── PERSONA.md
-│       │   └── references/
-│       ├── connector/
-│       │   └── PERSONA.md
-│       ├── student/
-│       │   └── PERSONA.md
-│       └── devils-advocate/
-│           └── PERSONA.md
+│   └── SQUAD.md           (personas: [skeptic, connector, student, devils-advocate])
 ├── research-academic/
-│   ├── SQUAD.md
-│   └── personas/
-│       ├── skeptic/          (symlink or shared reference)
-│       ├── academic-reviewer/
-│       │   └── PERSONA.md
-│       ├── methodologist/
-│       │   └── PERSONA.md
-│       └── student/
+│   └── SQUAD.md           (personas: [skeptic, academic-reviewer, methodologist, student])
 ├── finance-analysis/
-│   ├── SQUAD.md
-│   └── personas/
-│       ├── deep-analyst/
-│       │   ├── PERSONA.md
-│       │   └── references/
-│       │       ├── dcf-guide.md
-│       │       └── ratio-cheatsheet.md
-│       ├── risk-reviewer/
-│       │   └── PERSONA.md
-│       └── strategist/
+│   └── SQUAD.md           (personas: [deep-analyst, risk-reviewer, strategist])
 └── strategy-planning/
-    ├── SQUAD.md
-    └── personas/
-        ├── strategist/
-        ├── practitioner/
-        │   └── PERSONA.md
-        └── devils-advocate/
+    └── SQUAD.md           (personas: [strategist, practitioner, devils-advocate])
+
+personas/                  (flat registry — each persona defined once)
+├── skeptic/
+│   └── PERSONA.md
+├── connector/
+│   └── PERSONA.md
+├── student/
+│   └── PERSONA.md
+├── devils-advocate/
+│   └── PERSONA.md
+├── practitioner/
+│   └── PERSONA.md
+├── strategist/
+│   └── PERSONA.md
+├── academic-reviewer/
+│   └── PERSONA.md
+├── methodologist/
+│   └── PERSONA.md
+├── deep-analyst/
+│   ├── PERSONA.md
+│   └── references/
+│       ├── dcf-guide.md
+│       └── ratio-cheatsheet.md
+└── risk-reviewer/
+    └── PERSONA.md
 ```
+
+**Seeding approach:** Two-stage `include_str!` + hardcoded structs, same pattern as orchestrator skills in `skill-system`:
+
+1. **Compile time:** SQUAD.md and PERSONA.md files are compiled into the binary via `include_str!` macros in the `skill-system` crate (alongside existing orchestrator skills). The `PersonaSkillParser` parses them into `PersonaSkillMetadata` structs.
+2. **Startup (`SquadRepo::seed_builtins()`):** Iterates the parsed metadata, converts to `INSERT OR IGNORE` SQL for `insight_personas`, `squads`, and `squad_members` tables. Idempotent — safe to call on every startup.
+
+This differs from the current `PersonaRepo::seed_builtins()` which uses fully hardcoded Rust const structs (no markdown). The new approach uses markdown as the source of truth so persona skills can carry a body and references, but the seeding SQL pattern is the same.
 
 ### User-created
 
@@ -194,6 +199,9 @@ and strategic positioning.
 ```yaml
 ---
 name: deep-analyst
+description: >
+  Rigorous financial analyst specializing in DCF valuation,
+  ratio analysis, and scenario modeling.
 persona_only: true
 version: "1.0.0"
 icon: 📊
@@ -222,7 +230,7 @@ data-backed tone. You are skeptical of optimistic projections
 and always highlight downside risks.
 ```
 
-**Parser behavior:** Reuses the existing skill markdown parser. When `persona_only: true`, the parser ignores `tools`, `mcp_tools`, `max_iterations`, `can_delegate_to`, and `triggers`. Extracts `metadata` into `PersonaSkillMetadata`. The body becomes the persona's system prompt section.
+**Parser behavior:** Reuses the existing skill markdown parser. The `description` field is required (existing parser constraint). When `persona_only: true`, the parser ignores `tools`, `mcp_tools`, `max_iterations`, `can_delegate_to`, and `triggers`. Extracts `metadata` into `PersonaSkillMetadata` (defined in `skill-system` crate). The body becomes the persona's system prompt section.
 
 ## Three-Tier Memory Scoping
 
@@ -237,7 +245,32 @@ Global (scope_type = "system")
 - Squad-level synthesis sees: **Global + Squad**
 - Memory promotion (Phase 3): Persona → Squad → Global via reflection
 
-**Implementation:** Extends existing `scope_type`/`scope_id` columns in `semantic_facts`, `episodic_memories`, and `procedural_rules`. `MemoryRetriever` accepts a scope chain `[("system", None), ("squad", Some(squad_id)), ("persona", Some(persona_id))]` and queries all tiers.
+**Implementation:** The existing cognitive tables (`semantic_facts`, `episodic_memories`, `procedural_rules`) currently use `project_id` as their sole scoping column. This feature adds `scope_type` and `scope_id` columns.
+
+**Pre-release migration strategy:** Since no user data exists, modify the existing `CREATE TABLE` statements directly in `001_cognitive_tables.sql` to include the new columns inline (not via `ALTER TABLE`). Example for `semantic_facts`:
+
+```sql
+CREATE TABLE IF NOT EXISTS semantic_facts (
+    -- ... existing columns ...
+    scope_type TEXT NOT NULL DEFAULT 'system',
+    scope_id TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_semantic_facts_scope ON semantic_facts(scope_type, scope_id);
+
+-- Same pattern for episodic_memories and procedural_rules
+```
+
+The corresponding row structs (`SemanticFact`, `EpisodicMemory`, `ProceduralRule` in `cognitive/src/types.rs`) gain `scope_type: String` and `scope_id: Option<String>` fields. All explicit-column SQL in repo methods (`upsert()`, `reinstate_archived()`, `archive_superseded()`, etc.) must also include the new columns in their INSERT/UPDATE column lists and bind parameters.
+
+`MemoryRetriever` gains a new method `retrieve_scoped()` that accepts a scope chain `[("system", None), ("squad", Some(squad_id)), ("persona", Some(persona_id))]` and queries with correlated scope filtering:
+
+```sql
+WHERE (scope_type = 'system')
+   OR (scope_type = 'squad' AND scope_id = ?squad_id)
+   OR (scope_type = 'persona' AND scope_id = ?persona_id)
+```
+
+The existing `retrieve()` method continues to work unchanged (defaults to system scope). `UnifiedMemoryService` delegates to `retrieve_scoped()` when a squad context is active.
 
 ## Builtin Squads
 
@@ -274,7 +307,7 @@ Current 6 builtins redistributed:
 
 4 new personas added: Academic Reviewer, Methodologist, Deep Analyst, Risk Reviewer.
 
-Pre-release: drop existing persona table, recreate with new schema. No migration scripts needed.
+Pre-release: drop existing `insight_personas` table, recreate with new schema. No migration scripts needed. Existing persona tests (e.g., `assert_eq!(active.len(), 6)` in `persona.rs`) must be updated for the new 10-persona builtin count.
 
 ## Execution Architecture
 
@@ -284,7 +317,7 @@ Pre-release: drop existing persona table, recreate with new schema. No migration
 User selects squad
     → resolve_squad() loads squad + all members
     → Orchestrator does shared analysis pass (tool calls OK)
-    → tokio::join! fans out to N persona LLM calls (parallel)
+    → join_all fans out to N persona LLM calls (parallel)
         Each call gets:
         - Note content
         - Orchestrator context
@@ -297,7 +330,7 @@ User selects squad
 
 **Key changes from current system:**
 - `select_personas()` → `resolve_squad()` — loads squad + all members
-- Single prompt → N parallel LLM calls via `tokio::join!`
+- Single prompt → N parallel LLM calls via `futures::future::join_all` (variable N at runtime)
 - Each call includes persona skill body + three-tier scoped memory
 - SSE streaming per persona card (independent progress)
 - `SquadExecutor` reuses existing `DirectEngine` for each persona call
@@ -308,7 +341,8 @@ User selects squad
 
 ```
 User sends message to squad
-    → AgentRuntime::process_message(squad_id: Some("..."))
+    → RoutingContext { squad_id: Some("..."), ... }
+    → AgentRuntime::process_message(ctx)
     → Orchestrator routes:
         1. Tool call → orchestrator handles directly
         2. Fan-out → each persona responds with perspective
@@ -317,7 +351,7 @@ User sends message to squad
     → Persona outputs stored as Message rows with persona_id field
 ```
 
-**Integration:** `AgentRuntime::process_message()` gains `squad_id: Option<String>`. When set, runtime loads squad, resolves orchestrator + personas, executes layered. Orchestrator still controls tool filtering, MCP access, delegation.
+**Integration:** `RoutingContext` gains `squad_id: Option<String>`. When set, runtime loads squad, resolves orchestrator + personas, executes layered. This avoids breaking the `process_message()` signature — all callers already pass `RoutingContext`. Orchestrator still controls tool filtering, MCP access, delegation.
 
 ### Phase 3 — Multi-Agent Collaboration (Future)
 
@@ -334,11 +368,12 @@ Intentionally left high-level — designed after Phase 1+2 usage data:
 
 **cognitive (L5):**
 - New `SquadRow`, `SquadMemberRow` tables
-- New `SquadRepo` — CRUD, `resolve_squad()`, `seed_builtins()` (loads from `squads/{name}/SQUAD.md` at startup, same pattern as `status_workflows`)
-- New `PersonaSkillMetadata` struct
+- New `SquadRepo` — CRUD, `resolve_squad()`, `seed_builtins()` (idempotent seeding from compiled markdown, same pattern as `PersonaRepo::seed_builtins()`)
 - Extend `PersonaRow` — add `skill_path`, `questioning_style`, `cognitive_bias`, `analysis_frameworks`
 - Extend `PersonaRepo::seed_builtins()` for squad-aware seeding
-- Extend `MemoryRetriever` — accept scope chain `[global, squad, persona]`
+- Extend row structs (`SemanticFact`, `EpisodicMemory`, `ProceduralRule`) — add `scope_type: String`, `scope_id: Option<String>` fields
+- Add `scope_type`/`scope_id` columns + indexes to `001_cognitive_tables.sql` (pre-release consolidation)
+- Extend `MemoryRetriever` — new `retrieve_scoped()` accepting scope chain `[global, squad, persona]`
 - Extend `SemanticFactRepo` — queries with `scope_type IN ('system','squad','persona')`
 
 **app-core (L7):**
@@ -360,14 +395,20 @@ Intentionally left high-level — designed after Phase 1+2 usage data:
 
 **skill-system (L3):**
 - New `SkillType::Persona` variant
+- New `PersonaSkillMetadata` struct — parsed from PERSONA.md frontmatter metadata block
 - New `PersonaSkillParser` — reuses `SkillParser`, extracts `PersonaSkillMetadata`
-- Extend `SkillPackage` — `persona_only: bool` field, skip tool/mcp when true
-- Extend `SkillCatalog::discover()` — load persona skills from `squads/` dir
+- `SkillType::Persona` is the canonical marker — no separate `persona_only: bool` on `SkillPackage`. When the parser sees `persona_only: true` in frontmatter, it sets `skill_type = SkillType::Persona` and skips tool/mcp/delegation fields. The `persona_only` field exists only in the PERSONA.md YAML, not on the Rust struct.
+- Extend `SkillCatalog::discover()` — add `SkillSource::Personas(path)` variant to scan `personas/` directory for `PERSONA.md` files (distinct from `SKILL.md` scan in `scan_directory_recursive`)
+- New `SkillCatalog::persona_skills()` accessor — filters for `SkillType::Persona` (excluded from `orchestrators()` and `regular_skills()`)
+- Extend `catalog_prompt()` — add `SkillType::Persona => continue` match arm to exclude persona skills from the prompt catalog (prevents compile error from exhaustive match)
+
+**agent (L5):**
+- New `PersonaPerspectiveSource` — `ContextSource` impl for persona skill injection. Loads from `PersonaSkillMetadata` instead of the flat `PersonaRow` fields.
+- **Delete** `AnalysisPersonaContextSource` (`agent/src/context_sources/analysis_persona.rs`) — remove the file, remove its `mod` declaration from `context_sources/mod.rs`, and remove its registration from the `ContextEngine` builder. `PersonaPerspectiveSource` fully replaces it. Both must not coexist to avoid duplicate persona sections in the system prompt.
 
 **agent (L5) — Phase 2 only:**
 - New `SquadExecutor` — orchestrate parallel persona calls, collect results, synthesize. Reuses existing `DirectEngine` for each persona call.
-- Extend `AgentRuntime::process_message()` — `squad_id: Option<String>` parameter
-- New `PersonaPerspectiveSource` — `ContextSource` impl for persona skill injection
+- Extend `RoutingContext` — add `squad_id: Option<String>` field (avoids breaking `process_message()` signature). All callers (chat command, MCP bridge, test harness) pass `squad_id` via `RoutingContext` rather than a new parameter.
 
 ### Zero Changes
 
@@ -458,7 +499,7 @@ Intentionally left high-level — designed after Phase 1+2 usage data:
 ### Phase 2: Chat Mode (future spec)
 - `SquadSession` concept
 - `SquadExecutor` in agent crate
-- `squad_id` on `process_message()`
+- `squad_id` on `RoutingContext`
 - Multi-voice vs. synthesized toggle
 - Chat UI for squad conversations
 
