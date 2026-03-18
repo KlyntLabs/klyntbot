@@ -368,6 +368,139 @@ impl FlashcardRepo {
         .await
     }
 
+    /// Get a single card by ID.
+    pub async fn get_by_id(&self, id: &str) -> Result<Option<FlashcardRow>, sqlx::Error> {
+        sqlx::query_as::<_, FlashcardRow>("SELECT * FROM flashcards WHERE id = ?1")
+            .bind(id)
+            .fetch_optional(&self.pool)
+            .await
+    }
+
+    /// Create a single flashcard (for manual creation). Immediately due.
+    pub async fn create_single(&self, card: NewFlashcard) -> Result<FlashcardRow, sqlx::Error> {
+        let mut rows = self.create_batch(vec![card]).await?;
+        rows.pop().ok_or(sqlx::Error::RowNotFound)
+    }
+
+    /// Update a card's front, back, deck, tags, and type-specific data.
+    pub async fn update_card(
+        &self,
+        id: &str,
+        front: &str,
+        back: &str,
+        deck: &str,
+        tags: &[String],
+        cloze_data: Option<&serde_json::Value>,
+        vocab_data: Option<&serde_json::Value>,
+    ) -> Result<FlashcardRow, sqlx::Error> {
+        let now = Utc::now().to_rfc3339();
+        let tags_str = serde_json::to_string(tags).unwrap_or_else(|_| "[]".to_string());
+        let cloze_str = cloze_data.map(|v| v.to_string());
+        let vocab_str = vocab_data.map(|v| v.to_string());
+
+        sqlx::query(
+            r#"
+            UPDATE flashcards
+            SET front = ?1, back = ?2, deck = ?3, tags = ?4,
+                cloze_data = ?5, vocab_data = ?6, updated_at = ?7
+            WHERE id = ?8
+            "#,
+        )
+        .bind(front)
+        .bind(back)
+        .bind(deck)
+        .bind(&tags_str)
+        .bind(&cloze_str)
+        .bind(&vocab_str)
+        .bind(&now)
+        .bind(id)
+        .execute(&self.pool)
+        .await?;
+
+        self.get_by_id(id).await?.ok_or(sqlx::Error::RowNotFound)
+    }
+
+    /// List all cards in a deck (not just due).
+    pub async fn list_all_in_deck(
+        &self,
+        deck: &str,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<FlashcardRow>, sqlx::Error> {
+        sqlx::query_as::<_, FlashcardRow>(
+            r#"
+            SELECT * FROM flashcards
+            WHERE deck = ?1
+            ORDER BY created_at DESC
+            LIMIT ?2 OFFSET ?3
+            "#,
+        )
+        .bind(deck)
+        .bind(limit)
+        .bind(offset)
+        .fetch_all(&self.pool)
+        .await
+    }
+
+    /// Delete a single card by ID. Returns true if deleted.
+    pub async fn delete_card(&self, id: &str) -> Result<bool, sqlx::Error> {
+        let result = sqlx::query("DELETE FROM flashcards WHERE id = ?1")
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(result.rows_affected() > 0)
+    }
+
+    /// Toggle suspended state for a card.
+    pub async fn suspend_card(
+        &self,
+        id: &str,
+        suspended: bool,
+    ) -> Result<FlashcardRow, sqlx::Error> {
+        let now = Utc::now().to_rfc3339();
+        sqlx::query("UPDATE flashcards SET suspended = ?1, updated_at = ?2 WHERE id = ?3")
+            .bind(suspended as i64)
+            .bind(&now)
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+
+        self.get_by_id(id).await?.ok_or(sqlx::Error::RowNotFound)
+    }
+
+    /// Fetch all due cards across ALL decks.
+    pub async fn get_all_due_cards(&self, limit: i64) -> Result<Vec<FlashcardRow>, sqlx::Error> {
+        let now = Utc::now().to_rfc3339();
+        sqlx::query_as::<_, FlashcardRow>(
+            r#"
+            SELECT * FROM flashcards
+            WHERE suspended = 0
+              AND (due_at IS NULL OR due_at <= ?1)
+            ORDER BY due_at ASC
+            LIMIT ?2
+            "#,
+        )
+        .bind(&now)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+    }
+
+    /// Get total due count across all decks.
+    pub async fn total_due_count(&self) -> Result<i64, sqlx::Error> {
+        let now = Utc::now().to_rfc3339();
+        let row: (i64,) = sqlx::query_as(
+            r#"
+            SELECT COUNT(*) FROM flashcards
+            WHERE suspended = 0 AND (due_at IS NULL OR due_at <= ?1)
+            "#,
+        )
+        .bind(&now)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(row.0)
+    }
+
     /// Delete all cards in a deck.
     pub async fn delete_deck(&self, deck: &str) -> Result<u64, sqlx::Error> {
         let result = sqlx::query("DELETE FROM flashcards WHERE deck = ?1")
@@ -598,6 +731,122 @@ mod tests {
 
         let remaining = repo.get_due_cards("to-delete", 10).await.unwrap();
         assert!(remaining.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_get_by_id() {
+        let (_pool, repo) = setup().await;
+        let created = repo
+            .create_batch(vec![sample_card("test", None)])
+            .await
+            .unwrap();
+        let found = repo.get_by_id(&created[0].id).await.unwrap();
+        assert!(found.is_some());
+        assert_eq!(found.unwrap().id, created[0].id);
+        let missing = repo.get_by_id("nonexistent").await.unwrap();
+        assert!(missing.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_create_single() {
+        let (_pool, repo) = setup().await;
+        let card = repo
+            .create_single(sample_card("single", None))
+            .await
+            .unwrap();
+        assert_eq!(card.front, "What is 2 + 2?");
+        assert_eq!(card.state, "new");
+    }
+
+    #[tokio::test]
+    async fn test_update_card() {
+        let (_pool, repo) = setup().await;
+        let created = repo
+            .create_single(sample_card("edit-test", None))
+            .await
+            .unwrap();
+        let updated = repo
+            .update_card(
+                &created.id,
+                "Updated front",
+                "Updated back",
+                "new-deck",
+                &["tag1".to_string()],
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+        assert_eq!(updated.front, "Updated front");
+        assert_eq!(updated.back, "Updated back");
+        assert_eq!(updated.deck, "new-deck");
+        let tags: Vec<String> = serde_json::from_str(&updated.tags).unwrap();
+        assert_eq!(tags, vec!["tag1"]);
+    }
+
+    #[tokio::test]
+    async fn test_list_all_in_deck() {
+        let (_pool, repo) = setup().await;
+        repo.create_batch(vec![
+            sample_card("list-all", None),
+            sample_card("list-all", None),
+            sample_card("other", None),
+        ])
+        .await
+        .unwrap();
+        let all = repo.list_all_in_deck("list-all", 100, 0).await.unwrap();
+        assert_eq!(all.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_delete_card() {
+        let (_pool, repo) = setup().await;
+        let created = repo
+            .create_single(sample_card("del", None))
+            .await
+            .unwrap();
+        assert!(repo.delete_card(&created.id).await.unwrap());
+        assert!(repo.get_by_id(&created.id).await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn test_suspend_card() {
+        let (_pool, repo) = setup().await;
+        let created = repo
+            .create_single(sample_card("suspend", None))
+            .await
+            .unwrap();
+        assert_eq!(created.suspended, 0);
+        let suspended = repo.suspend_card(&created.id, true).await.unwrap();
+        assert_eq!(suspended.suspended, 1);
+        let due = repo.get_due_cards("suspend", 10).await.unwrap();
+        assert!(due.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_get_all_due_cards() {
+        let (_pool, repo) = setup().await;
+        repo.create_batch(vec![
+            sample_card("deck-a", None),
+            sample_card("deck-b", None),
+        ])
+        .await
+        .unwrap();
+        let all_due = repo.get_all_due_cards(100).await.unwrap();
+        assert!(all_due.len() >= 2);
+    }
+
+    #[tokio::test]
+    async fn test_total_due_count() {
+        let (_pool, repo) = setup().await;
+        repo.create_batch(vec![
+            sample_card("count-a", None),
+            sample_card("count-b", None),
+        ])
+        .await
+        .unwrap();
+        let count = repo.total_due_count().await.unwrap();
+        assert!(count >= 2);
     }
 
     #[tokio::test]

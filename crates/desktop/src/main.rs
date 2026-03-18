@@ -386,6 +386,13 @@ fn run_desktop_app() {
             commands::notes::flashcard_list_decks,
             commands::notes::flashcard_get_due,
             commands::notes::flashcard_record_review,
+            commands::notes::flashcard_get,
+            commands::notes::flashcard_create,
+            commands::notes::flashcard_update,
+            commands::notes::flashcard_list_cards,
+            commands::notes::flashcard_delete,
+            commands::notes::flashcard_get_all_due,
+            commands::notes::flashcard_total_due,
             // Areas
             commands::areas::area_list,
             commands::areas::area_create,

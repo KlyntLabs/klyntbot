@@ -1,9 +1,11 @@
 import { KlyntLogo } from "@shared/components/ui/KlyntLogo";
+import { ipc } from "@shared/hooks/useIpc";
 import type { SidebarItem } from "@shared/types";
 import {
   CheckSquare,
   Cpu,
   FileText,
+  GraduationCap,
   LayoutDashboard,
   MessageCircle,
   MessageSquare,
@@ -11,6 +13,7 @@ import {
   Timer,
   Wallet,
 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 
 interface SidebarProps {
@@ -25,6 +28,7 @@ const items: { key: SidebarItem; icon: typeof MessageSquare; path?: string; bott
   { key: "Dashboard", icon: LayoutDashboard, path: "/" },
   { key: "Tasks", icon: CheckSquare, path: "/tasks" },
   { key: "Notes", icon: FileText, path: "/notes" },
+  { key: "Learn", icon: GraduationCap, path: "/learn" },
   { key: "Finance", icon: Wallet, path: "/finance" },
   { key: "Automations", icon: Timer, path: "/automations" },
   { key: "System", icon: Cpu, path: "/system", bottom: true },
@@ -33,6 +37,24 @@ const items: { key: SidebarItem; icon: typeof MessageSquare; path?: string; bott
 
 export function Sidebar({ active, onNavigate, isChatOpen, onToggleChat }: SidebarProps) {
   const navigate = useNavigate();
+  const [dueCount, setDueCount] = useState(0);
+  const dueCountRef = useRef(0);
+
+  useEffect(() => {
+    const fetchDue = () => {
+      ipc<number>("flashcard_total_due", {})
+        .then((count) => {
+          if (count !== dueCountRef.current) {
+            dueCountRef.current = count;
+            setDueCount(count);
+          }
+        })
+        .catch(() => {});
+    };
+    fetchDue();
+    const interval = setInterval(fetchDue, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleClick = (item: (typeof items)[number]) => {
     if (item.path) {
@@ -62,19 +84,25 @@ export function Sidebar({ active, onNavigate, isChatOpen, onToggleChat }: Sideba
       {topItems.map((item) => {
         const Icon = item.icon;
         const isActive = active === item.key;
+        const showBadge = item.key === "Learn" && dueCount > 0;
         return (
           <button
             type="button"
             key={item.key}
             onClick={() => handleClick(item)}
             aria-label={item.key}
-            className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-200 ${
+            className={`relative w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-200 ${
               isActive
                 ? "glass-button-active text-brand"
                 : "text-muted-foreground hover:text-foreground hover:bg-accent"
             }`}
           >
             <Icon className="w-[17px] h-[17px]" strokeWidth={1.5} aria-hidden="true" />
+            {showBadge && (
+              <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] rounded-full bg-brand text-[8px] text-white flex items-center justify-center font-medium px-0.5">
+                {dueCount > 99 ? "99" : dueCount}
+              </span>
+            )}
           </button>
         );
       })}

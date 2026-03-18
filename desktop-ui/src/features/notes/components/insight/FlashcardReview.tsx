@@ -102,25 +102,16 @@ export function FlashcardReview({ onClose }: FlashcardReviewProps) {
         </button>
       </div>
 
-      {/* Question */}
+      {/* Front */}
       <div className="rounded-lg bg-white/[0.03] p-3">
-        <p className="text-[11px] text-foreground whitespace-pre-wrap">{current.question}</p>
-        {current.choices && (
-          <div className="mt-2 space-y-1">
-            {current.choices.map((c) => (
-              <div key={c.label} className="text-[10px] text-muted-foreground">
-                <span className="font-medium">{c.label}.</span> {c.text}
-              </div>
-            ))}
-          </div>
-        )}
+        <p className="text-[11px] text-foreground whitespace-pre-wrap">{current.front}</p>
       </div>
 
-      {/* Answer (revealed or button) */}
+      {/* Back (revealed or button) */}
       {revealed ? (
         <>
           <div className="rounded-lg bg-white/[0.04] border border-border p-3">
-            <p className="text-[11px] text-foreground whitespace-pre-wrap">{current.answer}</p>
+            <p className="text-[11px] text-foreground whitespace-pre-wrap">{current.back}</p>
           </div>
           <div className="flex gap-2 justify-center">
             {(["again", "hard", "good", "easy"] as const).map((q) => (

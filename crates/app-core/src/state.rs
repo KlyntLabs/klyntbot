@@ -178,6 +178,13 @@ impl AppCore {
             .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "domain event bus is not available"))
     }
 
+    /// Return flashcard repo or a "not available" error.
+    pub fn flashcard_repo(&self) -> Result<&cognitive::FlashcardRepo, ApiError> {
+        self.flashcard_repo
+            .as_ref()
+            .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "Flashcard repo not available"))
+    }
+
     /// Return launcher search engine or a "feature disabled" error.
     pub fn launcher_engine(&self) -> Result<&Arc<LauncherSearchEngine>, ApiError> {
         self.launcher_engine

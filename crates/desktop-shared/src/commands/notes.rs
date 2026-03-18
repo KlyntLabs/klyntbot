@@ -285,6 +285,39 @@ pub struct FlashcardReviewParams {
     pub recall_speed_ms: Option<i64>,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FlashcardCreateParams {
+    pub deck: String,
+    pub front: String,
+    pub back: String,
+    pub card_type: String,
+    pub tags: Option<Vec<String>>,
+    pub source_note_id: Option<String>,
+    pub cloze_data: Option<serde_json::Value>,
+    pub vocab_data: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FlashcardUpdateParams {
+    pub id: String,
+    pub front: String,
+    pub back: String,
+    pub deck: String,
+    pub tags: Option<Vec<String>>,
+    pub cloze_data: Option<serde_json::Value>,
+    pub vocab_data: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FlashcardListParams {
+    pub deck: String,
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
+}
+
 // ── Insight Quiz ─────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Deserialize)]

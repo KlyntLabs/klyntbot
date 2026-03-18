@@ -60,6 +60,7 @@ export type SidebarItem =
   | "OKR"
   | "Calendar"
   | "Notes"
+  | "Learn"
   | "Finance"
   | "Automations"
   | "System"

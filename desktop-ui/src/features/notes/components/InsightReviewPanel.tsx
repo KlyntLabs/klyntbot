@@ -26,7 +26,6 @@ import { useInsightSSE } from "../hooks/useInsightSSE";
 import { useInsightVersions } from "../hooks/useInsightVersions";
 import { usePersonas } from "../hooks/usePersonas";
 import { ChangesBanner } from "./insight/ChangesBanner";
-import { KnowledgeGrowthMetrics } from "./insight/KnowledgeGrowthMetrics";
 import { ConceptMapTab } from "./insight/ConceptMapTab";
 import { FlashcardReview } from "./insight/FlashcardReview";
 import { GapAnalysisTab } from "./insight/GapAnalysisTab";
@@ -37,6 +36,7 @@ import {
   type ScopeConfig,
 } from "./insight/InsightScopePopover";
 import { InsightVersionList } from "./insight/InsightVersionList";
+import { KnowledgeGrowthMetrics } from "./insight/KnowledgeGrowthMetrics";
 import { ManagePersonasModal } from "./insight/ManagePersonasModal";
 import { PerspectivesTab } from "./insight/PerspectivesTab";
 import { SelfAssessmentTab } from "./insight/SelfAssessmentTab";

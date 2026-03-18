@@ -63,6 +63,7 @@ export function AppShell() {
     if (path.startsWith("/chat")) return "Chat";
     if (path.startsWith("/tasks") || path.startsWith("/task/")) return "Tasks";
     if (path.startsWith("/notes")) return "Notes";
+    if (path.startsWith("/learn")) return "Learn";
     if (path.startsWith("/finance")) return "Finance";
     if (path.startsWith("/automations")) return "Automations";
     if (path.startsWith("/system")) return "System";

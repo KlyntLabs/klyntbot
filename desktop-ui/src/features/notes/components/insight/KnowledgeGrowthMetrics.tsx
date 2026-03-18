@@ -42,8 +42,7 @@ export function KnowledgeGrowthMetrics({ isOpen }: Props) {
       </span>
       {data.updatedFactsCount > 0 && (
         <span>
-          ·{" "}
-          <span className="text-muted-foreground font-medium">{data.updatedFactsCount}</span>{" "}
+          · <span className="text-muted-foreground font-medium">{data.updatedFactsCount}</span>{" "}
           updated
         </span>
       )}

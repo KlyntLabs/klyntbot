@@ -23,6 +23,9 @@ const KnowledgeBasePage = lazy(() =>
   import("../features/notes").then((m) => ({ default: m.KnowledgeBasePage })),
 );
 
+// ── Learn Feature ────────────────────────────────────────────────
+const LearnPage = lazy(() => import("../features/learn").then((m) => ({ default: m.LearnPage })));
+
 // ── Finance Feature ──────────────────────────────────────────────
 const FinanceOverviewPage = lazy(() =>
   import("../features/finance").then((m) => ({ default: m.FinanceOverviewPage })),
@@ -175,6 +178,7 @@ export const router = createHashRouter([
       { path: "/tasks", element: <TasksPage /> },
       { path: "/chat", element: <ChatPage /> },
       { path: "/notes", element: <KnowledgeBasePage /> },
+      { path: "/learn", element: <LearnPage /> },
       { path: "/automations", element: <AutomationsPage /> },
       // Redirect old routes
       { path: "/productivity", element: <Navigate to="/" replace /> },

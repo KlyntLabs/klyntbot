@@ -2,14 +2,14 @@ use std::sync::Arc;
 
 use desktop_shared::commands::{
     BacklinkResponse, ChangesSummaryResponse, CreatePersonaParams, DeckSummaryResponse,
-    FlashcardResponse, FlashcardReviewParams, HybridSearchResponse, InboxCreateParams,
-    InboxItemResponse, InsightEvolutionResponse, InsightQuizSubmitParams, InsightReviewResponse,
-    InsightReviewStarted, InsightSaveFlashcardsParams, InsightVersionResponse,
-    KnowledgeGrowthResponse, NoteCreateParams, NoteLinkResponse, NoteResponse,
-    NoteSuggestionsResponse, NoteUpdateParams, NoteVersionResponse, NotebookCreateParams,
-    NotebookResponse, NotebookUpdateParams, PersonaChatParams, PersonaChatResponse,
-    PersonaResponse, RatePersonaParams, ScenarioChallengeResponse, SetPersonaPinsParams,
-    TabContent, UpdatePersonaParams,
+    FlashcardCreateParams, FlashcardListParams, FlashcardResponse, FlashcardReviewParams,
+    FlashcardUpdateParams, HybridSearchResponse, InboxCreateParams, InboxItemResponse,
+    InsightEvolutionResponse, InsightQuizSubmitParams, InsightReviewResponse, InsightReviewStarted,
+    InsightSaveFlashcardsParams, InsightVersionResponse, KnowledgeGrowthResponse, NoteCreateParams,
+    NoteLinkResponse, NoteResponse, NoteSuggestionsResponse, NoteUpdateParams, NoteVersionResponse,
+    NotebookCreateParams, NotebookResponse, NotebookUpdateParams, PersonaChatParams,
+    PersonaChatResponse, PersonaResponse, RatePersonaParams, ScenarioChallengeResponse,
+    SetPersonaPinsParams, TabContent, UpdatePersonaParams,
 };
 use desktop_shared::errors::ApiError;
 use tauri::State;
@@ -478,6 +478,61 @@ pub async fn flashcard_record_review(
     state.flashcard_record_review(params).await
 }
 
+#[tauri::command]
+pub async fn flashcard_get(
+    state: State<'_, Arc<AppCore>>,
+    id: String,
+) -> Result<FlashcardResponse, ApiError> {
+    state.flashcard_get(&id).await
+}
+
+#[tauri::command]
+pub async fn flashcard_create(
+    state: State<'_, Arc<AppCore>>,
+    params: FlashcardCreateParams,
+) -> Result<FlashcardResponse, ApiError> {
+    state.flashcard_create(params).await
+}
+
+#[tauri::command]
+pub async fn flashcard_update(
+    state: State<'_, Arc<AppCore>>,
+    params: FlashcardUpdateParams,
+) -> Result<FlashcardResponse, ApiError> {
+    state.flashcard_update(params).await
+}
+
+#[tauri::command]
+pub async fn flashcard_list_cards(
+    state: State<'_, Arc<AppCore>>,
+    params: FlashcardListParams,
+) -> Result<Vec<FlashcardResponse>, ApiError> {
+    state.flashcard_list_cards(params).await
+}
+
+#[tauri::command]
+pub async fn flashcard_delete(
+    state: State<'_, Arc<AppCore>>,
+    id: String,
+) -> Result<bool, ApiError> {
+    state.flashcard_delete(&id).await
+}
+
+#[tauri::command]
+pub async fn flashcard_get_all_due(
+    state: State<'_, Arc<AppCore>>,
+    limit: i64,
+) -> Result<Vec<FlashcardResponse>, ApiError> {
+    state.flashcard_get_all_due(limit).await
+}
+
+#[tauri::command]
+pub async fn flashcard_total_due(
+    state: State<'_, Arc<AppCore>>,
+) -> Result<i64, ApiError> {
+    state.flashcard_total_due().await
+}
+
 // ── Dev server dispatch ─────────────────────────────────────────────
 
 #[cfg(test)]
@@ -533,6 +588,13 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "flashcard_list_decks",
     "flashcard_get_due",
     "flashcard_record_review",
+    "flashcard_get",
+    "flashcard_create",
+    "flashcard_update",
+    "flashcard_list_cards",
+    "flashcard_delete",
+    "flashcard_get_all_due",
+    "flashcard_total_due",
 ];
 
 #[cfg(debug_assertions)]
@@ -735,6 +797,28 @@ pub(crate) async fn dispatch_dev(
             let params: FlashcardReviewParams = try_field!(dev::parse_params(body));
             dev::val(core.flashcard_record_review(params).await)
         }
+        "flashcard_get" => {
+            let id = try_field!(dev::get_str(body, "id"));
+            dev::val(core.flashcard_get(&id).await)
+        }
+        "flashcard_create" => {
+            dev::val(core.flashcard_create(try_field!(dev::parse_params(body))).await)
+        }
+        "flashcard_update" => {
+            dev::val(core.flashcard_update(try_field!(dev::parse_params(body))).await)
+        }
+        "flashcard_list_cards" => {
+            dev::val(core.flashcard_list_cards(try_field!(dev::parse_params(body))).await)
+        }
+        "flashcard_delete" => {
+            let id = try_field!(dev::get_str(body, "id"));
+            dev::val(core.flashcard_delete(&id).await)
+        }
+        "flashcard_get_all_due" => {
+            let limit = body.get("limit").and_then(|v| v.as_i64()).unwrap_or(50);
+            dev::val(core.flashcard_get_all_due(limit).await)
+        }
+        "flashcard_total_due" => dev::val(core.flashcard_total_due().await),
         _ => return None,
     })
 }

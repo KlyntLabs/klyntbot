@@ -10,19 +10,32 @@ export interface DeckSummary {
 export interface Flashcard {
   id: string;
   deck: string;
-  question: string;
-  answer: string;
+  front: string;
+  back: string;
   cardType: string;
-  choices: { label: string; text: string }[] | null;
+  clozeData: Record<string, unknown> | null;
+  vocabData: {
+    word?: string;
+    reading?: string;
+    meaning?: string;
+    exampleSentence?: string;
+    audioUrl?: string;
+    partOfSpeech?: string;
+  } | null;
+  imageData: Record<string, unknown> | null;
+  tags: string[];
+  sourceNoteId: string | null;
+  sourceContext: string | null;
   stability: number;
   difficulty: number;
   dueAt: string | null;
   state: string;
   reviewCount: number;
+  recallSpeedMs: number | null;
   createdAt: string;
 }
 
-type ReviewQuality = "again" | "hard" | "good" | "easy";
+export type ReviewQuality = "again" | "hard" | "good" | "easy";
 
 export function useFlashcards() {
   const [decks, setDecks] = useState<DeckSummary[]>([]);
@@ -45,10 +58,14 @@ export function useFlashcards() {
   const reveal = useCallback(() => setRevealed(true), []);
 
   const review = useCallback(
-    async (quality: ReviewQuality) => {
+    async (quality: ReviewQuality, recallSpeedMs?: number) => {
       const card = cards[currentIndex];
       if (!card) return;
-      await ipc("flashcard_record_review", { cardId: card.id, quality });
+      await ipc("flashcard_record_review", {
+        cardId: card.id,
+        quality,
+        recallSpeedMs: recallSpeedMs ?? null,
+      });
       setRevealed(false);
       setCurrentIndex((i) => i + 1);
     },
