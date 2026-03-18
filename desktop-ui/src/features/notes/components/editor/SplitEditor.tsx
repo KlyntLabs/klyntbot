@@ -210,8 +210,7 @@ export function SplitEditor({ note, splitMode, onSave }: SplitEditorProps) {
       rightContentRef.current = newStore[splitMode];
       summaryContentRef.current = newStore.summary;
       setSummaryText(newStore.summary.markdown);
-      if (leftEditor)
-        leftEditor.commands.setContent(newStore.left.html || newStore.left.markdown);
+      if (leftEditor) leftEditor.commands.setContent(newStore.left.html || newStore.left.markdown);
       if (rightEditor)
         rightEditor.commands.setContent(
           newStore[splitMode].html || newStore[splitMode].markdown || "",

@@ -108,6 +108,8 @@ pub struct AppCore {
     pub flashcard_repo: Option<cognitive::FlashcardRepo>,
     /// Persona repo for Insight Review personas (None when cognitive feature unavailable).
     pub persona_repo: Option<cognitive::PersonaRepo>,
+    /// Squad repo for Insight Review persona squads (None when cognitive feature unavailable).
+    pub squad_repo: Option<cognitive::SquadRepo>,
 }
 
 impl AppCore {
@@ -176,6 +178,13 @@ impl AppCore {
         self.domain_event_bus
             .as_ref()
             .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "domain event bus is not available"))
+    }
+
+    /// Return persona repo or a "not available" error.
+    pub fn persona_repo(&self) -> Result<&cognitive::PersonaRepo, ApiError> {
+        self.persona_repo
+            .as_ref()
+            .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "Persona repo not available"))
     }
 
     /// Return flashcard repo or a "not available" error.

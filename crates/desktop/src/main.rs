@@ -568,6 +568,14 @@ fn run_desktop_app() {
             commands::cognitive::cognitive_inject_event,
             commands::cognitive::cognitive_event_log,
             commands::cognitive::cognitive_pipeline_log,
+            // Squads
+            commands::squads::list_squads,
+            commands::squads::get_squad,
+            commands::squads::create_squad,
+            commands::squads::update_squad,
+            commands::squads::delete_squad,
+            commands::squads::add_squad_member,
+            commands::squads::remove_squad_member,
             // Cron / Automations
             commands::cron::cron_list,
             commands::cron::cron_status,

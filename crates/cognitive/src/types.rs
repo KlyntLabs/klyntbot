@@ -37,6 +37,8 @@ pub struct SemanticFact {
     pub access_count: i64,
     pub project_id: Option<String>,
     pub memory_type: String,
+    pub scope_type: String,
+    pub scope_id: Option<String>,
 }
 
 /// An episodic memory entry.
@@ -53,6 +55,8 @@ pub struct EpisodicMemory {
     pub last_accessed: Option<String>,
     pub access_count: i64,
     pub project_id: Option<String>,
+    pub scope_type: String,
+    pub scope_id: Option<String>,
 }
 
 /// A procedural rule learned from reflection.
@@ -68,6 +72,8 @@ pub struct ProceduralRule {
     pub updated_at: String,
     pub active: bool,
     pub project_id: Option<String>,
+    pub scope_type: String,
+    pub scope_id: Option<String>,
 }
 
 /// Minimum priority level considered "critical" for context injection.

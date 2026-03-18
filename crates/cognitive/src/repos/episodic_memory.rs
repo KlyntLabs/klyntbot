@@ -164,6 +164,8 @@ mod tests {
             last_accessed: None,
             access_count: 0,
             project_id: None,
+            scope_type: "system".to_string(),
+            scope_id: None,
         }
     }
 

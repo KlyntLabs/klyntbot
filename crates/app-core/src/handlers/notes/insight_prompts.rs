@@ -183,6 +183,35 @@ Respond ONLY with JSON (no markdown, no explanation):
     )
 }
 
+/// Generate a prompt for a single persona to analyze the knowledge context.
+pub fn single_persona_prompt(
+    context: &str,
+    persona_name: &str,
+    persona_role: &str,
+    persona_expertise: &str,
+    persona_perspective: &str,
+    persona_tone: &str,
+) -> String {
+    format!(
+        r#"You are {persona_name}, a {persona_role}.
+
+Your expertise: {persona_expertise}
+Your perspective: {persona_perspective}
+Your tone: {persona_tone}
+
+Analyze the following knowledge context from your unique perspective. Write 2-3 paragraphs:
+- Engage directly with the content (not just summarize)
+- Identify what's strong and what's weak from your viewpoint
+- Offer specific recommendations or challenges
+
+End with a **Key recommendation:** — one actionable suggestion.
+
+--- BEGIN KNOWLEDGE CONTEXT ---
+{context}
+--- END KNOWLEDGE CONTEXT ---"#
+    )
+}
+
 /// Format a list of PersonaRow entries into prompt blocks for the perspectives prompt.
 pub fn format_persona_blocks(personas: &[(String, String, String, String, String)]) -> String {
     personas

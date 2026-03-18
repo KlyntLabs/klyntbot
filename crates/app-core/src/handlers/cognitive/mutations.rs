@@ -37,6 +37,8 @@ impl AppCore {
             access_count: 0,
             project_id: None,
             memory_type: DEFAULT_MEMORY_TYPE.to_string(),
+            scope_type: "system".to_string(),
+            scope_id: None,
         };
 
         fact_repo.upsert(&fact).await.map_err(map_cognitive_err)?;
@@ -101,6 +103,8 @@ impl AppCore {
             updated_at: now,
             active: true,
             project_id: None,
+            scope_type: "system".to_string(),
+            scope_id: None,
         };
 
         repo.upsert(&rule).await.map_err(map_cognitive_err)?;

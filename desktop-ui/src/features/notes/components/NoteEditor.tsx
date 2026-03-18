@@ -56,7 +56,9 @@ export function NoteEditor({
       try {
         const split = JSON.parse(note.splitContent);
         return split.left?.html || split.left?.markdown || note.body || "";
-      } catch { /* fall through */ }
+      } catch {
+        /* fall through */
+      }
     }
     return note.bodyHtml || note.body || "";
   })();
@@ -325,7 +327,9 @@ export function NoteEditor({
           <div className="flex-1 flex flex-col min-h-0">
             <SplitToolbar
               currentMode={activeSplitMode}
-              onModeChange={(mode) => onSplitModeChange?.(mode === "single" ? null : (mode as SplitMode))}
+              onModeChange={(mode) =>
+                onSplitModeChange?.(mode === "single" ? null : (mode as SplitMode))
+              }
             />
             <SplitEditor note={note} splitMode={activeSplitMode} onSave={onSave} />
           </div>

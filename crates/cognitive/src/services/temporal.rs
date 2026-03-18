@@ -187,6 +187,8 @@ mod tests {
             access_count: 0,
             project_id: None,
             memory_type: DEFAULT_MEMORY_TYPE.to_string(),
+            scope_type: "system".to_string(),
+            scope_id: None,
         }
     }
 

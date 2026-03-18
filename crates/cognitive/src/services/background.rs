@@ -388,6 +388,8 @@ impl BackgroundConsolidationService {
                                     last_accessed: None,
                                     access_count: 0,
                                     project_id: None,
+                                    scope_type: "system".to_string(),
+                                    scope_id: None,
                                 };
                                 if let Err(e) = ep_repo.insert(&mem).await {
                                     warn!("Failed to store episodic memory: {e}");

@@ -251,6 +251,8 @@ mod tests {
             access_count: 0,
             project_id: None,
             memory_type: DEFAULT_MEMORY_TYPE.to_string(),
+            scope_type: "system".to_string(),
+            scope_id: None,
         }
     }
 
@@ -266,6 +268,8 @@ mod tests {
             updated_at: "2026-03-06".into(),
             active: true,
             project_id: None,
+            scope_type: "system".to_string(),
+            scope_id: None,
         }
     }
 

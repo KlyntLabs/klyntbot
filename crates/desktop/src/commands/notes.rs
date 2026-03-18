@@ -292,9 +292,10 @@ pub async fn note_insight_review(
     state: State<'_, Arc<AppCore>>,
     note_id: String,
     scope_config: Option<desktop_shared::commands::InsightScopeConfigParams>,
+    squad_id: Option<String>,
 ) -> Result<InsightReviewStarted, ApiError> {
     state
-        .note_insight_review(&note_id, scope_config.as_ref(), None)
+        .note_insight_review(&note_id, scope_config.as_ref(), squad_id.as_deref(), None)
         .await
 }
 

@@ -20,6 +20,10 @@ pub struct PersonaRow {
     pub domains: String,
     pub is_active: i64,
     pub relevance_score: f64,
+    pub skill_path: Option<String>,
+    pub questioning_style: String,
+    pub cognitive_bias: String,
+    pub analysis_frameworks: String, // JSON array
     pub created_at: String,
     pub updated_at: String,
 }
@@ -33,6 +37,9 @@ pub struct NewPersona {
     pub tone: String,
     pub icon: String,
     pub domains: Vec<String>,
+    pub questioning_style: Option<String>,
+    pub cognitive_bias: Option<String>,
+    pub analysis_frameworks: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone)]
@@ -57,6 +64,9 @@ struct BuiltinPersona {
     tone: &'static str,
     icon: &'static str,
     domains: &'static str,
+    questioning_style: &'static str,
+    cognitive_bias: &'static str,
+    analysis_frameworks: &'static str,
 }
 
 const BUILTINS: &[BuiltinPersona] = &[
@@ -69,6 +79,9 @@ const BUILTINS: &[BuiltinPersona] = &[
         tone: "direct",
         icon: "🔍",
         domains: r#"["general","research"]"#,
+        questioning_style: "interrogative",
+        cognitive_bias: "precision",
+        analysis_frameworks: r#"["critical-analysis","evidence-evaluation"]"#,
     },
     BuiltinPersona {
         id: "builtin-practitioner",
@@ -79,6 +92,9 @@ const BUILTINS: &[BuiltinPersona] = &[
         tone: "practical",
         icon: "🛠️",
         domains: r#"["engineering","operations"]"#,
+        questioning_style: "practical",
+        cognitive_bias: "pragmatism",
+        analysis_frameworks: r#"["feasibility-analysis","implementation-mapping"]"#,
     },
     BuiltinPersona {
         id: "builtin-connector",
@@ -89,6 +105,9 @@ const BUILTINS: &[BuiltinPersona] = &[
         tone: "curious",
         icon: "🔗",
         domains: r#"["general","research","creative"]"#,
+        questioning_style: "exploratory",
+        cognitive_bias: "breadth",
+        analysis_frameworks: r#"["cross-domain-synthesis","analogy-mapping"]"#,
     },
     BuiltinPersona {
         id: "builtin-student",
@@ -99,6 +118,9 @@ const BUILTINS: &[BuiltinPersona] = &[
         tone: "inquisitive",
         icon: "📚",
         domains: r#"["general","learning"]"#,
+        questioning_style: "naive",
+        cognitive_bias: "simplicity",
+        analysis_frameworks: r#"["socratic-method","first-principles"]"#,
     },
     BuiltinPersona {
         id: "builtin-strategist",
@@ -109,6 +131,9 @@ const BUILTINS: &[BuiltinPersona] = &[
         tone: "analytical",
         icon: "♟️",
         domains: r#"["business","planning","finance"]"#,
+        questioning_style: "strategic",
+        cognitive_bias: "long-term",
+        analysis_frameworks: r#"["swot-analysis","scenario-planning"]"#,
     },
     BuiltinPersona {
         id: "builtin-devils-advocate",
@@ -119,6 +144,61 @@ const BUILTINS: &[BuiltinPersona] = &[
         tone: "provocative",
         icon: "😈",
         domains: r#"["general","debate"]"#,
+        questioning_style: "adversarial",
+        cognitive_bias: "contrarian",
+        analysis_frameworks: r#"["steelmanning","reductio-ad-absurdum"]"#,
+    },
+    BuiltinPersona {
+        id: "builtin-academic-reviewer",
+        name: "Academic Reviewer",
+        role: "Peer reviewer",
+        expertise: "Methodology critique, literature awareness, rigor assessment",
+        perspective: "Reviews content with the rigor of academic peer review",
+        tone: "formal",
+        icon: "🎓",
+        domains: r#"["research","academic"]"#,
+        questioning_style: "methodological",
+        cognitive_bias: "rigor",
+        analysis_frameworks: r#"["peer-review","systematic-review"]"#,
+    },
+    BuiltinPersona {
+        id: "builtin-methodologist",
+        name: "Methodologist",
+        role: "Methods specialist",
+        expertise: "Research design, statistical validity, experimental rigor",
+        perspective: "Focuses on the soundness of methods and processes",
+        tone: "precise",
+        icon: "🔬",
+        domains: r#"["research","engineering"]"#,
+        questioning_style: "systematic",
+        cognitive_bias: "validity",
+        analysis_frameworks: r#"["hypothesis-testing","experimental-design"]"#,
+    },
+    BuiltinPersona {
+        id: "builtin-deep-analyst",
+        name: "Deep Analyst",
+        role: "Financial analyst",
+        expertise: "DCF valuation, ratio analysis, financial modeling",
+        perspective: "Digs deep into the numbers with rigorous quantitative analysis",
+        tone: "rigorous",
+        icon: "📊",
+        domains: r#"["finance","productivity"]"#,
+        questioning_style: "interrogative",
+        cognitive_bias: "precision",
+        analysis_frameworks: r#"["bottom-up-analysis","comparative-valuation"]"#,
+    },
+    BuiltinPersona {
+        id: "builtin-risk-reviewer",
+        name: "Risk Reviewer",
+        role: "Risk assessor",
+        expertise: "Risk identification, probability assessment, mitigation strategies",
+        perspective: "Systematically identifies and evaluates risks across all dimensions",
+        tone: "measured",
+        icon: "⚠️",
+        domains: r#"["finance","operations","planning"]"#,
+        questioning_style: "cautious",
+        cognitive_bias: "downside-protection",
+        analysis_frameworks: r#"["risk-matrix","scenario-analysis"]"#,
     },
 ];
 
@@ -142,8 +222,9 @@ impl PersonaRepo {
                 r#"
                 INSERT OR IGNORE INTO insight_personas
                     (id, name, role, expertise, perspective, tone, icon, source, domains,
+                     questioning_style, cognitive_bias, analysis_frameworks,
                      is_active, relevance_score, created_at, updated_at)
-                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'builtin', ?8, 1, 0.5, ?9, ?9)
+                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'builtin', ?8, ?9, ?10, ?11, 1, 0.5, ?12, ?12)
                 "#,
             )
             .bind(b.id)
@@ -154,6 +235,9 @@ impl PersonaRepo {
             .bind(b.tone)
             .bind(b.icon)
             .bind(b.domains)
+            .bind(b.questioning_style)
+            .bind(b.cognitive_bias)
+            .bind(b.analysis_frameworks)
             .bind(&now)
             .execute(&self.pool)
             .await?;
@@ -166,13 +250,19 @@ impl PersonaRepo {
         let id = Uuid::new_v4().to_string();
         let now = Utc::now().to_rfc3339();
         let domains_json = serde_json::to_string(&persona.domains).unwrap_or_else(|_| "[]".into());
+        let questioning_style = persona.questioning_style.as_deref().unwrap_or("analytical");
+        let cognitive_bias = persona.cognitive_bias.as_deref().unwrap_or("balanced");
+        let analysis_frameworks_json = persona.analysis_frameworks.as_ref()
+            .map(|f| serde_json::to_string(f).unwrap_or_else(|_| "[]".into()))
+            .unwrap_or_else(|| "[]".into());
 
         sqlx::query(
             r#"
             INSERT INTO insight_personas
                 (id, name, role, expertise, perspective, tone, icon, source, domains,
+                 questioning_style, cognitive_bias, analysis_frameworks,
                  is_active, relevance_score, created_at, updated_at)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'user', ?8, 1, 0.5, ?9, ?9)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'user', ?8, ?9, ?10, ?11, 1, 0.5, ?12, ?12)
             "#,
         )
         .bind(&id)
@@ -183,6 +273,9 @@ impl PersonaRepo {
         .bind(&persona.tone)
         .bind(&persona.icon)
         .bind(&domains_json)
+        .bind(questioning_style)
+        .bind(cognitive_bias)
+        .bind(&analysis_frameworks_json)
         .bind(&now)
         .execute(&self.pool)
         .await?;
@@ -198,13 +291,19 @@ impl PersonaRepo {
         let id = Uuid::new_v4().to_string();
         let now = Utc::now().to_rfc3339();
         let domains_json = serde_json::to_string(&persona.domains).unwrap_or_else(|_| "[]".into());
+        let questioning_style = persona.questioning_style.as_deref().unwrap_or("analytical");
+        let cognitive_bias = persona.cognitive_bias.as_deref().unwrap_or("balanced");
+        let analysis_frameworks_json = persona.analysis_frameworks.as_ref()
+            .map(|f| serde_json::to_string(f).unwrap_or_else(|_| "[]".into()))
+            .unwrap_or_else(|| "[]".into());
 
         sqlx::query(
             r#"
             INSERT INTO insight_personas
                 (id, name, role, expertise, perspective, tone, icon, source, domains,
+                 questioning_style, cognitive_bias, analysis_frameworks,
                  is_active, relevance_score, created_at, updated_at)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'auto', ?8, 1, 0.5, ?9, ?9)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'auto', ?8, ?9, ?10, ?11, 1, 0.5, ?12, ?12)
             "#,
         )
         .bind(&id)
@@ -215,6 +314,9 @@ impl PersonaRepo {
         .bind(&persona.tone)
         .bind(&persona.icon)
         .bind(&domains_json)
+        .bind(questioning_style)
+        .bind(cognitive_bias)
+        .bind(&analysis_frameworks_json)
         .bind(&now)
         .execute(&self.pool)
         .await?;
@@ -475,12 +577,12 @@ mod tests {
 
         repo.seed_builtins().await.unwrap();
         let active = repo.list_active().await.unwrap();
-        assert_eq!(active.len(), 6);
+        assert_eq!(active.len(), 10);
 
         // Idempotent: seeding again should not duplicate
         repo.seed_builtins().await.unwrap();
         let active2 = repo.list_active().await.unwrap();
-        assert_eq!(active2.len(), 6);
+        assert_eq!(active2.len(), 10);
 
         // Verify known persona
         let skeptic = repo.get("builtin-skeptic").await.unwrap().unwrap();
@@ -541,6 +643,9 @@ mod tests {
                 tone: "formal".into(),
                 icon: "🎯".into(),
                 domains: vec!["niche".into()],
+                questioning_style: None,
+                cognitive_bias: None,
+                analysis_frameworks: None,
             })
             .await
             .unwrap();
@@ -574,9 +679,9 @@ mod tests {
         repo.seed_builtins().await.unwrap();
         repo.set_active("builtin-skeptic", false).await.unwrap();
         let all = repo.list_all().await.unwrap();
-        assert_eq!(all.len(), 6);
+        assert_eq!(all.len(), 10);
         let active = repo.list_active().await.unwrap();
-        assert_eq!(active.len(), 5);
+        assert_eq!(active.len(), 9);
     }
 
     #[tokio::test]
@@ -593,6 +698,9 @@ mod tests {
                 tone: "neutral".into(),
                 icon: "🧪".into(),
                 domains: vec!["testing".into()],
+                questioning_style: None,
+                cognitive_bias: None,
+                analysis_frameworks: None,
             })
             .await
             .unwrap();
@@ -652,5 +760,17 @@ mod tests {
         repo.update_relevance("builtin-skeptic", 0.5).await.unwrap();
         let capped = repo.get("builtin-skeptic").await.unwrap().unwrap();
         assert!((capped.relevance_score - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[tokio::test]
+    async fn test_persona_skill_fields() {
+        let pool = setup().await;
+        let repo = PersonaRepo::new(pool.clone());
+        repo.seed_builtins().await.unwrap();
+
+        let persona = repo.get("builtin-skeptic").await.unwrap().unwrap();
+        assert_eq!(persona.questioning_style, "interrogative");
+        assert_eq!(persona.cognitive_bias, "precision");
+        assert!(!persona.analysis_frameworks.is_empty());
     }
 }

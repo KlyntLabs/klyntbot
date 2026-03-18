@@ -154,14 +154,13 @@ function IntroView({ onDecompose }: { onDecompose: () => void }) {
       <div className="size-10 rounded-full bg-purple-500/10 flex items-center justify-center mb-4">
         <Bot className="size-5 text-purple-400" />
       </div>
-      <h3 className="text-sm font-medium text-[hsl(var(--foreground))] mb-2">
-        AI Task Breakdown
-      </h3>
+      <h3 className="text-sm font-medium text-[hsl(var(--foreground))] mb-2">AI Task Breakdown</h3>
       <p className="text-xs text-[hsl(var(--muted-foreground))] mb-1">
         Analyze this task and suggest a breakdown into smaller, actionable subtasks.
       </p>
       <p className="text-xs text-[hsl(var(--muted-foreground))] mb-6">
-        The AI considers the description, acceptance criteria, and complexity to propose a structured plan.
+        The AI considers the description, acceptance criteria, and complexity to propose a
+        structured plan.
       </p>
       <button
         type="button"
@@ -182,7 +181,9 @@ function LoadingView() {
         <Bot className="size-5 text-purple-400" />
       </div>
       <p className="text-sm text-[hsl(var(--muted-foreground))]">Analyzing task...</p>
-      <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">This may take a few seconds</p>
+      <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">
+        This may take a few seconds
+      </p>
     </div>
   );
 }
@@ -257,9 +258,7 @@ function ResultView({
           disabled={applying}
           className="px-3 py-1.5 text-xs rounded-md bg-purple-600 text-white hover:bg-purple-500 disabled:opacity-50 transition-colors"
         >
-          {applying
-            ? "Applying..."
-            : `Create ${totalCount} subtask${totalCount !== 1 ? "s" : ""}`}
+          {applying ? "Applying..." : `Create ${totalCount} subtask${totalCount !== 1 ? "s" : ""}`}
         </button>
       </div>
     </>

@@ -17,12 +17,15 @@ CREATE TABLE IF NOT EXISTS semantic_facts (
     last_accessed   TEXT,
     access_count    INTEGER NOT NULL DEFAULT 0,
     project_id      TEXT,  -- logical FK to projects.id (not enforced, separate database)
-    memory_type     TEXT DEFAULT 'fact'
+    memory_type     TEXT DEFAULT 'fact',
+    scope_type      TEXT NOT NULL DEFAULT 'system',
+    scope_id        TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_semantic_facts_domain ON semantic_facts(domain);
 CREATE INDEX IF NOT EXISTS idx_semantic_facts_subject ON semantic_facts(subject, predicate);
 CREATE INDEX IF NOT EXISTS idx_semantic_facts_active ON semantic_facts(valid_until) WHERE valid_until IS NULL;
+CREATE INDEX IF NOT EXISTS idx_semantic_facts_scope ON semantic_facts(scope_type, scope_id);
 
 CREATE TABLE IF NOT EXISTS episodic_memories (
     id              TEXT PRIMARY KEY,
@@ -35,11 +38,14 @@ CREATE TABLE IF NOT EXISTS episodic_memories (
     stability       REAL NOT NULL DEFAULT 1.0,
     last_accessed   TEXT,
     access_count    INTEGER NOT NULL DEFAULT 0,
-    project_id      TEXT   -- logical FK to projects.id (not enforced, separate database)
+    project_id      TEXT,   -- logical FK to projects.id (not enforced, separate database)
+    scope_type      TEXT NOT NULL DEFAULT 'system',
+    scope_id        TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_episodic_domain ON episodic_memories(domain);
 CREATE INDEX IF NOT EXISTS idx_episodic_occurred ON episodic_memories(occurred_at);
+CREATE INDEX IF NOT EXISTS idx_episodic_memories_scope ON episodic_memories(scope_type, scope_id);
 
 CREATE TABLE IF NOT EXISTS procedural_rules (
     id              TEXT PRIMARY KEY,
@@ -51,11 +57,14 @@ CREATE TABLE IF NOT EXISTS procedural_rules (
     created_at      TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
     active          INTEGER NOT NULL DEFAULT 1,
-    project_id      TEXT   -- logical FK to projects.id (not enforced, separate database)
+    project_id      TEXT,   -- logical FK to projects.id (not enforced, separate database)
+    scope_type      TEXT NOT NULL DEFAULT 'system',
+    scope_id        TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_procedural_domain ON procedural_rules(domain);
 CREATE INDEX IF NOT EXISTS idx_procedural_active ON procedural_rules(active) WHERE active = 1;
+CREATE INDEX IF NOT EXISTS idx_procedural_rules_scope ON procedural_rules(scope_type, scope_id);
 
 -- Archive tables (cold storage for superseded/decayed memories)
 CREATE TABLE IF NOT EXISTS semantic_facts_archive (
@@ -76,6 +85,8 @@ CREATE TABLE IF NOT EXISTS semantic_facts_archive (
     access_count    INTEGER NOT NULL,
     project_id      TEXT,
     memory_type     TEXT DEFAULT 'fact',
+    scope_type      TEXT NOT NULL DEFAULT 'system',
+    scope_id        TEXT,
     archived_at     TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -383,6 +394,10 @@ CREATE TABLE IF NOT EXISTS insight_personas (
     domains JSON NOT NULL DEFAULT '[]',
     is_active INTEGER NOT NULL DEFAULT 1,
     relevance_score REAL NOT NULL DEFAULT 0.5,
+    skill_path          TEXT,
+    questioning_style   TEXT NOT NULL DEFAULT 'analytical',
+    cognitive_bias      TEXT NOT NULL DEFAULT 'balanced',
+    analysis_frameworks TEXT NOT NULL DEFAULT '[]',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -396,6 +411,33 @@ CREATE TABLE IF NOT EXISTS insight_persona_pins (
     created_at TEXT NOT NULL,
     PRIMARY KEY (note_id, persona_id)
 );
+
+-- ── Squads ──────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS squads (
+    id                  TEXT PRIMARY KEY,
+    name                TEXT NOT NULL,
+    description         TEXT NOT NULL DEFAULT '',
+    icon                TEXT NOT NULL DEFAULT '',
+    orchestrator_skill  TEXT NOT NULL DEFAULT 'general',
+    source              TEXT NOT NULL DEFAULT 'user',
+    domains             TEXT NOT NULL DEFAULT '[]',
+    is_active           INTEGER NOT NULL DEFAULT 1,
+    created_at          TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at          TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_squads_name_user
+    ON squads(name) WHERE source = 'user';
+
+CREATE TABLE IF NOT EXISTS squad_members (
+    squad_id        TEXT NOT NULL REFERENCES squads(id) ON DELETE CASCADE,
+    persona_id      TEXT NOT NULL,
+    role_in_squad   TEXT NOT NULL DEFAULT 'member',
+    sort_order      INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (squad_id, persona_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_squad_members_persona ON squad_members(persona_id);
 
 -- ── Flashcards (FSRS-5 spaced repetition) ─────────────────────────
 

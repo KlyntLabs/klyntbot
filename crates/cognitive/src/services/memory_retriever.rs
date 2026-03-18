@@ -345,6 +345,8 @@ mod tests {
             access_count: 0,
             project_id: None,
             memory_type: crate::types::DEFAULT_MEMORY_TYPE.to_string(),
+            scope_type: "system".to_string(),
+            scope_id: None,
         };
         fact_repo.upsert(&fact).await.unwrap();
 

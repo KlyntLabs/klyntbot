@@ -40,6 +40,9 @@ impl AppCore {
                 tone: params.tone,
                 icon: params.icon,
                 domains: params.domains,
+                questioning_style: None,
+                cognitive_bias: None,
+                analysis_frameworks: None,
             })
             .await
             .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?;
@@ -249,6 +252,9 @@ Return ONLY the JSON object, no markdown fences, no explanation."#,
                         .collect()
                 })
                 .unwrap_or_default(),
+            questioning_style: None,
+            cognitive_bias: None,
+            analysis_frameworks: None,
         };
 
         let row = persona_repo

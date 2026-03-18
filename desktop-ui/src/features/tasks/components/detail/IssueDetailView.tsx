@@ -43,7 +43,9 @@ export function IssueDetailView({ issueId, projectMap, areaMap }: IssueDetailVie
   return (
     <div ref={containerRef} className="flex h-full relative">
       {/* Left column — splits when decomposition is open */}
-      <div className={`flex-1 min-w-0 flex ${detail.decompositionOpen && detail.decompositionResult ? "" : ""}`}>
+      <div
+        className={`flex-1 min-w-0 flex ${detail.decompositionOpen && detail.decompositionResult ? "" : ""}`}
+      >
         {/* Main content */}
         <div className="flex-1 min-w-0 overflow-y-auto px-6 py-4">
           <IssueDetailBreadcrumb />

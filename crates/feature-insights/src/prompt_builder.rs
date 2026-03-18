@@ -190,6 +190,8 @@ mod tests {
             icon: None,
             color: None,
             embedding_updated_at: None,
+            split_content: None,
+            split_mode: None,
             created_at: String::new(),
             updated_at: String::new(),
         }

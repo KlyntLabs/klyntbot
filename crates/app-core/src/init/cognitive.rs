@@ -22,6 +22,12 @@ pub(super) async fn init_cognitive(
         warn!("Failed to seed builtin personas: {e}");
     }
 
+    // Seed builtin squads (idempotent, safe on every startup)
+    let squad_repo = cognitive::SquadRepo::new(storage_pool.inner().clone());
+    if let Err(e) = squad_repo.seed_builtins().await {
+        warn!("Failed to seed builtin squads: {e}");
+    }
+
     // Phase 3: Auto-generate ingestion token on first startup if missing.
     if config.capture.ingestion_api.enabled && config.capture.ingestion_api.token.is_none() {
         config.capture.ingestion_api.token = Some(uuid::Uuid::new_v4().to_string());

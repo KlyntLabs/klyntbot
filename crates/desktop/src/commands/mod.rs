@@ -23,6 +23,7 @@ pub mod project_sources;
 pub mod projects;
 pub mod settings;
 pub mod shortcuts;
+pub mod squads;
 pub mod status;
 pub mod tasks;
 pub mod timeline;

@@ -116,6 +116,8 @@ pub enum SkillSource {
     BuiltIn(Vec<(String, String)>),
     /// Filesystem directory to scan for skill subdirs.
     Directory(std::path::PathBuf, SkillScope),
+    /// Persona skill files: Vec<(name, PERSONA.md content)>
+    Personas(Vec<(String, String)>),
     /// Inline test source: Vec<(name, content)> with a scope.
     #[cfg(test)]
     Inline(Vec<(String, String)>, SkillScope),
@@ -143,6 +145,9 @@ impl SkillCatalog {
                 }
                 SkillSource::Directory(dir, scope) => {
                     Self::scan_directory(dir, *scope, &mut skills).await?;
+                }
+                SkillSource::Personas(entries) => {
+                    Self::process_persona_entries(entries, &mut skills);
                 }
                 #[cfg(test)]
                 SkillSource::Inline(entries, scope) => {
@@ -183,6 +188,9 @@ impl SkillCatalog {
                     )
                     .into());
                 }
+                SkillSource::Personas(entries) => {
+                    Self::process_persona_entries(entries, &mut skills);
+                }
                 #[cfg(test)]
                 SkillSource::Inline(entries, scope) => {
                     Self::process_inline_entries(entries, *scope, &mut skills);
@@ -220,6 +228,42 @@ impl SkillCatalog {
                 }
             }
         }
+    }
+
+    fn process_persona_entries(
+        entries: &[(String, String)],
+        skills: &mut HashMap<String, Arc<SkillPackage>>,
+    ) {
+        for (name, content) in entries {
+            match crate::persona::parse_persona_skill(content) {
+                Ok(parsed) => {
+                    let pkg = SkillPackage {
+                        name: parsed.name.clone(),
+                        description: parsed.description,
+                        skill_type: SkillType::Persona,
+                        scope: SkillScope::BuiltIn,
+                        location: std::path::PathBuf::from(format!("persona::{name}")),
+                        body: parsed.body,
+                        manifest: None,
+                        metadata: SkillMetadata::default(),
+                        resources: Vec::new(),
+                        loaded_at: SystemTime::now(),
+                        trusted: true,
+                    };
+                    skills.insert(parsed.name, Arc::new(pkg));
+                }
+                Err(e) => {
+                    tracing::warn!(persona = %name, "Skipping persona skill: {e}");
+                }
+            }
+        }
+    }
+
+    pub fn persona_skills(&self) -> Vec<&Arc<SkillPackage>> {
+        self.skills
+            .values()
+            .filter(|s| matches!(s.skill_type, SkillType::Persona) && s.trusted)
+            .collect()
     }
 
     /// Scan safety bounds per Agent Skills spec.
@@ -373,6 +417,7 @@ impl SkillCatalog {
         sorted.sort_by_key(|p| &p.name);
         for pkg in sorted {
             let type_str = match pkg.skill_type {
+                SkillType::Persona => continue,
                 SkillType::Orchestrator => "orchestrator",
                 SkillType::Skill => "skill",
             };

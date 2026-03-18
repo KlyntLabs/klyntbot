@@ -171,7 +171,18 @@ impl NotesTool {
 
         let updated = self
             .repo
-            .update_note(id, title, body, None, pinned, notebook_id, None, None, None, None)
+            .update_note(
+                id,
+                title,
+                body,
+                None,
+                pinned,
+                notebook_id,
+                None,
+                None,
+                None,
+                None,
+            )
             .await?;
         self.maybe_set_tags(p, id).await?;
 

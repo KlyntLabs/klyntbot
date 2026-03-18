@@ -31,11 +31,15 @@ pub(super) async fn dispatch(
         let scope: Option<desktop_shared::commands::InsightScopeConfigParams> = body
             .get("scopeConfig")
             .and_then(|v| serde_json::from_value(v.clone()).ok());
+        let squad_id: Option<String> = body
+            .get("squadId")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
         let emitter: Arc<dyn AppEventEmitter> = Arc::new(SseEmitter {
             tx: state.insight_tx.clone(),
         });
         return into_api_result(
-            core.note_insight_review(&id, scope.as_ref(), Some(emitter))
+            core.note_insight_review(&id, scope.as_ref(), squad_id.as_deref(), Some(emitter))
                 .await
                 .map(|v| serde_json::to_value(v).unwrap_or_default()),
         );
@@ -130,6 +134,9 @@ pub(super) async fn dispatch(
         return into_api_result(r);
     }
     if let Some(r) = commands::shortcuts::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
+    if let Some(r) = commands::squads::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }
 

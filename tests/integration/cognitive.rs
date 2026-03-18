@@ -68,6 +68,8 @@ fn test_fact(id: &str, predicate: &str, object: &str) -> SemanticFact {
         access_count: 0,
         project_id: None,
         memory_type: DEFAULT_MEMORY_TYPE.to_string(),
+        scope_type: "system".to_string(),
+        scope_id: None,
     }
 }
 
@@ -577,6 +579,8 @@ async fn test_cognitive_context_source_with_facts() {
         updated_at: "2026-03-06".into(),
         active: true,
         project_id: None,
+        scope_type: "system".to_string(),
+        scope_id: None,
     };
     rule_repo.upsert(&rule).await.unwrap();
 

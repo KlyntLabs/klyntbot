@@ -296,9 +296,10 @@ pub(crate) async fn dispatch_dev(
             core.task_reject_decomposition(try_field!(dev::get_str(body, "decompositionId")))
                 .await,
         ),
-        "task_forecast" => {
-            dev::val(core.task_forecast(try_field!(dev::get_str(body, "taskId"))).await)
-        }
+        "task_forecast" => dev::val(
+            core.task_forecast(try_field!(dev::get_str(body, "taskId")))
+                .await,
+        ),
         _ => return None,
     })
 }

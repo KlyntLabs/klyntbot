@@ -297,6 +297,7 @@ impl AppCore {
                 storage_pool.inner().clone(),
             )),
             persona_repo: Some(::cognitive::PersonaRepo::new(storage_pool.inner().clone())),
+            squad_repo: Some(::cognitive::SquadRepo::new(storage_pool.inner().clone())),
         };
 
         // ── Background insight progress refresh (daily) ──────────────────

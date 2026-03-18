@@ -1,8 +1,8 @@
 import type { Note, NoteUpdateParams } from "@shared/types";
 import { useCallback, useRef } from "react";
+import type { SplitMode } from "./editor/SplitEditor";
 import { NoteEditor } from "./NoteEditor";
 import { NoteTags, type NoteTagsHandle } from "./NoteTags";
-import type { SplitMode } from "./editor/SplitEditor";
 
 type NotesViewMode = "editor" | "graph";
 

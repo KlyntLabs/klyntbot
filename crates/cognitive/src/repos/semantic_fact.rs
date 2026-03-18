@@ -257,7 +257,8 @@ impl SemanticFactRepo {
         let sql = format!(
             "SELECT id, domain, subject, predicate, object, confidence, source, \
              valid_from, valid_until, recorded_at, superseded_at, superseded_by, \
-             stability, last_accessed, access_count, project_id, memory_type \
+             stability, last_accessed, access_count, project_id, memory_type, \
+             scope_type, scope_id \
              FROM semantic_facts_archive {where_clause} ORDER BY recorded_at DESC LIMIT {limit_param}"
         );
         let mut query = sqlx::query_as::<_, SemanticFact>(&sql);
@@ -280,10 +281,12 @@ impl SemanticFactRepo {
             INSERT INTO semantic_facts
                 (id, domain, subject, predicate, object, confidence, source,
                  valid_from, valid_until, recorded_at, superseded_at, superseded_by,
-                 stability, last_accessed, access_count, project_id, memory_type)
+                 stability, last_accessed, access_count, project_id, memory_type,
+                 scope_type, scope_id)
             SELECT id, domain, subject, predicate, object, confidence, source,
                    valid_from, NULL, recorded_at, NULL, NULL,
-                   stability, last_accessed, access_count, project_id, memory_type
+                   stability, last_accessed, access_count, project_id, memory_type,
+                   scope_type, scope_id
             FROM semantic_facts_archive
             WHERE id = ?1
             "#,
@@ -353,7 +356,8 @@ impl SemanticFactRepo {
         sqlx::query_as::<_, SemanticFact>(
             "SELECT id, domain, subject, predicate, object, confidence, source, \
              valid_from, valid_until, recorded_at, superseded_at, superseded_by, \
-             stability, last_accessed, access_count, project_id, memory_type \
+             stability, last_accessed, access_count, project_id, memory_type, \
+             scope_type, scope_id \
              FROM semantic_facts_archive WHERE subject = ?1 AND predicate = ?2 ORDER BY valid_from DESC",
         )
         .bind(subject)
@@ -437,10 +441,12 @@ impl SemanticFactRepo {
             INSERT INTO semantic_facts_archive
                 (id, domain, subject, predicate, object, confidence, source,
                  valid_from, valid_until, recorded_at, superseded_at, superseded_by,
-                 stability, last_accessed, access_count, project_id, memory_type)
+                 stability, last_accessed, access_count, project_id, memory_type,
+                 scope_type, scope_id)
             SELECT id, domain, subject, predicate, object, confidence, source,
                    valid_from, valid_until, recorded_at, superseded_at, superseded_by,
-                   stability, last_accessed, access_count, project_id, memory_type
+                   stability, last_accessed, access_count, project_id, memory_type,
+                   scope_type, scope_id
             FROM semantic_facts
             WHERE superseded_at IS NOT NULL
               AND julianday('now') - julianday(superseded_at) > ?1
@@ -497,6 +503,8 @@ mod tests {
             access_count: 0,
             project_id: None,
             memory_type: DEFAULT_MEMORY_TYPE.to_string(),
+            scope_type: "system".to_string(),
+            scope_id: None,
         }
     }
 

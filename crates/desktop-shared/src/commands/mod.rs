@@ -14,6 +14,7 @@ mod settings;
 mod tasks;
 mod timeline;
 mod work_context;
+mod squads;
 mod workspace;
 
 pub use agents::*;
@@ -29,6 +30,7 @@ pub use okr::*;
 pub use productivity::*;
 pub use projects::*;
 pub use settings::*;
+pub use squads::*;
 pub use tasks::*;
 pub use timeline::*;
 pub use work_context::*;

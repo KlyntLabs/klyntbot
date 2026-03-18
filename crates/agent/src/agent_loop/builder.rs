@@ -289,15 +289,6 @@ impl AgentLoopBuilder {
             Box::new(PageContextSource::new(repos.clone())),
         ];
 
-        // Analysis persona context source (DB personas for analysis queries)
-        if let Some(ref pool) = self.pool {
-            sources.push(Box::new(
-                crate::context_sources::analysis_persona::AnalysisPersonaContextSource::new(
-                    cognitive::repos::PersonaRepo::new(pool.clone()),
-                ),
-            ));
-        }
-
         // Cognitive context source (optional — requires real pool).
         // These are hoisted so UnifiedMemoryService can use them outside the block.
         let mut cognitive_fact_repo: Option<cognitive::SemanticFactRepo> = None;

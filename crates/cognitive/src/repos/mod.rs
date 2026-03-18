@@ -12,6 +12,7 @@ pub mod markdown_parser;
 pub mod persona;
 pub mod procedural_rule;
 pub mod semantic_fact;
+pub mod squad;
 
 pub use accumulated_observation::AccumulatedObservationRepo;
 pub use annotation::AnnotationRepo;
@@ -32,6 +33,7 @@ pub use markdown_parser::parse_markdown_to_tree;
 pub use persona::{NewPersona, PersonaRepo, PersonaRow, PersonaUpdate};
 pub use procedural_rule::ProceduralRuleRepo;
 pub use semantic_fact::SemanticFactRepo;
+pub use squad::{NewSquad, ResolvedSquad, SquadMemberRow, SquadRepo, SquadRow};
 
 use tools_core::FeatureMigration;
 use tracing::warn;
@@ -60,8 +62,8 @@ pub fn cognitive_migrations() -> Vec<FeatureMigration> {
     vec![
         FeatureMigration {
             feature_name: "cognitive".to_string(),
-            version: 6,
-            description: "FSRS-5 flashcard schema + review_log + fsrs_parameters".to_string(),
+            version: 8,
+            description: "Cognitive tables + squads + scope columns + persona skill fields".to_string(),
             sql: include_str!("../../migrations/001_cognitive_tables.sql").to_string(),
         },
         FeatureMigration {

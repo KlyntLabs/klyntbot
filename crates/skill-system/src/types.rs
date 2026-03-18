@@ -14,6 +14,7 @@ pub enum SkillType {
     #[default]
     Skill,
     Orchestrator,
+    Persona,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

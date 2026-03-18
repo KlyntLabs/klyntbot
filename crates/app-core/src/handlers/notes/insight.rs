@@ -44,6 +44,7 @@ impl AppCore {
         &self,
         note_id: &str,
         scope_params: Option<&InsightScopeConfigParams>,
+        squad_id: Option<&str>,
         emitter_override: Option<Arc<dyn crate::events::AppEventEmitter>>,
     ) -> Result<InsightReviewStarted, ApiError> {
         let note = self
@@ -170,7 +171,7 @@ impl AppCore {
                 (ctx.text, ctx.note_title, None)
             };
 
-        let selected_personas = self.select_personas(note_id, &note_domains).await;
+        let selected_personas = self.resolve_squad_for_note(note_id, squad_id, &note_domains).await;
 
         let config = self.config.read().await;
         let params = providers::cognitive_chat_params(&config, 4096);
@@ -627,7 +628,7 @@ impl AppCore {
             "assessment" => insight_prompts::self_assessment_prompt(&ctx_text),
             "concept-map" => insight_prompts::concept_map_prompt(&ctx_text, &ctx_note_title),
             "perspectives" => {
-                let personas = self.select_personas(note_id, &note_domains).await;
+                let personas = self.resolve_squad_for_note(note_id, None, &note_domains).await;
                 tab_personas = personas
                     .iter()
                     .map(|p| PersonaMetaResponse {
@@ -850,14 +851,27 @@ impl AppCore {
         notes
     }
 
-    async fn select_personas(
+    async fn resolve_squad_for_note(
         &self,
         note_id: &str,
+        squad_id: Option<&str>,
         domains: &[String],
     ) -> Vec<cognitive::PersonaRow> {
+        if let Some(sid) = squad_id {
+            if let Some(squad_repo) = &self.squad_repo {
+                if let Ok(Some(resolved)) = squad_repo.resolve_squad(sid).await {
+                    return resolved.personas;
+                }
+            }
+        }
+        if let Some(squad_repo) = &self.squad_repo {
+            if let Ok(Some(resolved)) = squad_repo.resolve_squad("builtin-squad-general").await {
+                return resolved.personas;
+            }
+        }
         match &self.persona_repo {
             Some(repo) => repo
-                .select_for_note(note_id, domains, usize::MAX)
+                .select_for_note(note_id, domains, 6)
                 .await
                 .unwrap_or_default(),
             None => Vec::new(),
@@ -902,21 +916,6 @@ async fn run_insight_pipeline(args: InsightPipelineArgs) {
     let assessment_prompt = insight_prompts::self_assessment_prompt(&context);
     let concept_map_prompt = insight_prompts::concept_map_prompt(&context, &note_title);
 
-    let persona_blocks: Vec<(String, String, String, String, String)> = personas
-        .iter()
-        .map(|p| {
-            (
-                p.name.clone(),
-                p.role.clone(),
-                p.expertise.clone(),
-                p.perspective.clone(),
-                p.tone.clone(),
-            )
-        })
-        .collect();
-    let formatted_blocks = insight_prompts::format_persona_blocks(&persona_blocks);
-    let perspectives_prompt = insight_prompts::perspectives_prompt(&context, &formatted_blocks);
-
     let personas_meta: Vec<serde_json::Value> = personas
         .iter()
         .map(|p| {
@@ -934,29 +933,99 @@ async fn run_insight_pipeline(args: InsightPipelineArgs) {
         serde_json::json!({ "personas": personas_meta }),
     );
 
-    let (gaps, assessment, concept_map, perspectives) = tokio::join!(
-        generate_tab(&provider, &emitter, "gaps", &gaps_prompt, &params),
-        generate_tab(
-            &provider,
-            &emitter,
-            "assessment",
-            &assessment_prompt,
-            &params,
-        ),
-        generate_tab(
-            &provider,
-            &emitter,
-            "concept-map",
-            &concept_map_prompt,
-            &params,
-        ),
-        generate_tab(
-            &provider,
-            &emitter,
-            "perspectives",
-            &perspectives_prompt,
-            &params,
-        ),
+    // Per-persona parallel perspective generation
+    let persona_futures: Vec<_> = personas
+        .iter()
+        .map(|p| {
+            let provider = provider.clone();
+            let emitter = emitter.clone();
+            let params = params.clone();
+            let ctx = context.clone();
+            let name = p.name.clone();
+            let role = p.role.clone();
+            let expertise = p.expertise.clone();
+            let perspective = p.perspective.clone();
+            let tone = p.tone.clone();
+            let persona_id = p.id.clone();
+            async move {
+                let prompt = insight_prompts::single_persona_prompt(
+                    &ctx,
+                    &name,
+                    &role,
+                    &expertise,
+                    &perspective,
+                    &tone,
+                );
+                let messages = vec![
+                    providers::Message::System {
+                        content: prompt,
+                    },
+                    providers::Message::User {
+                        content: providers::UserContent::Text(
+                            "Generate the analysis now.".to_string(),
+                        ),
+                    },
+                ];
+                match provider.chat(&messages, None, &params).await {
+                    Ok(response) => {
+                        let content = response.content.unwrap_or_default();
+                        emitter.emit_event(
+                            "insight:persona-perspective",
+                            serde_json::json!({
+                                "personaId": persona_id,
+                                "name": name,
+                                "content": content,
+                            }),
+                        );
+                        Some(content)
+                    }
+                    Err(e) => {
+                        emitter.emit_event(
+                            "insight:error",
+                            serde_json::json!({ "tab": "perspectives", "persona": name, "error": e.to_string() }),
+                        );
+                        None
+                    }
+                }
+            }
+        })
+        .collect();
+
+    let ((gaps, assessment, concept_map), persona_results) = tokio::join!(
+        async {
+            tokio::join!(
+                generate_tab(&provider, &emitter, "gaps", &gaps_prompt, &params),
+                generate_tab(
+                    &provider,
+                    &emitter,
+                    "assessment",
+                    &assessment_prompt,
+                    &params,
+                ),
+                generate_tab(
+                    &provider,
+                    &emitter,
+                    "concept-map",
+                    &concept_map_prompt,
+                    &params,
+                ),
+            )
+        },
+        futures_util::future::join_all(persona_futures),
+    );
+
+    // Combine persona perspectives with --- separator
+    let perspectives: Option<String> = {
+        let parts: Vec<String> = persona_results.into_iter().flatten().collect();
+        if parts.is_empty() {
+            None
+        } else {
+            Some(parts.join("\n\n---\n\n"))
+        }
+    };
+    emitter.emit_event(
+        "insight:tab-done",
+        serde_json::json!({ "tab": "perspectives", "content": perspectives }),
     );
 
     if let Some(ref service) = insight_service {

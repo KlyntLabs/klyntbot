@@ -209,7 +209,12 @@ export function useIssueDetail(
         })),
       );
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : typeof e === "object" && e !== null ? JSON.stringify(e) : String(e);
+      const msg =
+        e instanceof Error
+          ? e.message
+          : typeof e === "object" && e !== null
+            ? JSON.stringify(e)
+            : String(e);
       setAiError(msg);
     } finally {
       setSuggestionsLoading(false);
@@ -254,7 +259,12 @@ export function useIssueDetail(
         setDecompositionResult(result);
       }
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : typeof e === "object" && e !== null ? JSON.stringify(e) : String(e);
+      const msg =
+        e instanceof Error
+          ? e.message
+          : typeof e === "object" && e !== null
+            ? JSON.stringify(e)
+            : String(e);
       setAiError(msg);
     } finally {
       setDecompositionLoading(false);
@@ -281,10 +291,13 @@ export function useIssueDetail(
     setDecompositionResult(null);
   }, []);
 
-  const rejectDecomposition = useCallback(async (id: string) => {
-    await ipc("task_reject_decomposition", { decompositionId: id });
-    closeDecomposition();
-  }, [closeDecomposition]);
+  const rejectDecomposition = useCallback(
+    async (id: string) => {
+      await ipc("task_reject_decomposition", { decompositionId: id });
+      closeDecomposition();
+    },
+    [closeDecomposition],
+  );
 
   // Forecast
   const [forecast, setForecast] = useState<TaskForecast | null>(null);
@@ -297,7 +310,12 @@ export function useIssueDetail(
       setForecast(result);
     } catch (e: unknown) {
       setForecast(null);
-      const msg = e instanceof Error ? e.message : typeof e === "object" && e !== null ? JSON.stringify(e) : String(e);
+      const msg =
+        e instanceof Error
+          ? e.message
+          : typeof e === "object" && e !== null
+            ? JSON.stringify(e)
+            : String(e);
       setAiError(msg);
     } finally {
       setForecastLoading(false);
