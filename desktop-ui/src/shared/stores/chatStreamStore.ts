@@ -12,7 +12,11 @@ import type {
   AgentErrorPayload,
   AgentSelectedPayload,
   ClassificationCompletePayload,
+  ConsensusReachedPayload,
   ContentChunkPayload,
+  DebateRound,
+  DebateRoundCompletedPayload,
+  DebateRoundStartedPayload,
   DelegationCompletedPayload,
   DelegationStartedPayload,
   ExecutionStartedPayload,
@@ -55,6 +59,10 @@ const SSE_AGENT_EVENTS = [
   "agent:plan_step_completed",
   "agent:interaction_request",
   "agent:persona_perspective",
+  "agent:debate_round_started",
+  "agent:debate_round_completed",
+  "agent:consensus_reached",
+  "agent:memory_promoted",
   "entity:updated",
 ] as const;
 
@@ -69,6 +77,10 @@ export interface StreamSnapshot {
   transparency: TransparencyData | null;
   activeDelegateAgent: string | null;
   personaMessages: PersonaSegment[];
+  debateRounds: DebateRound[];
+  currentDebateRound: number | null;
+  consensusReached: boolean;
+  consensusSummary: string | null;
   /** True when a stream finished while no component was subscribed to consume onDone. */
   needsRefetch: boolean;
 }
@@ -82,6 +94,10 @@ const DEFAULT_SNAPSHOT: StreamSnapshot = Object.freeze({
   transparency: null,
   activeDelegateAgent: null,
   personaMessages: [],
+  debateRounds: [],
+  currentDebateRound: null,
+  consensusReached: false,
+  consensusSummary: null,
   needsRefetch: false,
 });
 
@@ -297,6 +313,13 @@ class ChatStreamStore {
     on<PlanGeneratedPayload>("agent:plan_generated", (p) => this.onPlanGenerated(p));
     on<PlanStepCompletedPayload>("agent:plan_step_completed", (p) => this.onPlanStepCompleted(p));
     on<PersonaPerspectivePayload>("agent:persona_perspective", (p) => this.onPersonaPerspective(p));
+    on<DebateRoundStartedPayload>("agent:debate_round_started", (p) =>
+      this.onDebateRoundStarted(p),
+    );
+    on<DebateRoundCompletedPayload>("agent:debate_round_completed", (p) =>
+      this.onDebateRoundCompleted(p),
+    );
+    on<ConsensusReachedPayload>("agent:consensus_reached", (p) => this.onConsensusReached(p));
   }
 
   private initTauriListeners(): void {
@@ -339,6 +362,15 @@ class ChatStreamStore {
       );
       register<PersonaPerspectivePayload>("agent:persona_perspective", (p) =>
         this.onPersonaPerspective(p),
+      );
+      register<DebateRoundStartedPayload>("agent:debate_round_started", (p) =>
+        this.onDebateRoundStarted(p),
+      );
+      register<DebateRoundCompletedPayload>("agent:debate_round_completed", (p) =>
+        this.onDebateRoundCompleted(p),
+      );
+      register<ConsensusReachedPayload>("agent:consensus_reached", (p) =>
+        this.onConsensusReached(p),
       );
     });
   }
@@ -662,18 +694,56 @@ class ChatStreamStore {
 
   private onPersonaPerspective(payload: PersonaPerspectivePayload): void {
     if (!this.isActive(payload.sessionKey)) return;
+    const segment: PersonaSegment = {
+      personaId: payload.personaId,
+      personaName: payload.personaName,
+      personaIcon: payload.personaIcon,
+      personaRole: payload.personaRole,
+      content: payload.content,
+    };
     this.updateState(payload.sessionKey, (s) => ({
       ...s,
-      personaMessages: [
-        ...s.personaMessages,
-        {
-          personaId: payload.personaId,
-          personaName: payload.personaName,
-          personaIcon: payload.personaIcon,
-          personaRole: payload.personaRole,
-          content: payload.content,
-        },
+      personaMessages: [...s.personaMessages, segment],
+      // Also append to current debate round if in debate mode
+      debateRounds:
+        s.currentDebateRound !== null
+          ? s.debateRounds.map((r) =>
+              r.round === s.currentDebateRound
+                ? { ...r, personaMessages: [...r.personaMessages, segment] }
+                : r,
+            )
+          : s.debateRounds,
+    }));
+  }
+
+  private onDebateRoundStarted(payload: DebateRoundStartedPayload): void {
+    if (!this.isActive(payload.sessionKey)) return;
+    this.updateState(payload.sessionKey, (s) => ({
+      ...s,
+      currentDebateRound: payload.round,
+      debateRounds: [
+        ...s.debateRounds,
+        { round: payload.round, personaMessages: [], consensusScore: null },
       ],
+    }));
+  }
+
+  private onDebateRoundCompleted(payload: DebateRoundCompletedPayload): void {
+    if (!this.isActive(payload.sessionKey)) return;
+    this.updateState(payload.sessionKey, (s) => ({
+      ...s,
+      debateRounds: s.debateRounds.map((r) =>
+        r.round === payload.round ? { ...r, consensusScore: payload.consensusScore } : r,
+      ),
+    }));
+  }
+
+  private onConsensusReached(payload: ConsensusReachedPayload): void {
+    if (!this.isActive(payload.sessionKey)) return;
+    this.updateState(payload.sessionKey, (s) => ({
+      ...s,
+      consensusReached: true,
+      consensusSummary: payload.summary,
     }));
   }
 }

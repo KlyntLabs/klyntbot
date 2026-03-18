@@ -50,6 +50,10 @@ pub const AGENT_PLAN_GENERATED: &str = "agent:plan_generated";
 pub const AGENT_PLAN_STEP_COMPLETED: &str = "agent:plan_step_completed";
 pub const AGENT_BUDGET_WARNING: &str = "agent:budget_warning";
 pub const AGENT_PERSONA_PERSPECTIVE: &str = "agent:persona_perspective";
+pub const AGENT_DEBATE_ROUND_STARTED: &str = "agent:debate_round_started";
+pub const AGENT_DEBATE_ROUND_COMPLETED: &str = "agent:debate_round_completed";
+pub const AGENT_CONSENSUS_REACHED: &str = "agent:consensus_reached";
+pub const AGENT_MEMORY_PROMOTED: &str = "agent:memory_promoted";
 pub const ENTITY_UPDATED: &str = "entity:updated";
 pub const MCP_OAUTH_COMPLETE: &str = "mcp:oauth_complete";
 pub const MCP_OAUTH_ERROR: &str = "mcp:oauth_error";
@@ -348,6 +352,42 @@ pub struct PersonaPerspectivePayload {
     pub persona_icon: String,
     pub persona_role: String,
     pub content: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DebateRoundStartedPayload {
+    pub session_key: String,
+    pub round: u32,
+    pub total_rounds: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DebateRoundCompletedPayload {
+    pub session_key: String,
+    pub round: u32,
+    pub consensus_score: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConsensusReachedPayload {
+    pub session_key: String,
+    pub round: u32,
+    pub consensus_score: f64,
+    pub summary: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MemoryPromotedPayload {
+    pub session_key: String,
+    pub fact_id: String,
+    pub from_scope: String,
+    pub to_scope: String,
+    pub subject: String,
+    pub predicate: String,
 }
 
 /// Accumulated transparency data for an assistant message.

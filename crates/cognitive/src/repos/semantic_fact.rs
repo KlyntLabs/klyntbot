@@ -25,8 +25,9 @@ impl SemanticFactRepo {
             r#"
             INSERT INTO semantic_facts (id, domain, subject, predicate, object, confidence, source,
                 valid_from, valid_until, recorded_at, superseded_at, superseded_by,
-                stability, last_accessed, access_count, project_id, memory_type)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)
+                stability, last_accessed, access_count, project_id, memory_type,
+                scope_type, scope_id)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)
             ON CONFLICT (id) DO UPDATE SET
                 domain = excluded.domain,
                 subject = excluded.subject,
@@ -42,7 +43,9 @@ impl SemanticFactRepo {
                 last_accessed = excluded.last_accessed,
                 access_count = excluded.access_count,
                 project_id = excluded.project_id,
-                memory_type = excluded.memory_type
+                memory_type = excluded.memory_type,
+                scope_type = excluded.scope_type,
+                scope_id = excluded.scope_id
             "#,
         )
         .bind(&fact.id)
@@ -62,6 +65,8 @@ impl SemanticFactRepo {
         .bind(fact.access_count)
         .bind(&fact.project_id)
         .bind(&fact.memory_type)
+        .bind(&fact.scope_type)
+        .bind(&fact.scope_id)
         .execute(&self.pool)
         .await?;
         Ok(())
@@ -92,6 +97,55 @@ impl SemanticFactRepo {
         )
         .fetch_all(&self.pool)
         .await
+    }
+
+    /// List active facts for a specific scope.
+    pub async fn list_by_scope(
+        &self,
+        scope_type: &str,
+        scope_id: Option<&str>,
+    ) -> Result<Vec<SemanticFact>, sqlx::Error> {
+        if let Some(sid) = scope_id {
+            sqlx::query_as::<_, SemanticFact>(
+                "SELECT * FROM semantic_facts WHERE scope_type = ?1 AND scope_id = ?2 AND superseded_at IS NULL ORDER BY recorded_at DESC",
+            )
+            .bind(scope_type)
+            .bind(sid)
+            .fetch_all(&self.pool)
+            .await
+        } else {
+            sqlx::query_as::<_, SemanticFact>(
+                "SELECT * FROM semantic_facts WHERE scope_type = ?1 AND scope_id IS NULL AND superseded_at IS NULL ORDER BY recorded_at DESC",
+            )
+            .bind(scope_type)
+            .fetch_all(&self.pool)
+            .await
+        }
+    }
+
+    /// List active facts visible to a scope chain (e.g., system + squad + persona).
+    /// Returns facts matching ANY tier in the chain, deduplicated by ID.
+    ///
+    /// Uses N separate `list_by_scope()` calls + dedup to avoid dynamic SQL bind issues.
+    pub async fn list_by_scope_chain(
+        &self,
+        chain: &[(&str, Option<&str>)],
+    ) -> Result<Vec<SemanticFact>, sqlx::Error> {
+        if chain.is_empty() {
+            return Ok(Vec::new());
+        }
+        let mut seen = std::collections::HashSet::new();
+        let mut results = Vec::new();
+        for (scope_type, scope_id) in chain {
+            let facts = self.list_by_scope(scope_type, *scope_id).await?;
+            for fact in facts {
+                if seen.insert(fact.id.clone()) {
+                    results.push(fact);
+                }
+            }
+        }
+        results.sort_by(|a, b| b.recorded_at.cmp(&a.recorded_at));
+        Ok(results)
     }
 
     /// Find facts with matching subject and predicate (for consolidation).
@@ -761,6 +815,61 @@ mod tests {
         assert!(repo.get("f1").await.unwrap().is_none());
         assert!(repo.get("f2").await.unwrap().is_some());
         assert!(repo.get("f3").await.unwrap().is_some());
+    }
+
+    #[tokio::test]
+    async fn test_scoped_fact_upsert_and_list() {
+        let pool = setup().await;
+        let repo = SemanticFactRepo::new(pool);
+
+        // Insert a squad-scoped fact
+        let mut fact = test_fact("squad-f1", "finance", "recommended_by", "Deep Analyst");
+        fact.scope_type = "squad".into();
+        fact.scope_id = Some("builtin-squad-finance".into());
+        fact.confidence = 0.9;
+        repo.upsert(&fact).await.unwrap();
+
+        // Insert a system-scoped fact
+        let mut sys_fact = test_fact("system-f1", "finance", "index_funds", "low risk");
+        sys_fact.scope_type = "system".into();
+        sys_fact.scope_id = None;
+        repo.upsert(&sys_fact).await.unwrap();
+
+        // list_by_scope should return only squad-scoped
+        let squad_facts = repo
+            .list_by_scope("squad", Some("builtin-squad-finance"))
+            .await
+            .unwrap();
+        assert_eq!(squad_facts.len(), 1);
+        assert_eq!(squad_facts[0].id, "squad-f1");
+
+        // list_by_scope for system should return only system-scoped
+        let sys_facts = repo.list_by_scope("system", None).await.unwrap();
+        assert_eq!(sys_facts.len(), 1);
+        assert_eq!(sys_facts[0].id, "system-f1");
+
+        // list_by_scope_chain should return both system + squad
+        let chain = vec![
+            ("system", None),
+            ("squad", Some("builtin-squad-finance")),
+        ];
+        let all = repo.list_by_scope_chain(&chain).await.unwrap();
+        assert_eq!(all.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_scoped_upsert_persists_scope_fields() {
+        let pool = setup().await;
+        let repo = SemanticFactRepo::new(pool);
+
+        let mut fact = test_fact("scoped-1", "finance", "pred", "val");
+        fact.scope_type = "persona".into();
+        fact.scope_id = Some("builtin-deep-analyst".into());
+        repo.upsert(&fact).await.unwrap();
+
+        let retrieved = repo.get("scoped-1").await.unwrap().unwrap();
+        assert_eq!(retrieved.scope_type, "persona");
+        assert_eq!(retrieved.scope_id.as_deref(), Some("builtin-deep-analyst"));
     }
 
     #[tokio::test]

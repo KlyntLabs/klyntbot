@@ -6,14 +6,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useSearchParams } from "react-router";
 import { ChatInput } from "../components/ChatInput";
 import { CoachingNudge } from "../components/CoachingNudge";
+import { DebateView } from "../components/DebateView";
 import { MessageList } from "../components/MessageList";
-import { PersonaMessageList } from "../components/PersonaMessageList";
-import { SquadChatHeader } from "../components/SquadChatHeader";
 import { ThreadContextMenu } from "../components/ThreadContextMenu";
 import { type AreaGroup, featurePrefix, ThreadList } from "../components/ThreadList";
 import { TransparencyPanel } from "../components/TransparencyPanel";
 import { TransparencyToggle } from "../components/TransparencyToggle";
-import { type VoiceMode, VoiceToggle } from "../components/VoiceToggle";
+import type { VoiceMode } from "../components/VoiceToggle";
 import { useChatSession } from "../hooks/useChatSession";
 
 interface GroupedThreads {
@@ -270,7 +269,6 @@ export function ChatPage() {
         renameRef={renameRef}
         onSelectThread={setSelectedThread}
         onNewThread={handleNewThread}
-        onNewSquadThread={handleNewSquadThread}
         onToggleGroup={toggleGroup}
         onContextMenu={openContextMenu}
         onRenameChange={(value) => setRenaming((r) => (r ? { ...r, value } : null))}
@@ -308,13 +306,9 @@ export function ChatPage() {
             <div />
           )}
           <div className="flex items-center gap-2">
-            {squadId && <VoiceToggle mode={voiceMode} onChange={setVoiceMode} />}
             <TransparencyToggle enabled={showTransparency} onToggle={toggleTransparency} />
           </div>
         </div>
-
-        {/* Squad chat header */}
-        {squadId && <SquadChatHeader squadId={squadId} />}
 
         <div className="flex-1 overflow-y-auto p-6">
           <div className="max-w-3xl mx-auto">
@@ -331,10 +325,15 @@ export function ChatPage() {
               </div>
             ) : (
               <>
-                {/* Persona messages in multi-voice mode */}
-                {showPersonaMessages && (
+                {chat.debateRounds.length > 0 && (
                   <div className="mb-6">
-                    <PersonaMessageList personaMessages={chat.personaMessages} />
+                    <DebateView
+                      rounds={chat.debateRounds}
+                      totalRounds={3}
+                      currentRound={chat.debateRounds.at(-1)?.round ?? null}
+                      consensusReached={chat.consensusReached}
+                      consensusSummary={chat.consensusSummary}
+                    />
                   </div>
                 )}
                 <MessageList
@@ -352,6 +351,7 @@ export function ChatPage() {
                   showTransparency={showTransparency}
                   liveTransparency={chat.transparency}
                   activeDelegateAgent={chat.activeDelegateAgent}
+                  personaMessages={showPersonaMessages ? chat.personaMessages : undefined}
                 />
               </>
             )}
@@ -363,8 +363,13 @@ export function ChatPage() {
         <ChatInput
           input={chat.input}
           isStreaming={chat.isStreaming}
+          squadId={squadId}
+          voiceMode={voiceMode}
           onInputChange={chat.setInput}
           onSend={handleSend}
+          onSelectSquad={handleNewSquadThread}
+          onSelectDefault={handleNewThread}
+          onVoiceModeChange={setVoiceMode}
         />
 
         {/* Floating transparency overlay */}

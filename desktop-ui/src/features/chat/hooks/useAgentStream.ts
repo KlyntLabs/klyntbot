@@ -1,6 +1,7 @@
 import { chatStreamStore } from "@shared/stores/chatStreamStore";
 import type {
   ActiveInteraction,
+  DebateRound,
   MessageSegment,
   PersonaSegment,
   TransparencyData,
@@ -17,6 +18,9 @@ interface AgentStream {
   activeInteraction: ActiveInteraction | null;
   transparency: TransparencyData | null;
   personaMessages: PersonaSegment[];
+  debateRounds: DebateRound[];
+  consensusReached: boolean;
+  consensusSummary: string | null;
   /** Call before sending a message to enter streaming mode. */
   startStreaming: () => void;
   /** Abort streaming and show an error. */
@@ -104,6 +108,9 @@ export function useAgentStream(sessionKey: string, onDone?: () => void): AgentSt
     transparency: state.transparency,
     activeDelegateAgent: state.activeDelegateAgent,
     personaMessages: state.personaMessages,
+    debateRounds: state.debateRounds,
+    consensusReached: state.consensusReached,
+    consensusSummary: state.consensusSummary,
     startStreaming,
     failStreaming,
     clearInteraction,

@@ -3,6 +3,7 @@ import { parseApiError } from "@shared/lib/utils";
 import type {
   ActiveInteraction,
   ChatMessage,
+  DebateRound,
   MessageSegment,
   PersonaSegment,
   TransparencyData,
@@ -21,6 +22,9 @@ interface ChatSession {
   activeInteraction: ActiveInteraction | null;
   activeDelegateAgent: string | null;
   personaMessages: PersonaSegment[];
+  debateRounds: DebateRound[];
+  consensusReached: boolean;
+  consensusSummary: string | null;
   input: string;
   setInput: (value: string) => void;
   send: (extraPayload?: Record<string, unknown>) => Promise<void>;
@@ -121,6 +125,9 @@ export function useChatSession(
     activeInteraction: stream.activeInteraction,
     activeDelegateAgent: stream.activeDelegateAgent,
     personaMessages: stream.personaMessages,
+    debateRounds: stream.debateRounds,
+    consensusReached: stream.consensusReached,
+    consensusSummary: stream.consensusSummary,
     input,
     setInput,
     send,

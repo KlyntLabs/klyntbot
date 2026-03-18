@@ -9,6 +9,7 @@ use tools::RoutingContext;
 
 use crate::execution::{ExecutionParams, ReasoningTrace};
 
+pub mod debate;
 pub mod direct;
 pub mod reactive;
 pub mod squad;

@@ -185,6 +185,41 @@ export interface PersonaSegment {
   content: string;
 }
 
+// ── Debate Events ──────────────────────────────────────────
+export interface DebateRoundStartedPayload {
+  sessionKey: string;
+  round: number;
+  totalRounds: number;
+}
+
+export interface DebateRoundCompletedPayload {
+  sessionKey: string;
+  round: number;
+  consensusScore: number;
+}
+
+export interface ConsensusReachedPayload {
+  sessionKey: string;
+  round: number;
+  consensusScore: number;
+  summary: string;
+}
+
+export interface MemoryPromotedPayload {
+  sessionKey: string;
+  factId: string;
+  fromScope: string;
+  toScope: string;
+  subject: string;
+  predicate: string;
+}
+
+export interface DebateRound {
+  round: number;
+  personaMessages: PersonaSegment[];
+  consensusScore: number | null;
+}
+
 // ── Delegation Events ────────────────────────────────────────
 
 export interface DelegationStartedPayload {

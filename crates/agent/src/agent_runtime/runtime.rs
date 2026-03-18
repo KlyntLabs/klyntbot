@@ -64,6 +64,7 @@ pub(crate) struct SquadDeps {
     pub repo: cognitive::SquadRepo,
     pub provider: providers::DynProvider,
     pub chat_params: providers::ChatParams,
+    pub blackboard_repo: Option<cognitive::BlackboardRepo>,
 }
 
 pub struct AgentRuntime {
@@ -166,11 +167,13 @@ impl AgentRuntime {
         repo: cognitive::SquadRepo,
         provider: providers::DynProvider,
         chat_params: providers::ChatParams,
+        blackboard_repo: Option<cognitive::BlackboardRepo>,
     ) -> Self {
         self.squad_deps = Some(SquadDeps {
             repo,
             provider,
             chat_params,
+            blackboard_repo,
         });
         self
     }
@@ -610,6 +613,7 @@ impl AgentRuntime {
         provider: &providers::DynProvider,
         params: &providers::ChatParams,
     ) -> Result<RuntimeResult> {
+        use crate::intent_pipeline::engines;
         use crate::intent_pipeline::engines::squad;
 
         // 1. Resolve squad
@@ -641,16 +645,48 @@ impl AgentRuntime {
         }
         let orchestrator_context = context_parts.join("\n\n");
 
-        // 3. Persona fan-out
-        let persona_responses = squad::fan_out_personas(
-            provider,
-            &orchestrator_context,
-            message,
-            &resolved.personas,
-            params,
-            event_tx.as_ref(),
-        )
-        .await;
+        // 3. Persona fan-out (debate or single-pass)
+        let blackboard_repo = self
+            .squad_deps
+            .as_ref()
+            .and_then(|d| d.blackboard_repo.as_ref());
+        let use_debate = resolved.personas.len() >= 3 && blackboard_repo.is_some();
+
+        let persona_responses = if use_debate {
+            let blackboard_repo = blackboard_repo.unwrap();
+            let debate_session_key =
+                format!("debate:{}:{}", squad_id, uuid::Uuid::new_v4());
+            let debate_results = engines::debate::run_debate(
+                provider,
+                &orchestrator_context,
+                message,
+                &resolved.personas,
+                params,
+                blackboard_repo,
+                &debate_session_key,
+                squad_id,
+                engines::debate::DEFAULT_MAX_ROUNDS,
+                engines::debate::DEFAULT_CONSENSUS_THRESHOLD,
+                event_tx.as_ref(),
+            )
+            .await;
+
+            // Collect responses from the final round for synthesis
+            debate_results
+                .last()
+                .map(|(_, responses, _)| responses.clone())
+                .unwrap_or_default()
+        } else {
+            squad::fan_out_personas(
+                provider,
+                &orchestrator_context,
+                message,
+                &resolved.personas,
+                params,
+                event_tx.as_ref(),
+            )
+            .await
+        };
 
         // 4. Synthesis
         let synthesis_prompt = squad::build_squad_synthesis_prompt(message, &persona_responses);

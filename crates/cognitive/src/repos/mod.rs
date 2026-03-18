@@ -1,5 +1,6 @@
 pub mod accumulated_observation;
 pub mod annotation;
+pub mod blackboard;
 pub mod book_tree;
 pub mod entity;
 pub mod episodic_memory;
@@ -10,10 +11,12 @@ pub mod gt_link;
 pub mod insight_cache;
 pub mod markdown_parser;
 pub mod persona;
+pub mod persona_accuracy;
 pub mod procedural_rule;
 pub mod semantic_fact;
 pub mod squad;
 
+pub use blackboard::{BlackboardEntry, BlackboardRepo, NewBlackboardEntry};
 pub use accumulated_observation::AccumulatedObservationRepo;
 pub use annotation::AnnotationRepo;
 pub use book_tree::SqliteBookTreeRepo;
@@ -31,6 +34,7 @@ pub use gt_link::SqliteGTLinkRepo;
 pub use insight_cache::{InsightCacheRepo, InsightCacheRow};
 pub use markdown_parser::parse_markdown_to_tree;
 pub use persona::{NewPersona, PersonaRepo, PersonaRow, PersonaUpdate};
+pub use persona_accuracy::{PersonaAccuracy, PersonaAccuracyRepo};
 pub use procedural_rule::ProceduralRuleRepo;
 pub use semantic_fact::SemanticFactRepo;
 pub use squad::{NewSquad, ResolvedSquad, SquadMemberRow, SquadRepo, SquadRow};
@@ -62,8 +66,8 @@ pub fn cognitive_migrations() -> Vec<FeatureMigration> {
     vec![
         FeatureMigration {
             feature_name: "cognitive".to_string(),
-            version: 8,
-            description: "Cognitive tables + squads + scope columns + persona skill fields"
+            version: 9,
+            description: "Cognitive tables + squads + scope columns + persona skill fields + blackboard + persona accuracy"
                 .to_string(),
             sql: include_str!("../../migrations/001_cognitive_tables.sql").to_string(),
         },

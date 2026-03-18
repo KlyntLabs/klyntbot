@@ -15,12 +15,7 @@ interface SquadPickerProps {
   inline?: boolean;
 }
 
-export function SquadPicker({
-  selectedSquadId,
-  onSelect,
-  onManage,
-  inline,
-}: SquadPickerProps) {
+export function SquadPicker({ selectedSquadId, onSelect, onManage, inline }: SquadPickerProps) {
   const { squads, loading } = useSquads();
   const [open, setOpen] = useState(!!inline);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -32,7 +27,7 @@ export function SquadPicker({
   // Inline mode: render dropdown directly, no trigger button
   if (inline) {
     return (
-      <div ref={containerRef} className="w-64 glass-panel rounded-xl p-2 flex flex-col gap-1 shadow-xl">
+      <div ref={containerRef} className="w-64 glass-dropdown rounded-xl p-2 flex flex-col gap-1">
         {squads.length === 0 && !loading && (
           <div className="px-2 py-3 text-[11px] text-dim italic text-center">
             No squads created yet
@@ -89,7 +84,7 @@ export function SquadPicker({
 
       {/* Dropdown */}
       {open && (
-        <div className="absolute left-0 top-full mt-1 z-50 w-64 glass-panel rounded-xl p-2 flex flex-col gap-1 shadow-xl">
+        <div className="absolute left-0 top-full mt-1 z-50 w-64 glass-dropdown rounded-xl p-2 flex flex-col gap-1">
           {squads.length === 0 && !loading && (
             <div className="px-2 py-3 text-[11px] text-dim italic text-center">
               No squads created yet

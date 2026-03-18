@@ -44,6 +44,9 @@ pub struct RetrievalParams {
     pub relevance_weight_frequency: f64,
     pub relevance_weight_situation: f64,
     pub relevance_weight_temporal: f64,
+    /// Optional scope chain for filtering. When set, only facts matching
+    /// these scopes are considered. When empty, all scopes are included (backwards-compatible).
+    pub scope_chain: Vec<(String, Option<String>)>,
 }
 
 impl RetrievalParams {
@@ -60,6 +63,7 @@ impl RetrievalParams {
             relevance_weight_frequency: 0.1,
             relevance_weight_situation: 0.25,
             relevance_weight_temporal: 0.05,
+            scope_chain: Vec::new(),
         }
     }
 }
@@ -111,18 +115,18 @@ pub async fn retrieve_relevant_facts(
                 let vector_ids: std::collections::HashSet<String> =
                     vector_scored.iter().map(|s| s.fact.id.clone()).collect();
                 let mut fallback =
-                    fallback_path(repo, domains, params.situational_boost, &weights).await?;
+                    fallback_path(repo, domains, params.situational_boost, &weights, &params.scope_chain).await?;
                 fallback.retain(|s| !vector_ids.contains(&s.fact.id));
                 vector_scored.append(&mut fallback);
                 vector_scored
             }
             Err(e) => {
                 warn!("Vector search failed, using fallback: {e}");
-                fallback_path(repo, domains, params.situational_boost, &weights).await?
+                fallback_path(repo, domains, params.situational_boost, &weights, &params.scope_chain).await?
             }
         }
     } else {
-        fallback_path(repo, domains, params.situational_boost, &weights).await?
+        fallback_path(repo, domains, params.situational_boost, &weights, &params.scope_chain).await?
     };
 
     // BM25 boost: add FTS5 signal for non-empty queries
@@ -225,12 +229,23 @@ async fn fallback_path(
     domains: &[&str],
     situational_boost: f64,
     weights: &RelevanceWeights,
+    scope_chain: &[(String, Option<String>)],
 ) -> Result<Vec<ScoredFact>, sqlx::Error> {
-    let mut all_facts = Vec::new();
-    for domain in domains {
-        let mut facts = repo.list_active(domain).await?;
-        all_facts.append(&mut facts);
-    }
+    let all_facts = if scope_chain.is_empty() {
+        // Backwards-compatible: load all domains
+        let mut all = Vec::new();
+        for domain in domains {
+            all.extend(repo.list_active(domain).await?);
+        }
+        all
+    } else {
+        // Scoped: load facts visible to the scope chain
+        let chain_refs: Vec<(&str, Option<&str>)> = scope_chain
+            .iter()
+            .map(|(st, sid)| (st.as_str(), sid.as_deref()))
+            .collect();
+        repo.list_by_scope_chain(&chain_refs).await?
+    };
 
     let now = Utc::now();
 

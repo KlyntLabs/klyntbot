@@ -212,4 +212,38 @@ pub enum AgentEvent {
         persona_role: String,
         content: String,
     },
+
+    /// A debate round started.
+    DebateRoundStarted {
+        round: u32,
+        #[serde(rename = "totalRounds")]
+        total_rounds: u32,
+    },
+
+    /// A debate round completed with all persona responses.
+    DebateRoundCompleted {
+        round: u32,
+        #[serde(rename = "consensusScore")]
+        consensus_score: f64,
+    },
+
+    /// Consensus was reached — debate terminates early.
+    ConsensusReached {
+        round: u32,
+        #[serde(rename = "consensusScore")]
+        consensus_score: f64,
+        summary: String,
+    },
+
+    /// A memory was promoted from one scope to a higher scope.
+    MemoryPromoted {
+        #[serde(rename = "factId")]
+        fact_id: String,
+        #[serde(rename = "fromScope")]
+        from_scope: String,
+        #[serde(rename = "toScope")]
+        to_scope: String,
+        subject: String,
+        predicate: String,
+    },
 }

@@ -1368,7 +1368,9 @@ impl AgentLoopBuilder {
                 .cloned()
                 .unwrap_or_else(|| provider.clone());
             let squad_params = providers::cognitive_chat_params(&config, 4096);
-            runtime = runtime.with_squad_deps(squad_repo, squad_provider, squad_params);
+            let blackboard_repo = Some(cognitive::BlackboardRepo::new(pool.clone()));
+            runtime =
+                runtime.with_squad_deps(squad_repo, squad_provider, squad_params, blackboard_repo);
         }
 
         let runtime = Arc::new(runtime);

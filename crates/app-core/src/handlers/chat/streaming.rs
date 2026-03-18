@@ -856,6 +856,50 @@ pub async fn relay_chat_stream(
                             }
                         );
                     }
+                    AgentEvent::DebateRoundStarted { round, total_rounds } => {
+                        emit!(
+                            events::AGENT_DEBATE_ROUND_STARTED,
+                            events::DebateRoundStartedPayload {
+                                session_key: sk.to_string(),
+                                round,
+                                total_rounds,
+                            }
+                        );
+                    }
+                    AgentEvent::DebateRoundCompleted { round, consensus_score } => {
+                        emit!(
+                            events::AGENT_DEBATE_ROUND_COMPLETED,
+                            events::DebateRoundCompletedPayload {
+                                session_key: sk.to_string(),
+                                round,
+                                consensus_score,
+                            }
+                        );
+                    }
+                    AgentEvent::ConsensusReached { round, consensus_score, summary } => {
+                        emit!(
+                            events::AGENT_CONSENSUS_REACHED,
+                            events::ConsensusReachedPayload {
+                                session_key: sk.to_string(),
+                                round,
+                                consensus_score,
+                                summary,
+                            }
+                        );
+                    }
+                    AgentEvent::MemoryPromoted { fact_id, from_scope, to_scope, subject, predicate } => {
+                        emit!(
+                            events::AGENT_MEMORY_PROMOTED,
+                            events::MemoryPromotedPayload {
+                                session_key: sk.to_string(),
+                                fact_id,
+                                from_scope,
+                                to_scope,
+                                subject,
+                                predicate,
+                            }
+                        );
+                    }
                 }
             }
             else => break,

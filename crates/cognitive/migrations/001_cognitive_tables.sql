@@ -537,3 +537,39 @@ CREATE TABLE IF NOT EXISTS insight_progress_snapshots (
 );
 
 CREATE INDEX IF NOT EXISTS idx_progress_insight ON insight_progress_snapshots(insight_review_id, version);
+
+-- ── Blackboard (Phase 3: transient shared working memory for debate) ────
+CREATE TABLE IF NOT EXISTS blackboard_entries (
+    id          TEXT PRIMARY KEY,
+    session_key TEXT NOT NULL,
+    squad_id    TEXT NOT NULL,
+    round       INTEGER NOT NULL,
+    persona_id  TEXT NOT NULL,
+    persona_name TEXT NOT NULL,
+    entry_type  TEXT NOT NULL DEFAULT 'observation',
+    content     TEXT NOT NULL,
+    confidence  REAL NOT NULL DEFAULT 0.5,
+    references_entry_id TEXT,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_blackboard_session ON blackboard_entries(session_key, round);
+CREATE INDEX IF NOT EXISTS idx_blackboard_squad ON blackboard_entries(squad_id);
+
+-- ── Persona Accuracy (Phase 3: FSRS-based persona learning) ─────────
+CREATE TABLE IF NOT EXISTS persona_accuracy (
+    id              TEXT PRIMARY KEY,
+    persona_id      TEXT NOT NULL,
+    squad_id        TEXT NOT NULL,
+    domain          TEXT NOT NULL DEFAULT 'general',
+    total_debates   INTEGER NOT NULL DEFAULT 0,
+    consensus_hits  INTEGER NOT NULL DEFAULT 0,
+    stability       REAL NOT NULL DEFAULT 1.0,
+    difficulty      REAL NOT NULL DEFAULT 5.0,
+    last_debate_at  TEXT,
+    created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(persona_id, squad_id, domain)
+);
+
+CREATE INDEX IF NOT EXISTS idx_persona_accuracy_persona ON persona_accuracy(persona_id);

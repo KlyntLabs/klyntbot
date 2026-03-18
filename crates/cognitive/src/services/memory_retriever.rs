@@ -90,6 +90,7 @@ impl UnifiedMemoryService {
             relevance_weight_frequency: self.config.relevance_weight_frequency,
             relevance_weight_situation: self.config.relevance_weight_situation,
             relevance_weight_temporal: self.config.relevance_weight_temporal,
+            scope_chain: Vec::new(),
         };
 
         match retrieve_relevant_facts(
@@ -115,6 +116,64 @@ impl UnifiedMemoryService {
                 .collect(),
             Err(e) => {
                 warn!("Cognitive fact retrieval failed: {e}");
+                Vec::new()
+            }
+        }
+    }
+
+    /// Retrieve memories visible to a specific scope chain.
+    ///
+    /// `scope_chain` is e.g. `[("system", None), ("squad", Some("squad-id")), ("persona", Some("persona-id"))]`.
+    /// Each persona sees global + its squad's + its own memories.
+    pub async fn retrieve_scoped(
+        &self,
+        query: &str,
+        limit: usize,
+        scope_chain: Vec<(String, Option<String>)>,
+    ) -> Vec<MemoryEntry> {
+        if !self.config.dynamic_facts_enabled || query.is_empty() {
+            return Vec::new();
+        }
+        let situational_boost = self.current_situational_boost().await;
+        let params = RetrievalParams {
+            limit,
+            scope_chain,
+            vector_top_k: self.config.vector_top_k,
+            min_similarity: self.config.min_similarity,
+            situational_boost,
+            max_stability: self.config.max_stability,
+            relevance_weight_semantic: self.config.relevance_weight_semantic,
+            relevance_weight_retrievability: self.config.relevance_weight_retrievability,
+            relevance_weight_importance: self.config.relevance_weight_importance,
+            relevance_weight_frequency: self.config.relevance_weight_frequency,
+            relevance_weight_situation: self.config.relevance_weight_situation,
+            relevance_weight_temporal: self.config.relevance_weight_temporal,
+        };
+        match retrieve_relevant_facts(
+            &self.fact_repo,
+            self.embedder.as_deref(),
+            query,
+            USER_MODEL_DOMAINS,
+            &params,
+        )
+        .await
+        {
+            Ok(facts) => facts
+                .into_iter()
+                .filter(|f| f.score > 0.3)
+                .map(|f| MemoryEntry {
+                    id: f.fact.id,
+                    content: format!(
+                        "{}: {} = {}",
+                        f.fact.subject, f.fact.predicate, f.fact.object
+                    ),
+                    score: f.score,
+                    source: MemorySource::CognitiveFact,
+                    raw_score: f.score,
+                })
+                .collect(),
+            Err(e) => {
+                warn!("Scoped retrieval failed: {e}");
                 Vec::new()
             }
         }

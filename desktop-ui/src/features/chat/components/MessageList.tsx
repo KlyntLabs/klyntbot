@@ -2,9 +2,10 @@ import type {
   ActiveInteraction,
   ChatMessage,
   MessageSegment,
+  PersonaSegment,
   TransparencyData,
 } from "@shared/types";
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { CollapsedInteraction } from "./CollapsedInteraction";
 import { InteractionCard } from "./InteractionCard";
 import { MarkdownContent } from "./MarkdownContent";
@@ -23,6 +24,7 @@ interface MessageListProps {
   showTransparency: boolean;
   liveTransparency: TransparencyData | null;
   activeDelegateAgent?: string | null;
+  personaMessages?: PersonaSegment[];
 }
 
 export function MessageList({
@@ -37,6 +39,7 @@ export function MessageList({
   showTransparency,
   liveTransparency,
   activeDelegateAgent,
+  personaMessages,
 }: MessageListProps) {
   const endRef = useRef<HTMLDivElement>(null);
   const [userScrolledUp, setUserScrolledUp] = useState(false);
@@ -90,34 +93,71 @@ export function MessageList({
 
   return (
     <div className="space-y-6" aria-live="polite">
-      {messages.map((msg) => (
-        <div
-          key={msg.id}
-          className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-          style={{ animation: "fade-in 0.3s ease-out" }}
-        >
-          {msg.role === "user" ? (
-            <div className="max-w-[85%] glass-bubble-user px-5 py-3.5">
-              <p className="text-[13px] font-light whitespace-pre-wrap leading-relaxed text-foreground">
-                {msg.content}
-              </p>
-            </div>
-          ) : msg.role === "interaction" ? (
-            <CollapsedInteraction content={msg.content} />
-          ) : (
-            <div className="max-w-[85%]">
-              {msg.segments && msg.segments.length > 0 ? (
-                <SegmentedMessage segments={msg.segments} plan={msg.transparency?.plan} />
+      {messages.map((msg, idx) => {
+        // Insert persona bubbles right after the last user message
+        const isLastUser =
+          msg.role === "user" && !messages.slice(idx + 1).some((m) => m.role === "user");
+        const showPersonas = isLastUser && personaMessages && personaMessages.length > 0;
+
+        return (
+          <Fragment key={msg.id}>
+            <div
+              className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+              style={{ animation: "fade-in 0.3s ease-out" }}
+            >
+              {msg.role === "user" ? (
+                <div className="max-w-[85%] glass-bubble-user px-5 py-3.5">
+                  <p className="text-[13px] font-light whitespace-pre-wrap leading-relaxed text-foreground">
+                    {msg.content}
+                  </p>
+                </div>
+              ) : msg.role === "interaction" ? (
+                <CollapsedInteraction content={msg.content} />
               ) : (
-                <MarkdownContent content={msg.content} />
-              )}
-              {showTransparency && msg.transparency && (
-                <TokenBadge transparency={msg.transparency} />
+                <div className="max-w-[85%]">
+                  {msg.segments && msg.segments.length > 0 ? (
+                    <SegmentedMessage segments={msg.segments} plan={msg.transparency?.plan} />
+                  ) : (
+                    <MarkdownContent content={msg.content} />
+                  )}
+                  {showTransparency && msg.transparency && (
+                    <TokenBadge transparency={msg.transparency} />
+                  )}
+                </div>
               )}
             </div>
-          )}
-        </div>
-      ))}
+
+            {/* Persona perspectives — inserted after last user message */}
+            {showPersonas &&
+              personaMessages.map((pm) => (
+                <div
+                  key={pm.personaId}
+                  className="flex justify-start gap-2.5"
+                  style={{ animation: "fade-in 0.3s ease-out" }}
+                >
+                  <div className="shrink-0 w-7 h-7 rounded-full bg-purple-500/15 flex items-center justify-center text-sm mt-1">
+                    {pm.personaIcon || "🤖"}
+                  </div>
+                  <div className="max-w-[80%]">
+                    <div className="flex items-baseline gap-1.5 mb-1">
+                      <span className="text-[11px] font-medium text-foreground">
+                        {pm.personaName}
+                      </span>
+                      {pm.personaRole && (
+                        <span className="text-[9px] text-dim">{pm.personaRole}</span>
+                      )}
+                    </div>
+                    <div className="glass-bubble px-4 py-3">
+                      <div className="text-[13px] font-light text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                        {pm.content}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+          </Fragment>
+        );
+      })}
 
       {/* Streaming segments (live) — includes inline tool spinners + cursor */}
       {(segments.length > 0 || activeTools.length > 0) && (

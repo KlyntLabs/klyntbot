@@ -1,8 +1,5 @@
-import { useClickOutside } from "@shared/hooks/useClickOutside";
 import type { ChatThread } from "@shared/types";
-import { FolderOpen, Globe, Plus, RotateCcw, Settings, Users, Wallet } from "lucide-react";
-import { useRef, useState } from "react";
-import { SquadPicker } from "../../notes/components/insight/SquadPicker";
+import { FolderOpen, Globe, Plus, RotateCcw, Settings, Wallet } from "lucide-react";
 import { GroupHeader } from "./GroupHeader";
 import { ThreadButton } from "./ThreadButton";
 
@@ -38,7 +35,6 @@ interface ThreadListProps {
   renameRef: React.RefObject<HTMLInputElement | null>;
   onSelectThread: (key: string) => void;
   onNewThread: () => void;
-  onNewSquadThread?: (squadId: string) => void;
   onToggleGroup: (key: string) => void;
   onContextMenu: (e: React.MouseEvent, thread: ChatThread) => void;
   onRenameChange: (value: string) => void;
@@ -55,16 +51,12 @@ export function ThreadList({
   renameRef,
   onSelectThread,
   onNewThread,
-  onNewSquadThread,
   onToggleGroup,
   onContextMenu,
   onRenameChange,
   onRenameConfirm,
   onRenameCancel,
 }: ThreadListProps) {
-  const [showSquadPicker, setShowSquadPicker] = useState(false);
-  const squadPickerRef = useRef<HTMLDivElement>(null);
-  useClickOutside(squadPickerRef, () => setShowSquadPicker(false), showSquadPicker);
   const renderThread = (thread: ChatThread) => (
     <ThreadButton
       key={thread.sessionKey}
@@ -93,30 +85,6 @@ export function ThreadList({
           <Plus className="w-[13px] h-[13px]" strokeWidth={1.5} />
           New thread
         </button>
-        {onNewSquadThread && (
-          <div ref={squadPickerRef} className="relative">
-            <button
-              type="button"
-              onClick={() => setShowSquadPicker((prev) => !prev)}
-              className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-accent transition-all text-[12px] font-light text-muted-foreground hover:text-purple-400"
-            >
-              <Users className="w-[13px] h-[13px]" strokeWidth={1.5} />
-              New squad chat
-            </button>
-            {showSquadPicker && (
-              <div className="mt-1 ml-4">
-                <SquadPicker
-                  selectedSquadId={null}
-                  inline
-                  onSelect={(squadId) => {
-                    onNewSquadThread(squadId);
-                    setShowSquadPicker(false);
-                  }}
-                />
-              </div>
-            )}
-          </div>
-        )}
         <button
           type="button"
           className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-accent transition-all text-[12px] font-light text-muted-foreground hover:text-foreground"
