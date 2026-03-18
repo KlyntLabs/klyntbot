@@ -182,11 +182,10 @@ impl Operator for SelectBySection {
         OperatorType::Selector
     }
     async fn execute(&self, ctx: &mut OperatorContext) -> Result<()> {
-        // Get all root sections
+        // Get all root sections (cached for 60s)
         let roots = ctx
             .book_index
-            .tree_repo()
-            .get_root_sections(&crate::book_index::SourceType::Note)
+            .get_root_sections_cached(&crate::book_index::SourceType::Note)
             .await?;
         if roots.is_empty() {
             return Ok(());

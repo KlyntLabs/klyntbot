@@ -7,9 +7,11 @@ pub mod types;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
 use common::Result;
+use dashmap::DashMap;
 
 pub use gt_link::GTLinkRepo;
 pub use tree::BookTreeRepo;
@@ -46,6 +48,8 @@ pub struct BookIndex {
     gt_link_repo: Arc<dyn GTLinkRepo>,
     embedder: Arc<dyn BookEmbedder>,
     has_content_flag: AtomicBool,
+    root_sections_cache: DashMap<String, (Vec<TreeNode>, Instant)>,
+    cache_ttl: Duration,
 }
 
 impl BookIndex {
@@ -61,6 +65,8 @@ impl BookIndex {
             gt_link_repo,
             embedder,
             has_content_flag: AtomicBool::new(false),
+            root_sections_cache: DashMap::new(),
+            cache_ttl: Duration::from_secs(60),
         }
     }
 
@@ -87,6 +93,30 @@ impl BookIndex {
     pub async fn refresh_has_content(&self) -> Result<()> {
         let has = self.tree_repo.has_any_nodes().await?;
         self.has_content_flag.store(has, Ordering::Release);
+        self.invalidate_caches();
         Ok(())
+    }
+
+    /// Get root sections with 60s TTL cache.
+    pub async fn get_root_sections_cached(
+        &self,
+        source_type: &SourceType,
+    ) -> Result<Vec<TreeNode>> {
+        let key = source_type.as_str().to_string();
+        if let Some(entry) = self.root_sections_cache.get(&key) {
+            let (nodes, inserted_at) = entry.value();
+            if inserted_at.elapsed() < self.cache_ttl {
+                return Ok(nodes.clone());
+            }
+        }
+        let nodes = self.tree_repo.get_root_sections(source_type).await?;
+        self.root_sections_cache
+            .insert(key, (nodes.clone(), Instant::now()));
+        Ok(nodes)
+    }
+
+    /// Invalidate all caches (call after tree modifications).
+    pub fn invalidate_caches(&self) {
+        self.root_sections_cache.clear();
     }
 }

@@ -143,3 +143,20 @@ pub fn build_bookrag_searcher(
         config.operator_timeout_ms,
     ))
 }
+
+pub fn build_entity_extractor(
+    entity_repo: cognitive::repos::EntityRepo,
+    gt_link_repo: Arc<dyn GTLinkRepo>,
+    provider: providers::DynProvider,
+    config: &config::Config,
+) -> Arc<super::book_index_entity_extractor::BookIndexEntityExtractor> {
+    let params = providers::cognitive_chat_params(config, 256);
+    let llm: Arc<dyn OperatorLlm> = Arc::new(OperatorLlmAdapter { provider, params });
+    Arc::new(
+        super::book_index_entity_extractor::BookIndexEntityExtractor::new(
+            entity_repo,
+            gt_link_repo,
+            llm,
+        ),
+    )
+}

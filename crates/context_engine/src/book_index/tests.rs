@@ -339,4 +339,162 @@ mod integration_tests {
             "Empty BookIndex should return no results"
         );
     }
+
+    fn make_section(
+        id: &str,
+        parent: Option<&str>,
+        title: &str,
+        source_id: &str,
+        level: u32,
+    ) -> TreeNode {
+        TreeNode {
+            id: id.into(),
+            parent_id: parent.map(|p| p.into()),
+            node_type: TreeNodeType::Section,
+            content: title.into(),
+            title: Some(title.into()),
+            level,
+            source_type: SourceType::Note,
+            source_id: source_id.into(),
+            position: 0,
+            metadata: None,
+        }
+    }
+
+    fn make_text(id: &str, parent: &str, content: &str, source_id: &str, level: u32) -> TreeNode {
+        TreeNode {
+            id: id.into(),
+            parent_id: Some(parent.into()),
+            node_type: TreeNodeType::Text,
+            content: content.into(),
+            title: None,
+            level,
+            source_type: SourceType::Note,
+            source_id: source_id.into(),
+            position: 1,
+            metadata: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn multi_hop_integration() {
+        let nodes = vec![
+            make_section("s1", None, "Project Alpha", "note-1", 1),
+            make_text(
+                "t1",
+                "s1",
+                "Project Alpha uses Rust and has deadline March 30.",
+                "note-1",
+                2,
+            ),
+            make_section("s2", None, "Finance Goals", "note-2", 1),
+            make_text(
+                "t2",
+                "s2",
+                "Budget for Project Alpha is $15,000.",
+                "note-2",
+                2,
+            ),
+        ];
+        let tree_repo = Arc::new(MockBookTreeRepo::new(nodes));
+        let gt_links = vec![
+            ("entity-alpha".to_string(), "s1".to_string()),
+            ("entity-alpha".to_string(), "t1".to_string()),
+            ("entity-alpha".to_string(), "t2".to_string()),
+        ];
+        let gt_link_repo = Arc::new(MockGTLinkRepo::new(gt_links, tree_repo.clone()));
+
+        let book_index = Arc::new(BookIndex::new(
+            tree_repo as Arc<dyn BookTreeRepo>,
+            Arc::new(MockBookEntityRepo),
+            gt_link_repo as Arc<dyn GTLinkRepo>,
+            Arc::new(MockBookEmbedder),
+        ));
+        book_index.refresh_has_content().await.unwrap();
+
+        let llm: Arc<dyn OperatorLlm> = Arc::new(MockOperatorLlm);
+        let planner = Arc::new(RetrievalPlanner::new(
+            book_index,
+            llm,
+            BookRetrievalConfig::default(),
+        ));
+        let searcher = BookRAGSearcher::new(planner, 50, 10, 5000);
+
+        // "relate" keyword triggers MultiHop in heuristic
+        let results = searcher
+            .search("How does Project Alpha relate to my finance goals?", 10)
+            .await;
+        assert!(
+            !results.is_empty(),
+            "MultiHop should return results from linked notes"
+        );
+    }
+
+    #[tokio::test]
+    async fn global_aggregation_integration() {
+        let nodes = vec![
+            make_section("s1", None, "Note 1", "note-1", 1),
+            make_text("t1", "s1", "Task A is overdue.", "note-1", 2),
+            make_section("s2", None, "Note 2", "note-2", 1),
+            make_text("t2", "s2", "Task B is overdue.", "note-2", 2),
+        ];
+        let tree_repo = Arc::new(MockBookTreeRepo::new(nodes));
+        let gt_link_repo = Arc::new(MockGTLinkRepo::new(vec![], tree_repo.clone()));
+
+        let book_index = Arc::new(BookIndex::new(
+            tree_repo as Arc<dyn BookTreeRepo>,
+            Arc::new(MockBookEntityRepo),
+            gt_link_repo as Arc<dyn GTLinkRepo>,
+            Arc::new(MockBookEmbedder),
+        ));
+        book_index.refresh_has_content().await.unwrap();
+
+        let llm: Arc<dyn OperatorLlm> = Arc::new(MockOperatorLlm);
+        let planner = Arc::new(RetrievalPlanner::new(
+            book_index,
+            llm,
+            BookRetrievalConfig::default(),
+        ));
+        let searcher = BookRAGSearcher::new(planner, 50, 10, 5000);
+
+        // "across all" triggers GlobalAggregation
+        let _results = searcher
+            .search("How many tasks are overdue across all projects?", 10)
+            .await;
+        // May be empty (mock FTS returns nothing) but should NOT crash
+        // The important thing is the pipeline executed without error
+    }
+
+    #[tokio::test]
+    async fn empty_bookrag_does_not_crash() {
+        // Regression: BookRAGSearcher with empty index should return empty, not panic
+        let empty_tree = Arc::new(MockBookTreeRepo::new(vec![]));
+        let empty_gt = Arc::new(MockGTLinkRepo::new(vec![], empty_tree.clone()));
+        let book_index = Arc::new(BookIndex::new(
+            empty_tree as Arc<dyn BookTreeRepo>,
+            Arc::new(MockBookEntityRepo),
+            empty_gt as Arc<dyn GTLinkRepo>,
+            Arc::new(MockBookEmbedder),
+        ));
+        // has_content is false — searcher should short-circuit
+
+        let llm: Arc<dyn OperatorLlm> = Arc::new(MockOperatorLlm);
+        let planner = Arc::new(RetrievalPlanner::new(
+            book_index,
+            llm,
+            BookRetrievalConfig::default(),
+        ));
+        let searcher = BookRAGSearcher::new(planner, 50, 10, 5000);
+
+        let results = searcher
+            .search(
+                "Tell me about something complex and interesting across many domains",
+                10,
+            )
+            .await;
+        assert!(
+            results.is_empty(),
+            "Empty BookIndex should gracefully return empty"
+        );
+    }
 }

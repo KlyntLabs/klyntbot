@@ -79,6 +79,13 @@ export default function KnowledgeBasePage() {
   const insightActionsRef = useRef(insightActions);
   insightActionsRef.current = insightActions;
 
+  // ── Sync Insight Review panel when switching notes ────────────────────
+  useEffect(() => {
+    if (insightState.isOpen && selectedNoteId && selectedNoteId !== insightState.noteId) {
+      void insightActions.open(selectedNoteId);
+    }
+  }, [selectedNoteId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Sidebar widths (imperatively managed for perf) ────────────────────
   const [leftWidth, setLeftWidth] = useState(220);
   const [rightWidth, setRightWidth] = useState(260);

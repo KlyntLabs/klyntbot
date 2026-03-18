@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use common::Result;
 
-pub use classifier::{classify_heuristic, QueryCategory};
+pub use classifier::{classify_heuristic, classify_with_llm_fallback, QueryCategory};
 
 use crate::book_index::{BookIndex, BookRetrievalConfig};
 use crate::operators::formulator::{Decompose, Extract};
@@ -44,7 +44,7 @@ impl RetrievalPlanner {
     }
 
     pub async fn plan(&self, query: &str) -> Result<RetrievalPlan> {
-        let category = classify_heuristic(query);
+        let category = classify_with_llm_fallback(query, self.llm.as_ref()).await;
         let operators = self.generate_plan(query, &category);
         Ok(RetrievalPlan {
             category,

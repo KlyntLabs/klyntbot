@@ -4,6 +4,10 @@
 //! `context_engine`, `cognitive`) with concrete logic that lives at L5.
 
 pub mod agent_task;
+pub mod book_index_backfill;
+pub mod book_index_entity_extractor;
+pub mod book_index_skill_builder;
+pub mod book_index_task_builder;
 pub mod book_index_updater;
 pub mod book_index_wiring;
 pub mod cognitive_embedder;

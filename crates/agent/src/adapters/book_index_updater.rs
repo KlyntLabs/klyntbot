@@ -8,6 +8,8 @@ use tracing::{debug, info, warn};
 use cognitive::repos::{parse_markdown_to_tree, SqliteBookTreeRepo};
 use context_engine::book_index::{BookIndex, BookTreeRepo, SourceType};
 
+use super::book_index_entity_extractor::BookIndexEntityExtractor;
+
 /// Background service that updates the BookIndex tree when notes/tasks change.
 pub struct BookIndexUpdater {
     cancel_token: CancellationToken,
@@ -20,6 +22,9 @@ impl BookIndexUpdater {
         tree_repo: Arc<SqliteBookTreeRepo>,
         book_index: Arc<BookIndex>,
         cancel: CancellationToken,
+        entity_extractor: Option<Arc<BookIndexEntityExtractor>>,
+        task_repo: Option<storage::TaskRepo>,
+        project_repo: Option<storage::ProjectRepo>,
     ) -> Self {
         let cancel_clone = cancel.clone();
         let handle = tokio::spawn(async move {
@@ -33,7 +38,14 @@ impl BookIndexUpdater {
                     result = event_rx.recv() => {
                         match result {
                             Ok(event) => {
-                                if let Err(e) = handle_event(&tree_repo, &book_index, event).await {
+                                if let Err(e) = handle_event(
+                                    &tree_repo,
+                                    &book_index,
+                                    event,
+                                    entity_extractor.as_ref(),
+                                    task_repo.as_ref(),
+                                    project_repo.as_ref(),
+                                ).await {
                                     warn!("BookIndexUpdater event handling failed: {e}");
                                 }
                             }
@@ -68,24 +80,31 @@ async fn handle_event(
     tree_repo: &SqliteBookTreeRepo,
     book_index: &BookIndex,
     event: bus::DomainEvent,
+    entity_extractor: Option<&Arc<BookIndexEntityExtractor>>,
+    task_repo: Option<&storage::TaskRepo>,
+    project_repo: Option<&storage::ProjectRepo>,
 ) -> common::Result<()> {
     match event {
         bus::DomainEvent::NoteContentChanged { note_id, content } => {
             debug!("BookIndex: rebuilding tree for note {note_id}");
-            // Delete existing tree for this note
             tree_repo
                 .delete_by_source(&SourceType::Note, &note_id)
                 .await?;
-            // Parse markdown and insert new tree
             let nodes = parse_markdown_to_tree(&note_id, &content);
             if !nodes.is_empty() {
                 tree_repo.insert_nodes(&nodes).await?;
-                // Refresh the has_content flag
                 book_index.refresh_has_content().await?;
                 debug!(
                     "BookIndex: inserted {} tree nodes for note {note_id}",
                     nodes.len()
                 );
+
+                if let Some(extractor) = entity_extractor {
+                    super::book_index_entity_extractor::spawn_extract_and_link(
+                        extractor,
+                        nodes.clone(),
+                    );
+                }
             }
         }
         bus::DomainEvent::NoteDeleted { note_id } => {
@@ -96,10 +115,50 @@ async fn handle_event(
             book_index.refresh_has_content().await?;
         }
         bus::DomainEvent::TaskHierarchyChanged { project_id } => {
-            debug!("BookIndex: task hierarchy changed for project {project_id}");
-            // Task tree building is a future enhancement — for now just log
+            debug!("BookIndex: rebuilding task tree for project {project_id}");
+            if let Some(task_repo) = task_repo {
+                tree_repo
+                    .delete_by_source(&SourceType::Task, &project_id)
+                    .await?;
+
+                let project_name = if let Some(project_repo) = project_repo {
+                    project_repo
+                        .get(&project_id)
+                        .await
+                        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))
+                        .ok()
+                        .flatten()
+                        .map(|p| p.name)
+                        .unwrap_or_else(|| project_id.clone())
+                } else {
+                    project_id.clone()
+                };
+
+                let tasks = task_repo
+                    .list(&storage::TaskFilter {
+                        project_id: Some(project_id.clone()),
+                        ..Default::default()
+                    })
+                    .await
+                    .map_err(|e| common::KlyntbotError::Storage(e.to_string()))
+                    .unwrap_or_default();
+
+                if !tasks.is_empty() {
+                    let nodes = crate::adapters::book_index_task_builder::build_task_tree(
+                        &project_id,
+                        &project_name,
+                        &tasks,
+                    );
+                    tree_repo.insert_nodes(&nodes).await?;
+                    book_index.refresh_has_content().await?;
+                    debug!(
+                        "BookIndex: inserted {} task tree nodes for project {project_id}",
+                        nodes.len()
+                    );
+                }
+            }
         }
-        _ => {} // Ignore other events
+        _ => {}
     }
     Ok(())
 }

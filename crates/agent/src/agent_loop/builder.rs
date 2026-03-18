@@ -703,7 +703,7 @@ impl AgentLoopBuilder {
                 let book_index = crate::adapters::book_index_wiring::build_book_index(
                     tree_repo.clone(),
                     book_entity_repo,
-                    gt_link_repo,
+                    gt_link_repo.clone(),
                     embedding_engine.clone(),
                 );
                 let bookrag_searcher = crate::adapters::book_index_wiring::build_bookrag_searcher(
@@ -713,17 +713,68 @@ impl AgentLoopBuilder {
                 );
                 forge.add_searcher(bookrag_searcher);
 
-                // Start BookIndex updater (listens for NoteContentChanged/NoteDeleted events)
+                // Build entity extractor for GT-Link population
+                let entity_extractor = crate::adapters::book_index_wiring::build_entity_extractor(
+                    cognitive::repos::EntityRepo::new(storage_pool.inner().clone()),
+                    gt_link_repo.clone(),
+                    provider.clone(),
+                    &config,
+                );
+
+                // Start BookIndex updater (listens for NoteContentChanged/NoteDeleted/TaskHierarchyChanged)
                 if let Some(ref domain_bus) = self.domain_event_bus {
                     let updater_rx = domain_bus.subscribe();
+                    let task_repo_for_updater =
+                        storage::TaskRepo::new(storage_pool.inner().clone());
+                    let project_repo_for_updater =
+                        storage::ProjectRepo::new(storage_pool.inner().clone());
                     let _updater = crate::adapters::book_index_updater::BookIndexUpdater::start(
                         updater_rx,
-                        tree_repo,
-                        book_index,
+                        tree_repo.clone(),
+                        book_index.clone(),
                         CancellationToken::new(),
+                        Some(entity_extractor.clone()),
+                        Some(task_repo_for_updater),
+                        Some(project_repo_for_updater),
                     );
                     info!("BookIndex updater started");
                 }
+
+                // Build skill trees at startup (non-blocking)
+                let tree_repo_for_skills = tree_repo.clone();
+                tokio::spawn(async move {
+                    match crate::adapters::book_index_skill_builder::build_all_skill_trees(
+                        tree_repo_for_skills.as_ref(),
+                    )
+                    .await
+                    {
+                        Ok(checksum) => {
+                            tracing::info!("BookIndex: skill trees built (checksum: {checksum})")
+                        }
+                        Err(e) => tracing::warn!("BookIndex: skill tree build failed: {e}"),
+                    }
+                });
+
+                // Backfill existing notes (non-blocking)
+                let note_repo_for_backfill =
+                    feature_notes::repo::NoteRepo::new(storage_pool.inner().clone());
+                let tree_repo_for_backfill = tree_repo.clone();
+                let book_index_for_backfill = book_index.clone();
+                let extractor_for_backfill = entity_extractor.clone();
+                tokio::spawn(async move {
+                    match crate::adapters::book_index_backfill::backfill_existing_notes(
+                        &note_repo_for_backfill,
+                        tree_repo_for_backfill.as_ref(),
+                        &book_index_for_backfill,
+                        Some(&extractor_for_backfill),
+                    )
+                    .await
+                    {
+                        Ok(0) => {}
+                        Ok(n) => tracing::info!("BookIndex: backfilled {n} existing notes"),
+                        Err(e) => tracing::warn!("BookIndex backfill failed: {e}"),
+                    }
+                });
             }
 
             // One-time entity backfill from pre-existing SPO facts (non-blocking)

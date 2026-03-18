@@ -44,6 +44,7 @@ dirs.workspace = true
 async-trait.workspace = true
 chrono-tz = { workspace = true }
 regex.workspace = true
+sha2.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
