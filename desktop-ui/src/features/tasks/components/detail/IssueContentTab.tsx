@@ -5,7 +5,6 @@ import type { useIssueDetail } from "../../hooks/useIssueDetail";
 import type { SubIssue } from "../../lib/mappers";
 import { renderStatusIcon } from "../../lib/status-utils";
 import { useTabStore } from "../../store/tab-store";
-import { DecompositionModal } from "./DecompositionModal";
 
 interface IssueContentTabProps {
   detail: ReturnType<typeof useIssueDetail>;
@@ -22,14 +21,6 @@ export function IssueContentTab({ detail }: IssueContentTabProps) {
         <AcceptanceCriteria text={detail.task.acceptanceCriteria} />
       )}
       <SubIssuesList issues={detail.subIssues} onDecompose={detail.decompose} />
-      <DecompositionModal
-        result={detail.decompositionResult}
-        open={detail.decompositionOpen}
-        onOpenChange={detail.setDecompositionOpen}
-        onApply={detail.applyDecomposition}
-        onReject={detail.rejectDecomposition}
-        applying={detail.decompositionApplying}
-      />
     </div>
   );
 }

@@ -5,7 +5,7 @@ import { EMPTY_TIMELINE_RESPONSE } from "@shared/types";
 import type { TimelineResponse } from "@shared/types/common";
 import type { Area, Task, TaskUpdateParams } from "@shared/types/tasks";
 import { useCallback, useMemo, useState } from "react";
-import type { DecompositionResult } from "../components/detail/DecompositionModal";
+import type { DecompositionResult } from "../components/detail/DecompositionPanel";
 import { useStatusWorkflow } from "../contexts/StatusWorkflowContext";
 import {
   type ActivityEntry,
