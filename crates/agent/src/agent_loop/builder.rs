@@ -701,17 +701,29 @@ impl AgentLoopBuilder {
                     storage_pool.inner().clone(),
                 ));
                 let book_index = crate::adapters::book_index_wiring::build_book_index(
-                    tree_repo,
+                    tree_repo.clone(),
                     book_entity_repo,
                     gt_link_repo,
                     embedding_engine.clone(),
                 );
                 let bookrag_searcher = crate::adapters::book_index_wiring::build_bookrag_searcher(
-                    book_index,
+                    book_index.clone(),
                     provider.clone(),
                     &config.cognitive.book_index.retrieval,
                 );
                 forge.add_searcher(bookrag_searcher);
+
+                // Start BookIndex updater (listens for NoteContentChanged/NoteDeleted events)
+                if let Some(ref domain_bus) = self.domain_event_bus {
+                    let updater_rx = domain_bus.subscribe();
+                    let _updater = crate::adapters::book_index_updater::BookIndexUpdater::start(
+                        updater_rx,
+                        tree_repo,
+                        book_index,
+                        CancellationToken::new(),
+                    );
+                    info!("BookIndex updater started");
+                }
             }
 
             // One-time entity backfill from pre-existing SPO facts (non-blocking)

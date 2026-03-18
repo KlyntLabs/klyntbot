@@ -87,13 +87,18 @@ impl TaskTool {
                 )
                 .await;
 
-            // Emit domain event
+            // Emit domain events
             if let Some(ref bus) = self.domain_bus {
                 bus.publish(bus::DomainEvent::TaskDecomposed {
                     source_task_id: task.id.clone(),
                     subtask_ids: created_ids.clone(),
                     total_estimated_mins: result.tree.total_estimated_mins.map(|m| m as i64),
                 });
+                if let Some(ref project_id) = task.project_id {
+                    bus.publish(bus::DomainEvent::TaskHierarchyChanged {
+                        project_id: project_id.clone(),
+                    });
+                }
             }
 
             let mut output = format!(

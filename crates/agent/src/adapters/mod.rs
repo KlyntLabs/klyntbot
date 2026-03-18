@@ -4,6 +4,7 @@
 //! `context_engine`, `cognitive`) with concrete logic that lives at L5.
 
 pub mod agent_task;
+pub mod book_index_updater;
 pub mod book_index_wiring;
 pub mod cognitive_embedder;
 pub mod cognitive_handlers;
