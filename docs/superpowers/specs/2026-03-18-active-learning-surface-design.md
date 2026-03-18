@@ -27,7 +27,7 @@ The system builds on the existing TipTap 3 editor, split-pane layout, FSRS-5 fla
 ### Data Flow
 
 1. **User selects text** — TipTap selection → `coordsAtPos()` → position
-2. **Generate annotationId (ULID)** — Frontend generates ULID before any mutation
+2. **Generate annotationId (ULID)** — Frontend generates ULID before any mutation so the mark and DB row can always be correlated even if the IPC call fails
 3. **Floating toolbar / Right-click** — "Add Annotation" action triggered
 4. **AI pre-fills suggestion** — `MemoryRetriever` queried with selected text → returns related facts + confidence score (0.0–1.0). Latency target: <500ms.
 5. **User confirms / edits / adds thought** — Popover with AI suggestion + free-form input
@@ -43,7 +43,8 @@ The system builds on the existing TipTap 3 editor, split-pane layout, FSRS-5 fla
 -- NOTE: The existing UNIQUE(target_type, target_id, content) constraint must be
 -- dropped and replaced with UNIQUE(target_type, target_id, mark_id) to support
 -- multiple annotations on the same note (including those with empty/duplicate content).
--- Pre-release: recreate the table with the new constraint.
+-- Pre-release: recreate the table with the new constraint, or drop the old UNIQUE
+-- and add UNIQUE(target_type, target_id, mark_id) if duplicates become common.
 ALTER TABLE annotations ADD COLUMN mark_id TEXT;        -- links to TipTap mark
 ALTER TABLE annotations ADD COLUMN quoted_text TEXT;    -- fallback text anchor
 ALTER TABLE annotations ADD COLUMN range_start INTEGER; -- char offset start
@@ -256,7 +257,7 @@ Returns:
 - `ProceduralRuleRepo::search_fts()` — procedural rules (existing FTS5 method)
 - `AnnotationRepo::search_by_content()` — cross-note annotations (existing FTS5 on `annotations_fts`)
 
-This is a new composition of existing repos, not a delegation to `MemoryRetriever`. The handler lives in `app-core` and queries each repo in parallel via `tokio::join!`.
+This is a new composition of existing repos, not a delegation to `MemoryRetriever`. The handler lives in `app-core` and queries each repo in parallel via `tokio::join!` for <200ms latency on typical notes.
 
 ## Section 4: Creative Additions
 
