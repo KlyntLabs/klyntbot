@@ -40,6 +40,8 @@ crates/feature-learning/
 feature-learning (L4)
   ├── cognitive (L3)        → FlashcardRepo, FSRS engine, SemanticFactRepo
   ├── feature-notes (L4)    → NoteRepo (source linking, content retrieval)
+  │                           Note: L4→L4 dep has precedent (feature-insights → feature-notes).
+  │                           Only uses NoteRepo for read-only source lookups, not mutations.
   ├── context_engine (L3)   → BookRAG (grounding tutor in note content)
   ├── providers (L3)        → LLM calls for card generation, tutoring
   ├── tools-core (L1)       → Tool/FeaturePackage traits
@@ -99,6 +101,8 @@ desktop-ui/src/features/learn/
 ## Data Model
 
 ### Upgraded `cognitive` flashcard schema
+
+**Migration note:** The existing `CardType` enum has `MultipleChoice` and `ShortAnswer` variants (from the quiz/insight system). These are replaced by the new card types below. Since this is pre-release with no user data to migrate, the `card_type` column and `CardType` enum are rewritten in-place. The existing `front`/`back` TEXT columns are retained and used by all card types.
 
 ```sql
 -- Existing flashcards table, upgraded columns:
@@ -191,6 +195,10 @@ When `split_content` is non-null, the editor reads from it. The `body` field sta
 
 ## FSRS-5 Engine
 
+### Scope of FSRS-5 changes
+
+**Important:** The FSRS-5 upgrade applies **only to flashcard scheduling** in `FlashcardRepo`. The existing `decay.rs` functions (`retrievability()`, `update_stability()`, `relevance_score()`) used by the broader cognitive memory system (semantic fact retrieval, relevance scoring) are **unchanged**. The flashcard scheduler gets its own dedicated FSRS-5 implementation (new file: `cognitive/src/services/fsrs5.rs`), leaving the cognitive memory decay model intact.
+
 ### Upgrade from current system
 
 ```
@@ -217,6 +225,8 @@ record_review(card_id, rating, recall_speed_ms)
 ```
 
 Implementation: port FSRS-5 directly (~200 lines of math) rather than depending on `fsrs-rs` crate. Avoids external dependency, allows extending with recall-speed weighting and concept-level signals.
+
+**Weight training:** Uses FSRS-5 default weights initially. Personal weight optimization runs after 400+ reviews in `review_log` (FSRS-5 recommended minimum). Training is triggered manually or on a weekly schedule. Until trained, default weights provide good-enough scheduling.
 
 ### Card types
 
@@ -386,7 +396,7 @@ All in `feature-learning::card_generator`:
 
 The LLM receives:
 - Note content (or selection)
-- User's existing cards on this topic (via `FlashcardRepo::list_by_source_note`)
+- User's existing cards on this topic (via new `FlashcardRepo::list_by_source_note(note_id)` method — needs to be added)
 - Cognitive facts about user's knowledge level (via `SemanticFactRepo`)
 - Instruction to vary card types: cloze for definitions, vocab for foreign words, basic for concepts, typed for terms to spell
 
@@ -431,7 +441,14 @@ notes/components/editor/
   └── SplitToolbar.tsx         # Mode toggle + mode-specific actions
 ```
 
-Each pane is its own TipTap editor instance. Content stored in `split_content` JSON column. The `body` field stays as flattened concatenation so FTS5 and BookRAG index all content.
+### Dual-editor architecture
+
+Each pane is its own TipTap editor instance. Key behaviors:
+
+- **Save lifecycle:** `SplitEditor` wraps both editors and owns a single debounced save (1s). On save, it serializes both panes into `split_content` JSON, concatenates them into `body`/`body_html` for FTS5/BookRAG, and calls `note_update` once. Both panes are always saved atomically.
+- **Undo/redo:** Per-pane. Each TipTap instance has its own history stack. No cross-pane undo.
+- **Synced scrolling (Translation mode):** Paragraph-level alignment using a scroll ratio approach — `onScroll` on either pane computes `scrollTop / scrollHeight` and applies the same ratio to the sibling pane. Not line-level precision, but good enough for paragraph-aligned content. Other modes do not sync scroll.
+- **Resize handle:** Same imperative `pointermove` + `requestAnimationFrame` pattern used in `KnowledgeBasePage.tsx` for the three-panel layout. Includes `resizing` class for glass-filter suppression during drag.
 
 ## AI Tutor Engine
 
@@ -473,8 +490,10 @@ max_iterations: 15
 
 ### Misconception tracking
 
+**Concept normalization:** Concepts are derived from flashcard tags and deck names. Tags are the canonical concept identifier (lowercased, hyphenated: `te-form`, `n3-kanji`). The LLM-based misconception detector groups by tag, not free-text — avoiding normalization ambiguity.
+
 After each session, background analysis:
-- Group failed cards by concept/tag
+- Group failed cards by tag (= concept)
 - If same concept failed 3+ times across sessions: LLM analyzes patterns
 - Generates `error_pattern` (e.g., "Confuses て-form with た-form in conditionals")
 - Stored in `concept_mastery.error_patterns`
@@ -573,11 +592,17 @@ Connection 5: Both → Cognitive Memory (bidirectional)
   • Misconception patterns stored as cognitive annotations
 
 Connection 6: Tray integration
-  • Tray countdown: "📚 23 cards due" when no focus/calendar event
-  • Focus session integration: study sessions register as focus
+  • Tray countdown: "📚 23 cards due" — lowest priority, only shown when
+    no focus session active AND no calendar event within 30 min AND no task deadline.
+    Existing tray_countdown.rs priority order: focus timer > calendar > task deadline > flashcard due count.
+  • Focus session integration: study sessions register as focus via FOCUS_ACTIVE flag
 ```
 
 ## Implementation Phases
+
+### MVP (Phases 1-4): Functional learning loop
+
+The MVP delivers a working "write notes → generate cards → review cards" loop with the new `/learn` page. Each phase gets its own implementation plan.
 
 | Phase | What | Depends On | Scope |
 |-------|------|------------|-------|
@@ -585,11 +610,18 @@ Connection 6: Tray integration
 | **2** | `/learn` page: dashboard + immersive review | Phase 1 | New UI + `app-core` handlers |
 | **3** | Card generation pipeline + source linking | Phase 1 | `feature-learning` crate + notes toolbar |
 | **4** | Split-pane editor (3 modes) | — (parallel with 2-3) | `desktop-ui` notes feature |
+
+Phases 1 and 4 can run in parallel. Phases 2 and 3 can partially overlap.
+
+### Post-MVP (Phases 5-10): Intelligence layer
+
+These phases add AI tutoring, analytics, and polish. Each phase gets its own implementation plan after MVP is stable.
+
+| Phase | What | Depends On | Scope |
+|-------|------|------------|-------|
 | **5** | AI Tutor skill + Socratic dialogue | Phases 1-3 | `feature-learning` + new skill |
 | **6** | Study planner + mid-session adaptation | Phase 5 | `feature-learning` tutor extension |
 | **7** | Analytics dashboard | Phases 1-2 | `feature-learning` analytics + UI |
 | **8** | Sentence mining + language extensions | Phase 3 | `feature-learning` sentence_miner |
 | **9** | Feedback arrow (Learn → Notes) | Phases 2-3 | Cross-feature wiring |
 | **10** | Tray integration + coaching hooks | Phases 1-2 | `desktop` crate |
-
-Phases 1 and 4 can run in parallel. Phases 2 and 3 can partially overlap.
