@@ -234,20 +234,30 @@ export function useIssueDetail(
   const [decompositionResult, setDecompositionResult] = useState<DecompositionResult | null>(null);
   const [decompositionOpen, setDecompositionOpen] = useState(false);
   const [decompositionApplying, setDecompositionApplying] = useState(false);
+  const [decompositionLoading, setDecompositionLoading] = useState(false);
+
+  const openDecomposition = useCallback(() => {
+    setDecompositionOpen(true);
+    setDecompositionResult(null);
+    setAiError(null);
+  }, []);
 
   const decompose = useCallback(async () => {
     setAiError(null);
+    setDecompositionLoading(true);
     try {
       const result = await ipc<DecompositionResult>("task_decompose", { taskId: task.id });
       if (result.autoApplied) {
+        setDecompositionOpen(false);
         refetch();
       } else {
         setDecompositionResult(result);
-        setDecompositionOpen(true);
       }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : typeof e === "object" && e !== null ? JSON.stringify(e) : String(e);
       setAiError(msg);
+    } finally {
+      setDecompositionLoading(false);
     }
   }, [task.id, refetch]);
 
@@ -266,11 +276,15 @@ export function useIssueDetail(
     [refetch],
   );
 
-  const rejectDecomposition = useCallback(async (id: string) => {
-    await ipc("task_reject_decomposition", { decompositionId: id });
+  const closeDecomposition = useCallback(() => {
     setDecompositionOpen(false);
     setDecompositionResult(null);
   }, []);
+
+  const rejectDecomposition = useCallback(async (id: string) => {
+    await ipc("task_reject_decomposition", { decompositionId: id });
+    closeDecomposition();
+  }, [closeDecomposition]);
 
   // Forecast
   const [forecast, setForecast] = useState<TaskForecast | null>(null);
@@ -317,11 +331,13 @@ export function useIssueDetail(
     stopFocus,
     decompositionResult,
     decompositionOpen,
-    setDecompositionOpen,
+    decompositionLoading,
     decompositionApplying,
+    openDecomposition,
     decompose,
     applyDecomposition,
     rejectDecomposition,
+    closeDecomposition,
     forecast,
     forecastLoading,
     fetchForecast,

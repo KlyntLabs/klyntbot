@@ -20,7 +20,7 @@ export function IssueContentTab({ detail }: IssueContentTabProps) {
       {detail.task.acceptanceCriteria && (
         <AcceptanceCriteria text={detail.task.acceptanceCriteria} />
       )}
-      <SubIssuesList issues={detail.subIssues} onDecompose={detail.decompose} />
+      <SubIssuesList issues={detail.subIssues} onDecompose={detail.openDecomposition} />
     </div>
   );
 }

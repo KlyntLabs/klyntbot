@@ -22,9 +22,11 @@ export interface DecompositionResult {
 }
 
 interface DecompositionPanelProps {
-  result: DecompositionResult;
+  result: DecompositionResult | null;
+  loading: boolean;
+  onDecompose: () => void;
   onApply: (id: string) => void;
-  onReject: (id: string) => void;
+  onClose: () => void;
   applying: boolean;
 }
 
@@ -105,12 +107,12 @@ function SubtaskItem({ subtask, depth }: { subtask: PlannedSubtask; depth: numbe
 
 export function DecompositionPanel({
   result,
+  loading,
+  onDecompose,
   onApply,
-  onReject,
+  onClose,
   applying,
 }: DecompositionPanelProps) {
-  const totalCount = countSubtasks(result.subtasks);
-
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -118,15 +120,17 @@ export function DecompositionPanel({
         <div className="flex items-center gap-2">
           <Bot className="size-4 text-purple-400" />
           <span className="text-sm font-medium text-[hsl(var(--foreground))]">Task Breakdown</span>
-          <span
-            className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${confidenceBadgeClass(result.confidence)}`}
-          >
-            {Math.round(result.confidence)}%
-          </span>
+          {result && (
+            <span
+              className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${confidenceBadgeClass(result.confidence)}`}
+            >
+              {Math.round(result.confidence)}%
+            </span>
+          )}
         </div>
         <button
           type="button"
-          onClick={() => onReject(result.id)}
+          onClick={onClose}
           className="p-0.5 rounded hover:bg-[hsl(var(--accent))] text-[hsl(var(--muted-foreground))] transition-colors"
           aria-label="Close breakdown"
         >
@@ -134,6 +138,70 @@ export function DecompositionPanel({
         </button>
       </div>
 
+      {/* Content */}
+      {!result && !loading && <IntroView onDecompose={onDecompose} />}
+      {loading && <LoadingView />}
+      {result && (
+        <ResultView result={result} onApply={onApply} onClose={onClose} applying={applying} />
+      )}
+    </div>
+  );
+}
+
+function IntroView({ onDecompose }: { onDecompose: () => void }) {
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center px-6 py-8 text-center">
+      <div className="size-10 rounded-full bg-purple-500/10 flex items-center justify-center mb-4">
+        <Bot className="size-5 text-purple-400" />
+      </div>
+      <h3 className="text-sm font-medium text-[hsl(var(--foreground))] mb-2">
+        AI Task Breakdown
+      </h3>
+      <p className="text-xs text-[hsl(var(--muted-foreground))] mb-1">
+        Analyze this task and suggest a breakdown into smaller, actionable subtasks.
+      </p>
+      <p className="text-xs text-[hsl(var(--muted-foreground))] mb-6">
+        The AI considers the description, acceptance criteria, and complexity to propose a structured plan.
+      </p>
+      <button
+        type="button"
+        onClick={onDecompose}
+        className="flex items-center gap-2 px-4 py-2 text-sm rounded-md bg-purple-600 text-white hover:bg-purple-500 transition-colors"
+      >
+        <Bot className="size-4" />
+        Break Down
+      </button>
+    </div>
+  );
+}
+
+function LoadingView() {
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center px-6 py-8 text-center">
+      <div className="size-10 rounded-full bg-purple-500/10 flex items-center justify-center mb-4 animate-pulse">
+        <Bot className="size-5 text-purple-400" />
+      </div>
+      <p className="text-sm text-[hsl(var(--muted-foreground))]">Analyzing task...</p>
+      <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">This may take a few seconds</p>
+    </div>
+  );
+}
+
+function ResultView({
+  result,
+  onApply,
+  onClose,
+  applying,
+}: {
+  result: DecompositionResult;
+  onApply: (id: string) => void;
+  onClose: () => void;
+  applying: boolean;
+}) {
+  const totalCount = countSubtasks(result.subtasks);
+
+  return (
+    <>
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
         {/* Reasoning */}
@@ -178,7 +246,7 @@ export function DecompositionPanel({
       <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-[hsl(var(--border))] shrink-0">
         <button
           type="button"
-          onClick={() => onReject(result.id)}
+          onClick={onClose}
           className="px-3 py-1.5 text-xs rounded-md text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))]/50 transition-colors"
         >
           Cancel
@@ -194,6 +262,6 @@ export function DecompositionPanel({
             : `Create ${totalCount} subtask${totalCount !== 1 ? "s" : ""}`}
         </button>
       </div>
-    </div>
+    </>
   );
 }

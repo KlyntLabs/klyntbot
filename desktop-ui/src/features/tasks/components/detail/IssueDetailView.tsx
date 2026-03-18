@@ -55,12 +55,14 @@ export function IssueDetailView({ issueId, projectMap, areaMap }: IssueDetailVie
         </div>
 
         {/* Decomposition panel — slides in from right */}
-        {detail.decompositionOpen && detail.decompositionResult && (
+        {detail.decompositionOpen && (
           <div className="w-[380px] shrink-0 border-l border-[hsl(var(--border))] bg-[hsl(var(--surface-base))]/50">
             <DecompositionPanel
               result={detail.decompositionResult}
+              loading={detail.decompositionLoading}
+              onDecompose={detail.decompose}
               onApply={detail.applyDecomposition}
-              onReject={detail.rejectDecomposition}
+              onClose={detail.closeDecomposition}
               applying={detail.decompositionApplying}
             />
           </div>
