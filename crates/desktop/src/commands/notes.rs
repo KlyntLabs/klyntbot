@@ -5,9 +5,9 @@ use desktop_shared::commands::{
     FlashcardCreateParams, FlashcardGenerateParams, FlashcardGenerateResponse, FlashcardListParams,
     FlashcardResponse, FlashcardReviewParams, FlashcardSaveGeneratedParams, FlashcardUpdateParams,
     HybridSearchResponse, InboxCreateParams, InboxItemResponse, InsightEvolutionResponse,
-    InsightQuizSubmitParams, InsightReviewResponse, InsightReviewStarted, InsightSaveFlashcardsParams,
-    InsightVersionResponse, KnowledgeGrowthResponse, NoteCreateParams, NoteLinkResponse,
-    NoteResponse, NoteSuggestionsResponse, NoteUpdateParams, NoteVersionResponse,
+    InsightQuizSubmitParams, InsightReviewResponse, InsightReviewStarted,
+    InsightSaveFlashcardsParams, InsightVersionResponse, KnowledgeGrowthResponse, NoteCreateParams,
+    NoteLinkResponse, NoteResponse, NoteSuggestionsResponse, NoteUpdateParams, NoteVersionResponse,
     NotebookCreateParams, NotebookResponse, NotebookUpdateParams, PersonaChatParams,
     PersonaChatResponse, PersonaResponse, RatePersonaParams, ScenarioChallengeResponse,
     SetPersonaPinsParams, TabContent, UpdatePersonaParams,
@@ -528,9 +528,7 @@ pub async fn flashcard_get_all_due(
 }
 
 #[tauri::command]
-pub async fn flashcard_total_due(
-    state: State<'_, Arc<AppCore>>,
-) -> Result<i64, ApiError> {
+pub async fn flashcard_total_due(state: State<'_, Arc<AppCore>>) -> Result<i64, ApiError> {
     state.flashcard_total_due().await
 }
 
@@ -820,15 +818,18 @@ pub(crate) async fn dispatch_dev(
             let id = try_field!(dev::get_str(body, "id"));
             dev::val(core.flashcard_get(&id).await)
         }
-        "flashcard_create" => {
-            dev::val(core.flashcard_create(try_field!(dev::parse_params(body))).await)
-        }
-        "flashcard_update" => {
-            dev::val(core.flashcard_update(try_field!(dev::parse_params(body))).await)
-        }
-        "flashcard_list_cards" => {
-            dev::val(core.flashcard_list_cards(try_field!(dev::parse_params(body))).await)
-        }
+        "flashcard_create" => dev::val(
+            core.flashcard_create(try_field!(dev::parse_params(body)))
+                .await,
+        ),
+        "flashcard_update" => dev::val(
+            core.flashcard_update(try_field!(dev::parse_params(body)))
+                .await,
+        ),
+        "flashcard_list_cards" => dev::val(
+            core.flashcard_list_cards(try_field!(dev::parse_params(body)))
+                .await,
+        ),
         "flashcard_delete" => {
             let id = try_field!(dev::get_str(body, "id"));
             dev::val(core.flashcard_delete(&id).await)
@@ -838,12 +839,14 @@ pub(crate) async fn dispatch_dev(
             dev::val(core.flashcard_get_all_due(limit).await)
         }
         "flashcard_total_due" => dev::val(core.flashcard_total_due().await),
-        "flashcard_generate" => {
-            dev::val(core.flashcard_generate(try_field!(dev::parse_params(body))).await)
-        }
-        "flashcard_save_generated" => {
-            dev::val(core.flashcard_save_generated(try_field!(dev::parse_params(body))).await)
-        }
+        "flashcard_generate" => dev::val(
+            core.flashcard_generate(try_field!(dev::parse_params(body)))
+                .await,
+        ),
+        "flashcard_save_generated" => dev::val(
+            core.flashcard_save_generated(try_field!(dev::parse_params(body)))
+                .await,
+        ),
         _ => return None,
     })
 }

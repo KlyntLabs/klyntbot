@@ -7,6 +7,7 @@ mod dev_server;
 mod focus_timer;
 mod notify;
 mod oauth;
+mod shortcuts;
 mod tray_countdown;
 
 use std::sync::Arc;
@@ -16,7 +17,6 @@ use commands::window::{WINDOW_LAUNCHER, WINDOW_QUICK_CAPTURE, WINDOW_TRAY};
 use tauri::image::Image;
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::Manager;
-use tauri_plugin_global_shortcut::{Code, Modifiers, ShortcutState};
 
 #[derive(Parser)]
 #[command(name = "Klynt", about = "Klynt personal AI agent")]
@@ -147,54 +147,7 @@ fn run_mcp_stdio() {
 
 fn run_desktop_app() {
     tauri::Builder::default()
-        .plugin(
-            tauri_plugin_global_shortcut::Builder::new()
-                .with_shortcuts(["alt+space", "alt+shift+space", "super+shift+c"])
-                .expect("failed to parse shortcut")
-                .with_handler(|app, shortcut, event| {
-                    if event.state != ShortcutState::Pressed {
-                        return;
-                    }
-
-                    // Option+Space → toggle launcher
-                    if shortcut.matches(Modifiers::ALT, Code::Space) {
-                        if let Some(window) = app.get_webview_window(WINDOW_LAUNCHER) {
-                            if window.is_visible().unwrap_or(false) {
-                                let _ = window.hide();
-                            } else {
-                                let _ = window.center();
-                                let _ = window.show();
-                                let _ = window.set_focus();
-                            }
-                        }
-                    }
-
-                    // Option+Shift+Space → toggle tray
-                    if shortcut.matches(Modifiers::ALT | Modifiers::SHIFT, Code::Space) {
-                        if let Some(window) = app.get_webview_window(WINDOW_TRAY) {
-                            if window.is_visible().unwrap_or(false) {
-                                let _ = window.hide();
-                            } else {
-                                focus_timer::open_tray_window(app);
-                            }
-                        }
-                    }
-
-                    // Cmd+Shift+C → toggle quick capture
-                    if shortcut.matches(Modifiers::SUPER | Modifiers::SHIFT, Code::KeyC) {
-                        if let Some(window) = app.get_webview_window(WINDOW_QUICK_CAPTURE) {
-                            if window.is_visible().unwrap_or(false) {
-                                let _ = window.hide();
-                            } else {
-                                let _ = window.center();
-                                let _ = window.show();
-                                let _ = window.set_focus();
-                            }
-                        }
-                    }
-                })
-                .build(),
-        )
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
@@ -243,6 +196,23 @@ fn run_desktop_app() {
             app.manage(core);
             app.manage(Arc::new(focus_timer::FocusTimer::new()));
 
+            // Register global shortcuts from config (or defaults if config invalid).
+            {
+                let core_ref = app.state::<Arc<app_core::AppCore>>();
+                let shortcuts_config = tauri::async_runtime::block_on(async {
+                    core_ref.config.read().await.shortcuts.clone()
+                });
+                if let Err(e) = shortcuts::register_shortcuts(app.handle(), &shortcuts_config) {
+                    tracing::warn!(
+                        "Failed to register shortcuts from config, falling back to defaults: {e}"
+                    );
+                    let defaults = config::ShortcutsConfig::default();
+                    if let Err(e2) = shortcuts::register_shortcuts(app.handle(), &defaults) {
+                        tracing::error!("Failed to register default shortcuts: {e2}");
+                    }
+                }
+            }
+
             // Show the main window now that init is complete (starts hidden
             // via tauri.conf.json to avoid a blank window during boot).
             if let Some(main_window) = app.get_webview_window("main") {
@@ -279,14 +249,7 @@ fn run_desktop_app() {
                         ..
                     } = event
                     {
-                        let app = tray.app_handle();
-                        if let Some(window) = app.get_webview_window(WINDOW_TRAY) {
-                            if window.is_visible().unwrap_or(false) {
-                                let _ = window.hide();
-                            } else {
-                                focus_timer::open_tray_window(app);
-                            }
-                        }
+                        shortcuts::toggle_window(tray.app_handle(), WINDOW_TRAY);
                     }
                 })
                 .build(app)?;
@@ -547,6 +510,9 @@ fn run_desktop_app() {
             commands::settings::config_get_section,
             commands::settings::config_update_section,
             commands::settings::config_mark_setup_completed,
+            // Shortcuts
+            commands::shortcuts::shortcuts_get,
+            commands::shortcuts::shortcuts_update,
             // OAuth
             oauth::commands::mcp_oauth_start,
             oauth::commands::mcp_oauth_disconnect,

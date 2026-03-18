@@ -129,6 +129,9 @@ pub(super) async fn dispatch(
     if let Some(r) = commands::launcher::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }
+    if let Some(r) = commands::shortcuts::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
 
     // ── chat_send (needs SSE channels, handled inline) ──────────────
     if cmd == "chat_send" {

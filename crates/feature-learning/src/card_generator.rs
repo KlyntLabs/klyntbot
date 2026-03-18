@@ -27,7 +27,9 @@ Respond ONLY with a JSON array. No markdown fences, no explanation, no preamble.
     let mut user = String::new();
 
     if let Some(ref existing) = ctx.existing_cards_summary {
-        user.push_str("The user already has these flashcards from this note. Do NOT generate duplicates:\n");
+        user.push_str(
+            "The user already has these flashcards from this note. Do NOT generate duplicates:\n",
+        );
         user.push_str(existing);
         user.push_str("\n\n");
     }

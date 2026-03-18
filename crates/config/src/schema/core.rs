@@ -26,6 +26,7 @@ use super::productivity::ProductivityConfig;
 use super::project::ProjectConfig;
 use super::providers::{ProviderManagerConfig, ProvidersConfig};
 use super::scenario::ScenarioConfig;
+use super::shortcuts::ShortcutsConfig;
 use super::todo::TodoConfig;
 use super::tools::ToolsConfig;
 use super::user::UserConfig;
@@ -195,6 +196,10 @@ pub struct Config {
     /// Scenario/what-if reasoning configuration.
     #[serde(default)]
     pub scenario: ScenarioConfig,
+
+    /// Global keyboard shortcuts for Launcher, Tray, and Quick Capture.
+    #[serde(default)]
+    pub shortcuts: ShortcutsConfig,
 
     /// Whether the first-run setup wizard has been completed.
     #[serde(default)]

@@ -36,6 +36,7 @@ mod productivity;
 mod project;
 mod providers;
 mod scenario;
+mod shortcuts;
 mod todo;
 mod tools;
 mod user;
@@ -63,6 +64,7 @@ pub use self::productivity::*;
 pub use self::project::*;
 pub use self::providers::*;
 pub use self::scenario::*;
+pub use self::shortcuts::*;
 pub use self::todo::*;
 pub use self::tools::*;
 pub use self::user::*;
@@ -539,5 +541,40 @@ mod tests {
         let config: Config = serde_json::from_str(json).unwrap();
         assert!(!config.finance.fire.enabled);
         assert_eq!(config.finance.fire.fire_type, "regular");
+    }
+
+    #[test]
+    fn test_shortcuts_config_default() {
+        let config = Config::default();
+        assert_eq!(config.shortcuts.launcher, "alt+space");
+        assert_eq!(config.shortcuts.tray, "alt+shift+space");
+        assert_eq!(config.shortcuts.quick_capture, "super+shift+c");
+    }
+
+    #[test]
+    fn test_shortcuts_config_serde_roundtrip() {
+        let json = r#"{"shortcuts": {"launcher": "ctrl+space", "tray": "ctrl+shift+space", "quickCapture": "super+shift+v"}}"#;
+        let config: Config = serde_json::from_str(json).unwrap();
+        assert_eq!(config.shortcuts.launcher, "ctrl+space");
+        assert_eq!(config.shortcuts.tray, "ctrl+shift+space");
+        assert_eq!(config.shortcuts.quick_capture, "super+shift+v");
+
+        let serialized = serde_json::to_string(&config).unwrap();
+        let loaded: Config = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(loaded.shortcuts.launcher, "ctrl+space");
+    }
+
+    #[test]
+    fn test_shortcuts_config_camel_case() {
+        let config = Config::default();
+        let json = serde_json::to_string(&config).unwrap();
+        assert!(json.contains("quickCapture"));
+    }
+
+    #[test]
+    fn test_config_without_shortcuts_deserializes() {
+        let json = r#"{}"#;
+        let config: Config = serde_json::from_str(json).unwrap();
+        assert_eq!(config.shortcuts.launcher, "alt+space");
     }
 }

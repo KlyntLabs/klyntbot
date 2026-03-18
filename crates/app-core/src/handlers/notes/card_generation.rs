@@ -1,6 +1,6 @@
 use desktop_shared::commands::{
-    FlashcardGenerateParams, FlashcardGenerateResponse, FlashcardResponse, FlashcardSaveGeneratedParams,
-    GeneratedCardPreview,
+    FlashcardGenerateParams, FlashcardGenerateResponse, FlashcardResponse,
+    FlashcardSaveGeneratedParams, GeneratedCardPreview,
 };
 use desktop_shared::errors::ApiError;
 

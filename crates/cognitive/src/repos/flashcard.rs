@@ -51,7 +51,6 @@ pub enum ReviewQuality {
     Easy = 4,
 }
 
-
 // ── Input / row types ────────────────────────────────────────────
 
 #[derive(Debug, Clone)]
@@ -801,10 +800,7 @@ mod tests {
     #[tokio::test]
     async fn test_delete_card() {
         let (_pool, repo) = setup().await;
-        let created = repo
-            .create_single(sample_card("del", None))
-            .await
-            .unwrap();
+        let created = repo.create_single(sample_card("del", None)).await.unwrap();
         assert!(repo.delete_card(&created.id).await.unwrap());
         assert!(repo.get_by_id(&created.id).await.unwrap().is_none());
     }

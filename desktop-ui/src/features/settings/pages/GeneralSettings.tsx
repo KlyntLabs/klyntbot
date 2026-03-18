@@ -1,7 +1,9 @@
+import { SettingsCard } from "@shared/composites";
 import { ipc } from "@shared/hooks/useIpc";
 import { useQuery } from "@shared/hooks/useQuery";
 import type { AgentStatus, AppInfoResponse } from "@shared/types";
-import { useState } from "react";
+import { SaveButton, ShortcutRecorder } from "@shared/ui";
+import { useMemo, useState } from "react";
 import { PermissionsCard } from "../components/PermissionsCard";
 
 interface AgentDefaults {
@@ -14,6 +16,12 @@ interface AgentDefaults {
 interface AgentsConfig {
   defaults?: AgentDefaults;
 }
+
+const SHORTCUT_DEFAULTS = {
+  launcher: "alt+space",
+  tray: "alt+shift+space",
+  quickCapture: "super+shift+c",
+};
 
 export function GeneralSettings() {
   const { data: appInfo } = useQuery<AppInfoResponse>("app_info", undefined, {
@@ -33,6 +41,51 @@ export function GeneralSettings() {
     { section: "agents" },
     { defaults: {} },
   );
+
+  // ── Shortcuts ─────────────────────────────────────
+
+  const { data: shortcutsConfig, refetch: refetchShortcuts } = useQuery<typeof SHORTCUT_DEFAULTS>(
+    "shortcuts_get",
+    undefined,
+    SHORTCUT_DEFAULTS,
+  );
+
+  const [shortcutEdits, setShortcutEdits] = useState<Record<string, string>>({});
+  const [shortcutError, setShortcutError] = useState<string | null>(null);
+  const [savingShortcuts, setSavingShortcuts] = useState(false);
+
+  const currentShortcuts = useMemo(
+    () => ({
+      launcher: shortcutEdits.launcher ?? shortcutsConfig.launcher,
+      tray: shortcutEdits.tray ?? shortcutsConfig.tray,
+      quickCapture: shortcutEdits.quickCapture ?? shortcutsConfig.quickCapture,
+    }),
+    [shortcutEdits, shortcutsConfig],
+  );
+
+  const hasShortcutChanges = Object.keys(shortcutEdits).length > 0;
+
+  const duplicateShortcut = useMemo(() => {
+    const values = Object.values(currentShortcuts);
+    return values.find((v, i) => values.indexOf(v) !== i) ?? null;
+  }, [currentShortcuts]);
+
+  const handleSaveShortcuts = async () => {
+    setSavingShortcuts(true);
+    setShortcutError(null);
+    try {
+      await ipc("shortcuts_update", currentShortcuts);
+      refetchShortcuts();
+      setShortcutEdits({});
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setShortcutError(msg);
+    } finally {
+      setSavingShortcuts(false);
+    }
+  };
+
+  // ── Agent defaults ────────────────────────────────
 
   const defaults = agentsConfig.defaults ?? {};
   const [model, setModel] = useState<string | null>(null);
@@ -76,8 +129,7 @@ export function GeneralSettings() {
       </div>
 
       <div className="space-y-4">
-        <div className="bg-card rounded-lg border border-border p-4">
-          <h3 className="text-[13px] font-medium text-muted-foreground mb-3">System</h3>
+        <SettingsCard title="System">
           <div className="space-y-2">
             <div className="flex justify-between text-[13px]">
               <span className="text-muted-foreground">Version</span>
@@ -96,10 +148,47 @@ export function GeneralSettings() {
               <span className="text-muted-foreground">{status.activeTaskCount}</span>
             </div>
           </div>
-        </div>
+        </SettingsCard>
 
-        <div className="bg-card rounded-lg border border-border p-4">
-          <h3 className="text-[13px] font-medium text-muted-foreground mb-3">Agent defaults</h3>
+        <SettingsCard title="Keyboard Shortcuts">
+          <div className="space-y-3">
+            {(
+              [
+                ["launcher", "Launcher"],
+                ["tray", "Tray popup"],
+                ["quickCapture", "Quick capture"],
+              ] as const
+            ).map(([key, label]) => (
+              <div key={key} className="flex items-center justify-between gap-4">
+                <span className="text-[12px] text-muted-foreground w-28 shrink-0">{label}</span>
+                <ShortcutRecorder
+                  value={currentShortcuts[key]}
+                  defaultValue={SHORTCUT_DEFAULTS[key]}
+                  onChange={(val) => setShortcutEdits((prev) => ({ ...prev, [key]: val }))}
+                  error={
+                    duplicateShortcut && currentShortcuts[key] === duplicateShortcut
+                      ? "Duplicate shortcut"
+                      : undefined
+                  }
+                />
+              </div>
+            ))}
+
+            {shortcutError && <p className="text-[12px] text-red-400">{shortcutError}</p>}
+
+            {hasShortcutChanges && (
+              <div className="flex justify-end">
+                <SaveButton
+                  onClick={handleSaveShortcuts}
+                  saving={savingShortcuts}
+                  disabled={duplicateShortcut !== null}
+                />
+              </div>
+            )}
+          </div>
+        </SettingsCard>
+
+        <SettingsCard title="Agent defaults">
           <div className="space-y-3">
             <label className="block">
               <span className="block text-[12px] text-muted-foreground mb-1">Default model</span>
@@ -140,18 +229,11 @@ export function GeneralSettings() {
 
             {hasChanges && (
               <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={handleSaveDefaults}
-                  disabled={saving}
-                  className="px-4 py-1.5 text-[12px] font-medium text-white bg-brand hover:bg-brand-hover rounded-lg transition-colors disabled:opacity-50"
-                >
-                  {saving ? "Saving..." : "Save changes"}
-                </button>
+                <SaveButton onClick={handleSaveDefaults} saving={saving} />
               </div>
             )}
           </div>
-        </div>
+        </SettingsCard>
 
         <PermissionsCard />
       </div>
