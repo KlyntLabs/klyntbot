@@ -9,7 +9,7 @@
 
 Transform Klyntbot's note editor from a static writing canvas into a dynamic, AI-powered learning surface. Users can annotate text with cognitive memory connections, apply per-section "perspectives" that transform how they see content, and interact with AI through a floating toolbar and context menu — all without modifying the underlying document.
 
-The system builds on the existing TipTap 3 editor, split-pane layout, FSRS-5 flashcard system, and cognitive memory infrastructure. No new crates or tables are needed — only column additions to existing tables and new frontend components.
+The system builds on the existing TipTap 3 editor, split-pane layout, FSRS-5 flashcard system, and cognitive memory infrastructure. No new crates or tables are needed — only column additions to existing tables, updates to existing Rust models/handlers, and new frontend components.
 
 ## Decisions
 
@@ -27,18 +27,23 @@ The system builds on the existing TipTap 3 editor, split-pane layout, FSRS-5 fla
 ### Data Flow
 
 1. **User selects text** — TipTap selection → `coordsAtPos()` → position
-2. **Generate annotationId (ULID)** — Frontend generates ULID, passed to both TipTap mark and backend INSERT in the same transaction
+2. **Generate annotationId (ULID)** — Frontend generates ULID before any mutation
 3. **Floating toolbar / Right-click** — "Add Annotation" action triggered
 4. **AI pre-fills suggestion** — `MemoryRetriever` queried with selected text → returns related facts + confidence score (0.0–1.0). Latency target: <500ms.
 5. **User confirms / edits / adds thought** — Popover with AI suggestion + free-form input
-6. **Dual storage:**
-   - **6a: TipTap Mark** — `AnnotationMark { annotationId: "ulid" }` applied to selected range
-   - **6b: annotations table** — `INSERT { id, target_type: "note", target_id, mark_id, content, tags, quoted_text, range_start, range_end, ai_suggestion }`
+6. **Dual storage (optimistic with rollback):**
+   - **6a: TipTap Mark** — `AnnotationMark { annotationId: "ulid" }` applied optimistically to selected range with a visual "pending" state (faint highlight, no click handler). This gives instant visual feedback.
+   - **6b: IPC call** — `annotation_create(...)` sends the annotation to the backend. On success: mark transitions to "confirmed" state (full highlight, click opens popover). On failure: mark is removed via `editor.chain().unsetMark('annotation', { annotationId }).run()` and user sees an error toast.
+   - These are **not** a cross-boundary transaction. The mark is applied optimistically and rolled back on IPC failure. The ULID ensures the mark and DB row can always be correlated.
 
 ### Schema Changes
 
 ```sql
 -- annotations table (existing, in cognitive crate)
+-- NOTE: The existing UNIQUE(target_type, target_id, content) constraint must be
+-- dropped and replaced with UNIQUE(target_type, target_id, mark_id) to support
+-- multiple annotations on the same note (including those with empty/duplicate content).
+-- Pre-release: recreate the table with the new constraint.
 ALTER TABLE annotations ADD COLUMN mark_id TEXT;        -- links to TipTap mark
 ALTER TABLE annotations ADD COLUMN quoted_text TEXT;    -- fallback text anchor
 ALTER TABLE annotations ADD COLUMN range_start INTEGER; -- char offset start
@@ -47,7 +52,19 @@ ALTER TABLE annotations ADD COLUMN ai_suggestion TEXT;  -- original AI hint
 
 -- notes table (existing, in feature-notes crate)
 ALTER TABLE notes ADD COLUMN perspective_config TEXT;    -- JSON
+ALTER TABLE notes ADD COLUMN last_visited_at TEXT;       -- ISO-8601, for Active Recall Gate
 ```
+
+### Backend Model Updates Required
+
+The following existing Rust types must be extended with the new columns:
+
+- `NoteRow` in `crates/feature-notes/src/models.rs` — add `perspective_config: Option<String>`, `last_visited_at: Option<String>`
+- `NoteResponse` in `crates/desktop-shared/src/commands/notes.rs` — add `perspective_config: Option<String>`, `last_visited_at: Option<String>`
+- `NoteUpdateParams` in `crates/desktop-shared/src/commands/notes.rs` — add `perspective_config: Option<Option<String>>`
+- `Annotation` in `crates/cognitive/src/types.rs` — add `mark_id`, `quoted_text`, `range_start`, `range_end`, `ai_suggestion` fields
+- New IPC handlers in `crates/desktop/src/commands/notes.rs` — `note_update_perspective_config`, `note_get_linked_context`, plus annotation CRUD commands
+- Each new command module must export `DEV_COMMANDS` and be added to `dev_server/mod.rs` test coverage list
 
 ### TipTap Mark
 
@@ -95,7 +112,7 @@ Appears when user clicks an annotation highlight. Glassmorphic (`glass-panel`) d
 
 Auto-appears on any text selection. Uses TipTap's built-in `BubbleMenu` extension with `shouldShow` callback (only when selection is non-empty and not inside a code block). 200ms debounce prevents flicker on click-drag.
 
-**Layout:** Format group (B/I/H) | divider | AI group (Annotate, Flashcard, Translate, Ask AI)
+**Layout:** AI actions only (Annotate, Flashcard, Translate, Ask AI). No format buttons — the existing static `EditorToolbar` already provides comprehensive formatting. The BubbleMenu is a focused AI interaction surface, not a duplicate toolbar.
 
 **Actions:**
 
@@ -156,7 +173,7 @@ The existing split-pane right side becomes **contextual**: when the cursor enter
 
 | Perspective | Description | Data Source | LLM Required |
 |-------------|-------------|-------------|--------------|
-| **🔍 Linked View** (★ Hero) | Overlays semantic facts, episodic memories, procedural rules, and cross-note annotations from cognitive memory | `MemoryRetriever` | No |
+| **🔍 Linked View** (★ Hero) | Overlays semantic facts, episodic memories, procedural rules, and cross-note annotations from cognitive memory | Direct repo queries (see below) | No |
 | **📝 Annotated** | Shows all inline annotations for this section with AI-suggested follow-ups. Highlights cluster density. | `annotations` table | Optional |
 | **📖 Study Mode** | Inline flashcard prompts from this section. Click to reveal answers. Due cards highlighted. Quick-review button. | `flashcards` table (FSRS-5) | No |
 
@@ -192,6 +209,8 @@ The existing split-pane right side becomes **contextual**: when the cursor enter
 ### Section Identity
 
 Sections are identified by heading node IDs. TipTap's `UniqueID` extension generates stable UUIDs per block node. A "section" is a heading + all content until the next heading of equal or higher level.
+
+**Copy-paste / duplication caveat:** When a heading is copy-pasted within or between notes, the `UniqueID` extension generates a new UUID for the pasted heading. This means `perspective_config` entries keyed to the original heading ID become orphaned in the duplicate. Behavior: orphaned entries are silently dropped on save (a cleanup pass runs when `perspective_config` is persisted — any key not matching a current heading ID is removed).
 
 ### Caching Strategy
 
@@ -230,7 +249,14 @@ Returns:
 - `related_annotations: Vec<AnnotationResult>` — from other notes
 - `procedural_rules: Vec<ProceduralRuleResult>` — if applicable
 
-Implementation: Delegates to existing `MemoryRetriever` with section text as the query. No new retrieval logic needed.
+**Implementation note:** The existing `MemoryRetriever` (`UnifiedMemoryService`) only retrieves `SemanticFact` entries and conversation recall. It does **not** currently support episodic memories or procedural rules. The `note_get_linked_context` handler must query repos directly:
+
+- `SemanticFactRepo::search()` — semantic facts (uses existing BM25 + embedding search)
+- `EpisodicMemoryRepo::search_fts()` — episodic memories (existing FTS5 method)
+- `ProceduralRuleRepo::search_fts()` — procedural rules (existing FTS5 method)
+- `AnnotationRepo::search_by_content()` — cross-note annotations (existing FTS5 on `annotations_fts`)
+
+This is a new composition of existing repos, not a delegation to `MemoryRetriever`. The handler lives in `app-core` and queries each repo in parallel via `tokio::join!`.
 
 ## Section 4: Creative Additions
 
@@ -251,7 +277,7 @@ A subtle visual overlay on the left margin of each section showing engagement de
 
 When you reopen a note you haven't visited in 3+ days, before showing the content, briefly present 2-3 flashcard prompts from that note's deck. Get them right → note opens normally with a green flash. Get them wrong → the missed sections are highlighted amber, nudging you to re-read. Turns every note revisit into a micro-review session that strengthens long-term retention.
 
-**Implementation:** Check `last_visited` timestamp + query due cards on note open. Modal with existing flashcard review component. ~100 lines of frontend code.
+**Implementation:** Check `last_visited_at` column (added in schema changes) + query due cards on note open. Requires backend to update `last_visited_at` on every note open (`note_get` handler). Modal with existing flashcard review component. Frontend: ~100 lines. Backend: ~20 lines (column + update-on-read).
 
 **UX flow:**
 1. Open note → "🧠 Quick recall check..."
@@ -282,8 +308,9 @@ range_start INTEGER    -- character offset start (fallback)
 range_end INTEGER      -- character offset end (fallback)
 ai_suggestion TEXT     -- original AI suggestion at creation time
 
--- feature-notes.notes (1 new column)
+-- feature-notes.notes (2 new columns)
 perspective_config TEXT -- JSON: per-section perspective configuration
+last_visited_at TEXT   -- ISO-8601: for Active Recall Gate (stretch goal)
 ```
 
 ### New TipTap Extensions
@@ -311,17 +338,17 @@ perspective_config TEXT -- JSON: per-section perspective configuration
 
 ### New IPC Commands
 
-- `annotation_create(noteId, markId, content, quotedText, rangeStart, rangeEnd)` → `AnnotationResponse`
+- `annotation_create(noteId, markId, content, quotedText, rangeStart, rangeEnd, aiSuggestion?)` → `AnnotationResponse`
 - `annotation_update(annotationId, content, tags)` → `AnnotationResponse`
 - `annotation_delete(annotationId)` → `()`
-- `annotation_list_for_note(noteId)` → `Vec<AnnotationResponse>`
+- `annotation_list_for_note(noteId, limit?: 200)` → `Vec<AnnotationResponse>` (paginated, default limit 200)
 - `annotation_get_ai_suggestion(noteId, selectedText)` → `AiSuggestionResponse`
 - `note_get_linked_context(noteId, sectionText)` → `LinkedContextResponse`
 - `note_update_perspective_config(noteId, config)` → `()`
 
 ## Phase 1 Scope Summary
 
-**In scope:**
+**In scope (core):**
 - Annotation system (marks + external storage + popover + AI suggestions)
 - Floating toolbar (BubbleMenu with Annotate, Flashcard, Translate, Ask AI)
 - Right-click context menu (grouped actions with keyboard shortcuts)
@@ -329,9 +356,11 @@ perspective_config TEXT -- JSON: per-section perspective configuration
 - Linked View perspective (cognitive memory overlay — hero feature)
 - Annotated perspective (annotation list + AI follow-ups)
 - Study Mode perspective (inline flashcard prompts)
+- Keyboard shortcuts (⌥A, ⌥F, ⌥L)
+
+**In scope (stretch — if core ships cleanly):**
 - Knowledge Heat Map (engagement density visualization)
 - Active Recall Gate (micro-quiz on note reopen)
-- Keyboard shortcuts (⌥A, ⌥F, ⌥L)
 
 **Out of scope (Phase 2+):**
 - Translated, Simplified, Expert, Concept Map perspectives
