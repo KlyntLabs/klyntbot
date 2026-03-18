@@ -1,5 +1,7 @@
 import { invalidateQueries } from "@shared/hooks/useQuery";
 import { useCallback, useEffect, useState } from "react";
+import { CardGenerationModal } from "../../notes/components/CardGenerationModal";
+import { useCardGeneration } from "../../notes/hooks/useCardGeneration";
 import { DashboardHome } from "../components/DashboardHome";
 import { ImmersiveReview } from "../components/ImmersiveReview";
 import { QuickAdd } from "../components/QuickAdd";
@@ -10,6 +12,8 @@ export default function LearnPage() {
   const [mode, setMode] = useState<ViewMode>("dashboard");
   const [reviewDeck, setReviewDeck] = useState<string | undefined>();
   const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const cardGen = useCardGeneration();
+  const [cardGenOpen, setCardGenOpen] = useState(false);
 
   const handleStartReview = useCallback((deck?: string) => {
     setReviewDeck(deck);
@@ -40,7 +44,19 @@ export default function LearnPage() {
 
   return (
     <>
-      <DashboardHome onStartReview={handleStartReview} onQuickAdd={() => setQuickAddOpen(true)} />
+      <DashboardHome
+        onStartReview={handleStartReview}
+        onQuickAdd={() => setQuickAddOpen(true)}
+        onGenerateFromNote={(noteId) => {
+          setCardGenOpen(true);
+          cardGen.generateFromNote(noteId);
+        }}
+        onGenerateFromText={(text) => {
+          setCardGenOpen(true);
+          cardGen.generateFromText(text);
+        }}
+        generating={cardGen.generating}
+      />
       <QuickAdd
         open={quickAddOpen}
         onClose={() => setQuickAddOpen(false)}
@@ -48,6 +64,25 @@ export default function LearnPage() {
           setQuickAddOpen(false);
           invalidateQueries("flashcard_");
         }}
+      />
+      <CardGenerationModal
+        open={cardGenOpen}
+        generating={cardGen.generating}
+        previews={cardGen.previews}
+        deckSuggestion={cardGen.deckSuggestion}
+        approved={cardGen.approved}
+        error={cardGen.error}
+        saving={cardGen.saving}
+        onToggleCard={cardGen.toggleCard}
+        onEditCard={cardGen.editCard}
+        onSave={(noteId, deck) => {
+          cardGen.saveApproved(noteId, deck).then(() => setCardGenOpen(false));
+        }}
+        onClose={() => {
+          cardGen.reset();
+          setCardGenOpen(false);
+        }}
+        noteId={null}
       />
     </>
   );

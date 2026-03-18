@@ -32,6 +32,7 @@ members = [
     "crates/feature-tasks",
     "crates/feature-launcher",
     "crates/klyntbot-server",
+    "crates/feature-learning",
     "crates/platform-macos",
 ]
 
@@ -70,6 +71,7 @@ app-core = { path = "crates/app-core" }
 activity-log = { path = "crates/activity-log" }
 feature-tasks = { path = "crates/feature-tasks" }
 feature-launcher = { path = "crates/feature-launcher" }
+feature-learning = { path = "crates/feature-learning" }
 klyntbot-server = { path = "crates/klyntbot-server" }
 platform-macos = { path = "crates/platform-macos" }
 extism = "1"

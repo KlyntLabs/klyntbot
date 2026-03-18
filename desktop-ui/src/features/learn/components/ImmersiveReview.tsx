@@ -1,5 +1,6 @@
 import { ArrowLeft, Edit3, ExternalLink, Lightbulb, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router";
 import { useReviewSession } from "../hooks/useReviewSession";
 import { CardRenderer } from "./CardRenderer";
 import { PostSession } from "./PostSession";
@@ -12,6 +13,7 @@ interface ImmersiveReviewProps {
 
 export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   const session = useReviewSession();
   const { current, revealed, reveal, rate, cards, currentIndex, done: sessionDone } = session;
@@ -53,11 +55,19 @@ export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
           e.preventDefault();
           rate(quality);
         }
+
+        if (e.key === "s" || e.key === "S") {
+          if (current?.sourceNoteId) {
+            e.preventDefault();
+            navigate(`/notes?id=${current.sourceNoteId}`);
+          }
+          return;
+        }
       }
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [revealed, current, reveal, rate, onExit]);
+  }, [revealed, current, reveal, rate, onExit, navigate]);
 
   if (loading) {
     return (
@@ -169,8 +179,17 @@ export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
           </button>
           <button
             type="button"
-            className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors opacity-50 cursor-not-allowed"
-            disabled
+            onClick={() => {
+              if (current?.sourceNoteId) {
+                navigate(`/notes?id=${current.sourceNoteId}`);
+              }
+            }}
+            disabled={!current?.sourceNoteId}
+            className={`flex items-center gap-1 text-[11px] transition-colors ${
+              current?.sourceNoteId
+                ? "text-muted-foreground hover:text-foreground cursor-pointer"
+                : "text-muted-foreground opacity-50 cursor-not-allowed"
+            }`}
           >
             <ExternalLink size={12} strokeWidth={1.5} />
             Source

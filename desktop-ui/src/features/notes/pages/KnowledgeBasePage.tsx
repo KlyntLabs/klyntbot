@@ -11,6 +11,7 @@ import type {
 import { FileText, GitGraph, PenLine } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
+import { CardGenerationModal } from "../components/CardGenerationModal";
 import { ContextPanel } from "../components/ContextPanel";
 import { GraphView } from "../components/GraphView";
 import { NavigationSidebar } from "../components/NavigationSidebar";
@@ -18,6 +19,7 @@ import { NoteCreationDialog } from "../components/NoteCreationDialog";
 import { NoteEditorPanel } from "../components/NoteEditorPanel";
 import { NoteFinder } from "../components/NoteFinder";
 import { VersionHistoryOverlay } from "../components/VersionHistoryOverlay";
+import { useCardGeneration } from "../hooks/useCardGeneration";
 import { useInbox } from "../hooks/useInbox";
 import { useInsightReview } from "../hooks/useInsightReview";
 
@@ -71,6 +73,10 @@ export default function KnowledgeBasePage() {
   const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [showNoteFinder, setShowNoteFinder] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
+
+  // ── Card Generation ──────────────────────────────────────────────────
+  const cardGen = useCardGeneration();
+  const [cardGenOpen, setCardGenOpen] = useState(false);
 
   // ── Insight Review ────────────────────────────────────────────────────
   const [insightState, insightActions] = useInsightReview();
@@ -249,6 +255,19 @@ export default function KnowledgeBasePage() {
       await deleteInboxItem({ id });
     },
     [deleteInboxItem],
+  );
+
+  const handleGenerateCards = useCallback(
+    (selectedText?: string) => {
+      if (!selectedNote) return;
+      setCardGenOpen(true);
+      if (selectedText) {
+        cardGen.generateFromText(selectedText, selectedNote.title);
+      } else {
+        cardGen.generateFromNote(selectedNote.id);
+      }
+    },
+    [selectedNote, cardGen.generateFromNote, cardGen.generateFromText],
   );
 
   // ── Resize logic (left sidebar) ───────────────────────────────────────
@@ -471,6 +490,7 @@ export default function KnowledgeBasePage() {
                 setLayoutMode((prev) => (prev === "three-panel" ? "focus" : "three-panel"))
               }
               focusModeActive={isFocusMode}
+              onGenerateCards={handleGenerateCards}
             />
           </div>
         ) : (
@@ -560,6 +580,27 @@ export default function KnowledgeBasePage() {
           setShowNoteFinder(false);
         }}
         notes={notes}
+      />
+
+      {/* Card Generation Modal */}
+      <CardGenerationModal
+        open={cardGenOpen}
+        generating={cardGen.generating}
+        previews={cardGen.previews}
+        deckSuggestion={cardGen.deckSuggestion}
+        approved={cardGen.approved}
+        error={cardGen.error}
+        saving={cardGen.saving}
+        onToggleCard={cardGen.toggleCard}
+        onEditCard={cardGen.editCard}
+        onSave={(noteId, deck) => {
+          cardGen.saveApproved(noteId, deck).then(() => setCardGenOpen(false));
+        }}
+        onClose={() => {
+          cardGen.reset();
+          setCardGenOpen(false);
+        }}
+        noteId={selectedNote?.id ?? null}
       />
     </div>
   );

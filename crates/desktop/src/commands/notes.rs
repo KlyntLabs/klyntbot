@@ -2,11 +2,12 @@ use std::sync::Arc;
 
 use desktop_shared::commands::{
     BacklinkResponse, ChangesSummaryResponse, CreatePersonaParams, DeckSummaryResponse,
-    FlashcardCreateParams, FlashcardListParams, FlashcardResponse, FlashcardReviewParams,
-    FlashcardUpdateParams, HybridSearchResponse, InboxCreateParams, InboxItemResponse,
-    InsightEvolutionResponse, InsightQuizSubmitParams, InsightReviewResponse, InsightReviewStarted,
-    InsightSaveFlashcardsParams, InsightVersionResponse, KnowledgeGrowthResponse, NoteCreateParams,
-    NoteLinkResponse, NoteResponse, NoteSuggestionsResponse, NoteUpdateParams, NoteVersionResponse,
+    FlashcardCreateParams, FlashcardGenerateParams, FlashcardGenerateResponse, FlashcardListParams,
+    FlashcardResponse, FlashcardReviewParams, FlashcardSaveGeneratedParams, FlashcardUpdateParams,
+    HybridSearchResponse, InboxCreateParams, InboxItemResponse, InsightEvolutionResponse,
+    InsightQuizSubmitParams, InsightReviewResponse, InsightReviewStarted, InsightSaveFlashcardsParams,
+    InsightVersionResponse, KnowledgeGrowthResponse, NoteCreateParams, NoteLinkResponse,
+    NoteResponse, NoteSuggestionsResponse, NoteUpdateParams, NoteVersionResponse,
     NotebookCreateParams, NotebookResponse, NotebookUpdateParams, PersonaChatParams,
     PersonaChatResponse, PersonaResponse, RatePersonaParams, ScenarioChallengeResponse,
     SetPersonaPinsParams, TabContent, UpdatePersonaParams,
@@ -533,6 +534,22 @@ pub async fn flashcard_total_due(
     state.flashcard_total_due().await
 }
 
+#[tauri::command]
+pub async fn flashcard_generate(
+    state: State<'_, Arc<AppCore>>,
+    params: FlashcardGenerateParams,
+) -> Result<FlashcardGenerateResponse, ApiError> {
+    state.flashcard_generate(params).await
+}
+
+#[tauri::command]
+pub async fn flashcard_save_generated(
+    state: State<'_, Arc<AppCore>>,
+    params: FlashcardSaveGeneratedParams,
+) -> Result<Vec<FlashcardResponse>, ApiError> {
+    state.flashcard_save_generated(params).await
+}
+
 // ── Dev server dispatch ─────────────────────────────────────────────
 
 #[cfg(test)]
@@ -595,6 +612,8 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "flashcard_delete",
     "flashcard_get_all_due",
     "flashcard_total_due",
+    "flashcard_generate",
+    "flashcard_save_generated",
 ];
 
 #[cfg(debug_assertions)]
@@ -819,6 +838,12 @@ pub(crate) async fn dispatch_dev(
             dev::val(core.flashcard_get_all_due(limit).await)
         }
         "flashcard_total_due" => dev::val(core.flashcard_total_due().await),
+        "flashcard_generate" => {
+            dev::val(core.flashcard_generate(try_field!(dev::parse_params(body))).await)
+        }
+        "flashcard_save_generated" => {
+            dev::val(core.flashcard_save_generated(try_field!(dev::parse_params(body))).await)
+        }
         _ => return None,
     })
 }

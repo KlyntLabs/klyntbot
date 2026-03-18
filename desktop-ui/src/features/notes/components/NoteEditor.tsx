@@ -24,6 +24,7 @@ interface NoteEditorProps {
   onViewModeChange: (mode: NotesViewMode) => void;
   onToggleFocusMode?: () => void;
   focusModeActive?: boolean;
+  onGenerateCards?: (selectedText?: string) => void;
 }
 
 export function NoteEditor({
@@ -33,6 +34,7 @@ export function NoteEditor({
   onViewModeChange,
   onToggleFocusMode,
   focusModeActive,
+  onGenerateCards,
 }: NoteEditorProps) {
   const navigate = useNavigate();
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -259,6 +261,7 @@ export function NoteEditor({
             onToggleVim={toggleVim}
             onOpenLinkDialog={() => setLinkDialog({ type: "link", isOpen: true })}
             onOpenImageDialog={() => setLinkDialog({ type: "image", isOpen: true })}
+            onGenerateCards={onGenerateCards}
             onToggleFocusMode={onToggleFocusMode}
             onToggleGraphMode={() => onViewModeChange(viewMode === "graph" ? "editor" : "graph")}
             onToggleVersionHistory={() => setShowHistory(!showHistory)}

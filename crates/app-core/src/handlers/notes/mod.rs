@@ -1,3 +1,4 @@
+mod card_generation;
 mod converters;
 mod crud;
 mod flashcard;

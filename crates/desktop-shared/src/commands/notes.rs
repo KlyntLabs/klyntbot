@@ -318,6 +318,46 @@ pub struct FlashcardListParams {
     pub offset: Option<i64>,
 }
 
+// ── Card Generation ─────────────────────────────────────────────
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FlashcardGenerateParams {
+    /// Generate from a specific note (fetches note content)
+    pub note_id: Option<String>,
+    /// Generate from raw text (clipboard, selection)
+    pub text_content: Option<String>,
+    /// Suggested deck name (optional)
+    pub deck_hint: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GeneratedCardPreview {
+    pub front: String,
+    pub back: String,
+    pub card_type: String,
+    pub tags: Vec<String>,
+    pub source_context: Option<String>,
+    pub cloze_data: Option<serde_json::Value>,
+    pub vocab_data: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FlashcardGenerateResponse {
+    pub cards: Vec<GeneratedCardPreview>,
+    pub deck_suggestion: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FlashcardSaveGeneratedParams {
+    pub note_id: Option<String>,
+    pub deck: String,
+    pub cards: Vec<GeneratedCardPreview>,
+}
+
 // ── Insight Quiz ─────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Deserialize)]

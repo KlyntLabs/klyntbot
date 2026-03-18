@@ -393,6 +393,8 @@ fn run_desktop_app() {
             commands::notes::flashcard_delete,
             commands::notes::flashcard_get_all_due,
             commands::notes::flashcard_total_due,
+            commands::notes::flashcard_generate,
+            commands::notes::flashcard_save_generated,
             // Areas
             commands::areas::area_list,
             commands::areas::area_create,

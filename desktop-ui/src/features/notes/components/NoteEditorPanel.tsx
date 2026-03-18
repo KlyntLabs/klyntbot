@@ -13,6 +13,7 @@ interface NoteEditorPanelProps {
   onViewModeChange: (mode: NotesViewMode) => void;
   onToggleFocusMode?: () => void;
   focusModeActive?: boolean;
+  onGenerateCards?: (selectedText?: string) => void;
 }
 
 export function NoteEditorPanel({
@@ -23,6 +24,7 @@ export function NoteEditorPanel({
   onViewModeChange,
   onToggleFocusMode,
   focusModeActive,
+  onGenerateCards,
 }: NoteEditorPanelProps) {
   const titleRef = useRef<HTMLDivElement>(null);
   const tagsRef = useRef<NoteTagsHandle>(null);
@@ -95,6 +97,7 @@ export function NoteEditorPanel({
         onViewModeChange={onViewModeChange}
         onToggleFocusMode={onToggleFocusMode}
         focusModeActive={focusModeActive}
+        onGenerateCards={onGenerateCards}
       />
     </div>
   );

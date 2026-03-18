@@ -1,14 +1,24 @@
-import { GraduationCap, Play, Plus, Sparkles } from "lucide-react";
+import { GraduationCap, Play, Plus } from "lucide-react";
 import { useLearnDashboard } from "../hooks/useLearnDashboard";
 import { DeckList } from "./DeckList";
+import { QuickGenerate } from "./QuickGenerate";
 import { StatsBar } from "./StatsBar";
 
 interface DashboardHomeProps {
   onStartReview: (deck?: string) => void;
   onQuickAdd: () => void;
+  onGenerateFromNote: (noteId: string) => void;
+  onGenerateFromText: (text: string) => void;
+  generating: boolean;
 }
 
-export function DashboardHome({ onStartReview, onQuickAdd }: DashboardHomeProps) {
+export function DashboardHome({
+  onStartReview,
+  onQuickAdd,
+  onGenerateFromNote,
+  onGenerateFromText,
+  generating,
+}: DashboardHomeProps) {
   const { decks, totalDue, loading } = useLearnDashboard();
 
   if (loading) {
@@ -97,15 +107,11 @@ export function DashboardHome({ onStartReview, onQuickAdd }: DashboardHomeProps)
           </p>
         </button>
 
-        <div className="glass-card p-4 text-left opacity-50 cursor-not-allowed">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="p-1.5 rounded-lg bg-purple/10">
-              <Sparkles size={16} className="text-purple" strokeWidth={1.5} />
-            </div>
-            <span className="text-sm font-medium text-foreground">AI Study Session</span>
-          </div>
-          <p className="text-[12px] text-muted-foreground">Coming in Phase 5</p>
-        </div>
+        <QuickGenerate
+          onGenerateFromNote={onGenerateFromNote}
+          onGenerateFromText={onGenerateFromText}
+          generating={generating}
+        />
       </div>
 
       {/* Deck list */}

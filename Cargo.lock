@@ -267,6 +267,7 @@ dependencies = [
  "feature-finance",
  "feature-insights",
  "feature-launcher",
+ "feature-learning",
  "feature-notes",
  "feature-productivity",
  "feature-tasks",
@@ -3756,6 +3757,17 @@ dependencies = [
  "tools-core",
  "tracing",
  "which",
+]
+
+[[package]]
+name = "feature-learning"
+version = "0.1.0"
+dependencies = [
+ "common",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

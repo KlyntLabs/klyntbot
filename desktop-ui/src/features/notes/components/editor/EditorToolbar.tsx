@@ -20,6 +20,7 @@ import {
   ListOrdered,
   Minus,
   Quote,
+  Sparkles,
   Strikethrough,
   Table,
   Underline as UnderlineIcon,
@@ -34,6 +35,7 @@ interface EditorToolbarProps {
   onToggleVim: () => void;
   onOpenLinkDialog?: () => void;
   onOpenImageDialog?: () => void;
+  onGenerateCards?: (selectedText?: string) => void;
   onToggleFocusMode?: () => void;
   onToggleGraphMode?: () => void;
   onToggleVersionHistory?: () => void;
@@ -223,6 +225,7 @@ export function EditorToolbar({
   onToggleVim,
   onOpenLinkDialog,
   onOpenImageDialog,
+  onGenerateCards,
   onToggleFocusMode,
   onToggleGraphMode,
   onToggleVersionHistory,
@@ -234,6 +237,21 @@ export function EditorToolbar({
 
   const modeButtons = (
     <div className="flex items-center gap-0.5 ml-auto">
+      {onGenerateCards && (
+        <button
+          type="button"
+          onClick={() => {
+            const { from, to } = editor.state.selection;
+            const selectedText =
+              from !== to ? editor.state.doc.textBetween(from, to, "\n") : undefined;
+            onGenerateCards(selectedText);
+          }}
+          title="Generate flashcards from note (or selection)"
+          className="p-1.5 rounded-lg transition-all text-dim hover:text-muted-foreground hover:bg-card"
+        >
+          <Sparkles className="w-3.5 h-3.5" strokeWidth={1.5} />
+        </button>
+      )}
       {onToggleFocusMode && (
         <button
           type="button"

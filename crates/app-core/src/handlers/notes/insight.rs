@@ -410,7 +410,11 @@ impl AppCore {
                 };
                 cognitive::NewFlashcard {
                     source_note_id: Some(params.note_id.clone()),
-                    source_context: None,
+                    source_context: if q.source_notes.is_empty() {
+                        None
+                    } else {
+                        Some(format!("From: {}", q.source_notes.join(", ")))
+                    },
                     deck: params.deck_name.clone(),
                     front: q.question.clone(),
                     back: q.correct_answer.clone(),
