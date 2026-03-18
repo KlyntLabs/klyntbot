@@ -2,6 +2,7 @@ import type { Note, NoteUpdateParams } from "@shared/types";
 import { useCallback, useRef } from "react";
 import { NoteEditor } from "./NoteEditor";
 import { NoteTags, type NoteTagsHandle } from "./NoteTags";
+import type { SplitMode } from "./editor/SplitEditor";
 
 type NotesViewMode = "editor" | "graph";
 
@@ -14,6 +15,8 @@ interface NoteEditorPanelProps {
   onToggleFocusMode?: () => void;
   focusModeActive?: boolean;
   onGenerateCards?: (selectedText?: string) => void;
+  splitMode?: SplitMode | null;
+  onSplitModeChange?: (mode: SplitMode | null) => void;
 }
 
 export function NoteEditorPanel({
@@ -25,6 +28,8 @@ export function NoteEditorPanel({
   onToggleFocusMode,
   focusModeActive,
   onGenerateCards,
+  splitMode,
+  onSplitModeChange,
 }: NoteEditorPanelProps) {
   const titleRef = useRef<HTMLDivElement>(null);
   const tagsRef = useRef<NoteTagsHandle>(null);
@@ -98,6 +103,8 @@ export function NoteEditorPanel({
         onToggleFocusMode={onToggleFocusMode}
         focusModeActive={focusModeActive}
         onGenerateCards={onGenerateCards}
+        splitMode={splitMode}
+        onSplitModeChange={onSplitModeChange}
       />
     </div>
   );

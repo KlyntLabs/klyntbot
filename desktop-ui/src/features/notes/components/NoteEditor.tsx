@@ -6,6 +6,8 @@ import { EditorContentWrapper, useEntityResolution, useNoteEditor } from "./edit
 import { EditorToolbar } from "./editor/EditorToolbar";
 import { EntityMentionMenu } from "./editor/EntityMention";
 import { SlashMenu } from "./editor/SlashCommandMenu";
+import { SplitEditor, type SplitMode } from "./editor/SplitEditor";
+import { SplitToolbar } from "./editor/SplitToolbar";
 import { VimCommandLine } from "./editor/VimCommandLine";
 import type { VimMode } from "./editor/vim";
 import { getVimPlugin, VIM_SAVE_EVENT } from "./editor/vim";
@@ -25,6 +27,8 @@ interface NoteEditorProps {
   onToggleFocusMode?: () => void;
   focusModeActive?: boolean;
   onGenerateCards?: (selectedText?: string) => void;
+  splitMode?: SplitMode | null;
+  onSplitModeChange?: (mode: SplitMode | null) => void;
 }
 
 export function NoteEditor({
@@ -35,15 +39,29 @@ export function NoteEditor({
   onToggleFocusMode,
   focusModeActive,
   onGenerateCards,
+  splitMode,
+  onSplitModeChange,
 }: NoteEditorProps) {
+  const activeSplitMode = splitMode ?? (note.splitMode as SplitMode | null);
   const navigate = useNavigate();
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastNoteIdRef = useRef(note.id);
   const pendingRef = useRef<{ html: string; markdown: string } | null>(null);
   const onSaveRef = useRef(onSave);
   onSaveRef.current = onSave;
-  const noteContentRef = useRef(note.bodyHtml || note.body || "");
-  noteContentRef.current = note.bodyHtml || note.body || "";
+  // When splitContent exists, show only the left pane in single mode
+  // (body contains concatenated left+right for indexing — confusing to display)
+  const singlePaneContent = (() => {
+    if (note.splitContent) {
+      try {
+        const split = JSON.parse(note.splitContent);
+        return split.left?.html || split.left?.markdown || note.body || "";
+      } catch { /* fall through */ }
+    }
+    return note.bodyHtml || note.body || "";
+  })();
+  const noteContentRef = useRef(singlePaneContent);
+  noteContentRef.current = singlePaneContent;
   const lastVersionTimeRef = useRef(0);
   const [showHistory, setShowHistory] = useState(false);
 
@@ -187,8 +205,9 @@ export function NoteEditor({
     [editor],
   );
 
-  // Cmd+S → force save
+  // Cmd+S → force save (skip when split mode is active — SplitEditor handles its own)
   useEffect(() => {
+    if (activeSplitMode) return;
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "s") {
         e.preventDefault();
@@ -197,7 +216,7 @@ export function NoteEditor({
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [flushSave]);
+  }, [flushSave, activeSplitMode]);
 
   // vim:save event → force save (dispatched by VimPlugin on :w command)
   useEffect(() => {
@@ -249,6 +268,25 @@ export function NoteEditor({
     ? `flex-1 min-h-0 overflow-y-auto vim-${vimMode}`
     : "flex-1 min-h-0 overflow-y-auto";
 
+  const handleToggleSplitMode = useCallback(() => {
+    if (activeSplitMode) {
+      onSplitModeChange?.(null);
+    } else {
+      onSplitModeChange?.("translation");
+    }
+  }, [activeSplitMode, onSplitModeChange]);
+
+  // Restore main editor content when leaving split mode — show left pane only
+  const prevSplitModeRef = useRef(activeSplitMode);
+  const restoreContentRef = useRef(singlePaneContent);
+  restoreContentRef.current = singlePaneContent;
+  useEffect(() => {
+    if (prevSplitModeRef.current && !activeSplitMode && editor) {
+      editor.commands.setContent(restoreContentRef.current);
+    }
+    prevSplitModeRef.current = activeSplitMode;
+  }, [activeSplitMode, editor]);
+
   return (
     <div className="flex-1 flex gap-2 min-w-0 min-h-0">
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
@@ -262,6 +300,8 @@ export function NoteEditor({
             onOpenLinkDialog={() => setLinkDialog({ type: "link", isOpen: true })}
             onOpenImageDialog={() => setLinkDialog({ type: "image", isOpen: true })}
             onGenerateCards={onGenerateCards}
+            onToggleSplitMode={onSplitModeChange ? handleToggleSplitMode : undefined}
+            splitModeActive={!!activeSplitMode}
             onToggleFocusMode={onToggleFocusMode}
             onToggleGraphMode={() => onViewModeChange(viewMode === "graph" ? "editor" : "graph")}
             onToggleVersionHistory={() => setShowHistory(!showHistory)}
@@ -281,19 +321,29 @@ export function NoteEditor({
         />
 
         {/* Content: body */}
-        <div className="flex-1 overflow-y-auto min-h-0 relative">
-          <EditorContentWrapper editor={editor} className={editorContentClass} />
-          {/* Vim command line at bottom of editor area */}
-          {vimEnabled && commandLine && (
-            <div className="absolute bottom-0 left-0 right-0">
-              <VimCommandLine
-                prefix={commandLine.prefix}
-                onSubmit={handleCommandLineSubmit}
-                onCancel={handleCommandLineCancel}
-              />
-            </div>
-          )}
-        </div>
+        {activeSplitMode ? (
+          <div className="flex-1 flex flex-col min-h-0">
+            <SplitToolbar
+              currentMode={activeSplitMode}
+              onModeChange={(mode) => onSplitModeChange?.(mode === "single" ? null : (mode as SplitMode))}
+            />
+            <SplitEditor note={note} splitMode={activeSplitMode} onSave={onSave} />
+          </div>
+        ) : (
+          <div className="flex-1 overflow-y-auto min-h-0 relative">
+            <EditorContentWrapper editor={editor} className={editorContentClass} />
+            {/* Vim command line at bottom of editor area */}
+            {vimEnabled && commandLine && (
+              <div className="absolute bottom-0 left-0 right-0">
+                <VimCommandLine
+                  prefix={commandLine.prefix}
+                  onSubmit={handleCommandLineSubmit}
+                  onCancel={handleCommandLineCancel}
+                />
+              </div>
+            )}
+          </div>
+        )}
         {editor && <SlashMenu editor={editor} />}
         {editor && <WikiLinkMenu editor={editor} currentNoteTitle={note.title} />}
         {editor && <EntityMentionMenu editor={editor} />}

@@ -23,6 +23,8 @@ CREATE TABLE IF NOT EXISTS notes (
     icon        TEXT,
     color       TEXT,
     embedding_updated_at TEXT,
+    split_content   TEXT,
+    split_mode      TEXT,
     created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
     updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );

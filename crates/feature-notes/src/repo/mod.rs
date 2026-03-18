@@ -62,6 +62,8 @@ mod tests {
             icon: None,
             color: None,
             embedding_updated_at: None,
+            split_content: None,
+            split_mode: None,
             created_at: now.clone(),
             updated_at: now,
         }
@@ -104,6 +106,8 @@ mod tests {
                 None,
                 None,
                 Some(true),
+                None,
+                None,
                 None,
                 None,
                 None,

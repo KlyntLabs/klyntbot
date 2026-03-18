@@ -5,6 +5,7 @@ import {
   AlignRight,
   Bold,
   Code,
+  Columns,
   Expand,
   GitGraph,
   Heading1,
@@ -39,9 +40,11 @@ interface EditorToolbarProps {
   onToggleFocusMode?: () => void;
   onToggleGraphMode?: () => void;
   onToggleVersionHistory?: () => void;
+  onToggleSplitMode?: () => void;
   focusModeActive?: boolean;
   graphModeActive?: boolean;
   versionHistoryActive?: boolean;
+  splitModeActive?: boolean;
 }
 
 interface ToolbarButton {
@@ -229,14 +232,30 @@ export function EditorToolbar({
   onToggleFocusMode,
   onToggleGraphMode,
   onToggleVersionHistory,
+  onToggleSplitMode,
   focusModeActive,
   graphModeActive,
   versionHistoryActive,
+  splitModeActive,
 }: EditorToolbarProps) {
   if (!editor) return null;
 
   const modeButtons = (
     <div className="flex items-center gap-0.5 ml-auto">
+      {onToggleSplitMode && (
+        <button
+          type="button"
+          onClick={onToggleSplitMode}
+          title="Split-pane editor"
+          className={`p-1.5 rounded-lg transition-all ${
+            splitModeActive
+              ? "bg-brand/15 text-brand"
+              : "text-dim hover:text-muted-foreground hover:bg-card"
+          }`}
+        >
+          <Columns className="w-3.5 h-3.5" strokeWidth={1.5} />
+        </button>
+      )}
       {onGenerateCards && (
         <button
           type="button"

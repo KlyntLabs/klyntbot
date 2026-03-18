@@ -17,6 +17,7 @@ import { GraphView } from "../components/GraphView";
 import { NavigationSidebar } from "../components/NavigationSidebar";
 import { NoteCreationDialog } from "../components/NoteCreationDialog";
 import { NoteEditorPanel } from "../components/NoteEditorPanel";
+import type { SplitMode } from "../components/editor/SplitEditor";
 import { NoteFinder } from "../components/NoteFinder";
 import { VersionHistoryOverlay } from "../components/VersionHistoryOverlay";
 import { useCardGeneration } from "../hooks/useCardGeneration";
@@ -271,6 +272,14 @@ export default function KnowledgeBasePage() {
     [selectedNote, generateFromNote, generateFromText],
   );
 
+  const handleSplitModeChange = useCallback(
+    (mode: SplitMode | null) => {
+      if (!selectedNote) return;
+      updateNote({ id: selectedNote.id, splitMode: mode });
+    },
+    [selectedNote, updateNote],
+  );
+
   // ── Resize logic (left sidebar) ───────────────────────────────────────
   const onLeftResizeStart = useCallback((e: React.PointerEvent) => {
     e.preventDefault();
@@ -492,6 +501,8 @@ export default function KnowledgeBasePage() {
               }
               focusModeActive={isFocusMode}
               onGenerateCards={handleGenerateCards}
+              splitMode={selectedNote?.splitMode as SplitMode | null}
+              onSplitModeChange={handleSplitModeChange}
             />
           </div>
         ) : (

@@ -117,6 +117,8 @@ impl AppCore {
             icon: None,
             color: None,
             embedding_updated_at: None,
+            split_content: None,
+            split_mode: None,
             created_at: now.clone(),
             updated_at: now,
         };
@@ -187,6 +189,8 @@ impl AppCore {
                 params.notebook_id.as_ref().map(|o| o.as_deref()),
                 params.icon.as_ref().map(|o| o.as_deref()),
                 params.color.as_ref().map(|o| o.as_deref()),
+                params.split_content.as_ref().map(|o| o.as_deref()),
+                params.split_mode.as_ref().map(|o| o.as_deref()),
             )
             .await
             .map_err(map_storage_err)?;
@@ -345,6 +349,8 @@ impl AppCore {
                 &note_id,
                 None,
                 Some(&version.body),
+                None,
+                None,
                 None,
                 None,
                 None,

@@ -11,6 +11,8 @@ export interface Note {
   icon: string | null;
   color: string | null;
   tags: string[];
+  splitContent: string | null;
+  splitMode: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -71,6 +73,8 @@ export interface NoteUpdateParams {
   tags?: string[];
   icon?: string | null;
   color?: string | null;
+  splitContent?: string | null;
+  splitMode?: string | null;
 }
 
 // ── Notebook Mutation Parameters ───────────────────────────
