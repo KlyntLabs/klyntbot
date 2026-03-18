@@ -4,6 +4,7 @@ import type {
   ActiveInteraction,
   ChatMessage,
   MessageSegment,
+  PersonaSegment,
   TransparencyData,
 } from "@shared/types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -19,10 +20,15 @@ interface ChatSession {
   error: string | null;
   activeInteraction: ActiveInteraction | null;
   activeDelegateAgent: string | null;
+  personaMessages: PersonaSegment[];
   input: string;
   setInput: (value: string) => void;
   send: (extraPayload?: Record<string, unknown>) => Promise<void>;
   clearInteraction: () => void;
+}
+
+interface UseChatSessionOptions {
+  squadId?: string;
 }
 
 /**
@@ -31,8 +37,13 @@ interface ChatSession {
  *
  * @param onDone Optional callback fired when the agent finishes — use for
  *               refreshing thread lists or other side-effects.
+ * @param options Optional configuration including squadId for squad chat mode.
  */
-export function useChatSession(sessionKey: string, onDone?: () => void): ChatSession {
+export function useChatSession(
+  sessionKey: string,
+  onDone?: () => void,
+  options?: UseChatSessionOptions,
+): ChatSession {
   const { data: messages, refetch } = useQuery<ChatMessage[]>(
     "chat_messages",
     sessionKey ? { sessionKey } : null,
@@ -50,7 +61,7 @@ export function useChatSession(sessionKey: string, onDone?: () => void): ChatSes
   // Clear streaming segments only when a NEW assistant message arrives from refetch.
   // Tracks assistant count to avoid clearing before the refetch completes — the old
   // approach fired on isStreaming→false before the new message existed, causing a flash.
-  const { isStreaming, clearSegments, clearTransparency, segments } = stream;
+  const { isStreaming, clearSegments, clearTransparency, clearPersonaMessages, segments } = stream;
   const hasSegmentsRef = useRef(false);
   hasSegmentsRef.current = segments.length > 0;
   const assistantCountRef = useRef(0);
@@ -60,15 +71,17 @@ export function useChatSession(sessionKey: string, onDone?: () => void): ChatSes
     if (!isStreaming && hasSegmentsRef.current && count > assistantCountRef.current) {
       clearSegments();
       clearTransparency();
+      clearPersonaMessages();
     }
     assistantCountRef.current = count;
-  }, [messages, isStreaming, clearSegments, clearTransparency]);
+  }, [messages, isStreaming, clearSegments, clearTransparency, clearPersonaMessages]);
 
   const displayMessages = useMemo(() => {
     if (!pendingUserMsg) return messages;
     return [...messages, { id: "pending", role: "user" as const, content: pendingUserMsg }];
   }, [messages, pendingUserMsg]);
 
+  const squadId = options?.squadId;
   const send = useCallback(
     async (extraPayload?: Record<string, unknown>) => {
       if (!input.trim() || stream.isStreaming) return;
@@ -79,16 +92,23 @@ export function useChatSession(sessionKey: string, onDone?: () => void): ChatSes
       stream.startStreaming();
 
       try {
-        await ipc<ChatMessage>("chat_send", {
+        const payload: Record<string, unknown> = {
           content: text,
           sessionKey,
           ...extraPayload,
-        });
+        };
+        if (squadId) {
+          payload.context = {
+            ...(payload.context as Record<string, unknown> | undefined),
+            squadId,
+          };
+        }
+        await ipc<ChatMessage>("chat_send", payload);
       } catch (e: unknown) {
         stream.failStreaming(parseApiError(e).message);
       }
     },
-    [input, sessionKey, stream],
+    [input, sessionKey, stream, squadId],
   );
 
   return {
@@ -100,6 +120,7 @@ export function useChatSession(sessionKey: string, onDone?: () => void): ChatSes
     error: stream.error,
     activeInteraction: stream.activeInteraction,
     activeDelegateAgent: stream.activeDelegateAgent,
+    personaMessages: stream.personaMessages,
     input,
     setInput,
     send,

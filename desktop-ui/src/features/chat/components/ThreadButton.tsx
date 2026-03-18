@@ -1,6 +1,6 @@
 import { formatRelativeTime } from "@shared/lib/dates";
 import type { ChatThread } from "@shared/types";
-import { Check, MessageSquare, X } from "lucide-react";
+import { Check, MessageSquare, Users, X } from "lucide-react";
 
 interface ThreadButtonProps {
   thread: ChatThread;
@@ -71,7 +71,11 @@ export function ThreadButton({
           : "text-muted-foreground hover:bg-accent hover:text-foreground"
       }`}
     >
-      <MessageSquare className="w-3 h-3 shrink-0" strokeWidth={1.5} />
+      {thread.squadId ? (
+        <Users className="w-3 h-3 shrink-0 text-purple-400" strokeWidth={1.5} />
+      ) : (
+        <MessageSquare className="w-3 h-3 shrink-0" strokeWidth={1.5} />
+      )}
       <span className="flex-1 text-left truncate">{thread.title}</span>
       <span className="text-[11px] shrink-0">{formatRelativeTime(thread.updatedAt)}</span>
     </button>

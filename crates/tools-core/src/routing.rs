@@ -75,6 +75,8 @@ pub struct RoutingContext {
     /// Platform-native interaction channel (Telegram buttons, Discord selects, etc.).
     /// When present, `ask_user` uses this for structured UI instead of text fallback.
     pub interaction_channel: Option<Arc<dyn InteractionChannel>>,
+    /// Squad context — when set, the agent uses SquadExecutor for multi-persona responses.
+    pub squad_id: Option<String>,
 }
 
 impl RoutingContext {
@@ -88,6 +90,7 @@ impl RoutingContext {
             delegation_depth: 0,
             entity_tx: None,
             interaction_channel: None,
+            squad_id: None,
         }
     }
 
@@ -105,6 +108,21 @@ impl RoutingContext {
             delegation_depth: 0,
             entity_tx: None,
             interaction_channel: None,
+            squad_id: None,
+        }
+    }
+
+    /// Non-interactive mode with a squad context.
+    pub fn with_squad(channel: ChannelName, chat_id: ChatId, squad_id: String) -> Self {
+        Self {
+            channel,
+            chat_id,
+            interaction_tx: None,
+            is_direct_mode: false,
+            delegation_depth: 0,
+            entity_tx: None,
+            interaction_channel: None,
+            squad_id: Some(squad_id),
         }
     }
 }

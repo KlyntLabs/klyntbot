@@ -7,10 +7,13 @@ import { useLocation, useSearchParams } from "react-router";
 import { ChatInput } from "../components/ChatInput";
 import { CoachingNudge } from "../components/CoachingNudge";
 import { MessageList } from "../components/MessageList";
+import { PersonaMessageList } from "../components/PersonaMessageList";
+import { SquadChatHeader } from "../components/SquadChatHeader";
 import { ThreadContextMenu } from "../components/ThreadContextMenu";
 import { type AreaGroup, featurePrefix, ThreadList } from "../components/ThreadList";
 import { TransparencyPanel } from "../components/TransparencyPanel";
 import { TransparencyToggle } from "../components/TransparencyToggle";
+import { type VoiceMode, VoiceToggle } from "../components/VoiceToggle";
 import { useChatSession } from "../hooks/useChatSession";
 
 interface GroupedThreads {
@@ -47,8 +50,18 @@ export function ChatPage() {
     [],
   );
 
-  // Chat session
-  const chat = useChatSession(selectedThread, refetchThreads);
+  // Detect squad chat from the currently selected thread
+  const currentThread = useMemo(
+    () => threads.find((t) => t.sessionKey === selectedThread),
+    [threads, selectedThread],
+  );
+  const squadId = currentThread?.squadId ?? null;
+
+  // Voice mode for squad chat
+  const [voiceMode, setVoiceMode] = useState<VoiceMode>("multi");
+
+  // Chat session — pass squadId when present
+  const chat = useChatSession(selectedThread, refetchThreads, squadId ? { squadId } : undefined);
 
   // Context resume — pre-fill input from navigation state
   const location = useLocation();
@@ -153,6 +166,16 @@ export function ChatPage() {
     setSelectedThread(`chat:${crypto.randomUUID()}`);
   };
 
+  const handleNewSquadThread = useCallback(
+    (newSquadId: string) => {
+      setSelectedThread(`squad:${newSquadId}:${crypto.randomUUID()}`);
+    },
+    [setSelectedThread],
+  );
+
+  // Whether to show persona messages instead of the normal assistant bubble
+  const showPersonaMessages = squadId && voiceMode === "multi" && chat.personaMessages.length > 0;
+
   // ── Thread actions ─────────────────────────────────────────────────────
   const [contextMenu, setContextMenu] = useState<{
     thread: ChatThread;
@@ -241,6 +264,7 @@ export function ChatPage() {
         renameRef={renameRef}
         onSelectThread={setSelectedThread}
         onNewThread={handleNewThread}
+        onNewSquadThread={handleNewSquadThread}
         onToggleGroup={toggleGroup}
         onContextMenu={openContextMenu}
         onRenameChange={(value) => setRenaming((r) => (r ? { ...r, value } : null))}
@@ -261,6 +285,7 @@ export function ChatPage() {
 
       {/* Right Panel — Conversation */}
       <div className="flex-1 flex flex-col overflow-hidden rounded-xl relative">
+        {/* Toolbar: resume banner, squad header, voice toggle, transparency */}
         <div className="flex items-center justify-between px-4 py-2 border-b border-border-subtle">
           {resumeBanner ? (
             <div className="flex items-center gap-2 text-[12px]">
@@ -276,35 +301,53 @@ export function ChatPage() {
           ) : (
             <div />
           )}
-          <TransparencyToggle enabled={showTransparency} onToggle={toggleTransparency} />
+          <div className="flex items-center gap-2">
+            {squadId && <VoiceToggle mode={voiceMode} onChange={setVoiceMode} />}
+            <TransparencyToggle enabled={showTransparency} onToggle={toggleTransparency} />
+          </div>
         </div>
+
+        {/* Squad chat header */}
+        {squadId && <SquadChatHeader squadId={squadId} />}
 
         <div className="flex-1 overflow-y-auto p-6">
           <div className="max-w-3xl mx-auto">
             {chat.messages.length === 0 && !chat.isStreaming ? (
               <div className="flex flex-col items-center justify-center py-20">
-                <p className="text-muted-foreground text-sm font-light">Start a conversation</p>
+                <p className="text-muted-foreground text-sm font-light">
+                  {squadId ? "Start a squad conversation" : "Start a conversation"}
+                </p>
                 <p className="text-dim text-xs font-light mt-1">
-                  Ask Klynt anything about your tasks, projects, or schedule
+                  {squadId
+                    ? "Your squad members will each share their perspective"
+                    : "Ask Klynt anything about your tasks, projects, or schedule"}
                 </p>
               </div>
             ) : (
-              <MessageList
-                messages={chat.messages}
-                segments={chat.segments}
-                isStreaming={chat.isStreaming}
-                activeTools={chat.activeTools}
-                error={chat.error}
-                activeInteraction={chat.activeInteraction}
-                sessionKey={selectedThread}
-                onInteractionSubmitted={() => {
-                  chat.clearInteraction();
-                  refetchThreads();
-                }}
-                showTransparency={showTransparency}
-                liveTransparency={chat.transparency}
-                activeDelegateAgent={chat.activeDelegateAgent}
-              />
+              <>
+                {/* Persona messages in multi-voice mode */}
+                {showPersonaMessages && (
+                  <div className="mb-6">
+                    <PersonaMessageList personaMessages={chat.personaMessages} />
+                  </div>
+                )}
+                <MessageList
+                  messages={chat.messages}
+                  segments={chat.segments}
+                  isStreaming={chat.isStreaming}
+                  activeTools={chat.activeTools}
+                  error={chat.error}
+                  activeInteraction={chat.activeInteraction}
+                  sessionKey={selectedThread}
+                  onInteractionSubmitted={() => {
+                    chat.clearInteraction();
+                    refetchThreads();
+                  }}
+                  showTransparency={showTransparency}
+                  liveTransparency={chat.transparency}
+                  activeDelegateAgent={chat.activeDelegateAgent}
+                />
+              </>
             )}
           </div>
         </div>

@@ -73,6 +73,7 @@ impl ToolRegistryBridge {
             delegation_depth: 0,
             entity_tx: None,
             interaction_channel: None,
+            squad_id: None,
         };
 
         // Acquire read lock, prepare (validate + clone Arc<dyn Tool>), then drop lock

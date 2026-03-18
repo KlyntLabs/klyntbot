@@ -40,6 +40,7 @@ export interface ChatThread {
   areaName?: string;
   projectId?: string;
   projectName?: string;
+  squadId?: string;
 }
 
 // ── Session Context ─────────────────────────────────────────
@@ -163,6 +164,23 @@ export interface PlanStepCompletedPayload {
   stepIndex: number;
   description: string;
   toolName: string;
+}
+
+// ── Persona Events ──────────────────────────────────────────
+
+export interface PersonaPerspectivePayload {
+  sessionKey: string;
+  personaId: string;
+  personaName: string;
+  content: string;
+}
+
+export interface PersonaSegment {
+  personaId: string;
+  personaName: string;
+  personaIcon?: string;
+  personaRole?: string;
+  content: string;
 }
 
 // ── Delegation Events ────────────────────────────────────────

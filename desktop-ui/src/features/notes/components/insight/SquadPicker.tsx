@@ -29,13 +29,15 @@ export function SquadPicker({ selectedSquadId, onSelect, onManage }: SquadPicker
         onClick={() => setOpen((prev) => !prev)}
         className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/[0.04] hover:bg-white/[0.06] border border-transparent hover:border-border transition-colors text-[11px]"
       >
-        {selected ? (
+        {loading && selectedSquadId ? (
+          <span className="text-[10px] text-muted-foreground">Loading...</span>
+        ) : selected ? (
           <>
-            <span className="text-sm leading-none">{selected.icon}</span>
+            <span>{selected.icon}</span>
             <span className="text-muted-foreground truncate max-w-[120px]">{selected.name}</span>
           </>
         ) : (
-          <span className="text-dim italic">{loading ? "Loading..." : "Select squad"}</span>
+          <span className="text-[10px] text-muted-foreground">Select squad</span>
         )}
         <ChevronDown
           size={10}

@@ -55,6 +55,13 @@ pub struct RuntimeResult {
 ///
 /// The key difference: agent selection happens first, and the agent profile
 /// shapes everything downstream (system prompt, tool filtering, iteration budget).
+/// Bundled dependencies for squad chat mode.
+pub(crate) struct SquadDeps {
+    pub repo: cognitive::SquadRepo,
+    pub provider: providers::DynProvider,
+    pub chat_params: providers::ChatParams,
+}
+
 pub struct AgentRuntime {
     skill_catalog: Arc<RwLock<SkillCatalog>>,
     skill_router: Arc<RwLock<skill_system::router::SkillRouter>>,
@@ -78,6 +85,8 @@ pub struct AgentRuntime {
     delegation_self_ref: std::sync::OnceLock<Arc<dyn tools::DelegationHandler>>,
     /// Event sender for transparency events during delegation (set per-message).
     current_event_tx: RwLock<Option<tokio::sync::mpsc::Sender<AgentEvent>>>,
+    /// Bundled dependencies for squad chat mode — always set together.
+    squad_deps: Option<SquadDeps>,
 }
 
 impl AgentRuntime {
@@ -108,6 +117,7 @@ impl AgentRuntime {
             tool_registry: None,
             delegation_self_ref: std::sync::OnceLock::new(),
             current_event_tx: RwLock::new(None),
+            squad_deps: None,
         }
     }
 
@@ -143,6 +153,21 @@ impl AgentRuntime {
         registry: Arc<RwLock<tools::registry::ToolRegistry>>,
     ) -> Self {
         self.tool_registry = Some(registry);
+        self
+    }
+
+    /// Set squad execution dependencies for multi-persona squad mode.
+    pub fn with_squad_deps(
+        mut self,
+        repo: cognitive::SquadRepo,
+        provider: providers::DynProvider,
+        chat_params: providers::ChatParams,
+    ) -> Self {
+        self.squad_deps = Some(SquadDeps {
+            repo,
+            provider,
+            chat_params,
+        });
         self
     }
 
@@ -226,6 +251,22 @@ impl AgentRuntime {
         {
             let mut guard = self.active_profile.write().await;
             *guard = Some(Arc::clone(&profile));
+        }
+
+        // Step 2b: Squad detection — if a squad_id is set, fan out to personas
+        if let (Some(ref squad_id), Some(ref deps)) = (&ctx.squad_id, &self.squad_deps) {
+            return self
+                .run_squad_execution(
+                    message,
+                    history,
+                    system_prompt,
+                    event_tx,
+                    squad_id,
+                    &deps.repo,
+                    &deps.provider,
+                    &deps.chat_params,
+                )
+                .await;
         }
 
         // Step 3: Filter MCP tool names to those the matched agent can access
@@ -548,6 +589,102 @@ impl AgentRuntime {
                 })
                 .await;
         }
+    }
+
+    /// Execute via multi-persona squad fan-out instead of normal pipeline.
+    #[allow(clippy::too_many_arguments)]
+    async fn run_squad_execution(
+        &self,
+        message: &str,
+        history: Vec<Message>,
+        system_prompt: Option<&str>,
+        event_tx: Option<tokio::sync::mpsc::Sender<AgentEvent>>,
+        squad_id: &str,
+        squad_repo: &cognitive::SquadRepo,
+        provider: &providers::DynProvider,
+        params: &providers::ChatParams,
+    ) -> Result<RuntimeResult> {
+        use crate::intent_pipeline::engines::squad;
+
+        // 1. Resolve squad
+        let resolved = squad_repo
+            .resolve_squad(squad_id)
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(format!("squad resolve: {e}")))?
+            .ok_or_else(|| {
+                common::KlyntbotError::StorageNotFound(format!("squad '{squad_id}' not found"))
+            })?;
+
+        // 2. Build orchestrator context from system prompt + conversation history
+        let mut context_parts =
+            vec![system_prompt.unwrap_or("You are a helpful AI assistant.").to_string()];
+        for msg in &history {
+            match msg {
+                Message::User { content } => {
+                    if let providers::UserContent::Text(t) = content {
+                        context_parts.push(format!("User: {t}"));
+                    }
+                }
+                Message::Assistant { content, .. } => {
+                    if let Some(c) = content {
+                        context_parts.push(format!("Assistant: {c}"));
+                    }
+                }
+                _ => {}
+            }
+        }
+        let orchestrator_context = context_parts.join("\n\n");
+
+        // 3. Persona fan-out
+        let persona_responses = squad::fan_out_personas(
+            provider,
+            &orchestrator_context,
+            message,
+            &resolved.personas,
+            params,
+            event_tx.as_ref(),
+        )
+        .await;
+
+        // 4. Synthesis
+        let synthesis_prompt = squad::build_squad_synthesis_prompt(message, &persona_responses);
+        let synthesis_messages = vec![
+            Message::System {
+                content: synthesis_prompt,
+            },
+            Message::User {
+                content: providers::UserContent::Text("Synthesize now.".to_string()),
+            },
+        ];
+        let synthesis = provider.chat(&synthesis_messages, None, params).await?;
+
+        let multi_voice = squad::format_multi_voice(&persona_responses);
+        let content = synthesis.content.unwrap_or(multi_voice);
+
+        // Build a minimal classification for the result
+        let classification = IntentAnalysis {
+            mode: crate::intent_pipeline::types::ExecutionMode::Direct,
+            signals: crate::intent_pipeline::types::ComplexitySignals {
+                estimated_tool_calls: 0,
+                has_sequential_deps: false,
+                failure_risk: crate::intent_pipeline::types::FailureRisk::Low,
+                requires_state_tracking: false,
+                requires_retries: false,
+                has_hypothetical: false,
+            },
+            confidence: 1.0,
+            source: crate::intent_pipeline::types::AnalysisSource::Heuristic,
+            reasoning: "Squad multi-persona execution".to_string(),
+            needs_orchestration: false,
+        };
+
+        Ok(RuntimeResult {
+            content: content.clone(),
+            mode_used: "squad".to_string(),
+            classification,
+            validation: self.validator.validate(&content),
+            agent_name: format!("squad:{}", resolved.squad.name),
+        })
     }
 
     async fn record_usage(

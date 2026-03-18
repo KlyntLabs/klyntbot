@@ -2,9 +2,13 @@ import { useAutoResizeTextarea } from "@shared/hooks/useAutoResizeTextarea";
 import { useChatSession } from "@shared/hooks/useChatSession";
 import { useMutation } from "@shared/hooks/useMutation";
 import { usePageContext } from "@shared/hooks/usePageContext";
-import { Pin, Send, X } from "lucide-react";
+import { Pin, Send, Users, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { SquadPicker } from "../../notes/components/insight/SquadPicker";
 import { MessageList } from "./MessageList";
+import { PersonaMessageList } from "./PersonaMessageList";
+import { SquadChatHeader } from "./SquadChatHeader";
+import { type VoiceMode, VoiceToggle } from "./VoiceToggle";
 
 interface SidebarChatProps {
   isOpen: boolean;
@@ -44,6 +48,11 @@ export function SidebarChat({
   // Override session key when the launcher expands a chat to main
   const [overrideSessionKey, setOverrideSessionKey] = useState<string | null>(null);
 
+  // Squad chat state
+  const [showSquadPicker, setShowSquadPicker] = useState(false);
+  const [activeSquadId, setActiveSquadId] = useState<string | null>(null);
+  const [voiceMode, setVoiceMode] = useState<VoiceMode>("multi");
+
   useEffect(() => {
     if (openSessionKey) {
       setOverrideSessionKey(openSessionKey);
@@ -71,7 +80,11 @@ export function SidebarChat({
       ? sessionKeyFor(routeContext.entityKind, routeContext.entityId)
       : "desktop-panel");
 
-  const chat = useChatSession(sessionKey);
+  const chat = useChatSession(
+    sessionKey,
+    undefined,
+    activeSquadId ? { squadId: activeSquadId } : undefined,
+  );
   const pinThread = useMutation<void, Record<string, unknown>>("chat_pin_thread");
 
   const handleSend = () => {
@@ -82,9 +95,18 @@ export function SidebarChat({
     await pinThread.mutate({ sessionKey });
   };
 
+  const handleSquadSelect = (squadId: string) => {
+    setActiveSquadId(squadId);
+    // Create a new session for this squad chat
+    setOverrideSessionKey(`squad:${squadId}:${crypto.randomUUID()}`);
+    setShowSquadPicker(false);
+  };
+
   if (!isOpen) return null;
 
-  const label = contextLabel(pageContext?.entityKind);
+  const label = activeSquadId ? "Squad Chat" : contextLabel(pageContext?.entityKind);
+  const showPersonaMessages =
+    activeSquadId && voiceMode === "multi" && chat.personaMessages.length > 0;
 
   return (
     <div className="w-96 glass-sidebar flex flex-col shrink-0">
@@ -92,6 +114,15 @@ export function SidebarChat({
       <div className="h-14 flex items-center justify-between px-5">
         <span className="text-[13px] font-light text-muted-foreground">{label}</span>
         <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setShowSquadPicker((prev) => !prev)}
+            aria-label="New squad chat"
+            title="New squad chat"
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-purple-400 hover:bg-accent transition-all"
+          >
+            <Users className="w-3.5 h-3.5" strokeWidth={1.5} />
+          </button>
           {pageContext && (
             <button
               type="button"
@@ -114,6 +145,23 @@ export function SidebarChat({
         </div>
       </div>
 
+      {/* Squad picker dropdown */}
+      {showSquadPicker && (
+        <div className="px-4 pb-2">
+          <SquadPicker selectedSquadId={activeSquadId} onSelect={handleSquadSelect} />
+        </div>
+      )}
+
+      {/* Squad header + voice toggle */}
+      {activeSquadId && (
+        <>
+          <SquadChatHeader squadId={activeSquadId} />
+          <div className="flex justify-end px-4 py-1">
+            <VoiceToggle mode={voiceMode} onChange={setVoiceMode} />
+          </div>
+        </>
+      )}
+
       <div className="mx-4 glass-divider" />
 
       {/* Messages */}
@@ -121,25 +169,35 @@ export function SidebarChat({
         {chat.messages.length === 0 && !chat.isStreaming ? (
           <div className="flex flex-col items-center justify-center py-12">
             <p className="text-muted-foreground text-[12px] font-light text-center">
-              {pageContext
-                ? `Ask about this ${pageContext.entityKind?.split(".")[0] || "item"}`
-                : "Ask me anything"}
+              {activeSquadId
+                ? "Start a squad conversation"
+                : pageContext
+                  ? `Ask about this ${pageContext.entityKind?.split(".")[0] || "item"}`
+                  : "Ask me anything"}
             </p>
           </div>
         ) : (
-          <MessageList
-            messages={chat.messages}
-            segments={chat.segments}
-            isStreaming={chat.isStreaming}
-            activeTools={chat.activeTools}
-            error={chat.error}
-            activeInteraction={chat.activeInteraction}
-            sessionKey={sessionKey}
-            onInteractionSubmitted={() => chat.clearInteraction()}
-            showTransparency={false}
-            liveTransparency={null}
-            activeDelegateAgent={chat.activeDelegateAgent}
-          />
+          <>
+            {/* Persona messages in multi-voice mode */}
+            {showPersonaMessages && (
+              <div className="mb-4">
+                <PersonaMessageList personaMessages={chat.personaMessages} compact />
+              </div>
+            )}
+            <MessageList
+              messages={chat.messages}
+              segments={chat.segments}
+              isStreaming={chat.isStreaming}
+              activeTools={chat.activeTools}
+              error={chat.error}
+              activeInteraction={chat.activeInteraction}
+              sessionKey={sessionKey}
+              onInteractionSubmitted={() => chat.clearInteraction()}
+              showTransparency={false}
+              liveTransparency={null}
+              activeDelegateAgent={chat.activeDelegateAgent}
+            />
+          </>
         )}
       </div>
 

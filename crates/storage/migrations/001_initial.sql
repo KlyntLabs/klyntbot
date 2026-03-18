@@ -214,8 +214,10 @@ CREATE TABLE sessions (
     updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
     project_id        TEXT REFERENCES projects(id),
     conversation_type TEXT DEFAULT 'general',
-    pinned            INTEGER DEFAULT 0
+    pinned            INTEGER DEFAULT 0,
+    squad_id          TEXT
 );
+CREATE INDEX IF NOT EXISTS idx_sessions_squad ON sessions(squad_id);
 
 -- ============================================================
 -- Session Messages
@@ -228,7 +230,8 @@ CREATE TABLE session_messages (
     timestamp   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
     request_id  TEXT,
     tool_calls  TEXT,
-    metadata    TEXT
+    metadata    TEXT,
+    persona_id  TEXT
 );
 CREATE INDEX idx_session_messages_key_ts ON session_messages(session_key, timestamp);
 

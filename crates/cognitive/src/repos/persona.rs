@@ -252,7 +252,9 @@ impl PersonaRepo {
         let domains_json = serde_json::to_string(&persona.domains).unwrap_or_else(|_| "[]".into());
         let questioning_style = persona.questioning_style.as_deref().unwrap_or("analytical");
         let cognitive_bias = persona.cognitive_bias.as_deref().unwrap_or("balanced");
-        let analysis_frameworks_json = persona.analysis_frameworks.as_ref()
+        let analysis_frameworks_json = persona
+            .analysis_frameworks
+            .as_ref()
             .map(|f| serde_json::to_string(f).unwrap_or_else(|_| "[]".into()))
             .unwrap_or_else(|| "[]".into());
 
@@ -293,7 +295,9 @@ impl PersonaRepo {
         let domains_json = serde_json::to_string(&persona.domains).unwrap_or_else(|_| "[]".into());
         let questioning_style = persona.questioning_style.as_deref().unwrap_or("analytical");
         let cognitive_bias = persona.cognitive_bias.as_deref().unwrap_or("balanced");
-        let analysis_frameworks_json = persona.analysis_frameworks.as_ref()
+        let analysis_frameworks_json = persona
+            .analysis_frameworks
+            .as_ref()
             .map(|f| serde_json::to_string(f).unwrap_or_else(|_| "[]".into()))
             .unwrap_or_else(|| "[]".into());
 

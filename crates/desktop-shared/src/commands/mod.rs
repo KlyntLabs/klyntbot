@@ -11,10 +11,10 @@ mod okr;
 mod productivity;
 mod projects;
 mod settings;
+mod squads;
 mod tasks;
 mod timeline;
 mod work_context;
-mod squads;
 mod workspace;
 
 pub use agents::*;

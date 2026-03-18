@@ -53,7 +53,7 @@ impl SessionRepo {
         let rows = sqlx::query_as::<_, SessionListRow>(
             "SELECT s.key, s.metadata, s.created_at, s.updated_at,
                     COALESCE(counts.cnt, 0) AS message_count,
-                    s.project_id, s.conversation_type, s.pinned
+                    s.project_id, s.conversation_type, s.pinned, s.squad_id
              FROM sessions s
              LEFT JOIN (
                  SELECT session_key, COUNT(*) AS cnt
@@ -89,6 +89,7 @@ impl SessionRepo {
         request_id: Option<&str>,
         tool_calls: Option<&serde_json::Value>,
         metadata: Option<&serde_json::Value>,
+        persona_id: Option<&str>,
     ) -> Result<SessionMessageRow, StorageError> {
         let now = Utc::now();
         let row = sqlx::query_as::<_, SessionMessageRow>(
@@ -96,8 +97,8 @@ impl SessionRepo {
                  UPDATE sessions SET updated_at = ?5 WHERE key = ?2
              )
              INSERT INTO session_messages
-                 (id, session_key, role, content, timestamp, request_id, tool_calls, metadata)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+                 (id, session_key, role, content, timestamp, request_id, tool_calls, metadata, persona_id)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
              RETURNING *",
         )
         .bind(id)
@@ -108,6 +109,7 @@ impl SessionRepo {
         .bind(request_id)
         .bind(tool_calls)
         .bind(metadata)
+        .bind(persona_id)
         .fetch_one(&self.pool)
         .await?;
         Ok(row)
@@ -128,6 +130,7 @@ impl SessionRepo {
         request_ids: &[Option<String>],
         tool_calls_list: &[Option<serde_json::Value>],
         metadata_list: &[Option<serde_json::Value>],
+        persona_ids: &[Option<String>],
     ) -> Result<u64, StorageError> {
         if ids.is_empty() {
             return Ok(0);
@@ -142,14 +145,14 @@ impl SessionRepo {
             .await?;
 
         // Batch insert all messages in a single statement using QueryBuilder.
-        // SQLite supports up to 999 bind parameters; each row uses 8 binds,
-        // so we chunk into batches of 124 rows (992 binds) to stay under the limit.
+        // SQLite supports up to 999 bind parameters; each row uses 9 binds,
+        // so we chunk into batches of 111 rows (999 binds) to stay under the limit.
         let mut inserted = 0u64;
-        for chunk_start in (0..ids.len()).step_by(124) {
-            let chunk_end = (chunk_start + 124).min(ids.len());
+        for chunk_start in (0..ids.len()).step_by(111) {
+            let chunk_end = (chunk_start + 111).min(ids.len());
             let mut qb = sqlx::QueryBuilder::new(
                 "INSERT OR IGNORE INTO session_messages \
-                 (id, session_key, role, content, timestamp, request_id, tool_calls, metadata) ",
+                 (id, session_key, role, content, timestamp, request_id, tool_calls, metadata, persona_id) ",
             );
             qb.push_values(chunk_start..chunk_end, |mut b, i| {
                 b.push_bind(ids[i])
@@ -159,7 +162,8 @@ impl SessionRepo {
                     .push_bind(timestamps[i])
                     .push_bind(request_ids[i].as_deref())
                     .push_bind(&tool_calls_list[i])
-                    .push_bind(&metadata_list[i]);
+                    .push_bind(&metadata_list[i])
+                    .push_bind(persona_ids[i].as_deref());
             });
             let result = qb.build().execute(&self.pool).await?;
             inserted += result.rows_affected();
@@ -254,6 +258,16 @@ impl SessionRepo {
         Ok(result.rows_affected() > 0)
     }
 
+    /// Set the squad_id on a session.
+    pub async fn set_squad_id(&self, key: &str, squad_id: &str) -> Result<(), StorageError> {
+        sqlx::query("UPDATE sessions SET squad_id = ?1 WHERE key = ?2")
+            .bind(squad_id)
+            .bind(key)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
     /// Delete a session and all its messages (CASCADE).
     pub async fn delete_session(&self, key: &str) -> Result<bool, StorageError> {
         let result = sqlx::query("DELETE FROM sessions WHERE key = ?1")
@@ -324,7 +338,7 @@ impl SessionRepo {
         let rows = sqlx::query_as::<_, SessionListRow>(
             "SELECT s.key, s.metadata, s.created_at, s.updated_at,
                     COUNT(sm.id) AS message_count,
-                    s.project_id, s.conversation_type, s.pinned
+                    s.project_id, s.conversation_type, s.pinned, s.squad_id
              FROM sessions s
              LEFT JOIN session_messages sm ON sm.session_key = s.key
              WHERE s.project_id = ?1

@@ -392,12 +392,13 @@ impl AgentLoop {
             .await?;
 
         // Mutate session and collect data under the per-session lock
-        let (history, embed_msg_id) = {
+        let (history, embed_msg_id, session_squad_id) = {
             let mut session = session_arc.lock().await;
             session.add_message("user", &msg.content);
             let msg_id = session.messages.last().map(|m| m.id.clone());
             let history = session.get_history(self.history_limit).to_vec();
-            (history, msg_id)
+            let squad_id = session.squad_id.clone();
+            (history, msg_id, squad_id)
             // per-session lock released here
         };
 
@@ -410,7 +411,10 @@ impl AgentLoop {
         self.ingest_chat_message(session_key.as_str(), "user", &msg.content);
 
         // Run through pipeline
-        let routing_ctx = RoutingContext::new(msg.channel.clone(), msg.chat_id.clone());
+        let mut routing_ctx = RoutingContext::new(msg.channel.clone(), msg.chat_id.clone());
+        if let Some(sid) = session_squad_id {
+            routing_ctx.squad_id = Some(sid);
+        }
         let response_content = self
             .run_pipeline(&msg.content, history, &routing_ctx, None, None)
             .await?;
@@ -713,11 +717,19 @@ impl AgentLoop {
         let (interaction_tx, interaction_rx) = mpsc::channel(4);
 
         // Routing context with interaction channel for ask_user tool
-        let routing_ctx = RoutingContext::with_interaction(
+        let mut routing_ctx = RoutingContext::with_interaction(
             "cli".into(),
             session_key.clone().into(),
             interaction_tx,
         );
+
+        // Set squad_id from session if this is a squad chat
+        if let Ok(session_arc) = self.session_manager.get_or_create(&session_key).await {
+            let session = session_arc.lock().await;
+            if let Some(ref sid) = session.squad_id {
+                routing_ctx.squad_id = Some(sid.clone());
+            }
+        }
 
         let cancel_token = CancellationToken::new();
         let cancel_clone = cancel_token.clone();

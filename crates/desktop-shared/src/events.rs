@@ -49,6 +49,7 @@ pub const AGENT_DELEGATION_COMPLETED: &str = "agent:delegation_completed";
 pub const AGENT_PLAN_GENERATED: &str = "agent:plan_generated";
 pub const AGENT_PLAN_STEP_COMPLETED: &str = "agent:plan_step_completed";
 pub const AGENT_BUDGET_WARNING: &str = "agent:budget_warning";
+pub const AGENT_PERSONA_PERSPECTIVE: &str = "agent:persona_perspective";
 pub const ENTITY_UPDATED: &str = "entity:updated";
 pub const MCP_OAUTH_COMPLETE: &str = "mcp:oauth_complete";
 pub const MCP_OAUTH_ERROR: &str = "mcp:oauth_error";
@@ -336,6 +337,15 @@ pub struct BudgetWarningPayload {
     pub monthly_spend_usd: f64,
     pub monthly_budget_usd: f64,
     pub usage_percent: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PersonaPerspectivePayload {
+    pub session_key: String,
+    pub persona_id: String,
+    pub persona_name: String,
+    pub content: String,
 }
 
 /// Accumulated transparency data for an assistant message.

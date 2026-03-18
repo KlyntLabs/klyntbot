@@ -227,6 +227,15 @@ pub async fn chat_send(
             })
             .await
             .map_err(map_storage_err)?;
+
+        // Persist squad_id on the session if provided
+        if let Some(squad_id) = &ctx.squad_id {
+            repos
+                .sessions
+                .set_squad_id(&session_key, squad_id)
+                .await
+                .map_err(map_storage_err)?;
+        }
     }
 
     // 3. Call agent with streaming (agent loop stores user + assistant messages)
@@ -248,6 +257,8 @@ pub async fn chat_send(
         timestamp: now,
         segments: None,
         transparency: None,
+        persona_id: None,
+        persona_name: None,
     };
 
     // 6. Build stream info for the caller to wire up
@@ -317,6 +328,7 @@ pub async fn chat_respond_interaction(
             None,
             None,
             Some(&metadata),
+            None, // persona_id
         )
         .await
     {
@@ -835,6 +847,17 @@ pub async fn relay_chat_stream(
                                 monthly_spend_usd,
                                 monthly_budget_usd,
                                 usage_percent,
+                            }
+                        );
+                    }
+                    AgentEvent::PersonaPerspective { persona_id, persona_name, content } => {
+                        emit!(
+                            events::AGENT_PERSONA_PERSPECTIVE,
+                            events::PersonaPerspectivePayload {
+                                session_key: sk.to_string(),
+                                persona_id,
+                                persona_name,
+                                content,
                             }
                         );
                     }

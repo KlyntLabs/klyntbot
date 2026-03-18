@@ -21,6 +21,8 @@ import type {
   LearningEventPayload,
   MemoryAccessPayload,
   MessageSegment,
+  PersonaPerspectivePayload,
+  PersonaSegment,
   PlanGeneratedPayload,
   PlanStepCompletedPayload,
   SkillLoadedPayload,
@@ -52,6 +54,7 @@ const SSE_AGENT_EVENTS = [
   "agent:plan_generated",
   "agent:plan_step_completed",
   "agent:interaction_request",
+  "agent:persona_perspective",
   "entity:updated",
 ] as const;
 
@@ -65,6 +68,7 @@ export interface StreamSnapshot {
   activeInteraction: ActiveInteraction | null;
   transparency: TransparencyData | null;
   activeDelegateAgent: string | null;
+  personaMessages: PersonaSegment[];
   /** True when a stream finished while no component was subscribed to consume onDone. */
   needsRefetch: boolean;
 }
@@ -77,6 +81,7 @@ const DEFAULT_SNAPSHOT: StreamSnapshot = Object.freeze({
   activeInteraction: null,
   transparency: null,
   activeDelegateAgent: null,
+  personaMessages: [],
   needsRefetch: false,
 });
 
@@ -166,6 +171,10 @@ class ChatStreamStore {
 
   clearInteraction(sessionKey: string): void {
     this.updateState(sessionKey, (s) => ({ ...s, activeInteraction: null }));
+  }
+
+  clearPersonaMessages(sessionKey: string): void {
+    this.updateState(sessionKey, (s) => ({ ...s, personaMessages: [] }));
   }
 
   // ── Internal helpers ────────────────────────────────────────────────
@@ -287,6 +296,7 @@ class ChatStreamStore {
     );
     on<PlanGeneratedPayload>("agent:plan_generated", (p) => this.onPlanGenerated(p));
     on<PlanStepCompletedPayload>("agent:plan_step_completed", (p) => this.onPlanStepCompleted(p));
+    on<PersonaPerspectivePayload>("agent:persona_perspective", (p) => this.onPersonaPerspective(p));
   }
 
   private initTauriListeners(): void {
@@ -326,6 +336,9 @@ class ChatStreamStore {
       register<PlanGeneratedPayload>("agent:plan_generated", (p) => this.onPlanGenerated(p));
       register<PlanStepCompletedPayload>("agent:plan_step_completed", (p) =>
         this.onPlanStepCompleted(p),
+      );
+      register<PersonaPerspectivePayload>("agent:persona_perspective", (p) =>
+        this.onPersonaPerspective(p),
       );
     });
   }
@@ -644,6 +657,21 @@ class ChatStreamStore {
             }
           : undefined,
       },
+    }));
+  }
+
+  private onPersonaPerspective(payload: PersonaPerspectivePayload): void {
+    if (!this.isActive(payload.sessionKey)) return;
+    this.updateState(payload.sessionKey, (s) => ({
+      ...s,
+      personaMessages: [
+        ...s.personaMessages,
+        {
+          personaId: payload.personaId,
+          personaName: payload.personaName,
+          content: payload.content,
+        },
+      ],
     }));
   }
 }

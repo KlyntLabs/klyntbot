@@ -1359,6 +1359,18 @@ impl AgentLoopBuilder {
         // Inject tool registry for delegation support
         runtime = runtime.with_tool_registry(Arc::clone(&tool_registry));
 
+        // Inject squad execution dependencies (requires pool for SquadRepo)
+        if let Some(ref pool) = self.pool {
+            let squad_repo = cognitive::SquadRepo::new(pool.clone());
+            let squad_provider = self
+                .cognitive_provider
+                .as_ref()
+                .cloned()
+                .unwrap_or_else(|| provider.clone());
+            let squad_params = providers::cognitive_chat_params(&config, 4096);
+            runtime = runtime.with_squad_deps(squad_repo, squad_provider, squad_params);
+        }
+
         let runtime = Arc::new(runtime);
 
         // Two-phase init: set the self-reference for delegation after Arc wrapping

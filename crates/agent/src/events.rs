@@ -199,4 +199,13 @@ pub enum AgentEvent {
         #[serde(rename = "toolName")]
         tool_name: String,
     },
+
+    /// A persona in a squad completed its analysis.
+    PersonaPerspective {
+        #[serde(rename = "personaId")]
+        persona_id: String,
+        #[serde(rename = "personaName")]
+        persona_name: String,
+        content: String,
+    },
 }

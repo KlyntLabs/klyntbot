@@ -1,6 +1,13 @@
 import { chatStreamStore } from "@shared/stores/chatStreamStore";
-import type { ActiveInteraction, MessageSegment, TransparencyData } from "@shared/types";
+import type {
+  ActiveInteraction,
+  MessageSegment,
+  PersonaSegment,
+  TransparencyData,
+} from "@shared/types";
 import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
+
+export type { PersonaSegment };
 
 interface AgentStream {
   segments: MessageSegment[];
@@ -9,6 +16,7 @@ interface AgentStream {
   error: string | null;
   activeInteraction: ActiveInteraction | null;
   transparency: TransparencyData | null;
+  personaMessages: PersonaSegment[];
   /** Call before sending a message to enter streaming mode. */
   startStreaming: () => void;
   /** Abort streaming and show an error. */
@@ -19,6 +27,8 @@ interface AgentStream {
   clearSegments: () => void;
   /** Clear accumulated transparency data. */
   clearTransparency: () => void;
+  /** Clear accumulated persona messages. */
+  clearPersonaMessages: () => void;
   /** The agent currently being delegated to (between delegation_started and delegation_completed). */
   activeDelegateAgent: string | null;
 }
@@ -80,6 +90,11 @@ export function useAgentStream(sessionKey: string, onDone?: () => void): AgentSt
     [sessionKey],
   );
 
+  const clearPersonaMessages = useCallback(
+    () => chatStreamStore.clearPersonaMessages(sessionKey),
+    [sessionKey],
+  );
+
   return {
     segments: state.segments,
     isStreaming: state.isStreaming,
@@ -88,10 +103,12 @@ export function useAgentStream(sessionKey: string, onDone?: () => void): AgentSt
     activeInteraction: state.activeInteraction,
     transparency: state.transparency,
     activeDelegateAgent: state.activeDelegateAgent,
+    personaMessages: state.personaMessages,
     startStreaming,
     failStreaming,
     clearInteraction,
     clearSegments,
     clearTransparency,
+    clearPersonaMessages,
   };
 }

@@ -35,6 +35,10 @@ pub struct Session {
     /// Session metadata
     #[serde(default)]
     pub metadata: HashMap<String, serde_json::Value>,
+
+    /// Optional squad ID — when set, this session uses multi-persona squad execution.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub squad_id: Option<String>,
 }
 
 impl Session {
@@ -47,6 +51,7 @@ impl Session {
             created_at: now,
             updated_at: now,
             metadata: HashMap::new(),
+            squad_id: None,
         }
     }
 
@@ -199,6 +204,7 @@ impl SessionManager {
             created_at: row.created_at,
             updated_at: row.updated_at,
             metadata,
+            squad_id: row.squad_id,
         }
     }
 
@@ -288,6 +294,7 @@ impl SessionManager {
             let mut request_ids = Vec::with_capacity(session.messages.len());
             let mut tool_calls_list = Vec::with_capacity(session.messages.len());
             let mut metadata_list = Vec::with_capacity(session.messages.len());
+            let mut persona_ids = Vec::with_capacity(session.messages.len());
 
             for msg in &session.messages {
                 ids.push(Uuid::parse_str(&msg.id).unwrap_or_else(|_| Uuid::new_v4()));
@@ -297,6 +304,7 @@ impl SessionManager {
                 request_ids.push(msg.request_id.clone());
                 tool_calls_list.push(msg.tool_calls.clone());
                 metadata_list.push(msg.metadata.clone());
+                persona_ids.push(None); // persona_id not tracked in in-memory Session
             }
 
             self.sql_repo
@@ -309,6 +317,7 @@ impl SessionManager {
                     &request_ids,
                     &tool_calls_list,
                     &metadata_list,
+                    &persona_ids,
                 )
                 .await?;
         }
@@ -336,6 +345,7 @@ impl SessionManager {
                         None,
                         None,
                         None,
+                        None, // persona_id
                     )
                     .await;
 

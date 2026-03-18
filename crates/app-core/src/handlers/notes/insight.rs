@@ -171,7 +171,9 @@ impl AppCore {
                 (ctx.text, ctx.note_title, None)
             };
 
-        let selected_personas = self.resolve_squad_for_note(note_id, squad_id, &note_domains).await;
+        let selected_personas = self
+            .resolve_squad_for_note(note_id, squad_id, &note_domains)
+            .await;
 
         let config = self.config.read().await;
         let params = providers::cognitive_chat_params(&config, 4096);
@@ -628,7 +630,9 @@ impl AppCore {
             "assessment" => insight_prompts::self_assessment_prompt(&ctx_text),
             "concept-map" => insight_prompts::concept_map_prompt(&ctx_text, &ctx_note_title),
             "perspectives" => {
-                let personas = self.resolve_squad_for_note(note_id, None, &note_domains).await;
+                let personas = self
+                    .resolve_squad_for_note(note_id, None, &note_domains)
+                    .await;
                 tab_personas = personas
                     .iter()
                     .map(|p| PersonaMetaResponse {
