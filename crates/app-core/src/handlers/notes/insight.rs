@@ -854,7 +854,7 @@ impl AppCore {
     ) -> Vec<cognitive::PersonaRow> {
         match &self.persona_repo {
             Some(repo) => repo
-                .select_for_note(note_id, domains, 4)
+                .select_for_note(note_id, domains, usize::MAX)
                 .await
                 .unwrap_or_default(),
             None => Vec::new(),
