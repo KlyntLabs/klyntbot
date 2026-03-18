@@ -38,7 +38,7 @@ crates/feature-learning/
 
 ```
 feature-learning (L4)
-  ├── cognitive (L3)        → FlashcardRepo, FSRS engine, SemanticFactRepo
+  ├── cognitive (L5)        → FlashcardRepo, FSRS engine, SemanticFactRepo
   ├── feature-notes (L4)    → NoteRepo (source linking, content retrieval)
   │                           Note: L4→L4 dep has precedent (feature-insights → feature-notes).
   │                           Only uses NoteRepo for read-only source lookups, not mutations.
