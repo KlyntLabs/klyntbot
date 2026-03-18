@@ -102,7 +102,7 @@ desktop-ui/src/features/learn/
 
 ### Upgraded `cognitive` flashcard schema
 
-**Migration note:** The existing `CardType` enum has `MultipleChoice` and `ShortAnswer` variants (from the quiz/insight system). These are replaced by the new card types below. Since this is pre-release with no user data to migrate, the `card_type` column and `CardType` enum are rewritten in-place. The existing `front`/`back` TEXT columns are retained and used by all card types.
+**Migration note:** The existing `CardType` enum has `MultipleChoice` and `ShortAnswer` variants (from the quiz/insight system). These are replaced by the new card types below. Since this is pre-release with no user data to migrate, the `card_type` column and `CardType` enum are rewritten in-place. The existing columns `question`/`answer` are renamed to `front`/`back` (along with updating `FlashcardRow` struct and all repo methods) to match standard SRS terminology. Existing columns `choices` (JSON), `insight_review_id`, and `source_session_id` are dropped in the consolidated migration.
 
 ```sql
 -- Existing flashcards table, upgraded columns:
@@ -396,7 +396,7 @@ All in `feature-learning::card_generator`:
 
 The LLM receives:
 - Note content (or selection)
-- User's existing cards on this topic (via new `FlashcardRepo::list_by_source_note(note_id)` method — needs to be added)
+- User's existing cards on this topic (via existing `FlashcardRepo::list_by_note(note_id)` method)
 - Cognitive facts about user's knowledge level (via `SemanticFactRepo`)
 - Instruction to vary card types: cloze for definitions, vocab for foreign words, basic for concepts, typed for terms to spell
 
