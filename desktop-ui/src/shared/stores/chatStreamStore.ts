@@ -669,6 +669,8 @@ class ChatStreamStore {
         {
           personaId: payload.personaId,
           personaName: payload.personaName,
+          personaIcon: payload.personaIcon,
+          personaRole: payload.personaRole,
           content: payload.content,
         },
       ],

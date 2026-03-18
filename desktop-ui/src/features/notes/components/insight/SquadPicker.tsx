@@ -10,16 +10,58 @@ interface SquadPickerProps {
   selectedSquadId: string | null;
   onSelect: (squadId: string) => void;
   onManage?: () => void;
+  /** When true, renders the dropdown directly without a trigger button.
+   *  Useful when the parent already provides the trigger (e.g. "New squad chat" button). */
+  inline?: boolean;
 }
 
-export function SquadPicker({ selectedSquadId, onSelect, onManage }: SquadPickerProps) {
+export function SquadPicker({
+  selectedSquadId,
+  onSelect,
+  onManage,
+  inline,
+}: SquadPickerProps) {
   const { squads, loading } = useSquads();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(!!inline);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  useClickOutside(containerRef, () => setOpen(false), open);
+  useClickOutside(containerRef, () => setOpen(false), open && !inline);
 
   const selected = squads.find((s) => s.id === selectedSquadId);
+
+  // Inline mode: render dropdown directly, no trigger button
+  if (inline) {
+    return (
+      <div ref={containerRef} className="w-64 glass-panel rounded-xl p-2 flex flex-col gap-1 shadow-xl">
+        {squads.length === 0 && !loading && (
+          <div className="px-2 py-3 text-[11px] text-dim italic text-center">
+            No squads created yet
+          </div>
+        )}
+        {squads.map((squad) => (
+          <SquadOption
+            key={squad.id}
+            squad={squad}
+            isSelected={squad.id === selectedSquadId}
+            onSelect={() => onSelect(squad.id)}
+          />
+        ))}
+        {onManage && (
+          <>
+            <div className="border-t border-border my-1" />
+            <button
+              type="button"
+              onClick={onManage}
+              className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-[10px] text-dim hover:text-muted-foreground hover:bg-white/[0.04] transition-colors"
+            >
+              <Settings size={10} />
+              Manage Squads
+            </button>
+          </>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div ref={containerRef} className="relative">

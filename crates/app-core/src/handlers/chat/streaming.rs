@@ -205,9 +205,10 @@ pub async fn chat_send(
         .trim()
         .to_string();
     let metadata = serde_json::json!({ "title": title });
+    let squad_id_ref = context.as_ref().and_then(|c| c.squad_id.as_deref());
     repos
         .sessions
-        .upsert_session(&session_key, &metadata)
+        .upsert_session(&session_key, &metadata, squad_id_ref)
         .await
         .map_err(map_storage_err)?;
 
@@ -228,14 +229,6 @@ pub async fn chat_send(
             .await
             .map_err(map_storage_err)?;
 
-        // Persist squad_id on the session if provided
-        if let Some(squad_id) = &ctx.squad_id {
-            repos
-                .sessions
-                .set_squad_id(&session_key, squad_id)
-                .await
-                .map_err(map_storage_err)?;
-        }
     }
 
     // 3. Call agent with streaming (agent loop stores user + assistant messages)
@@ -850,13 +843,15 @@ pub async fn relay_chat_stream(
                             }
                         );
                     }
-                    AgentEvent::PersonaPerspective { persona_id, persona_name, content } => {
+                    AgentEvent::PersonaPerspective { persona_id, persona_name, persona_icon, persona_role, content } => {
                         emit!(
                             events::AGENT_PERSONA_PERSPECTIVE,
                             events::PersonaPerspectivePayload {
                                 session_key: sk.to_string(),
                                 persona_id,
                                 persona_name,
+                                persona_icon,
+                                persona_role,
                                 content,
                             }
                         );

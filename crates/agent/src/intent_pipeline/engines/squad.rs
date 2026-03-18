@@ -87,6 +87,8 @@ pub async fn fan_out_personas(
             let user_msg = user_message.to_string();
             let persona_name = persona.name.clone();
             let persona_id = persona.id.clone();
+            let persona_icon = persona.icon.clone();
+            let persona_role = persona.role.clone();
             let tx = event_tx.cloned();
 
             async move {
@@ -110,6 +112,8 @@ pub async fn fan_out_personas(
                         .send(crate::AgentEvent::PersonaPerspective {
                             persona_id: persona_id.clone(),
                             persona_name: persona_name.clone(),
+                            persona_icon: persona_icon.clone(),
+                            persona_role: persona_role.clone(),
                             content: text.clone(),
                         })
                         .await;

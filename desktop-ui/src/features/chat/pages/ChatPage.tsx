@@ -55,7 +55,13 @@ export function ChatPage() {
     () => threads.find((t) => t.sessionKey === selectedThread),
     [threads, selectedThread],
   );
-  const squadId = currentThread?.squadId ?? null;
+  // Derive squadId from DB thread metadata, or parse from the session key pattern
+  // (squad:{squadId}:{uuid}) for newly created squad chats that aren't in the DB yet.
+  const squadId = useMemo(() => {
+    if (currentThread?.squadId) return currentThread.squadId;
+    const match = selectedThread.match(/^squad:([^:]+):/);
+    return match?.[1] ?? null;
+  }, [currentThread?.squadId, selectedThread]);
 
   // Voice mode for squad chat
   const [voiceMode, setVoiceMode] = useState<VoiceMode>("multi");

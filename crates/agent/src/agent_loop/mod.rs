@@ -388,7 +388,7 @@ impl AgentLoop {
         let session_key = msg.session_key();
         let session_arc = self
             .session_manager
-            .get_or_create(session_key.as_str())
+            .get_or_create(session_key.as_str(), None)
             .await?;
 
         // Mutate session and collect data under the per-session lock
@@ -471,7 +471,7 @@ impl AgentLoop {
         let system_msg_content = format!("[System: {}] {}", msg.sender_id, msg.content);
 
         // Get or create session and mutate under the per-session lock
-        let session_arc = self.session_manager.get_or_create(&session_key).await?;
+        let session_arc = self.session_manager.get_or_create(&session_key, None).await?;
         let history = {
             let mut session = session_arc.lock().await;
             session.add_message("user", &system_msg_content);
@@ -556,7 +556,7 @@ impl AgentLoop {
 
     /// Save assistant response to session and return the persisted message ID.
     async fn save_to_session(&self, session_key: &str, content: &str) -> Option<String> {
-        if let Ok(session_arc) = self.session_manager.get_or_create(session_key).await {
+        if let Ok(session_arc) = self.session_manager.get_or_create(session_key, None).await {
             // Mutate under per-session lock, clone for async save
             let (session_clone, msg_id) = {
                 let mut session = session_arc.lock().await;
@@ -665,7 +665,7 @@ impl AgentLoop {
         };
         debug!("Processing {} message: {}", label, preview);
 
-        let session_arc = self.session_manager.get_or_create(session_key).await?;
+        let session_arc = self.session_manager.get_or_create(session_key, None).await?;
         let (history, embed_msg_id) = {
             let mut session = session_arc.lock().await;
             session.add_message("user", content);
@@ -724,7 +724,7 @@ impl AgentLoop {
         );
 
         // Set squad_id from session if this is a squad chat
-        if let Ok(session_arc) = self.session_manager.get_or_create(&session_key).await {
+        if let Ok(session_arc) = self.session_manager.get_or_create(&session_key, None).await {
             let session = session_arc.lock().await;
             if let Some(ref sid) = session.squad_id {
                 routing_ctx.squad_id = Some(sid.clone());

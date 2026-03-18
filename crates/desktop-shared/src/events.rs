@@ -345,6 +345,8 @@ pub struct PersonaPerspectivePayload {
     pub session_key: String,
     pub persona_id: String,
     pub persona_name: String,
+    pub persona_icon: String,
+    pub persona_role: String,
     pub content: String,
 }
 

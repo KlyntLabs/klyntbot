@@ -104,9 +104,10 @@ export function ThreadList({
               New squad chat
             </button>
             {showSquadPicker && (
-              <div className="absolute left-full top-0 ml-1 z-50">
+              <div className="mt-1 ml-4">
                 <SquadPicker
                   selectedSquadId={null}
+                  inline
                   onSelect={(squadId) => {
                     onNewSquadThread(squadId);
                     setShowSquadPicker(false);

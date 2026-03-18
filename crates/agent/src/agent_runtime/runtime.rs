@@ -49,6 +49,10 @@ pub struct RuntimeResult {
     pub validation: ValidationResult,
     /// Name of the agent that handled this message.
     pub agent_name: String,
+    /// Multi-voice formatted output (all personas, markdown). Only set in squad mode.
+    pub multi_voice: Option<String>,
+    /// Raw per-persona responses for structured display. Only set in squad mode.
+    pub persona_responses: Option<Vec<(String, String)>>,
 }
 
 /// Agent-driven runtime that replaces IntentPipeline.
@@ -554,6 +558,8 @@ impl AgentRuntime {
             classification: analysis,
             validation,
             agent_name,
+            multi_voice: None,
+            persona_responses: None,
         })
     }
 
@@ -659,7 +665,7 @@ impl AgentRuntime {
         let synthesis = provider.chat(&synthesis_messages, None, params).await?;
 
         let multi_voice = squad::format_multi_voice(&persona_responses);
-        let content = synthesis.content.unwrap_or(multi_voice);
+        let content = synthesis.content.unwrap_or_else(|| multi_voice.clone());
 
         // Build a minimal classification for the result
         let classification = IntentAnalysis {
@@ -684,6 +690,8 @@ impl AgentRuntime {
             classification,
             validation: self.validator.validate(&content),
             agent_name: format!("squad:{}", resolved.squad.name),
+            multi_voice: Some(multi_voice),
+            persona_responses: Some(persona_responses),
         })
     }
 

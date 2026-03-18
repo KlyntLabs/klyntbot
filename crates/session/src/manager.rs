@@ -212,7 +212,12 @@ impl SessionManager {
     ///
     /// Returns an `Arc<TokioMutex<Session>>` — the caller locks it per-session.
     /// Concurrent calls for *different* keys proceed without blocking each other.
-    pub async fn get_or_create(&self, key: impl Into<String>) -> Result<Arc<TokioMutex<Session>>> {
+    /// When `squad_id` is `Some`, new sessions are stamped with the squad.
+    pub async fn get_or_create(
+        &self,
+        key: impl Into<String>,
+        squad_id: Option<&str>,
+    ) -> Result<Arc<TokioMutex<Session>>> {
         let key = key.into();
 
         // Update LRU order and collect keys to evict (sync, brief hold).
@@ -259,9 +264,13 @@ impl SessionManager {
             }
             Err(storage::StorageError::NotFound(_)) => {
                 let metadata = serde_json::Value::Object(serde_json::Map::new());
-                self.sql_repo.upsert_session(&key, &metadata).await?;
+                self.sql_repo
+                    .upsert_session(&key, &metadata, squad_id)
+                    .await?;
                 debug!("Creating new session in SQL: {}", key);
-                Session::new(key.clone())
+                let mut s = Session::new(key.clone());
+                s.squad_id = squad_id.map(|s| s.to_string());
+                s
             }
             Err(e) => return Err(e.into()),
         };
@@ -282,7 +291,7 @@ impl SessionManager {
         let metadata = serde_json::to_value(&session.metadata)
             .map_err(|e| KlyntbotError::Storage(format!("session metadata: {e}")))?;
         self.sql_repo
-            .upsert_session(&session.key, &metadata)
+            .upsert_session(&session.key, &metadata, session.squad_id.as_deref())
             .await?;
 
         // Build batch arrays from session messages

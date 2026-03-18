@@ -172,6 +172,8 @@ export interface PersonaPerspectivePayload {
   sessionKey: string;
   personaId: string;
   personaName: string;
+  personaIcon: string;
+  personaRole: string;
   content: string;
 }
 

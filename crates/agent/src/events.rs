@@ -206,6 +206,10 @@ pub enum AgentEvent {
         persona_id: String,
         #[serde(rename = "personaName")]
         persona_name: String,
+        #[serde(rename = "personaIcon")]
+        persona_icon: String,
+        #[serde(rename = "personaRole")]
+        persona_role: String,
         content: String,
     },
 }

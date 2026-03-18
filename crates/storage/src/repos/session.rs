@@ -18,22 +18,29 @@ impl SessionRepo {
     }
 
     /// Upsert a session — inserts on first call, updates `updated_at` on conflict.
+    ///
+    /// When `squad_id` is `Some`, the session is stamped with the squad on creation
+    /// and updated on conflict. When `None`, an existing `squad_id` is preserved.
     pub async fn upsert_session(
         &self,
         key: &str,
         metadata: &serde_json::Value,
+        squad_id: Option<&str>,
     ) -> Result<SessionRow, StorageError> {
         let now = Utc::now();
         let row = sqlx::query_as::<_, SessionRow>(
-            "INSERT INTO sessions (key, metadata, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4)
-             ON CONFLICT (key) DO UPDATE SET updated_at = ?4
+            "INSERT INTO sessions (key, metadata, created_at, updated_at, squad_id)
+             VALUES (?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT (key) DO UPDATE SET
+               updated_at = ?4,
+               squad_id = COALESCE(?5, sessions.squad_id)
              RETURNING *",
         )
         .bind(key)
         .bind(metadata)
         .bind(now)
         .bind(now)
+        .bind(squad_id)
         .fetch_one(&self.pool)
         .await?;
         Ok(row)

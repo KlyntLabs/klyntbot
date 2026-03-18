@@ -126,3 +126,18 @@ impl RoutingContext {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_routing_context_squad_id() {
+        let ctx = RoutingContext::new("cli".into(), "test-chat".into());
+        assert!(ctx.squad_id.is_none());
+
+        let ctx2 =
+            RoutingContext::with_squad("cli".into(), "test-chat".into(), "squad-123".to_string());
+        assert_eq!(ctx2.squad_id.as_deref(), Some("squad-123"));
+    }
+}
