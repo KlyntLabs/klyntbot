@@ -283,7 +283,6 @@ impl AppCore {
                     scope_resolver,
                     feature_insights::SmartMergeEngine::new(insight_repo),
                     feature_insights::PromptBuilder::new(Arc::clone(&cognitive_accessor)),
-                    cognitive_accessor,
                     Arc::new(
                         crate::adapters::flashcard_accessor::FlashcardAccessorImpl::new(
                             storage_pool.inner().clone(),

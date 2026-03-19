@@ -15,7 +15,7 @@ use crate::progress_repo::InsightProgressRepo;
 use crate::prompt_builder::{InsightContext, PromptBuilder};
 use crate::repo::InsightReviewRepo;
 use crate::scope::ScopeResolver;
-use crate::traits::{CognitiveAccessor, FlashcardAccessor, InsightEmbedder};
+use crate::traits::{FlashcardAccessor, InsightEmbedder};
 use crate::types::{
     InsightContent, InsightReviewRow, ProgressSnapshotRow, ProgressWeights, ScopeConfig,
 };
@@ -39,8 +39,6 @@ pub struct InsightService {
     pub(crate) scope_resolver: Arc<dyn ScopeResolver>,
     pub(crate) merge_engine: SmartMergeEngine,
     pub(crate) prompt_builder: PromptBuilder,
-    #[allow(dead_code)]
-    pub(crate) cognitive: Arc<dyn CognitiveAccessor>,
     pub(crate) flashcards: Arc<dyn FlashcardAccessor>,
     pub(crate) embedder: Arc<dyn InsightEmbedder>,
     pub(crate) progress_weights: ProgressWeights,
@@ -54,7 +52,6 @@ impl InsightService {
         scope_resolver: Arc<dyn ScopeResolver>,
         merge_engine: SmartMergeEngine,
         prompt_builder: PromptBuilder,
-        cognitive: Arc<dyn CognitiveAccessor>,
         flashcards: Arc<dyn FlashcardAccessor>,
         embedder: Arc<dyn InsightEmbedder>,
         progress_weights: ProgressWeights,
@@ -65,7 +62,6 @@ impl InsightService {
             scope_resolver,
             merge_engine,
             prompt_builder,
-            cognitive,
             flashcards,
             embedder,
             progress_weights,

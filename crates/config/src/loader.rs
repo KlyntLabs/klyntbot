@@ -202,10 +202,7 @@ mod tests {
     #[test]
     fn test_default_config() {
         let config = Config::default();
-        assert_eq!(
-            config.agents.defaults.model,
-            crate::schema::DEFAULT_MODEL
-        );
+        assert_eq!(config.agents.defaults.model, crate::schema::DEFAULT_MODEL);
         assert_eq!(config.agents.defaults.max_tokens, 8192);
     }
 

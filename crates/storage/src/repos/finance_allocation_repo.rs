@@ -134,7 +134,10 @@ mod tests {
         let second = repo.add("port-1", "equity", "0.70", "0.10").await.unwrap();
 
         // ID must be preserved (not a new UUID)
-        assert_eq!(second.id, original_id, "upsert must preserve existing row id");
+        assert_eq!(
+            second.id, original_id,
+            "upsert must preserve existing row id"
+        );
         assert_eq!(second.target_weight, "0.70");
         assert_eq!(second.tolerance_band, "0.10");
 

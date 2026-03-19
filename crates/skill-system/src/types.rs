@@ -32,7 +32,6 @@ pub struct SkillPackage {
     pub scope: SkillScope,
     pub location: PathBuf,
     pub body: String,
-    pub manifest: Option<SkillManifest>,
     pub metadata: SkillMetadata,
     /// Bundled resource file paths (scripts/, references/, assets/) — enumerated at discovery.
     pub resources: Vec<String>,
@@ -111,13 +110,6 @@ pub struct KlyntbotMeta {
     pub invokes: Vec<String>,
 }
 
-#[derive(Debug, Clone, Default)]
-pub struct SkillManifest {
-    pub schema_version: String,
-    pub entities: HashMap<String, serde_json::Value>,
-    pub permissions: Vec<String>,
-}
-
 #[derive(Debug, Clone)]
 pub enum SkillChange {
     Added(String),
@@ -164,7 +156,6 @@ mod tests {
             scope: SkillScope::BuiltIn,
             location: PathBuf::new(),
             body: String::new(),
-            manifest: None,
             metadata: SkillMetadata::default(),
             resources: Vec::new(),
             loaded_at: SystemTime::now(),
@@ -189,7 +180,6 @@ mod tests {
             scope: SkillScope::BuiltIn,
             location: PathBuf::new(),
             body: String::new(),
-            manifest: None,
             resources: Vec::new(),
             loaded_at: SystemTime::now(),
             trusted: true,
@@ -217,7 +207,6 @@ mod tests {
             scope: SkillScope::BuiltIn,
             location: PathBuf::new(),
             body: String::new(),
-            manifest: None,
             resources: Vec::new(),
             loaded_at: SystemTime::now(),
             trusted: true,
@@ -235,7 +224,6 @@ mod tests {
             scope: SkillScope::BuiltIn,
             location: PathBuf::new(),
             body: String::new(),
-            manifest: None,
             resources: Vec::new(),
             loaded_at: SystemTime::now(),
             trusted: true,

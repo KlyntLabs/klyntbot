@@ -272,10 +272,7 @@ mod tests {
 
         let estimate = source.estimated_tokens();
         // Should be roughly body_len/4 + overhead, NOT the old hardcoded 500
-        assert!(
-            estimate > 50,
-            "estimate should include overhead at minimum"
-        );
+        assert!(estimate > 50, "estimate should include overhead at minimum");
         // Should scale with the orchestrator body length
         let expected_min = body_len / 4;
         assert!(

@@ -70,7 +70,8 @@ fn is_plugin_table(table_name: &str, plugin_id: &str) -> bool {
 /// INTO, UPDATE, and TABLE keywords.
 fn check_table_sandbox(sql: &str, plugin_id: &str) -> Result<(), String> {
     let upper = sql.to_uppercase();
-    let tokens: Vec<&str> = sql.split(|c: char| !c.is_alphanumeric() && c != '_')
+    let tokens: Vec<&str> = sql
+        .split(|c: char| !c.is_alphanumeric() && c != '_')
         .filter(|s| !s.is_empty())
         .collect();
     let upper_tokens: Vec<String> = tokens.iter().map(|t| t.to_uppercase()).collect();
@@ -88,8 +89,10 @@ fn check_table_sandbox(sql: &str, plugin_id: &str) -> Result<(), String> {
             if let Some(table_name) = tokens.get(i + 1) {
                 // Skip SQL keywords that look like table names (e.g. FROM SELECT in subqueries)
                 let tn_upper = table_name.to_uppercase();
-                if ["SELECT", "WITH", "VALUES", "SET", "WHERE", "IF", "NOT", "EXISTS", "OR"]
-                    .contains(&tn_upper.as_str())
+                if [
+                    "SELECT", "WITH", "VALUES", "SET", "WHERE", "IF", "NOT", "EXISTS", "OR",
+                ]
+                .contains(&tn_upper.as_str())
                 {
                     continue;
                 }
@@ -723,26 +726,27 @@ mod tests {
     #[test]
     fn test_sandbox_allows_plugin_owned_tables() {
         let pid = "notion-connector";
-        assert!(check_table_sandbox(
-            "SELECT * FROM plugin_notion_connector_cache",
-            pid
-        ).is_ok());
+        assert!(check_table_sandbox("SELECT * FROM plugin_notion_connector_cache", pid).is_ok());
         assert!(check_table_sandbox(
             "INSERT INTO plugin_notion_connector_items (id, data) VALUES ('1', 'x')",
             pid
-        ).is_ok());
+        )
+        .is_ok());
         assert!(check_table_sandbox(
             "DELETE FROM plugin_notion_connector_cache WHERE id = '1'",
             pid
-        ).is_ok());
+        )
+        .is_ok());
         assert!(check_table_sandbox(
             "UPDATE plugin_notion_connector_cache SET data = 'y' WHERE id = '1'",
             pid
-        ).is_ok());
+        )
+        .is_ok());
         assert!(check_table_sandbox(
             "CREATE TABLE IF NOT EXISTS plugin_notion_connector_new (id TEXT)",
             pid
-        ).is_ok());
+        )
+        .is_ok());
     }
 
     #[test]
@@ -750,19 +754,16 @@ mod tests {
         let pid = "notion-connector";
         assert!(check_table_sandbox("SELECT * FROM sessions", pid).is_err());
         assert!(check_table_sandbox("DELETE FROM todos WHERE id = '1'", pid).is_err());
-        assert!(check_table_sandbox(
-            "INSERT INTO actions (id) VALUES ('1')",
-            pid
-        ).is_err());
+        assert!(check_table_sandbox("INSERT INTO actions (id) VALUES ('1')", pid).is_err());
         assert!(check_table_sandbox("UPDATE projects SET name = 'x'", pid).is_err());
     }
 
     #[test]
     fn test_sandbox_rejects_other_plugin_tables() {
-        assert!(check_table_sandbox(
-            "SELECT * FROM plugin_other_plugin_data",
-            "notion-connector"
-        ).is_err());
+        assert!(
+            check_table_sandbox("SELECT * FROM plugin_other_plugin_data", "notion-connector")
+                .is_err()
+        );
     }
 
     #[test]

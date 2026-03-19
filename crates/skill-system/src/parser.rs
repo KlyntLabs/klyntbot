@@ -83,7 +83,6 @@ pub fn parse_skill_md(
         scope,
         location,
         body: body.trim().to_string(),
-        manifest: None,
         metadata: SkillMetadata {
             license: raw.license,
             compatibility: raw.compatibility,

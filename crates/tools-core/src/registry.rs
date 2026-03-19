@@ -6,19 +6,20 @@ use std::sync::{Arc, Mutex};
 use tracing::{debug, warn};
 
 use crate::metadata::{ToolCategory, ToolMetadata};
-use crate::search::{rrf_merge_triple, Searchable};
 use crate::{DynTool, RoutingContext, Tool, ToolPermissions};
 use common::{Result, ToolError};
 
 /// A tool entry for search result output.
+#[cfg(test)]
 #[derive(Debug, Clone)]
-pub struct ToolSearchEntry {
+pub(crate) struct ToolSearchEntry {
     pub name: String,
     pub description: String,
     pub category: ToolCategory,
 }
 
-impl Searchable for ToolSearchEntry {
+#[cfg(test)]
+impl crate::search::Searchable for ToolSearchEntry {
     fn search_id(&self) -> &str {
         &self.name
     }
@@ -215,7 +216,10 @@ impl ToolRegistry {
     /// Produces three ranked lists (name matches, description matches, tag matches)
     /// and merges them via Reciprocal Rank Fusion for consistent scoring with the
     /// rest of the search infrastructure.
-    pub fn search_tools(&self, query: &str, limit: usize) -> Vec<(String, f64)> {
+    #[cfg(test)]
+    pub(crate) fn search_tools(&self, query: &str, limit: usize) -> Vec<(String, f64)> {
+        use crate::search::rrf_merge_triple;
+
         let query_lower = query.to_lowercase();
         let terms: Vec<&str> = query_lower.split_whitespace().collect();
 

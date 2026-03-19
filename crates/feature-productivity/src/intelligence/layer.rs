@@ -155,7 +155,15 @@ impl ProductivityIntelligenceLayer {
         }
 
         // 4. Check for interventions
-        let _intervention = self.intervention_router.evaluate(&classified);
+        // TODO: publish via DomainEventBus (e.g. InterventionTriggered) so coaching/UI can react
+        if let Some(intervention) = self.intervention_router.evaluate(&classified) {
+            info!(
+                intervention_type = ?intervention.intervention_type,
+                urgency = ?intervention.urgency,
+                message = %intervention.message,
+                "Productivity intervention triggered"
+            );
+        }
     }
 
     /// Generate and store a human-readable title + description for a session.

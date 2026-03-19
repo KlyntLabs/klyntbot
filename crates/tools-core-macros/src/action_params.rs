@@ -19,7 +19,11 @@ pub fn derive(input: TokenStream) -> TokenStream {
         _ => panic!("ActionParams can only be derived for structs"),
     };
 
-    let (schema_properties, required_fields, from_value_fields) = collect_field_tokens(fields);
+    let (schema_properties, required_fields, from_value_fields) = match collect_field_tokens(fields)
+    {
+        Ok(tokens) => tokens,
+        Err(e) => return e.to_compile_error().into(),
+    };
 
     let expanded = quote! {
         impl #name {

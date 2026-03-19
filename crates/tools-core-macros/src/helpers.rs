@@ -16,11 +16,11 @@ pub struct TypeInfo {
 }
 
 /// Classify a Rust type into JSON schema type info.
-pub fn classify_type(ty: &Type) -> TypeInfo {
+pub fn classify_type(ty: &Type) -> syn::Result<TypeInfo> {
     let type_str = quote!(#ty).to_string().replace(' ', "");
 
     if type_str == "String" {
-        return TypeInfo {
+        return Ok(TypeInfo {
             json_type: "string",
             is_optional: false,
             is_array: false,
@@ -28,11 +28,11 @@ pub fn classify_type(ty: &Type) -> TypeInfo {
             is_integer: false,
             is_float: false,
             array_item_type: "string",
-        };
+        });
     }
 
     if type_str == "bool" {
-        return TypeInfo {
+        return Ok(TypeInfo {
             json_type: "boolean",
             is_optional: false,
             is_array: false,
@@ -40,14 +40,14 @@ pub fn classify_type(ty: &Type) -> TypeInfo {
             is_integer: false,
             is_float: false,
             array_item_type: "string",
-        };
+        });
     }
 
     if matches!(
         type_str.as_str(),
         "u8" | "u16" | "u32" | "u64" | "i8" | "i16" | "i32" | "i64"
     ) {
-        return TypeInfo {
+        return Ok(TypeInfo {
             json_type: "integer",
             is_optional: false,
             is_array: false,
@@ -55,11 +55,11 @@ pub fn classify_type(ty: &Type) -> TypeInfo {
             is_integer: true,
             is_float: false,
             array_item_type: "string",
-        };
+        });
     }
 
     if matches!(type_str.as_str(), "f32" | "f64") {
-        return TypeInfo {
+        return Ok(TypeInfo {
             json_type: "number",
             is_optional: false,
             is_array: false,
@@ -67,13 +67,13 @@ pub fn classify_type(ty: &Type) -> TypeInfo {
             is_integer: false,
             is_float: true,
             array_item_type: "string",
-        };
+        });
     }
 
     if type_str.starts_with("Vec<") {
         let inner = &type_str[4..type_str.len() - 1];
-        let item_type = classify_inner_type(inner);
-        return TypeInfo {
+        let item_type = classify_inner_type(inner, ty)?;
+        return Ok(TypeInfo {
             json_type: "array",
             is_optional: false,
             is_array: true,
@@ -81,13 +81,13 @@ pub fn classify_type(ty: &Type) -> TypeInfo {
             is_integer: false,
             is_float: false,
             array_item_type: item_type,
-        };
+        });
     }
 
     if type_str.starts_with("Option<") {
         let inner = &type_str[7..type_str.len() - 1];
         if inner == "String" {
-            return TypeInfo {
+            return Ok(TypeInfo {
                 json_type: "string",
                 is_optional: true,
                 is_array: false,
@@ -95,10 +95,10 @@ pub fn classify_type(ty: &Type) -> TypeInfo {
                 is_integer: false,
                 is_float: false,
                 array_item_type: "string",
-            };
+            });
         }
         if inner == "bool" {
-            return TypeInfo {
+            return Ok(TypeInfo {
                 json_type: "boolean",
                 is_optional: true,
                 is_array: false,
@@ -106,13 +106,13 @@ pub fn classify_type(ty: &Type) -> TypeInfo {
                 is_integer: false,
                 is_float: false,
                 array_item_type: "string",
-            };
+            });
         }
         if matches!(
             inner,
             "u8" | "u16" | "u32" | "u64" | "i8" | "i16" | "i32" | "i64"
         ) {
-            return TypeInfo {
+            return Ok(TypeInfo {
                 json_type: "integer",
                 is_optional: true,
                 is_array: false,
@@ -120,10 +120,10 @@ pub fn classify_type(ty: &Type) -> TypeInfo {
                 is_integer: true,
                 is_float: false,
                 array_item_type: "string",
-            };
+            });
         }
         if matches!(inner, "f32" | "f64") {
-            return TypeInfo {
+            return Ok(TypeInfo {
                 json_type: "number",
                 is_optional: true,
                 is_array: false,
@@ -131,30 +131,38 @@ pub fn classify_type(ty: &Type) -> TypeInfo {
                 is_integer: false,
                 is_float: true,
                 array_item_type: "string",
-            };
+            });
         }
     }
 
-    // Fallback to string
-    TypeInfo {
-        json_type: "string",
-        is_optional: false,
-        is_array: false,
-        is_bool: false,
-        is_integer: false,
-        is_float: false,
-        array_item_type: "string",
-    }
+    Err(syn::Error::new_spanned(
+        ty,
+        format!(
+            "unsupported field type `{}`. \
+             Supported: String, bool, i8..i64, u8..u64, f32, f64, \
+             Vec<T>, Option<T> where T is a supported type. \
+             If this type serializes as a string, wrap it: `pub field: String` \
+             and convert in your handler.",
+            type_str
+        ),
+    ))
 }
 
 /// Classify a Rust type name into a JSON schema type string.
-fn classify_inner_type(inner: &str) -> &'static str {
+fn classify_inner_type(inner: &str, span_source: &Type) -> syn::Result<&'static str> {
     match inner {
-        "String" => "string",
-        "bool" => "boolean",
-        "u8" | "u16" | "u32" | "u64" | "i8" | "i16" | "i32" | "i64" => "integer",
-        "f32" | "f64" => "number",
-        _ => "string",
+        "String" => Ok("string"),
+        "bool" => Ok("boolean"),
+        "u8" | "u16" | "u32" | "u64" | "i8" | "i16" | "i32" | "i64" => Ok("integer"),
+        "f32" | "f64" => Ok("number"),
+        _ => Err(syn::Error::new_spanned(
+            span_source,
+            format!(
+                "unsupported Vec item type `{}`. \
+                 Supported: String, bool, integer primitives, f32, f64.",
+                inner
+            ),
+        )),
     }
 }
 
@@ -375,11 +383,11 @@ pub fn gen_from_value_extraction(
 /// Shared by both `ActionParams` and `ToolParams` derive macros.
 pub fn collect_field_tokens(
     fields: &syn::punctuated::Punctuated<syn::Field, syn::Token![,]>,
-) -> (
+) -> syn::Result<(
     Vec<proc_macro2::TokenStream>,
     Vec<proc_macro2::TokenStream>,
     Vec<proc_macro2::TokenStream>,
-) {
+)> {
     let mut schema_properties = Vec::new();
     let mut required_fields = Vec::new();
     let mut from_value_fields = Vec::new();
@@ -391,7 +399,7 @@ pub fn collect_field_tokens(
 
         let attrs = parse_param_attrs(&field.attrs);
         let description = get_doc_comment(&field.attrs);
-        let type_info = classify_type(field_ty);
+        let type_info = classify_type(field_ty)?;
 
         schema_properties.push(gen_schema_property(
             &field_name_str,
@@ -412,7 +420,7 @@ pub fn collect_field_tokens(
         ));
     }
 
-    (schema_properties, required_fields, from_value_fields)
+    Ok((schema_properties, required_fields, from_value_fields))
 }
 
 /// Generate the `metadata()` method TokenStream from optional category, tags, cost strings.

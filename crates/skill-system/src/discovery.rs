@@ -244,7 +244,6 @@ impl SkillCatalog {
                         scope: SkillScope::BuiltIn,
                         location: std::path::PathBuf::from(format!("persona::{name}")),
                         body: parsed.body,
-                        manifest: None,
                         metadata: SkillMetadata::default(),
                         resources: Vec::new(),
                         loaded_at: SystemTime::now(),
