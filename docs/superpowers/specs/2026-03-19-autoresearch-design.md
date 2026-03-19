@@ -139,7 +139,12 @@ pub struct TrialParams {
 
 **Constraints:**
 - `skill_keyword_weight + skill_semantic_weight = 1.0`.
-- All 6 relevance weights must sum to 1.0. Phase 1 tunes 3 of 6; the remaining 3 are held at Config defaults. The system normalizes all 6 to sum to 1.0 after applying overrides.
+- All 6 relevance weights must sum to 1.0. **Note:** the current `CognitiveConfig` defaults
+  (0.30 + 0.20 + 0.15 + 0.10 + 0.25 + 0.05) sum to 1.05, not 1.0 — the doc comment says "5 weights"
+  but there are 6 (temporal was added later). The AutoTuner's normalization step must always normalize
+  all 6 weights to sum to exactly 1.0, regardless of what the raw Config defaults produce. Phase 1
+  tunes 3 of 6; the remaining 3 are held at (normalized) Config defaults. After applying overrides,
+  all 6 are re-normalized to sum to 1.0.
 
 ### Trial — one experiment variant
 
@@ -265,7 +270,7 @@ pub struct ShadowPrediction {
 ### Phase 0: Bootstrap (first 24-48 hours)
 
 1. **Collect baseline** — Run Config defaults for 24h, recording all metrics. This becomes the Champion's `baseline_metrics`.
-2. **Historical replay** — Take the last 7 days of sessions from `session_messages` (via `SessionRepo`). For each message, re-run the heuristic + embedding layers of IntentAnalyzer with 5-10 random parameter perturbations (within bounds). Score each against ground truth by joining with `strategy_records` on `request_id` — **note:** this requires that `StrategyRecordRow.request_id` matches the `SessionMessage` identifier. If the join key is not present, fall back to scoring by comparing predicted execution mode (Direct/Reactive) against the `actual_strategy` field in `strategy_records` for the same `chat_id` + timestamp window.
+2. **Historical replay** — Take the last 7 days of sessions from `session_messages` (via `SessionRepo`). For each message, re-run the heuristic + embedding layers of IntentAnalyzer with 5-10 random parameter perturbations (within bounds). Score each against ground truth from `strategy_records` by matching on `chat_id` + closest timestamp within a 30-second window (there is no shared `request_id` between session messages and strategy records — `StrategyRecordRow.request_id` is an internal pipeline ID not present on `SessionMessage`). Compare the variant's predicted execution mode (Direct/Reactive) against the `actual_strategy` field in the matched strategy record. Bootstrap replay runs in the L5 `agent/autotuner/` orchestrator (which has access to both `SessionRepo` and `StrategyRepo`), NOT in the L4 `autotuner` crate.
 3. **Seed generation** — Feed replay results to LLM generator to produce 3 promising initial variants.
 4. **Transition** — Seeded variants become the first `Active` trials for live shadow scoring.
 
@@ -354,15 +359,33 @@ When a trial is promoted:
 3. If `Some(params)`, attaches to `RoutingContext.champion_params: Option<TrialParams>`.
 4. `IntentAnalyzer` and `SkillRouter` read from `RoutingContext` when present, falling back to `Config`.
 
-**IntentAnalyzer signature strategy:** Rather than changing the `analyze()` signature (which has
-many callers), add a `with_overrides(&TrialParams)` builder method that returns a lightweight
-`AnalyzerWithOverrides` wrapper. The wrapper delegates to the same internal cascade but reads
-thresholds from the overrides first. This avoids breaking existing call sites. The shadow classifier
-in `agent/autotuner/` uses this wrapper; the live path continues calling `analyze()` directly (which
-reads from `RoutingContext.champion_params` internally via the context it already receives).
+**IntentAnalyzer signature strategy:** `IntentAnalyzer::analyze()` currently accepts only
+`(message, tool_names)` and has no access to `RoutingContext`. Rather than threading RoutingContext
+through (which would change many call sites), the approach is:
 
-Similarly, `SkillRouter::select_orchestrator_blended()` gains an optional `weight_overrides`
-parameter (defaulting to `None` at existing call sites).
+- Add an `overrides: Option<TrialParams>` field to the `IntentAnalyzer` struct itself (set at
+  construction time, defaulting to `None`).
+- The `AgentRuntime` constructs `IntentAnalyzer` per-session. When Champion params exist, it sets
+  `overrides` on the live analyzer instance. The existing `analyze()` signature is unchanged —
+  internally it reads `self.overrides` before falling back to `self.config`.
+- For shadow scoring, the `ShadowClassifier` in `agent/autotuner/` constructs a separate
+  `IntentAnalyzer` instance with the trial's `TrialParams` as overrides. This is lightweight since
+  `IntentAnalyzer` shares its AC matchers and embedding cache via `OnceLock`/`Arc`.
+
+Similarly, `SkillRouter::select_orchestrator_blended()` gains optional raw `f64` weight parameters
+(not `TrialParams` — avoiding a new `skill-system` → `common` dependency). The shadow classifier
+extracts the relevant weights from `TrialParams` and passes them as `Option<f64>` arguments:
+
+```rust
+// In skill-system/src/router.rs — no new crate dependency needed
+pub fn select_orchestrator_blended(
+    &self,
+    message: &str,
+    embedding: Option<&[f32]>,
+    keyword_weight: Option<f64>,   // default 0.7 if None
+    semantic_weight: Option<f64>,  // default 0.3 if None
+) -> &str
+```
 
 No Config mutation. No global mutable state. If no Champion exists (fresh start), everything
 falls through to Config defaults — zero behavior change.
@@ -544,7 +567,7 @@ pub trait ShadowRetriever: Send + Sync {
 | `RoutingContext` (L1) | Add `champion_params: Option<TrialParams>` | Agent reads Champion params |
 | `IntentAnalyzer` (L5) | New `with_overrides(&TrialParams)` builder → `AnalyzerWithOverrides` wrapper. Existing `analyze()` signature unchanged. | Shadow classifier uses wrapper; live path reads from RoutingContext |
 | `SkillRouter` (L3) | `select_orchestrator_blended()` gains optional `weight_overrides` param (default None) | Shadow classifier calls with trial weights |
-| `CognitiveRetrievalConfig` (L5) | Shadow retrieval accepts relevance weight overrides from TrialParams | Phase 1: shadow-score ranking; Phase 2: full retrieval |
+| `CognitiveConfig` (L1) / `RetrievalParams` (L5) | Relevance weights from TrialParams override CognitiveConfig values. Applied in the cognitive crate's retrieval ranking. | Phase 1: shadow-score ranking; Phase 2: full retrieval |
 | `DomainEventBus` (L1) | `MetricCollector` subscribes to `UserCorrectedAI`, `CoachingFeedback`, `TaskExecutionCompleted` | Ground truth collection |
 | `StrategyRepo` (L2) | `MetricSource` reads execution mode accuracy (Direct/Reactive). Orchestrator routing quality measured via correction rate, not StrategyRepo. | Evaluation metrics |
 | `CronService` (L3) | Nightly cycle registered as `CronJob` at startup | Triggers experiment cycle |
