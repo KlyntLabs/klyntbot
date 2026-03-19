@@ -53,16 +53,23 @@ impl SkillRouter {
         message: &str,
         catalog: &'a SkillCatalog,
     ) -> &'a Arc<SkillPackage> {
-        self.select_orchestrator_blended(message, &[], catalog)
+        self.select_orchestrator_blended(message, &[], catalog, None, None)
     }
 
     /// Select orchestrator with blended keyword + semantic scoring.
+    ///
+    /// `keyword_weight` and `semantic_weight` override the default 0.7 / 0.3
+    /// blend weights when supplied. Pass `None` to use the defaults.
     pub fn select_orchestrator_blended<'a>(
         &self,
         message: &str,
         query_embedding: &[f32],
         catalog: &'a SkillCatalog,
+        keyword_weight: Option<f64>,
+        semantic_weight: Option<f64>,
     ) -> &'a Arc<SkillPackage> {
+        let kw_w = keyword_weight.unwrap_or(0.7);
+        let sem_w = semantic_weight.unwrap_or(0.3);
         let kw_scores = self.keyword_scores(message, catalog);
         let mut best: Option<(&str, f64)> = None;
 
@@ -83,7 +90,7 @@ impl SkillRouter {
                 continue;
             }
 
-            let blended = kw_score * 0.7 + sem_score * 0.3;
+            let blended = kw_score * kw_w + sem_score * sem_w;
             if best.as_ref().map_or(true, |(_, s)| blended > *s) {
                 best = Some((pkg.name.as_str(), blended));
             }

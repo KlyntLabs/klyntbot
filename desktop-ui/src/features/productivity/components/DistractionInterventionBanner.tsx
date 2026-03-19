@@ -46,53 +46,35 @@ export function DistractionInterventionBanner() {
 
   if (!distraction || dismissed) return null;
 
-  const handleBackToWork = async () => {
+  const respond = async (action: string) => {
     try {
       await ipc("distraction_respond", {
-        action: "back_to_work",
-        sessionId: distraction.sessionId,
+        action,
+        appName: distraction.appName,
       });
-      setDismissed(true);
     } catch (error) {
       console.error("Failed to respond to distraction:", error);
     }
+  };
+
+  const handleBackToWork = async () => {
+    await respond("back_to_work");
+    setDismissed(true);
   };
 
   const handleNotDistraction = async () => {
-    try {
-      await ipc("distraction_respond", {
-        action: "not_distraction",
-        appName: distraction.appName,
-        sessionId: distraction.sessionId,
-      });
-      setDismissed(true);
-    } catch (error) {
-      console.error("Failed to respond to distraction:", error);
-    }
+    await respond("not_distraction");
+    setDismissed(true);
   };
 
   const handleSnooze = async () => {
-    try {
-      await ipc("distraction_respond", {
-        action: "snooze",
-        sessionId: distraction.sessionId,
-      });
-      setSnoozeCountdown(5 * 60); // 5 minute snooze
-    } catch (error) {
-      console.error("Failed to snooze distraction:", error);
-    }
+    await respond("snooze");
+    setSnoozeCountdown(5 * 60);
   };
 
   const handleEndFocus = async () => {
-    try {
-      await ipc("distraction_respond", {
-        action: "end_focus",
-        sessionId: distraction.sessionId,
-      });
-      setDismissed(true);
-    } catch (error) {
-      console.error("Failed to end focus:", error);
-    }
+    await respond("end_focus");
+    setDismissed(true);
   };
 
   return (

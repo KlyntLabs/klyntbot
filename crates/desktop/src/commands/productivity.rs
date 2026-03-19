@@ -14,6 +14,7 @@ use feature_productivity::auto_focus::AutoFocusEvent;
 use tauri::State;
 
 use crate::app_core::AppCore;
+use crate::focus_timer::FocusTimer;
 
 #[tauri::command]
 pub async fn productivity_today(
@@ -273,10 +274,32 @@ pub async fn productivity_auto_focus_confirm(
 
 #[tauri::command(rename_all = "snake_case")]
 pub async fn distraction_respond(
-    _state: State<'_, Arc<AppCore>>,
-    _response: DistractionResponse,
+    state: State<'_, Arc<AppCore>>,
+    timer: State<'_, Arc<FocusTimer>>,
+    app: tauri::AppHandle,
+    response: DistractionResponse,
 ) -> Result<(), ApiError> {
-    // Stub for now — will be populated with actual distraction handling logic
+    let app_name = response.app_name.unwrap_or_default();
+    match response.action.as_str() {
+        "back_to_work" => {
+            state.distraction_dismiss(app_name).await?;
+        }
+        "not_distraction" => {
+            state
+                .distraction_allow_session(app_name, None, "productive".to_string())
+                .await?;
+        }
+        "snooze" => {
+            state.distraction_allow_temp(app_name).await?;
+        }
+        "end_focus" => {
+            timer.stop(&app).await;
+            let _ = state.productivity_focus_end(None).await;
+        }
+        other => {
+            tracing::warn!("unknown distraction_respond action: {other}");
+        }
+    }
     Ok(())
 }
 
@@ -337,7 +360,7 @@ pub async fn calendar_sync_events(
 
 // ── Focus Timer (tray-driven) ──────────────────────────────────────────
 
-use crate::focus_timer::{FocusTimer, TimerMode};
+use crate::focus_timer::TimerMode;
 use desktop_shared::commands::FocusTimerStatusResponse;
 
 #[allow(clippy::too_many_arguments)]
@@ -705,7 +728,20 @@ pub(crate) async fn dispatch_dev(
             core.productivity_auto_focus_confirm(try_field!(dev::parse_params(body)))
                 .await,
         ),
-        "distraction_respond" => Ok(serde_json::Value::Null),
+        "distraction_respond" => {
+            let response: DistractionResponse = try_field!(dev::parse_params(body));
+            let app_name = response.app_name.unwrap_or_default();
+            match response.action.as_str() {
+                "back_to_work" => dev::val(core.distraction_dismiss(app_name).await),
+                "not_distraction" => dev::val(
+                    core.distraction_allow_session(app_name, None, "productive".to_string())
+                        .await,
+                ),
+                "snooze" => dev::val(core.distraction_allow_temp(app_name).await),
+                "end_focus" => dev::val(core.productivity_focus_end(None).await.map(|_| ())),
+                _ => Ok(serde_json::Value::Null),
+            }
+        }
         "productivity_patterns" => {
             dev::val(core.productivity_patterns(dev::get(body, "days")).await)
         }
