@@ -599,6 +599,12 @@ fn run_desktop_app() {
             commands::cron::cron_update,
             // Status
             commands::status::agent_status,
+            // AutoTuner
+            commands::autotuner::autotuner_status,
+            commands::autotuner::autotuner_history,
+            commands::autotuner::autotuner_revert,
+            commands::autotuner::autotuner_pause,
+            commands::autotuner::autotuner_resume,
             // Window
             // Work Contexts
             commands::work_context::list_work_contexts,

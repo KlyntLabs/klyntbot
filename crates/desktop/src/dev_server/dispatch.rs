@@ -133,6 +133,9 @@ pub(super) async fn dispatch(
     if let Some(r) = commands::agents::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }
+    if let Some(r) = commands::autotuner::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
     if let Some(r) = commands::integrations::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }
