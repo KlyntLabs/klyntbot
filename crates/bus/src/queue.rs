@@ -32,12 +32,18 @@ impl MessageBus {
 
     /// Take ownership of the inbound receiver (can only be called once)
     pub fn take_inbound_rx(&self) -> Option<mpsc::Receiver<InboundMessage>> {
-        self.inbound_rx.lock().unwrap().take()
+        self.inbound_rx
+            .lock()
+            .expect("message bus lock poisoned")
+            .take()
     }
 
     /// Take ownership of the outbound receiver (can only be called once)
     pub fn take_outbound_rx(&self) -> Option<mpsc::Receiver<OutboundMessage>> {
-        self.outbound_rx.lock().unwrap().take()
+        self.outbound_rx
+            .lock()
+            .expect("message bus lock poisoned")
+            .take()
     }
 
     /// Publish an inbound message to the bus

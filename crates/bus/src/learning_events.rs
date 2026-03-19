@@ -45,7 +45,7 @@ impl LearningEventBus {
     /// Publish an event to all current subscribers.
     ///
     /// No-op (does not error) when there are no active subscribers.
-    pub async fn publish(&self, event: LearningEvent) {
+    pub fn publish(&self, event: LearningEvent) {
         let _ = self.tx.send(event);
     }
 

@@ -17,9 +17,6 @@ reqwest = { workspace = true }
 rust_decimal = { workspace = true }
 
 chrono-tz = { workspace = true }
-iana-time-zone = { workspace = true }
 
 [dev-dependencies]
-tempfile = { workspace = true }
 tokio = { workspace = true, features = ["test-util"] }
-rust_decimal_macros = { workspace = true }

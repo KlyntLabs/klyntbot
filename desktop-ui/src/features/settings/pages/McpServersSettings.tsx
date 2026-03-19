@@ -117,10 +117,8 @@ export function McpServersSettings() {
   const handleOAuthConnect = useCallback(
     async (server: RecommendedMcpServer) => {
       if (!server.oauthProvider) return;
-      console.log("[MCP OAuth] Starting flow for", server.name, server.oauthProvider);
       setOauthLoadingServer(server.name);
-      const result = await startOAuth({ provider: server.oauthProvider, serverName: server.name });
-      console.log("[MCP OAuth] Result:", result);
+      await startOAuth({ provider: server.oauthProvider, serverName: server.name });
     },
     [startOAuth],
   );

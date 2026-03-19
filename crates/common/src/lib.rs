@@ -10,7 +10,6 @@ pub mod entity_card;
 pub mod error;
 pub mod helpers;
 pub mod http;
-pub mod money;
 pub mod notify;
 pub mod ports;
 pub mod prompts;
@@ -32,7 +31,6 @@ pub use types::{
 
 // ── Re-exports: commonly used utilities ─────────────────────────────────
 
-pub use money::{Currency, Money};
 pub use rust_decimal::Decimal;
 
 pub use date::parse_datetime;

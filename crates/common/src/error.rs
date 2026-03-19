@@ -29,12 +29,6 @@ pub enum KlyntbotError {
     #[error("Cron error: {0}")]
     Cron(String),
 
-    #[error("Goal error: {0}")]
-    Goal(String),
-
-    #[error("Plan error: {0}")]
-    Plan(String),
-
     #[error("Storage error: {0}")]
     Storage(String),
 
@@ -244,15 +238,6 @@ mod tests {
             KlyntbotError::Cron("bad cron".into()).to_string(),
             "Cron error: bad cron"
         );
-        assert_eq!(
-            KlyntbotError::Goal("not found".into()).to_string(),
-            "Goal error: not found"
-        );
-        assert_eq!(
-            KlyntbotError::Plan("invalid state".into()).to_string(),
-            "Plan error: invalid state"
-        );
-
         // KlyntbotError direct variants
         assert_eq!(
             KlyntbotError::BusDisconnected.to_string(),

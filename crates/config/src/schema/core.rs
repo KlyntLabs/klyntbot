@@ -33,11 +33,16 @@ use super::tools::ToolsConfig;
 use super::user::UserConfig;
 use super::work_context::WorkContextConfig;
 
-/// Expand a leading `~` in a path to the user's home directory.
+/// Expand a leading `~/` in a path to the user's home directory.
+/// Bare `~` (without slash) expands to home. `~user` is treated as literal.
 pub(crate) fn expand_tilde(path: &str) -> PathBuf {
-    if path.starts_with('~') {
+    if path == "~" || path.starts_with("~/") {
         if let Some(home) = dirs::home_dir() {
-            return home.join(path.trim_start_matches("~/"));
+            return if path == "~" {
+                home
+            } else {
+                home.join(&path[2..])
+            };
         }
     }
     PathBuf::from(path)

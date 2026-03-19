@@ -178,7 +178,6 @@ dependencies = [
  "rust_decimal",
  "rust_decimal_macros",
  "serde",
- "serde_json",
 ]
 
 [[package]]
@@ -1683,13 +1682,10 @@ dependencies = [
  "async-trait",
  "chrono",
  "chrono-tz",
- "iana-time-zone",
  "reqwest 0.13.2",
  "rust_decimal",
- "rust_decimal_macros",
  "serde",
  "serde_json",
- "tempfile",
  "thiserror 2.0.18",
  "tokio",
  "tracing",

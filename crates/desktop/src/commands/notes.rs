@@ -761,7 +761,10 @@ pub(crate) async fn dispatch_dev(
         }
         "note_insight_debate" => {
             let id = try_field!(dev::get_str(body, "noteId"));
-            let squad_id = body.get("squadId").and_then(|v| v.as_str()).map(|s| s.to_string());
+            let squad_id = body
+                .get("squadId")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
             dev::val(core.note_insight_debate(&id, squad_id.as_deref()).await)
         }
         "note_insight_list_versions" => {

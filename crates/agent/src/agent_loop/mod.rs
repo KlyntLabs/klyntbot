@@ -871,13 +871,11 @@ mod tests {
         });
 
         // Publish threshold change (what LearningService will do)
-        event_bus
-            .publish(LearningEvent::ThresholdChanged {
-                old_threshold: 0.70,
-                new_threshold: 0.82,
-                reason: "test_subscriber".to_string(),
-            })
-            .await;
+        event_bus.publish(LearningEvent::ThresholdChanged {
+            old_threshold: 0.70,
+            new_threshold: 0.82,
+            reason: "test_subscriber".to_string(),
+        });
 
         tokio::time::sleep(Duration::from_millis(50)).await;
 

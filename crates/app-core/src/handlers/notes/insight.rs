@@ -891,8 +891,7 @@ impl AppCore {
         let config = self.config.read().await;
         let params = providers::cognitive_chat_params(&config, 4096);
         drop(config);
-        let blackboard_repo =
-            cognitive::BlackboardRepo::new(self.storage_pool.inner().clone());
+        let blackboard_repo = cognitive::BlackboardRepo::new(self.storage_pool.inner().clone());
         let session_key = format!("debate:insight:{}:{}", note_id, uuid::Uuid::new_v4());
 
         // Build context from note content
@@ -902,8 +901,7 @@ impl AppCore {
         );
 
         // Create event channel for debate events
-        let (event_tx, mut event_rx) =
-            tokio::sync::mpsc::channel::<agent::AgentEvent>(64);
+        let (event_tx, mut event_rx) = tokio::sync::mpsc::channel::<agent::AgentEvent>(64);
 
         // Clone emitter for the relay task
         let emitter = Arc::clone(&self.event_emitter);

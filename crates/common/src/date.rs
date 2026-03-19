@@ -166,15 +166,6 @@ fn days_until_weekday(current: Weekday, target: Weekday) -> i64 {
     }
 }
 
-/// Format a UTC datetime for display in the given timezone.
-pub fn format_datetime_local(dt: &DateTime<Utc>, timezone: &str, fmt: &str) -> String {
-    if let Ok(tz) = timezone.parse::<Tz>() {
-        dt.with_timezone(&tz).format(fmt).to_string()
-    } else {
-        dt.format(fmt).to_string()
-    }
-}
-
 /// Get the UTC offset string for a timezone (e.g., "+07:00", "-05:00").
 ///
 /// Uses the current time to determine the offset (accounts for DST).
@@ -251,13 +242,6 @@ mod tests {
         // With invalid timezone, naive datetimes should be treated as UTC
         let dt = parse_datetime("2026-02-17T21:00:00", "Invalid/TZ").unwrap();
         assert_eq!(dt.hour(), 21);
-    }
-
-    #[test]
-    fn test_format_datetime_local() {
-        let dt = "2026-02-17T14:00:00Z".parse::<DateTime<Utc>>().unwrap();
-        let formatted = format_datetime_local(&dt, "Asia/Bangkok", "%H:%M");
-        assert_eq!(formatted, "21:00"); // 14:00 UTC = 21:00 Bangkok
     }
 
     #[test]

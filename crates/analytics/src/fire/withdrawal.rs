@@ -31,7 +31,7 @@ pub struct WithdrawalResult {
 
 impl super::FIRECalculator {
     /// Run a withdrawal simulation using Monte Carlo.
-    pub fn withdrawal_simulation(params: &WithdrawalParams) -> WithdrawalResult {
+    pub fn withdrawal_simulation(params: &WithdrawalParams) -> common::Result<WithdrawalResult> {
         let config = SimulationConfig {
             runs: params.monte_carlo_runs,
             years: params.years,
@@ -44,11 +44,11 @@ impl super::FIRECalculator {
             seed: params.seed,
         };
 
-        let result = MonteCarloEngine::run(&config).expect("Monte Carlo simulation failed");
+        let result = MonteCarloEngine::run(&config)?;
 
-        WithdrawalResult {
+        Ok(WithdrawalResult {
             success_rate: result.success_rate,
             simulation: result,
-        }
+        })
     }
 }

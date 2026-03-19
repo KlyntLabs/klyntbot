@@ -11,6 +11,8 @@ pub struct TypeInfo {
     pub is_bool: bool,
     pub is_integer: bool,
     pub is_float: bool,
+    /// JSON type for array items (only meaningful when is_array is true).
+    pub array_item_type: &'static str,
 }
 
 /// Classify a Rust type into JSON schema type info.
@@ -25,6 +27,7 @@ pub fn classify_type(ty: &Type) -> TypeInfo {
             is_bool: false,
             is_integer: false,
             is_float: false,
+            array_item_type: "string",
         };
     }
 
@@ -36,6 +39,7 @@ pub fn classify_type(ty: &Type) -> TypeInfo {
             is_bool: true,
             is_integer: false,
             is_float: false,
+            array_item_type: "string",
         };
     }
 
@@ -50,6 +54,7 @@ pub fn classify_type(ty: &Type) -> TypeInfo {
             is_bool: false,
             is_integer: true,
             is_float: false,
+            array_item_type: "string",
         };
     }
 
@@ -61,10 +66,13 @@ pub fn classify_type(ty: &Type) -> TypeInfo {
             is_bool: false,
             is_integer: false,
             is_float: true,
+            array_item_type: "string",
         };
     }
 
     if type_str.starts_with("Vec<") {
+        let inner = &type_str[4..type_str.len() - 1];
+        let item_type = classify_inner_type(inner);
         return TypeInfo {
             json_type: "array",
             is_optional: false,
@@ -72,6 +80,7 @@ pub fn classify_type(ty: &Type) -> TypeInfo {
             is_bool: false,
             is_integer: false,
             is_float: false,
+            array_item_type: item_type,
         };
     }
 
@@ -85,6 +94,7 @@ pub fn classify_type(ty: &Type) -> TypeInfo {
                 is_bool: false,
                 is_integer: false,
                 is_float: false,
+                array_item_type: "string",
             };
         }
         if inner == "bool" {
@@ -95,6 +105,7 @@ pub fn classify_type(ty: &Type) -> TypeInfo {
                 is_bool: true,
                 is_integer: false,
                 is_float: false,
+                array_item_type: "string",
             };
         }
         if matches!(
@@ -108,6 +119,7 @@ pub fn classify_type(ty: &Type) -> TypeInfo {
                 is_bool: false,
                 is_integer: true,
                 is_float: false,
+                array_item_type: "string",
             };
         }
         if matches!(inner, "f32" | "f64") {
@@ -118,6 +130,7 @@ pub fn classify_type(ty: &Type) -> TypeInfo {
                 is_bool: false,
                 is_integer: false,
                 is_float: true,
+                array_item_type: "string",
             };
         }
     }
@@ -130,6 +143,18 @@ pub fn classify_type(ty: &Type) -> TypeInfo {
         is_bool: false,
         is_integer: false,
         is_float: false,
+        array_item_type: "string",
+    }
+}
+
+/// Classify a Rust type name into a JSON schema type string.
+fn classify_inner_type(inner: &str) -> &'static str {
+    match inner {
+        "String" => "string",
+        "bool" => "boolean",
+        "u8" | "u16" | "u32" | "u64" | "i8" | "i16" | "i32" | "i64" => "integer",
+        "f32" | "f64" => "number",
+        _ => "string",
     }
 }
 
@@ -226,11 +251,31 @@ pub fn gen_from_value_extraction(
     is_required: bool,
 ) -> proc_macro2::TokenStream {
     if type_info.is_array {
-        return quote! {
-            #field_name: args.get(#field_name_str)
-                .and_then(|v| v.as_array())
-                .map(|a| a.iter().filter_map(|v| v.as_str().map(::std::string::String::from)).collect())
-                .unwrap_or_default(),
+        return match type_info.array_item_type {
+            "integer" => quote! {
+                #field_name: args.get(#field_name_str)
+                    .and_then(|v| v.as_array())
+                    .map(|a| a.iter().filter_map(|v| v.as_i64().map(|n| n as _)).collect())
+                    .unwrap_or_default(),
+            },
+            "number" => quote! {
+                #field_name: args.get(#field_name_str)
+                    .and_then(|v| v.as_array())
+                    .map(|a| a.iter().filter_map(|v| v.as_f64().map(|n| n as _)).collect())
+                    .unwrap_or_default(),
+            },
+            "boolean" => quote! {
+                #field_name: args.get(#field_name_str)
+                    .and_then(|v| v.as_array())
+                    .map(|a| a.iter().filter_map(|v| v.as_bool()).collect())
+                    .unwrap_or_default(),
+            },
+            _ => quote! {
+                #field_name: args.get(#field_name_str)
+                    .and_then(|v| v.as_array())
+                    .map(|a| a.iter().filter_map(|v| v.as_str().map(::std::string::String::from)).collect())
+                    .unwrap_or_default(),
+            },
         };
     }
 
@@ -243,7 +288,7 @@ pub fn gen_from_value_extraction(
         if type_info.is_integer {
             return quote! {
                 #field_name: args.get(#field_name_str)
-                    .and_then(|v| v.as_u64())
+                    .and_then(|v| v.as_i64())
                     .map(|n| n as _),
             };
         }
@@ -448,7 +493,8 @@ pub fn gen_schema_property(
     };
 
     let array_items_insert = if type_info.is_array {
-        quote! { prop.insert("items".to_string(), ::serde_json::json!({"type": "string"})); }
+        let item_type = type_info.array_item_type;
+        quote! { prop.insert("items".to_string(), ::serde_json::json!({"type": #item_type})); }
     } else {
         quote! {}
     };

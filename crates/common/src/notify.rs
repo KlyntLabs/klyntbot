@@ -3,7 +3,7 @@
 //! Platform-specific implementations for desktop notifications.
 //! Uses tokio::process::Command for async compatibility.
 
-pub use crate::ports::NotificationSender;
+use crate::ports::NotificationSender;
 use crate::Result;
 
 /// Default implementation — delegates to the platform `osascript` /
