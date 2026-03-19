@@ -17,7 +17,7 @@ impl AppCore {
         let repo = AnnotationRepo::new(self.storage_pool.inner().clone());
         let now = chrono::Utc::now().to_rfc3339();
         let annotation = Annotation {
-            id: params.mark_id.clone(),
+            id: uuid::Uuid::new_v4().to_string(),
             target_type: "note".into(),
             target_id: params.note_id.clone(),
             content: params.content,
@@ -43,16 +43,13 @@ impl AppCore {
         params: AnnotationUpdateParams,
     ) -> Result<AnnotationResponse, ApiError> {
         let repo = AnnotationRepo::new(self.storage_pool.inner().clone());
-        let pool = self.storage_pool.inner().clone();
-        let mut annotation =
-            sqlx::query_as::<_, Annotation>("SELECT * FROM annotations WHERE id = ?1")
-                .bind(&params.id)
-                .fetch_optional(&pool)
-                .await
-                .map_err(map_cognitive_err)?
-                .ok_or_else(|| {
-                    ApiError::new("NOT_FOUND", format!("Annotation {} not found", params.id))
-                })?;
+        let mut annotation = repo
+            .get_by_id(&params.id)
+            .await
+            .map_err(map_cognitive_err)?
+            .ok_or_else(|| {
+                ApiError::new("NOT_FOUND", format!("Annotation {} not found", params.id))
+            })?;
 
         if let Some(content) = params.content {
             annotation.content = content;

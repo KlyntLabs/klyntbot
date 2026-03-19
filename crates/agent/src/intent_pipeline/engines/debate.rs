@@ -13,10 +13,10 @@ use providers::{ChatParams, DynProvider, Message, UserContent};
 use serde::{Deserialize, Serialize};
 
 /// Safety cap — maximum total rounds including opening and final.
-pub const MAX_ROUNDS: u32 = 6;
+const MAX_ROUNDS: u32 = 6;
 
 /// Consensus threshold — judge score 0-100, debate stops at this level.
-pub const CONSENSUS_THRESHOLD: f64 = 85.0;
+const CONSENSUS_THRESHOLD: f64 = 85.0;
 
 /// Debate phase — controls prompt style and execution pattern.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -68,15 +68,7 @@ impl Default for JudgeDecision {
 
 /// Parse judge JSON response, returning default on failure.
 pub fn parse_judge_json(text: &str) -> JudgeDecision {
-    let json_str = if let Some(start) = text.find('{') {
-        if let Some(end) = text.rfind('}') {
-            &text[start..=end]
-        } else {
-            text
-        }
-    } else {
-        text
-    };
+    let json_str = common::helpers::extract_json_object(text).unwrap_or(text);
     serde_json::from_str(json_str).unwrap_or_default()
 }
 
@@ -115,9 +107,7 @@ pub fn build_phase_prompt(
                  > {challenge_text}"
             )
         }
-        DebatePhase::Final => format!(
-            "This is the **final round**. Summarize your final position in 2-3 sentences, accounting for the full discussion above."
-        ),
+        DebatePhase::Final => "This is the **final round**. Summarize your final position in 2-3 sentences, accounting for the full discussion above.".to_string(),
     };
 
     format!(
@@ -334,7 +324,7 @@ async fn run_sequential_round(
         let text = match provider.chat(&messages, None, params).await {
             Ok(r) => r.content.unwrap_or_default(),
             Err(e) => {
-                tracing::warn!(persona = %persona.name, round, "LLM call failed, skipping");
+                tracing::warn!(persona = %persona.name, round, "LLM call failed, skipping: {e}");
                 if let Some(tx) = event_tx {
                     let _ = tx
                         .send(crate::AgentEvent::PersonaPerspective {

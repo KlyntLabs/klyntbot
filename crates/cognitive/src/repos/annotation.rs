@@ -58,6 +58,13 @@ impl AnnotationRepo {
         Ok(())
     }
 
+    pub async fn get_by_id(&self, id: &str) -> Result<Option<Annotation>, sqlx::Error> {
+        sqlx::query_as::<_, Annotation>("SELECT * FROM annotations WHERE id = ?1")
+            .bind(id)
+            .fetch_optional(&self.pool)
+            .await
+    }
+
     pub async fn get_for_target(
         &self,
         target_type: &str,

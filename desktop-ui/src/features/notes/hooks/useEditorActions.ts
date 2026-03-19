@@ -1,7 +1,7 @@
 import type { Editor } from "@tiptap/react";
 import { useCallback } from "react";
 import { ulid } from "ulid";
-import { useAnnotations } from "./useAnnotations";
+import type { useAnnotations } from "./useAnnotations";
 import { useCardGeneration } from "./useCardGeneration";
 
 /** Get selected text from whichever editor has the selection, falling back to DOM selection. */
@@ -19,21 +19,11 @@ function getSelectedText(editor: Editor | null): string | null {
   return null;
 }
 
-/** Find the TipTap editor instance that currently has a selection (checks all .tiptap elements). */
-function getActiveEditor(): Editor | null {
-  // ProseMirror stores the editor view on the DOM node
-  const tiptaps = document.querySelectorAll(".tiptap");
-  for (const el of tiptaps) {
-    const view = (el as unknown as { pmViewDesc?: { view?: { state?: { selection?: { empty: boolean } } } } }).pmViewDesc?.view;
-    if (view && view.state && !view.state.selection.empty) {
-      return null; // We can't get the Editor wrapper, but we know there's a selection
-    }
-  }
-  return null;
-}
-
-export function useEditorActions(editor: Editor | null, noteId: string | null) {
-  const { createAnnotation } = useAnnotations(noteId, editor);
+export function useEditorActions(
+  editor: Editor | null,
+  noteId: string | null,
+  createAnnotation: ReturnType<typeof useAnnotations>["createAnnotation"],
+) {
   const { generateFromText } = useCardGeneration();
 
   const handleAnnotate = useCallback(() => {

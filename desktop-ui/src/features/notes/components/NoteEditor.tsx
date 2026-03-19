@@ -170,10 +170,11 @@ export function NoteEditor({
   useEntityResolution(editor);
 
   // ── Annotation & Perspective hooks ────────────────────────────────
-  const { annotations, updateAnnotation, deleteAnnotation } = useAnnotations(note.id, editor);
+  const { annotations, createAnnotation, updateAnnotation, deleteAnnotation } = useAnnotations(note.id, editor);
   const { handleAnnotate, handleFlashcard, handleTranslate, handleAskAI } = useEditorActions(
     editor,
     note.id,
+    createAnnotation,
   );
   const { activePerspective, focusedSectionId, setPerspective } = usePerspective(
     note.id,
