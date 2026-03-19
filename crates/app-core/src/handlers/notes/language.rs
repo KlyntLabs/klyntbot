@@ -169,18 +169,12 @@ impl AppCore {
             sf_repo.upsert(&fact).await.map_err(map_cognitive_err)?;
         }
 
-        flashcard_repo
+        let created = flashcard_repo
             .create_batch(new_cards)
             .await
             .map_err(map_cognitive_err)?;
 
-        // Return the created flashcards as responses
-        let cards = flashcard_repo
-            .list_all_in_deck(&params.deck, params.words.len() as i64, 0)
-            .await
-            .map_err(map_cognitive_err)?;
-
-        Ok(cards
+        Ok(created
             .into_iter()
             .map(super::flashcard::flashcard_to_response)
             .collect())
@@ -293,7 +287,19 @@ impl AppCore {
             .ok_or_else(|| ApiError::new("LLM_ERROR", "Empty response"))?;
 
         let cleaned = common::helpers::strip_llm_fences(&text);
-        serde_json::from_str(cleaned)
-            .map_err(|e| ApiError::new("PARSE_ERROR", format!("Failed to parse: {e}")))
+        let mut result: AnnotationEnrichmentResponse = serde_json::from_str(cleaned)
+            .map_err(|e| ApiError::new("PARSE_ERROR", format!("Failed to parse: {e}")))?;
+
+        // Mark words as new/known (same as translate_breakdown)
+        let sf_repo = SemanticFactRepo::new(self.storage_pool.inner().clone());
+        for word in &mut result.words {
+            let existing = sf_repo
+                .find_vocabulary_by_subject(&word.word)
+                .await
+                .unwrap_or_default();
+            word.is_new = existing.is_empty();
+        }
+
+        Ok(result)
     }
 }

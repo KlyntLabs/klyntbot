@@ -29,9 +29,8 @@ pub async fn language_evaluate_translation(
 pub async fn language_save_vocabulary(
     state: State<'_, Arc<AppCore>>,
     params: VocabularySaveParams,
-) -> Result<serde_json::Value, ApiError> {
-    let cards = state.language_save_vocabulary(params).await?;
-    Ok(serde_json::to_value(cards).unwrap_or_default())
+) -> Result<Vec<desktop_shared::commands::FlashcardResponse>, ApiError> {
+    state.language_save_vocabulary(params).await
 }
 
 #[tauri::command]

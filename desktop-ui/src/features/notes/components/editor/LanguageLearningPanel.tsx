@@ -102,12 +102,8 @@ export function LanguageLearningPanel({
         </CollapsibleSection>
       )}
 
-      {/* Section 5: Confusables (conditional — only shows when matches found) */}
-      {result && result.words.some((w) => w.isNew) && (
-        <CollapsibleSection title="Confusable Words">
-          <ConfusableSection words={result.words} sourceLang={sourceLang} />
-        </CollapsibleSection>
-      )}
+      {/* Section 5: Confusables (renders its own container, only visible when matches found) */}
+      {result && <ConfusableSection words={result.words} sourceLang={sourceLang} />}
     </div>
   );
 }

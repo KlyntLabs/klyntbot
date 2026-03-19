@@ -80,7 +80,7 @@ export function PracticeSection({ sourceText, sourceLang, targetLang }: Practice
 }
 
 function EvaluationResults({ evaluation }: { evaluation: TranslationEvalResponse }) {
-  const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
+  const [expandedSet, setExpandedSet] = useState<Set<number>>(new Set());
 
   const { grades, corrections, modelTranslation } = evaluation;
 
@@ -107,13 +107,20 @@ function EvaluationResults({ evaluation }: { evaluation: TranslationEvalResponse
                 </div>
                 <button
                   type="button"
-                  onClick={() => setExpandedIdx(expandedIdx === i ? null : i)}
+                  onClick={() =>
+                    setExpandedSet((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(i)) next.delete(i);
+                      else next.add(i);
+                      return next;
+                    })
+                  }
                   className="text-[10px] text-muted-foreground hover:text-primary"
                 >
-                  {expandedIdx === i ? "▾ Hide" : "▸ Why?"}
+                  {expandedSet.has(i) ? "▾ Hide" : "▸ Why?"}
                 </button>
               </div>
-              {expandedIdx === i && (
+              {expandedSet.has(i) && (
                 <div className="mt-1 ml-4 border-l-2 border-blue-500/30 pl-2 text-[11px] text-muted">
                   {c.explanation}
                 </div>

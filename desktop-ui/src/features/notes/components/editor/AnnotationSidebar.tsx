@@ -24,12 +24,16 @@ interface AnnotationSidebarProps {
   /** The mark ID of the annotation currently selected in the editor */
   activeAnnotationId: string | null;
   onAnnotationClick: (markId: string) => void;
+  sourceLang?: string;
+  targetLang?: string;
 }
 
 export function AnnotationSidebar({
   noteId,
   activeAnnotationId,
   onAnnotationClick,
+  sourceLang = "zh",
+  targetLang = "en",
 }: AnnotationSidebarProps) {
   const { annotations, updateAnnotation, deleteAnnotation } = useAnnotations(noteId, null);
 
@@ -54,6 +58,8 @@ export function AnnotationSidebar({
                 onClick={() => onAnnotationClick(ann.markId ?? ann.id)}
                 onUpdate={updateAnnotation}
                 onDelete={deleteAnnotation}
+                sourceLang={sourceLang}
+                targetLang={targetLang}
               />
             ))}
           </div>
@@ -69,12 +75,16 @@ function AnnotationCard({
   onClick,
   onUpdate,
   onDelete,
+  sourceLang,
+  targetLang,
 }: {
   annotation: AnnotationResponse;
   isActive: boolean;
   onClick: () => void;
   onUpdate: (params: { id: string; content?: string; tags?: string }) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  sourceLang: string;
+  targetLang: string;
 }) {
   const [comment, setComment] = useState(annotation.content || "");
   const [editing, setEditing] = useState(false);
@@ -99,8 +109,8 @@ function AnnotationCard({
       params: {
         annotationId: annotation.id,
         quotedText: annotation.quotedText,
-        sourceLang: "zh",
-        targetLang: "en",
+        sourceLang,
+        targetLang,
       },
     })
       .then(setEnrichment)

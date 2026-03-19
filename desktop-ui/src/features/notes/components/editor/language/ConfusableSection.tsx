@@ -1,6 +1,7 @@
 import { ipc } from "@shared/hooks/useIpc";
 import { useEffect, useState } from "react";
 import type { WordBreakdown } from "../../../hooks/useLanguageBreakdown";
+import { CollapsibleSection } from "./CollapsibleSection";
 
 interface ConfusableAlert {
   word: string;
@@ -66,22 +67,24 @@ export function ConfusableSection({ words, sourceLang }: ConfusableSectionProps)
   if (alerts.length === 0) return null;
 
   return (
-    <div className="space-y-2">
-      {alerts.map((a) => (
-        <div
-          key={`${a.word}-${a.confusableWord}`}
-          className="rounded-md border border-amber-500/20 bg-amber-500/5 p-2"
-        >
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-amber-400 text-xs">⚠</span>
-            <span className="text-xs text-primary font-medium">
-              {a.word} vs {a.confusableWord}
-            </span>
-            <span className="text-[10px] text-muted">({a.confusableMeaning})</span>
+    <CollapsibleSection title={`Confusable Words (${alerts.length})`}>
+      <div className="space-y-2">
+        {alerts.map((a) => (
+          <div
+            key={`${a.word}-${a.confusableWord}`}
+            className="rounded-md border border-amber-500/20 bg-amber-500/5 p-2"
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-amber-400 text-xs">⚠</span>
+              <span className="text-xs text-primary font-medium">
+                {a.word} vs {a.confusableWord}
+              </span>
+              <span className="text-[10px] text-muted">({a.confusableMeaning})</span>
+            </div>
+            {a.explanation && <p className="text-[11px] text-muted ml-5">{a.explanation}</p>}
           </div>
-          {a.explanation && <p className="text-[11px] text-muted ml-5">{a.explanation}</p>}
-        </div>
-      ))}
-    </div>
+        ))}
+      </div>
+    </CollapsibleSection>
   );
 }

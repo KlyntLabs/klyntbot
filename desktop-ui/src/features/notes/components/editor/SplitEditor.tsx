@@ -429,6 +429,8 @@ export function SplitEditor({ note, splitMode, onSave }: SplitEditorProps) {
               noteId={note.id}
               activeAnnotationId={activeAnnotationId}
               onAnnotationClick={handleSidebarAnnotationClick}
+              sourceLang={sourceLang}
+              targetLang={targetLang}
             />
           ) : (
             <>
