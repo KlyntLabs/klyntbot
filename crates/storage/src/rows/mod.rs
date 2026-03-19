@@ -18,6 +18,7 @@ pub mod status;
 pub mod task;
 pub mod task_group;
 pub mod tool_usage;
+pub mod trial;
 pub mod usage;
 
 pub use custom_column::{CustomColumnRow, CustomColumnValueRow};
