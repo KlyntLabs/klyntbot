@@ -16,7 +16,7 @@ cargo clippy --workspace --all-targets --all-features  # Lint (must be 0 warning
 cargo fmt --all --check                            # Check formatting
 ```
 
-All tests use ephemeral SQLite (`StoragePool::connect_in_memory()`). No external DB needed.
+Root facade crate has 4 test binaries in `tests/`: `integration/` (cross-crate via facade), `e2e/` (agent loop + reminders), `unit/` (config, providers), `plugins.rs` (WASM, needs `--features plugin-integration` + pre-built plugin). Shared fixtures in `tests/common/`. All tests use ephemeral SQLite (`StoragePool::connect_in_memory()`). No external DB needed.
 
 ## Desktop UI (desktop-ui/)
 
@@ -27,6 +27,7 @@ cd desktop-ui && bun run build          # Production build
 cd desktop-ui && bun run lint:fix       # Biome 2.0 auto-fix (lint + format + imports)
 cd desktop-ui && bun run test           # Vitest (run once)
 cd desktop-ui && bun run test:watch     # Vitest (watch mode)
+cd desktop-ui && bun run lint           # Biome check only (no auto-fix)
 ```
 
 **Path aliases:** `@/*` → `src/*`, `@shared/*` → `src/shared/*`, `@features/*` → `src/features/*`, `@app/*` → `src/app/*`. Always use these in imports, never relative `../../` paths.
@@ -34,6 +35,12 @@ cd desktop-ui && bun run test:watch     # Vitest (watch mode)
 **Tailwind v4 + CSS tokens:** All theming in `src/styles/theme.css` via CSS variables + `@theme inline`. No `tailwind.config.js`. Never hardcode hex/rgba — use token utilities (`bg-surface-base`, `text-muted`, `border-border`). For new visual patterns, add a CSS variable to `:root` first, register in `@theme inline`, then use via Tailwind.
 
 **`glass-panel`:** Glassmorphism class for dropdowns/popups/dialogs. Uses `@apply backdrop-blur-[80px] backdrop-saturate-150`.
+
+**Biome 2.0:** Line width 100. Organizes imports automatically. Warnings (not errors) on `noArrayIndexKey`, `noNonNullAssertion`, `noStaticElementInteractions`, `noImportantStyles`.
+
+**React Compiler:** Enabled via `babel-plugin-react-compiler` in `vite.config.ts`. Auto-memoizes components — don't manually wrap with `React.memo`/`useMemo`/`useCallback` unless profiling shows a specific need.
+
+**Data fetching:** `useQuery(cmd, args)` for reads (SWR caching, 30s stale time), `useMutation(cmd)` for writes. Both use `ipc()` which calls Tauri `invoke` in desktop or `fetch("/api/{cmd}")` in browser dev mode. Never call `invoke` directly — always go through `ipc()`.
 
 **CSS gotchas:** (1) Never write raw `backdrop-filter: blur() saturate()` — minifier breaks it. Use Tailwind's `@apply backdrop-blur-* backdrop-saturate-*`. Parent `backdrop-blur` blocks child `backdrop-filter`. (2) Never use `overflow-x-auto`/`overflow: hidden` on containers with absolute dropdown children — clips them. Use portals instead.
 
@@ -59,7 +66,7 @@ L1: config, bus, tools-core, tools-core-macros, analytics — Config (camelCase 
 L2: storage               — SqlitePool, migrations, *Repo structs, *Row types
 L3: providers, session, scheduling, context_engine, skill-system — LLM clients, session persistence, cron, token budgets, skill discovery/routing
 L4: tools, feature-tasks, feature-finance, feature-notes, feature-productivity, feature-coaching, feature-insights, feature-launcher, feature-learning (flashcard generation), activity-log, plugin-runtime — 20+ tools, feature packages, WASM plugins
-L5: channels, agent, cognitive — Platform integrations (Telegram/Discord/Slack/Email), agent runtime, cognitive memory system
+L5: channels, agent, cognitive — Platform integrations (Telegram/Discord/Slack/Email), agent runtime, cognitive memory (episodic/semantic extraction, spaced repetition via FSRS5, salience decay, reflection)
 L6: mcp                   — MCP server/client
 L7: app-core, desktop-shared, desktop — Application core (shared handlers), Tauri desktop app
 L8: klyntbot, klyntbot-server — Re-export facade, standalone MCP server binary
@@ -142,7 +149,6 @@ Klyntbot exposes tools to external AI clients (Claude Code, Cursor, etc.) via MC
 - **MSRV 1.75** — don't use APIs stabilized after 1.75 (e.g., `Option::is_none_or` requires 1.82). Use `map_or`/`map_or_else` instead. Clippy catches this.
 - **New Tauri command modules need `DEV_COMMANDS`** — every `crates/desktop/src/commands/*.rs` module with `#[tauri::command]` functions must export `pub const DEV_COMMANDS: &[&str]` and be added to `dev_server/mod.rs` test coverage list. The `dev_server_covers_all_tauri_commands` test enforces this.
 - **`StoragePool::from_existing()` skips migrations** — only for already-migrated pools. Tests must use `connect_in_memory()`.
-
 - **Config changes require restart** of the desktop app.
 - **Dependency inversion** — new tools needing agent context must inject via `Arc<dyn Trait>` to avoid circular deps.
 - **`email` feature** (on by default) gates IMAP/SMTP deps in `channels` crate.
