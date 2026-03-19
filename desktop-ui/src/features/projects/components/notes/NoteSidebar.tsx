@@ -2,7 +2,7 @@ import { ipc } from "@shared/hooks/useIpc";
 import { useQuery } from "@shared/hooks/useQuery";
 import type { Note, Notebook } from "@shared/types";
 import { BookOpen, Search } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 interface NoteSidebarProps {
   notebookIds: string[];
@@ -22,6 +22,10 @@ export function NoteSidebar({
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Note[] | null>(null);
   const [searching, setSearching] = useState(false);
+  const searchTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  // Clean up debounce timer on unmount
+  useEffect(() => () => clearTimeout(searchTimer.current), []);
 
   // Fetch notebook metadata for the tree
   const { data: allNotebooks } = useQuery<Notebook[]>("notebook_list", undefined, []);
@@ -36,7 +40,6 @@ export function NoteSidebar({
 
   const handleSearch = useCallback(
     async (query: string) => {
-      setSearchQuery(query);
       if (!query.trim()) {
         setSearchResults(null);
         return;
@@ -66,6 +69,12 @@ export function NoteSidebar({
     [notebookIds],
   );
 
+  function handleSearchInput(value: string) {
+    setSearchQuery(value);
+    clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => handleSearch(value), 300);
+  }
+
   const displayNotes = searchResults ?? recentNotes;
 
   return (
@@ -77,7 +86,7 @@ export function NoteSidebar({
           <input
             type="text"
             value={searchQuery}
-            onChange={(e) => handleSearch(e.target.value)}
+            onChange={(e) => handleSearchInput(e.target.value)}
             placeholder="Search notes..."
             className="glass-input w-full pl-8 pr-3 py-1.5 text-xs rounded-lg"
           />

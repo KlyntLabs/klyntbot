@@ -100,7 +100,11 @@ export function ProjectNotesTab() {
             </div>
 
             {/* Action bar */}
-            <NoteActionBar noteId={selectedNote.id} onInsightGenerated={refetch} />
+            <NoteActionBar
+              noteId={selectedNote.id}
+              noteTitle={selectedNote.title}
+              onInsightGenerated={refetch}
+            />
           </>
         ) : (
           /* Empty state */

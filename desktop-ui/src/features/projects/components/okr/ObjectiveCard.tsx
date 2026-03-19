@@ -1,3 +1,4 @@
+import { useClickOutside } from "@shared/hooks/useClickOutside";
 import { useMutation } from "@shared/hooks/useMutation";
 import type { KeyResult, Objective } from "@shared/types";
 import { ProgressRing } from "@shared/ui";
@@ -12,6 +13,7 @@ import {
 } from "lucide-react";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useProjectContext } from "../../contexts/ProjectContext";
+import { classifyObjective, type ObjectiveStatus } from "../../lib/okr-utils";
 import { useProjectDetailStore } from "../../store/project-detail-store";
 import { KeyResultCreateForm } from "./KeyResultCreateForm";
 import { KeyResultRow } from "./KeyResultRow";
@@ -21,21 +23,11 @@ interface ObjectiveCardProps {
   onEdit: (objective: Objective) => void;
 }
 
-function computeStatus(objective: Objective): { label: string; color: string } {
-  if (objective.progress >= 100)
-    return { label: "Achieved", color: "bg-emerald-500/20 text-emerald-400" };
-  if (objective.status === "at_risk")
-    return { label: "At Risk", color: "bg-amber-500/20 text-amber-400" };
-
-  // Heuristic: if progress is significantly behind, show at risk
-  const krs = objective.keyResults ?? [];
-  const avgProgress =
-    krs.length > 0 ? krs.reduce((s, kr) => s + kr.progress, 0) / krs.length : objective.progress;
-  if (avgProgress < 30 && krs.length > 0)
-    return { label: "At Risk", color: "bg-amber-500/20 text-amber-400" };
-
-  return { label: "On Track", color: "bg-emerald-500/20 text-emerald-400" };
-}
+const STATUS_DISPLAY: Record<ObjectiveStatus, { label: string; color: string }> = {
+  achieved: { label: "Achieved", color: "bg-emerald-500/20 text-emerald-400" },
+  at_risk: { label: "At Risk", color: "bg-amber-500/20 text-amber-400" },
+  on_track: { label: "On Track", color: "bg-emerald-500/20 text-emerald-400" },
+};
 
 function computeAiConfidence(objective: Objective): number {
   const krs = objective.keyResults ?? [];
@@ -47,7 +39,7 @@ function computeAiConfidence(objective: Objective): number {
 }
 
 export function ObjectiveCard({ objective, onEdit }: ObjectiveCardProps) {
-  const { refetchObjectives } = useProjectContext();
+  const { refetchObjectives, tasks } = useProjectContext();
   const expanded = useProjectDetailStore((s) => s.expandedObjectives.has(objective.id));
   const toggleObjective = useProjectDetailStore((s) => s.toggleObjective);
 
@@ -56,8 +48,11 @@ export function ObjectiveCard({ objective, onEdit }: ObjectiveCardProps) {
   const menuRef = useRef<HTMLDivElement>(null);
 
   const { mutate: deleteObjective } = useMutation<void, { id: string }>("objective_delete");
+  const { mutate: deleteKr } = useMutation<void, { id: string }>("key_result_delete");
 
-  const status = useMemo(() => computeStatus(objective), [objective]);
+  useClickOutside(menuRef, () => setMenuOpen(false), menuOpen);
+
+  const status = useMemo(() => STATUS_DISPLAY[classifyObjective(objective)], [objective]);
   const confidence = useMemo(() => computeAiConfidence(objective), [objective]);
   const krs = objective.keyResults ?? [];
 
@@ -66,6 +61,14 @@ export function ObjectiveCard({ objective, onEdit }: ObjectiveCardProps) {
     await deleteObjective({ id: objective.id });
     refetchObjectives();
   }, [objective.id, deleteObjective, refetchObjectives]);
+
+  const handleKrDelete = useCallback(
+    async (kr: KeyResult) => {
+      await deleteKr({ id: kr.id });
+      refetchObjectives();
+    },
+    [deleteKr, refetchObjectives],
+  );
 
   return (
     <div className="glass-card rounded-lg border border-border">
@@ -153,7 +156,13 @@ export function ObjectiveCard({ objective, onEdit }: ObjectiveCardProps) {
       {expanded && (
         <div className="px-4 pb-3 space-y-1">
           {krs.map((kr: KeyResult) => (
-            <KeyResultRow key={kr.id} keyResult={kr} projectId={objective.projectId} />
+            <KeyResultRow
+              key={kr.id}
+              keyResult={kr}
+              projectId={objective.projectId}
+              tasks={tasks}
+              onDelete={handleKrDelete}
+            />
           ))}
 
           {/* Add Key Result form or button */}

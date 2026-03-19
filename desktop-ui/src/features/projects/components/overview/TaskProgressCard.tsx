@@ -1,13 +1,12 @@
+import { todayISO } from "@shared/lib/dates";
 import { Progress } from "@shared/ui";
 import { useMemo } from "react";
 import { useNavigate } from "react-router";
 import { useProjectContext } from "../../contexts/ProjectContext";
-import { useProjectTasks } from "../../hooks/useProjectTasks";
 
 export function TaskProgressCard() {
   const navigate = useNavigate();
-  const { project } = useProjectContext();
-  const { data: tasks } = useProjectTasks(project?.id ?? "");
+  const { project, tasks } = useProjectContext();
 
   const totalCount = project?.taskCount ?? 0;
   const completedCount = project?.completedCount ?? 0;
@@ -15,8 +14,7 @@ export function TaskProgressCard() {
   const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
   const { dueToday, overdue } = useMemo(() => {
-    const now = new Date();
-    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const todayStr = todayISO();
     let dueTodayCount = 0;
     let overdueCount = 0;
     for (const t of tasks) {

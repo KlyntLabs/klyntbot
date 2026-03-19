@@ -1,9 +1,10 @@
 // desktop-ui/src/features/projects/pages/ProjectDetailPage.tsx
 
 import { Skeleton } from "@shared/ui";
-import { lazy, Suspense, useMemo } from "react";
-import { useLocation, useParams } from "react-router";
+import { lazy, Suspense, useMemo, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router";
 import { GlassTabBar, type TabDef } from "../components/GlassTabBar";
+import { ObjectiveCreateModal } from "../components/okr/ObjectiveCreateModal";
 import { ProjectHeader } from "../components/ProjectHeader";
 import { QuickAddFAB } from "../components/QuickAddFAB";
 import { ProjectProvider, useProjectContext } from "../contexts/ProjectContext";
@@ -29,7 +30,9 @@ const TAB_COMPONENTS: Record<string, React.LazyExoticComponent<React.ComponentTy
 
 function ProjectDetailInner() {
   const location = useLocation();
+  const navigate = useNavigate();
   const { project, objectives } = useProjectContext();
+  const [showCreateObjective, setShowCreateObjective] = useState(false);
   const { order, reorder } = useProjectTabOrder(project);
 
   // Derive active tab from URL path
@@ -73,15 +76,19 @@ function ProjectDetailInner() {
       </div>
       <QuickAddFAB
         onAddTask={() => {
-          /* TODO: open create task modal scoped to project */
+          navigate(`/project/${project?.id}/tasks`);
         }}
         onAddNote={() => {
-          /* TODO: navigate to notes tab + create */
+          navigate(`/project/${project?.id}/notes`);
         }}
-        onAddObjective={() => {
-          /* TODO: open create objective modal */
-        }}
+        onAddObjective={() => setShowCreateObjective(true)}
       />
+      {showCreateObjective && (
+        <ObjectiveCreateModal
+          open={showCreateObjective}
+          onClose={() => setShowCreateObjective(false)}
+        />
+      )}
     </div>
   );
 }

@@ -1,8 +1,7 @@
+import { Dialog } from "@shared/composites/Dialog/Dialog";
 import { useMutation } from "@shared/hooks/useMutation";
 import type { Objective, ObjectiveCreateParams, ObjectiveUpdateParams } from "@shared/types";
-import { X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useCallback, useEffect, useState } from "react";
 import { useProjectContext } from "../../contexts/ProjectContext";
 
 interface ObjectiveCreateModalProps {
@@ -18,7 +17,6 @@ export function ObjectiveCreateModal({
   editingObjective,
 }: ObjectiveCreateModalProps) {
   const { project, refetchObjectives } = useProjectContext();
-  const backdropRef = useRef<HTMLDivElement>(null);
 
   const isEdit = !!editingObjective;
 
@@ -32,9 +30,9 @@ export function ObjectiveCreateModal({
     if (open) {
       if (editingObjective) {
         setTitle(editingObjective.title);
-        setDescription("");
-        setPriority("3");
-        setDueDate("");
+        setDescription(editingObjective.description ?? "");
+        setPriority(String(editingObjective.priority ?? 3));
+        setDueDate(editingObjective.dueDate ?? "");
       } else {
         setTitle("");
         setDescription("");
@@ -99,151 +97,104 @@ export function ObjectiveCreateModal({
     ],
   );
 
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    },
-    [onClose],
-  );
-
-  useEffect(() => {
-    if (!open) return;
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [open, handleKeyDown]);
-
-  if (!open) return null;
-
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === backdropRef.current) onClose();
-  };
-
-  return createPortal(
-    <div
-      ref={backdropRef}
-      onClick={handleBackdropClick}
-      className="fixed inset-0 z-50 flex items-start justify-center bg-overlay backdrop-blur-sm pt-[15vh]"
-    >
-      <div
-        className="glass-panel w-full max-w-md"
-        style={{ animation: "glass-appear 0.2s ease-out" }}
-      >
-        <div className="bg-card rounded-[var(--glass-radius-inner)]">
-          {/* Header */}
-          <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-            <h3 className="text-[14px] font-medium text-foreground">
-              {isEdit ? "Edit Objective" : "New Objective"}
-            </h3>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Close dialog"
-              className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="px-5 py-4 space-y-4">
-            {/* Title */}
-            <div>
-              <label
-                htmlFor="obj-title"
-                className="block text-xs font-medium text-muted-foreground mb-1"
-              >
-                Title <span className="text-red-400">*</span>
-              </label>
-              <input
-                id="obj-title"
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g. Improve API latency by 50%"
-                autoFocus
-                required
-                className="w-full px-3 py-2 text-sm bg-transparent border border-border rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-brand"
-              />
-            </div>
-
-            {/* Description */}
-            <div>
-              <label
-                htmlFor="obj-desc"
-                className="block text-xs font-medium text-muted-foreground mb-1"
-              >
-                Description
-              </label>
-              <textarea
-                id="obj-desc"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Why this objective matters..."
-                rows={3}
-                className="w-full px-3 py-2 text-sm bg-transparent border border-border rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-brand resize-none"
-              />
-            </div>
-
-            {/* Priority + Due date */}
-            <div className="flex gap-3">
-              <div className="flex-1">
-                <label
-                  htmlFor="obj-priority"
-                  className="block text-xs font-medium text-muted-foreground mb-1"
-                >
-                  Priority
-                </label>
-                <select
-                  id="obj-priority"
-                  value={priority}
-                  onChange={(e) => setPriority(e.target.value)}
-                  className="w-full px-3 py-2 text-sm bg-transparent border border-border rounded-md text-foreground focus:outline-none focus:ring-1 focus:ring-brand"
-                >
-                  <option value="1">1 - Critical</option>
-                  <option value="2">2 - High</option>
-                  <option value="3">3 - Medium</option>
-                  <option value="4">4 - Low</option>
-                  <option value="5">5 - Minimal</option>
-                </select>
-              </div>
-              <div className="flex-1">
-                <label
-                  htmlFor="obj-due"
-                  className="block text-xs font-medium text-muted-foreground mb-1"
-                >
-                  Due Date
-                </label>
-                <input
-                  id="obj-due"
-                  type="date"
-                  value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
-                  className="w-full px-3 py-2 text-sm bg-transparent border border-border rounded-md text-foreground focus:outline-none focus:ring-1 focus:ring-brand"
-                />
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={!title.trim() || loading}
-                className="px-4 py-2 text-xs font-medium rounded-md bg-brand text-white hover:bg-brand/90 disabled:opacity-50 transition-colors"
-              >
-                {loading ? "Saving..." : isEdit ? "Update Objective" : "Create Objective"}
-              </button>
-            </div>
-          </form>
+  return (
+    <Dialog open={open} onClose={onClose} title={isEdit ? "Edit Objective" : "New Objective"}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Title */}
+        <div>
+          <label
+            htmlFor="obj-title"
+            className="block text-xs font-medium text-muted-foreground mb-1"
+          >
+            Title <span className="text-red-400">*</span>
+          </label>
+          <input
+            id="obj-title"
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="e.g. Improve API latency by 50%"
+            autoFocus
+            required
+            className="w-full px-3 py-2 text-sm bg-transparent border border-border rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-brand"
+          />
         </div>
-      </div>
-    </div>,
-    document.body,
+
+        {/* Description */}
+        <div>
+          <label
+            htmlFor="obj-desc"
+            className="block text-xs font-medium text-muted-foreground mb-1"
+          >
+            Description
+          </label>
+          <textarea
+            id="obj-desc"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Why this objective matters..."
+            rows={3}
+            className="w-full px-3 py-2 text-sm bg-transparent border border-border rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-brand resize-none"
+          />
+        </div>
+
+        {/* Priority + Due date */}
+        <div className="flex gap-3">
+          <div className="flex-1">
+            <label
+              htmlFor="obj-priority"
+              className="block text-xs font-medium text-muted-foreground mb-1"
+            >
+              Priority
+            </label>
+            <select
+              id="obj-priority"
+              value={priority}
+              onChange={(e) => setPriority(e.target.value)}
+              className="w-full px-3 py-2 text-sm bg-transparent border border-border rounded-md text-foreground focus:outline-none focus:ring-1 focus:ring-brand"
+            >
+              <option value="1">1 - Critical</option>
+              <option value="2">2 - High</option>
+              <option value="3">3 - Medium</option>
+              <option value="4">4 - Low</option>
+              <option value="5">5 - Minimal</option>
+            </select>
+          </div>
+          <div className="flex-1">
+            <label
+              htmlFor="obj-due"
+              className="block text-xs font-medium text-muted-foreground mb-1"
+            >
+              Due Date
+            </label>
+            <input
+              id="obj-due"
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              className="w-full px-3 py-2 text-sm bg-transparent border border-border rounded-md text-foreground focus:outline-none focus:ring-1 focus:ring-brand"
+            />
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center justify-end gap-2 pt-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={!title.trim() || loading}
+            className="px-4 py-2 text-xs font-medium rounded-md bg-brand text-white hover:bg-brand/90 disabled:opacity-50 transition-colors"
+          >
+            {loading ? "Saving..." : isEdit ? "Update Objective" : "Create Objective"}
+          </button>
+        </div>
+      </form>
+    </Dialog>
   );
 }

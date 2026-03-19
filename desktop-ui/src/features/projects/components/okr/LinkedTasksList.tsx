@@ -2,19 +2,17 @@ import { useMutation } from "@shared/hooks/useMutation";
 import type { Task } from "@shared/types";
 import { CheckCircle2, Circle } from "lucide-react";
 import { useMemo } from "react";
-import { useProjectTasks } from "../../hooks/useProjectTasks";
+import { useProjectContext } from "../../contexts/ProjectContext";
 
 interface LinkedTasksListProps {
   keyResultId: string;
-  projectId: string;
 }
 
-export function LinkedTasksList({ keyResultId, projectId }: LinkedTasksListProps) {
-  const { data: tasks } = useProjectTasks(projectId);
+export function LinkedTasksList({ keyResultId }: LinkedTasksListProps) {
+  const { tasks, refetchTasks, refetchObjectives } = useProjectContext();
 
   const linkedTasks = useMemo(() => {
     return tasks.filter((t: Task) => {
-      // Tasks linked via metadata.keyResultId or via objectiveId mapping
       const meta = t as Task & { metadata?: Record<string, unknown> };
       return meta.metadata?.keyResultId === keyResultId;
     });
@@ -24,6 +22,8 @@ export function LinkedTasksList({ keyResultId, projectId }: LinkedTasksListProps
 
   const handleToggle = async (task: Task) => {
     await toggleComplete({ id: task.id });
+    refetchTasks();
+    refetchObjectives();
   };
 
   if (linkedTasks.length === 0) {

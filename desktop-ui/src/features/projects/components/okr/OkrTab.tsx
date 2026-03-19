@@ -2,20 +2,11 @@ import type { Objective } from "@shared/types";
 import { Plus, Target } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useProjectContext } from "../../contexts/ProjectContext";
+import { classifyObjective, type ObjectiveStatus } from "../../lib/okr-utils";
 import { ObjectiveCard } from "./ObjectiveCard";
 import { ObjectiveCreateModal } from "./ObjectiveCreateModal";
 
-type StatusFilter = "all" | "on_track" | "at_risk" | "achieved";
-
-function classifyObjective(objective: Objective): StatusFilter {
-  if (objective.progress >= 100) return "achieved";
-  if (objective.status === "at_risk") return "at_risk";
-  const krs = objective.keyResults ?? [];
-  const avgProgress =
-    krs.length > 0 ? krs.reduce((s, kr) => s + kr.progress, 0) / krs.length : objective.progress;
-  if (avgProgress < 30 && krs.length > 0) return "at_risk";
-  return "on_track";
-}
+type StatusFilter = "all" | ObjectiveStatus;
 
 const FILTER_OPTIONS: { value: StatusFilter; label: string }[] = [
   { value: "all", label: "All" },

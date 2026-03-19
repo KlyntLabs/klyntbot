@@ -1,8 +1,9 @@
+import { useClickOutside } from "@shared/hooks/useClickOutside";
 import { useMutation } from "@shared/hooks/useMutation";
-import type { KeyResult } from "@shared/types";
+import type { KeyResult, Task } from "@shared/types";
 import { ProgressRing } from "@shared/ui";
 import { ChevronDown, ChevronRight, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useProjectContext } from "../../contexts/ProjectContext";
 import { useProjectDetailStore } from "../../store/project-detail-store";
 import { LinkedTasksList } from "./LinkedTasksList";
@@ -10,11 +11,18 @@ import { LinkedTasksList } from "./LinkedTasksList";
 interface KeyResultRowProps {
   keyResult: KeyResult;
   projectId: string;
+  tasks?: Task[];
   onEdit?: (kr: KeyResult) => void;
   onDelete?: (kr: KeyResult) => void;
 }
 
-export function KeyResultRow({ keyResult, projectId, onEdit, onDelete }: KeyResultRowProps) {
+export function KeyResultRow({
+  keyResult,
+  projectId,
+  tasks = [],
+  onEdit,
+  onDelete,
+}: KeyResultRowProps) {
   const { refetchObjectives } = useProjectContext();
   const expanded = useProjectDetailStore((s) => s.expandedKrs.has(keyResult.id));
   const toggleKr = useProjectDetailStore((s) => s.toggleKr);
@@ -27,6 +35,17 @@ export function KeyResultRow({ keyResult, projectId, onEdit, onDelete }: KeyResu
 
   const { mutate: updateMetric } = useMutation<void, { id: string; currentValue: number }>(
     "key_result_update_metric",
+  );
+
+  useClickOutside(menuRef, () => setMenuOpen(false), menuOpen);
+
+  const linkedTaskCount = useMemo(
+    () =>
+      tasks.filter((t) => {
+        const meta = t as Task & { metadata?: Record<string, unknown> };
+        return meta.metadata?.keyResultId === keyResult.id;
+      }).length,
+    [tasks, keyResult.id],
   );
 
   const handleMetricSave = useCallback(async () => {
@@ -111,7 +130,9 @@ export function KeyResultRow({ keyResult, projectId, onEdit, onDelete }: KeyResu
           onClick={() => toggleKr(keyResult.id)}
           className="text-[10px] px-1.5 py-0.5 rounded-full bg-brand/10 text-brand opacity-0 group-hover:opacity-100 transition-opacity"
         >
-          Tasks
+          {linkedTaskCount > 0
+            ? `${linkedTaskCount} task${linkedTaskCount !== 1 ? "s" : ""}`
+            : "Tasks"}
         </button>
 
         {/* Context menu */}
@@ -151,7 +172,7 @@ export function KeyResultRow({ keyResult, projectId, onEdit, onDelete }: KeyResu
       </div>
 
       {/* Expanded linked tasks */}
-      {expanded && <LinkedTasksList keyResultId={keyResult.id} projectId={projectId} />}
+      {expanded && <LinkedTasksList keyResultId={keyResult.id} />}
     </div>
   );
 }

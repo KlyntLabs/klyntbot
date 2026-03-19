@@ -1,5 +1,5 @@
 import { useQuery } from "@shared/hooks/useQuery";
-import { formatHumanDuration } from "@shared/lib/dates";
+import { formatHumanDuration, TZ_OFFSET_MINS, todayISO } from "@shared/lib/dates";
 
 interface WorkContextSummary {
   id: string;
@@ -15,10 +15,8 @@ interface DashboardIntelligence {
   productivityScore: number;
 }
 
-const TZ_OFFSET_MINS = new Date().getTimezoneOffset();
-
 export function WorkContextCard() {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayISO();
   const { data: intel } = useQuery<DashboardIntelligence>("get_dashboard_intelligence", {
     date: today,
     tzOffsetMins: TZ_OFFSET_MINS,

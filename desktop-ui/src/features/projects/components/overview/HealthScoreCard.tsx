@@ -2,7 +2,6 @@ import { ProgressRing } from "@shared/ui";
 import { useNavigate } from "react-router";
 import { useProjectContext } from "../../contexts/ProjectContext";
 import { useHealthScore } from "../../hooks/useHealthScore";
-import { useProjectTasks } from "../../hooks/useProjectTasks";
 
 const STATUS_TEXT: Record<string, string> = {
   green: "On Track",
@@ -12,8 +11,7 @@ const STATUS_TEXT: Record<string, string> = {
 
 export function HealthScoreCard() {
   const navigate = useNavigate();
-  const { project, objectives } = useProjectContext();
-  const { data: tasks } = useProjectTasks(project?.id ?? "");
+  const { project, objectives, tasks } = useProjectContext();
   const health = useHealthScore(objectives, tasks);
 
   const allKrs = objectives.flatMap((o) => o.keyResults ?? []);

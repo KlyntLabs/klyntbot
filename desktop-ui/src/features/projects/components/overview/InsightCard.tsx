@@ -1,32 +1,98 @@
-import { Lightbulb } from "lucide-react";
+import { ipc } from "@shared/hooks/useIpc";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { useProjectContext } from "../../contexts/ProjectContext";
+
+interface CachedInsight {
+  insightReviewId: string;
+  noteId: string;
+  synthesis: string | null;
+}
 
 export function InsightCard() {
   const navigate = useNavigate();
   const { project } = useProjectContext();
+  const [insight, setInsight] = useState<CachedInsight | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  // Iteration 1: placeholder teaser. Full implementation requires calling
-  // note_insight_cache_get per project note which is complex for the overview.
-  // Deferred to a follow-up when the InsightPreview component is available.
+  useEffect(() => {
+    async function fetchInsight() {
+      if (!project) return;
+      const notebookIds = (project.settings as Record<string, unknown>)?.notebookIds as
+        | string[]
+        | undefined;
+      if (!notebookIds?.length) {
+        setLoading(false);
+        return;
+      }
+      try {
+        const notes = await ipc<Array<{ id: string; title: string; updatedAt: string }>>(
+          "note_list",
+          { notebookId: notebookIds[0] },
+        );
+        const recent = notes.slice(0, 5);
+        for (const note of recent) {
+          const cached = await ipc<CachedInsight | null>("note_insight_cache_get", {
+            noteId: note.id,
+          });
+          if (cached?.synthesis) {
+            setInsight(cached);
+            break;
+          }
+        }
+      } catch {
+        // Silently fail — insight is optional
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchInsight();
+  }, [project]);
 
-  return (
-    <div className="glass-card rounded-xl p-5">
-      <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-3">
-        Latest Insight
-      </p>
+  if (loading) {
+    return (
+      <div className="glass-card rounded-xl p-5">
+        <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-3">
+          Latest Insight
+        </div>
+        <div className="h-12 bg-accent/20 rounded animate-pulse" />
+      </div>
+    );
+  }
 
-      <div className="flex flex-col items-center gap-2 py-2">
-        <Lightbulb className="w-5 h-5 text-muted-foreground/50" />
-        <p className="text-[11px] text-muted-foreground text-center">
-          Generate insights by visiting the Notes tab
+  if (!insight) {
+    return (
+      <div className="glass-card rounded-xl p-5">
+        <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-3">
+          Latest Insight
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          No insights yet. Visit the Notes tab and click "Generate Insight" on a note.
         </p>
         <button
           type="button"
-          onClick={() => navigate(`/project/${project?.id ?? ""}/notes`)}
-          className="text-[10px] text-brand hover:underline mt-1"
+          onClick={() => navigate(`/project/${project?.id}/notes`)}
+          className="mt-3 text-[10px] px-3 py-1 rounded bg-brand/10 text-brand hover:bg-brand/20 transition-colors"
         >
           Go to Notes
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="glass-card rounded-xl p-5 border border-brand/15">
+      <div className="text-[10px] text-brand uppercase tracking-wider mb-3">Latest Insight</div>
+      <p className="text-[11px] text-muted-foreground line-clamp-3 leading-relaxed">
+        {insight.synthesis}
+      </p>
+      <div className="flex gap-2 mt-3">
+        <button
+          type="button"
+          onClick={() => navigate(`/project/${project?.id}/notes`)}
+          className="text-[10px] px-3 py-1 rounded bg-brand/10 text-brand hover:bg-brand/20 transition-colors"
+        >
+          View Insight
         </button>
       </div>
     </div>

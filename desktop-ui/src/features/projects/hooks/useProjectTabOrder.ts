@@ -1,5 +1,5 @@
 import { useMutation } from "@shared/hooks/useMutation";
-import type { Project } from "@shared/types";
+import type { Project, ProjectUpdateParams } from "@shared/types";
 import { useCallback } from "react";
 
 const DEFAULT_ORDER = ["overview", "tasks", "okr", "notes"];

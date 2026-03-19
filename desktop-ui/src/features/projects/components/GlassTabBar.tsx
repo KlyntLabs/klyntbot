@@ -15,6 +15,7 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { useCallback, useMemo } from "react";
 import { useNavigate } from "react-router";
 
 export interface TabDef {
@@ -76,23 +77,28 @@ function SortableTab({
 export function GlassTabBar({ tabs, activeTab, basePath, onReorder }: GlassTabBarProps) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
-  function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const oldIndex = tabs.findIndex((t) => t.id === active.id);
-    const newIndex = tabs.findIndex((t) => t.id === over.id);
-    const newOrder = arrayMove(
-      tabs.map((t) => t.id),
-      oldIndex,
-      newIndex,
-    );
-    onReorder(newOrder);
-  }
+  const tabIds = useMemo(() => tabs.map((t) => t.id), [tabs]);
+
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (!over || active.id === over.id) return;
+      const oldIndex = tabs.findIndex((t) => t.id === active.id);
+      const newIndex = tabs.findIndex((t) => t.id === over.id);
+      const newOrder = arrayMove(
+        tabs.map((t) => t.id),
+        oldIndex,
+        newIndex,
+      );
+      onReorder(newOrder);
+    },
+    [tabs, onReorder],
+  );
 
   return (
     <div className="flex gap-0.5 px-6 glass-toolbar border-b border-border">
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <SortableContext items={tabs.map((t) => t.id)} strategy={horizontalListSortingStrategy}>
+        <SortableContext items={tabIds} strategy={horizontalListSortingStrategy}>
           {tabs.map((tab) => (
             <SortableTab
               key={tab.id}

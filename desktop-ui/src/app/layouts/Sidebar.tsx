@@ -28,7 +28,6 @@ const items: { key: SidebarItem; icon: typeof MessageSquare; path?: string; bott
   { key: "Chat", icon: MessageSquare, path: "/chat" },
   { key: "Dashboard", icon: LayoutDashboard, path: "/" },
   { key: "Tasks", icon: CheckSquare, path: "/tasks" },
-  { key: "OKR", icon: Target, path: "/tasks" },
   { key: "Notes", icon: FileText, path: "/notes" },
   { key: "Learn", icon: GraduationCap, path: "/learn" },
   { key: "Finance", icon: Wallet, path: "/finance" },

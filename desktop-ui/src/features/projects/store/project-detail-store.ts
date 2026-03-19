@@ -5,6 +5,7 @@ interface ProjectDetailState {
   expandedKrs: Set<string>;
   toggleObjective: (id: string) => void;
   toggleKr: (id: string) => void;
+  reset: () => void;
 }
 
 export const useProjectDetailStore = create<ProjectDetailState>((set) => ({
@@ -24,4 +25,5 @@ export const useProjectDetailStore = create<ProjectDetailState>((set) => ({
       else next.add(id);
       return { expandedKrs: next };
     }),
+  reset: () => set({ expandedObjectives: new Set(), expandedKrs: new Set() }),
 }));

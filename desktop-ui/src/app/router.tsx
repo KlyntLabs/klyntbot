@@ -44,6 +44,9 @@ const TargetsPage = lazy(() =>
 const ProjectDetailPage = lazy(() =>
   import("../features/projects").then((m) => ({ default: m.ProjectDetailPage })),
 );
+const ProjectsListPage = lazy(() =>
+  import("../features/projects").then((m) => ({ default: m.ProjectsListPage })),
+);
 
 // ── System Feature ───────────────────────────────────────────────
 const SystemPage = lazy(() =>
@@ -267,6 +270,7 @@ export const router = createHashRouter([
           </SettingsLayout>
         ),
       },
+      { path: "/projects", element: <ProjectsListPage /> },
       { path: "/project/:id", element: <ProjectDetailPage /> },
       { path: "/project/:id/:tab", element: <ProjectDetailPage /> },
     ],

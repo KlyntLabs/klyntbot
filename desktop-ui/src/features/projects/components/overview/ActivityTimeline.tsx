@@ -1,7 +1,6 @@
 import { formatRelativeTime } from "@shared/lib/dates";
 import { useMemo } from "react";
 import { useProjectContext } from "../../contexts/ProjectContext";
-import { useProjectTasks } from "../../hooks/useProjectTasks";
 
 interface TimelineItem {
   id: string;
@@ -31,11 +30,9 @@ function groupLabel(ts: string): string {
 const MAX_ITEMS = 10;
 
 export function ActivityTimeline() {
-  const { objectives } = useProjectContext();
-  const { project } = useProjectContext();
-  const { data: tasks } = useProjectTasks(project?.id ?? "");
+  const { tasks } = useProjectContext();
 
-  const items = useMemo(() => {
+  const grouped = useMemo(() => {
     const all: TimelineItem[] = [];
 
     for (const t of tasks) {
@@ -49,23 +46,23 @@ export function ActivityTimeline() {
       }
     }
 
-    for (const o of objectives) {
-      // Objectives don't have updatedAt on the response type,
-      // so we use a synthetic entry based on their presence
-      all.push({
-        id: o.id,
-        type: "objective",
-        label: `Objective: ${o.title} (${Math.round(o.progress)}%)`,
-        // Fall back to current time if no timestamp available
-        timestamp: new Date().toISOString(),
-      });
-    }
+    // Objectives excluded from timeline — they don't have updatedAt
+    // and using fabricated timestamps (new Date()) causes incorrect ordering.
 
     all.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
-    return all.slice(0, MAX_ITEMS);
-  }, [tasks, objectives]);
+    const items = all.slice(0, MAX_ITEMS);
 
-  if (items.length === 0) {
+    const groups = new Map<string, TimelineItem[]>();
+    for (const item of items) {
+      const group = groupLabel(item.timestamp);
+      const existing = groups.get(group);
+      if (existing) existing.push(item);
+      else groups.set(group, [item]);
+    }
+    return groups;
+  }, [tasks]);
+
+  if (grouped.size === 0) {
     return (
       <div className="glass-card rounded-xl p-5">
         <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-3">
@@ -74,15 +71,6 @@ export function ActivityTimeline() {
         <p className="text-[11px] text-muted-foreground">No recent activity</p>
       </div>
     );
-  }
-
-  // Group items by time period
-  const grouped = new Map<string, TimelineItem[]>();
-  for (const item of items) {
-    const group = groupLabel(item.timestamp);
-    const existing = grouped.get(group);
-    if (existing) existing.push(item);
-    else grouped.set(group, [item]);
   }
 
   return (

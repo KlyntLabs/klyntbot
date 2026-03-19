@@ -1,7 +1,8 @@
 // desktop-ui/src/features/projects/components/QuickAddFAB.tsx
 
+import { useClickOutside } from "@shared/hooks/useClickOutside";
 import { ChevronDown, Plus } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 interface QuickAddFABProps {
   onAddTask: () => void;
@@ -13,13 +14,7 @@ export function QuickAddFAB({ onAddTask, onAddNote, onAddObjective }: QuickAddFA
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  useClickOutside(ref, () => setOpen(false), open);
 
   return (
     <div ref={ref} className="fixed bottom-5 right-6 z-50 flex items-center gap-px">
