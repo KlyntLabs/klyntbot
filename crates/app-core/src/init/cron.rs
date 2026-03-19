@@ -109,6 +109,10 @@ pub(super) async fn init_cron(
     // ── AutoTuner nightly cycle (conditional) ────────────────────────────
     let autotuner = if config.autotuner.enabled {
         let trial_repo = storage::TrialRepo::new(repos.pool().clone());
+        trial_repo
+            .migrate()
+            .await
+            .map_err(|e| format!("autotuner migration failed: {e}"))?;
         let strategy_repo = repos.strategies.clone();
         let metric_source: Arc<dyn autotuner::MetricSource> =
             Arc::new(agent::autotuner::metric_collector::AgentMetricCollector::new(strategy_repo));
