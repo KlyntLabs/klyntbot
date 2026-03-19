@@ -98,6 +98,7 @@ impl AppCore {
             suggestion_applier,
             decomposition_handler,
             forecast_handler,
+            autotuner,
         } = cron::init_cron(
             &config,
             &repos,
@@ -296,7 +297,7 @@ impl AppCore {
             )),
             persona_repo: Some(::cognitive::PersonaRepo::new(storage_pool.inner().clone())),
             squad_repo: Some(::cognitive::SquadRepo::new(storage_pool.inner().clone())),
-            autotuner: None,
+            autotuner,
         };
 
         // ── Background insight progress refresh (daily) ──────────────────

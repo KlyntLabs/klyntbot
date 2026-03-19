@@ -3082,6 +3082,7 @@ dependencies = [
  "anyhow",
  "app-core",
  "async-trait",
+ "autotuner",
  "axum",
  "base64 0.22.1",
  "bus",

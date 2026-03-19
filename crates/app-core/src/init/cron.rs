@@ -15,6 +15,7 @@ pub(super) struct CronResult {
     pub suggestion_applier: Option<Arc<dyn SuggestionApplier>>,
     pub decomposition_handler: Option<Arc<dyn DecompositionHandler>>,
     pub forecast_handler: Option<Arc<dyn ForecastHandler>>,
+    pub autotuner: Option<Arc<agent::autotuner::AutoTunerOrchestrator>>,
 }
 
 pub const JOB_PROACTIVE_SCAN: &str = "proactive_scan";
@@ -105,6 +106,29 @@ pub(super) async fn init_cron(
         suggestion_applier,
     );
 
+    // ── AutoTuner nightly cycle (conditional) ────────────────────────────
+    let autotuner = if config.autotuner.enabled {
+        let trial_repo = storage::TrialRepo::new(repos.pool().clone());
+        let strategy_repo = repos.strategies.clone();
+        let metric_source: Arc<dyn autotuner::MetricSource> =
+            Arc::new(agent::autotuner::metric_collector::AgentMetricCollector::new(strategy_repo));
+        let orchestrator = Arc::new(agent::autotuner::AutoTunerOrchestrator::new(
+            autotuner::Champion::default(),
+            true,
+        ));
+        agent::autotuner::AutoTunerOrchestrator::register_nightly_cycle(
+            Arc::clone(&orchestrator),
+            &mut cron_service,
+            config.autotuner.clone(),
+            trial_repo,
+            metric_source,
+        );
+        info!("autotuner nightly cycle handler registered");
+        Some(orchestrator)
+    } else {
+        None
+    };
+
     let cron_service = Arc::new(cron_service);
     ensure_cron_jobs(&cron_service, config, &tasks_config)
         .await
@@ -118,6 +142,7 @@ pub(super) async fn init_cron(
         suggestion_applier: suggestion_applier_out,
         decomposition_handler,
         forecast_handler,
+        autotuner,
     })
 }
 
@@ -557,6 +582,15 @@ async fn ensure_cron_jobs(
             },
             "Proactive task suggestion scan"
         );
+    }
+
+    // Autotuner nightly evaluation cycle
+    if config.autotuner.enabled {
+        agent::autotuner::AutoTunerOrchestrator::ensure_nightly_job(
+            cron_service,
+            &config.autotuner.schedule,
+        )
+        .await?;
     }
 
     Ok(())
