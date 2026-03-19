@@ -47,6 +47,7 @@ dependencies = [
  "activity-log",
  "aho-corasick",
  "async-trait",
+ "autotuner",
  "base64 0.22.1",
  "bus",
  "chrono",
