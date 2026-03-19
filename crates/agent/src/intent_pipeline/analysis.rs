@@ -1165,6 +1165,10 @@ pub struct IntentAnalyzer {
     semantic_fact_repo: Option<cognitive::SemanticFactRepo>,
     /// Cached adaptive threshold with TTL.
     threshold_cache: Mutex<Option<(Instant, f32)>>,
+    /// Optional parameter overrides from the autotuner.
+    overrides: Option<common::TrialParams>,
+    /// When true, stop after Layer 1-2 (never invoke LLM classifier).
+    shadow_mode: bool,
 }
 
 impl IntentAnalyzer {
@@ -1184,6 +1188,8 @@ impl IntentAnalyzer {
             centroid_cache: Mutex::new(None),
             semantic_fact_repo: None,
             threshold_cache: Mutex::new(None),
+            overrides: None,
+            shadow_mode: false,
         }
     }
 
@@ -1199,6 +1205,18 @@ impl IntentAnalyzer {
 
     pub fn with_semantic_fact_repo(mut self, repo: cognitive::SemanticFactRepo) -> Self {
         self.semantic_fact_repo = Some(repo);
+        self
+    }
+
+    /// Set parameter overrides for this analyzer instance.
+    pub fn with_overrides(mut self, params: common::TrialParams) -> Self {
+        self.overrides = Some(params);
+        self
+    }
+
+    /// Enable shadow mode — stop cascade at Layer 1-2, never invoke LLM.
+    pub fn with_shadow_mode(mut self) -> Self {
+        self.shadow_mode = true;
         self
     }
 
@@ -1238,10 +1256,12 @@ impl IntentAnalyzer {
                         );
                         emb_analysis
                     } else {
-                        self.classify_with_llm(message, tool_names).await
+                        self.classify_or_shadow_defer(message, tool_names, Some(&emb_analysis))
+                            .await
                     }
                 } else {
-                    self.classify_with_llm(message, tool_names).await
+                    self.classify_or_shadow_defer(message, tool_names, Some(&analysis))
+                        .await
                 }
             }
         } else {
@@ -1255,11 +1275,13 @@ impl IntentAnalyzer {
                     );
                     emb_analysis
                 } else {
-                    self.classify_with_llm(message, tool_names).await
+                    self.classify_or_shadow_defer(message, tool_names, Some(&emb_analysis))
+                        .await
                 }
             } else {
                 // Layer 3: LLM classifier
-                self.classify_with_llm(message, tool_names).await
+                self.classify_or_shadow_defer(message, tool_names, None)
+                    .await
             }
         };
 
@@ -1297,6 +1319,44 @@ impl IntentAnalyzer {
         self.apply_cognitive_boost(message, &mut analysis).await;
 
         analysis
+    }
+
+    /// Gate before Layer 3: in shadow mode, return a deferred result instead
+    /// of invoking the LLM classifier.  Accepts the best Layer 1-2 result (if
+    /// any) so the caller gets the most useful partial classification.
+    async fn classify_or_shadow_defer(
+        &self,
+        message: &str,
+        tool_names: &[&str],
+        best_layer12: Option<&IntentAnalysis>,
+    ) -> IntentAnalysis {
+        if self.shadow_mode {
+            debug!("Shadow mode: skipping LLM classifier (Layer 3)");
+            return match best_layer12 {
+                Some(partial) => IntentAnalysis {
+                    source: AnalysisSource::ShadowDeferred,
+                    ..partial.clone()
+                },
+                None => IntentAnalysis {
+                    mode: ExecutionMode::Reactive {
+                        max_iterations: ORCHESTRATION_MIN_ITERATIONS,
+                    },
+                    signals: ComplexitySignals {
+                        estimated_tool_calls: 1,
+                        has_sequential_deps: false,
+                        failure_risk: FailureRisk::Low,
+                        requires_state_tracking: false,
+                        requires_retries: false,
+                        has_hypothetical: false,
+                    },
+                    confidence: 0.0,
+                    source: AnalysisSource::ShadowDeferred,
+                    reasoning: "Shadow mode — Layer 1-2 inconclusive, LLM skipped".to_string(),
+                    needs_orchestration: false,
+                },
+            };
+        }
+        self.classify_with_llm(message, tool_names).await
     }
 
     // ── Layer 2: Embedding fallback ──
@@ -1418,6 +1478,13 @@ impl IntentAnalyzer {
     // ── Adaptive threshold ──
 
     async fn effective_heuristic_threshold(&self) -> f32 {
+        // Override from autotuner trial takes precedence over everything.
+        if let Some(ref overrides) = self.overrides {
+            if let Some(threshold) = overrides.heuristic_confidence_threshold {
+                return threshold as f32;
+            }
+        }
+
         let base = self.config.heuristic_confidence_threshold;
 
         let repo = match &self.strategy_repo {

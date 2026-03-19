@@ -126,6 +126,8 @@ pub enum AnalysisSource {
     Heuristic,
     LlmClassifier,
     MidExecutionEscalation,
+    /// Shadow mode stopped the cascade before Layer 3 (LLM).
+    ShadowDeferred,
 }
 
 /// Configuration for the execution pipeline (used by `AgentRuntime`).
