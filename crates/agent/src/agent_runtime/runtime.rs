@@ -16,6 +16,7 @@ use tools::RoutingContext;
 use tracing::{debug, warn};
 
 use super::scenario;
+use crate::autotuner::hooks::AutoTunerHook;
 use crate::events::AgentEvent;
 
 use crate::execution::ExecutionParams;
@@ -92,6 +93,10 @@ pub struct AgentRuntime {
     current_event_tx: RwLock<Option<tokio::sync::mpsc::Sender<AgentEvent>>>,
     /// Bundled dependencies for squad chat mode — always set together.
     squad_deps: Option<SquadDeps>,
+    /// AutoTuner orchestrator — provides champion params for live classification.
+    autotuner: Option<Arc<crate::autotuner::AutoTunerOrchestrator>>,
+    /// AutoTuner hook — runs shadow classification and records ground truth.
+    autotuner_hook: Option<Arc<dyn AutoTunerHook>>,
 }
 
 impl AgentRuntime {
@@ -124,6 +129,8 @@ impl AgentRuntime {
             delegation_self_ref: std::sync::OnceLock::new(),
             current_event_tx: RwLock::new(None),
             squad_deps: None,
+            autotuner: None,
+            autotuner_hook: None,
         }
     }
 
@@ -179,6 +186,21 @@ impl AgentRuntime {
         self
     }
 
+    /// Set the autotuner orchestrator for champion param application.
+    pub fn with_autotuner(
+        mut self,
+        orchestrator: Arc<crate::autotuner::AutoTunerOrchestrator>,
+    ) -> Self {
+        self.autotuner = Some(orchestrator);
+        self
+    }
+
+    /// Set the autotuner hook for shadow classification callbacks.
+    pub fn with_autotuner_hook(mut self, hook: Arc<dyn AutoTunerHook>) -> Self {
+        self.autotuner_hook = Some(hook);
+        self
+    }
+
     /// Set the self-reference for delegation support (called after Arc wrapping).
     pub fn set_delegation_self_ref(&self, handler: Arc<dyn tools::DelegationHandler>) {
         let _ = self.delegation_self_ref.set(handler);
@@ -224,6 +246,21 @@ impl AgentRuntime {
         cancel_token: Option<tokio_util::sync::CancellationToken>,
     ) -> Result<RuntimeResult> {
         let pipeline_start = Instant::now();
+
+        // Step 0a: AutoTuner hook — shadow classification before live processing.
+        if let Some(ref hook) = self.autotuner_hook {
+            hook.on_message_received(message, ctx.chat_id.as_str())
+                .await;
+        }
+
+        // Step 0b: Read champion params from autotuner (if active).
+        // Currently used for transparency logging; IntentAnalyzer reads directly
+        // from its own autotuner reference for per-message threshold overrides.
+        let _champion_params = if let Some(ref orchestrator) = self.autotuner {
+            orchestrator.current_champion_params().await
+        } else {
+            None
+        };
 
         // Step 1: Match message to orchestrator skill via SkillRouter
         let mut profile = {
@@ -554,6 +591,18 @@ impl AgentRuntime {
             }
         };
         tokio::join!(usage_fut, strategy_fut, interaction_fut);
+
+        // Step 11: AutoTuner hook — record ground truth after response delivery.
+        if let Some(ref hook) = self.autotuner_hook {
+            let tokens = router_result.usage.prompt_tokens + router_result.usage.completion_tokens;
+            hook.on_message_completed(
+                ctx.chat_id.as_str(),
+                false, // user_corrected — updated later via reaction/feedback
+                tokens,
+                pipeline_elapsed_ms,
+            )
+            .await;
+        }
 
         let final_content = std::mem::take(&mut validation.filtered_content);
 

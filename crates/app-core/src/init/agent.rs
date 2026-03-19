@@ -36,6 +36,7 @@ pub(super) async fn init_agent(
     cron_service: &Arc<CronService>,
     notification_dispatcher: &Arc<agent::NotificationDispatcher>,
     notification_sender: &Option<Arc<dyn common::NotificationSender>>,
+    autotuner: Option<&Arc<agent::autotuner::AutoTunerOrchestrator>>,
 ) -> Result<AgentResult, String> {
     // 7. Load personas
     let data_dir = config.data_dir_path();
@@ -85,6 +86,10 @@ pub(super) async fn init_agent(
 
     if let Some(vs) = vector_store {
         builder = builder.with_vector_store(vs);
+    }
+
+    if let Some(orchestrator) = autotuner {
+        builder = builder.with_autotuner(Arc::clone(orchestrator));
     }
 
     let mut agent_loop_raw = builder

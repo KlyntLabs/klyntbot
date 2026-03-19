@@ -1165,8 +1165,11 @@ pub struct IntentAnalyzer {
     semantic_fact_repo: Option<cognitive::SemanticFactRepo>,
     /// Cached adaptive threshold with TTL.
     threshold_cache: Mutex<Option<(Instant, f32)>>,
-    /// Optional parameter overrides from the autotuner.
+    /// Optional parameter overrides from the autotuner (static, set at construction).
     overrides: Option<common::TrialParams>,
+    /// Live autotuner reference — reads champion params on every `analyze()` call.
+    /// Takes precedence over `overrides` when present and active.
+    autotuner: Option<std::sync::Arc<crate::autotuner::AutoTunerOrchestrator>>,
     /// When true, stop after Layer 1-2 (never invoke LLM classifier).
     shadow_mode: bool,
 }
@@ -1189,6 +1192,7 @@ impl IntentAnalyzer {
             semantic_fact_repo: None,
             threshold_cache: Mutex::new(None),
             overrides: None,
+            autotuner: None,
             shadow_mode: false,
         }
     }
@@ -1208,9 +1212,18 @@ impl IntentAnalyzer {
         self
     }
 
-    /// Set parameter overrides for this analyzer instance.
+    /// Set parameter overrides for this analyzer instance (static, set at construction).
     pub fn with_overrides(mut self, params: common::TrialParams) -> Self {
         self.overrides = Some(params);
+        self
+    }
+
+    /// Set a live autotuner reference for per-message champion param reads.
+    pub fn with_autotuner(
+        mut self,
+        orchestrator: std::sync::Arc<crate::autotuner::AutoTunerOrchestrator>,
+    ) -> Self {
+        self.autotuner = Some(orchestrator);
         self
     }
 
@@ -1478,7 +1491,16 @@ impl IntentAnalyzer {
     // ── Adaptive threshold ──
 
     async fn effective_heuristic_threshold(&self) -> f32 {
-        // Override from autotuner trial takes precedence over everything.
+        // Live autotuner champion params take highest precedence.
+        if let Some(ref orchestrator) = self.autotuner {
+            if let Some(params) = orchestrator.current_champion_params().await {
+                if let Some(threshold) = params.heuristic_confidence_threshold {
+                    return threshold as f32;
+                }
+            }
+        }
+
+        // Static override from autotuner trial (set at construction, e.g. shadow mode).
         if let Some(ref overrides) = self.overrides {
             if let Some(threshold) = overrides.heuristic_confidence_threshold {
                 return threshold as f32;

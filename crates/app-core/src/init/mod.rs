@@ -175,6 +175,7 @@ impl AppCore {
             &cron_service,
             &notification_dispatcher,
             &notification_sender,
+            autotuner.as_ref(),
         )
         .await?;
 

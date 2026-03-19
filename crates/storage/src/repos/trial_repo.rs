@@ -158,6 +158,41 @@ impl TrialRepo {
         Ok(rows)
     }
 
+    /// Insert a shadow log entry recording a shadow classification prediction.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn insert_shadow_log(
+        &self,
+        trial_id: &str,
+        message_timestamp: &str,
+        chat_id: &str,
+        predicted_orchestrator: &str,
+        predicted_mode: &str,
+        confidence: f64,
+        predicted_iteration_budget: i64,
+        control_orchestrator: &str,
+        control_mode: &str,
+    ) -> Result<(), StorageError> {
+        sqlx::query(
+            "INSERT INTO autotuner_shadow_log
+                (trial_id, message_timestamp, chat_id, predicted_orchestrator,
+                 predicted_mode, confidence, predicted_iteration_budget,
+                 control_orchestrator, control_mode)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+        )
+        .bind(trial_id)
+        .bind(message_timestamp)
+        .bind(chat_id)
+        .bind(predicted_orchestrator)
+        .bind(predicted_mode)
+        .bind(confidence)
+        .bind(predicted_iteration_budget)
+        .bind(control_orchestrator)
+        .bind(control_mode)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
     /// Return the most recently completed trials, newest first.
     pub async fn get_recent_completed(&self, limit: u32) -> Result<Vec<TrialRow>, StorageError> {
         let rows = sqlx::query_as::<_, TrialRow>(
