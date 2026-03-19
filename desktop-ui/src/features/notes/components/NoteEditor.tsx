@@ -170,12 +170,19 @@ export function NoteEditor({
   useEntityResolution(editor);
 
   // ── Annotation & Perspective hooks ────────────────────────────────
-  const { annotations, createAnnotation, updateAnnotation, deleteAnnotation } = useAnnotations(note.id, editor);
-  const { handleAnnotate, handleFlashcard, handleTranslate, handleAskAI } = useEditorActions(
+  const { annotations, createAnnotation, updateAnnotation, deleteAnnotation } = useAnnotations(
+    note.id,
+    editor,
+  );
+  const { handleAnnotate, handleFlashcard, handleAskAI } = useEditorActions(
     editor,
     note.id,
     createAnnotation,
   );
+
+  const handleTranslate = useCallback(() => {
+    onSplitModeChange?.("translation");
+  }, [onSplitModeChange]);
   const { activePerspective, focusedSectionId, setPerspective } = usePerspective(
     note.id,
     editor,
@@ -235,18 +242,6 @@ export function NoteEditor({
     window.addEventListener("editor-action", handler);
     return () => window.removeEventListener("editor-action", handler);
   }, [handleAnnotate, handleFlashcard, focusedSectionId, setPerspective]);
-
-  const [hasSelection, setHasSelection] = useState(false);
-
-  // Track selection across both single and split mode editors via DOM selection API
-  useEffect(() => {
-    const checkSelection = () => {
-      const sel = window.getSelection();
-      setHasSelection(!!sel && !sel.isCollapsed && (sel.toString().length > 0));
-    };
-    document.addEventListener("selectionchange", checkSelection);
-    return () => document.removeEventListener("selectionchange", checkSelection);
-  }, []);
 
   // Flush on note change and update editor content
   useEffect(() => {
@@ -408,7 +403,6 @@ export function NoteEditor({
 
         {/* Content: body */}
         <EditorContextMenu
-          hasSelection={hasSelection}
           onAnnotate={handleAnnotate}
           onFlashcard={handleFlashcard}
           onTranslate={handleTranslate}
@@ -418,10 +412,7 @@ export function NoteEditor({
           }}
           onApplyPerspective={(type) => {
             if (focusedSectionId)
-              setPerspective(
-                focusedSectionId,
-                type as "linked-view" | "annotated" | "study-mode",
-              );
+              setPerspective(focusedSectionId, type as "linked-view" | "annotated" | "study-mode");
           }}
         >
           {activeSplitMode ? (

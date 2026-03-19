@@ -9,6 +9,10 @@ const INSIGHT_EVENTS = [
   "insight:perspectives-meta",
   "insight:persona-perspective",
   "insight:changes-summary",
+  "insight:debate-round-started",
+  "insight:debate-persona",
+  "insight:debate-judge",
+  "insight:debate-consensus",
 ];
 
 /**

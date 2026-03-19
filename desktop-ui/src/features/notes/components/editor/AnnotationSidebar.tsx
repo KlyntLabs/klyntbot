@@ -1,10 +1,7 @@
 import { ipc } from "@shared/hooks/useIpc";
 import { invalidateQueries } from "@shared/hooks/useQuery";
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  type AnnotationResponse,
-  useAnnotations,
-} from "../../hooks/useAnnotations";
+import { type AnnotationResponse, useAnnotations } from "../../hooks/useAnnotations";
 
 interface AnnotationSidebarProps {
   noteId: string;

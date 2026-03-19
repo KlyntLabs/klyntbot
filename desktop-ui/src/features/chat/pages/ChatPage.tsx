@@ -65,15 +65,11 @@ export function ChatPage() {
   // Voice mode for squad chat
   const [voiceMode, setVoiceMode] = useState<VoiceMode>("multi");
 
-  // Squad mode: "quick" (single-pass) or "debate" (room-style conversation)
-  type SquadModeType = "quick" | "debate";
-  const [squadMode, setSquadMode] = useState<SquadModeType>("quick");
-
-  // Chat session — pass squadId and squadMode when present
+  // Chat session — always use debate mode for squad chats
   const chat = useChatSession(
     selectedThread,
     refetchThreads,
-    squadId ? { squadId, squadMode } : undefined,
+    squadId ? { squadId, squadMode: "debate" } : undefined,
   );
 
   // Context resume — pre-fill input from navigation state
@@ -314,19 +310,6 @@ export function ChatPage() {
             <div />
           )}
           <div className="flex items-center gap-2">
-            {squadId && (
-              <button
-                type="button"
-                onClick={() => setSquadMode((m) => (m === "quick" ? "debate" : "quick"))}
-                className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
-                  squadMode === "debate"
-                    ? "bg-purple-500/20 text-purple-300 border border-purple-500/30"
-                    : "bg-white/[0.04] text-dim hover:text-muted-foreground border border-transparent"
-                }`}
-              >
-                {squadMode === "debate" ? "Debate" : "Quick"}
-              </button>
-            )}
             <TransparencyToggle enabled={showTransparency} onToggle={toggleTransparency} />
           </div>
         </div>

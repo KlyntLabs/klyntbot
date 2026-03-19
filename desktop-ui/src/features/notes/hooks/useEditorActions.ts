@@ -53,13 +53,9 @@ export function useEditorActions(
     generateFromText(selectedText);
   }, [editor, generateFromText]);
 
-  const handleTranslate = useCallback(() => {
-    // TODO: Activate translation split-pane with selection
-  }, []);
-
   const handleAskAI = useCallback(() => {
     // TODO: Open inline AI prompt input
   }, []);
 
-  return { handleAnnotate, handleFlashcard, handleTranslate, handleAskAI };
+  return { handleAnnotate, handleFlashcard, handleAskAI };
 }

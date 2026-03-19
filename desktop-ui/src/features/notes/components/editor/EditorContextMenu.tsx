@@ -1,9 +1,8 @@
 import * as ContextMenu from "@radix-ui/react-context-menu";
-import type { ReactNode } from "react";
+import { type ReactNode, useCallback, useState } from "react";
 
 interface EditorContextMenuProps {
   children: ReactNode;
-  hasSelection: boolean;
   onAnnotate: () => void;
   onFlashcard: () => void;
   onTranslate: () => void;
@@ -14,7 +13,6 @@ interface EditorContextMenuProps {
 
 export function EditorContextMenu({
   children,
-  hasSelection,
   onAnnotate,
   onFlashcard,
   onTranslate,
@@ -22,14 +20,24 @@ export function EditorContextMenu({
   onLinkedView,
   onApplyPerspective,
 }: EditorContextMenuProps) {
+  // Snapshot selection when the menu opens — before Radix collapses it
+  const [hadSelection, setHadSelection] = useState(false);
+
+  const handleOpenChange = useCallback((open: boolean) => {
+    if (open) {
+      const sel = window.getSelection();
+      setHadSelection(!!sel && !sel.isCollapsed && sel.toString().trim().length > 0);
+    }
+  }, []);
+
   return (
-    <ContextMenu.Root>
+    <ContextMenu.Root onOpenChange={handleOpenChange}>
       <ContextMenu.Trigger asChild>{children}</ContextMenu.Trigger>
       <ContextMenu.Portal>
         <ContextMenu.Content className="glass-panel min-w-[200px] rounded-lg p-1.5 shadow-xl">
-          {hasSelection && (
+          {hadSelection && (
             <>
-              <ContextMenu.Label className="px-2 py-1 text-[11px] font-medium text-muted uppercase tracking-wide">
+              <ContextMenu.Label className="px-2 py-1 text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
                 Selection
               </ContextMenu.Label>
               <MenuItem onClick={onAnnotate} shortcut="⌥A">
@@ -43,7 +51,7 @@ export function EditorContextMenu({
             </>
           )}
 
-          <ContextMenu.Label className="px-2 py-1 text-[11px] font-medium text-muted uppercase tracking-wide">
+          <ContextMenu.Label className="px-2 py-1 text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
             AI Actions
           </ContextMenu.Label>
           <MenuItem onClick={onAskAI}>Ask AI</MenuItem>

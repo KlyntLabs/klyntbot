@@ -855,6 +855,177 @@ impl AppCore {
         notes
     }
 
+    /// Run a room-style debate on the note content using the squad's personas.
+    /// Emits debate events through the insight SSE channel.
+    pub async fn note_insight_debate(
+        &self,
+        note_id: &str,
+        squad_id: Option<&str>,
+    ) -> Result<(), ApiError> {
+        let provider = self
+            .cognitive_provider
+            .as_ref()
+            .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "LLM provider not configured"))?;
+
+        let note = self
+            .note_repo
+            .get_note(note_id)
+            .await
+            .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?
+            .ok_or_else(|| ApiError::new("NOT_FOUND", "Note not found"))?;
+
+        let tags = self.note_repo.get_tags(note_id).await.unwrap_or_default();
+        let entity_repo = cognitive::repos::EntityRepo::new(self.storage_pool.inner().clone());
+        let note_domains = insight_context::extract_note_domains(&tags, Some(&entity_repo)).await;
+
+        let personas = self
+            .resolve_squad_for_note(note_id, squad_id, &note_domains)
+            .await;
+        if personas.len() < 2 {
+            return Err(ApiError::new(
+                "NOT_ENOUGH_PERSONAS",
+                "Need at least 2 personas for a debate",
+            ));
+        }
+
+        let config = self.config.read().await;
+        let params = providers::cognitive_chat_params(&config, 4096);
+        drop(config);
+        let blackboard_repo =
+            cognitive::BlackboardRepo::new(self.storage_pool.inner().clone());
+        let session_key = format!("debate:insight:{}:{}", note_id, uuid::Uuid::new_v4());
+
+        // Build context from note content
+        let context = format!(
+            "You are analyzing the following note:\n\n# {}\n\n{}",
+            note.title, note.body
+        );
+
+        // Create event channel for debate events
+        let (event_tx, mut event_rx) =
+            tokio::sync::mpsc::channel::<agent::AgentEvent>(64);
+
+        // Clone emitter for the relay task
+        let emitter = Arc::clone(&self.event_emitter);
+
+        // Spawn relay task: convert AgentEvents → insight SSE events
+        let relay_handle = tokio::spawn(async move {
+            while let Some(event) = event_rx.recv().await {
+                match event {
+                    agent::AgentEvent::DebateRoundStarted {
+                        round,
+                        total_rounds,
+                        phase,
+                    } => {
+                        emitter.emit_event(
+                            "insight:debate-round-started",
+                            serde_json::json!({
+                                "round": round,
+                                "totalRounds": total_rounds,
+                                "phase": phase,
+                            }),
+                        );
+                    }
+                    agent::AgentEvent::PersonaPerspective {
+                        persona_id,
+                        persona_name,
+                        persona_icon,
+                        persona_role,
+                        content,
+                        challenge,
+                    } => {
+                        emitter.emit_event(
+                            "insight:debate-persona",
+                            serde_json::json!({
+                                "personaId": persona_id,
+                                "personaName": persona_name,
+                                "personaIcon": persona_icon,
+                                "personaRole": persona_role,
+                                "content": content,
+                                "challenge": challenge,
+                            }),
+                        );
+                    }
+                    agent::AgentEvent::DebateJudgeDecision {
+                        round,
+                        consensus_score,
+                        decision,
+                        speaking_order,
+                        reasoning,
+                    } => {
+                        emitter.emit_event(
+                            "insight:debate-judge",
+                            serde_json::json!({
+                                "round": round,
+                                "consensusScore": consensus_score,
+                                "decision": decision,
+                                "speakingOrder": speaking_order,
+                                "reasoning": reasoning,
+                            }),
+                        );
+                    }
+                    agent::AgentEvent::DebateRoundCompleted {
+                        round,
+                        consensus_score,
+                    } => {
+                        emitter.emit_event(
+                            "insight:debate-round-completed",
+                            serde_json::json!({
+                                "round": round,
+                                "consensusScore": consensus_score,
+                            }),
+                        );
+                    }
+                    agent::AgentEvent::ConsensusReached {
+                        round,
+                        consensus_score,
+                        summary,
+                    } => {
+                        emitter.emit_event(
+                            "insight:debate-consensus",
+                            serde_json::json!({
+                                "round": round,
+                                "consensusScore": consensus_score,
+                                "summary": summary,
+                            }),
+                        );
+                    }
+                    _ => {} // Ignore other events
+                }
+            }
+        });
+
+        // Run the debate
+        let emitter_done = Arc::clone(&self.event_emitter);
+        let provider_clone = provider.clone();
+        let note_id_owned = note_id.to_string();
+        tokio::spawn(async move {
+            let _results = agent::intent_pipeline::engines::debate::run_room_debate(
+                &provider_clone,
+                &context,
+                "Analyze this note from your unique perspective. What are the key insights, weaknesses, and recommendations?",
+                &personas,
+                &params,
+                &blackboard_repo,
+                &session_key,
+                "insight",
+                Some(&event_tx),
+            )
+            .await;
+
+            // Drop the sender to signal relay task to finish
+            drop(event_tx);
+            let _ = relay_handle.await;
+
+            emitter_done.emit_event(
+                "insight:debate-done",
+                serde_json::json!({ "noteId": note_id_owned }),
+            );
+        });
+
+        Ok(())
+    }
+
     async fn resolve_squad_for_note(
         &self,
         note_id: &str,

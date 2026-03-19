@@ -371,6 +371,8 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
                 noteId={state.noteId}
                 squadId={state.squadId}
                 onSquadChange={(id) => actions.setSquadId(id)}
+                debate={state.tabs.perspectives.debate}
+                onStartDebate={actions.startDebate}
               />
             )}
           </>

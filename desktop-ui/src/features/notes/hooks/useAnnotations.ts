@@ -37,15 +37,19 @@ interface AnnotationUpdateParams {
 const EMPTY_ANNOTATIONS: AnnotationResponse[] = [];
 
 export function useAnnotations(noteId: string | null, editor: Editor | null) {
-  const { data: annotations, refetch } = useQuery<AnnotationResponse[]>(
+  const {
+    data: annotations,
+    loading,
+    refetch,
+  } = useQuery<AnnotationResponse[]>(
     "annotation_list_for_note",
     noteId ? { noteId, limit: 200 } : null,
     EMPTY_ANNOTATIONS,
   );
 
-  // Clean up orphan marks that have no matching DB record
+  // Clean up orphan marks that have no matching DB record (only after data loaded)
   useEffect(() => {
-    if (!editor || !annotations || annotations.length === 0) return;
+    if (!editor || loading) return;
     const validIds = new Set(annotations.map((a) => a.markId ?? a.id));
     const { tr, doc } = editor.state;
     let modified = false;
@@ -58,7 +62,7 @@ export function useAnnotations(noteId: string | null, editor: Editor | null) {
       }
     });
     if (modified) editor.view.dispatch(tr);
-  }, [editor, annotations]);
+  }, [editor, annotations, loading]);
 
   const createAnnotation = useCallback(
     async (params: AnnotationCreateParams) => {

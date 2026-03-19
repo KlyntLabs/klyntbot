@@ -333,6 +333,17 @@ pub async fn note_insight_regenerate_tab(
 }
 
 #[tauri::command]
+pub async fn note_insight_debate(
+    state: State<'_, Arc<AppCore>>,
+    note_id: String,
+    squad_id: Option<String>,
+) -> Result<(), ApiError> {
+    state
+        .note_insight_debate(&note_id, squad_id.as_deref())
+        .await
+}
+
+#[tauri::command]
 pub async fn note_insight_list_versions(
     state: State<'_, Arc<AppCore>>,
     note_id: String,
@@ -586,6 +597,7 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "note_insight_save_flashcards",
     "note_insight_submit_quiz",
     "note_insight_regenerate_tab",
+    "note_insight_debate",
     "note_insight_list_versions",
     "note_insight_get_evolution",
     "note_insight_get_version",
@@ -746,6 +758,11 @@ pub(crate) async fn dispatch_dev(
             let id = try_field!(dev::get_str(body, "noteId"));
             let tab = try_field!(dev::get_str(body, "tab"));
             dev::val(core.note_insight_regenerate_tab(&id, &tab).await)
+        }
+        "note_insight_debate" => {
+            let id = try_field!(dev::get_str(body, "noteId"));
+            let squad_id = body.get("squadId").and_then(|v| v.as_str()).map(|s| s.to_string());
+            dev::val(core.note_insight_debate(&id, squad_id.as_deref()).await)
         }
         "note_insight_list_versions" => {
             let id = try_field!(dev::get_str(body, "noteId"));

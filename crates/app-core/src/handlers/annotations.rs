@@ -17,7 +17,7 @@ impl AppCore {
         let repo = AnnotationRepo::new(self.storage_pool.inner().clone());
         let now = chrono::Utc::now().to_rfc3339();
         let annotation = Annotation {
-            id: uuid::Uuid::new_v4().to_string(),
+            id: params.mark_id.clone(),
             target_type: "note".into(),
             target_id: params.note_id.clone(),
             content: params.content,

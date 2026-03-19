@@ -648,15 +648,12 @@ impl AgentRuntime {
         }
         let orchestrator_context = context_parts.join("\n\n");
 
-        // 3. Persona fan-out (quick or room debate)
+        // 3. Persona fan-out — always use room debate when blackboard is available
         let blackboard_repo = self
             .squad_deps
             .as_ref()
             .and_then(|d| d.blackboard_repo.as_ref());
-        let use_debate = match squad_mode_str {
-            Some("debate") => blackboard_repo.is_some(),
-            _ => false, // "quick" or None → single-pass
-        };
+        let use_debate = blackboard_repo.is_some();
 
         let persona_responses = if use_debate {
             let blackboard_repo = blackboard_repo.unwrap();
