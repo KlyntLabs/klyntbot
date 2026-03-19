@@ -2529,3 +2529,278 @@ git commit -m "test(autotuner): add integration tests for evaluation and promoti
 | 14 | Frontend | Transparency Panel UI |
 | 15 | CronJob | Nightly cycle registration |
 | 16 | Integration test | End-to-end evaluation cycle |
+
+---
+
+## Review Fixes (MUST READ before implementing)
+
+The following corrections address critical and important issues found during plan review. Apply these
+fixes when implementing the corresponding tasks.
+
+### Fix 1: Shadow classifier must NOT invoke Layer 3 LLM (affects Task 10 + 11)
+
+**Problem:** Task 11's `shadow_classifier.rs` calls `analyzer.analyze()` which runs the full 4-layer
+cascade including the LLM classifier. The spec explicitly requires shadow scoring to run **only
+Layer 1-2** (heuristic + embedding).
+
+**Fix in Task 10:** Add a `shadow_mode: bool` field to `IntentAnalyzer` (alongside `overrides`):
+
+```rust
+// In IntentAnalyzer struct
+shadow_mode: bool,  // When true, stop after Layer 1-2 (never invoke LLM classifier)
+```
+
+Add a builder method:
+```rust
+pub fn with_shadow_mode(mut self) -> Self {
+    self.shadow_mode = true;
+    self
+}
+```
+
+In `analyze()`, after the Layer 2 embedding fallback, check:
+```rust
+if self.shadow_mode {
+    // Layer 1-2 didn't produce a confident result — return Deferred
+    return IntentAnalysis {
+        strategy: AnalysisResult::deferred(), // or a new variant indicating "would defer to LLM"
+        source: "shadow_deferred",
+        ..
+    };
+}
+// Otherwise continue to Layer 3 LLM classifier...
+```
+
+**Fix in Task 11:** Shadow classifier constructs the analyzer with both overrides AND shadow mode:
+```rust
+let analyzer = IntentAnalyzer::new(self.provider.clone(), &self.model, &self.config)
+    .with_overrides(params.clone())
+    .with_shadow_mode();
+```
+
+### Fix 2: AppCore needs autotuner_orchestrator field (affects Task 12)
+
+**Problem:** Task 12 calls `core.autotuner_orchestrator()` but AppCore has no such field.
+
+**Fix:** Add a step to Task 12 (before writing handlers):
+
+In `crates/app-core/src/state.rs`, add to the `AppCore` struct:
+```rust
+autotuner: Option<Arc<agent::autotuner::AutoTunerOrchestrator>>,
+```
+
+Add a method:
+```rust
+pub fn autotuner_orchestrator(&self) -> &agent::autotuner::AutoTunerOrchestrator {
+    self.autotuner.as_ref().expect("AutoTuner not initialized")
+}
+```
+
+In the AppCore initialization path (`init/mod.rs` or equivalent), construct the orchestrator:
+```rust
+let autotuner = if config.autotuner.enabled {
+    let champion = load_champion_from_learning_state(&repos.learning_state).await;
+    Some(Arc::new(AutoTunerOrchestrator::new(champion, true)))
+} else {
+    None
+};
+```
+
+### Fix 3: metric_collector.rs needs implementation (affects Task 11)
+
+**Problem:** The file is declared in mod.rs but has no code. NightlyCycle depends on MetricSource.
+
+**Fix:** Add to Task 11:
+
+```rust
+// crates/agent/src/autotuner/metric_collector.rs
+use async_trait::async_trait;
+use autotuner::{MetricSnapshot, MetricSource};
+use chrono::{DateTime, Utc};
+use storage::{StrategyRepo, TrialRepo};
+use uuid::Uuid;
+
+pub struct AgentMetricCollector {
+    strategy_repo: StrategyRepo,
+    trial_repo: TrialRepo,
+}
+
+impl AgentMetricCollector {
+    pub fn new(strategy_repo: StrategyRepo, trial_repo: TrialRepo) -> Self {
+        Self { strategy_repo, trial_repo }
+    }
+}
+
+#[async_trait]
+impl MetricSource for AgentMetricCollector {
+    async fn collect_metrics(
+        &self,
+        since: DateTime<Utc>,
+        trial_id: Option<Uuid>,
+    ) -> common::Result<MetricSnapshot> {
+        // Query strategy_records for classification accuracy since the given time
+        let stats = self.strategy_repo.get_overall_stats().await
+            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+
+        // For trial-specific metrics, query the shadow_log table
+        // For now, return aggregate metrics from the strategy repo
+        Ok(MetricSnapshot {
+            correction_rate: 0.0, // TODO: count UserCorrectedAI events from domain_event_log
+            classification_accuracy: stats.accuracy.unwrap_or(0.0),
+            avg_tokens_per_message: 0.0, // TODO: from usage_records
+            avg_response_time_ms: stats.avg_response_time_ms.unwrap_or(0.0),
+            routing_stability: 1.0, // TODO: compute from shadow_log agreement
+            memory_relevance: 1.0,  // TODO: placeholder until Phase 2
+            user_satisfaction: stats.avg_satisfaction.map(|s| s as f64),
+            total_messages: stats.total_records as u32,
+        })
+    }
+}
+```
+
+### Fix 4: CronJob registration needs Clone + real body (affects Task 15)
+
+**Problem:** `AutoTunerOrchestrator` doesn't derive Clone, and the cron closure body is empty.
+
+**Fix:** In Task 11, wrap the orchestrator in `Arc` from the start (it's already behind Arc in
+AppCore). The cron registration should use the Arc reference, not clone the struct:
+
+```rust
+pub async fn register_nightly_cycle(
+    orchestrator: Arc<AutoTunerOrchestrator>,
+    cycle: Arc<NightlyCycle>,
+    cron_service: &scheduling::CronService,
+    schedule: &str,
+) -> common::Result<()> {
+    let orch = orchestrator.clone();
+    let cyc = cycle.clone();
+    cron_service.register_system_job(
+        "autotuner_nightly_cycle",
+        schedule,
+        move |_job| {
+            let orch = orch.clone();
+            let cyc = cyc.clone();
+            Box::pin(async move {
+                tracing::info!("Running AutoTuner nightly cycle");
+                let champion = orch.champion.read().await.clone();
+                let result = cyc.run_evaluation_and_promotion(&champion).await?;
+                if let Some((trial_id, new_metrics)) = result.promotion {
+                    // Update champion in orchestrator + LearningStateRepo
+                    tracing::info!(trial_id = %trial_id, "Promoted new champion");
+                }
+                if result.regression {
+                    let champion = orch.champion.read().await;
+                    let days = champion.consecutive_regression_days + 1;
+                    if days >= 3 {
+                        tracing::warn!("Auto-reverting after 3-day regression");
+                    }
+                }
+                Ok(())
+            })
+        },
+    ).await?;
+    Ok(())
+}
+```
+
+### Fix 5: TrialRepo pool type (affects Task 4)
+
+**Problem:** Mixing StoragePool newtype with `.inner()` calls is inconsistent with existing repos.
+
+**Fix:** Use `StoragePool` as the field type (matching `SqlitePool` alias from storage crate). The
+test `setup()` code is correct — `StoragePool::connect_in_memory()` returns the right type and
+`.inner()` gives the underlying sqlx pool. But document this in the task so implementers follow
+the same pattern as existing repos.
+
+### Fix 6: MetricAggregator needs volume-weighted averaging (affects Task 9)
+
+**Problem:** `aggregate_to_result` does simple averaging by snapshot count, not by message volume.
+
+**Fix:**
+```rust
+pub fn aggregate_to_result(trial_id: Uuid, snapshots: &[MetricSnapshot]) -> TrialResult {
+    if snapshots.is_empty() {
+        return TrialResult { trial_id, ..Default::default() };
+    }
+    let total_messages: u32 = snapshots.iter().map(|s| s.total_messages).sum();
+    if total_messages == 0 {
+        return TrialResult { trial_id, ..Default::default() };
+    }
+    let w = |s: &MetricSnapshot| s.total_messages as f64 / total_messages as f64;
+    TrialResult {
+        trial_id,
+        messages_scored: total_messages,
+        correction_rate: snapshots.iter().map(|s| s.correction_rate * w(s)).sum(),
+        classification_accuracy: snapshots.iter().map(|s| s.classification_accuracy * w(s)).sum(),
+        avg_tokens_per_message: snapshots.iter().map(|s| s.avg_tokens_per_message * w(s)).sum(),
+        avg_response_time_ms: snapshots.iter().map(|s| s.avg_response_time_ms * w(s)).sum(),
+        routing_stability: snapshots.iter().map(|s| s.routing_stability * w(s)).sum(),
+        memory_relevance: snapshots.iter().map(|s| s.memory_relevance * w(s)).sum(),
+        user_satisfaction: {
+            let sats: Vec<(f64, f64)> = snapshots.iter()
+                .filter_map(|s| s.user_satisfaction.map(|v| (v, w(s))))
+                .collect();
+            if sats.is_empty() { None } else { Some(sats.iter().map(|(v, w)| v * w).sum()) }
+        },
+    }
+}
+```
+
+### Fix 7: experiment_pace should be in LearningStateRepo, not Config (affects Task 2)
+
+**Problem:** The spec says experiment_pace is changeable at runtime via the Transparency Panel.
+`Config` requires an app restart.
+
+**Fix:** Remove `experiment_pace` from `AutoTunerConfig`. Instead, read/write it via
+`LearningStateRepo` (key: `"autotuner_experiment_pace"`, default: `"balanced"`). The Transparency
+Panel's pace control calls a new handler `autotuner_set_pace(pace: String)` that writes to
+LearningStateRepo. The nightly cycle reads the pace from LearningStateRepo before generating
+variants.
+
+### Fix 8: nextest filter syntax (affects Task 7)
+
+**Problem:** `-E 'test(constraint)' -E 'test(diversity)'` is invalid nextest syntax.
+
+**Fix:** Use `-E 'test(constraint) | test(diversity)'` (single expression with OR).
+
+### Fix 9: Generator prompt copy-paste bug (affects Task 8)
+
+**Problem:** Trial history format uses `t.outcome` twice instead of `t.reasoning` + `t.outcome`.
+
+**Fix:** Change the format string to:
+```rust
+"Trial {} — {}\n  Reasoning: {}\n  Outcome: {}\n  correction_rate: {:.4}, tokens: {:.1}\n\n",
+t.id, t.outcome, t.reasoning, t.outcome,
+```
+→
+```rust
+"Trial {} — Status: {}\n  Reasoning: {}\n  correction_rate: {:.4}, tokens: {:.1}\n\n",
+t.id, t.outcome, t.reasoning,
+t.result.correction_rate, t.result.avg_tokens_per_message,
+```
+
+### Fix 10: ShadowContext should use typed newtypes (affects Task 6)
+
+**Problem:** Plan uses `String` for `chat_id` and `session_key` when `common` provides `ChatId`
+and `SessionKey` newtypes.
+
+**Fix:** Use the typed newtypes in `ShadowContext`:
+```rust
+pub struct ShadowContext {
+    pub chat_id: common::ChatId,
+    pub session_key: common::SessionKey,
+}
+```
+
+### Fix 11: Missing Bootstrap task (affects overall plan)
+
+**Problem:** The spec's Phase 0 Bootstrap (24-48h historical replay + seed generation) has no plan
+task. Without it, the nightly cycle has no trials to evaluate on first run.
+
+**Fix:** This is intentionally deferred. The AutoTuner starts in "baseline collection" mode for the
+first 24h — it records metrics but has no active trials. The first nightly cycle after 24h
+generates initial variants using the LLM generator with baseline metrics only (no historical
+replay). Historical replay is a future optimization. The implementer should:
+1. On first nightly cycle (no experiments exist), run the generator with baseline-only context.
+2. Skip the evaluation step (no trials to evaluate).
+3. Create the first experiment with 3 variants.
