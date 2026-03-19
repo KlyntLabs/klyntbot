@@ -573,4 +573,288 @@ mod tests {
         assert!((super::diversity_bonus(0.0, 10.0) - 0.0).abs() < 1e-9);
         assert!((super::diversity_bonus(5.0, 0.0) - 0.0).abs() < 1e-9);
     }
+
+    // ── Integration tests ──────────────────────────────────────────────
+
+    /// End-to-end: seed 3 trials with varying quality.  Trial A has great
+    /// metrics (passes all constraints), Trial B fails the token cost
+    /// constraint, Trial C has bad correction rate.  Assert that only
+    /// Trial A is promoted.
+    #[tokio::test]
+    async fn full_evaluation_cycle_promotes_winning_trial() {
+        let repo = setup_repo().await;
+        let champion = default_champion();
+        // champion baseline: correction_rate=0.20, tokens=500, response_time=800,
+        //                    routing_stability=0.90, memory_relevance=0.80
+
+        let trial_a = Uuid::new_v4();
+        let trial_b = Uuid::new_v4();
+        let trial_c = Uuid::new_v4();
+
+        let params_a = TrialParams {
+            skill_keyword_weight: Some(0.55),
+            ..Default::default()
+        };
+        let params_b = TrialParams {
+            skill_keyword_weight: Some(0.40),
+            ..Default::default()
+        };
+        let params_c = TrialParams {
+            skill_keyword_weight: Some(0.30),
+            ..Default::default()
+        };
+
+        insert_active_trial(&repo, trial_a, "exp-int-1", &params_a).await;
+        insert_active_trial(&repo, trial_b, "exp-int-1", &params_b).await;
+        insert_active_trial(&repo, trial_c, "exp-int-1", &params_c).await;
+
+        let mut trial_snapshots = std::collections::HashMap::new();
+
+        // Trial A: great metrics — passes all constraints
+        //   correction improvement = (0.20 - 0.14) / 0.20 = 30% (needs >= 5%)
+        //   token increase = (510 - 500) / 500 = 2% (max 8%)
+        //   response time increase = (820 - 800) / 800 = 2.5% (max 15%)
+        //   routing stability decrease = (0.90 - 0.88) / 0.90 = 2.2% (max 10%)
+        //   memory relevance decrease = (0.80 - 0.78) / 0.80 = 2.5% (max 5%)
+        trial_snapshots.insert(
+            trial_a,
+            MetricSnapshot {
+                correction_rate: 0.14,
+                classification_accuracy: 0.88,
+                avg_tokens_per_message: 510.0,
+                avg_response_time_ms: 820.0,
+                routing_stability: 0.88,
+                memory_relevance: 0.78,
+                user_satisfaction: None,
+                total_messages: 100,
+            },
+        );
+
+        // Trial B: ok correction but FAILS token cost constraint
+        //   correction improvement = (0.20 - 0.17) / 0.20 = 15% — passes
+        //   token increase = (600 - 500) / 500 = 20% — FAILS (max 8%)
+        trial_snapshots.insert(
+            trial_b,
+            MetricSnapshot {
+                correction_rate: 0.17,
+                classification_accuracy: 0.86,
+                avg_tokens_per_message: 600.0,
+                avg_response_time_ms: 810.0,
+                routing_stability: 0.89,
+                memory_relevance: 0.79,
+                user_satisfaction: None,
+                total_messages: 100,
+            },
+        );
+
+        // Trial C: bad correction rate — fails correction improvement constraint
+        //   correction improvement = (0.20 - 0.22) / 0.20 = -10% — FAILS (needs >= 5%)
+        trial_snapshots.insert(
+            trial_c,
+            MetricSnapshot {
+                correction_rate: 0.22,
+                classification_accuracy: 0.84,
+                avg_tokens_per_message: 490.0,
+                avg_response_time_ms: 790.0,
+                routing_stability: 0.91,
+                memory_relevance: 0.81,
+                user_satisfaction: None,
+                total_messages: 100,
+            },
+        );
+
+        let source = Arc::new(MockMetricSource {
+            trial_snapshots,
+            overall_snapshot: MetricSnapshot::default(),
+        });
+
+        let config = AutoTunerConfig {
+            min_messages_for_promotion: 50,
+            ..Default::default()
+        };
+        let cycle = NightlyCycle::new(config, repo, source);
+        let result = cycle.run_evaluation_and_promotion(&champion).await.unwrap();
+
+        // Trial A should be promoted (only one passing all constraints)
+        assert!(result.promotion.is_some(), "should promote trial A");
+        let (promoted_id, _, _) = result.promotion.unwrap();
+        assert_eq!(
+            promoted_id, trial_a,
+            "trial A should be the promoted winner"
+        );
+
+        // All three trials had enough messages → all evaluated
+        assert_eq!(result.completed_count, 3);
+
+        // Trial B and C should appear in failed_constraints
+        assert_eq!(
+            result.failed_constraints.len(),
+            2,
+            "exactly 2 trials should fail constraints"
+        );
+
+        let failed_ids: Vec<Uuid> = result
+            .failed_constraints
+            .iter()
+            .map(|(id, _)| *id)
+            .collect();
+        assert!(
+            failed_ids.contains(&trial_b),
+            "trial B should be in failed list"
+        );
+        assert!(
+            failed_ids.contains(&trial_c),
+            "trial C should be in failed list"
+        );
+
+        // Verify the failure reasons are specific
+        let trial_b_failures = result
+            .failed_constraints
+            .iter()
+            .find(|(id, _)| *id == trial_b)
+            .map(|(_, descs)| descs)
+            .unwrap();
+        assert!(
+            trial_b_failures.iter().any(|d| d.contains("token cost")),
+            "trial B should fail on token cost, got: {trial_b_failures:?}"
+        );
+
+        let trial_c_failures = result
+            .failed_constraints
+            .iter()
+            .find(|(id, _)| *id == trial_c)
+            .map(|(_, descs)| descs)
+            .unwrap();
+        assert!(
+            trial_c_failures
+                .iter()
+                .any(|d| d.contains("correction_rate")),
+            "trial C should fail on correction_rate, got: {trial_c_failures:?}"
+        );
+    }
+
+    /// When every trial fails at least one promotion constraint, no
+    /// promotion should occur and all trials should appear in
+    /// `failed_constraints`.
+    #[tokio::test]
+    async fn evaluation_rejects_all_when_none_pass_constraints() {
+        let repo = setup_repo().await;
+        let champion = default_champion();
+        // champion baseline: correction_rate=0.20, tokens=500, response_time=800,
+        //                    routing_stability=0.90, memory_relevance=0.80
+
+        let trial_a = Uuid::new_v4();
+        let trial_b = Uuid::new_v4();
+        let trial_c = Uuid::new_v4();
+
+        insert_active_trial(&repo, trial_a, "exp-int-2", &TrialParams::default()).await;
+        insert_active_trial(&repo, trial_b, "exp-int-2", &TrialParams::default()).await;
+        insert_active_trial(&repo, trial_c, "exp-int-2", &TrialParams::default()).await;
+
+        let mut trial_snapshots = std::collections::HashMap::new();
+
+        // Trial A: fails token cost (tokens +20%)
+        //   correction improvement = (0.20 - 0.14) / 0.20 = 30% — passes
+        //   token increase = (600 - 500) / 500 = 20% — FAILS (max 8%)
+        trial_snapshots.insert(
+            trial_a,
+            MetricSnapshot {
+                correction_rate: 0.14,
+                classification_accuracy: 0.87,
+                avg_tokens_per_message: 600.0,
+                avg_response_time_ms: 810.0,
+                routing_stability: 0.88,
+                memory_relevance: 0.78,
+                user_satisfaction: None,
+                total_messages: 100,
+            },
+        );
+
+        // Trial B: fails correction improvement (only 2% improvement, needs 5%)
+        //   correction improvement = (0.20 - 0.196) / 0.20 = 2% — FAILS
+        trial_snapshots.insert(
+            trial_b,
+            MetricSnapshot {
+                correction_rate: 0.196,
+                classification_accuracy: 0.86,
+                avg_tokens_per_message: 510.0,
+                avg_response_time_ms: 810.0,
+                routing_stability: 0.89,
+                memory_relevance: 0.79,
+                user_satisfaction: None,
+                total_messages: 100,
+            },
+        );
+
+        // Trial C: fails memory relevance (drops 8%, max allowed 5%)
+        //   correction improvement = (0.20 - 0.17) / 0.20 = 15% — passes
+        //   memory relevance decrease = (0.80 - 0.736) / 0.80 = 8% — FAILS (max 5%)
+        trial_snapshots.insert(
+            trial_c,
+            MetricSnapshot {
+                correction_rate: 0.17,
+                classification_accuracy: 0.86,
+                avg_tokens_per_message: 510.0,
+                avg_response_time_ms: 810.0,
+                routing_stability: 0.88,
+                memory_relevance: 0.736,
+                user_satisfaction: None,
+                total_messages: 100,
+            },
+        );
+
+        let source = Arc::new(MockMetricSource {
+            trial_snapshots,
+            overall_snapshot: MetricSnapshot::default(),
+        });
+
+        let config = AutoTunerConfig {
+            min_messages_for_promotion: 50,
+            ..Default::default()
+        };
+        let cycle = NightlyCycle::new(config, repo, source);
+        let result = cycle.run_evaluation_and_promotion(&champion).await.unwrap();
+
+        // No trial should be promoted
+        assert!(
+            result.promotion.is_none(),
+            "no trial should be promoted when all fail constraints"
+        );
+
+        // All 3 were evaluated
+        assert_eq!(result.completed_count, 3);
+
+        // All 3 should appear in failed_constraints
+        assert_eq!(
+            result.failed_constraints.len(),
+            3,
+            "all 3 trials should have constraint failures"
+        );
+
+        let failed_ids: Vec<Uuid> = result
+            .failed_constraints
+            .iter()
+            .map(|(id, _)| *id)
+            .collect();
+        assert!(
+            failed_ids.contains(&trial_a),
+            "trial A should be in failed list"
+        );
+        assert!(
+            failed_ids.contains(&trial_b),
+            "trial B should be in failed list"
+        );
+        assert!(
+            failed_ids.contains(&trial_c),
+            "trial C should be in failed list"
+        );
+
+        // Verify each trial has at least one failure description
+        for (id, descs) in &result.failed_constraints {
+            assert!(
+                !descs.is_empty(),
+                "trial {id} should have at least one failure description"
+            );
+        }
+    }
 }
