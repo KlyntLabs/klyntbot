@@ -5,21 +5,9 @@
 
 ## Summary
 
-- **2 Bugs** -- frontend calls non-existent commands (runtime errors)
-- **12 High** priority gaps -- core features with backend ready but no/incomplete UI
-- **14 Medium** priority gaps -- secondary features or partially integrated
+- **10 High** priority gaps -- core features with backend ready but no/incomplete UI
+- **12 Medium** priority gaps -- secondary features or partially integrated
 - **9 Low** priority gaps -- nice-to-have, internal-only, or debug-only
-
----
-
-## 0. Bugs -- Frontend Calls Non-Existent Backend Commands
-
-These will cause **runtime errors** when triggered:
-
-| Frontend Call | File | Actual Backend Command | Fix |
-|--------------|------|----------------------|-----|
-| `ipc("calendar_events", { limit: 5 })` | `desktop-ui/src/features/tray/pages/SystemTrayPage.tsx:34` | `productivity_calendar_events` (takes `date`, not `limit`) | Rename to `productivity_calendar_events` and pass `date` param |
-| `ipc("productivity_auto_focus_confirm", { session })` | `desktop-ui/src/features/productivity/components/AutoFocusToast.tsx:19` | Does not exist -- closest is `productivity_auto_focus_start` / `productivity_auto_focus_end` | Create command or rename to existing one |
 
 ---
 
@@ -107,7 +95,7 @@ These will cause **runtime errors** when triggered:
 | `finance_report_income` | `commands/finance.rs` | Income report not displayed | **Wire** into cash flow page |
 | `finance_report_trends` | `commands/finance.rs` | Trends report not displayed | **Wire** into finance charts |
 | `distraction_allow_temp` / `distraction_allow_session` | `commands/distraction.rs` | Called from DistractionOverlay | OK -- integrated |
-| `productivity_auto_focus_start` / `_end` | `commands/productivity.rs` | Called from backend events only; `AutoFocusToast` uses non-existent `productivity_auto_focus_confirm` | **Fix** -- `productivity_auto_focus_confirm` does not exist as a Tauri command; wire to correct command |
+| `productivity_auto_focus_start` / `_end` | `commands/productivity.rs` | Called from backend events only | OK -- `productivity_auto_focus_confirm` now exists |
 
 ---
 
@@ -145,9 +133,9 @@ These will cause **runtime errors** when triggered:
 | `productivity` | Yes | Yes | Yes | -- |
 | `work_context` | Yes | Yes | Yes | -- |
 | `agent` | Yes | Yes | Yes (chat_send delegates) | -- |
-| `annotate` | Yes | **No** | Yes (via `annotation_*` commands) | Add to MCP whitelist |
-| `learning` | Yes | **No** | No desktop commands | Add to MCP whitelist + desktop commands |
-| `cron` | Yes | **No** | Yes (via `cron_*` commands) | Add to MCP whitelist if desired |
+| `annotate` | Yes | Yes | Yes (via `annotation_*` commands) | -- |
+| `learning` | Yes | Yes | No desktop commands | Wire desktop commands |
+| `cron` | Yes | Yes | Yes (via `cron_*` commands) | -- |
 | `spawn` | Yes | **No** | No (internal) | Internal only -- OK |
 | `delegate` | Yes | **No** | No (internal) | Internal only -- OK |
 | `agent_task` | Yes | **No** | No (internal) | Internal only -- OK |
@@ -160,7 +148,7 @@ These will cause **runtime errors** when triggered:
 | `glob` | Yes | **No** | No (internal) | Keep internal |
 | `browser` | Yes | **No** | No (internal) | Keep internal |
 
-**Actionable MCP gaps:** `annotate` and `learning` should be added to `default_exposed_tools()`.
+**MCP whitelist is now complete.** `annotate`, `learning`, and `cron` added to `default_exposed_tools()`.
 
 ---
 
@@ -241,70 +229,63 @@ Config sections are exposed via `config_get_section` / `config_update_section`. 
    - Files: Add project management dialogs to `desktop-ui/src/features/tasks/`
    - Commands to wire: `project_create`, `project_get`, `project_update`, `project_delete`, `project_archive`, `project_update_instructions`, `project_update_role`
 
-3. **Fix `productivity_auto_focus_confirm`** -- The `AutoFocusToast.tsx` calls `ipc("productivity_auto_focus_confirm")` which does NOT exist as a Tauri command. This is a runtime error.
-   - Effort: 30 min
-   - Either rename the frontend call to `productivity_auto_focus_start` or create the missing command
-
 ### Medium Priority (secondary features or partial integration)
 
-4. **Note archive/unarchive + tag filtering** -- Backend supports `note_archive`, `note_unarchive`, `note_list_archived`, `note_tags_all`. None are called from UI.
+3. **Note archive/unarchive + tag filtering** -- Backend supports `note_archive`, `note_unarchive`, `note_list_archived`, `note_tags_all`. None are called from UI.
    - Effort: 1 day
    - Add archive toggle, archived notes tab, and tag filter sidebar to knowledge base
 
-5. **Coaching Dashboard** -- Coaching has full backend (signals, patterns, feedback, interventions) but only appears in debug tab + chat nudge banners.
+4. **Coaching Dashboard** -- Coaching has full backend (signals, patterns, feedback, interventions) but only appears in debug tab + chat nudge banners.
    - Effort: 2 days
    - Build a dedicated coaching insights page or integrate into productivity
 
-6. **Productivity Projects** -- `productivity_projects_list`, `productivity_project_upsert`, `productivity_project_delete` are not called from any UI.
+5. **Productivity Projects** -- `productivity_projects_list`, `productivity_project_upsert`, `productivity_project_delete` are not called from any UI.
    - Effort: 1 day
    - Add project assignment in productivity category settings
 
-7. **Plugin Management UI** -- `plugin-runtime` has WASM plugin support but no settings page for plugin management.
+6. **Plugin Management UI** -- `plugin-runtime` has WASM plugin support but no settings page for plugin management.
    - Effort: 1 day
    - Add plugin list with install/enable/disable in settings
 
-8. **Project Context Panels** -- `project_conversations_list`, `project_memories_list`, `project_source_*` commands exist but no UI shows project conversations, memories, or sources.
+7. **Project Context Panels** -- `project_conversations_list`, `project_memories_list`, `project_source_*` commands exist but no UI shows project conversations, memories, or sources.
    - Effort: 1-2 days
    - Add sidebar panels to project detail view
 
-9. **Finance Reports** -- `finance_report_income`, `finance_report_trends`, `finance_exchange_rates` have no UI.
+8. **Finance Reports** -- `finance_report_income`, `finance_report_trends`, `finance_exchange_rates` have no UI.
    - Effort: 1 day
    - Add income report + trends charts to finance pages
 
-10. **Todo/Notifications Config UI** -- `todo.focus.maxSlots`, `todo.notifications.*` have no settings UI.
+9. **Todo/Notifications Config UI** -- `todo.focus.maxSlots`, `todo.notifications.*` have no settings UI.
     - Effort: 0.5 days
     - Add "Tasks & Notifications" section to settings
 
-11. **Launcher Config UI** -- Launcher search sources (`launcher.sources.*`) not configurable from settings.
+10. **Launcher Config UI** -- Launcher search sources (`launcher.sources.*`) not configurable from settings.
     - Effort: 0.5 days
     - Add launcher preferences section
 
-12. **Provider Manager Config** -- `providerManager` (primary/fallback routing) has no UI.
+11. **Provider Manager Config** -- `providerManager` (primary/fallback routing) has no UI.
     - Effort: 0.5 days
     - Add provider fallback configuration to Personalization settings
 
-13. **MCP Tool Whitelist** -- `annotate` and `learning` tools should be added to `default_exposed_tools()` in `crates/config/src/schema/mcp.rs`.
-    - Effort: 5 min code change
-
 ### Low Priority (nice-to-have or internal-only)
 
-14. **Entity Graph Explorer** -- `entity_search`, `entity_merge`, `entity_get_neighborhood` exist but no dedicated entity management UI.
+12. **Entity Graph Explorer** -- `entity_search`, `entity_merge`, `entity_get_neighborhood` exist but no dedicated entity management UI.
     - Effort: 2 days
 
-15. **Agent Profiles UI** -- `agent_*` commands for managing custom agent profiles have no frontend.
+13. **Agent Profiles UI** -- `agent_*` commands for managing custom agent profiles have no frontend.
     - Effort: 1 day
 
-16. **Workspace File Browser** -- `workspace_*` commands have no frontend.
+14. **Workspace File Browser** -- `workspace_*` commands have no frontend.
     - Effort: 1 day
 
-17. **Cron Status Badge** -- `cron_status` not called; could show system health in automations page.
+15. **Cron Status Badge** -- `cron_status` not called; could show system health in automations page.
     - Effort: 0.5 days
 
-18. **Various Config Sections** -- Many config sections (confidence, conversation, content, skills, packs, scenario, orchestrator) have no settings UI. These are advanced tuning parameters that most users will never need.
+16. **Various Config Sections** -- Many config sections (confidence, conversation, content, skills, packs, scenario, orchestrator) have no settings UI. These are advanced tuning parameters that most users will never need.
     - Effort: Low priority; expose on demand
 
-19. **Task Start Focus Button** -- `task_start_focus` has no UI trigger (only `task_end_focus` is called). Users need a way to initiate focus from the task detail page.
+17. **Task Start Focus Button** -- `task_start_focus` has no UI trigger (only `task_end_focus` is called). Users need a way to initiate focus from the task detail page.
     - Effort: 30 min
 
-20. **Flashcard Edit/Delete** -- `flashcard_update` and `flashcard_delete` not called from frontend.
+18. **Flashcard Edit/Delete** -- `flashcard_update` and `flashcard_delete` not called from frontend.
     - Effort: 0.5 days

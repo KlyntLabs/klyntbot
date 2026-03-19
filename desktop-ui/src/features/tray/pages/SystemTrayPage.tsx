@@ -7,6 +7,7 @@ import { useQuery } from "@shared/hooks/useQuery";
 import { useSetToggle } from "@shared/hooks/useSetToggle";
 import { useTransparentBackground } from "@shared/hooks/useTransparentBackground";
 import { useWindowAutoResize } from "@shared/hooks/useWindowAutoResize";
+import { todayISO } from "@shared/lib/dates";
 import { isTauri } from "@shared/lib/utils";
 import type { CalendarEvent, TodayTask } from "@shared/types";
 import { Badge, Checkbox } from "@shared/ui";
@@ -31,7 +32,11 @@ export function SystemTray() {
     undefined,
     [],
   );
-  const { data: calendarEvents } = useQuery<CalendarEvent[]>("calendar_events", { limit: 5 }, []);
+  const { data: calendarEvents } = useQuery<CalendarEvent[]>(
+    "productivity_calendar_events",
+    { date: todayISO() },
+    [],
+  );
 
   // Coaching nudge (Channel 2: tray nudge) — 30s auto-collapse for compact tray
   const { nudge: coachingNudge, handleFeedback: handleCoachingFeedback } = useCoachingNudge({

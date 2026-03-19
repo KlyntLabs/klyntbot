@@ -9,6 +9,7 @@ use desktop_shared::commands::{
     ProductivitySummaryResponse, TimeEntryResponse, TrackedAppResponse, WeeklyAssessmentResponse,
 };
 use desktop_shared::errors::ApiError;
+use desktop_shared::events::AutoFocusPayload;
 use feature_productivity::auto_focus::AutoFocusEvent;
 use tauri::State;
 
@@ -263,6 +264,14 @@ pub async fn productivity_auto_focus_end(
 }
 
 #[tauri::command(rename_all = "snake_case")]
+pub async fn productivity_auto_focus_confirm(
+    state: State<'_, Arc<AppCore>>,
+    payload: AutoFocusPayload,
+) -> Result<FocusSessionResponse, ApiError> {
+    state.productivity_auto_focus_confirm(payload).await
+}
+
+#[tauri::command(rename_all = "snake_case")]
 pub async fn distraction_respond(
     _state: State<'_, Arc<AppCore>>,
     _response: DistractionResponse,
@@ -510,6 +519,7 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "calendar_sync_events",
     "productivity_auto_focus_start",
     "productivity_auto_focus_end",
+    "productivity_auto_focus_confirm",
     "distraction_respond",
     "productivity_patterns",
     "productivity_hourly_breakdown",
@@ -689,6 +699,10 @@ pub(crate) async fn dispatch_dev(
         "productivity_auto_focus_start" => dev::val(core.productivity_auto_focus_start().await),
         "productivity_auto_focus_end" => dev::val(
             core.productivity_auto_focus_end(try_field!(dev::parse_params(body)))
+                .await,
+        ),
+        "productivity_auto_focus_confirm" => dev::val(
+            core.productivity_auto_focus_confirm(try_field!(dev::parse_params(body)))
                 .await,
         ),
         "distraction_respond" => Ok(serde_json::Value::Null),

@@ -487,6 +487,7 @@ fn run_desktop_app() {
             commands::productivity::productivity_insight_dismiss,
             commands::productivity::productivity_auto_focus_start,
             commands::productivity::productivity_auto_focus_end,
+            commands::productivity::productivity_auto_focus_confirm,
             commands::productivity::distraction_respond,
             commands::productivity::productivity_projects_list,
             commands::productivity::productivity_project_upsert,
