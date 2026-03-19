@@ -67,21 +67,7 @@ pub fn create_provider(config: &Config) -> Result<(DynProvider, String)> {
     }
 
     // Try gateway detection (OpenRouter key prefix, AiHubMix base URL, etc.)
-    let providers_config = &config.providers;
-    let candidates = [
-        ("openrouter", &providers_config.openrouter),
-        ("openai", &providers_config.openai),
-        ("anthropic", &providers_config.anthropic),
-        ("deepseek", &providers_config.deepseek),
-        ("gemini", &providers_config.gemini),
-        ("groq", &providers_config.groq),
-        ("vllm", &providers_config.vllm),
-        ("zhipu", &providers_config.zhipu),
-        ("dashscope", &providers_config.dashscope),
-        ("moonshot", &providers_config.moonshot),
-        ("minimax", &providers_config.minimax),
-        ("aihubmix", &providers_config.aihubmix),
-    ];
+    let candidates = config.all_providers();
 
     // Check for gateway by api_key prefix or api_base keyword
     for (name, pc) in &candidates {

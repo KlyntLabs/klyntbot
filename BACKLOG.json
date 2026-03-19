@@ -96,7 +96,7 @@
     "description": "A parsing error about a message role uses KlyntbotError::Bus which is semantically incorrect.",
     "location": "crates/common/src/types.rs:185",
     "suggested_fix": "Use KlyntbotError::Tool(ToolError::InvalidParams(...)) or a dedicated parse error.",
-    "status": "open"
+    "status": "fixed"
   },
   {
     "id": "L0-010",
@@ -217,7 +217,7 @@
     "description": "The _ => {} arm provides no feedback when an unrecognised provider name is passed.",
     "location": "crates/config/src/schema/core.rs:280-297",
     "suggested_fix": "Log a warning or return a Result indicating the unknown provider.",
-    "status": "open"
+    "status": "fixed"
   },
   {
     "id": "L1-003",
@@ -228,7 +228,7 @@
     "description": "The array size 12 is hardcoded. Adding a provider requires updating this separately.",
     "location": "crates/config/src/schema/core.rs:234",
     "suggested_fix": "Use a Vec or const-computed array length.",
-    "status": "open"
+    "status": "fixed"
   },
   {
     "id": "L1-004",
@@ -646,7 +646,7 @@
     "description": "factory.rs candidates hardcodes provider names. New providers not in both lists are excluded.",
     "location": "crates/providers/src/factory.rs:70-84",
     "suggested_fix": "Generate candidates from PROVIDERS registry.",
-    "status": "open"
+    "status": "fixed"
   },
   {
     "id": "L3-004",
