@@ -51,7 +51,10 @@ fn backward_compat_minimal_config_deserializes() {
     let config: Config = serde_json::from_str(old_config_json).unwrap();
 
     // Verify original fields preserved
-    assert_eq!(config.agents.defaults.model, "anthropic/claude-opus-4-5");
+    assert_eq!(
+        config.agents.defaults.model,
+        klyntbot::config::schema::DEFAULT_MODEL
+    );
     assert_eq!(config.agents.defaults.max_tokens, 4096);
     assert_eq!(config.providers.anthropic.api_key.expose(), "sk-ant-test");
 
@@ -70,7 +73,10 @@ fn backward_compat_minimal_config_deserializes() {
 #[test]
 fn config_default_round_trips() {
     let config = Config::default();
-    assert_eq!(config.agents.defaults.model, "anthropic/claude-opus-4-5");
+    assert_eq!(
+        config.agents.defaults.model,
+        klyntbot::config::schema::DEFAULT_MODEL
+    );
 
     // Workspace path resolution
     let workspace = config.workspace_path();

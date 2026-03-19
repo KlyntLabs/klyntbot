@@ -58,7 +58,6 @@ export function IssueDetailSidebar({ detail, onClose }: IssueDetailSidebarProps)
           task={detail.task}
           taskState={taskState}
           suggestions={detail.suggestions}
-          taskMemory={detail.taskMemory}
           onApply={detail.applySuggestion}
           onDismiss={detail.dismissSuggestion}
           onFetchSuggestions={detail.fetchSuggestions}

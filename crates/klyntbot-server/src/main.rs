@@ -87,12 +87,19 @@ async fn main() -> Result<()> {
             }
         }
         Command::Tools { list, schema } => {
-            // TODO: Implement tool listing (Phase 2)
             if list {
-                eprintln!("Tool listing not yet implemented.");
+                let cfg = config::load_with_env_overrides()
+                    .await
+                    .map_err(|e| anyhow::anyhow!("config load failed: {e}"))?;
+                println!("Exposed MCP tools:");
+                for name in &cfg.mcp.server.exposed_tools {
+                    println!("  - {name}");
+                }
             }
             if let Some(name) = schema {
-                eprintln!("Schema for '{name}' not yet implemented.");
+                eprintln!(
+                    "Schema for '{name}' not yet available via CLI. Use MCP tools/list instead."
+                );
             }
         }
     }

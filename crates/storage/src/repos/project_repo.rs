@@ -222,7 +222,7 @@ impl ProjectRepo {
         let rows: Vec<(String, i64)> = sqlx::query_as(
             r#"
             SELECT status, COUNT(*) as count
-            FROM actions
+            FROM tasks
             WHERE project_id = ?1 AND is_template = FALSE
             GROUP BY status
             "#,

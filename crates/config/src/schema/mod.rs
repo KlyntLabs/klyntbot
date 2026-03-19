@@ -80,7 +80,7 @@ mod tests {
     #[test]
     fn test_config_default() {
         let config = Config::default();
-        assert_eq!(config.agents.defaults.model, "anthropic/claude-opus-4-5");
+        assert_eq!(config.agents.defaults.model, DEFAULT_MODEL);
         assert_eq!(config.agents.defaults.max_tokens, 8192);
         assert_eq!(config.agents.defaults.temperature, 0.7);
         assert_eq!(config.agents.defaults.max_tool_iterations, 20);

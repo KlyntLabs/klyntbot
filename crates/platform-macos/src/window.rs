@@ -236,7 +236,7 @@ pub fn get_screen_frame() -> (f64, f64, f64, f64) {
 
 #[cfg(not(target_os = "macos"))]
 pub fn get_screen_frame() -> (f64, f64, f64, f64) {
-    (0.0, 0.0, 1920.0, 1080.0)
+    (0.0, 0.0, 0.0, 0.0)
 }
 
 /// Move and resize the focused window of the application with the given PID.

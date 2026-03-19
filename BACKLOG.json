@@ -118,7 +118,7 @@
     "description": "build_http_client failure wraps in ChannelError::ConnectionFailed which is semantically incorrect \u2014 it's a config/TLS error.",
     "location": "crates/common/src/http.rs:64-68",
     "suggested_fix": "Use a more appropriate error variant.",
-    "status": "open"
+    "status": "fixed"
   },
   {
     "id": "L0-012",
@@ -184,7 +184,7 @@
     "description": "let _ = std::fs::create_dir_all(&cache_dir) discards errors. Cache misses on every call if dir can't be created.",
     "location": "crates/platform-macos/src/apps.rs:66",
     "suggested_fix": "Log warning on failure via tracing::warn!.",
-    "status": "open"
+    "status": "fixed"
   },
   {
     "id": "L0-018",
@@ -195,7 +195,7 @@
     "description": "Returns hardcoded 1920x1080 which is a false assumption. Should indicate unavailability.",
     "location": "crates/platform-macos/src/window.rs:239",
     "suggested_fix": "Return (0.0, 0.0, 0.0, 0.0) to communicate unavailability.",
-    "status": "open"
+    "status": "fixed"
   },
   {
     "id": "L1-001",
@@ -239,7 +239,7 @@
     "description": "Both env_string! and env_secret! accept a $config:expr parameter that is never referenced. Vestigial dead macro parameter.",
     "location": "crates/config/src/env.rs:12-37",
     "suggested_fix": "Remove the unused $config parameter from macro signatures.",
-    "status": "open"
+    "status": "fixed"
   },
   {
     "id": "L1-005",
@@ -250,7 +250,7 @@
     "description": "AgentDefaults.model hardcodes 'anthropic/claude-opus-4-5' and the test at loader.rs:205 duplicates this string.",
     "location": "crates/config/src/schema/agents.rs:71",
     "suggested_fix": "Extract to a named constant DEFAULT_MODEL and reference from both places.",
-    "status": "open"
+    "status": "fixed"
   },
   {
     "id": "L1-006",
@@ -305,7 +305,7 @@
     "description": "author, version default to '' and are never set. examples and related_tools are always empty Vec across all tools.",
     "location": "crates/tools-core/src/metadata.rs:73-82",
     "suggested_fix": "Remove dead fields or add #[serde(skip_serializing_if)] to reduce payload size.",
-    "status": "open"
+    "status": "fixed"
   },
   {
     "id": "L1-011",
@@ -412,10 +412,10 @@
     "type": "tech_debt",
     "severity": "low",
     "title": "Duplicate Pearson correlation implementations",
-    "description": "Two separate pearson_correlation impls: one on &[Decimal] in spending/correlation.rs and one on Vec<(f64,f64)> in portfolio/correlation.rs.",
+    "description": "Two separate pearson_correlation impls: one on &[Decimal] in spending/correlation.rs and one on Vec<(f64,f64)> in portfolio/correlation.rs. Won't fix: implementations operate on different types (Decimal vs f64) with different signatures \u2014 unifying adds generics complexity with no practical benefit.",
     "location": "crates/analytics/src/portfolio/correlation.rs:100-141, crates/analytics/src/spending/correlation.rs:112-157",
     "suggested_fix": "Unify into a shared generic helper.",
-    "status": "open"
+    "status": "wontfix"
   },
   {
     "id": "L1-021",
@@ -423,10 +423,10 @@
     "type": "tech_debt",
     "severity": "low",
     "title": "Duplicate compute_median_i64 reimplements shared median logic",
-    "description": "compute_median_i64 in recurring.rs duplicates the sort-and-pick logic from spending/mod.rs.",
+    "description": "compute_median_i64 in recurring.rs duplicates the sort-and-pick logic from spending/mod.rs. Won't fix: compute_median_i64 operates on i64 day intervals while compute_median uses Decimal. Converting adds overhead for no benefit in a tight loop.",
     "location": "crates/analytics/src/spending/recurring.rs:227-239",
     "suggested_fix": "Unify with a generic median function or convert to Decimal before calling shared version.",
-    "status": "open"
+    "status": "wontfix"
   },
   {
     "id": "TODO-001",
@@ -470,7 +470,7 @@
     "description": "CLI tool introspection commands (list, schema) print 'not yet implemented' messages.",
     "location": "crates/klyntbot-server/src/main.rs:90-95",
     "suggested_fix": "Implement or remove the CLI subcommands if not needed for release.",
-    "status": "open"
+    "status": "fixed"
   },
   {
     "id": "FE-001",
@@ -558,7 +558,7 @@
     "description": "useIssueDetail.ts:325 taskMemory hardcoded null (AI insights never render), rejectDecomposition returned but unused, IssueDetailView.tsx:47 ternary produces same value both branches.",
     "location": "desktop-ui/src/features/tasks/",
     "suggested_fix": "Remove dead code paths and no-op conditionals.",
-    "status": "open"
+    "status": "fixed"
   },
   {
     "id": "L2-001",
@@ -569,7 +569,7 @@
     "description": "run_feature_migrations executes migration SQL and tracking INSERT as separate statements. Crash between them causes re-run on next startup.",
     "location": "crates/storage/src/pool.rs:75-95",
     "suggested_fix": "Wrap both statements in an explicit transaction.",
-    "status": "open"
+    "status": "fixed"
   },
   {
     "id": "L2-002",
@@ -580,7 +580,7 @@
     "description": "INSERT OR REPLACE deletes conflicting row and inserts new one with new id. FK references to old id break.",
     "location": "crates/storage/src/repos/finance_allocation_repo.rs:20-45",
     "suggested_fix": "Use INSERT ON CONFLICT DO UPDATE SET to preserve existing id.",
-    "status": "open"
+    "status": "fixed"
   },
   {
     "id": "L2-003",
@@ -591,7 +591,7 @@
     "description": "Malformed blocked_by JSON returns empty Vec via unwrap_or_default(). Task appears unblocked.",
     "location": "crates/storage/src/repos/agent_task.rs:128",
     "suggested_fix": "Log warning and skip task rather than treating as unblocked.",
-    "status": "open"
+    "status": "fixed"
   },
   {
     "id": "L2-004",
@@ -602,7 +602,7 @@
     "description": "Project stats count from actions table, not tasks. Projects show zero task counts.",
     "location": "crates/storage/src/repos/project_repo.rs:219-234",
     "suggested_fix": "Query the tasks table.",
-    "status": "open"
+    "status": "fixed"
   },
   {
     "id": "L2-005",

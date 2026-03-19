@@ -63,12 +63,15 @@ impl Default for AgentDefaults {
     }
 }
 
+/// Default model identifier used when no model is configured.
+pub const DEFAULT_MODEL: &str = "anthropic/claude-opus-4-5";
+
 fn default_workspace() -> String {
     "~/.klyntbot/workspace".to_string()
 }
 
 fn default_model() -> String {
-    "anthropic/claude-opus-4-5".to_string()
+    DEFAULT_MODEL.to_string()
 }
 
 fn default_max_tokens() -> u32 {

@@ -62,7 +62,7 @@ where
     let builder = Client::builder();
     let configured = configure(builder);
     configured.build().map_err(|e| {
-        crate::KlyntbotError::Channel(crate::ChannelError::ConnectionFailed(format!(
+        crate::KlyntbotError::Config(crate::ConfigError::Invalid(format!(
             "Failed to build HTTP client: {}",
             e
         )))

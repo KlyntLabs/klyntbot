@@ -1,6 +1,7 @@
 import { ipc } from "@shared/hooks/useIpc";
 import { useMutation } from "@shared/hooks/useMutation";
 import { useQuery } from "@shared/hooks/useQuery";
+import { toErrorMessage } from "@shared/lib/errors";
 import { EMPTY_TIMELINE_RESPONSE } from "@shared/types";
 import type { TimelineResponse } from "@shared/types/common";
 import type { Area, Task, TaskUpdateParams } from "@shared/types/tasks";
@@ -19,22 +20,13 @@ import {
   type Suggestion,
   type SuggestionStatus,
   statusToMutationParams,
-  type TaskMemory,
   type TaskState,
   taskToDetailTask,
   taskToSubIssue,
   timelineToActivity,
 } from "../lib/mappers";
 
-export type {
-  DetailTask,
-  TaskState,
-  SubIssue,
-  Suggestion,
-  FocusSession,
-  TaskMemory,
-  ActivityEntry,
-};
+export type { DetailTask, TaskState, SubIssue, Suggestion, FocusSession, ActivityEntry };
 
 export interface TaskForecast {
   estimatedMinutes: number;
@@ -209,13 +201,7 @@ export function useIssueDetail(
         })),
       );
     } catch (e: unknown) {
-      const msg =
-        e instanceof Error
-          ? e.message
-          : typeof e === "object" && e !== null
-            ? JSON.stringify(e)
-            : String(e);
-      setAiError(msg);
+      setAiError(toErrorMessage(e));
     } finally {
       setSuggestionsLoading(false);
     }
@@ -259,13 +245,7 @@ export function useIssueDetail(
         setDecompositionResult(result);
       }
     } catch (e: unknown) {
-      const msg =
-        e instanceof Error
-          ? e.message
-          : typeof e === "object" && e !== null
-            ? JSON.stringify(e)
-            : String(e);
-      setAiError(msg);
+      setAiError(toErrorMessage(e));
     } finally {
       setDecompositionLoading(false);
     }
@@ -291,14 +271,6 @@ export function useIssueDetail(
     setDecompositionResult(null);
   }, []);
 
-  const rejectDecomposition = useCallback(
-    async (id: string) => {
-      await ipc("task_reject_decomposition", { decompositionId: id });
-      closeDecomposition();
-    },
-    [closeDecomposition],
-  );
-
   // Forecast
   const [forecast, setForecast] = useState<TaskForecast | null>(null);
   const [forecastLoading, setForecastLoading] = useState(false);
@@ -310,19 +282,12 @@ export function useIssueDetail(
       setForecast(result);
     } catch (e: unknown) {
       setForecast(null);
-      const msg =
-        e instanceof Error
-          ? e.message
-          : typeof e === "object" && e !== null
-            ? JSON.stringify(e)
-            : String(e);
-      setAiError(msg);
+      setAiError(toErrorMessage(e));
     } finally {
       setForecastLoading(false);
     }
   }, [task.id]);
 
-  const taskMemory: TaskMemory | null = null;
   const focusSession: FocusSession | null = buildFocusSession(task);
 
   // Focus mutations
@@ -342,7 +307,6 @@ export function useIssueDetail(
     fetchSuggestions,
     focusSession,
     subIssues,
-    taskMemory,
     updateTask,
     dismissSuggestion,
     applySuggestion,
@@ -354,7 +318,6 @@ export function useIssueDetail(
     openDecomposition,
     decompose,
     applyDecomposition,
-    rejectDecomposition,
     closeDecomposition,
     forecast,
     forecastLoading,

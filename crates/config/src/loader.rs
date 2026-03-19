@@ -202,7 +202,10 @@ mod tests {
     #[test]
     fn test_default_config() {
         let config = Config::default();
-        assert_eq!(config.agents.defaults.model, "anthropic/claude-opus-4-5");
+        assert_eq!(
+            config.agents.defaults.model,
+            crate::schema::DEFAULT_MODEL
+        );
         assert_eq!(config.agents.defaults.max_tokens, 8192);
     }
 
@@ -257,7 +260,7 @@ mod tests {
     fn test_agent_defaults() {
         let defaults = super::super::schema::AgentDefaults::default();
         assert_eq!(defaults.workspace, "~/.klyntbot/workspace");
-        assert_eq!(defaults.model, "anthropic/claude-opus-4-5");
+        assert_eq!(defaults.model, crate::schema::DEFAULT_MODEL);
         assert_eq!(defaults.max_tokens, 8192);
         assert_eq!(defaults.temperature, 0.7);
         assert_eq!(defaults.max_tool_iterations, 20);

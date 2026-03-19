@@ -78,12 +78,6 @@ export interface SubIssue {
   completed: boolean;
 }
 
-export interface TaskMemory {
-  lastSessionSummary: string;
-  continuityNote: string;
-  relatedFacts: string[];
-}
-
 export interface FocusSession {
   startedAt: string;
   elapsed: number;

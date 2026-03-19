@@ -25,7 +25,7 @@ pub use tools_core_macros::{tool_actions, ActionParams, DomainEnum, Tool, ToolPa
 
 pub use config_persistence::ConfigPersistence;
 pub use feature::{FeatureMigration, FeaturePackage, HealthStatus};
-pub use metadata::{CostHint, ToolCategory, ToolExample, ToolMetadata, ToolSource};
+pub use metadata::{CostHint, ToolCategory, ToolMetadata, ToolSource};
 pub use pagination::Page;
 pub use params::ParamExtractor;
 pub use permissions::{PermissionLevel, ToolPermissions};

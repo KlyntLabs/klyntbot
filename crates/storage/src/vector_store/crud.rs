@@ -34,6 +34,29 @@ pub fn sanitize_predicate_value(value: &str) -> Result<String, StorageError> {
     Ok(value.replace('\'', "''"))
 }
 
+/// Validate a full predicate expression for dangerous patterns.
+///
+/// Unlike [`sanitize_predicate_value`] (which escapes a single interpolated value),
+/// this checks an assembled predicate for structural injection indicators:
+/// semicolons (multi-statement), comment markers, and line breaks.
+///
+/// Single-quote safety is the caller's responsibility — use [`sanitize_predicate_value`]
+/// for each interpolated value before assembling the predicate.
+pub(crate) fn validate_predicate(predicate: &str) -> Result<(), StorageError> {
+    if predicate.contains(';')
+        || predicate.contains('\n')
+        || predicate.contains('\r')
+        || predicate.contains("--")
+        || predicate.contains("/*")
+    {
+        return Err(StorageError::Vector(format!(
+            "Predicate contains disallowed characters: {:?}",
+            &predicate[..predicate.len().min(60)]
+        )));
+    }
+    Ok(())
+}
+
 impl VectorStore {
     /// Upsert an embedding vector (insert-then-delete-old for crash safety).
     ///
@@ -181,7 +204,12 @@ impl VectorStore {
     }
 
     /// Delete all rows matching a SQL predicate.
+    ///
+    /// The predicate is validated for dangerous patterns (semicolons, comment
+    /// markers, line breaks) before being passed to LanceDB. Individual values
+    /// within the predicate should already be escaped via [`sanitize_predicate_value`].
     pub async fn delete_where(&self, table: &str, predicate: &str) -> Result<(), StorageError> {
+        validate_predicate(predicate)?;
         let tbl = match self.db.open_table(table).execute().await {
             Ok(t) => t,
             Err(_) => return Ok(()), // table may not exist yet

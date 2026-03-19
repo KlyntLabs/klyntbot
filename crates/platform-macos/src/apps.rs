@@ -63,7 +63,9 @@ pub struct AppIconCache {
 impl AppIconCache {
     /// Create a new icon cache at the given directory. Creates the directory if needed.
     pub fn new(cache_dir: PathBuf) -> Self {
-        let _ = std::fs::create_dir_all(&cache_dir);
+        if let Err(e) = std::fs::create_dir_all(&cache_dir) {
+            tracing::warn!("Failed to create icon cache dir {:?}: {}", cache_dir, e);
+        }
         Self { cache_dir }
     }
 
