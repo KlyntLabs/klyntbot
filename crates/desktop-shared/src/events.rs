@@ -52,6 +52,7 @@ pub const AGENT_BUDGET_WARNING: &str = "agent:budget_warning";
 pub const AGENT_PERSONA_PERSPECTIVE: &str = "agent:persona_perspective";
 pub const AGENT_DEBATE_ROUND_STARTED: &str = "agent:debate_round_started";
 pub const AGENT_DEBATE_ROUND_COMPLETED: &str = "agent:debate_round_completed";
+pub const AGENT_DEBATE_JUDGE_DECISION: &str = "agent:debate_judge_decision";
 pub const AGENT_CONSENSUS_REACHED: &str = "agent:consensus_reached";
 pub const AGENT_MEMORY_PROMOTED: &str = "agent:memory_promoted";
 pub const ENTITY_UPDATED: &str = "entity:updated";
@@ -352,6 +353,7 @@ pub struct PersonaPerspectivePayload {
     pub persona_icon: String,
     pub persona_role: String,
     pub content: String,
+    pub challenge: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -360,6 +362,18 @@ pub struct DebateRoundStartedPayload {
     pub session_key: String,
     pub round: u32,
     pub total_rounds: u32,
+    pub phase: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DebateJudgeDecisionPayload {
+    pub session_key: String,
+    pub round: u32,
+    pub consensus_score: f64,
+    pub decision: String,
+    pub speaking_order: Vec<String>,
+    pub reasoning: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -358,6 +358,13 @@ fn run_desktop_app() {
             commands::notes::flashcard_total_due,
             commands::notes::flashcard_generate,
             commands::notes::flashcard_save_generated,
+            // Annotations
+            commands::annotations::annotation_create,
+            commands::annotations::annotation_update,
+            commands::annotations::annotation_delete,
+            commands::annotations::annotation_list_for_note,
+            commands::annotations::annotation_get_ai_suggestion,
+            commands::annotations::note_get_linked_context,
             // Areas
             commands::areas::area_list,
             commands::areas::area_create,

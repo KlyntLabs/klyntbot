@@ -849,10 +849,7 @@ mod tests {
         assert_eq!(sys_facts[0].id, "system-f1");
 
         // list_by_scope_chain should return both system + squad
-        let chain = vec![
-            ("system", None),
-            ("squad", Some("builtin-squad-finance")),
-        ];
+        let chain = vec![("system", None), ("squad", Some("builtin-squad-finance"))];
         let all = repo.list_by_scope_chain(&chain).await.unwrap();
         assert_eq!(all.len(), 2);
     }

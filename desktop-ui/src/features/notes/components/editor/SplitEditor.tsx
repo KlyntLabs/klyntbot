@@ -1,5 +1,6 @@
 import type { Note, NoteUpdateParams } from "@shared/types";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { AnnotationSidebar } from "./AnnotationSidebar";
 import { EditorContentWrapper, useNoteEditor } from "./EditorCore";
 
 export type SplitMode = "translation" | "annotation" | "cornell";
@@ -328,7 +329,43 @@ export function SplitEditor({ note, splitMode, onSave }: SplitEditorProps) {
     }
   }, [splitMode]);
 
-  if (!leftEditor || !rightEditor) return null;
+  // ── Annotation mode: track active annotation ─────────
+  const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null);
+
+  // Listen for clicks on annotation highlights in the left editor
+  useEffect(() => {
+    if (splitMode !== "annotation" || !leftEditor) return;
+    const handleClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      const highlight = target.closest(".annotation-highlight") as HTMLElement | null;
+      if (highlight) {
+        const markId = highlight.getAttribute("data-annotation-id");
+        if (markId) setActiveAnnotationId(markId);
+      } else {
+        setActiveAnnotationId(null);
+      }
+    };
+    const editorEl = leftEditor.view.dom;
+    editorEl.addEventListener("click", handleClick);
+    return () => editorEl.removeEventListener("click", handleClick);
+  }, [splitMode, leftEditor]);
+
+  // When user clicks an annotation in the sidebar, scroll to it in the editor
+  const handleSidebarAnnotationClick = useCallback(
+    (markId: string) => {
+      setActiveAnnotationId(markId);
+      if (!leftEditor) return;
+      const el = leftEditor.view.dom.querySelector(
+        `.annotation-highlight[data-annotation-id="${markId}"]`,
+      );
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    },
+    [leftEditor],
+  );
+
+  if (!leftEditor || (!rightEditor && splitMode !== "annotation")) return null;
 
   // ── Mode labels ───────────────────────────────────────
   const leftLabel =
@@ -371,10 +408,20 @@ export function SplitEditor({ note, splitMode, onSave }: SplitEditorProps) {
           style={{ width: `${(1 - splitRatio) * 100}%` }}
           onScroll={() => handleSyncScroll("right")}
         >
-          <div className="px-3 py-1.5 text-[10px] text-muted-foreground uppercase tracking-wider border-b border-border shrink-0">
-            {rightLabel}
-          </div>
-          <EditorContentWrapper editor={rightEditor} className="flex-1 min-h-0" />
+          {splitMode === "annotation" ? (
+            <AnnotationSidebar
+              noteId={note.id}
+              activeAnnotationId={activeAnnotationId}
+              onAnnotationClick={handleSidebarAnnotationClick}
+            />
+          ) : (
+            <>
+              <div className="px-3 py-1.5 text-[10px] text-muted-foreground uppercase tracking-wider border-b border-border shrink-0">
+                {rightLabel}
+              </div>
+              <EditorContentWrapper editor={rightEditor} className="flex-1 min-h-0" />
+            </>
+          )}
         </div>
       </div>
 

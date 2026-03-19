@@ -515,3 +515,37 @@
   border-radius: 2px;
   box-shadow: 0 0 0 1px rgba(249, 115, 22, 0.3);
 }
+
+/* Annotation highlights */
+.annotation-highlight {
+  background: rgba(255, 140, 50, 0.15);
+  border-bottom: 2px solid rgba(255, 140, 50, 0.5);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.annotation-highlight:hover {
+  background: rgba(255, 140, 50, 0.25);
+}
+
+.annotation-highlight[data-pending="true"] {
+  background: rgba(255, 140, 50, 0.08);
+  border-bottom: 2px dashed rgba(255, 140, 50, 0.3);
+  cursor: default;
+}
+
+/* Perspective section badge */
+.perspective-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.perspective-badge:hover {
+  opacity: 0.8;
+}

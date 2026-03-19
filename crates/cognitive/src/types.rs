@@ -93,6 +93,11 @@ pub struct Annotation {
     pub updated_at: String,
     pub expires_at: Option<String>,
     pub access_count: i64,
+    pub mark_id: Option<String>,
+    pub quoted_text: Option<String>,
+    pub range_start: Option<i64>,
+    pub range_end: Option<i64>,
+    pub ai_suggestion: Option<String>,
 }
 
 /// Salience verdict for event filtering.

@@ -1,0 +1,75 @@
+import type { Editor } from "@tiptap/react";
+import { useCallback } from "react";
+import { ulid } from "ulid";
+import { useAnnotations } from "./useAnnotations";
+import { useCardGeneration } from "./useCardGeneration";
+
+/** Get selected text from whichever editor has the selection, falling back to DOM selection. */
+function getSelectedText(editor: Editor | null): string | null {
+  // Try the main editor first
+  if (editor && !editor.state.selection.empty) {
+    const { from, to } = editor.state.selection;
+    return editor.state.doc.textBetween(from, to);
+  }
+  // Fall back to DOM selection (works for split-mode editors)
+  const sel = window.getSelection();
+  if (sel && !sel.isCollapsed && sel.toString().trim().length > 0) {
+    return sel.toString();
+  }
+  return null;
+}
+
+/** Find the TipTap editor instance that currently has a selection (checks all .tiptap elements). */
+function getActiveEditor(): Editor | null {
+  // ProseMirror stores the editor view on the DOM node
+  const tiptaps = document.querySelectorAll(".tiptap");
+  for (const el of tiptaps) {
+    const view = (el as unknown as { pmViewDesc?: { view?: { state?: { selection?: { empty: boolean } } } } }).pmViewDesc?.view;
+    if (view && view.state && !view.state.selection.empty) {
+      return null; // We can't get the Editor wrapper, but we know there's a selection
+    }
+  }
+  return null;
+}
+
+export function useEditorActions(editor: Editor | null, noteId: string | null) {
+  const { createAnnotation } = useAnnotations(noteId, editor);
+  const { generateFromText } = useCardGeneration();
+
+  const handleAnnotate = useCallback(() => {
+    if (!noteId) return;
+
+    const selectedText = getSelectedText(editor);
+    if (!selectedText) return;
+
+    const markId = ulid();
+
+    // Try to apply the mark via the main editor if it has the selection
+    if (editor && !editor.state.selection.empty) {
+      editor.commands.setAnnotation(markId);
+    }
+
+    createAnnotation({
+      noteId,
+      markId,
+      content: "",
+      quotedText: selectedText,
+    });
+  }, [editor, noteId, createAnnotation]);
+
+  const handleFlashcard = useCallback(() => {
+    const selectedText = getSelectedText(editor);
+    if (!selectedText) return;
+    generateFromText(selectedText);
+  }, [editor, generateFromText]);
+
+  const handleTranslate = useCallback(() => {
+    // TODO: Activate translation split-pane with selection
+  }, []);
+
+  const handleAskAI = useCallback(() => {
+    // TODO: Open inline AI prompt input
+  }, []);
+
+  return { handleAnnotate, handleFlashcard, handleTranslate, handleAskAI };
+}

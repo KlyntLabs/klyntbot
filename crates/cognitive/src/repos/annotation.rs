@@ -18,8 +18,9 @@ impl AnnotationRepo {
         sqlx::query(
             r#"
             INSERT INTO annotations (id, target_type, target_id, content, tags, author,
-                priority, created_at, updated_at, expires_at, access_count)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+                priority, created_at, updated_at, expires_at, access_count,
+                mark_id, quoted_text, range_start, range_end, ai_suggestion)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
             ON CONFLICT (id) DO UPDATE SET
                 target_type = excluded.target_type,
                 target_id = excluded.target_id,
@@ -28,7 +29,12 @@ impl AnnotationRepo {
                 author = excluded.author,
                 priority = excluded.priority,
                 updated_at = excluded.updated_at,
-                expires_at = excluded.expires_at
+                expires_at = excluded.expires_at,
+                mark_id = excluded.mark_id,
+                quoted_text = excluded.quoted_text,
+                range_start = excluded.range_start,
+                range_end = excluded.range_end,
+                ai_suggestion = excluded.ai_suggestion
             "#,
         )
         .bind(&annotation.id)
@@ -42,6 +48,11 @@ impl AnnotationRepo {
         .bind(&annotation.updated_at)
         .bind(&annotation.expires_at)
         .bind(annotation.access_count)
+        .bind(&annotation.mark_id)
+        .bind(&annotation.quoted_text)
+        .bind(annotation.range_start)
+        .bind(annotation.range_end)
+        .bind(&annotation.ai_suggestion)
         .execute(&self.pool)
         .await?;
         Ok(())
@@ -128,6 +139,20 @@ impl AnnotationRepo {
         Ok(())
     }
 
+    pub async fn list_for_note(
+        &self,
+        note_id: &str,
+        limit: i64,
+    ) -> Result<Vec<Annotation>, sqlx::Error> {
+        sqlx::query_as::<_, Annotation>(
+            "SELECT * FROM annotations WHERE target_type = 'note' AND target_id = ?1 ORDER BY created_at DESC LIMIT ?2",
+        )
+        .bind(note_id)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+    }
+
     pub async fn get_by_min_priority(
         &self,
         min_priority: i32,
@@ -162,7 +187,63 @@ mod tests {
             updated_at: "2026-03-10T10:00:00Z".into(),
             expires_at: None,
             access_count: 0,
+            mark_id: None,
+            quoted_text: None,
+            range_start: None,
+            range_end: None,
+            ai_suggestion: None,
         }
+    }
+
+    #[tokio::test]
+    async fn test_create_annotation_with_mark_id() {
+        let pool = setup().await;
+        let repo = AnnotationRepo::new(pool);
+
+        let annotation = Annotation {
+            id: "ann-1".into(),
+            target_type: "note".into(),
+            target_id: "note-123".into(),
+            content: "My annotation".into(),
+            tags: "learning".into(),
+            author: "user".into(),
+            priority: 0,
+            created_at: "2026-03-18T00:00:00Z".into(),
+            updated_at: "2026-03-18T00:00:00Z".into(),
+            expires_at: None,
+            access_count: 0,
+            mark_id: Some("mark-abc".into()),
+            quoted_text: Some("selected text".into()),
+            range_start: Some(42),
+            range_end: Some(55),
+            ai_suggestion: Some("Related to X".into()),
+        };
+
+        repo.upsert(&annotation).await.unwrap();
+        let results = repo.get_for_target("note", "note-123").await.unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].mark_id, Some("mark-abc".into()));
+        assert_eq!(results[0].quoted_text, Some("selected text".into()));
+        assert_eq!(results[0].range_start, Some(42));
+        assert_eq!(results[0].range_end, Some(55));
+        assert_eq!(results[0].ai_suggestion, Some("Related to X".into()));
+    }
+
+    #[tokio::test]
+    async fn test_list_for_note() {
+        let pool = setup().await;
+        let repo = AnnotationRepo::new(pool);
+
+        let mut ann1 = test_annotation("ann-1", "note", "note-1", "First note");
+        ann1.mark_id = Some("m1".into());
+        let mut ann2 = test_annotation("ann-2", "note", "note-1", "Second note");
+        ann2.mark_id = Some("m2".into());
+
+        repo.upsert(&ann1).await.unwrap();
+        repo.upsert(&ann2).await.unwrap();
+
+        let results = repo.list_for_note("note-1", 10).await.unwrap();
+        assert_eq!(results.len(), 2);
     }
 
     #[tokio::test]

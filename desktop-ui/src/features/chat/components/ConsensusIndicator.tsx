@@ -41,9 +41,7 @@ export function ConsensusIndicator({
 
   // Fallback: simple consensus badge
   if (reached) {
-    return (
-      <span className="text-[10px] text-green-400">Consensus reached</span>
-    );
+    return <span className="text-[10px] text-green-400">Consensus reached</span>;
   }
 
   return null;

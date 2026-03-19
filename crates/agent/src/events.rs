@@ -211,6 +211,9 @@ pub enum AgentEvent {
         #[serde(rename = "personaRole")]
         persona_role: String,
         content: String,
+        /// What the judge asked this persona to address (targeted phase only).
+        #[serde(rename = "challenge", skip_serializing_if = "Option::is_none")]
+        challenge: Option<String>,
     },
 
     /// A debate round started.
@@ -218,6 +221,19 @@ pub enum AgentEvent {
         round: u32,
         #[serde(rename = "totalRounds")]
         total_rounds: u32,
+        /// "opening" | "discussion" | "targeted" | "final"
+        phase: String,
+    },
+
+    /// Emitted after the judge evaluates each round.
+    DebateJudgeDecision {
+        round: u32,
+        #[serde(rename = "consensusScore")]
+        consensus_score: f64,
+        decision: String,
+        #[serde(rename = "speakingOrder")]
+        speaking_order: Vec<String>,
+        reasoning: String,
     },
 
     /// A debate round completed with all persona responses.

@@ -21,6 +21,8 @@ pub(crate) fn note_row_to_response(row: &NoteRow, tags: Vec<String>) -> NoteResp
         color: row.color.clone(),
         split_content: row.split_content.clone(),
         split_mode: row.split_mode.clone(),
+        perspective_config: row.perspective_config.clone(),
+        last_visited_at: row.last_visited_at.clone(),
         tags,
         created_at: row.created_at.clone(),
         updated_at: row.updated_at.clone(),

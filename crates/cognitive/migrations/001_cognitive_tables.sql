@@ -264,7 +264,11 @@ CREATE TABLE IF NOT EXISTS annotations (
     updated_at TEXT NOT NULL,
     expires_at TEXT,
     access_count INTEGER DEFAULT 0,
-    UNIQUE(target_type, target_id, content)
+    mark_id TEXT,
+    quoted_text TEXT,
+    range_start INTEGER,
+    range_end INTEGER,
+    ai_suggestion TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_annotations_target ON annotations(target_type, target_id);

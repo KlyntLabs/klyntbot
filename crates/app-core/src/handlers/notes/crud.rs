@@ -119,6 +119,8 @@ impl AppCore {
             embedding_updated_at: None,
             split_content: None,
             split_mode: None,
+            perspective_config: None,
+            last_visited_at: None,
             created_at: now.clone(),
             updated_at: now,
         };
@@ -191,6 +193,7 @@ impl AppCore {
                 params.color.as_ref().map(|o| o.as_deref()),
                 params.split_content.as_ref().map(|o| o.as_deref()),
                 params.split_mode.as_ref().map(|o| o.as_deref()),
+                params.perspective_config.as_ref().map(|o| o.as_deref()),
             )
             .await
             .map_err(map_storage_err)?;
@@ -349,6 +352,7 @@ impl AppCore {
                 &note_id,
                 None,
                 Some(&version.body),
+                None,
                 None,
                 None,
                 None,

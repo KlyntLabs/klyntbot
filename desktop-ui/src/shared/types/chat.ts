@@ -175,6 +175,7 @@ export interface PersonaPerspectivePayload {
   personaIcon: string;
   personaRole: string;
   content: string;
+  challenge?: string;
 }
 
 export interface PersonaSegment {
@@ -183,13 +184,18 @@ export interface PersonaSegment {
   personaIcon?: string;
   personaRole?: string;
   content: string;
+  challenge?: string;
 }
 
 // ── Debate Events ──────────────────────────────────────────
+
+export type DebatePhase = "opening" | "discussion" | "targeted" | "final";
+
 export interface DebateRoundStartedPayload {
   sessionKey: string;
   round: number;
   totalRounds: number;
+  phase: DebatePhase;
 }
 
 export interface DebateRoundCompletedPayload {
@@ -205,6 +211,23 @@ export interface ConsensusReachedPayload {
   summary: string;
 }
 
+export interface DebateJudgeDecisionPayload {
+  sessionKey: string;
+  round: number;
+  consensusScore: number;
+  decision: "continue" | "final_round" | "stop";
+  speakingOrder: string[];
+  reasoning: string;
+}
+
+export interface JudgeDecisionEntry {
+  round: number;
+  consensusScore: number;
+  decision: "continue" | "final_round" | "stop";
+  speakingOrder: string[];
+  reasoning: string;
+}
+
 export interface MemoryPromotedPayload {
   sessionKey: string;
   factId: string;
@@ -216,6 +239,7 @@ export interface MemoryPromotedPayload {
 
 export interface DebateRound {
   round: number;
+  phase: DebatePhase;
   personaMessages: PersonaSegment[];
   consensusScore: number | null;
 }

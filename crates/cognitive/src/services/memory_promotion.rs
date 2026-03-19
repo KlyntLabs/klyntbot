@@ -117,10 +117,14 @@ mod tests {
         };
         repo.upsert(&fact).await.unwrap();
 
-        let promoted =
-            promote_fact(&repo, "persona-fact-1", "squad", Some("builtin-squad-finance"))
-                .await
-                .unwrap();
+        let promoted = promote_fact(
+            &repo,
+            "persona-fact-1",
+            "squad",
+            Some("builtin-squad-finance"),
+        )
+        .await
+        .unwrap();
         assert!(promoted.is_some());
         let p = promoted.unwrap();
         assert_eq!(p.scope_type, "squad");

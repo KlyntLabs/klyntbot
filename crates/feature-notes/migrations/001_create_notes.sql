@@ -25,6 +25,8 @@ CREATE TABLE IF NOT EXISTS notes (
     embedding_updated_at TEXT,
     split_content   TEXT,
     split_mode      TEXT,
+    perspective_config TEXT,
+    last_visited_at TEXT,
     created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
     updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );

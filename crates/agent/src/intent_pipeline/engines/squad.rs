@@ -115,6 +115,7 @@ pub async fn fan_out_personas(
                             persona_icon: persona_icon.clone(),
                             persona_role: persona_role.clone(),
                             content: text.clone(),
+                            challenge: None,
                         })
                         .await;
                 }

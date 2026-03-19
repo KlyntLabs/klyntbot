@@ -2,6 +2,11 @@ import { ipc } from "@shared/hooks/useIpc";
 import type { Note, NoteUpdateParams } from "@shared/types";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
+import { type AnnotationResponse, useAnnotations } from "../hooks/useAnnotations";
+import { useEditorActions } from "../hooks/useEditorActions";
+import { usePerspective } from "../hooks/usePerspective";
+import { AnnotationPopover } from "./AnnotationPopover";
+import { EditorContextMenu } from "./editor/EditorContextMenu";
 import { EditorContentWrapper, useEntityResolution, useNoteEditor } from "./editor/EditorCore";
 import { EditorToolbar } from "./editor/EditorToolbar";
 import { EntityMentionMenu } from "./editor/EntityMention";
@@ -164,6 +169,84 @@ export function NoteEditor({
   // Resolve entity mentions and wiki links — grays out non-existent references
   useEntityResolution(editor);
 
+  // ── Annotation & Perspective hooks ────────────────────────────────
+  const { annotations, updateAnnotation, deleteAnnotation } = useAnnotations(note.id, editor);
+  const { handleAnnotate, handleFlashcard, handleTranslate, handleAskAI } = useEditorActions(
+    editor,
+    note.id,
+  );
+  const { activePerspective, focusedSectionId, setPerspective } = usePerspective(
+    note.id,
+    editor,
+    (note as Record<string, unknown>).perspectiveConfig as string | null | undefined,
+  );
+
+  // Annotation popover state
+  const [activePopover, setActivePopover] = useState<{
+    annotation: AnnotationResponse;
+    position: { top: number; left: number };
+  } | null>(null);
+
+  // Use a ref so the click handler always sees the latest annotations
+  const annotationsRef = useRef(annotations);
+  annotationsRef.current = annotations;
+
+  // Click handler for annotation marks
+  useEffect(() => {
+    if (!editor) return;
+    const handleClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      const highlight = target.closest(".annotation-highlight") as HTMLElement | null;
+      if (!highlight) {
+        setActivePopover(null);
+        return;
+      }
+      const annotationId = highlight.getAttribute("data-annotation-id");
+      if (!annotationId) return;
+
+      const ann = annotationsRef.current.find(
+        (a) => a.markId === annotationId || a.id === annotationId,
+      );
+      if (!ann) return;
+
+      const rect = highlight.getBoundingClientRect();
+      setActivePopover({
+        annotation: ann,
+        position: { top: rect.bottom, left: rect.left },
+      });
+    };
+
+    const editorEl = editor.view.dom;
+    editorEl.addEventListener("click", handleClick);
+    return () => editorEl.removeEventListener("click", handleClick);
+  }, [editor]);
+
+  // Listen for editor-action events (keyboard shortcuts from AnnotationMark)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { action } = (e as CustomEvent<{ action: string }>).detail;
+      if (action === "annotate") handleAnnotate();
+      else if (action === "flashcard") handleFlashcard();
+      else if (action === "linked-view" && focusedSectionId) {
+        setPerspective(focusedSectionId, "linked-view");
+      }
+    };
+    window.addEventListener("editor-action", handler);
+    return () => window.removeEventListener("editor-action", handler);
+  }, [handleAnnotate, handleFlashcard, focusedSectionId, setPerspective]);
+
+  const [hasSelection, setHasSelection] = useState(false);
+
+  // Track selection across both single and split mode editors via DOM selection API
+  useEffect(() => {
+    const checkSelection = () => {
+      const sel = window.getSelection();
+      setHasSelection(!!sel && !sel.isCollapsed && (sel.toString().length > 0));
+    };
+    document.addEventListener("selectionchange", checkSelection);
+    return () => document.removeEventListener("selectionchange", checkSelection);
+  }, []);
+
   // Flush on note change and update editor content
   useEffect(() => {
     if (lastNoteIdRef.current !== note.id) {
@@ -323,37 +406,76 @@ export function NoteEditor({
         />
 
         {/* Content: body */}
-        {activeSplitMode ? (
-          <div className="flex-1 flex flex-col min-h-0">
-            <SplitToolbar
-              currentMode={activeSplitMode}
-              onModeChange={(mode) =>
-                onSplitModeChange?.(mode === "single" ? null : (mode as SplitMode))
-              }
-            />
-            <SplitEditor note={note} splitMode={activeSplitMode} onSave={onSave} />
-          </div>
-        ) : (
-          <div className="flex-1 overflow-y-auto min-h-0 relative">
-            <EditorContentWrapper editor={editor} className={editorContentClass} />
-            {/* Vim command line at bottom of editor area */}
-            {vimEnabled && commandLine && (
-              <div className="absolute bottom-0 left-0 right-0">
-                <VimCommandLine
-                  prefix={commandLine.prefix}
-                  onSubmit={handleCommandLineSubmit}
-                  onCancel={handleCommandLineCancel}
-                />
-              </div>
-            )}
-          </div>
-        )}
+        <EditorContextMenu
+          hasSelection={hasSelection}
+          onAnnotate={handleAnnotate}
+          onFlashcard={handleFlashcard}
+          onTranslate={handleTranslate}
+          onAskAI={handleAskAI}
+          onLinkedView={() => {
+            if (focusedSectionId) setPerspective(focusedSectionId, "linked-view");
+          }}
+          onApplyPerspective={(type) => {
+            if (focusedSectionId)
+              setPerspective(
+                focusedSectionId,
+                type as "linked-view" | "annotated" | "study-mode",
+              );
+          }}
+        >
+          {activeSplitMode ? (
+            <div className="flex-1 flex flex-col min-h-0">
+              <SplitToolbar
+                currentMode={activeSplitMode}
+                onModeChange={(mode) =>
+                  onSplitModeChange?.(mode === "single" ? null : (mode as SplitMode))
+                }
+              />
+              <SplitEditor note={note} splitMode={activeSplitMode} onSave={onSave} />
+            </div>
+          ) : (
+            <div className="flex-1 overflow-y-auto min-h-0 relative">
+              <EditorContentWrapper editor={editor} className={editorContentClass} />
+              {/* Vim command line at bottom of editor area */}
+              {vimEnabled && commandLine && (
+                <div className="absolute bottom-0 left-0 right-0">
+                  <VimCommandLine
+                    prefix={commandLine.prefix}
+                    onSubmit={handleCommandLineSubmit}
+                    onCancel={handleCommandLineCancel}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+        </EditorContextMenu>
         {editor && <SlashMenu editor={editor} />}
         {editor && <WikiLinkMenu editor={editor} currentNoteTitle={note.title} />}
         {editor && <EntityMentionMenu editor={editor} />}
       </div>
 
       {showHistory && <NoteVersionHistory noteId={note.id} onRestore={handleRestore} />}
+
+      {/* Annotation popover */}
+      {activePopover && (
+        <AnnotationPopover
+          annotation={activePopover.annotation}
+          position={activePopover.position}
+          onClose={() => setActivePopover(null)}
+          onEdit={(id, content) => {
+            updateAnnotation({ id, content });
+            setActivePopover(null);
+          }}
+          onDelete={(id) => {
+            deleteAnnotation(id);
+            setActivePopover(null);
+          }}
+          onCreateFlashcard={(quotedText) => {
+            onGenerateCards?.(quotedText);
+            setActivePopover(null);
+          }}
+        />
+      )}
 
       {/* Link/Image insert dialog */}
       <LinkInsertDialog

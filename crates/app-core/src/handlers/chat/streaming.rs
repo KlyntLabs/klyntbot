@@ -228,14 +228,14 @@ pub async fn chat_send(
             })
             .await
             .map_err(map_storage_err)?;
-
     }
 
     // 3. Call agent with streaming (agent loop stores user + assistant messages)
     let msg_id = uuid::Uuid::new_v4();
     let now = chrono::Utc::now();
+    let squad_mode = context.as_ref().and_then(|c| c.squad_mode.clone());
     let streaming_handle = agent
-        .process_direct_streaming(content.clone(), session_key.clone())
+        .process_direct_streaming(content.clone(), session_key.clone(), squad_mode)
         .await
         .map_err(ApiError::from)?;
 
@@ -843,7 +843,7 @@ pub async fn relay_chat_stream(
                             }
                         );
                     }
-                    AgentEvent::PersonaPerspective { persona_id, persona_name, persona_icon, persona_role, content } => {
+                    AgentEvent::PersonaPerspective { persona_id, persona_name, persona_icon, persona_role, content, challenge } => {
                         emit!(
                             events::AGENT_PERSONA_PERSPECTIVE,
                             events::PersonaPerspectivePayload {
@@ -853,16 +853,31 @@ pub async fn relay_chat_stream(
                                 persona_icon,
                                 persona_role,
                                 content,
+                                challenge,
                             }
                         );
                     }
-                    AgentEvent::DebateRoundStarted { round, total_rounds } => {
+                    AgentEvent::DebateRoundStarted { round, total_rounds, phase } => {
                         emit!(
                             events::AGENT_DEBATE_ROUND_STARTED,
                             events::DebateRoundStartedPayload {
                                 session_key: sk.to_string(),
                                 round,
                                 total_rounds,
+                                phase,
+                            }
+                        );
+                    }
+                    AgentEvent::DebateJudgeDecision { round, consensus_score, decision, speaking_order, reasoning } => {
+                        emit!(
+                            events::AGENT_DEBATE_JUDGE_DECISION,
+                            events::DebateJudgeDecisionPayload {
+                                session_key: sk.to_string(),
+                                round,
+                                consensus_score,
+                                decision,
+                                speaking_order,
+                                reasoning,
                             }
                         );
                     }

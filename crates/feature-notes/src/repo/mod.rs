@@ -64,6 +64,8 @@ mod tests {
             embedding_updated_at: None,
             split_content: None,
             split_mode: None,
+            perspective_config: None,
+            last_visited_at: None,
             created_at: now.clone(),
             updated_at: now,
         }
@@ -106,6 +108,7 @@ mod tests {
                 None,
                 None,
                 Some(true),
+                None,
                 None,
                 None,
                 None,

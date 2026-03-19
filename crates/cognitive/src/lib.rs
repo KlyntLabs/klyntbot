@@ -30,13 +30,13 @@ pub use repos::{
     cognitive_migrations, AccumulatedObservationRepo, AnnotationRepo, EpisodicMemoryRepo,
     EventLogRepo, FailedObservationRepo, ProceduralRuleRepo, SemanticFactRepo,
 };
+pub use repos::{BlackboardEntry, BlackboardRepo, NewBlackboardEntry};
 pub use repos::{
     CardType, DeckSummary, FlashcardRepo, FlashcardRow, NewFlashcard, ReviewLogEntry, ReviewQuality,
 };
 #[allow(deprecated)]
 pub use repos::{InsightCacheRepo, InsightCacheRow};
 pub use repos::{NewPersona, PersonaRepo, PersonaRow, PersonaUpdate};
-pub use repos::{BlackboardEntry, BlackboardRepo, NewBlackboardEntry};
 pub use repos::{NewSquad, ResolvedSquad, SquadMemberRow, SquadRepo, SquadRow};
 pub use situation::{compute_situation, SituationInputs, UserSituation};
 pub use temporal::{ChangeSummary, FactVersion, TemporalService};

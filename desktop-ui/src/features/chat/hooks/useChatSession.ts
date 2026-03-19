@@ -4,6 +4,7 @@ import type {
   ActiveInteraction,
   ChatMessage,
   DebateRound,
+  JudgeDecisionEntry,
   MessageSegment,
   PersonaSegment,
   TransparencyData,
@@ -23,6 +24,9 @@ interface ChatSession {
   activeDelegateAgent: string | null;
   personaMessages: PersonaSegment[];
   debateRounds: DebateRound[];
+  totalDebateRounds: number | null;
+  squadMode: "quick" | "debate" | null;
+  judgeDecisions: JudgeDecisionEntry[];
   consensusReached: boolean;
   consensusSummary: string | null;
   input: string;
@@ -33,6 +37,7 @@ interface ChatSession {
 
 interface UseChatSessionOptions {
   squadId?: string;
+  squadMode?: "quick" | "debate";
 }
 
 /**
@@ -105,6 +110,7 @@ export function useChatSession(
           payload.context = {
             ...(payload.context as Record<string, unknown> | undefined),
             squadId,
+            squadMode: options?.squadMode,
           };
         }
         await ipc<ChatMessage>("chat_send", payload);
@@ -126,6 +132,9 @@ export function useChatSession(
     activeDelegateAgent: stream.activeDelegateAgent,
     personaMessages: stream.personaMessages,
     debateRounds: stream.debateRounds,
+    totalDebateRounds: stream.totalDebateRounds,
+    squadMode: stream.squadMode,
+    judgeDecisions: stream.judgeDecisions,
     consensusReached: stream.consensusReached,
     consensusSummary: stream.consensusSummary,
     input,

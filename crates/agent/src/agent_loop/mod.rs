@@ -471,7 +471,10 @@ impl AgentLoop {
         let system_msg_content = format!("[System: {}] {}", msg.sender_id, msg.content);
 
         // Get or create session and mutate under the per-session lock
-        let session_arc = self.session_manager.get_or_create(&session_key, None).await?;
+        let session_arc = self
+            .session_manager
+            .get_or_create(&session_key, None)
+            .await?;
         let history = {
             let mut session = session_arc.lock().await;
             session.add_message("user", &system_msg_content);
@@ -665,7 +668,10 @@ impl AgentLoop {
         };
         debug!("Processing {} message: {}", label, preview);
 
-        let session_arc = self.session_manager.get_or_create(session_key, None).await?;
+        let session_arc = self
+            .session_manager
+            .get_or_create(session_key, None)
+            .await?;
         let (history, embed_msg_id) = {
             let mut session = session_arc.lock().await;
             session.add_message("user", content);
@@ -707,6 +713,7 @@ impl AgentLoop {
         self: &Arc<Self>,
         content: String,
         session_key: String,
+        squad_mode: Option<String>,
     ) -> Result<StreamingHandle> {
         let history = self
             .setup_session(&content, &session_key, "streaming direct")
@@ -723,13 +730,14 @@ impl AgentLoop {
             interaction_tx,
         );
 
-        // Set squad_id from session if this is a squad chat
+        // Set squad_id and squad_mode from session if this is a squad chat
         if let Ok(session_arc) = self.session_manager.get_or_create(&session_key, None).await {
             let session = session_arc.lock().await;
             if let Some(ref sid) = session.squad_id {
                 routing_ctx.squad_id = Some(sid.clone());
             }
         }
+        routing_ctx.squad_mode = squad_mode;
 
         let cancel_token = CancellationToken::new();
         let cancel_clone = cancel_token.clone();

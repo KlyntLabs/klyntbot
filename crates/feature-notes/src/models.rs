@@ -77,6 +77,8 @@ pub struct NoteRow {
     pub embedding_updated_at: Option<String>,
     pub split_content: Option<String>,
     pub split_mode: Option<String>,
+    pub perspective_config: Option<String>,
+    pub last_visited_at: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -96,6 +98,8 @@ pub struct NoteSearchResult {
     pub embedding_updated_at: Option<String>,
     pub split_content: Option<String>,
     pub split_mode: Option<String>,
+    pub perspective_config: Option<String>,
+    pub last_visited_at: Option<String>,
     pub created_at: String,
     pub updated_at: String,
     pub rank: f64,

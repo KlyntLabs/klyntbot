@@ -22,9 +22,11 @@ import StarterKit from "@tiptap/starter-kit";
 import { common, createLowlight } from "lowlight";
 import { useEffect } from "react";
 import { Markdown } from "tiptap-markdown";
+import { AnnotationMark } from "./AnnotationMark";
 import { EntityMentionAutocomplete, EntityMentionMark } from "./EntityMention";
 import { MathBlock, MathInline } from "./MathNode";
 import { SlashCommandsExtension } from "./SlashCommandMenu";
+import { UniqueID } from "./UniqueID";
 import { VimModeExtension, type VimModeOptions } from "./vim";
 import { WikiLinkAutocomplete, WikiLinkMark } from "./WikiLinkNode";
 
@@ -185,6 +187,8 @@ export function getEditorExtensions(opts: EditorExtensionOptions = {}): Extensio
     MathBlock,
     MathInline,
     SlashCommandsExtension,
+    AnnotationMark,
+    UniqueID,
     VimModeExtension.configure(vimOptions ?? {}),
     Markdown.configure({
       html: true,

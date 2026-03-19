@@ -55,4 +55,6 @@ pub struct SessionContextInput {
     pub context_type: Option<String>,
     pub is_ephemeral: Option<bool>,
     pub squad_id: Option<String>,
+    /// Squad mode: "quick" (single-pass) or "debate" (room-style conversation).
+    pub squad_mode: Option<String>,
 }

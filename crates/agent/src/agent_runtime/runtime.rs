@@ -272,6 +272,7 @@ impl AgentRuntime {
                     &deps.repo,
                     &deps.provider,
                     &deps.chat_params,
+                    ctx.squad_mode.as_deref(),
                 )
                 .await;
         }
@@ -612,6 +613,7 @@ impl AgentRuntime {
         squad_repo: &cognitive::SquadRepo,
         provider: &providers::DynProvider,
         params: &providers::ChatParams,
+        squad_mode_str: Option<&str>,
     ) -> Result<RuntimeResult> {
         use crate::intent_pipeline::engines;
         use crate::intent_pipeline::engines::squad;
@@ -626,8 +628,9 @@ impl AgentRuntime {
             })?;
 
         // 2. Build orchestrator context from system prompt + conversation history
-        let mut context_parts =
-            vec![system_prompt.unwrap_or("You are a helpful AI assistant.").to_string()];
+        let mut context_parts = vec![system_prompt
+            .unwrap_or("You are a helpful AI assistant.")
+            .to_string()];
         for msg in &history {
             match msg {
                 Message::User { content } => {
@@ -645,18 +648,20 @@ impl AgentRuntime {
         }
         let orchestrator_context = context_parts.join("\n\n");
 
-        // 3. Persona fan-out (debate or single-pass)
+        // 3. Persona fan-out (quick or room debate)
         let blackboard_repo = self
             .squad_deps
             .as_ref()
             .and_then(|d| d.blackboard_repo.as_ref());
-        let use_debate = resolved.personas.len() >= 3 && blackboard_repo.is_some();
+        let use_debate = match squad_mode_str {
+            Some("debate") => blackboard_repo.is_some(),
+            _ => false, // "quick" or None → single-pass
+        };
 
         let persona_responses = if use_debate {
             let blackboard_repo = blackboard_repo.unwrap();
-            let debate_session_key =
-                format!("debate:{}:{}", squad_id, uuid::Uuid::new_v4());
-            let debate_results = engines::debate::run_debate(
+            let debate_session_key = format!("debate:{}:{}", squad_id, uuid::Uuid::new_v4());
+            let debate_results = engines::debate::run_room_debate(
                 provider,
                 &orchestrator_context,
                 message,
@@ -665,8 +670,6 @@ impl AgentRuntime {
                 blackboard_repo,
                 &debate_session_key,
                 squad_id,
-                engines::debate::DEFAULT_MAX_ROUNDS,
-                engines::debate::DEFAULT_CONSENSUS_THRESHOLD,
                 event_tx.as_ref(),
             )
             .await;

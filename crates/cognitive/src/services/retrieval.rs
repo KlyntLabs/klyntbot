@@ -114,19 +114,39 @@ pub async fn retrieve_relevant_facts(
                     vector_path(repo, &hits, params.situational_boost, &weights).await?;
                 let vector_ids: std::collections::HashSet<String> =
                     vector_scored.iter().map(|s| s.fact.id.clone()).collect();
-                let mut fallback =
-                    fallback_path(repo, domains, params.situational_boost, &weights, &params.scope_chain).await?;
+                let mut fallback = fallback_path(
+                    repo,
+                    domains,
+                    params.situational_boost,
+                    &weights,
+                    &params.scope_chain,
+                )
+                .await?;
                 fallback.retain(|s| !vector_ids.contains(&s.fact.id));
                 vector_scored.append(&mut fallback);
                 vector_scored
             }
             Err(e) => {
                 warn!("Vector search failed, using fallback: {e}");
-                fallback_path(repo, domains, params.situational_boost, &weights, &params.scope_chain).await?
+                fallback_path(
+                    repo,
+                    domains,
+                    params.situational_boost,
+                    &weights,
+                    &params.scope_chain,
+                )
+                .await?
             }
         }
     } else {
-        fallback_path(repo, domains, params.situational_boost, &weights, &params.scope_chain).await?
+        fallback_path(
+            repo,
+            domains,
+            params.situational_boost,
+            &weights,
+            &params.scope_chain,
+        )
+        .await?
     };
 
     // BM25 boost: add FTS5 signal for non-empty queries

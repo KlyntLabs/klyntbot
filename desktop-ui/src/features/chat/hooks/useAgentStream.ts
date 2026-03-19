@@ -2,6 +2,7 @@ import { chatStreamStore } from "@shared/stores/chatStreamStore";
 import type {
   ActiveInteraction,
   DebateRound,
+  JudgeDecisionEntry,
   MessageSegment,
   PersonaSegment,
   TransparencyData,
@@ -19,6 +20,9 @@ interface AgentStream {
   transparency: TransparencyData | null;
   personaMessages: PersonaSegment[];
   debateRounds: DebateRound[];
+  totalDebateRounds: number | null;
+  squadMode: "quick" | "debate" | null;
+  judgeDecisions: JudgeDecisionEntry[];
   consensusReached: boolean;
   consensusSummary: string | null;
   /** Call before sending a message to enter streaming mode. */
@@ -109,6 +113,9 @@ export function useAgentStream(sessionKey: string, onDone?: () => void): AgentSt
     activeDelegateAgent: state.activeDelegateAgent,
     personaMessages: state.personaMessages,
     debateRounds: state.debateRounds,
+    totalDebateRounds: state.totalDebateRounds,
+    squadMode: state.squadMode,
+    judgeDecisions: state.judgeDecisions,
     consensusReached: state.consensusReached,
     consensusSummary: state.consensusSummary,
     startStreaming,

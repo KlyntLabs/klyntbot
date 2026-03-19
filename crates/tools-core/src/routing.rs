@@ -77,6 +77,8 @@ pub struct RoutingContext {
     pub interaction_channel: Option<Arc<dyn InteractionChannel>>,
     /// Squad context — when set, the agent uses SquadExecutor for multi-persona responses.
     pub squad_id: Option<String>,
+    /// Squad mode: "quick" (single-pass) or "debate" (room-style conversation).
+    pub squad_mode: Option<String>,
 }
 
 impl RoutingContext {
@@ -91,6 +93,7 @@ impl RoutingContext {
             entity_tx: None,
             interaction_channel: None,
             squad_id: None,
+            squad_mode: None,
         }
     }
 
@@ -109,6 +112,7 @@ impl RoutingContext {
             entity_tx: None,
             interaction_channel: None,
             squad_id: None,
+            squad_mode: None,
         }
     }
 
@@ -123,6 +127,7 @@ impl RoutingContext {
             entity_tx: None,
             interaction_channel: None,
             squad_id: Some(squad_id),
+            squad_mode: None,
         }
     }
 }

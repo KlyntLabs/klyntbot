@@ -20,9 +20,7 @@ export function DebateRound({
       <div className="flex items-center justify-between">
         <span className="text-[10px] font-medium text-muted-foreground">
           Round {round.round}
-          {isCurrentRound && (
-            <span className="ml-1 text-purple-400 animate-pulse">Active</span>
-          )}
+          {isCurrentRound && <span className="ml-1 text-purple-400 animate-pulse">Active</span>}
         </span>
         <ConsensusIndicator
           score={round.consensusScore}

@@ -94,6 +94,11 @@ impl AnnotateTool {
             updated_at: now,
             expires_at: params.expires_at,
             access_count: 0,
+            mark_id: None,
+            quoted_text: None,
+            range_start: None,
+            range_end: None,
+            ai_suggestion: None,
         };
 
         self.repo.upsert(&annotation).await.map_err(|e| {

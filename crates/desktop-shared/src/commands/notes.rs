@@ -16,6 +16,8 @@ pub struct NoteResponse {
     pub color: Option<String>,
     pub split_content: Option<String>,
     pub split_mode: Option<String>,
+    pub perspective_config: Option<String>,
+    pub last_visited_at: Option<String>,
     pub tags: Vec<String>,
     pub created_at: String,
     pub updated_at: String,
@@ -54,6 +56,9 @@ pub struct NoteUpdateParams {
     /// `None` = don't change, `Some(None)` = clear split_mode, `Some(Some(mode))` = set split_mode
     #[serde(default, deserialize_with = "deserialize_nullable_field")]
     pub split_mode: Option<Option<String>>,
+    /// `None` = don't change, `Some(None)` = clear perspective_config, `Some(Some(json))` = set perspective_config
+    #[serde(default, deserialize_with = "deserialize_nullable_field")]
+    pub perspective_config: Option<Option<String>>,
 }
 
 /// Deserializes a field that distinguishes between absent, null, and present.

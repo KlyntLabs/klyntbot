@@ -16,9 +16,9 @@ pub mod procedural_rule;
 pub mod semantic_fact;
 pub mod squad;
 
-pub use blackboard::{BlackboardEntry, BlackboardRepo, NewBlackboardEntry};
 pub use accumulated_observation::AccumulatedObservationRepo;
 pub use annotation::AnnotationRepo;
+pub use blackboard::{BlackboardEntry, BlackboardRepo, NewBlackboardEntry};
 pub use book_tree::SqliteBookTreeRepo;
 pub use entity::{
     EntityRepo, EntityRow, GraphNeighborhood, NewEntity, NewRelationship, RelationshipRow,

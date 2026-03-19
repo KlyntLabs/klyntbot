@@ -144,9 +144,14 @@ mod tests {
         let repo = PersonaAccuracyRepo::new(pool);
 
         // Record a successful debate
-        repo.record_outcome("builtin-deep-analyst", "builtin-squad-finance", "finance", true)
-            .await
-            .unwrap();
+        repo.record_outcome(
+            "builtin-deep-analyst",
+            "builtin-squad-finance",
+            "finance",
+            true,
+        )
+        .await
+        .unwrap();
 
         let acc = repo
             .get("builtin-deep-analyst", "builtin-squad-finance", "finance")
@@ -158,9 +163,14 @@ mod tests {
         assert!(acc.stability > 1.0);
 
         // Record a miss
-        repo.record_outcome("builtin-deep-analyst", "builtin-squad-finance", "finance", false)
-            .await
-            .unwrap();
+        repo.record_outcome(
+            "builtin-deep-analyst",
+            "builtin-squad-finance",
+            "finance",
+            false,
+        )
+        .await
+        .unwrap();
         let acc = repo
             .get("builtin-deep-analyst", "builtin-squad-finance", "finance")
             .await

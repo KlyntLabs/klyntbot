@@ -65,8 +65,16 @@ export function ChatPage() {
   // Voice mode for squad chat
   const [voiceMode, setVoiceMode] = useState<VoiceMode>("multi");
 
-  // Chat session — pass squadId when present
-  const chat = useChatSession(selectedThread, refetchThreads, squadId ? { squadId } : undefined);
+  // Squad mode: "quick" (single-pass) or "debate" (room-style conversation)
+  type SquadModeType = "quick" | "debate";
+  const [squadMode, setSquadMode] = useState<SquadModeType>("quick");
+
+  // Chat session — pass squadId and squadMode when present
+  const chat = useChatSession(
+    selectedThread,
+    refetchThreads,
+    squadId ? { squadId, squadMode } : undefined,
+  );
 
   // Context resume — pre-fill input from navigation state
   const location = useLocation();
@@ -306,6 +314,19 @@ export function ChatPage() {
             <div />
           )}
           <div className="flex items-center gap-2">
+            {squadId && (
+              <button
+                type="button"
+                onClick={() => setSquadMode((m) => (m === "quick" ? "debate" : "quick"))}
+                className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                  squadMode === "debate"
+                    ? "bg-purple-500/20 text-purple-300 border border-purple-500/30"
+                    : "bg-white/[0.04] text-dim hover:text-muted-foreground border border-transparent"
+                }`}
+              >
+                {squadMode === "debate" ? "Debate" : "Quick"}
+              </button>
+            )}
             <TransparencyToggle enabled={showTransparency} onToggle={toggleTransparency} />
           </div>
         </div>
@@ -329,10 +350,11 @@ export function ChatPage() {
                   <div className="mb-6">
                     <DebateView
                       rounds={chat.debateRounds}
-                      totalRounds={3}
+                      totalRounds={chat.totalDebateRounds ?? 6}
                       currentRound={chat.debateRounds.at(-1)?.round ?? null}
                       consensusReached={chat.consensusReached}
                       consensusSummary={chat.consensusSummary}
+                      judgeDecisions={chat.judgeDecisions}
                     />
                   </div>
                 )}

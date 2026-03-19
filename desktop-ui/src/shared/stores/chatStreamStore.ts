@@ -14,6 +14,7 @@ import type {
   ClassificationCompletePayload,
   ConsensusReachedPayload,
   ContentChunkPayload,
+  DebateJudgeDecisionPayload,
   DebateRound,
   DebateRoundCompletedPayload,
   DebateRoundStartedPayload,
@@ -22,6 +23,7 @@ import type {
   ExecutionStartedPayload,
   InteractionRequestPayload,
   IterationStartPayload,
+  JudgeDecisionEntry,
   LearningEventPayload,
   MemoryAccessPayload,
   MessageSegment,
@@ -61,6 +63,7 @@ const SSE_AGENT_EVENTS = [
   "agent:persona_perspective",
   "agent:debate_round_started",
   "agent:debate_round_completed",
+  "agent:debate_judge_decision",
   "agent:consensus_reached",
   "agent:memory_promoted",
   "entity:updated",
@@ -79,8 +82,11 @@ export interface StreamSnapshot {
   personaMessages: PersonaSegment[];
   debateRounds: DebateRound[];
   currentDebateRound: number | null;
+  totalDebateRounds: number | null;
+  squadMode: "quick" | "debate" | null;
   consensusReached: boolean;
   consensusSummary: string | null;
+  judgeDecisions: JudgeDecisionEntry[];
   /** True when a stream finished while no component was subscribed to consume onDone. */
   needsRefetch: boolean;
 }
@@ -96,8 +102,11 @@ const DEFAULT_SNAPSHOT: StreamSnapshot = Object.freeze({
   personaMessages: [],
   debateRounds: [],
   currentDebateRound: null,
+  totalDebateRounds: null,
+  squadMode: null,
   consensusReached: false,
   consensusSummary: null,
+  judgeDecisions: [],
   needsRefetch: false,
 });
 
@@ -320,6 +329,9 @@ class ChatStreamStore {
       this.onDebateRoundCompleted(p),
     );
     on<ConsensusReachedPayload>("agent:consensus_reached", (p) => this.onConsensusReached(p));
+    on<DebateJudgeDecisionPayload>("agent:debate_judge_decision", (p) =>
+      this.onDebateJudgeDecision(p),
+    );
   }
 
   private initTauriListeners(): void {
@@ -371,6 +383,9 @@ class ChatStreamStore {
       );
       register<ConsensusReachedPayload>("agent:consensus_reached", (p) =>
         this.onConsensusReached(p),
+      );
+      register<DebateJudgeDecisionPayload>("agent:debate_judge_decision", (p) =>
+        this.onDebateJudgeDecision(p),
       );
     });
   }
@@ -700,6 +715,7 @@ class ChatStreamStore {
       personaIcon: payload.personaIcon,
       personaRole: payload.personaRole,
       content: payload.content,
+      challenge: payload.challenge ?? undefined,
     };
     this.updateState(payload.sessionKey, (s) => ({
       ...s,
@@ -721,9 +737,16 @@ class ChatStreamStore {
     this.updateState(payload.sessionKey, (s) => ({
       ...s,
       currentDebateRound: payload.round,
+      totalDebateRounds: payload.totalRounds,
+      squadMode: "debate",
       debateRounds: [
         ...s.debateRounds,
-        { round: payload.round, personaMessages: [], consensusScore: null },
+        {
+          round: payload.round,
+          phase: payload.phase,
+          personaMessages: [],
+          consensusScore: null,
+        },
       ],
     }));
   }
@@ -744,6 +767,23 @@ class ChatStreamStore {
       ...s,
       consensusReached: true,
       consensusSummary: payload.summary,
+    }));
+  }
+
+  private onDebateJudgeDecision(payload: DebateJudgeDecisionPayload): void {
+    if (!this.isActive(payload.sessionKey)) return;
+    this.updateState(payload.sessionKey, (s) => ({
+      ...s,
+      judgeDecisions: [
+        ...s.judgeDecisions,
+        {
+          round: payload.round,
+          consensusScore: payload.consensusScore,
+          decision: payload.decision,
+          speakingOrder: payload.speakingOrder,
+          reasoning: payload.reasoning,
+        },
+      ],
     }));
   }
 }

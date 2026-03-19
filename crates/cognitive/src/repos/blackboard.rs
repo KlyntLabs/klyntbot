@@ -99,6 +99,9 @@ impl BlackboardRepo {
         let mut rounds: std::collections::BTreeMap<i64, Vec<&BlackboardEntry>> =
             std::collections::BTreeMap::new();
         for e in entries {
+            if e.entry_type == "judge_decision" {
+                continue;
+            }
             rounds.entry(e.round).or_default().push(e);
         }
         let mut out = String::from("\n\n--- Prior Debate Rounds ---\n");
@@ -257,5 +260,41 @@ mod tests {
     #[test]
     fn test_format_for_prompt_empty() {
         assert!(BlackboardRepo::format_for_prompt(&[]).is_empty());
+    }
+
+    #[test]
+    fn test_format_for_prompt_skips_judge_decisions() {
+        let entries = vec![
+            BlackboardEntry {
+                id: "1".into(),
+                session_key: "s".into(),
+                squad_id: "sq".into(),
+                round: 1,
+                persona_id: "p1".into(),
+                persona_name: "Analyst".into(),
+                entry_type: "opening".into(),
+                content: "My analysis".into(),
+                confidence: 0.9,
+                references_entry_id: None,
+                created_at: "now".into(),
+            },
+            BlackboardEntry {
+                id: "2".into(),
+                session_key: "s".into(),
+                squad_id: "sq".into(),
+                round: 1,
+                persona_id: "judge".into(),
+                persona_name: "Judge".into(),
+                entry_type: "judge_decision".into(),
+                content: r#"{"decision":"continue"}"#.into(),
+                confidence: 1.0,
+                references_entry_id: None,
+                created_at: "now".into(),
+            },
+        ];
+        let prompt = BlackboardRepo::format_for_prompt(&entries);
+        assert!(prompt.contains("Analyst"));
+        assert!(!prompt.contains("Judge"));
+        assert!(!prompt.contains("judge_decision"));
     }
 }
