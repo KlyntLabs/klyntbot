@@ -418,7 +418,7 @@ Three-layer progressive disclosure:
 Small, unobtrusive status visible only when a recent promotion occurred:
 
 ```
-Getting to know you better +12% this week
+Getting to know you better — 12% fewer corrections this week
 ```
 
 Clicking opens the full panel. Hidden when no experiments are active.
@@ -438,7 +438,15 @@ Testing now: Experiment #48 (3 variants)
 47 messages scored so far today
 
 [Revert to defaults]          [Pause experiments]
+
+Experiment pace: [Conservative | Balanced | Bold]
 ```
+
+The **experiment pace** control maps to the diversity tier weighting in the LLM generation prompt.
+Conservative = all 3 variants are near-champion tweaks. Balanced = the standard conservative/moderate/bold
+split. Bold = 2 bold + 1 moderate. This gives the user agency over how aggressively the AI
+self-experiments without requiring per-promotion approval. Default: Balanced. Persisted in
+`LearningStateRepo` under key `"autotuner_experiment_pace"`.
 
 ### Layer 3: Experiment History (scrollable timeline)
 
@@ -449,6 +457,13 @@ Each entry shows:
 - For reverted: why it failed + what the system learned
 
 Entries grouped by weekly themes (e.g., "Week of Mar 10-17: Better at research routing").
+
+### Focus Banner Integration
+
+When the AutoTuner has active experiments and the user is in a focus session, the existing Focus
+Banner can occasionally show a subtle contextual line: "Learning how you focus best..." This creates
+a connection between the productivity and self-improvement systems. Shown at most once per focus
+session, only when the AutoTuner has been running for > 3 days (so there's real data being collected).
 
 ### Micro-Confirmation on Promotion
 
@@ -511,7 +526,7 @@ Uses existing `useQuery`/`useMutation` + `ipc()` pattern. Glass-panel styling.
 
 ## Phase 2 Sketch: Memory Optimization
 
-Reuses 90% of Phase 1 infrastructure. Begins after Phase 1 Champion stabilizes (no promotions in 3 consecutive cycles, minimum 2 weeks).
+Reuses 90% of Phase 1 infrastructure. Begins after Phase 1 has run for at least 14 days AND the Champion has been stable for the last 7 days (no promotions in 7 consecutive days). This keeps momentum while still protecting stability.
 
 ### New TrialParams (Phase 2 additions)
 
