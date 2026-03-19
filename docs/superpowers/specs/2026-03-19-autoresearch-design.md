@@ -50,7 +50,7 @@ Optimize FSRS weights, 6-factor relevance scoring, salience thresholds, promote/
 
 ### Crate: `autotuner` (L4)
 
-**Dependencies:** `common`, `config`, `storage`, `providers`
+**Dependencies:** `common`, `config`, `storage`, `providers`, `bus`
 
 ```
 crates/autotuner/
@@ -81,9 +81,14 @@ crates/agent/src/
 ### Dependency flow
 
 ```
-L4: autotuner (storage, config, common, providers)
-L5: agent/autotuner/ (autotuner, agent internals, bus)
+L0: common (defines TrialParams — pure value object, no dependencies beyond serde/uuid)
+L4: autotuner (storage, config, common, providers, bus)
+L5: agent/autotuner/ (autotuner, agent internals)
 ```
+
+**Event emission:** The `autotuner` crate (L4) defines `AutoTunerEvent` variants (Report, Promotion, Rollback)
+as its own enum. The `agent/autotuner/` orchestrator (L5) maps these to `AgentEvent` variants for the
+Transparency Panel. This avoids `autotuner` depending on `agent`'s event types.
 
 ---
 
@@ -91,12 +96,21 @@ L5: agent/autotuner/ (autotuner, agent internals, bus)
 
 ### TrialParams — per-request parameter override
 
-```rust
-/// Attached to RoutingContext for shadow scoring.
-/// Each field is Option — None means "use Config default."
-pub struct TrialParams {
-    pub trial_id: Uuid,
+`TrialParams` is defined in the `common` crate (L0) — not in `autotuner` — because it must be
+referenced by `RoutingContext` (in `tools-core`, L1). It is a pure value object: no methods, no
+dependencies beyond `serde` and `uuid`. All fields use `#[serde(default)]` for forward-compatible
+deserialization when Phase 2 fields are added.
 
+```rust
+// Defined in crates/common/src/autotuner.rs
+// Re-exported as common::TrialParams
+
+/// Per-request parameter overrides for autotuner experiments.
+/// Each field is Option — None means "use Config default."
+/// All fields are #[serde(default)] for forward-compatible deserialization.
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[serde(default)]
+pub struct TrialParams {
     // Phase 1: SkillRouter knobs
     pub skill_keyword_weight: Option<f64>,           // default 0.7, bounds [0.30, 0.90]
     pub skill_semantic_weight: Option<f64>,           // default 0.3, bounds [0.10, 0.70]
@@ -106,16 +120,32 @@ pub struct TrialParams {
     pub heuristic_confidence_threshold: Option<f64>,  // default 0.85, bounds [0.60, 0.95]
     pub llm_classifier_timeout_ms: Option<u64>,       // default 2000, bounds [500, 5000]
 
-    // Phase 1: ContextEngine knobs
-    pub memory_retrieval_weight: Option<f64>,         // default 0.20, bounds [0.05, 0.50]
-    pub semantic_weight: Option<f64>,                 // default 0.30, bounds [0.10, 0.60]
-    pub situation_weight: Option<f64>,                // default 0.25, bounds [0.05, 0.50]
+    // Phase 1: Cognitive retrieval knobs (from CognitiveRetrievalConfig / CognitiveConfig)
+    // These are the 6-factor relevance weights used by the cognitive memory retrieval layer.
+    // They live in CognitiveConfig, NOT in ContextEngine's BudgetAllocator.
+    // The BudgetAllocator controls how many tokens each context section gets;
+    // these weights control how retrieved memories are *ranked* within the memory section.
+    pub relevance_weight_semantic: Option<f64>,        // default 0.30, bounds [0.10, 0.60]
+    pub relevance_weight_retrievability: Option<f64>,  // default 0.20, bounds [0.05, 0.50]
+    pub relevance_weight_situation: Option<f64>,       // default 0.25, bounds [0.05, 0.50]
+    // Phase 1 holds the remaining 3 weights fixed at Config defaults.
+    // Phase 2 will add: relevance_weight_importance, relevance_weight_frequency,
+    // relevance_weight_temporal. Until then, the omitted weights are NOT tuned —
+    // the 3 tuned weights are rescaled proportionally so all 6 sum to 1.0.
+    // Rescaling formula: for each omitted weight, use its Config default.
+    // Then normalize all 6 weights to sum to 1.0.
 }
 ```
 
-**Constraint:** `skill_keyword_weight + skill_semantic_weight = 1.0`. All 6 relevance weights must sum to 1.0.
+**Constraints:**
+- `skill_keyword_weight + skill_semantic_weight = 1.0`.
+- All 6 relevance weights must sum to 1.0. Phase 1 tunes 3 of 6; the remaining 3 are held at Config defaults. The system normalizes all 6 to sum to 1.0 after applying overrides.
 
 ### Trial — one experiment variant
+
+`TrialParams` is a pure configuration value object — it does NOT carry `trial_id`.
+Identity belongs on the `Trial` container. Shadow prediction logging uses
+`Trial.id`, not a field inside `TrialParams`.
 
 ```rust
 pub struct Trial {
@@ -147,7 +177,7 @@ pub struct TrialResult {
     pub classification_accuracy: f64,
     pub avg_tokens_per_message: f64,
     pub avg_response_time_ms: f64,
-    pub routing_stability: f64,        // % agreement with champion routing
+    pub routing_stability: f64,        // see note below on measurement
     pub memory_relevance: f64,         // % of retrieved memories used in response
     pub user_satisfaction: Option<f64>,
 }
@@ -235,9 +265,11 @@ pub struct ShadowPrediction {
 ### Phase 0: Bootstrap (first 24-48 hours)
 
 1. **Collect baseline** — Run Config defaults for 24h, recording all metrics. This becomes the Champion's `baseline_metrics`.
-2. **Historical replay** — Take the last 7 days of sessions. Re-run intent pipeline with 5-10 random parameter perturbations (within bounds). Score against ground truth from `StrategyRepo`.
+2. **Historical replay** — Take the last 7 days of sessions from `session_messages` (via `SessionRepo`). For each message, re-run the heuristic + embedding layers of IntentAnalyzer with 5-10 random parameter perturbations (within bounds). Score each against ground truth by joining with `strategy_records` on `request_id` — **note:** this requires that `StrategyRecordRow.request_id` matches the `SessionMessage` identifier. If the join key is not present, fall back to scoring by comparing predicted execution mode (Direct/Reactive) against the `actual_strategy` field in `strategy_records` for the same `chat_id` + timestamp window.
 3. **Seed generation** — Feed replay results to LLM generator to produce 3 promising initial variants.
 4. **Transition** — Seeded variants become the first `Active` trials for live shadow scoring.
+
+**Note on ground truth:** `StrategyRepo` tracks execution mode classification accuracy (Direct vs Reactive), not orchestrator routing accuracy. Phase 1 uses two ground truth sources: (1) `StrategyRepo` for mode classification accuracy, and (2) `UserCorrectedAI` events for routing quality (corrections indicate the wrong orchestrator handled the request). The `classification_accuracy` metric in `TrialResult` specifically measures mode prediction accuracy from `StrategyRepo`. Orchestrator routing quality is captured indirectly through the `correction_rate` metric.
 
 ### Nightly Experiment Cycle (steady state)
 
@@ -267,7 +299,7 @@ Runs as a `CronJob` (default: `0 2 * * *` — 2am daily).
 | Correction rate | Must improve by >= 5% | Primary goal |
 | Token cost | Must not increase by > 8% | Prevent brute-force Reactive mode |
 | Response time | Must not increase by > 15% | Keep the agent snappy |
-| Routing stability | Must not decrease by > 10% | Avoid erratic behavior |
+| Routing stability | Must not decrease by > 10% | Avoid erratic behavior (see note) |
 | Memory relevance | Must not drop by > 5% | Protect Phase 2 foundation |
 
 - If multiple trials pass all constraints: prefer the one with the best correction rate improvement, with a diversity bonus (small preference for variants that differ most from current Champion by parameter distance).
@@ -290,8 +322,10 @@ Runs as a `CronJob` (default: `0 2 * * *` — 2am daily).
 On every inbound message:
 
 1. **Control path** — Pipeline runs with Champion params (or Config defaults). This drives the actual response.
-2. **Shadow path** — For each `Active` trial, run **only the classification stage** (IntentAnalyzer + SkillRouter) with `TrialParams`. Log the predicted routing decision, confidence, and selected orchestrator. No full execution — classification-only is near-zero cost.
+2. **Shadow path** — For each `Active` trial, run **only the heuristic + embedding layers (Layer 1-2)** of the IntentAnalyzer cascade, plus SkillRouter, with `TrialParams`. **Never invoke the Layer 3 LLM classifier for shadow scoring** — this would add up to 3 additional LLM calls per message (one per active trial) at 2000ms timeout each. When the heuristic+embedding layers return `None` (would defer to LLM), log the shadow prediction as `Deferred` — this is itself a useful signal (the variant's thresholds caused more LLM fallbacks). Log the predicted routing decision, confidence, and selected orchestrator.
 3. **Ground truth** — After response delivery, record user corrections, satisfaction feedback, token usage, and response time against both control and shadow predictions.
+
+**Cost model:** Shadow scoring at Layer 1-2 only adds <1ms per trial per message (Aho-Corasick + embedding cosine). With 3 active trials, overhead is <3ms per message — truly near-zero.
 
 ### Regression Detection & Auto-Rollback
 
@@ -310,14 +344,28 @@ Runs daily after evaluation:
 
 ## How Champion Params Reach the Live Pipeline
 
+Since `TrialParams` lives in `common` (L0), it can be referenced from `RoutingContext`
+(in `tools-core`, L1) without circular dependencies. The propagation path:
+
 When a trial is promoted:
 
 1. `AutoTunerOrchestrator` updates its in-memory `Champion`.
 2. On every message, `AgentRuntime` calls `orchestrator.current_champion_params()`.
-3. If `Some(params)`, attaches to `RoutingContext.champion_params`.
-4. `IntentAnalyzer` and `SkillRouter` check `ctx.champion_params` before falling back to `Config`.
+3. If `Some(params)`, attaches to `RoutingContext.champion_params: Option<TrialParams>`.
+4. `IntentAnalyzer` and `SkillRouter` read from `RoutingContext` when present, falling back to `Config`.
 
-No Config mutation. No global mutable state. If no Champion exists (fresh start), everything falls through to Config defaults — zero behavior change.
+**IntentAnalyzer signature strategy:** Rather than changing the `analyze()` signature (which has
+many callers), add a `with_overrides(&TrialParams)` builder method that returns a lightweight
+`AnalyzerWithOverrides` wrapper. The wrapper delegates to the same internal cascade but reads
+thresholds from the overrides first. This avoids breaking existing call sites. The shadow classifier
+in `agent/autotuner/` uses this wrapper; the live path continues calling `analyze()` directly (which
+reads from `RoutingContext.champion_params` internally via the context it already receives).
+
+Similarly, `SkillRouter::select_orchestrator_blended()` gains an optional `weight_overrides`
+parameter (defaulting to `None` at existing call sites).
+
+No Config mutation. No global mutable state. If no Champion exists (fresh start), everything
+falls through to Config defaults — zero behavior change.
 
 ---
 
@@ -465,7 +513,7 @@ pub trait ShadowRetriever: Send + Sync {
         query: &str,
         context: &ShadowContext,
         params: &TrialParams,
-    ) -> Result<Vec<RetrievedMemory>>;
+    ) -> Result<Vec<MemoryEntry>>;  // MemoryEntry from context_engine
 }
 ```
 
@@ -492,14 +540,16 @@ pub trait ShadowRetriever: Send + Sync {
 
 | System | Integration | Direction |
 |---|---|---|
-| `RoutingContext` | Add `champion_params: Option<TrialParams>` | Agent reads Champion params |
-| `IntentAnalyzer` | `analyze()` accepts optional `TrialParams` | Shadow classifier calls with trial params |
-| `SkillRouter` | `select_orchestrator_blended()` accepts optional weight overrides | Shadow classifier calls with trial weights |
-| `DomainEventBus` | `MetricCollector` subscribes to `UserCorrectedAI`, `CoachingFeedback`, `TaskExecutionCompleted` | Ground truth collection |
-| `StrategyRepo` | `MetricSource` reads classification accuracy history | Evaluation metrics |
-| `CronService` | Nightly cycle registered as `CronJob` at startup | Triggers experiment cycle |
-| `LearningStateRepo` | Stores Champion + previous Champion | Persistence across restarts |
-| `AgentEvent` | New variants: `AutoTunerReport`, `AutoTunerPromotion`, `AutoTunerRollback` | Transparency Panel |
+| `common` (L0) | New `TrialParams` struct (pure value object) | Referenced by RoutingContext, autotuner, agent |
+| `RoutingContext` (L1) | Add `champion_params: Option<TrialParams>` | Agent reads Champion params |
+| `IntentAnalyzer` (L5) | New `with_overrides(&TrialParams)` builder → `AnalyzerWithOverrides` wrapper. Existing `analyze()` signature unchanged. | Shadow classifier uses wrapper; live path reads from RoutingContext |
+| `SkillRouter` (L3) | `select_orchestrator_blended()` gains optional `weight_overrides` param (default None) | Shadow classifier calls with trial weights |
+| `CognitiveRetrievalConfig` (L5) | Shadow retrieval accepts relevance weight overrides from TrialParams | Phase 1: shadow-score ranking; Phase 2: full retrieval |
+| `DomainEventBus` (L1) | `MetricCollector` subscribes to `UserCorrectedAI`, `CoachingFeedback`, `TaskExecutionCompleted` | Ground truth collection |
+| `StrategyRepo` (L2) | `MetricSource` reads execution mode accuracy (Direct/Reactive). Orchestrator routing quality measured via correction rate, not StrategyRepo. | Evaluation metrics |
+| `CronService` (L3) | Nightly cycle registered as `CronJob` at startup | Triggers experiment cycle |
+| `LearningStateRepo` (L2) | Stores Champion + previous Champion + toast counter | Persistence across restarts |
+| `AgentEvent` (L5) | New variants mapped from `AutoTunerEvent`: Report, Promotion, Rollback | Transparency Panel |
 
 ---
 
@@ -511,9 +561,37 @@ pub trait ShadowRetriever: Send + Sync {
 | Convergence on degenerate config | Multi-metric constraints prevent single-metric optimization. Diversity bonus in promotion. Bold tier in generation. |
 | Regression after promotion | Automatic 3-day rollback + emergency revert button. |
 | LLM cost of nightly generation | Uses cheap classifier model. One prompt per night (~1k tokens). Negligible vs daily usage. |
-| Shadow scoring compute cost | Classification-only shadow (no full execution). Near-zero overhead per message. |
+| Shadow scoring compute cost | Heuristic + embedding layers only (Layer 1-2). Never invokes Layer 3 LLM classifier for shadow paths. <3ms per message with 3 active trials. |
 | Small sample noise | Minimum 50 messages before promotion eligibility. |
 | Local optima | Three diversity tiers (conservative/moderate/bold). Explicit instruction to avoid repeating recent patterns. |
+
+---
+
+## Design Notes & Clarifications
+
+### Routing stability measurement
+
+`routing_stability` measures how consistently a variant routes messages compared to a *correction-validated baseline*, not blind agreement with the current Champion. Specifically: for messages where the Champion's routing led to no user correction, we check whether the variant would have routed the same way. This prevents the stability constraint from creating inertia against improvements — a variant that routes *differently* on messages the Champion got wrong is not penalized.
+
+### Cron schedule timezone
+
+The nightly cycle cron expression (`0 2 * * *`) follows the existing `CronService` timezone convention. The implementation must use whichever timezone `CronService` operates in (likely local time, matching the weekly reflection job at `0 9 * * 1`). The spec does not mandate UTC or local — it matches the existing system.
+
+### Micro-confirmation toast counter
+
+The "first 3 promotions" toast counter is persisted in `LearningStateRepo` under key `"autotuner_promotion_toast_count"`. Resets when the autotuner feature is disabled and re-enabled.
+
+### Phase 2: FSRS tuning clarification
+
+`fsrs_desired_retention` in Phase 2 controls the target retention used by `next_interval()` to compute review scheduling (clamped to [0.7, 0.99]). It does NOT directly modify the 19-parameter FSRS weight vector. Tuning the full weight vector is out of scope for Phase 2 — it would require a separate training pipeline. Phase 2 focuses on the knobs that are already exposed as single values in `CognitiveConfig`.
+
+### Phase 2: ShadowRetriever return type
+
+`RetrievedMemory` in the Phase 2 sketch maps to the existing `MemoryEntry` type from the `context_engine` crate (which has `id`, `content`, `score`, `source` fields). The Phase 2 spec will use the concrete type name.
+
+### Forward-compatible serialization
+
+All `TrialParams` fields use `#[serde(default)]`. When Phase 2 adds new fields, existing Phase 1 Champions in `LearningStateRepo` will deserialize correctly with `None` for the new fields. Backward deserialization must be tested as part of Phase 2 implementation.
 
 ---
 
