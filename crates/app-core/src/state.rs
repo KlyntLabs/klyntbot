@@ -13,7 +13,6 @@ use feature_coaching::{FeedbackTracker, InterventionRouter, PatternDetector, Sig
 use feature_notes::repo::NoteRepo;
 use feature_productivity::repos::ProductivityRepos;
 use feature_productivity::{DailyAggregator, FocusManager, NudgeService, ProductivityEngine};
-use feature_tasks::types::ActiveTaskFocus;
 use scheduling::CronService;
 use storage::{Repos, StoragePool};
 use tokio::sync::{broadcast, oneshot, Mutex, RwLock};
@@ -82,9 +81,6 @@ pub struct AppCore {
     pub consecutive_coaching_ignores: Arc<AtomicI32>,
     /// Unified activity log ingestion service.
     pub activity_ingestion_service: Option<Arc<activity_log::ActivityIngestionService>>,
-    /// Active task focus session (None when no focus session is active).
-    /// Uses std::sync::Mutex because the lock is never held across await points.
-    pub active_task_focus: Arc<std::sync::Mutex<Option<ActiveTaskFocus>>>,
     /// Transport-agnostic event emitter — set by the desktop adapter (Tauri events)
     /// or left as `NoopEmitter` for CLI / tests. Used by the MCP server to push
     /// entity updates to the frontend after tool mutations.

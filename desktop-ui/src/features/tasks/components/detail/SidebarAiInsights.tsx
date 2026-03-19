@@ -179,11 +179,6 @@ function computeReasons(task: DetailTask): TaskReason[] {
     }
   }
 
-  // Focus momentum
-  if (task.focusedAt) {
-    reasons.push({ icon: Zap, text: "You're already in flow", weight: 85 });
-  }
-
   // Energy match
   if (task.energyLevel) {
     const hour = now.getHours();
