@@ -2,6 +2,7 @@
 .worktrees/
 .claude/worktrees/
 .fastembed_cache/
+.DS_Store
 
 # Test fixture build artifacts
 tests/fixtures/hello_plugin/target/

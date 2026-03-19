@@ -40,6 +40,11 @@ const TargetsPage = lazy(() =>
   import("../features/finance").then((m) => ({ default: m.TargetsPage })),
 );
 
+// ── Projects Feature ─────────────────────────────────────────────
+const ProjectDetailPage = lazy(() =>
+  import("../features/projects").then((m) => ({ default: m.ProjectDetailPage })),
+);
+
 // ── System Feature ───────────────────────────────────────────────
 const SystemPage = lazy(() =>
   import("../features/system").then((m) => ({ default: m.SystemPage })),
@@ -262,6 +267,8 @@ export const router = createHashRouter([
           </SettingsLayout>
         ),
       },
+      { path: "/project/:id", element: <ProjectDetailPage /> },
+      { path: "/project/:id/:tab", element: <ProjectDetailPage /> },
     ],
   },
   { path: "/setup", element: <ConversationRunner /> },
