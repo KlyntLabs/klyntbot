@@ -156,7 +156,26 @@ impl ContextSource for SkillContextSource {
     }
 
     fn estimated_tokens(&self) -> usize {
-        500
+        // Compute from actual content rather than hardcoding 500.
+        // Use blocking try_read to avoid async in a sync trait method;
+        // falls back to a conservative estimate if locks are held.
+        let orchestrator_tokens = self
+            .active_orchestrator
+            .try_read()
+            .ok()
+            .and_then(|guard| guard.as_ref().map(|pkg| pkg.body.len() / 4))
+            .unwrap_or(500);
+
+        let activated_tokens = self
+            .activated_skills
+            .try_read()
+            .ok()
+            .map(|guard| guard.iter().map(|pkg| pkg.body.len() / 4).sum::<usize>())
+            .unwrap_or(0);
+
+        // Add overhead for XML tags, headings, resource listings
+        let overhead = 50;
+        orchestrator_tokens + activated_tokens + overhead
     }
 }
 
@@ -238,6 +257,30 @@ mod tests {
         assert!(
             source.protected(),
             "Skill context should be protected from compaction"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_estimated_tokens_scales_with_content() {
+        let (catalog, refs) = make_catalog_with_always_skills();
+        let pkg = catalog.get("task-mgmt").unwrap().clone();
+        let body_len = pkg.body.len();
+
+        let active = Arc::new(RwLock::new(Some(pkg)));
+        let activated = Arc::new(RwLock::new(vec![]));
+        let source = SkillContextSource::new(active, activated, Arc::new(refs));
+
+        let estimate = source.estimated_tokens();
+        // Should be roughly body_len/4 + overhead, NOT the old hardcoded 500
+        assert!(
+            estimate > 50,
+            "estimate should include overhead at minimum"
+        );
+        // Should scale with the orchestrator body length
+        let expected_min = body_len / 4;
+        assert!(
+            estimate >= expected_min,
+            "estimate ({estimate}) should be at least body_len/4 ({expected_min})"
         );
     }
 }

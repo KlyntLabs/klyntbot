@@ -613,7 +613,7 @@
     "description": "Blocks ; and -- but not single quotes. delete_where accepts raw predicate unguarded.",
     "location": "crates/storage/src/vector_store/crud.rs:22-35",
     "suggested_fix": "Block single quotes. Sanitize delete_where input.",
-    "status": "open"
+    "status": "fixed"
   },
   {
     "id": "L3-001",
@@ -624,7 +624,7 @@
     "description": "delete() removes from sessions HashMap but NOT from lru_order IndexMap.",
     "location": "crates/session/src/manager.rs:425-433",
     "suggested_fix": "Also remove from lru_order in delete method.",
-    "status": "open"
+    "status": "fixed"
   },
   {
     "id": "L3-002",
@@ -635,7 +635,7 @@
     "description": "Always audio/ogg regardless of file extension (.mp3, .wav, .m4a, .webm).",
     "location": "crates/providers/src/adapters/transcription.rs:66",
     "suggested_fix": "Detect MIME type from file extension.",
-    "status": "open"
+    "status": "fixed"
   },
   {
     "id": "L3-003",
@@ -657,7 +657,7 @@
     "description": "estimated_tokens() returns hardcoded 500. Complex skills can be thousands of tokens.",
     "location": "crates/skill-system/src/context.rs:158",
     "suggested_fix": "Calculate from skill body size.",
-    "status": "open"
+    "status": "fixed"
   },
   {
     "id": "L3-005",
@@ -701,6 +701,6 @@
     "description": "Table-name sandboxing function exists but never called. Plugins could write to any SQLite table.",
     "location": "crates/plugin-runtime/src/host/mod.rs:60",
     "suggested_fix": "Wire is_plugin_table into DB write host function.",
-    "status": "open"
+    "status": "fixed"
   }
 ]

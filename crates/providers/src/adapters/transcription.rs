@@ -11,6 +11,25 @@ use common::{build_http_client, KlyntbotError, ProviderError, Result};
 /// Default API base URL for Groq
 const DEFAULT_GROQ_API_BASE: &str = "https://api.groq.com/openai/v1";
 
+/// Detect audio MIME type from file extension.
+fn mime_type_for_audio(path: &Path) -> &'static str {
+    match path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_lowercase())
+        .as_deref()
+    {
+        Some("mp3") => "audio/mpeg",
+        Some("wav") => "audio/wav",
+        Some("m4a") => "audio/mp4",
+        Some("webm") => "audio/webm",
+        Some("flac") => "audio/flac",
+        Some("mp4") => "audio/mp4",
+        Some("mpeg") | Some("mpga") => "audio/mpeg",
+        _ => "audio/ogg",
+    }
+}
+
 /// Transcription provider using Groq Whisper
 pub struct TranscriptionProvider {
     client: Client,
@@ -52,16 +71,18 @@ impl TranscriptionProvider {
             .await
             .map_err(KlyntbotError::Io)?;
 
-        // Get filename
+        // Get filename and detect MIME type from extension
         let filename = path
             .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("audio.ogg");
 
+        let mime_type = mime_type_for_audio(path);
+
         // Create multipart form
         let part = reqwest::multipart::Part::bytes(file)
             .file_name(filename.to_string())
-            .mime_str("audio/ogg")
+            .mime_str(mime_type)
             .map_err(|e| {
                 ProviderError::InvalidResponse(format!("Failed to create form part: {}", e))
             })?;
@@ -147,5 +168,22 @@ mod tests {
             provider.api_base.trim_end_matches('/')
         );
         assert_eq!(url, "https://custom.api.com/v1/audio/transcriptions");
+    }
+
+    #[test]
+    fn test_mime_type_detection() {
+        assert_eq!(mime_type_for_audio(Path::new("voice.mp3")), "audio/mpeg");
+        assert_eq!(mime_type_for_audio(Path::new("voice.wav")), "audio/wav");
+        assert_eq!(mime_type_for_audio(Path::new("voice.m4a")), "audio/mp4");
+        assert_eq!(mime_type_for_audio(Path::new("voice.webm")), "audio/webm");
+        assert_eq!(mime_type_for_audio(Path::new("voice.flac")), "audio/flac");
+        assert_eq!(mime_type_for_audio(Path::new("voice.mp4")), "audio/mp4");
+        assert_eq!(mime_type_for_audio(Path::new("voice.mpga")), "audio/mpeg");
+        assert_eq!(mime_type_for_audio(Path::new("voice.ogg")), "audio/ogg");
+        // Unknown extension defaults to ogg
+        assert_eq!(mime_type_for_audio(Path::new("voice.xyz")), "audio/ogg");
+        // Case-insensitive
+        assert_eq!(mime_type_for_audio(Path::new("voice.MP3")), "audio/mpeg");
+        assert_eq!(mime_type_for_audio(Path::new("voice.WAV")), "audio/wav");
     }
 }

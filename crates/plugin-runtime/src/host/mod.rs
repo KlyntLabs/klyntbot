@@ -155,7 +155,7 @@ pub fn build_host_functions(
                 }
 
                 if let Err(e) = check_table_sandbox(&input, &ctx.plugin_id) {
-                    let handle = plugin.memory_new(&format!("error: {e}"))?;
+                    let handle = plugin.memory_new(format!("error: {e}"))?;
                     outputs[0] = plugin.memory_to_val(handle);
                     return Ok(());
                 }
@@ -213,7 +213,7 @@ pub fn build_host_functions(
                 }
 
                 if let Err(e) = check_table_sandbox(&input, &ctx.plugin_id) {
-                    let handle = plugin.memory_new(&format!("error: {e}"))?;
+                    let handle = plugin.memory_new(format!("error: {e}"))?;
                     outputs[0] = plugin.memory_to_val(handle);
                     return Ok(());
                 }

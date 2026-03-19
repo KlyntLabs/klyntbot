@@ -423,8 +423,12 @@ impl SessionManager {
 
     /// Delete a session
     pub async fn delete(&self, key: &str) -> Result<bool> {
-        // Remove from cache
+        // Remove from cache and LRU tracking
         self.sessions.remove(key);
+        {
+            let mut lru = self.lru_order.lock().unwrap();
+            lru.shift_remove(key);
+        }
 
         self.sql_repo
             .delete_session(key)
@@ -619,6 +623,41 @@ mod tests {
                 .unwrap()
                 .contains_key(&key.to_string()),
             "session key should be removed from LRU order"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_delete_session_removes_from_lru() {
+        let pool = sqlx::SqlitePool::connect(":memory:").await.unwrap();
+        let repo = storage::SessionRepo::new(pool);
+        let manager = SessionManager::from_repo(repo, 1000).await;
+
+        let key = "test:delete-lru";
+
+        // Insert into cache + LRU
+        manager.sessions.insert(
+            key.to_string(),
+            Arc::new(TokioMutex::new(Session::new(key))),
+        );
+        manager
+            .lru_order
+            .lock()
+            .unwrap()
+            .insert(key.to_string(), ());
+
+        assert!(manager.has_session(key));
+        assert!(manager.lru_order.lock().unwrap().contains_key(key));
+
+        // delete should remove from both sessions and lru_order
+        let _ = manager.delete(key).await;
+
+        assert!(
+            !manager.has_session(key),
+            "session should no longer be in cache after delete"
+        );
+        assert!(
+            !manager.lru_order.lock().unwrap().contains_key(key),
+            "session key should be removed from LRU order after delete"
         );
     }
 
