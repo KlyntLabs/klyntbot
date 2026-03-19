@@ -1,0 +1,38 @@
+[
+  {
+    "id": "redesign-project-page",
+    "title": "Redesign /project detail page",
+    "type": "feature",
+    "priority": "high",
+    "status": "backlog",
+    "description": "Re-design the Project Detail Page (/project/:id). The current implementation has a 4-tab layout (Overview, Tasks, OKR, Notes) with code-split lazy loading, a ProjectProvider context, and a QuickAddFAB. The Overview tab packs 7 dashboard cards (HealthScore, TaskProgress, OkrSummary, WorkContext, Insight, Coaching, ActivityTimeline) which may be overwhelming. Project settings (AI instructions, role, sources, memories, conversations) are backend-ready but have no UI surface.",
+    "scope": [
+      "desktop-ui/src/features/projects/pages/ProjectDetailPage.tsx",
+      "desktop-ui/src/features/projects/pages/ProjectsListPage.tsx",
+      "desktop-ui/src/features/projects/components/overview/OverviewTab.tsx",
+      "desktop-ui/src/features/projects/components/ProjectHeader.tsx",
+      "desktop-ui/src/features/projects/components/QuickAddFAB.tsx",
+      "desktop-ui/src/features/projects/contexts/ProjectContext.tsx"
+    ],
+    "considerations": [
+      "Overview tab has 7 cards — consider reducing to essential metrics or making cards collapsible",
+      "Project settings (instructions, role, sources) have backend commands but no UI — surface in redesign",
+      "project_conversations_list, project_memories_list, project_source_* need UI panels",
+      "Health score formula (60% OKR, 20% task velocity, 10% insights, 10% focus) may need tuning",
+      "QuickAddFAB could be replaced with inline creation or command palette integration",
+      "Consider sidebar+content layout vs current tab layout",
+      "GlassTabBar with drag-reorder is nice but tabs may not scale if more sections are added"
+    ],
+    "backend_commands_to_wire": [
+      "project_update_instructions",
+      "project_update_role",
+      "project_conversations_list",
+      "project_memories_list",
+      "project_memories_by_type",
+      "project_source_create",
+      "project_source_delete",
+      "project_source_list"
+    ],
+    "created": "2026-03-19"
+  }
+]

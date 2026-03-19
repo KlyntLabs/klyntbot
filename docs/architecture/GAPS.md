@@ -7,7 +7,7 @@
 
 - **0 High** priority gaps -- OKR, Project CRUD, and Note UI gaps resolved
 - **8 Medium** priority gaps -- secondary features or partially integrated
-- **7 Low** priority gaps -- nice-to-have, internal-only, or debug-only
+- **6 Low** priority gaps -- nice-to-have, internal-only, or debug-only
 
 ---
 
@@ -29,7 +29,6 @@
 | `workspace_list_files` | `workspace.rs` | List workspace files | Low | Show workspace browser in settings or debug |
 | `workspace_read_file` | `workspace.rs` | Read workspace file | Low | Show file content in workspace browser |
 | `workspace_write_file` | `workspace.rs` | Write workspace file | Low | Wire into workspace file editor |
-| `task_start_focus` | `tasks.rs` | Start focus mode on a task | Medium | Add "Focus" button on task detail page |
 | `task_reject_decomposition` | `tasks.rs` | Reject a task decomposition | Low | Already using `task_apply_decomposition`; add reject button |
 | `cognitive_system_status` | `cognitive.rs` | Get cognitive system health | Low | Add to debug/system tab |
 | `cognitive_fact_create` | `cognitive.rs` | Manually create a semantic fact | Low | Debug only -- already in MemoryTab |
@@ -69,7 +68,7 @@
 | `finance_exchange_rates` | `commands/finance.rs` | Backend implements rates; no UI to display them | **Wire** into finance overview currency section |
 | `finance_report_income` | `commands/finance.rs` | Income report not displayed | **Wire** into cash flow page |
 | `finance_report_trends` | `commands/finance.rs` | Trends report not displayed | **Wire** into finance charts |
-| `distraction_allow_temp` / `distraction_allow_session` | `commands/distraction.rs` | Called from DistractionOverlay | OK -- integrated |
+| `distraction_allow_temp` / `distraction_allow_session` | `commands/distraction.rs` | Wired via `distraction_respond` dispatch | OK -- integrated |
 | `productivity_auto_focus_start` / `_end` | `commands/productivity.rs` | Called from backend events only | OK -- `productivity_auto_focus_confirm` now exists |
 
 ---
@@ -243,8 +242,5 @@ Config sections are exposed via `config_get_section` / `config_update_section`. 
 13. **Various Config Sections** -- Many config sections (confidence, conversation, content, skills, packs, scenario, orchestrator) have no settings UI. These are advanced tuning parameters that most users will never need.
     - Effort: Low priority; expose on demand
 
-14. **Task Start Focus Button** -- `task_start_focus` has no UI trigger (only `task_end_focus` is called). Users need a way to initiate focus from the task detail page.
-    - Effort: 30 min
-
-15. **Flashcard Edit/Delete** -- `flashcard_update` and `flashcard_delete` not called from frontend.
+14. **Flashcard Edit/Delete** -- `flashcard_update` and `flashcard_delete` not called from frontend.
     - Effort: 0.5 days
