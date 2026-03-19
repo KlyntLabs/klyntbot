@@ -276,11 +276,18 @@ impl AppCore {
             distraction_events: vec![],
             quality_score: Some(payload.productive_ratio),
             completed: true,
-            notes: Some(format!("Auto-detected: {} ({}min)", payload.dominant_app, payload.duration_mins)),
+            notes: Some(format!(
+                "Auto-detected: {} ({}min)",
+                payload.dominant_app, payload.duration_mins
+            )),
             source: feature_productivity::types::SessionSource::AutoDetected,
         };
 
-        repos.sessions.create(&session).await.map_err(map_prod_err)?;
+        repos
+            .sessions
+            .create(&session)
+            .await
+            .map_err(map_prod_err)?;
         Ok(session_to_response(session))
     }
 }
