@@ -915,6 +915,16 @@ pub async fn relay_chat_stream(
                             }
                         );
                     }
+                    // AutoTuner events — logged for now, wired to UI in Task 14.
+                    AgentEvent::AutoTunerReport(_) => {
+                        tracing::debug!("autotuner report event (not yet wired to UI)");
+                    }
+                    AgentEvent::AutoTunerPromotion(_) => {
+                        tracing::debug!("autotuner promotion event (not yet wired to UI)");
+                    }
+                    AgentEvent::AutoTunerRollback(_) => {
+                        tracing::debug!("autotuner rollback event (not yet wired to UI)");
+                    }
                 }
             }
             else => break,

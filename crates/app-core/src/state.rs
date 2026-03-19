@@ -106,6 +106,8 @@ pub struct AppCore {
     pub persona_repo: Option<cognitive::PersonaRepo>,
     /// Squad repo for Insight Review persona squads (None when cognitive feature unavailable).
     pub squad_repo: Option<cognitive::SquadRepo>,
+    /// AutoTuner orchestrator (None when autotuner is disabled).
+    pub autotuner: Option<Arc<agent::autotuner::AutoTunerOrchestrator>>,
 }
 
 impl AppCore {
@@ -203,6 +205,11 @@ impl AppCore {
             .as_ref()
             .map(|e| &e.clipboard_repo)
             .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "launcher feature is not enabled"))
+    }
+
+    /// Return autotuner orchestrator or `None` when disabled.
+    pub fn autotuner_orchestrator(&self) -> Option<&agent::autotuner::AutoTunerOrchestrator> {
+        self.autotuner.as_deref()
     }
 
     /// Return proactive handler or a "not initialized" error.

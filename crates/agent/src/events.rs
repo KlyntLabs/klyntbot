@@ -262,4 +262,11 @@ pub enum AgentEvent {
         subject: String,
         predicate: String,
     },
+
+    /// AutoTuner nightly cycle report.
+    AutoTunerReport(::autotuner::AutoTunerReport),
+    /// AutoTuner promoted a new champion.
+    AutoTunerPromotion(::autotuner::AutoTunerPromotion),
+    /// AutoTuner auto-reverted after regression.
+    AutoTunerRollback(::autotuner::AutoTunerRollback),
 }
