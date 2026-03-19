@@ -1,3 +1,4 @@
+import { AutoTunerPanel } from "@features/autotuner";
 import { SettingsCard } from "@shared/composites";
 import { ipc } from "@shared/hooks/useIpc";
 import { useQuery } from "@shared/hooks/useQuery";
@@ -238,6 +239,13 @@ export function GeneralSettings() {
         </SettingsCard>
 
         <PermissionsCard />
+
+        <SettingsCard title="AI Self-Improvement">
+          <p className="text-[12px] text-muted-foreground mb-3">
+            AutoTuner continuously learns your preferences and optimizes response quality.
+          </p>
+          <AutoTunerPanel />
+        </SettingsCard>
       </div>
     </div>
   );
