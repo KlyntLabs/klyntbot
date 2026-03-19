@@ -2,6 +2,7 @@ import { Suspense, useEffect } from "react";
 import { RouterProvider } from "react-router";
 import { ThemeProvider } from "./app/providers/ThemeProvider";
 import { router } from "./app/router";
+import { ErrorBoundary } from "./shared/components/ErrorBoundary";
 import { checkForUpdates } from "./shared/lib/updater";
 
 export default function App() {
@@ -13,10 +14,12 @@ export default function App() {
   }, []);
 
   return (
-    <ThemeProvider>
-      <Suspense fallback={null}>
-        <RouterProvider router={router} />
-      </Suspense>
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <Suspense fallback={null}>
+          <RouterProvider router={router} />
+        </Suspense>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }

@@ -1,6 +1,7 @@
 import { SettingsCard } from "@shared/composites";
 import { ipc } from "@shared/hooks/useIpc";
 import { useQuery } from "@shared/hooks/useQuery";
+import { useToastContext } from "@shared/hooks/useToast";
 import { SaveButton, SecretInput, Toggle } from "@shared/ui";
 import { useState } from "react";
 import { ThemeSwitcher } from "../components/ThemeSwitcher";
@@ -75,6 +76,7 @@ interface LearningData {
 // ── Component ────────────────────────────────────────────────────────
 
 export function PersonalizationSettings() {
+  const toast = useToastContext();
   const { data: providers, refetch: refetchProviders } = useQuery<ProvidersData>(
     "config_get_section",
     { section: "providers" },
@@ -160,8 +162,8 @@ export function PersonalizationSettings() {
       refetchProviders();
       refetchAgents();
       setProviderEdits({});
-    } catch (e) {
-      console.error("Failed to save provider config:", e);
+    } catch {
+      toast.show("Failed to save provider config");
     } finally {
       setSavingProvider(false);
     }
@@ -189,8 +191,8 @@ export function PersonalizationSettings() {
       });
       refetchLearning();
       setLearningEdits({});
-    } catch (e) {
-      console.error("Failed to save learning config:", e);
+    } catch {
+      toast.show("Failed to save learning config");
     } finally {
       setSavingLearning(false);
     }
@@ -225,8 +227,8 @@ export function PersonalizationSettings() {
       await ipc("config_update_section", { section: "cognitive", patch });
       refetchCognitive();
       setCognitiveEdits({});
-    } catch (e) {
-      console.error("Failed to save cognitive config:", e);
+    } catch {
+      toast.show("Failed to save cognitive config");
     } finally {
       setSavingCognitive(false);
     }

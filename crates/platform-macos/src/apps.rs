@@ -134,6 +134,9 @@ impl AppIconCache {
     ///
     /// Reads `Contents/Info.plist` for `CFBundleIconFile`, locates the `.icns`,
     /// and converts to a 32px PNG via `sips`.
+    ///
+    /// **Blocking:** Uses `std::process::Command` for PlistBuddy and sips.
+    /// Callers in async contexts must use `tokio::task::spawn_blocking`.
     #[cfg(target_os = "macos")]
     fn extract_icon(app_path: &Path, tmp_dir: &Path) -> Option<String> {
         use std::process::Command;

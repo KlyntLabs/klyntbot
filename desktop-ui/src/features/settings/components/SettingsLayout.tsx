@@ -1,3 +1,5 @@
+import { ToastContainer } from "@shared/components/ToastContainer";
+import { ToastContextProvider, useToast } from "@shared/hooks/useToast";
 import {
   Archive,
   ArrowLeft,
@@ -30,9 +32,12 @@ export function SettingsLayout({ children }: SettingsLayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const currentPath = location.pathname;
+  const toast = useToast();
 
   return (
-    <>
+    <ToastContextProvider value={{ show: toast.show }}>
+      <ToastContainer toasts={toast.toasts} onDismiss={toast.dismiss} />
+
       {/* Settings sidebar — floating glass panel */}
       <div className="w-56 glass-sidebar flex flex-col py-3">
         <button
@@ -77,6 +82,6 @@ export function SettingsLayout({ children }: SettingsLayoutProps) {
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-3xl mx-auto p-8">{children}</div>
       </div>
-    </>
+    </ToastContextProvider>
   );
 }

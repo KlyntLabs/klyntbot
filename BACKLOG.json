@@ -162,7 +162,7 @@
     "description": "AppleScript can block for seconds. Uses synchronous Command::output() which blocks the calling thread/tokio executor.",
     "location": "crates/platform-macos/src/browser.rs:164",
     "suggested_fix": "Use tokio::process::Command or document as blocking-only.",
-    "status": "open"
+    "status": "fixed"
   },
   {
     "id": "L0-016",
@@ -173,7 +173,7 @@
     "description": "Synchronous shell invocations for PlistBuddy and sips block the executor during icon resolution.",
     "location": "crates/platform-macos/src/apps.rs:140-180",
     "suggested_fix": "Use tokio::process::Command or spawn_blocking.",
-    "status": "open"
+    "status": "fixed"
   },
   {
     "id": "L0-017",
@@ -294,7 +294,7 @@
     "description": "validation.rs calls Regex::new(pattern) on every tool invocation with a pattern constraint. Regex compilation is expensive.",
     "location": "crates/tools-core/src/validation.rs:35",
     "suggested_fix": "Cache compiled regexes (OnceLock/LazyLock per pattern or a RegexCache).",
-    "status": "open"
+    "status": "fixed"
   },
   {
     "id": "L1-010",
@@ -492,7 +492,7 @@
     "description": "App.tsx only has Suspense with fallback={null}. No ErrorBoundary at app root. Only IssueDetailErrorBoundary exists for tasks detail.",
     "location": "desktop-ui/src/App.tsx:7-22",
     "suggested_fix": "Add a root ErrorBoundary component wrapping the app.",
-    "status": "open"
+    "status": "fixed"
   },
   {
     "id": "FE-003",
@@ -525,7 +525,7 @@
     "description": "Multiple clipboard.writeText calls without try-catch: InsightReviewPanel.tsx:161, ConceptMapTab.tsx:63, IntegrationsSettings.tsx:62.",
     "location": "desktop-ui/src/features/",
     "suggested_fix": "Wrap in try-catch or add .catch() handler.",
-    "status": "open"
+    "status": "fixed"
   },
   {
     "id": "FE-006",
@@ -547,7 +547,7 @@
     "description": "All settings pages (Configuration, General, Personalization) catch save errors with console.error only. No user-visible error feedback.",
     "location": "desktop-ui/src/features/settings/pages/",
     "suggested_fix": "Show toast notification on save failure.",
-    "status": "open"
+    "status": "fixed"
   },
   {
     "id": "FE-008",

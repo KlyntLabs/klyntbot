@@ -1,4 +1,5 @@
 import { SettingsCard } from "@shared/composites/SettingsCard/SettingsCard";
+import { useCopyToClipboard } from "@shared/hooks/useCopyToClipboard";
 import { ipc } from "@shared/hooks/useIpc";
 import { useQuery } from "@shared/hooks/useQuery";
 import { Check, Copy, RefreshCw, Terminal, X } from "lucide-react";
@@ -30,7 +31,7 @@ export function IntegrationsSettings() {
 
   const [installing, setInstalling] = useState(false);
   const [tokenVisible, setTokenVisible] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const { copied, copy } = useCopyToClipboard();
 
   const handleInstall = async () => {
     setInstalling(true);
@@ -57,12 +58,8 @@ export function IntegrationsSettings() {
     refetchToken();
   };
 
-  const handleCopyToken = () => {
-    if (token) {
-      navigator.clipboard.writeText(token);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
+  const handleCopyToken = async () => {
+    if (token) await copy(token);
   };
 
   return (

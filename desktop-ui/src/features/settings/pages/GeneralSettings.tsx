@@ -1,6 +1,7 @@
 import { SettingsCard } from "@shared/composites";
 import { ipc } from "@shared/hooks/useIpc";
 import { useQuery } from "@shared/hooks/useQuery";
+import { useToastContext } from "@shared/hooks/useToast";
 import type { AgentStatus, AppInfoResponse } from "@shared/types";
 import { SaveButton, ShortcutRecorder } from "@shared/ui";
 import { useMemo, useState } from "react";
@@ -24,6 +25,7 @@ const SHORTCUT_DEFAULTS = {
 };
 
 export function GeneralSettings() {
+  const toast = useToastContext();
   const { data: appInfo } = useQuery<AppInfoResponse>("app_info", undefined, {
     version: "...",
     dataDir: "...",
@@ -112,8 +114,8 @@ export function GeneralSettings() {
       setModel(null);
       setTemperature(null);
       setMaxTokens(null);
-    } catch (e) {
-      console.error("Failed to save agent defaults:", e);
+    } catch {
+      toast.show("Failed to save agent defaults");
     } finally {
       setSaving(false);
     }

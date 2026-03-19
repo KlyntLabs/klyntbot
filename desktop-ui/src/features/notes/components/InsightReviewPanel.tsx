@@ -1,3 +1,4 @@
+import { useCopyToClipboard } from "@shared/hooks/useCopyToClipboard";
 import { ipc } from "@shared/hooks/useIpc";
 import {
   BookOpen,
@@ -102,7 +103,7 @@ function tabStatus(state: InsightReviewState, tabId: TabId): TabStatus {
 // ---------------------------------------------------------------------------
 
 export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) {
-  const [copied, setCopied] = useState(false);
+  const { copied, copy } = useCopyToClipboard();
   const [showPersonaManager, setShowPersonaManager] = useState(false);
   const [showSquadManager, setShowSquadManager] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -157,11 +158,8 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
 
   const handleCopy = useCallback(async () => {
     const content = getActiveContent();
-    if (!content) return;
-    await navigator.clipboard.writeText(content);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }, [getActiveContent]);
+    if (content) await copy(content);
+  }, [getActiveContent, copy]);
 
   const handleInsertIntoNote = useCallback(async () => {
     const content = getActiveContent();

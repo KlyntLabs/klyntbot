@@ -143,6 +143,9 @@ pub fn extract_site_name(window_title: &str) -> Option<String> {
 ///
 /// Works for Chrome-family browsers (Chrome, Brave, Vivaldi, Edge, Opera, Arc)
 /// and Safari. Returns `None` for non-browser apps or if the script fails.
+///
+/// **Blocking:** Uses `std::process::Command` which can block for seconds.
+/// Callers in async contexts must use `tokio::task::spawn_blocking`.
 #[cfg(target_os = "macos")]
 pub fn get_browser_url(app_name: &str, bundle_id: Option<&str>) -> Option<String> {
     if !is_browser(app_name, bundle_id) {

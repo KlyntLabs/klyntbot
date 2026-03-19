@@ -1,6 +1,7 @@
 import { SettingsCard } from "@shared/composites";
 import { ipc } from "@shared/hooks/useIpc";
 import { useQuery } from "@shared/hooks/useQuery";
+import { useToastContext } from "@shared/hooks/useToast";
 import { SaveButton, SecretInput, Toggle } from "@shared/ui";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
@@ -74,6 +75,7 @@ interface GatewayData {
 // ── Component ────────────────────────────────────────────────────────
 
 export function ConfigurationSettings() {
+  const toast = useToastContext();
   const { data: channels, refetch: refetchChannels } = useQuery<ChannelsData>(
     "config_get_section",
     { section: "channels" },
@@ -130,8 +132,8 @@ export function ConfigurationSettings() {
         delete next[channelKey];
         return next;
       });
-    } catch (e) {
-      console.error("Failed to save channel config:", e);
+    } catch {
+      toast.show("Failed to save channel config");
     } finally {
       setSaving(null);
     }
@@ -168,8 +170,8 @@ export function ConfigurationSettings() {
       await ipc("config_update_section", { section: "tools", patch });
       refetchTools();
       setToolEdits({});
-    } catch (e) {
-      console.error("Failed to save tools config:", e);
+    } catch {
+      toast.show("Failed to save tools config");
     } finally {
       setSaving(null);
     }
@@ -184,8 +186,8 @@ export function ConfigurationSettings() {
       await ipc("config_update_section", { section: "gateway", patch: gatewayEdits });
       refetchGateway();
       setGatewayEdits({});
-    } catch (e) {
-      console.error("Failed to save gateway config:", e);
+    } catch {
+      toast.show("Failed to save gateway config");
     } finally {
       setSaving(null);
     }
