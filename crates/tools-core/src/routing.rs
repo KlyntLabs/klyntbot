@@ -79,6 +79,8 @@ pub struct RoutingContext {
     pub squad_id: Option<String>,
     /// Squad mode: "quick" (single-pass) or "debate" (room-style conversation).
     pub squad_mode: Option<String>,
+    /// Autotuner champion parameters for the current trial (if any).
+    pub champion_params: Option<common::TrialParams>,
 }
 
 impl RoutingContext {
@@ -94,6 +96,7 @@ impl RoutingContext {
             interaction_channel: None,
             squad_id: None,
             squad_mode: None,
+            champion_params: None,
         }
     }
 
@@ -113,6 +116,7 @@ impl RoutingContext {
             interaction_channel: None,
             squad_id: None,
             squad_mode: None,
+            champion_params: None,
         }
     }
 
@@ -128,6 +132,7 @@ impl RoutingContext {
             interaction_channel: None,
             squad_id: Some(squad_id),
             squad_mode: None,
+            champion_params: None,
         }
     }
 }

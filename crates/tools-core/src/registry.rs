@@ -12,6 +12,7 @@ use common::{Result, ToolError};
 /// A tool entry for search result output.
 #[cfg(test)]
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub(crate) struct ToolSearchEntry {
     pub name: String,
     pub description: String,

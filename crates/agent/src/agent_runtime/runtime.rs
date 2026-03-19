@@ -95,6 +95,7 @@ pub struct AgentRuntime {
 }
 
 impl AgentRuntime {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         skill_catalog: Arc<RwLock<SkillCatalog>>,
         skill_router: Arc<RwLock<skill_system::router::SkillRouter>>,
@@ -613,7 +614,7 @@ impl AgentRuntime {
         squad_repo: &cognitive::SquadRepo,
         provider: &providers::DynProvider,
         params: &providers::ChatParams,
-        squad_mode_str: Option<&str>,
+        _squad_mode_str: Option<&str>,
     ) -> Result<RuntimeResult> {
         use crate::intent_pipeline::engines;
         use crate::intent_pipeline::engines::squad;
@@ -633,15 +634,15 @@ impl AgentRuntime {
             .to_string()];
         for msg in &history {
             match msg {
-                Message::User { content } => {
-                    if let providers::UserContent::Text(t) = content {
-                        context_parts.push(format!("User: {t}"));
-                    }
+                Message::User {
+                    content: providers::UserContent::Text(t),
+                } => {
+                    context_parts.push(format!("User: {t}"));
                 }
-                Message::Assistant { content, .. } => {
-                    if let Some(c) = content {
-                        context_parts.push(format!("Assistant: {c}"));
-                    }
+                Message::Assistant {
+                    content: Some(c), ..
+                } => {
+                    context_parts.push(format!("Assistant: {c}"));
                 }
                 _ => {}
             }
@@ -1525,7 +1526,6 @@ mod tests {
                 scope: SkillScope::BuiltIn,
                 location: PathBuf::new(),
                 body: String::new(),
-                manifest: None,
                 metadata: SkillMetadata {
                     klyntbot: Some(KlyntbotMeta {
                         tools,

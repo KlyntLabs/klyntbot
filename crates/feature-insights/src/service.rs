@@ -122,6 +122,7 @@ impl InsightService {
     }
 
     /// Store a completed insight (called after the background pipeline finishes).
+    #[allow(clippy::too_many_arguments)]
     pub async fn store_insight(
         &self,
         note_id: &str,

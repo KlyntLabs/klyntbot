@@ -75,6 +75,7 @@ impl ToolRegistryBridge {
             interaction_channel: None,
             squad_id: None,
             squad_mode: None,
+            champion_params: None,
         };
 
         // Acquire read lock, prepare (validate + clone Arc<dyn Tool>), then drop lock

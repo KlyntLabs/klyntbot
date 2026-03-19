@@ -79,6 +79,7 @@ impl NoteRepo {
         Ok(rows)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn update_note(
         &self,
         id: &str,

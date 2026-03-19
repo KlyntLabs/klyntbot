@@ -382,6 +382,7 @@ impl FlashcardRepo {
     }
 
     /// Update a card's front, back, deck, tags, and type-specific data.
+    #[allow(clippy::too_many_arguments)]
     pub async fn update_card(
         &self,
         id: &str,

@@ -92,9 +92,7 @@ pub fn is_browser(app_name: &str, bundle_id: Option<&str>) -> bool {
     BROWSERS.iter().any(|b| {
         app_name.eq_ignore_ascii_case(b.name)
             || (!b.bundle_prefix.is_empty()
-                && bundle_id.map_or(false, |id| {
-                    id.to_ascii_lowercase().starts_with(b.bundle_prefix)
-                }))
+                && bundle_id.is_some_and(|id| id.to_ascii_lowercase().starts_with(b.bundle_prefix)))
     })
 }
 
