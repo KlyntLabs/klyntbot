@@ -366,6 +366,12 @@ fn run_desktop_app() {
             commands::annotations::annotation_list_for_note,
             commands::annotations::annotation_get_ai_suggestion,
             commands::annotations::note_get_linked_context,
+            // Language Learning
+            commands::language::language_translate_breakdown,
+            commands::language::language_evaluate_translation,
+            commands::language::language_save_vocabulary,
+            commands::language::language_detect_confusables,
+            commands::language::language_enrich_annotation,
             // Areas
             commands::areas::area_list,
             commands::areas::area_create,

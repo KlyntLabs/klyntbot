@@ -13,6 +13,7 @@ pub mod finance;
 pub mod groups;
 pub mod integrations;
 pub mod key_results;
+pub mod language;
 pub mod launcher;
 pub mod notes;
 pub mod objectives;

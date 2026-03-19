@@ -1,7 +1,9 @@
 import type { Note, NoteUpdateParams } from "@shared/types";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useLanguageConfig } from "../../hooks/useLanguageConfig";
 import { AnnotationSidebar } from "./AnnotationSidebar";
 import { EditorContentWrapper, useNoteEditor } from "./EditorCore";
+import { LanguageLearningPanel } from "./LanguageLearningPanel";
 
 export type SplitMode = "translation" | "annotation" | "cornell";
 
@@ -329,6 +331,12 @@ export function SplitEditor({ note, splitMode, onSave }: SplitEditorProps) {
     }
   }, [splitMode]);
 
+  // ── Language config for translation mode ─────────────
+  const { sourceLang, targetLang } = useLanguageConfig(
+    note.perspectiveConfig,
+    leftContentRef.current.markdown,
+  );
+
   // ── Annotation mode: track active annotation ─────────
   const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null);
 
@@ -408,7 +416,15 @@ export function SplitEditor({ note, splitMode, onSave }: SplitEditorProps) {
           style={{ width: `${(1 - splitRatio) * 100}%` }}
           onScroll={() => handleSyncScroll("right")}
         >
-          {splitMode === "annotation" ? (
+          {splitMode === "translation" ? (
+            <LanguageLearningPanel
+              noteId={note.id}
+              noteTitle={note.title}
+              sourceText={leftContentRef.current.markdown || leftContentRef.current.html}
+              sourceLang={sourceLang}
+              targetLang={targetLang}
+            />
+          ) : splitMode === "annotation" ? (
             <AnnotationSidebar
               noteId={note.id}
               activeAnnotationId={activeAnnotationId}

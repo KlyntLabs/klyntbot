@@ -527,6 +527,49 @@ impl SemanticFactRepo {
 
         Ok(archived)
     }
+
+    /// Find vocabulary facts by exact subject match (CJK-safe, does NOT use FTS5).
+    /// Used for confusable word detection and "is_new" vocabulary checks.
+    pub async fn find_vocabulary_by_subject(
+        &self,
+        word: &str,
+    ) -> Result<Vec<SemanticFact>, sqlx::Error> {
+        sqlx::query_as::<_, SemanticFact>(
+            "SELECT * FROM semantic_facts WHERE domain = 'learning' AND memory_type = 'vocabulary' AND subject = ?1 AND superseded_at IS NULL",
+        )
+        .bind(word)
+        .fetch_all(&self.pool)
+        .await
+    }
+
+    /// Find vocabulary facts with subjects similar to the given word.
+    /// For CJK: matches any fact containing a character from the word.
+    /// For Latin: uses prefix match on the first 3 characters.
+    pub async fn find_similar_vocabulary(
+        &self,
+        word: &str,
+        limit: i64,
+    ) -> Result<Vec<SemanticFact>, sqlx::Error> {
+        let pattern = if word.chars().any(|c| c > '\u{2E80}') {
+            // CJK: search for any fact containing any character from the word
+            if let Some(first_char) = word.chars().next() {
+                format!("%{first_char}%")
+            } else {
+                return Ok(vec![]);
+            }
+        } else {
+            format!("{}%", &word[..word.len().min(3)])
+        };
+
+        sqlx::query_as::<_, SemanticFact>(
+            "SELECT * FROM semantic_facts WHERE domain = 'learning' AND memory_type = 'vocabulary' AND subject LIKE ?1 AND subject != ?2 AND superseded_at IS NULL LIMIT ?3",
+        )
+        .bind(&pattern)
+        .bind(word)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+    }
 }
 
 #[cfg(test)]

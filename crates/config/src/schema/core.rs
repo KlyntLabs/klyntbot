@@ -15,6 +15,7 @@ use super::conversation::ConversationConfig;
 use super::finance::FinanceConfig;
 use super::gateway::GatewayConfig;
 use super::integrations::IntegrationsConfig;
+use super::language::LanguageConfig;
 use super::launcher::LauncherConfig;
 use super::learning::LearningConfig;
 use super::mcp::McpConfig;
@@ -188,6 +189,10 @@ pub struct Config {
     /// Set by the desktop app on launch. Distinct from agents.defaults.workspace.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub project_root: Option<String>,
+
+    /// Language learning pair settings (source/target language, proficiency).
+    #[serde(default)]
+    pub language: LanguageConfig,
 
     /// Launcher search sources configuration.
     #[serde(default)]

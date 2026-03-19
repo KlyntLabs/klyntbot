@@ -3,6 +3,22 @@ import { invalidateQueries } from "@shared/hooks/useQuery";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { type AnnotationResponse, useAnnotations } from "../../hooks/useAnnotations";
 
+interface AnnotationEnrichment {
+  translation: string;
+  words: Array<{
+    word: string;
+    reading: string | null;
+    meaning: string;
+    proficiencyLevel: string | null;
+  }>;
+}
+
+/** Detect if text contains non-ASCII/non-Latin characters (likely foreign language). */
+function hasForeignText(text: string): boolean {
+  const cjkPattern = /[\u2E80-\u9FFF\uF900-\uFAFF\u3040-\u309F\u30A0-\u30FF]/;
+  return cjkPattern.test(text);
+}
+
 interface AnnotationSidebarProps {
   noteId: string;
   /** The mark ID of the annotation currently selected in the editor */
@@ -63,6 +79,8 @@ function AnnotationCard({
   const [comment, setComment] = useState(annotation.content || "");
   const [editing, setEditing] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
+  const [enrichment, setEnrichment] = useState<AnnotationEnrichment | null>(null);
+  const enrichedRef = useRef(false);
 
   // Scroll into view when this card becomes active
   useEffect(() => {
@@ -70,6 +88,26 @@ function AnnotationCard({
       cardRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   }, [isActive]);
+
+  // Smart language enrichment: auto-enrich if quoted text has foreign characters
+  useEffect(() => {
+    if (enrichedRef.current || !annotation.quotedText) return;
+    if (!hasForeignText(annotation.quotedText)) return;
+    enrichedRef.current = true;
+
+    ipc<AnnotationEnrichment>("language_enrich_annotation", {
+      params: {
+        annotationId: annotation.id,
+        quotedText: annotation.quotedText,
+        sourceLang: "zh",
+        targetLang: "en",
+      },
+    })
+      .then(setEnrichment)
+      .catch(() => {
+        // Enrichment is non-critical; ignore failures
+      });
+  }, [annotation.id, annotation.quotedText]);
 
   const handleSaveComment = useCallback(async () => {
     await onUpdate({ id: annotation.id, content: comment });
@@ -103,6 +141,29 @@ function AnnotationCard({
           <p className="text-[11px] text-muted italic leading-relaxed">
             &ldquo;{annotation.quotedText}&rdquo;
           </p>
+        </div>
+      )}
+
+      {/* Language enrichment (Smart Detection) */}
+      {enrichment && (
+        <div className="mb-2 space-y-1.5">
+          <div className="rounded-md bg-surface-hover/50 px-2 py-1.5 text-[11px] text-muted">
+            {enrichment.translation}
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {enrichment.words.map((w) => (
+              <span
+                key={w.word}
+                className="inline-flex items-center gap-1 rounded bg-surface-hover px-1.5 py-0.5 text-[10px] text-primary"
+              >
+                {w.word}
+                {w.reading && <span className="text-[9px] text-muted">{w.reading}</span>}
+                {w.proficiencyLevel && (
+                  <span className="text-[9px] text-purple-400">{w.proficiencyLevel}</span>
+                )}
+              </span>
+            ))}
+          </div>
         </div>
       )}
 
