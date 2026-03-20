@@ -47,6 +47,7 @@ impl MetricSource for AgentMetricCollector {
             routing_stability,
             memory_relevance_opt,
             per_trial_correction,
+            phase2_metrics,
         ) = tokio::join!(
             self.strategy_repo.get_stats_since(since),
             self.event_log_repo
@@ -73,7 +74,26 @@ impl MetricSource for AgentMetricCollector {
                     None
                 }
             },
+            // Phase 2 metrics from shadow retrieval log
+            async {
+                if let Some(tid) = trial_id_str.as_deref() {
+                    let precision = self
+                        .trial_repo
+                        .retrieval_precision_for_trial(tid, since)
+                        .await
+                        .unwrap_or(0.0);
+                    let freshness = self
+                        .trial_repo
+                        .avg_memory_freshness_for_trial(tid, since)
+                        .await
+                        .unwrap_or(0.0);
+                    (precision, freshness)
+                } else {
+                    (0.0, 0.0)
+                }
+            },
         );
+        let (retrieval_precision, memory_freshness) = phase2_metrics;
 
         let stats = stats.map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         let correction_count = correction_count.unwrap_or(0);
@@ -110,8 +130,8 @@ impl MetricSource for AgentMetricCollector {
             memory_relevance,
             user_satisfaction: stats.avg_satisfaction,
             total_messages: stats.total_records as u32,
-            retrieval_precision: 0.0, // Phase 2: wired in Task 6
-            memory_freshness: 0.0,    // Phase 2: wired in Task 6
+            retrieval_precision,
+            memory_freshness,
         })
     }
 }
