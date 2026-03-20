@@ -4,7 +4,8 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use autotuner::{ShadowContext, ShadowRetriever, ShadowRetrievalResult};
+use autotuner::{ShadowContext, ShadowRetrievalResult, ShadowRetriever};
+use chrono::{DateTime, Utc};
 use common::TrialParams;
 use cognitive::UnifiedMemoryService;
 
@@ -39,24 +40,33 @@ impl ShadowRetriever for AgentShadowRetriever {
         let top_k = params.vector_top_k.unwrap_or(30);
         let min_sim = params.min_similarity.unwrap_or(0.55);
 
-        let entries = self
+        let scored_facts = self
             .memory_service
             .retrieve_with_overrides(query, top_k, min_sim, weights)
             .await?;
 
-        let total = entries.len();
-        let avg_score = if total > 0 {
-            entries.iter().map(|e| e.score).sum::<f64>() / total as f64
+        let total = scored_facts.len();
+        let now = Utc::now();
+
+        let (avg_score, avg_age_days) = if total > 0 {
+            let score_sum: f64 = scored_facts.iter().map(|f| f.score).sum();
+            let age_sum: f64 = scored_facts
+                .iter()
+                .map(|f| {
+                    f.fact
+                        .recorded_at
+                        .parse::<DateTime<Utc>>()
+                        .map(|ts| (now - ts).num_hours() as f64 / 24.0)
+                        .unwrap_or(0.0)
+                })
+                .sum();
+            (score_sum / total as f64, age_sum / total as f64)
         } else {
-            0.0
+            (0.0, 0.0)
         };
 
-        // avg_age_days placeholder — real age computation needs fact timestamps
-        // from the DB, which aren't exposed on MemoryEntry.
-        let avg_age_days = 0.0;
-
         Ok(ShadowRetrievalResult {
-            memory_ids: entries.into_iter().map(|e| e.id).collect(),
+            memory_ids: scored_facts.iter().map(|f| f.fact.id.clone()).collect(),
             avg_score,
             avg_age_days,
             total_retrieved: total,

@@ -10,7 +10,7 @@ use crate::context_source::CognitiveRetrievalConfig;
 use crate::conversation_recall::ConversationRecallService;
 use crate::embedder::SemanticFactEmbedder;
 use crate::repos::{SemanticFactRepo, USER_MODEL_DOMAINS};
-use crate::retrieval::{retrieve_relevant_facts, RetrievalParams};
+use crate::retrieval::{retrieve_relevant_facts, RetrievalParams, ScoredFact};
 use crate::situation::UserSituation;
 
 /// RRF constant — same as used in retrieval.rs BM25 merge.
@@ -181,21 +181,23 @@ impl UnifiedMemoryService {
         }
     }
 
-    /// Retrieve memories using overridden retrieval parameters (for shadow scoring).
+    /// Retrieve scored facts with overridden retrieval parameters (for shadow scoring).
+    /// Returns `ScoredFact` directly (not `MemoryEntry`) so callers can access
+    /// `fact.recorded_at` for age computation.
     pub async fn retrieve_with_overrides(
         &self,
         query: &str,
         vector_top_k: usize,
         min_similarity: f64,
         relevance_weights: [f64; 6],
-    ) -> common::Result<Vec<MemoryEntry>> {
+    ) -> common::Result<Vec<ScoredFact>> {
         if !self.config.dynamic_facts_enabled || query.is_empty() {
             return Ok(Vec::new());
         }
 
         let situational_boost = self.current_situational_boost().await;
         let params = RetrievalParams {
-            limit: vector_top_k, // use top_k as limit since we want all retrieved candidates
+            limit: vector_top_k,
             vector_top_k,
             min_similarity,
             situational_boost,
@@ -221,16 +223,6 @@ impl UnifiedMemoryService {
             Ok(facts) => Ok(facts
                 .into_iter()
                 .filter(|f| f.score > MIN_FACT_SCORE)
-                .map(|f| MemoryEntry {
-                    id: f.fact.id,
-                    content: format!(
-                        "{}: {} = {}",
-                        f.fact.subject, f.fact.predicate, f.fact.object
-                    ),
-                    score: f.score,
-                    source: MemorySource::CognitiveFact,
-                    raw_score: f.score,
-                })
                 .collect()),
             Err(e) => {
                 warn!("Shadow retrieval failed: {e}");
