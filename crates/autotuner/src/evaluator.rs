@@ -49,6 +49,12 @@ pub struct ConstraintEvaluator {
 
     /// memory_relevance must not decrease by more than this fraction.
     max_memory_relevance_decrease: f64,
+
+    // Phase 2 constraints
+    /// retrieval_precision must not drop by more than this absolute amount.
+    max_retrieval_precision_drop: f64,
+    /// correction_rate must not increase by more than this absolute amount (protects Phase 1 gains).
+    max_correction_rate_increase: f64,
 }
 
 impl ConstraintEvaluator {
@@ -60,6 +66,8 @@ impl ConstraintEvaluator {
             max_response_time_increase: config.max_response_time_increase,
             max_routing_stability_decrease: config.max_routing_stability_decrease,
             max_memory_relevance_decrease: config.max_memory_relevance_decrease,
+            max_retrieval_precision_drop: config.max_retrieval_precision_drop,
+            max_correction_rate_increase: config.max_correction_rate_increase,
         }
     }
 
@@ -155,6 +163,40 @@ impl ConstraintEvaluator {
                         "memory_relevance decreased by {:.1}% but max allowed is {:.1}%",
                         decrease * 100.0,
                         self.max_memory_relevance_decrease * 100.0,
+                    ),
+                });
+            }
+        }
+
+        // --- Phase 2: retrieval precision must not drop > threshold ---
+        if baseline.retrieval_precision > 0.0 {
+            let precision_drop = baseline.retrieval_precision - trial.retrieval_precision;
+            if precision_drop > self.max_retrieval_precision_drop {
+                failures.push(ConstraintFailure {
+                    metric: "retrieval_precision".into(),
+                    threshold: self.max_retrieval_precision_drop,
+                    actual: precision_drop,
+                    description: format!(
+                        "Precision dropped {:.1}% (max {:.1}%)",
+                        precision_drop * 100.0,
+                        self.max_retrieval_precision_drop * 100.0,
+                    ),
+                });
+            }
+        }
+
+        // --- Phase 2: correction rate must not increase > threshold (protect Phase 1) ---
+        if trial.correction_rate > baseline.correction_rate {
+            let increase = trial.correction_rate - baseline.correction_rate;
+            if increase > self.max_correction_rate_increase {
+                failures.push(ConstraintFailure {
+                    metric: "correction_rate_regression".into(),
+                    threshold: self.max_correction_rate_increase,
+                    actual: increase,
+                    description: format!(
+                        "Correction rate increased {:.1}% (max {:.1}%)",
+                        increase * 100.0,
+                        self.max_correction_rate_increase * 100.0,
                     ),
                 });
             }
@@ -315,6 +357,76 @@ mod tests {
                 .any(|f| f.metric == "avg_tokens_per_message"),
             "Expected avg_tokens_per_message in failures, got: {:?}",
             verdict.failures,
+        );
+    }
+
+    #[test]
+    fn fails_when_retrieval_precision_drops() {
+        let evaluator = default_evaluator();
+        let b = TrialResult {
+            retrieval_precision: 0.80,
+            ..baseline()
+        };
+
+        // Precision drops from 0.80 to 0.70 = 0.10 drop, max allowed 0.05
+        let trial = TrialResult {
+            correction_rate: 0.18, // passes correction improvement
+            retrieval_precision: 0.70,
+            ..b.clone()
+        };
+
+        let verdict = evaluator.evaluate(&trial, &b);
+        assert!(
+            verdict
+                .failures
+                .iter()
+                .any(|f| f.metric == "retrieval_precision"),
+            "Expected retrieval_precision failure, got: {:?}",
+            verdict.failures,
+        );
+    }
+
+    #[test]
+    fn fails_when_correction_rate_regresses() {
+        let evaluator = default_evaluator();
+        let b = baseline(); // correction_rate = 0.20
+
+        // Trial correction_rate = 0.25 — increases by 0.05, max allowed 0.03
+        let trial = TrialResult {
+            correction_rate: 0.25,
+            ..b.clone()
+        };
+
+        let verdict = evaluator.evaluate(&trial, &b);
+        assert!(
+            verdict
+                .failures
+                .iter()
+                .any(|f| f.metric == "correction_rate_regression"),
+            "Expected correction_rate_regression failure, got: {:?}",
+            verdict.failures,
+        );
+    }
+
+    #[test]
+    fn passes_precision_when_baseline_is_zero() {
+        let evaluator = default_evaluator();
+        let b = baseline(); // retrieval_precision defaults to 0.0
+
+        // Trial has some precision — should pass since baseline is 0.0
+        let trial = TrialResult {
+            correction_rate: 0.18,
+            retrieval_precision: 0.50,
+            ..b.clone()
+        };
+
+        let verdict = evaluator.evaluate(&trial, &b);
+        assert!(
+            !verdict
+                .failures
+                .iter()
+                .any(|f| f.metric == "retrieval_precision"),
+            "Should not fail precision when baseline is 0.0",
         );
     }
 

@@ -31,6 +31,12 @@ pub struct AutoTunerConfig {
     pub max_routing_stability_decrease: f64,
     #[serde(default = "default_max_relevance_decrease")]
     pub max_memory_relevance_decrease: f64,
+
+    // Phase 2 constraint thresholds
+    #[serde(default = "default_max_retrieval_precision_drop")]
+    pub max_retrieval_precision_drop: f64,
+    #[serde(default = "default_max_correction_rate_increase")]
+    pub max_correction_rate_increase: f64,
 }
 
 impl Default for AutoTunerConfig {
@@ -45,6 +51,8 @@ impl Default for AutoTunerConfig {
             max_response_time_increase: default_max_response_time_increase(),
             max_routing_stability_decrease: default_max_stability_decrease(),
             max_memory_relevance_decrease: default_max_relevance_decrease(),
+            max_retrieval_precision_drop: default_max_retrieval_precision_drop(),
+            max_correction_rate_increase: default_max_correction_rate_increase(),
         }
     }
 }
@@ -72,6 +80,12 @@ fn default_max_stability_decrease() -> f64 {
 }
 fn default_max_relevance_decrease() -> f64 {
     0.05
+}
+fn default_max_retrieval_precision_drop() -> f64 {
+    0.05
+}
+fn default_max_correction_rate_increase() -> f64 {
+    0.03
 }
 
 #[cfg(test)]
