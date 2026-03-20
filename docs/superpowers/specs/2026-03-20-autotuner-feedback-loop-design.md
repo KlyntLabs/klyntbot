@@ -22,7 +22,7 @@ The evaluator can't promote because it has no real signal. The generator can't l
 - **Gap 6: Generation context enrichment** — `trend_summary`, `behavioral_context`, `memory_snapshot` stay as placeholder strings. These become high-leverage *after* we see which failure modes cost most.
 - **`memory_relevance` metric** — stays `1.0`. Requires context engine retrieval scoring integration (Phase 2).
 - **Per-trial correction rates** — Phase 1 uses system-wide correction rate. Per-trial requires joining shadow_log ↔ domain_event_log by chat_id + time.
-- **UX acknowledgment** ("Got it — thanks for the correction") — good idea, separate concern, can be added independently.
+- **Full correction UX** (mini-form, "What was wrong?" dialog) — the one-line acknowledgment ("Noted — adjusting for next time.") is in-scope; richer correction capture UX is Phase 2.
 
 ---
 
@@ -136,7 +136,9 @@ After session load, before `run_pipeline`:
 | Strength | Phrases |
 |----------|---------|
 | 1.0 | `"no,"`, `"no "`, `"wrong"`, `"that's not"`, `"incorrect"` |
-| 0.8 | `"not "`, `"i meant"`, `"try again"`, `"redo"`, `"not quite"`, `"never mind"`, `"hold on"` |
+| 0.8 | `"i meant"`, `"try again"`, `"redo"`, `"not quite"`, `"never mind"` |
+
+**Excluded from v1:** `"not "`, `"hold on"`, `"actually"`, `"wait"` — too noisy in normal conversation. Re-evaluate after gathering real usage data.
 
 3. If matched:
    ```rust
@@ -150,6 +152,18 @@ After session load, before `run_pipeline`:
    ```
 
 **Performance:** String prefix check on first 80 chars. Negligible cost.
+
+**Rate limiting:** Max 1 keyword correction per 3 messages per session. Track with a simple counter on the session (reset after 3 non-correction messages). This prevents spam in rapid-fire chats while still capturing genuine corrections. Reaction-based corrections are NOT rate-limited (explicit user action = always valid).
+
+### 1e. Correction acknowledgment (micro-interaction)
+
+After emitting `UserCorrectedAI` (either reaction or keyword), set a flag on the session: `pending_correction_ack = true`. On the next assistant reply, if the flag is set, prepend a single warm line:
+
+> "Noted — adjusting for next time."
+
+Then clear the flag. This is presentation-layer polish — 5 lines of code, zero new UI. The exact phrasing can be made configurable later via user profile.
+
+For reaction-based corrections where no immediate reply follows, the ack is skipped (the user isn't in a conversation flow). The flag expires after 5 minutes.
 
 ### 1d. `TrialRepo` access in `AgentLoop`
 
@@ -457,26 +471,27 @@ Emitted in the nightly cycle callback after promotion or rollback. The cognitive
 
 **Important:** Both `event_to_observation()` and `event_type_key()` in `crates/cognitive/src/services/background.rs` are exhaustive `match` blocks on `DomainEvent`. Adding `AutotunerDecision` (and extending `UserCorrectedAI` with new fields) requires updating these match arms. For `AutotunerDecision`, map to an `Observation` with domain `"meta"`, importance `0.8`, and a descriptive text from the verdict + affected_params. For the extended `UserCorrectedAI`, update the existing destructuring pattern to include `kind` and `strength` fields (or use `..` to ignore them if not needed in the observation).
 
-### 4c. `learning_health` in status response
+### 4c. `brain_growth` in status response (user-facing)
 
 **File:** `crates/app-core/src/handlers/autotuner.rs` — `autotuner_status`
 
-Add to the response:
+Named `brain_growth` (not `learning_health`) — clinical language kills the second-brain magic. This is the field that Insights, Coaching, and a future "Brain Health" glassmorphism widget will reference.
+
 ```rust
-learning_health: LearningHealth {
+brain_growth: BrainGrowth {
     corrections_captured_7d: i64,    // from EventLogRepo
     trials_evaluated_7d: i32,        // from TrialRepo
     promoted_this_week: i32,         // from TrialRepo
-    status: String,                  // "healthy" | "needs_data" | "learning"
+    status: String,                  // "growing" | "needs_feedback" | "adapting"
 }
 ```
 
 Status derivation:
-- `"needs_data"` — if `corrections_captured_7d == 0` or total messages < 50
-- `"learning"` — if corrections exist but no promotions yet
-- `"healthy"` — if at least one promotion has occurred
+- `"needs_feedback"` — if `corrections_captured_7d == 0` or total messages < 50
+- `"adapting"` — if corrections exist but no promotions yet
+- `"growing"` — if at least one promotion has occurred
 
-### 4d. `metrics_health` in status response
+### 4d. `metrics_health` in status response (debug/internal)
 
 ```rust
 metrics_health: MetricsHealth {
@@ -485,6 +500,15 @@ metrics_health: MetricsHealth {
     stability_available: bool,         // shadow_log has non-pending rows
 }
 ```
+
+### 4e. Cognitive memory extraction on adaptation
+
+The `AutotunerDecision` domain event (Section 4b) flows through the existing cognitive pipeline. In `event_to_observation()`, map it to a descriptive observation text that the Reflection/InsightForge pipeline can surface:
+
+- On promotion: `"I refined my {affected_params} after {correction_count} corrections — routing improved {improvement_pct}%"`
+- On rollback: `"I reverted a recent change to {affected_params} — it wasn't working well"`
+
+This lets Insights and Coaching naturally reference real progress: "Based on your feedback, I've gotten better at task routing." The existing pipeline does all the heavy lifting — we just need to feed it a well-structured observation.
 
 ---
 
