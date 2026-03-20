@@ -201,6 +201,37 @@ impl StrategyRepo {
         Ok(count)
     }
 
+    /// Get stats since a given date: total records, accuracy, avg response time, avg satisfaction.
+    pub async fn get_stats_since(
+        &self,
+        since: DateTime<Utc>,
+    ) -> Result<OverallStats, StorageError> {
+        let row: (i64, i64, i64, Option<f64>) = sqlx::query_as(
+            "SELECT COUNT(*),
+                    COALESCE(SUM(CASE WHEN predicted_strategy = actual_strategy THEN 1 ELSE 0 END), 0),
+                    CAST(COALESCE(AVG(response_time_ms), 0) AS INTEGER),
+                    AVG(user_satisfaction)
+             FROM strategy_records
+             WHERE timestamp >= ?1",
+        )
+        .bind(since)
+        .fetch_one(&self.pool)
+        .await?;
+
+        let accuracy = if row.0 > 0 {
+            row.1 as f64 / row.0 as f64
+        } else {
+            0.0
+        };
+
+        Ok(OverallStats {
+            total_records: row.0,
+            accuracy,
+            avg_response_time_ms: row.2,
+            avg_satisfaction: row.3,
+        })
+    }
+
     /// Get overall stats: total records, accuracy, avg response time, avg satisfaction.
     pub async fn get_overall_stats(&self) -> Result<OverallStats, StorageError> {
         let row: (i64, i64, i64, Option<f64>) = sqlx::query_as(

@@ -286,8 +286,6 @@ fn run_desktop_app() {
             commands::tasks::task_delete,
             commands::tasks::task_toggle_complete,
             commands::tasks::task_list_children,
-            commands::tasks::task_start_focus,
-            commands::tasks::task_end_focus,
             commands::tasks::task_get_suggestions,
             commands::tasks::task_apply_suggestion,
             commands::tasks::task_dismiss_suggestion,
@@ -601,6 +599,12 @@ fn run_desktop_app() {
             commands::cron::cron_update,
             // Status
             commands::status::agent_status,
+            // AutoTuner
+            commands::autotuner::autotuner_status,
+            commands::autotuner::autotuner_history,
+            commands::autotuner::autotuner_revert,
+            commands::autotuner::autotuner_pause,
+            commands::autotuner::autotuner_resume,
             // Window
             // Work Contexts
             commands::work_context::list_work_contexts,

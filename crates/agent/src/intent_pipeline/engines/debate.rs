@@ -12,6 +12,9 @@ use cognitive::{BlackboardEntry, BlackboardRepo, NewBlackboardEntry, PersonaRow}
 use providers::{ChatParams, DynProvider, Message, UserContent};
 use serde::{Deserialize, Serialize};
 
+/// (round_number, persona_responses as (name, content), consensus_score) per round.
+type DebateRounds = Vec<(u32, Vec<(String, String)>, f64)>;
+
 /// Safety cap — maximum total rounds including opening and final.
 const MAX_ROUNDS: u32 = 6;
 
@@ -73,6 +76,7 @@ pub fn parse_judge_json(text: &str) -> JudgeDecision {
 }
 
 /// Build a persona prompt appropriate for the current debate phase.
+#[allow(clippy::too_many_arguments)]
 pub fn build_phase_prompt(
     orchestrator_context: &str,
     user_message: &str,
@@ -199,6 +203,7 @@ Output ONLY the JSON object, no other text."#
 }
 
 /// Phase 1 (Opening) and Phase Final (Closing): parallel fan-out.
+#[allow(clippy::too_many_arguments)]
 async fn fan_out_parallel(
     provider: &DynProvider,
     orchestrator_context: &str,
@@ -271,6 +276,7 @@ async fn fan_out_parallel(
 /// Phase 2 (Discussion) and Phase 3+ (Targeted): sequential execution.
 ///
 /// Each persona speaks in turn, seeing all prior speakers in this round.
+#[allow(clippy::too_many_arguments)]
 async fn run_sequential_round(
     provider: &DynProvider,
     orchestrator_context: &str,
@@ -379,6 +385,7 @@ async fn run_sequential_round(
 /// Run a room-style multi-round debate with 4 phases.
 ///
 /// Returns: Vec of (round_number, persona_responses as (name, content), consensus_score) per round.
+#[allow(clippy::too_many_arguments)]
 pub async fn run_room_debate(
     provider: &DynProvider,
     orchestrator_context: &str,
@@ -389,9 +396,9 @@ pub async fn run_room_debate(
     session_key: &str,
     squad_id: &str,
     event_tx: Option<&tokio::sync::mpsc::Sender<crate::AgentEvent>>,
-) -> Vec<(u32, Vec<(String, String)>, f64)> {
+) -> DebateRounds {
     let persona_ids: Vec<String> = personas.iter().map(|p| p.id.clone()).collect();
-    let mut all_rounds: Vec<(u32, Vec<(String, String)>, f64)> = Vec::new();
+    let mut all_rounds: DebateRounds = Vec::new();
     let mut last_judge: Option<JudgeDecision> = None;
     let mut round: u32 = 0;
 

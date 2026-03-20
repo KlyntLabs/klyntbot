@@ -1,9 +1,10 @@
+import { AmbientIndicator } from "@features/autotuner";
 import { ipc } from "@shared/hooks/useIpc";
 import { useQuery } from "@shared/hooks/useQuery";
 import { useSetToggle } from "@shared/hooks/useSetToggle";
 import type { ChatThread, ContextResumeData } from "@shared/types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useSearchParams } from "react-router";
+import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { ChatInput } from "../components/ChatInput";
 import { CoachingNudge } from "../components/CoachingNudge";
 import { DebateView } from "../components/DebateView";
@@ -22,6 +23,7 @@ interface GroupedThreads {
 }
 
 export function ChatPage() {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedThread, setSelectedThreadState] = useState(
     () => searchParams.get("thread") || `chat:${crypto.randomUUID()}`,
@@ -310,6 +312,7 @@ export function ChatPage() {
             <div />
           )}
           <div className="flex items-center gap-2">
+            <AmbientIndicator onClick={() => navigate("/settings/general")} />
             <TransparencyToggle enabled={showTransparency} onToggle={toggleTransparency} />
           </div>
         </div>

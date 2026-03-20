@@ -98,6 +98,7 @@ impl AppCore {
             suggestion_applier,
             decomposition_handler,
             forecast_handler,
+            autotuner,
         } = cron::init_cron(
             &config,
             &repos,
@@ -174,6 +175,7 @@ impl AppCore {
             &cron_service,
             &notification_dispatcher,
             &notification_sender,
+            autotuner.as_ref(),
         )
         .await?;
 
@@ -266,7 +268,6 @@ impl AppCore {
             event_log_repo: Some(::cognitive::EventLogRepo::new(storage_pool.inner().clone())),
             consecutive_coaching_ignores: Arc::new(std::sync::atomic::AtomicI32::new(0)),
             activity_ingestion_service: Some(Arc::clone(&activity_svc)),
-            active_task_focus: Arc::new(std::sync::Mutex::new(None)),
             event_emitter: event_emitter.unwrap_or_else(|| Arc::new(NoopEmitter)),
             note_embedding_handler,
             launcher_engine,
@@ -297,6 +298,7 @@ impl AppCore {
             )),
             persona_repo: Some(::cognitive::PersonaRepo::new(storage_pool.inner().clone())),
             squad_repo: Some(::cognitive::SquadRepo::new(storage_pool.inner().clone())),
+            autotuner,
         };
 
         // ── Background insight progress refresh (daily) ──────────────────

@@ -5,6 +5,7 @@ use std::fmt;
 use std::path::PathBuf;
 
 use super::agents::{AgentsConfig, SkillConfig};
+use super::autotuner::AutoTunerConfig;
 
 use super::capture::CaptureConfig;
 use super::channels::ChannelsConfig;
@@ -214,6 +215,10 @@ pub struct Config {
     /// Whether the first-run setup wizard has been completed.
     #[serde(default)]
     pub setup_completed: bool,
+
+    /// Autotuner self-optimization system configuration.
+    #[serde(default)]
+    pub autotuner: AutoTunerConfig,
 }
 
 impl Config {

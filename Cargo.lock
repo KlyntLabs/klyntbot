@@ -47,6 +47,7 @@ dependencies = [
  "activity-log",
  "aho-corasick",
  "async-trait",
+ "autotuner",
  "base64 0.22.1",
  "bus",
  "chrono",
@@ -252,6 +253,7 @@ dependencies = [
  "activity-log",
  "agent",
  "async-trait",
+ "autotuner",
  "base64 0.22.1",
  "bus",
  "channels",
@@ -812,6 +814,24 @@ name = "autocfg"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
+
+[[package]]
+name = "autotuner"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "bus",
+ "chrono",
+ "common",
+ "config",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "storage",
+ "tokio",
+ "tracing",
+ "uuid",
+]
 
 [[package]]
 name = "av-scenechange"
@@ -3062,6 +3082,7 @@ dependencies = [
  "anyhow",
  "app-core",
  "async-trait",
+ "autotuner",
  "axum",
  "base64 0.22.1",
  "bus",

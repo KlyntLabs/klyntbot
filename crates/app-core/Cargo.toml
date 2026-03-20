@@ -6,6 +6,7 @@ edition.workspace = true
 [dependencies]
 desktop-shared = { workspace = true }
 agent = { workspace = true }
+autotuner = { workspace = true }
 bus = { workspace = true }
 channels = { workspace = true }
 cognitive = { workspace = true }

@@ -16,6 +16,7 @@ use tools::RoutingContext;
 use tracing::{debug, warn};
 
 use super::scenario;
+use crate::autotuner::hooks::AutoTunerHook;
 use crate::events::AgentEvent;
 
 use crate::execution::ExecutionParams;
@@ -92,9 +93,12 @@ pub struct AgentRuntime {
     current_event_tx: RwLock<Option<tokio::sync::mpsc::Sender<AgentEvent>>>,
     /// Bundled dependencies for squad chat mode — always set together.
     squad_deps: Option<SquadDeps>,
+    /// AutoTuner hook — runs shadow classification and records ground truth.
+    autotuner_hook: Option<Arc<dyn AutoTunerHook>>,
 }
 
 impl AgentRuntime {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         skill_catalog: Arc<RwLock<SkillCatalog>>,
         skill_router: Arc<RwLock<skill_system::router::SkillRouter>>,
@@ -123,6 +127,7 @@ impl AgentRuntime {
             delegation_self_ref: std::sync::OnceLock::new(),
             current_event_tx: RwLock::new(None),
             squad_deps: None,
+            autotuner_hook: None,
         }
     }
 
@@ -178,6 +183,12 @@ impl AgentRuntime {
         self
     }
 
+    /// Set the autotuner hook for shadow classification callbacks.
+    pub fn with_autotuner_hook(mut self, hook: Arc<dyn AutoTunerHook>) -> Self {
+        self.autotuner_hook = Some(hook);
+        self
+    }
+
     /// Set the self-reference for delegation support (called after Arc wrapping).
     pub fn set_delegation_self_ref(&self, handler: Arc<dyn tools::DelegationHandler>) {
         let _ = self.delegation_self_ref.set(handler);
@@ -223,6 +234,12 @@ impl AgentRuntime {
         cancel_token: Option<tokio_util::sync::CancellationToken>,
     ) -> Result<RuntimeResult> {
         let pipeline_start = Instant::now();
+
+        // Step 0a: AutoTuner hook — shadow classification before live processing.
+        if let Some(ref hook) = self.autotuner_hook {
+            hook.on_message_received(message, ctx.chat_id.as_str())
+                .await;
+        }
 
         // Step 1: Match message to orchestrator skill via SkillRouter
         let mut profile = {
@@ -554,6 +571,18 @@ impl AgentRuntime {
         };
         tokio::join!(usage_fut, strategy_fut, interaction_fut);
 
+        // Step 11: AutoTuner hook — record ground truth after response delivery.
+        if let Some(ref hook) = self.autotuner_hook {
+            let tokens = router_result.usage.prompt_tokens + router_result.usage.completion_tokens;
+            hook.on_message_completed(
+                ctx.chat_id.as_str(),
+                false, // user_corrected — updated later via reaction/feedback
+                tokens,
+                pipeline_elapsed_ms,
+            )
+            .await;
+        }
+
         let final_content = std::mem::take(&mut validation.filtered_content);
 
         Ok(RuntimeResult {
@@ -613,7 +642,7 @@ impl AgentRuntime {
         squad_repo: &cognitive::SquadRepo,
         provider: &providers::DynProvider,
         params: &providers::ChatParams,
-        squad_mode_str: Option<&str>,
+        _squad_mode_str: Option<&str>,
     ) -> Result<RuntimeResult> {
         use crate::intent_pipeline::engines;
         use crate::intent_pipeline::engines::squad;
@@ -633,15 +662,15 @@ impl AgentRuntime {
             .to_string()];
         for msg in &history {
             match msg {
-                Message::User { content } => {
-                    if let providers::UserContent::Text(t) = content {
-                        context_parts.push(format!("User: {t}"));
-                    }
+                Message::User {
+                    content: providers::UserContent::Text(t),
+                } => {
+                    context_parts.push(format!("User: {t}"));
                 }
-                Message::Assistant { content, .. } => {
-                    if let Some(c) = content {
-                        context_parts.push(format!("Assistant: {c}"));
-                    }
+                Message::Assistant {
+                    content: Some(c), ..
+                } => {
+                    context_parts.push(format!("Assistant: {c}"));
                 }
                 _ => {}
             }
@@ -1525,7 +1554,6 @@ mod tests {
                 scope: SkillScope::BuiltIn,
                 location: PathBuf::new(),
                 body: String::new(),
-                manifest: None,
                 metadata: SkillMetadata {
                     klyntbot: Some(KlyntbotMeta {
                         tools,

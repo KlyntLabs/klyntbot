@@ -35,6 +35,10 @@ pub use repos::{AreaRepo, KeyResultRepo, ObjectiveRepo};
 // ── Sessions / Context ──────────────────────────────────────────────
 pub use repos::{SessionContextParams, SessionContextRepo, SessionRepo};
 
+// ── Autotuner ────────────────────────────────────────────────────────
+pub use repos::TrialRepo;
+pub use rows::trial::{ExperimentRow, ShadowLogRow, TrialRow};
+
 // ── Agent / Learning ────────────────────────────────────────────────
 pub use repos::StatusWorkflowRepo;
 pub use repos::ToolUsageRepo;

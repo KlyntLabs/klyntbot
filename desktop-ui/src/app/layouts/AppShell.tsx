@@ -1,8 +1,7 @@
 import { SidebarChat } from "@shared/components/chat/SidebarChat";
-import { FocusBanner } from "@shared/components/focus/FocusBanner";
 import { useEvent } from "@shared/hooks/useEvent";
 import { ipc } from "@shared/hooks/useIpc";
-import type { AppInfoResponse, SidebarItem, Task } from "@shared/types";
+import type { AppInfoResponse, SidebarItem } from "@shared/types";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Navigate, Outlet, useLocation, useNavigate } from "react-router";
 import { Sidebar } from "./Sidebar";
@@ -13,11 +12,6 @@ export function AppShell() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [openSessionKey, setOpenSessionKey] = useState<string | null>(null);
   const [setupState, setSetupState] = useState<"loading" | "needed" | "ready">("loading");
-  const [activeTask, setActiveTask] = useState<{
-    id: string;
-    title: string;
-    focusedAt: string;
-  } | null>(null);
 
   const isOnChatPage = location.pathname.startsWith("/chat");
 
@@ -30,23 +24,6 @@ export function AppShell() {
       .catch(() => {
         if (!cancelled) setSetupState("ready");
       });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // On mount: find any currently focused task (focusedAt persists in DB across restarts)
-  useEffect(() => {
-    let cancelled = false;
-    ipc<Task[]>("task_list", {})
-      .then((tasks) => {
-        if (cancelled) return;
-        const focused = tasks.find((t) => t.focusedAt != null);
-        if (focused?.focusedAt) {
-          setActiveTask({ id: focused.id, title: focused.title, focusedAt: focused.focusedAt });
-        }
-      })
-      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -99,24 +76,6 @@ export function AppShell() {
   const closeChat = useCallback(() => setIsChatOpen(false), []);
   const clearSessionKey = useCallback(() => setOpenSessionKey(null), []);
 
-  // Track task focus state via entity updates
-  useEvent<{ entityKind: string; id: string }>("entity:updated", (payload) => {
-    if (payload?.entityKind !== "task") return;
-    ipc<Task | null>("task_get", { id: payload.id })
-      .then((task) => {
-        if (!task) {
-          setActiveTask((prev) => (prev?.id === payload.id ? null : prev));
-          return;
-        }
-        if (task.focusedAt) {
-          setActiveTask({ id: task.id, title: task.title, focusedAt: task.focusedAt });
-        } else {
-          setActiveTask((prev) => (prev?.id === task.id ? null : prev));
-        }
-      })
-      .catch(() => {});
-  });
-
   // Listen for open-chat events from tray / launcher
   useEvent<{ text?: string; sessionKey?: string }>("open-chat", (payload) => {
     setIsChatOpen(true);
@@ -134,12 +93,6 @@ export function AppShell() {
 
   return (
     <div className="h-screen w-screen bg-background text-foreground flex gap-2 p-2 overflow-hidden">
-      <FocusBanner
-        activeTask={activeTask}
-        onEndFocus={async (taskId) => {
-          await ipc("task_end_focus", { taskId });
-        }}
-      />
       <Sidebar
         active={activeSidebarItem}
         isChatOpen={isChatOpen}

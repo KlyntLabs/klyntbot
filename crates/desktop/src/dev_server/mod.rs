@@ -210,6 +210,7 @@ mod tests {
             commands::project_memories::DEV_COMMANDS,
             commands::project_conversations::DEV_COMMANDS,
             commands::agents::DEV_COMMANDS,
+            commands::autotuner::DEV_COMMANDS,
             commands::workspace::DEV_COMMANDS,
             commands::integrations::DEV_COMMANDS,
             commands::launcher::DEV_COMMANDS,

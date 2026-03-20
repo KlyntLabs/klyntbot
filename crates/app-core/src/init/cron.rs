@@ -15,6 +15,7 @@ pub(super) struct CronResult {
     pub suggestion_applier: Option<Arc<dyn SuggestionApplier>>,
     pub decomposition_handler: Option<Arc<dyn DecompositionHandler>>,
     pub forecast_handler: Option<Arc<dyn ForecastHandler>>,
+    pub autotuner: Option<Arc<agent::autotuner::AutoTunerOrchestrator>>,
 }
 
 pub const JOB_PROACTIVE_SCAN: &str = "proactive_scan";
@@ -72,6 +73,7 @@ pub(super) async fn init_cron(
     // Build the proactive handler and applier for the cron job.
     // Uses its own LlmProactiveHandler instance (domain_bus=None — event emission
     // happens in run_proactive_scan after persist, not inside the handler).
+    let autotuner_provider = provider.clone();
     let proactive_handler: Arc<dyn ProactiveHandler> = {
         let task_repo = repos.tasks.clone();
         Arc::new(agent::handlers::LlmProactiveHandler::new(
@@ -105,6 +107,40 @@ pub(super) async fn init_cron(
         suggestion_applier,
     );
 
+    // ── AutoTuner nightly cycle (conditional) ────────────────────────────
+    let autotuner = if config.autotuner.enabled {
+        let trial_repo = storage::TrialRepo::new(repos.pool().clone());
+        trial_repo
+            .migrate()
+            .await
+            .map_err(|e| format!("autotuner migration failed: {e}"))?;
+        let strategy_repo = repos.strategies.clone();
+        let metric_source: Arc<dyn autotuner::MetricSource> =
+            Arc::new(agent::autotuner::metric_collector::AgentMetricCollector::new(strategy_repo));
+        let learning_state = repos.learning_state.clone();
+        let champion =
+            agent::autotuner::AutoTunerOrchestrator::load_champion(&learning_state).await;
+        let orchestrator = Arc::new(agent::autotuner::AutoTunerOrchestrator::new(
+            champion,
+            true,
+            learning_state,
+            trial_repo.clone(),
+            autotuner_provider,
+            config.agents.defaults.model.clone(),
+        ));
+        agent::autotuner::AutoTunerOrchestrator::register_nightly_cycle(
+            Arc::clone(&orchestrator),
+            &mut cron_service,
+            config.autotuner.clone(),
+            trial_repo,
+            metric_source,
+        );
+        info!("autotuner nightly cycle handler registered");
+        Some(orchestrator)
+    } else {
+        None
+    };
+
     let cron_service = Arc::new(cron_service);
     ensure_cron_jobs(&cron_service, config, &tasks_config)
         .await
@@ -118,6 +154,7 @@ pub(super) async fn init_cron(
         suggestion_applier: suggestion_applier_out,
         decomposition_handler,
         forecast_handler,
+        autotuner,
     })
 }
 
@@ -557,6 +594,15 @@ async fn ensure_cron_jobs(
             },
             "Proactive task suggestion scan"
         );
+    }
+
+    // Autotuner nightly evaluation cycle
+    if config.autotuner.enabled {
+        agent::autotuner::AutoTunerOrchestrator::ensure_nightly_job(
+            cron_service,
+            &config.autotuner.schedule,
+        )
+        .await?;
     }
 
     Ok(())

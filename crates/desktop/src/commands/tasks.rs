@@ -9,32 +9,6 @@ use tauri::State;
 use crate::app_core::AppCore;
 
 #[tauri::command]
-pub async fn task_start_focus(
-    state: State<'_, Arc<AppCore>>,
-    app: tauri::AppHandle,
-    task_id: String,
-) -> Result<TaskResponse, ApiError> {
-    let (response, updates) = state.start_focus(task_id).await?;
-    super::emit_updates(&app, &updates);
-    Ok(response)
-}
-
-#[tauri::command]
-pub async fn task_end_focus(
-    state: State<'_, Arc<AppCore>>,
-    app: tauri::AppHandle,
-    task_id: String,
-) -> Result<Option<TaskResponse>, ApiError> {
-    match state.end_focus(task_id).await? {
-        Some((response, updates)) => {
-            super::emit_updates(&app, &updates);
-            Ok(Some(response))
-        }
-        None => Ok(None),
-    }
-}
-
-#[tauri::command]
 pub async fn task_get(
     state: State<'_, Arc<AppCore>>,
     id: String,
@@ -206,8 +180,6 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "today_tasks",
     "project_list",
     "objective_list",
-    "task_start_focus",
-    "task_end_focus",
     "task_get_suggestions",
     "task_apply_suggestion",
     "task_dismiss_suggestion",
@@ -260,18 +232,6 @@ pub(crate) async fn dispatch_dev(
             core.objective_list_for_tasks(dev::get(body, "project_id"))
                 .await,
         ),
-        "task_start_focus" => {
-            let task_id = try_field!(dev::get_str(body, "taskId"));
-            dev::val_rh(core.start_focus(task_id).await)
-        }
-        "task_end_focus" => {
-            let task_id = try_field!(dev::get_str(body, "taskId"));
-            match core.end_focus(task_id).await {
-                Ok(Some((resp, _))) => dev::val(Ok::<_, ApiError>(Some(resp))),
-                Ok(None) => dev::val(Ok::<_, ApiError>(None::<TaskResponse>)),
-                Err(e) => dev::val(Err::<Option<TaskResponse>, _>(e)),
-            }
-        }
         "task_get_suggestions" => {
             let task_id = try_field!(dev::get_str(body, "taskId"));
             dev::val(core.task_get_suggestions(task_id).await)

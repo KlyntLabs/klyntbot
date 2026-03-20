@@ -101,6 +101,7 @@ pub async fn launcher_open_app(path: String) -> Result<(), ApiError> {
     Ok(())
 }
 
+#[allow(dead_code)]
 pub(crate) const DEV_COMMANDS: &[&str] = &[
     "launcher_search",
     "launcher_execute",

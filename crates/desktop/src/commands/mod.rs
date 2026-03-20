@@ -1,6 +1,7 @@
 pub mod agents;
 pub mod annotations;
 pub mod areas;
+pub mod autotuner;
 pub mod capture;
 pub mod chat;
 pub mod cognitive;

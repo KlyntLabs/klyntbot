@@ -10,11 +10,9 @@ import type { DecompositionResult } from "../components/detail/DecompositionPane
 import { useStatusWorkflow } from "../contexts/StatusWorkflowContext";
 import {
   type ActivityEntry,
-  buildFocusSession,
   type DetailTask,
   type DisplayProject,
   deriveTaskState,
-  type FocusSession,
   priorityToNumber,
   type SubIssue,
   type Suggestion,
@@ -26,7 +24,7 @@ import {
   timelineToActivity,
 } from "../lib/mappers";
 
-export type { DetailTask, TaskState, SubIssue, Suggestion, FocusSession, ActivityEntry };
+export type { DetailTask, TaskState, SubIssue, Suggestion, ActivityEntry };
 
 export interface TaskForecast {
   estimatedMinutes: number;
@@ -288,16 +286,6 @@ export function useIssueDetail(
     }
   }, [task.id]);
 
-  const focusSession: FocusSession | null = buildFocusSession(task);
-
-  // Focus mutations
-  const endFocusMutation = useMutation<Task | null, { id: string }>("task_end_focus", "params");
-
-  const stopFocus = useCallback(async () => {
-    if (!issueId) return;
-    await endFocusMutation.mutate({ id: issueId });
-  }, [issueId, endFocusMutation]);
-
   return {
     task,
     taskState,
@@ -305,12 +293,10 @@ export function useIssueDetail(
     suggestions,
     suggestionsLoading,
     fetchSuggestions,
-    focusSession,
     subIssues,
     updateTask,
     dismissSuggestion,
     applySuggestion,
-    stopFocus,
     decompositionResult,
     decompositionOpen,
     decompositionLoading,

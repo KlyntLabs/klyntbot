@@ -117,6 +117,7 @@ impl InsightCacheRepo {
     ///
     /// On conflict (same note + hash), bumps version and merges tab content via
     /// JSON merge.  Returns the stored row after the upsert.
+    #[allow(clippy::too_many_arguments)]
     pub async fn upsert(
         &self,
         note_id: &str,

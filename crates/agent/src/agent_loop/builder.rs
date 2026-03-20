@@ -83,6 +83,7 @@ pub struct AgentLoopBuilder {
     pipeline_tx: Option<tokio::sync::broadcast::Sender<cognitive::PipelineEvent>>,
     user_situation: Option<Arc<tokio::sync::Mutex<cognitive::situation::UserSituation>>>,
     activity_svc: Option<Arc<activity_log::ActivityIngestionService>>,
+    autotuner: Option<Arc<crate::autotuner::AutoTunerOrchestrator>>,
 }
 
 impl AgentLoopBuilder {
@@ -101,6 +102,7 @@ impl AgentLoopBuilder {
             pipeline_tx: None,
             user_situation: None,
             activity_svc: None,
+            autotuner: None,
         }
     }
 
@@ -160,6 +162,14 @@ impl AgentLoopBuilder {
         svc: Arc<activity_log::ActivityIngestionService>,
     ) -> Self {
         self.activity_svc = Some(svc);
+        self
+    }
+
+    pub fn with_autotuner(
+        mut self,
+        orchestrator: Arc<crate::autotuner::AutoTunerOrchestrator>,
+    ) -> Self {
+        self.autotuner = Some(orchestrator);
         self
     }
 
@@ -1299,12 +1309,17 @@ impl AgentLoopBuilder {
         let router =
             crate::intent_pipeline::router::ExecutionRouter::new(direct_engine, reactive_engine);
 
-        let analyzer = crate::intent_pipeline::analysis::IntentAnalyzer::new(
+        let mut analyzer = crate::intent_pipeline::analysis::IntentAnalyzer::new(
             provider.clone(),
             &config.agents.defaults.model,
             &config.orchestrator,
         )
         .with_strategy_repo(repos.strategies.clone());
+
+        // Wire live autotuner reference into IntentAnalyzer for per-message threshold reads
+        if let Some(ref orchestrator) = self.autotuner {
+            analyzer = analyzer.with_autotuner(Arc::clone(orchestrator));
+        }
 
         let cost_tracker = Arc::new(
             crate::output::CostTracker::from_repo(storage::UsageRepo::new(
@@ -1358,6 +1373,22 @@ impl AgentLoopBuilder {
 
         // Inject tool registry for delegation support
         runtime = runtime.with_tool_registry(Arc::clone(&tool_registry));
+
+        // Inject autotuner shadow hook
+        if let Some(ref orchestrator) = self.autotuner {
+            // Build the concrete AutoTunerHook for shadow classification
+            if let Some(ref pool) = self.pool {
+                let trial_repo = storage::TrialRepo::new(pool.clone());
+                let hook = Arc::new(crate::autotuner::hooks::AutoTunerHookImpl::new(
+                    Arc::clone(orchestrator),
+                    trial_repo,
+                    provider.clone(),
+                    &config.agents.defaults.model,
+                    &config.orchestrator,
+                ));
+                runtime = runtime.with_autotuner_hook(hook);
+            }
+        }
 
         // Inject squad execution dependencies (requires pool for SquadRepo)
         if let Some(ref pool) = self.pool {

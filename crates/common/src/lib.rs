@@ -5,6 +5,7 @@
 
 // ── Modules ─────────────────────────────────────────────────────────────
 
+pub mod autotuner;
 pub mod date;
 pub mod entity_card;
 pub mod error;
@@ -17,6 +18,7 @@ pub mod types;
 
 // ── Re-exports: domain types ────────────────────────────────────────────
 
+pub use autotuner::TrialParams;
 pub use entity_card::EntityCard;
 pub use error::{
     ChannelError, ConfigError, KlyntbotError, ProviderError, Result, SessionError, ToolError,

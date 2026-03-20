@@ -915,6 +915,16 @@ pub async fn relay_chat_stream(
                             }
                         );
                     }
+                    // AutoTuner events — forwarded to the UI for toast notifications and panel updates.
+                    AgentEvent::AutoTunerReport(report) => {
+                        emit!(events::AUTOTUNER_REPORT, report);
+                    }
+                    AgentEvent::AutoTunerPromotion(promotion) => {
+                        emit!(events::AUTOTUNER_PROMOTION, promotion);
+                    }
+                    AgentEvent::AutoTunerRollback(rollback) => {
+                        emit!(events::AUTOTUNER_ROLLBACK, rollback);
+                    }
                 }
             }
             else => break,

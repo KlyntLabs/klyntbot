@@ -5,9 +5,9 @@
 
 ## Summary
 
-- **10 High** priority gaps -- core features with backend ready but no/incomplete UI
-- **12 Medium** priority gaps -- secondary features or partially integrated
-- **9 Low** priority gaps -- nice-to-have, internal-only, or debug-only
+- **0 High** priority gaps -- OKR, Project CRUD, and Note UI gaps resolved
+- **8 Medium** priority gaps -- secondary features or partially integrated
+- **6 Low** priority gaps -- nice-to-have, internal-only, or debug-only
 
 ---
 
@@ -17,27 +17,6 @@
 
 | Command | Module | Description | Priority | Suggested Approach |
 |---------|--------|-------------|----------|-------------------|
-| `project_create` | `projects.rs` | Create a project | **High** | Wire into tasks page project sidebar; project CRUD dialog |
-| `project_get` | `projects.rs` | Get project details | **High** | Wire into project detail view / task board header |
-| `project_update` | `projects.rs` | Update project metadata | **High** | Add edit form to project detail panel |
-| `project_delete` | `projects.rs` | Delete a project | **High** | Add delete confirmation to project context menu |
-| `project_archive` | `projects.rs` | Archive a project | Medium | Add archive action to project context menu |
-| `project_update_instructions` | `projects.rs` | Set AI instructions per project | Medium | Add textarea to project settings panel |
-| `project_update_role` | `projects.rs` | Set AI role for project | Medium | Add role selector to project settings |
-| `project_conversations_list` | `project_conversations.rs` | List conversations linked to project | Medium | Show in project detail sidebar |
-| `project_memories_list` | `project_memories.rs` | List memories for a project | Medium | Show in project detail sidebar |
-| `project_memories_by_type` | `project_memories.rs` | Filter project memories by type | Low | Add filter dropdown to project memories |
-| `project_source_create` | `project_sources.rs` | Link external source to project | Medium | Add "Add source" button to project detail |
-| `project_source_delete` | `project_sources.rs` | Remove external source | Medium | Add delete in source list |
-| `project_source_list` | `project_sources.rs` | List project sources | Medium | Show sources section in project detail |
-| `objective_create` | `objectives.rs` | Create an OKR objective | **High** | Add OKR creation dialog in tasks/goals page |
-| `objective_get` | `objectives.rs` | Get objective details | **High** | Wire into objective detail view |
-| `objective_update` | `objectives.rs` | Update an objective | **High** | Add edit form to objective view |
-| `objective_delete` | `objectives.rs` | Delete an objective | **High** | Add delete action to objective context menu |
-| `key_result_create` | `key_results.rs` | Create key result under objective | **High** | Add KR creation inside objective detail |
-| `key_result_update` | `key_results.rs` | Update key result | **High** | Wire into KR inline edit |
-| `key_result_update_metric` | `key_results.rs` | Update KR progress metric | **High** | Add progress slider to KR card |
-| `key_result_delete` | `key_results.rs` | Delete key result | **High** | Add delete in KR context menu |
 | `entity_search` | `entities.rs` | Search knowledge graph entities | Medium | Add global entity search in knowledge base |
 | `entity_merge` | `entities.rs` | Merge duplicate entities | Low | Add merge action in entity detail |
 | `entity_get_neighborhood` | `entities.rs` | Get entity relationship graph | Medium | Wire into knowledge graph visualization |
@@ -50,7 +29,6 @@
 | `workspace_list_files` | `workspace.rs` | List workspace files | Low | Show workspace browser in settings or debug |
 | `workspace_read_file` | `workspace.rs` | Read workspace file | Low | Show file content in workspace browser |
 | `workspace_write_file` | `workspace.rs` | Write workspace file | Low | Wire into workspace file editor |
-| `task_start_focus` | `tasks.rs` | Start focus mode on a task | Medium | Add "Focus" button on task detail page |
 | `task_reject_decomposition` | `tasks.rs` | Reject a task decomposition | Low | Already using `task_apply_decomposition`; add reject button |
 | `cognitive_system_status` | `cognitive.rs` | Get cognitive system health | Low | Add to debug/system tab |
 | `cognitive_fact_create` | `cognitive.rs` | Manually create a semantic fact | Low | Debug only -- already in MemoryTab |
@@ -59,10 +37,6 @@
 | `cognitive_rule_deactivate` | `cognitive.rs` | Deactivate a rule | Low | Debug only |
 | `cognitive_inject_event` | `cognitive.rs` | Inject a domain event (debug) | Low | Debug only |
 | `note_search_semantic` | `notes.rs` | Pure semantic note search | Low | `note_search_hybrid` is used instead -- OK |
-| `note_archive` | `notes.rs` | Archive a note | Medium | Add archive action to note context menu |
-| `note_unarchive` | `notes.rs` | Unarchive a note | Medium | Add unarchive in archived notes view |
-| `note_list_archived` | `notes.rs` | List archived notes | Medium | Add "Archived" tab/filter in knowledge base |
-| `note_tags_all` | `notes.rs` | List all unique tags | Medium | Add tag cloud / filter sidebar in knowledge base |
 | `note_insight_regenerate_tab` | `notes.rs` | Regenerate a single insight tab | Low | Add refresh button per insight tab |
 | `note_insight_list_personas` | `notes.rs` | List insight personas | Low | Used via `usePersonas` -- partially covered |
 | `flashcard_get` | `notes.rs` | Get single flashcard | Low | Used internally by review flow |
@@ -94,7 +68,7 @@
 | `finance_exchange_rates` | `commands/finance.rs` | Backend implements rates; no UI to display them | **Wire** into finance overview currency section |
 | `finance_report_income` | `commands/finance.rs` | Income report not displayed | **Wire** into cash flow page |
 | `finance_report_trends` | `commands/finance.rs` | Trends report not displayed | **Wire** into finance charts |
-| `distraction_allow_temp` / `distraction_allow_session` | `commands/distraction.rs` | Called from DistractionOverlay | OK -- integrated |
+| `distraction_allow_temp` / `distraction_allow_session` | `commands/distraction.rs` | Wired via `distraction_respond` dispatch | OK -- integrated |
 | `productivity_auto_focus_start` / `_end` | `commands/productivity.rs` | Called from backend events only | OK -- `productivity_auto_focus_confirm` now exists |
 
 ---
@@ -105,7 +79,7 @@
 |---------|---------------|----------------|----------|-----------------|
 | **feature-tasks** | Complete (CRUD, focus, suggestions, decompose, forecast) | **Full UI** in `features/tasks/` | -- | -- |
 | **feature-finance** | Complete (accounts, transactions, budgets, goals, liabilities, portfolios, investments, reports) | **Full UI** in `features/finance/` (overview, cash flow, investments, targets) | Low | Income report + trends charts missing |
-| **feature-notes** | Complete (CRUD, notebooks, links, search, insights, personas, flashcards, versions, annotations, archive) | **Full UI** in `features/notes/` (editor, graph, insights, flashcards, language) | Low | Archive/unarchive, tag filtering not yet exposed |
+| **feature-notes** | Complete (CRUD, notebooks, links, search, insights, personas, flashcards, versions, annotations, archive) | **Full UI** in `features/notes/` (editor, graph, insights, flashcards, language) + archive/tag filtering via `TagsExplorer` | -- | -- |
 | **feature-productivity** | Complete (tracking, focus, goals, categories, calendar, insights, distraction, patterns, hourly breakdown) | **Full UI** in `features/productivity/` (day/week/month views, focus timer, goals, categories, insights) | Low | Project management section missing |
 | **feature-coaching** | Complete (signal accumulation, pattern detection, intervention routing, feedback) | **Partial UI** -- debug CoachingTab + nudge banners in chat | Medium | Dedicated coaching dashboard with patterns/feedback history |
 | **feature-insights** | Complete (insight review, versions, evolution, personas, scenarios, knowledge growth, flashcard gen) | **Full UI** integrated into notes insight panels | -- | -- |
@@ -113,7 +87,7 @@
 | **feature-learning** | Card generator + types only | **Basic UI** in `features/learn/` (review sessions, deck list) | Medium | Expand with progress tracking, spaced repetition stats |
 | **activity-log** | Complete (ingestion, work context tool, timeline) | **Integrated** via productivity + work-contexts features | -- | -- |
 | **plugin-runtime** | WASM plugin loading + FeaturePackage bridge | **No UI** | Medium | Add plugin management page in settings (install/enable/disable) |
-| **OKR system** (objectives + key_results) | Complete backend (CRUD, metrics) | **No UI** -- `objective_list` called from `useTasks` but no OKR management page | **High** | Build OKR dashboard page with objectives, key results, and progress tracking |
+| **OKR system** (objectives + key_results) | Complete backend (CRUD, metrics) | **Full UI** in `features/projects/components/okr/` (OkrTab, ObjectiveCard, KeyResultRow, create/edit modals) | -- | -- |
 
 ---
 
@@ -128,7 +102,7 @@
 | `area` | Yes | Yes | Yes (via `area_*` commands) | -- |
 | `notes` | Yes | Yes | Yes (via `note_*` commands) | -- |
 | `memory` | Yes | Yes | Yes (via `cognitive_*` commands) | -- |
-| `okr` | Yes | Yes | No dedicated UI | Wire UI |
+| `okr` | Yes | Yes | Yes (via `features/projects/components/okr/`) | -- |
 | `finance` | Yes | Yes | Yes | -- |
 | `productivity` | Yes | Yes | Yes | -- |
 | `work_context` | Yes | Yes | Yes | -- |
@@ -217,75 +191,56 @@ Config sections are exposed via `config_get_section` / `config_update_section`. 
 
 ## 7. Priority Action Plan
 
-### High Priority (core features with backend ready but no UI)
-
-1. **OKR System UI** -- Objectives + Key Results have full CRUD backend (`objective_*`, `key_result_*` commands) but ZERO frontend UI beyond `objective_list` being called alongside `task_list`. Build an OKR dashboard page.
-   - Effort: 2-3 days
-   - Files: New `desktop-ui/src/features/tasks/pages/OkrPage.tsx` or integrate into existing tasks feature
-   - Commands to wire: `objective_create`, `objective_get`, `objective_update`, `objective_delete`, `key_result_create`, `key_result_update`, `key_result_update_metric`, `key_result_delete`
-
-2. **Project CRUD UI** -- Project backend has full CRUD + archive + instructions + role, but frontend has NO calls to `project_create`, `project_update`, `project_delete`, `project_archive`, etc. The tasks page calls `project_list` but users cannot create/edit/delete projects from the UI.
-   - Effort: 1-2 days
-   - Files: Add project management dialogs to `desktop-ui/src/features/tasks/`
-   - Commands to wire: `project_create`, `project_get`, `project_update`, `project_delete`, `project_archive`, `project_update_instructions`, `project_update_role`
-
 ### Medium Priority (secondary features or partial integration)
 
-3. **Note archive/unarchive + tag filtering** -- Backend supports `note_archive`, `note_unarchive`, `note_list_archived`, `note_tags_all`. None are called from UI.
-   - Effort: 1 day
-   - Add archive toggle, archived notes tab, and tag filter sidebar to knowledge base
-
-4. **Coaching Dashboard** -- Coaching has full backend (signals, patterns, feedback, interventions) but only appears in debug tab + chat nudge banners.
+1. **Coaching Dashboard** -- Coaching has full backend (signals, patterns, feedback, interventions) but only appears in debug tab + chat nudge banners.
    - Effort: 2 days
    - Build a dedicated coaching insights page or integrate into productivity
 
-5. **Productivity Projects** -- `productivity_projects_list`, `productivity_project_upsert`, `productivity_project_delete` are not called from any UI.
+2. **Productivity Projects** -- `productivity_projects_list`, `productivity_project_upsert`, `productivity_project_delete` are not called from any UI.
    - Effort: 1 day
    - Add project assignment in productivity category settings
 
-6. **Plugin Management UI** -- `plugin-runtime` has WASM plugin support but no settings page for plugin management.
+3. **Plugin Management UI** -- `plugin-runtime` has WASM plugin support but no settings page for plugin management.
    - Effort: 1 day
    - Add plugin list with install/enable/disable in settings
 
-7. **Project Context Panels** -- `project_conversations_list`, `project_memories_list`, `project_source_*` commands exist but no UI shows project conversations, memories, or sources.
+4. **Project Context Panels** -- `project_conversations_list`, `project_memories_list`, `project_source_*` commands exist but no UI shows project conversations, memories, or sources.
    - Effort: 1-2 days
    - Add sidebar panels to project detail view
 
-8. **Finance Reports** -- `finance_report_income`, `finance_report_trends`, `finance_exchange_rates` have no UI.
+5. **Finance Reports** -- `finance_report_income`, `finance_report_trends`, `finance_exchange_rates` have no UI.
    - Effort: 1 day
    - Add income report + trends charts to finance pages
 
-9. **Todo/Notifications Config UI** -- `todo.focus.maxSlots`, `todo.notifications.*` have no settings UI.
+6. **Todo/Notifications Config UI** -- `todo.focus.maxSlots`, `todo.notifications.*` have no settings UI.
     - Effort: 0.5 days
     - Add "Tasks & Notifications" section to settings
 
-10. **Launcher Config UI** -- Launcher search sources (`launcher.sources.*`) not configurable from settings.
+7. **Launcher Config UI** -- Launcher search sources (`launcher.sources.*`) not configurable from settings.
     - Effort: 0.5 days
     - Add launcher preferences section
 
-11. **Provider Manager Config** -- `providerManager` (primary/fallback routing) has no UI.
+8. **Provider Manager Config** -- `providerManager` (primary/fallback routing) has no UI.
     - Effort: 0.5 days
     - Add provider fallback configuration to Personalization settings
 
 ### Low Priority (nice-to-have or internal-only)
 
-12. **Entity Graph Explorer** -- `entity_search`, `entity_merge`, `entity_get_neighborhood` exist but no dedicated entity management UI.
+9. **Entity Graph Explorer** -- `entity_search`, `entity_merge`, `entity_get_neighborhood` exist but no dedicated entity management UI.
     - Effort: 2 days
 
-13. **Agent Profiles UI** -- `agent_*` commands for managing custom agent profiles have no frontend.
+10. **Agent Profiles UI** -- `agent_*` commands for managing custom agent profiles have no frontend.
     - Effort: 1 day
 
-14. **Workspace File Browser** -- `workspace_*` commands have no frontend.
+11. **Workspace File Browser** -- `workspace_*` commands have no frontend.
     - Effort: 1 day
 
-15. **Cron Status Badge** -- `cron_status` not called; could show system health in automations page.
+12. **Cron Status Badge** -- `cron_status` not called; could show system health in automations page.
     - Effort: 0.5 days
 
-16. **Various Config Sections** -- Many config sections (confidence, conversation, content, skills, packs, scenario, orchestrator) have no settings UI. These are advanced tuning parameters that most users will never need.
+13. **Various Config Sections** -- Many config sections (confidence, conversation, content, skills, packs, scenario, orchestrator) have no settings UI. These are advanced tuning parameters that most users will never need.
     - Effort: Low priority; expose on demand
 
-17. **Task Start Focus Button** -- `task_start_focus` has no UI trigger (only `task_end_focus` is called). Users need a way to initiate focus from the task detail page.
-    - Effort: 30 min
-
-18. **Flashcard Edit/Delete** -- `flashcard_update` and `flashcard_delete` not called from frontend.
+14. **Flashcard Edit/Delete** -- `flashcard_update` and `flashcard_delete` not called from frontend.
     - Effort: 0.5 days

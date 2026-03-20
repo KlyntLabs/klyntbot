@@ -15,6 +15,7 @@
 //! - `tools`: ToolsConfig, permissions, exec, web
 
 mod agents;
+mod autotuner;
 mod capture;
 mod channels;
 mod cognitive;
@@ -44,6 +45,7 @@ mod user;
 mod work_context;
 
 pub use self::agents::*;
+pub use self::autotuner::*;
 pub use self::capture::*;
 pub use self::channels::*;
 pub use self::cognitive::*;

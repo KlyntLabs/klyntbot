@@ -34,6 +34,7 @@ pub mod task_repo;
 #[cfg(test)]
 pub mod tests;
 pub mod tool_usage;
+pub mod trial_repo;
 pub mod usage;
 
 pub use action_repo::{ActionFilter, ActionPatch, ActionRepo};
@@ -67,6 +68,7 @@ pub use strategy::{OverallStats, StrategyRepo, ToolStatsRow};
 pub use task_group::TaskGroupRepo;
 pub use task_repo::{TaskFilter, TaskPatch, TaskRepo};
 pub use tool_usage::ToolUsageRepo;
+pub use trial_repo::TrialRepo;
 pub use usage::UsageRepo;
 
 /// Aggregate counts by status — shared between actions and tasks.
