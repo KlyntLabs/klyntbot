@@ -43,7 +43,7 @@ export function DistractionOverlay() {
   const titleExcerpt =
     intervention?.windowTitle && intervention.windowTitle.length > 50
       ? `${intervention.windowTitle.slice(0, 50)}\u2026`
-      : intervention?.windowTitle ?? null;
+      : (intervention?.windowTitle ?? null);
 
   const hideWindow = async () => {
     setIntervention(null);
@@ -131,9 +131,7 @@ export function DistractionOverlay() {
             {/* Content */}
             <div className="glass-divider" />
             <div className="flex flex-col gap-1">
-              <div className="text-[13px] font-medium text-foreground">
-                {intervention.appName}
-              </div>
+              <div className="text-[13px] font-medium text-foreground">{intervention.appName}</div>
               {titleExcerpt && (
                 <div className="text-[11px] font-light text-muted-foreground truncate">
                   {titleExcerpt}

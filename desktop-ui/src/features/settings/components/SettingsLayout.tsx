@@ -3,6 +3,7 @@ import { ToastContextProvider, useToast } from "@shared/hooks/useToast";
 import {
   Archive,
   ArrowLeft,
+  BrainCircuit,
   Cable,
   Container,
   GitBranch,
@@ -27,6 +28,7 @@ const sections = [
   { label: "Git", path: "/settings/git", icon: GitBranch },
   { label: "Environments", path: "/settings/environments", icon: Container },
   { label: "Tasks & Notifications", path: "/settings/tasks", icon: ListChecks },
+  { label: "Work Contexts", path: "/settings/work-contexts", icon: BrainCircuit },
   { label: "Launcher", path: "/settings/launcher", icon: Rocket },
   { label: "Integrations", path: "/settings/integrations", icon: Cable },
   { label: "Archived threads", path: "/settings/archived", icon: Archive },

@@ -107,8 +107,11 @@ export function PersonalizationSettings() {
     {},
   );
 
-  const { data: providerManager, refetch: refetchProviderManager } =
-    useQuery<ProviderManagerData>("config_get_section", { section: "providerManager" }, {});
+  const { data: providerManager, refetch: refetchProviderManager } = useQuery<ProviderManagerData>(
+    "config_get_section",
+    { section: "providerManager" },
+    {},
+  );
 
   // ── Provider state ───────────────────────────────────────────────
 
@@ -571,16 +574,16 @@ export function PersonalizationSettings() {
             </label>
 
             <label className="block">
-              <span className="block text-[11px] text-muted-foreground mb-1">
-                Classifier model
-              </span>
+              <span className="block text-[11px] text-muted-foreground mb-1">Classifier model</span>
               <p className="text-[11px] text-dim mb-1">
                 Model used to classify request complexity for routing decisions
               </p>
               <input
                 type="text"
                 value={pmVal("classifierModel")}
-                onChange={(e) => setPmEdits((prev) => ({ ...prev, classifierModel: e.target.value }))}
+                onChange={(e) =>
+                  setPmEdits((prev) => ({ ...prev, classifierModel: e.target.value }))
+                }
                 placeholder="e.g. claude-haiku"
                 className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
               />

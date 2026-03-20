@@ -34,7 +34,12 @@ type SourceKey = keyof NonNullable<LauncherData["sources"]>;
 interface SourceDef {
   key: SourceKey;
   label: string;
-  extraFields?: { key: string; label: string; type: "text" | "number" | "dirs"; placeholder?: string }[];
+  extraFields?: {
+    key: string;
+    label: string;
+    type: "text" | "number" | "dirs";
+    placeholder?: string;
+  }[];
 }
 
 const SOURCE_DEFS: SourceDef[] = [
@@ -45,12 +50,16 @@ const SOURCE_DEFS: SourceDef[] = [
   {
     key: "gitRepos",
     label: "Git repositories",
-    extraFields: [{ key: "scanDirs", label: "Scan directories", type: "dirs", placeholder: "~/Projects" }],
+    extraFields: [
+      { key: "scanDirs", label: "Scan directories", type: "dirs", placeholder: "~/Projects" },
+    ],
   },
   {
     key: "scripts",
     label: "Scripts",
-    extraFields: [{ key: "dir", label: "Scripts directory", type: "text", placeholder: "~/.klyntbot/scripts" }],
+    extraFields: [
+      { key: "dir", label: "Scripts directory", type: "text", placeholder: "~/.klyntbot/scripts" },
+    ],
   },
   { key: "files", label: "Files" },
   {
@@ -96,7 +105,9 @@ export function LauncherSettings() {
   );
 
   const [edits, setEdits] = useState<Record<string, unknown>>({});
-  const [sourceEdits, setSourceEdits] = useState<Partial<Record<SourceKey, Record<string, unknown>>>>({});
+  const [sourceEdits, setSourceEdits] = useState<
+    Partial<Record<SourceKey, Record<string, unknown>>>
+  >({});
   const [saving, setSaving] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<SourceKey | null>(null);
 
@@ -105,7 +116,9 @@ export function LauncherSettings() {
   const sourceVal = <T,>(source: SourceKey, key: string, fallback: T): T => {
     const sEdits = sourceEdits[source];
     if (sEdits && key in sEdits) return sEdits[key] as T;
-    const data = (launcher.sources as Record<string, Record<string, unknown>> | undefined)?.[source];
+    const data = (launcher.sources as Record<string, Record<string, unknown>> | undefined)?.[
+      source
+    ];
     return (data?.[key] as T) ?? fallback;
   };
 
@@ -165,7 +178,9 @@ export function LauncherSettings() {
                 <p className="text-[11px] text-dim">Global toggle for the command launcher</p>
               </div>
               <Toggle
-                checked={("enabled" in edits ? edits.enabled : launcher.enabled) as boolean ?? true}
+                checked={
+                  (("enabled" in edits ? edits.enabled : launcher.enabled) as boolean) ?? true
+                }
                 onChange={(v) => setEdits((prev) => ({ ...prev, enabled: v }))}
               />
             </div>
@@ -223,7 +238,10 @@ export function LauncherSettings() {
                                 setSourceEdit(
                                   src.key,
                                   field.key,
-                                  e.target.value.split(",").map((s) => s.trim()).filter(Boolean),
+                                  e.target.value
+                                    .split(",")
+                                    .map((s) => s.trim())
+                                    .filter(Boolean),
                                 )
                               }
                               placeholder={field.placeholder}

@@ -119,7 +119,10 @@ impl ContextInferenceEngine {
         let active_contexts = WorkContextRepo::list_active(&self.pool).await?;
 
         // Bootstrap centroids for any contexts missing from cache (e.g. after restart)
-        self.ensure_centroids(&active_contexts).await;
+        // Skip entirely in heuristic-only mode (semantic_weight == 0.0)
+        if self.config.semantic_weight > 0.0 {
+            self.ensure_centroids(&active_contexts).await;
+        }
 
         let mut assignments = Vec::new();
         for event in &events {
@@ -159,20 +162,34 @@ impl ContextInferenceEngine {
         event: &ActivityLogEntry,
         active_contexts: &[WorkContext],
     ) -> common::Result<ContextAssignment> {
-        let text = build_embedding_text(event);
-        let event_vec = self.embedder.embed(&text).await?;
+        let use_semantic = self.config.semantic_weight > 0.0;
+
+        // Only embed when semantic scoring is enabled (skip CPU cost at weight 0.0)
+        let event_vec = if use_semantic {
+            let text = build_embedding_text(event);
+            Some(self.embedder.embed(&text).await?)
+        } else {
+            None
+        };
 
         // Phase 1: Compute semantic + temporal scores under read lock (no async I/O)
         let now = Utc::now();
         let partial_scores: Vec<(&WorkContext, f64, f64)> = {
-            let centroids = self.centroids.read().await;
+            let centroids = if use_semantic {
+                Some(self.centroids.read().await)
+            } else {
+                None
+            };
             active_contexts
                 .iter()
                 .map(|ctx| {
-                    let semantic = centroids
-                        .get(&ctx.id)
-                        .map(|c| cosine_similarity(&event_vec, c))
-                        .unwrap_or(0.0);
+                    let semantic = match (&event_vec, &centroids) {
+                        (Some(vec), Some(cache)) => cache
+                            .get(&ctx.id)
+                            .map(|c| cosine_similarity(vec, c))
+                            .unwrap_or(0.0),
+                        _ => 0.0,
+                    };
                     let hours_since = (now - ctx.last_active_at).num_minutes().max(0) as f64 / 60.0;
                     let temporal = (-self.config.temporal_decay_lambda * hours_since).exp();
                     (ctx, semantic, temporal)
@@ -207,8 +224,10 @@ impl ContextInferenceEngine {
 
         if best_score >= self.config.assignment_threshold {
             let ctx_id = best_ctx_id.unwrap();
-            // Update centroid via EMA
-            self.update_centroid(&ctx_id, &event_vec).await;
+            // Update centroid via EMA (only when semantic scoring is active)
+            if let Some(ref vec) = event_vec {
+                self.update_centroid(&ctx_id, vec).await;
+            }
 
             // Infer duration from event gap if not explicitly set (FIX 3)
             let duration = if let Some(explicit) = event.duration_secs {
@@ -272,8 +291,10 @@ impl ContextInferenceEngine {
             };
             WorkContextRepo::insert(&self.pool, &new_ctx).await?;
 
-            // Set initial centroid (reuses update_centroid which also persists to LanceDB)
-            self.set_centroid(&ctx_id, event_vec.clone()).await;
+            // Set initial centroid (only when semantic scoring is active)
+            if let Some(vec) = event_vec {
+                self.set_centroid(&ctx_id, vec).await;
+            }
 
             // Link resources
             self.link_event_resources(event, &ctx_id).await?;

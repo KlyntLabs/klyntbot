@@ -223,7 +223,10 @@ export function TasksSettings() {
             </label>
 
             {isDirty("notifications") && (
-              <SaveButton onClick={() => save("notifications")} saving={saving === "notifications"} />
+              <SaveButton
+                onClick={() => save("notifications")}
+                saving={saving === "notifications"}
+              />
             )}
           </div>
         </SettingsCard>
@@ -258,7 +261,11 @@ export function TasksSettings() {
                 step={0.05}
                 value={val("enrichment", "autoApplyThreshold", 0.85)}
                 onChange={(e) =>
-                  setEdit("enrichment", "autoApplyThreshold", Number.parseFloat(e.target.value) || 0.85)
+                  setEdit(
+                    "enrichment",
+                    "autoApplyThreshold",
+                    Number.parseFloat(e.target.value) || 0.85,
+                  )
                 }
                 className={`${INPUT_CLASS} w-24`}
               />
@@ -383,7 +390,10 @@ export function TasksSettings() {
             </label>
 
             {isDirty("dailyPlanning") && (
-              <SaveButton onClick={() => save("dailyPlanning")} saving={saving === "dailyPlanning"} />
+              <SaveButton
+                onClick={() => save("dailyPlanning")}
+                saving={saving === "dailyPlanning"}
+              />
             )}
           </div>
         </SettingsCard>

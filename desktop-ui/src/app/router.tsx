@@ -104,6 +104,9 @@ const TasksSettings = lazy(() =>
 const LauncherSettings = lazy(() =>
   import("../features/settings").then((m) => ({ default: m.LauncherSettings })),
 );
+const WorkContextSettings = lazy(() =>
+  import("../features/settings").then((m) => ({ default: m.WorkContextSettings })),
+);
 
 // (Debug feature — now integrated into System page)
 
@@ -273,6 +276,14 @@ export const router = createHashRouter([
         element: (
           <SettingsLayout>
             <TasksSettings />
+          </SettingsLayout>
+        ),
+      },
+      {
+        path: "/settings/work-contexts",
+        element: (
+          <SettingsLayout>
+            <WorkContextSettings />
           </SettingsLayout>
         ),
       },
