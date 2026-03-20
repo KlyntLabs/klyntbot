@@ -183,6 +183,8 @@ When a user's request crosses into another domain, hand off cleanly:
 
 ## Red Flags
 
+For amount conversion reference, see `scripts/validate_amount.md`.
+
 - **Amounts must be in smallest currency unit** — $50 is 5000, not 50. This is the most common mistake.
 - **Never guess account IDs** — always list accounts first to get real IDs.
 - **Never assume currency** — check `settings_get` for the user's default currency.

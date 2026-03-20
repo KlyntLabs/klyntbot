@@ -11769,6 +11769,7 @@ dependencies = [
  "cognitive",
  "common",
  "config",
+ "cron",
  "fastembed",
  "globset",
  "html2text",

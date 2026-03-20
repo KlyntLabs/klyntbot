@@ -289,6 +289,7 @@ pub struct ExecutionCore {
     pub tool_registry: Arc<RwLock<ToolRegistry>>,
     pub outcome_recorder: Option<Arc<crate::learning::recorder::OutcomeRecorder>>,
     pub domain_event_bus: Option<Arc<bus::DomainEventBus>>,
+    pub interceptor_chain: Option<Arc<tools_core::InterceptorChain>>,
     tool_semaphore: Arc<Semaphore>,
 }
 
@@ -299,6 +300,7 @@ impl ExecutionCore {
             tool_registry,
             outcome_recorder: None,
             domain_event_bus: None,
+            interceptor_chain: None,
             tool_semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_TOOLS)),
         }
     }
@@ -315,6 +317,16 @@ impl ExecutionCore {
         recorder: Arc<crate::learning::recorder::OutcomeRecorder>,
     ) -> Self {
         self.outcome_recorder = Some(recorder);
+        self
+    }
+
+    /// Set the interceptor chain for pre-execution validation hooks.
+    ///
+    /// Interceptors run after `prepare()` (which releases the registry read lock)
+    /// and before `execute()`. They should validate tool arguments only — not
+    /// rely on registry state, which may change between `prepare()` and `check()`.
+    pub fn with_interceptor_chain(mut self, chain: Arc<tools_core::InterceptorChain>) -> Self {
+        self.interceptor_chain = Some(chain);
         self
     }
 
@@ -456,6 +468,9 @@ impl ExecutionCore {
             // Create entity card channel for this batch of tool calls
             let (entity_tx, mut entity_rx) = tokio::sync::mpsc::channel::<common::EntityCard>(16);
 
+            // Clone once for the entire batch (not per-tool-call inside .map())
+            let interceptor_ref = self.interceptor_chain.clone();
+
             let futures: Vec<_> = response
                 .tool_calls
                 .iter()
@@ -463,6 +478,7 @@ impl ExecutionCore {
                 .map(|(i, tc)| {
                     let registry = self.tool_registry.clone();
                     let semaphore = self.tool_semaphore.clone();
+                    let interceptor_chain = interceptor_ref.clone();
                     let name = tc.name.clone();
                     let args = tc.arguments.clone();
                     let mut ctx = routing_ctx.clone();
@@ -500,6 +516,10 @@ impl ExecutionCore {
                                 let reg = registry.read().await;
                                 reg.prepare(&name, &args, &ctx)?
                             };
+                            // Run interceptor chain before executing (if configured)
+                            if let Some(ref chain) = interceptor_chain {
+                                chain.check(&name, &args, None).await?;
+                            }
                             // Read lock is dropped — safe for tools that re-enter the registry
                             tool.execute(args, &ctx).await
                         })

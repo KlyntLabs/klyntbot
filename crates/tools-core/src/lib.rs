@@ -8,6 +8,7 @@
 
 pub mod config_persistence;
 pub mod feature;
+pub mod interceptor;
 pub mod metadata;
 pub mod pagination;
 pub mod params;
@@ -25,6 +26,7 @@ pub use tools_core_macros::{tool_actions, ActionParams, DomainEnum, Tool, ToolPa
 
 pub use config_persistence::ConfigPersistence;
 pub use feature::{FeatureMigration, FeaturePackage, HealthStatus};
+pub use interceptor::{InterceptorChain, ToolCallInterceptor};
 pub use metadata::{CostHint, ToolCategory, ToolMetadata, ToolSource};
 pub use pagination::Page;
 pub use params::ParamExtractor;

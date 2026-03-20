@@ -315,6 +315,13 @@ impl FinanceTool {
         let id = p.required_str("id")?;
 
         let new_amount = p.optional_i64("amount")?;
+        if let Some(amt) = new_amount {
+            if amt <= 0 {
+                return Err(
+                    ToolError::InvalidParams("Amount must be positive".to_string()).into(),
+                );
+            }
+        }
         let category = p.optional_str("category")?;
         let subcategory = p.optional_str("subcategory")?;
         let counterparty = p.optional_str("counterparty")?;

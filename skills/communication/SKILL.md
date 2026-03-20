@@ -70,6 +70,7 @@ manage notifications, and coordinate cross-platform communication.
 
 See `references/messaging.md` for channel formatting rules and examples.
 See `references/notification.md` for alert routing and batching.
+Channel-specific message templates are in `assets/templates/`.
 
 ## Channel Formatting
 

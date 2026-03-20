@@ -823,3 +823,65 @@ async fn report_spending_shows_category_breakdown() {
         .execute(json!({"action": "account_delete", "id": account_id}), &ctx)
         .await;
 }
+
+// ---------------------------------------------------------------------------
+// tx_update positivity guard
+// ---------------------------------------------------------------------------
+
+/// Create an account + transaction, return the tx_id for update tests.
+async fn make_test_tx(tool: &FinanceTool, ctx: &RoutingContext) -> String {
+    tool.execute(
+        json!({
+            "action": "account_add",
+            "name": "Test Bank",
+            "type": "bank",
+            "currency": "USD",
+            "balance": 100000
+        }),
+        ctx,
+    )
+    .await
+    .unwrap();
+
+    let result = tool
+        .execute(
+            json!({
+                "action": "tx_add",
+                "amount": 5000,
+                "type": "expense",
+                "category": "food"
+            }),
+            ctx,
+        )
+        .await
+        .unwrap();
+
+    serde_json::from_str::<serde_json::Value>(&result).unwrap()["tx"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string()
+}
+
+#[tokio::test]
+async fn tx_update_rejects_negative_amount() {
+    let tool = make_finance_tool().await;
+    let ctx = test_ctx();
+    let tx_id = make_test_tx(&tool, &ctx).await;
+
+    let result = tool
+        .execute(json!({"action": "tx_update", "id": tx_id, "amount": -500}), &ctx)
+        .await;
+    assert!(result.is_err(), "tx_update should reject negative amounts");
+}
+
+#[tokio::test]
+async fn tx_update_rejects_zero_amount() {
+    let tool = make_finance_tool().await;
+    let ctx = test_ctx();
+    let tx_id = make_test_tx(&tool, &ctx).await;
+
+    let result = tool
+        .execute(json!({"action": "tx_update", "id": tx_id, "amount": 0}), &ctx)
+        .await;
+    assert!(result.is_err(), "tx_update should reject zero amounts");
+}

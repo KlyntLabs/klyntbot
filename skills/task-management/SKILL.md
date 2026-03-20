@@ -92,7 +92,7 @@ Area (Work, Personal, Health)
 | Step | Question | If YES | If NO |
 |------|----------|--------|-------|
 | 1 | Is user creating a new task? | Go to **Task Creation** flow below | Go to step 2 |
-| 2 | Is it a planning request (daily/weekly)? | Use daily-planner or weekly-review reference | Go to step 3 |
+| 2 | Is it a planning request (daily/weekly)? | Use daily-planner or weekly-review reference (output template: `assets/plan_template.md`) | Go to step 3 |
 | 3 | Is it a complex goal needing breakdown? | Use **task-decompose** — create parent then subtasks | Go to step 4 |
 | 4 | Is it a review/scoring request? | Use retrospective or weekly-review reference | Go to step 5 |
 | 5 | Does it involve money/budget? | **Delegate to finance-management** | Handle as project/area query |
