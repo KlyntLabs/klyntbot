@@ -1,6 +1,6 @@
 # Crate Dependency Map
 
-This document shows how all 33 workspace crates depend on each other, grouped by layer.
+This document shows how all 34 workspace crates depend on each other, grouped by layer.
 
 ## Mermaid Dependency Flowchart
 
@@ -43,6 +43,7 @@ flowchart TB
         feature_learning["feature-learning"]
         activity_log["activity-log"]
         plugin_runtime["plugin-runtime"]
+        autotuner
     end
 
     subgraph L5["L5: Orchestration"]
@@ -155,6 +156,11 @@ flowchart TB
     plugin_runtime --> storage
     plugin_runtime --> tools_core
 
+    autotuner --> common
+    autotuner --> config
+    autotuner --> storage
+    autotuner --> bus
+
     %% L5 deps
     channels --> common
     channels --> bus
@@ -187,6 +193,7 @@ flowchart TB
     agent --> context_engine
     agent --> storage
     agent --> activity_log
+    agent --> autotuner
 
     %% L6 deps
     mcp --> common
@@ -220,6 +227,7 @@ flowchart TB
     app_core --> tools_core
     app_core --> activity_log
     app_core --> skill_system
+    app_core --> autotuner
 
     desktop --> app_core
     desktop --> desktop_shared
@@ -256,6 +264,8 @@ Lower-layer crates define trait interfaces; higher-layer crates provide implemen
 | `ProgressHandler` (tools-core) | `ProgressHandlerImpl` (agent) |
 | `ScopeResolver` (feature-insights) | `ScopeResolverImpl` (app-core) |
 | `FlashcardAccessor` (feature-insights) | `FlashcardAccessorImpl` (app-core) |
+| `ShadowClassifier` (autotuner) | `ShadowClassifierImpl` (agent) |
+| `MetricSource` (autotuner) | `MetricCollectorImpl` (agent) |
 
 ### 3. Hub Crate Pattern
 `agent` (L5) is the hub crate -- it depends on nearly every feature crate to provide handler implementations. `app-core` (L7) is the second hub, orchestrating all crates for initialization.

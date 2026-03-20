@@ -7,7 +7,7 @@
 The storage crate is the single persistence boundary for the entire application. It provides:
 
 - **StoragePool** -- a newtype around `sqlx::SqlitePool` with automatic WAL mode, foreign keys, busy timeout, and migration execution on connect.
-- **22 repository structs** -- each wrapping `SqlitePool` with domain-specific CRUD, filtering, aggregation, and retention methods.
+- **23 repository structs** -- each wrapping `SqlitePool` with domain-specific CRUD, filtering, aggregation, and retention methods.
 - **Repos** -- an aggregate struct that constructs all repositories from a single pool, providing convenient `repos.actions`, `repos.sessions`, etc. access.
 - **VectorStore** -- a LanceDB-backed embedding store for semantic similarity search across 9 tables.
 - **FinanceStorage** -- a sub-aggregate of 9 finance-specific repositories.
@@ -1518,6 +1518,7 @@ erDiagram
 | `src/repos/custom_column.rs` | CustomColumnRepo |
 | `src/repos/entity_link_repo.rs` | EntityLinkRepo |
 | `src/repos/project_source_repo.rs` | ProjectSourceRepo |
+| `src/repos/trial_repo.rs` | TrialRepo (autotuner trials, experiments, shadow log) |
 | `src/repos/finance_*.rs` | 9 finance repositories |
 | `src/rows/` | 21 row-type modules |
 | `src/finance_storage.rs` | FinanceStorage aggregate |

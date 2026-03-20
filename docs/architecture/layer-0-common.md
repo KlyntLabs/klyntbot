@@ -238,6 +238,38 @@ pub enum FormResponse {
 
 ---
 
+## Autotuner Types (`autotuner` Module)
+
+### `TrialParams`
+
+Per-request parameter overrides for autotuner experiments. Defined in `common` (L0) so it can be referenced by `RoutingContext` (in `tools-core`, L1) without circular dependencies.
+
+Each field is `Option` — `None` means "use Config default." All fields use `#[serde(default)]` for forward-compatible deserialization when Phase 2 adds new fields.
+
+```rust
+#[derive(Clone, Debug, Serialize, Deserialize, Default, PartialEq)]
+#[serde(default)]
+pub struct TrialParams {
+    // Phase 1: SkillRouter knobs
+    pub skill_keyword_weight: Option<f64>,
+    pub skill_semantic_weight: Option<f64>,
+    pub skill_activation_threshold: Option<f64>,
+
+    // Phase 1: IntentAnalyzer knobs
+    pub heuristic_confidence_threshold: Option<f64>,
+    pub llm_classifier_timeout_ms: Option<u64>,
+
+    // Phase 1: Cognitive retrieval relevance weights (3 of 6 tuned)
+    pub relevance_weight_semantic: Option<f64>,
+    pub relevance_weight_retrievability: Option<f64>,
+    pub relevance_weight_situation: Option<f64>,
+}
+```
+
+**Key method:** `resolve_relevance_weights(default_importance, default_frequency, default_temporal) -> [f64; 6]` — resolves all 6 relevance weights to a normalized array summing to 1.0. Phase 1 tunes 3 weights; the other 3 come from Config defaults.
+
+---
+
 ## Ports (`ports` Module)
 
 Trait-based ports for dependency inversion. Implementations live in higher layers.
@@ -442,4 +474,5 @@ pub use date::parse_datetime;
 pub use helpers::{truncate_at_boundary, truncate_chars};
 pub use http::{build_http_client, build_http_client_with_builder};
 pub use ports::NotificationSender;
+pub use autotuner::TrialParams;
 ```

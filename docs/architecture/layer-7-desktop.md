@@ -41,7 +41,7 @@ src/
     registry.rs          -- OAuth provider registry
     commands.rs          -- mcp_oauth_start, mcp_oauth_disconnect
   commands/
-    mod.rs               -- 35 command modules + emit_updates() + emit_entity_updated()
+    mod.rs               -- 36 command modules + emit_updates() + emit_entity_updated()
     tasks.rs             -- 17 task commands + dispatch_dev
     notes.rs             -- 62 note commands + dispatch_dev
     chat.rs              -- 8 chat commands + dispatch_dev
@@ -56,6 +56,7 @@ src/
     workflows.rs         -- 8 workflow commands + dispatch_dev
     groups.rs            -- 5 group commands + dispatch_dev
     columns.rs           -- 8 column commands + dispatch_dev
+    autotuner.rs         -- 5 autotuner commands (status, history, revert, pause, resume) + dispatch_dev
     entities.rs          -- 3 entity commands + dispatch_dev
     entity_links.rs      -- 3 entity link commands + dispatch_dev
     squads.rs            -- 7 squad commands + dispatch_dev

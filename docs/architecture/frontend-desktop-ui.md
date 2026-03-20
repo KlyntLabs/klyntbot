@@ -43,6 +43,7 @@ desktop-ui/
         ThemeProvider.tsx        # Theme context (dark | retro), localStorage persistence
     features/                   # Feature-sliced modules (one per domain)
       automations/              # Cron job management
+      autotuner/               # Self-optimization transparency panel + experiment history
       chat/                     # AI chat interface (main + sidebar + launcher variants)
       dashboard/                # Day/week/month/year calendar timeline views
       debug/                    # Debug tabs (events, pipeline, memory, coaching)

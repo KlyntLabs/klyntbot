@@ -23,7 +23,7 @@ The desktop application is built with Tauri 2 (Rust backend + React 19 frontend)
 
 ## Layered Architecture (L0-L8)
 
-The workspace contains 33 crates organized into 9 dependency layers. Dependencies flow strictly upward -- a crate may only depend on crates in the same or lower layers.
+The workspace contains 34 crates organized into 9 dependency layers. Dependencies flow strictly upward -- a crate may only depend on crates in the same or lower layers.
 
 ```mermaid
 graph TB
@@ -63,6 +63,7 @@ graph TB
         learning["feature-learning<br/>Flashcard generation"]
         actlog["activity-log<br/>Unified activity log"]
         plugins["plugin-runtime<br/>WASM sandbox"]
+        autotuner["autotuner<br/>Self-optimization experiments"]
     end
 
     subgraph L5["L5: Orchestration"]
@@ -96,7 +97,7 @@ graph TB
     L8 --> L7
 ```
 
-## All 33 Crates by Layer
+## All 34 Crates by Layer
 
 | Layer | Crate | Purpose |
 |---|---|---|
@@ -123,6 +124,7 @@ graph TB
 | L4 | `feature-learning` | LLM flashcard generation prompts |
 | L4 | `activity-log` | Unified activity log with work context inference |
 | L4 | `plugin-runtime` | WASM plugin sandbox (Extism) |
+| L4 | `autotuner` | Self-optimization: experiment trials, constraint evaluation, LLM-guided variant generation |
 | L5 | `channels` | Platform adapters: Telegram, Discord, Slack, Email |
 | L5 | `agent` | `AgentRuntime`, ReAct loop, intent analysis, all handler implementations |
 | L5 | `cognitive` | Semantic facts, episodic memory, FSRS decay, knowledge graph, flashcards |
@@ -150,6 +152,8 @@ graph TB
 7. **Zero clippy warnings**: Enforced across the workspace. `desktop` crate has pre-existing exceptions.
 
 8. **Pre-release schema**: No migration scripts needed yet. Direct schema changes until first release.
+
+9. **Self-optimization (autotuner)**: Automated experiment loop shadow-scores routing parameter variants on live traffic (<3ms overhead), evaluates via multi-metric constraints, and promotes winners nightly — guided by LLM reasoning about user-specific patterns.
 
 ## Message Processing Pipeline (High Level)
 
@@ -196,3 +200,4 @@ Channel Adapter -> User
 | CoachingService | Proactive interventions | Event-driven |
 | WorkContextInference | Activity grouping | 5 min |
 | TrayCountdown | Menu bar countdown | 1s tick |
+| AutoTunerNightlyCycle | Experiment evaluation, promotion, variant generation | Daily (cron: 2am) |

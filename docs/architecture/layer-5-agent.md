@@ -6,7 +6,7 @@
 
 The agent crate is the orchestration layer of Klyntbot. It contains the `AgentLoop` (message processing loop), `AgentRuntime` (execution pipeline), intent analysis, execution engines, and all adapter implementations that bridge lower-layer trait contracts to concrete LLM-backed logic.
 
-**Dependencies:** Nearly all lower-layer crates -- `common`, `bus`, `config`, `cognitive`, `providers`, `session`, `tools`, `tools-core`, `feature-tasks`, `feature-finance`, `feature-productivity`, `feature-coaching`, `feature-notes`, `plugin-runtime`, `mcp`, `scheduling`, `skill-system`, `context_engine`, `storage`, `activity-log`.
+**Dependencies:** Nearly all lower-layer crates -- `common`, `bus`, `config`, `cognitive`, `providers`, `session`, `tools`, `tools-core`, `feature-tasks`, `feature-finance`, `feature-productivity`, `feature-coaching`, `feature-notes`, `plugin-runtime`, `mcp`, `scheduling`, `skill-system`, `context_engine`, `storage`, `activity-log`, `autotuner`.
 
 ---
 
@@ -63,6 +63,11 @@ agent/src/
   handlers/                  -- Feature handler implementations
   adapters/                  -- Trait adapter implementations
   services/                  -- Background services
+  autotuner/
+    mod.rs                   -- AutoTunerOrchestrator (wires autotuner to runtime)
+    shadow_classifier.rs     -- impl ShadowClassifier for IntentAnalyzer + SkillRouter
+    metric_collector.rs      -- impl MetricSource using StrategyRepo + DomainEventBus
+    hooks.rs                 -- AutoTunerHook trait, on_message_received/completed
   content_registry/          -- Content search registry
   events.rs                  -- AgentEvent enum
   persona.rs                 -- PersonaManager, PersonaChain
@@ -397,6 +402,8 @@ The agent crate implements traits defined in lower layers. This avoids circular 
 | `LlmConsolidationHandler` | `ConsolidationHandler` | cognitive | LLM-powered memory consolidation |
 | `HeuristicExtractionHandler` | `ExtractionHandler` | cognitive | Regex-based fallback extraction |
 | `HeuristicConsolidationHandler` | `ConsolidationHandler` | cognitive | Rule-based fallback consolidation |
+| `ShadowClassifierImpl` | `ShadowClassifier` | autotuner | Shadow routing with trial params (Layer 1-2 only) |
+| `MetricCollectorImpl` | `MetricSource` | autotuner | Ground truth metrics from StrategyRepo + DomainEventBus |
 
 ### Handlers (`handlers/`)
 
@@ -547,6 +554,9 @@ pub enum AgentEvent {
     UsageReport { prompt_tokens: u32, completion_tokens: u32, ... },
     BudgetWarning { monthly_spend_usd: f64, ... },
     LearningEvent { event_type: String, detail: String },
+    AutoTunerReport { champion: ChampionSummary, active_experiment: Option<ExperimentSummary>, ... },
+    AutoTunerPromotion { trial_id: Uuid, reason: String, impact: String, params_changed: Vec<ParamChange> },
+    AutoTunerRollback { reverted_trial_id: Uuid, reason: String, reverted_to: ChampionSummary },
     Done { content: String, message_id: Option<String> },
     Error { message: String },
 }

@@ -11,7 +11,7 @@
 ## Dependencies
 
 ```
-desktop-shared, agent, bus, channels, cognitive, common, config,
+desktop-shared, agent, autotuner, bus, channels, cognitive, common, config,
 feature-coaching, feature-finance, feature-insights, feature-launcher,
 feature-learning, feature-notes, feature-productivity, feature-tasks,
 providers, scheduling, session, storage, tools, tools-core,
@@ -46,6 +46,7 @@ src/
     productivity/         -- Tracking, focus, summaries, calendar, converters
     settings/             -- Config get/update, MCP server management
     launcher/             -- Search engine, execute, dashboard, clipboard, scripts
+    autotuner.rs          -- AutoTuner status, history, revert, pause/resume
     agents.rs             -- Agent profile listing, file read/write
     annotations.rs        -- Note annotation CRUD + AI suggestion
     areas.rs              -- Area CRUD + reorder

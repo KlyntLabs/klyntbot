@@ -29,6 +29,7 @@ graph TB
     subgraph "Shared Services"
         CONTEXT[context_engine<br/>Memory retrieval<br/>InsightForge]
         SKILLS[skill-system<br/>Orchestrator routing<br/>Context injection]
+        AUTOTUNE[autotuner<br/>Shadow scoring<br/>Experiment optimization]
     end
 
     subgraph "Cross-Feature Bridges"
@@ -50,6 +51,9 @@ graph TB
     COG -->|UserSituation| COACH
     CONTEXT -->|Memory retrieval| AGENT
     SKILLS -->|Skill context| CONTEXT
+    AUTOTUNE -->|Shadow scoring| SKILLS
+    AUTOTUNE -->|Champion params| AGENT
+    AGENT -->|UserCorrectedAI, strategy records| AUTOTUNE
 
     NOTES -.->|Note content| INSIGHTS
     NOTES -.->|Note content| LEARNING
@@ -142,6 +146,14 @@ graph TB
 - `app-core` orchestrates: fetch note -> build prompt -> LLM call -> persist flashcards
 - Flashcards stored in cognitive crate's `FlashcardRepo`
 
+### Autotuner <-> Agent/SkillRouter/IntentAnalyzer
+- `ShadowClassifier` (in agent) runs Layer 1-2 of IntentAnalyzer + SkillRouter with trial params for shadow scoring
+- `MetricCollector` (in agent) subscribes to `UserCorrectedAI`, `CoachingFeedback`, `TaskExecutionCompleted` events for ground truth
+- `StrategyRepo` provides execution mode accuracy (Direct/Reactive classification)
+- Champion params propagate to live pipeline via `RoutingContext.champion_params`
+- Nightly cycle runs via `CronService` — evaluates trials, promotes winners, generates new variants via LLM
+- `AutoTunerEvent`s are mapped to `AgentEvent` variants for the Transparency Panel
+
 ### Cognitive <-> Coaching
 - `UserSituation` (computed in cognitive) drives coaching decisions
 - Coaching feedback (`CoachingFeedback` domain event) feeds back into cognitive fact extraction
@@ -165,25 +177,30 @@ graph LR
         DLH[DelegationHandler]
         EXTH[ExtractionHandler]
         CONSH[ConsolidationHandler]
+        SC[ShadowClassifier]
+        MS[MetricSource]
     end
 
     subgraph "Implementations (L5)"
         AGENT[agent crate]
     end
 
-    subgraph "Consumers (L4)"
+    subgraph "Consumers (L4-L5)"
         TASKS[feature-tasks]
         TOOLS[tools]
         COGNITIVE[cognitive]
+        AUTOTUNER[autotuner]
     end
 
     AGENT -->|implements| DH & EH & TEH & PH & FH
     AGENT -->|implements| CH & SH & DLH
     AGENT -->|implements| EXTH & CONSH
+    AGENT -->|implements| SC & MS
 
     TASKS -->|uses| DH & EH & TEH & PH & FH
     TOOLS -->|uses| CH & SH & DLH
     COGNITIVE -->|uses| EXTH & CONSH
+    AUTOTUNER -->|uses| SC & MS
 ```
 
 ## Skill Delegation Graph
@@ -212,3 +229,5 @@ Multiple features access the same repositories:
 | `SessionRepo` | session | agent (history), app-core (chat) |
 | `SemanticFactRepo` | cognitive | agent (retrieval, context), coaching (situation) |
 | `VectorStore` | storage | cognitive (facts), tools (embedding), notes (search), activity-log |
+| `TrialRepo` | storage | autotuner (trials, experiments, shadow log) |
+| `LearningStateRepo` | storage | agent (learning), autotuner (champion state, toast counter, pace) |

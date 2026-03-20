@@ -174,6 +174,7 @@ classDiagram
         +LauncherConfig launcher
         +ScenarioConfig scenario
         +ShortcutsConfig shortcuts
+        +AutoTunerConfig autotuner
         +bool setup_completed
         +workspace_path() PathBuf
         +data_dir_path() PathBuf
@@ -211,6 +212,7 @@ classDiagram
     Config --> LauncherConfig
     Config --> ScenarioConfig
     Config --> ShortcutsConfig
+    Config --> AutoTunerConfig
 ```
 
 ### Config Methods

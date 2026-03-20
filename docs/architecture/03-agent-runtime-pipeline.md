@@ -117,8 +117,10 @@ sequenceDiagram
 `SkillRouter.select_orchestrator_blended()` scores all orchestrator skills:
 
 ```
-blended_score = keyword_score * 0.7 + semantic_score * 0.3
+blended_score = keyword_score * keyword_weight + semantic_score * semantic_weight
 ```
+
+Default weights: 0.7 / 0.3. When the autotuner has a promoted Champion, the Champion's `skill_keyword_weight` and `skill_semantic_weight` override these defaults via `RoutingContext.champion_params`.
 
 - **Keyword score**: Token overlap between user message and skill description
 - **Semantic score**: Cosine similarity of embeddings
@@ -210,6 +212,14 @@ for iteration in 0..max_iterations:
 - `StrategyRepo` records classification accuracy for adaptive learning
 - `InteractionRecorder` logs the interaction
 
+### Shadow Scoring (Autotuner)
+
+When the autotuner is enabled with active trials, the `AutoTunerOrchestrator` runs lightweight shadow scoring on every message in parallel with the main pipeline:
+
+1. **Control path** runs normally with Champion params (or Config defaults) — drives the actual response.
+2. **Shadow path** runs Layer 1-2 only (Aho-Corasick + embedding cosine) of IntentAnalyzer + SkillRouter for each active trial's `TrialParams`. No Layer 3 LLM calls. Overhead: <3ms total for 3 active trials.
+3. **Ground truth** is recorded after response delivery — user corrections, satisfaction, token usage, response time — against both control and shadow predictions.
+
 ## Delegation Flow
 
 When an orchestrator delegates to another skill:
@@ -255,4 +265,7 @@ Throughout execution, `AgentEvent`s are emitted for frontend transparency:
 | `ContentChunk` | Streaming text tokens |
 | `DelegationStarted` / `Completed` | Inter-agent delegation |
 | `UsageReport` | Token usage |
+| `AutoTunerReport` | Nightly experiment cycle completed |
+| `AutoTunerPromotion` | Trial promoted to Champion |
+| `AutoTunerRollback` | Champion reverted after regression |
 | `Done` | Processing complete |

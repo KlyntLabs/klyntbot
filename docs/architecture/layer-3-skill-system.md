@@ -57,7 +57,7 @@ classDiagram
         +new(catalog) SkillRouter
         +keyword_scores(message, catalog) HashMap~String, f64~
         +select_orchestrator(message, catalog) Arc~SkillPackage~
-        +select_orchestrator_blended(message, embedding, catalog) Arc~SkillPackage~
+        +select_orchestrator_blended(message, embedding, catalog, keyword_weight?, semantic_weight?) Arc~SkillPackage~
         +activate_skills(message, embedding, catalog) Vec~Arc~SkillPackage~~
     }
 
@@ -324,8 +324,10 @@ flowchart TD
 ### Scoring Formula
 
 ```
-blended_score = keyword_score * 0.7 + semantic_score * 0.3
+blended_score = keyword_score * keyword_weight + semantic_score * semantic_weight
 ```
+
+Default weights: `keyword_weight = 0.7`, `semantic_weight = 0.3`. These can be overridden per-request via optional `keyword_weight`/`semantic_weight` parameters on `select_orchestrator_blended()`, used by the autotuner to shadow-score routing with trial parameters.
 
 - **Keyword score**: `min(1.0, hits / max(1.0, desc_tokens / 3.0))`
 - **Semantic score**: Cosine similarity between query embedding and skill description embedding

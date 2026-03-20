@@ -177,6 +177,7 @@ pub struct RoutingContext {
     pub interaction_channel: Option<Arc<dyn InteractionChannel>>,
     pub squad_id: Option<String>,
     pub squad_mode: Option<String>,
+    pub champion_params: Option<common::TrialParams>,
 }
 ```
 
@@ -191,6 +192,7 @@ pub struct RoutingContext {
 | `interaction_channel` | Platform-native interaction channel (for buttons/menus) |
 | `squad_id` | Optional squad context for multi-persona responses |
 | `squad_mode` | Squad mode: `"quick"` or `"debate"` |
+| `champion_params` | Autotuner champion parameter overrides (None = use Config defaults) |
 
 **Constructors:**
 - `RoutingContext::new(channel, chat_id)` -- non-interactive mode
@@ -681,6 +683,7 @@ classDiagram
         +interaction_channel: Option
         +squad_id: Option~String~
         +squad_mode: Option~String~
+        +champion_params: Option~TrialParams~
     }
 
     class ToolMetadata {
