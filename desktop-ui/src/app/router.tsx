@@ -98,6 +98,9 @@ const ArchivedSettings = lazy(() =>
 const IntegrationsSettings = lazy(() =>
   import("../features/settings").then((m) => ({ default: m.IntegrationsSettings })),
 );
+const TasksSettings = lazy(() =>
+  import("../features/settings").then((m) => ({ default: m.TasksSettings })),
+);
 
 // (Debug feature — now integrated into System page)
 
@@ -259,6 +262,14 @@ export const router = createHashRouter([
         element: (
           <SettingsLayout>
             <IntegrationsSettings />
+          </SettingsLayout>
+        ),
+      },
+      {
+        path: "/settings/tasks",
+        element: (
+          <SettingsLayout>
+            <TasksSettings />
           </SettingsLayout>
         ),
       },

@@ -6,7 +6,7 @@
 ## Summary
 
 - **0 High** priority gaps -- OKR, Project CRUD, and Note UI gaps resolved
-- **8 Medium** priority gaps -- secondary features or partially integrated
+- **7 Medium** priority gaps -- secondary features or partially integrated
 - **6 Low** priority gaps -- nice-to-have, internal-only, or debug-only
 
 ---
@@ -159,9 +159,9 @@ Config sections are exposed via `config_get_section` / `config_update_section`. 
 | `tools` | `restrictToWorkspace`, `web.braveApiKey` | bool, Secret | Yes (Configuration) | -- |
 | `tools` | `permissions` (per-channel permission levels) | struct | **No** | Low |
 | `gateway` | `host`, `port` | string, u16 | Yes (Configuration) | -- |
-| `todo` | `focus.maxSlots`, `focus.deadlineHours` | numbers | **No** | Medium |
-| `todo` | `notifications.*` (targets, focusReminders, dailyDigest, dailyDigestTime) | various | **No** | Medium |
-| `todo` | `enrichment`, `search`, `dailyPlanning` | structs | **No** | Low |
+| `todo` | `focus.maxSlots`, `focus.deadlineHours` | numbers | Yes (Tasks & Notifications) | -- |
+| `todo` | `notifications.*` (targets, focusReminders, dailyDigest, dailyDigestTime) | various | Yes (Tasks & Notifications) | -- |
+| `todo` | `enrichment`, `search`, `dailyPlanning` | structs | Yes (Tasks & Notifications) | -- |
 | `confidence` | `confirmThreshold`, `warnThreshold` | f64 | **No** | Low |
 | `project` | Various | struct | **No** | Low |
 | `conversation` | `maxHistoryMessages`, `embedding.*`, `search.*` | various | **No** | Low |
@@ -213,34 +213,30 @@ Config sections are exposed via `config_get_section` / `config_update_section`. 
    - Effort: 1 day
    - Add income report + trends charts to finance pages
 
-6. **Todo/Notifications Config UI** -- `todo.focus.maxSlots`, `todo.notifications.*` have no settings UI.
-    - Effort: 0.5 days
-    - Add "Tasks & Notifications" section to settings
-
-7. **Launcher Config UI** -- Launcher search sources (`launcher.sources.*`) not configurable from settings.
+6. **Launcher Config UI** -- Launcher search sources (`launcher.sources.*`) not configurable from settings.
     - Effort: 0.5 days
     - Add launcher preferences section
 
-8. **Provider Manager Config** -- `providerManager` (primary/fallback routing) has no UI.
+7. **Provider Manager Config** -- `providerManager` (primary/fallback routing) has no UI.
     - Effort: 0.5 days
     - Add provider fallback configuration to Personalization settings
 
 ### Low Priority (nice-to-have or internal-only)
 
-9. **Entity Graph Explorer** -- `entity_search`, `entity_merge`, `entity_get_neighborhood` exist but no dedicated entity management UI.
+8. **Entity Graph Explorer** -- `entity_search`, `entity_merge`, `entity_get_neighborhood` exist but no dedicated entity management UI.
     - Effort: 2 days
 
-10. **Agent Profiles UI** -- `agent_*` commands for managing custom agent profiles have no frontend.
+9. **Agent Profiles UI** -- `agent_*` commands for managing custom agent profiles have no frontend.
     - Effort: 1 day
 
-11. **Workspace File Browser** -- `workspace_*` commands have no frontend.
+10. **Workspace File Browser** -- `workspace_*` commands have no frontend.
     - Effort: 1 day
 
-12. **Cron Status Badge** -- `cron_status` not called; could show system health in automations page.
+11. **Cron Status Badge** -- `cron_status` not called; could show system health in automations page.
     - Effort: 0.5 days
 
-13. **Various Config Sections** -- Many config sections (confidence, conversation, content, skills, packs, scenario, orchestrator) have no settings UI. These are advanced tuning parameters that most users will never need.
+12. **Various Config Sections** -- Many config sections (confidence, conversation, content, skills, packs, scenario, orchestrator) have no settings UI. These are advanced tuning parameters that most users will never need.
     - Effort: Low priority; expose on demand
 
-14. **Flashcard Edit/Delete** -- `flashcard_update` and `flashcard_delete` not called from frontend.
+13. **Flashcard Edit/Delete** -- `flashcard_update` and `flashcard_delete` not called from frontend.
     - Effort: 0.5 days
