@@ -14,6 +14,7 @@ use autotuner::{
     GenerationResponse, MetricSource, NightlyCycle, ShadowClassifier, TrialSummaryForPrompt,
 };
 use bus::DomainEventBus;
+use chrono::Utc;
 use common::TrialParams;
 use config::AutoTunerConfig;
 use providers::{ChatParams, DynProvider, Message};
@@ -115,6 +116,19 @@ impl AutoTunerOrchestrator {
 
     pub fn is_active(&self) -> bool {
         self.active
+    }
+
+    /// Check if Phase 2 (memory optimization) is ready to activate.
+    /// Requires champion stable >= 7 days.
+    pub fn is_phase2_ready(&self) -> bool {
+        if !self.active {
+            return false;
+        }
+        let Some(champion) = self.champion.try_read().ok() else {
+            return false;
+        };
+        let days_since_promotion = (Utc::now() - champion.promoted_at).num_days();
+        days_since_promotion >= 7
     }
 
     /// Return the current champion's trial params if the autotuner is active

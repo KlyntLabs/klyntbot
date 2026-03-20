@@ -1,10 +1,11 @@
 //! Hook trait and concrete implementation for wiring autotuner shadow scoring
 //! into the agent runtime.
 
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use autotuner::ShadowContext;
+use autotuner::{ShadowContext, ShadowRetriever};
 use chrono::{DateTime, Utc};
 use common::TrialParams;
 use config::OrchestratorConfig;
@@ -47,6 +48,7 @@ pub struct AutoTunerHookImpl {
     orchestrator: Arc<AutoTunerOrchestrator>,
     trial_repo: TrialRepo,
     shadow_classifier: super::shadow_classifier::AgentShadowClassifier,
+    shadow_retriever: Option<Arc<dyn ShadowRetriever>>,
     /// Cached active trials with timestamp to avoid querying DB per message.
     active_trials_cache: RwLock<(DateTime<Utc>, Vec<TrialRow>)>,
 }
@@ -65,8 +67,14 @@ impl AutoTunerHookImpl {
             shadow_classifier: super::shadow_classifier::AgentShadowClassifier::new(
                 provider, model, config,
             ),
+            shadow_retriever: None,
             active_trials_cache: RwLock::new((DateTime::<Utc>::MIN_UTC, Vec::new())),
         }
+    }
+
+    pub fn with_shadow_retriever(mut self, retriever: Arc<dyn ShadowRetriever>) -> Self {
+        self.shadow_retriever = Some(retriever);
+        self
     }
 }
 
@@ -170,6 +178,63 @@ impl AutoTunerHook for AutoTunerHookImpl {
 
         // Execute all inserts concurrently instead of sequentially.
         futures_util::future::join_all(insert_futs).await;
+
+        // Shadow retrieval (Phase 2)
+        if let Some(ref retriever) = self.shadow_retriever {
+            if self.orchestrator.is_phase2_ready() {
+                let champion_params = self
+                    .orchestrator
+                    .try_current_champion_params()
+                    .unwrap_or_default();
+
+                for trial in &active_trials {
+                    let params: TrialParams = match serde_json::from_str(&trial.params) {
+                        Ok(p) => p,
+                        Err(_) => continue,
+                    };
+                    if !params.has_memory_params() {
+                        continue;
+                    }
+
+                    let variant_result =
+                        match retriever.retrieve_shadow(message, &context, &params).await {
+                            Ok(r) => r,
+                            Err(e) => {
+                                debug!("shadow retrieval failed for trial {}: {e}", trial.id);
+                                continue;
+                            }
+                        };
+                    let control_result = match retriever
+                        .retrieve_shadow(message, &context, &champion_params)
+                        .await
+                    {
+                        Ok(r) => r,
+                        Err(e) => {
+                            debug!("shadow retrieval (control) failed: {e}");
+                            continue;
+                        }
+                    };
+
+                    let overlap = count_id_overlap(&variant_result.memory_ids, &control_result.memory_ids);
+                    if let Err(e) = self
+                        .trial_repo
+                        .insert_shadow_retrieval_log(
+                            &trial.id,
+                            chat_id,
+                            &timestamp,
+                            variant_result.total_retrieved as i64,
+                            control_result.total_retrieved as i64,
+                            overlap as i64,
+                            variant_result.avg_score,
+                            variant_result.avg_age_days,
+                        )
+                        .await
+                    {
+                        warn!("failed to insert shadow retrieval log for trial {}: {e}", trial.id);
+                    }
+                }
+            }
+        }
     }
 
     async fn on_message_completed(
@@ -197,6 +262,12 @@ impl AutoTunerHook for AutoTunerHookImpl {
         // nightly promotion), return None and let the caller use Config defaults.
         self.orchestrator.try_current_champion_params()
     }
+}
+
+/// Count the number of IDs that appear in both lists.
+fn count_id_overlap(a: &[String], b: &[String]) -> usize {
+    let set: HashSet<&str> = b.iter().map(|s| s.as_str()).collect();
+    a.iter().filter(|id| set.contains(id.as_str())).count()
 }
 
 #[cfg(test)]

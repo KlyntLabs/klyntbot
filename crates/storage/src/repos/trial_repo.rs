@@ -54,6 +54,21 @@ CREATE INDEX IF NOT EXISTS idx_autotuner_shadow_log_trial_id
 
 CREATE INDEX IF NOT EXISTS idx_autotuner_shadow_log_chat_id
     ON autotuner_shadow_log(chat_id);
+
+CREATE TABLE IF NOT EXISTS autotuner_shadow_retrieval_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    trial_id TEXT NOT NULL REFERENCES autotuner_trials(id),
+    chat_id TEXT NOT NULL,
+    message_timestamp TEXT NOT NULL,
+    variant_retrieved_count INTEGER NOT NULL,
+    control_retrieved_count INTEGER NOT NULL,
+    overlap_count INTEGER NOT NULL,
+    variant_avg_score REAL NOT NULL,
+    variant_avg_age_days REAL NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_shadow_retrieval_log_trial
+    ON autotuner_shadow_retrieval_log(trial_id);
 "#;
 
 /// Repository for autotuner experiment + trial persistence.
@@ -337,6 +352,81 @@ impl TrialRepo {
         .bind(&since_str)
         .fetch_one(&self.pool)
         .await?)
+    }
+
+    // ── Shadow retrieval log (Phase 2) ───────────────────────────────
+
+    /// Insert a shadow retrieval log entry for Phase 2 memory scoring.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn insert_shadow_retrieval_log(
+        &self,
+        trial_id: &str,
+        chat_id: &str,
+        message_timestamp: &str,
+        variant_retrieved_count: i64,
+        control_retrieved_count: i64,
+        overlap_count: i64,
+        variant_avg_score: f64,
+        variant_avg_age_days: f64,
+    ) -> Result<(), StorageError> {
+        sqlx::query(
+            "INSERT INTO autotuner_shadow_retrieval_log
+                (trial_id, chat_id, message_timestamp,
+                 variant_retrieved_count, control_retrieved_count, overlap_count,
+                 variant_avg_score, variant_avg_age_days)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        )
+        .bind(trial_id)
+        .bind(chat_id)
+        .bind(message_timestamp)
+        .bind(variant_retrieved_count)
+        .bind(control_retrieved_count)
+        .bind(overlap_count)
+        .bind(variant_avg_score)
+        .bind(variant_avg_age_days)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Retrieval precision for a trial: average overlap_count / variant_retrieved_count.
+    pub async fn retrieval_precision_for_trial(
+        &self,
+        trial_id: &str,
+        since: DateTime<Utc>,
+    ) -> Result<f64, StorageError> {
+        let since_str = since.format("%Y-%m-%d %H:%M:%S").to_string();
+        let result = sqlx::query_as::<_, (f64,)>(
+            "SELECT COALESCE(AVG(CASE WHEN variant_retrieved_count > 0
+                THEN CAST(overlap_count AS REAL) / variant_retrieved_count
+                ELSE 0.0 END), 0.0)
+             FROM autotuner_shadow_retrieval_log
+             WHERE trial_id = ?1 AND created_at >= ?2",
+        )
+        .bind(trial_id)
+        .bind(&since_str)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(result.0)
+    }
+
+    /// Average memory freshness for a trial (avg_age_days from shadow retrieval).
+    pub async fn avg_memory_freshness_for_trial(
+        &self,
+        trial_id: &str,
+        since: DateTime<Utc>,
+    ) -> Result<f64, StorageError> {
+        let since_str = since.format("%Y-%m-%d %H:%M:%S").to_string();
+        let result = sqlx::query_as::<_, (f64,)>(
+            "SELECT COALESCE(AVG(variant_avg_age_days), 0.0)
+             FROM autotuner_shadow_retrieval_log
+             WHERE trial_id = ?1 AND created_at >= ?2",
+        )
+        .bind(trial_id)
+        .bind(&since_str)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(result.0)
     }
 
     /// Count trials that were promoted since the given timestamp.
