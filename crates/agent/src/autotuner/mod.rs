@@ -5,6 +5,7 @@
 pub mod hooks;
 pub mod metric_collector;
 pub mod shadow_classifier;
+pub mod shadow_retriever;
 
 use std::sync::Arc;
 
