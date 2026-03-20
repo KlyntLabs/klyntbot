@@ -119,15 +119,16 @@ impl VectorStore {
             .await
             .map_err(|e| StorageError::Vector(format!("LanceDB add to {table}: {e}")))?;
 
-        // Delete old rows SECOND (safe: crash here = temporary duplicate,
-        // cleaned up on next upsert). We delete rows with matching ID that
-        // have an older timestamp than `now`.
+        // Delete old rows SECOND (best-effort cleanup). Crash or failure here
+        // leaves a temporary duplicate, cleaned up on next upsert or maintenance.
+        // We intentionally do NOT propagate delete errors — the new row is already
+        // persisted, so the upsert semantically succeeded.
         let safe_id = sanitize_predicate_value(id)?;
         let safe_now = sanitize_predicate_value(&now)?;
         let predicate = format!("id = '{safe_id}' AND {ts_col_name} < '{safe_now}'");
-        tbl.delete(&predicate)
-            .await
-            .map_err(|e| StorageError::Vector(format!("LanceDB cleanup old in {table}: {e}")))?;
+        if let Err(e) = tbl.delete(&predicate).await {
+            tracing::warn!("LanceDB cleanup old in {table} (non-fatal): {e}");
+        }
 
         Ok(())
     }

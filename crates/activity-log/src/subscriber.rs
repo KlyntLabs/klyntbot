@@ -8,8 +8,10 @@ use crate::normalizers::normalize_domain_event;
 use crate::service::ActivityIngestionService;
 
 /// Subscribes to the DomainEventBus and ingests normalized events into the unified log.
+///
+/// Shutdown is driven by the `CancellationToken` passed at construction.
+/// The caller controls lifetime by cancelling the token (or via parent propagation).
 pub struct ActivityLogSubscriber {
-    cancel: CancellationToken,
     _handle: JoinHandle<()>,
 }
 
@@ -51,18 +53,7 @@ impl ActivityLogSubscriber {
         });
 
         Self {
-            cancel,
             _handle: handle,
         }
-    }
-
-    pub fn stop(&self) {
-        self.cancel.cancel();
-    }
-}
-
-impl Drop for ActivityLogSubscriber {
-    fn drop(&mut self) {
-        self.cancel.cancel();
     }
 }

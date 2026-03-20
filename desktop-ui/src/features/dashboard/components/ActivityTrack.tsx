@@ -212,14 +212,12 @@ export function ActivityTrack({
               "absolute left-0.5 right-0.5 rounded-sm cursor-pointer transition-opacity overflow-hidden",
               isSelected && "ring-1 ring-brand",
               matched && "shadow-sm",
-              session.duringFocus && "border-l-2",
             )}
             style={{
               top,
               height,
-              backgroundColor: session.color,
+              backgroundColor: session.duringFocus ? "var(--timeline-focus)" : session.color,
               opacity,
-              borderLeftColor: session.duringFocus ? "var(--timeline-focus)" : undefined,
             }}
             onClick={() => onSelectSession(session)}
             onMouseEnter={() => setHoveredIdx(idx)}

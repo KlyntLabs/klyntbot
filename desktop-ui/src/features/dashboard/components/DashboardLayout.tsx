@@ -1,5 +1,4 @@
 import { AutoFocusToast } from "@features/productivity/components/AutoFocusToast";
-import { DistractionInterventionBanner } from "@features/productivity/components/DistractionInterventionBanner";
 import { FocusStateIndicator } from "@features/productivity/components/FocusStateIndicator";
 import { FocusTrayIndicator } from "@features/productivity/components/FocusTrayIndicator";
 import { MiniCalendar } from "@shared/components/MiniCalendar";
@@ -308,7 +307,6 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
       {/* Real-time overlays */}
       <FocusStateIndicator />
       <AutoFocusToast />
-      <DistractionInterventionBanner />
 
       {/* Content */}
       <DataModeContext.Provider value="productivity">

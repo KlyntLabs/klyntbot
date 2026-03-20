@@ -144,20 +144,6 @@ impl SignalAccumulator {
                     None
                 }
             }
-            "context_switch_overload" => {
-                if situation.recent_context_switches > 10 {
-                    Some(TriggerFired {
-                        condition_name: "context_switch_overload".into(),
-                        confidence: 0.75,
-                        context: format!(
-                            "{} context switches in last 30min",
-                            situation.recent_context_switches
-                        ),
-                    })
-                } else {
-                    None
-                }
-            }
             "budget_warning" => {
                 let budget_alerts = self.count_events("BudgetAlert");
                 if budget_alerts >= 1 {
@@ -393,14 +379,16 @@ mod tests {
     }
 
     #[test]
-    fn test_context_switch_overload() {
+    fn test_context_switch_overload_disabled() {
+        // context_switch_overload is disabled — data used for analytics only,
+        // distraction overlay handles real-time intervention.
         let mut acc = SignalAccumulator::new();
         let sit = UserSituation {
             recent_context_switches: 15,
             ..situation_with(0.0, 1.0, 0.0)
         };
         let fired = acc.evaluate(&sit);
-        assert!(fired
+        assert!(!fired
             .iter()
             .any(|t| t.condition_name == "context_switch_overload"));
     }

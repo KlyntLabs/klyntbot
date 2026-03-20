@@ -184,17 +184,20 @@ impl ActivityEventRepo {
         start: &DateTime<Utc>,
         end: &DateTime<Utc>,
         limit: i64,
-    ) -> common::Result<Vec<(String, i64)>> {
+    ) -> common::Result<Vec<(String, i64, Option<String>)>> {
         #[derive(sqlx::FromRow)]
         struct Row {
             display_name: String,
             total_secs: i64,
+            category: Option<String>,
         }
         let rows = sqlx::query_as::<_, Row>(
-            r#"SELECT COALESCE(site_name, app_name) AS display_name,
-                      COALESCE(SUM(duration_secs), 0) AS total_secs
-               FROM activity_events
-               WHERE started_at >= ?1 AND started_at < ?2 AND is_idle = FALSE
+            r#"SELECT COALESCE(e.site_name, e.app_name) AS display_name,
+                      COALESCE(SUM(e.duration_secs), 0) AS total_secs,
+                      MAX(c.name) AS category
+               FROM activity_events e
+               LEFT JOIN activity_categories c ON e.category_id = c.id
+               WHERE e.started_at >= ?1 AND e.started_at < ?2 AND e.is_idle = FALSE
                GROUP BY display_name
                ORDER BY total_secs DESC
                LIMIT ?3"#,
@@ -207,7 +210,7 @@ impl ActivityEventRepo {
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         Ok(rows
             .into_iter()
-            .map(|r| (r.display_name, r.total_secs))
+            .map(|r| (r.display_name, r.total_secs, r.category))
             .collect())
     }
 

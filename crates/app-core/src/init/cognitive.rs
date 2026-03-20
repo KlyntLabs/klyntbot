@@ -93,6 +93,9 @@ pub(super) fn spawn_post_core_services(
     shutdown_token: &CancellationToken,
 ) {
     // Start ActivityLogSubscriber for domain event normalization.
+    // The subscriber's background task runs until the shutdown token is cancelled.
+    // We intentionally drop the handle here — the spawned task is self-contained
+    // and will stop when the token fires.
     let _activity_subscriber = activity_log::ActivityLogSubscriber::start(
         domain_event_bus,
         activity_svc,

@@ -5,6 +5,7 @@ import {
   ProductivityScoreRing,
   ScoreBar,
 } from "@features/productivity/components/ProductivityScoreRing";
+import { getAppColor } from "@features/productivity/lib/constants";
 import { resolveActivityColor, resolveCategoryLabel } from "@features/productivity/shared";
 import { useQuery } from "@shared/hooks/useQuery";
 import { formatHumanDuration, TZ_OFFSET_MINS, todayISO } from "@shared/lib/dates";
@@ -291,6 +292,7 @@ function TopAppsChart({
     <div className="flex flex-col gap-1.5">
       {apps.slice(0, 5).map((app) => {
         const pct = maxSecs > 0 ? (app.durationSecs / maxSecs) * 100 : 0;
+        const color = getAppColor(app.appName, app.category ?? null);
         return (
           <div key={app.appName} className="flex items-center gap-2">
             <span className="text-[11px] text-muted-foreground truncate w-20 shrink-0">
@@ -301,7 +303,7 @@ function TopAppsChart({
                 className="h-full rounded-full"
                 style={{
                   width: `${Math.max(pct, 4)}%`,
-                  backgroundColor: "var(--success)",
+                  backgroundColor: color,
                   opacity: 0.6 + (pct / 100) * 0.4,
                 }}
               />

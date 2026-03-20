@@ -152,7 +152,7 @@ fn default_auto_detect_max_switches() -> u64 {
     2
 }
 fn default_cooldown_grace_secs() -> u64 {
-    120
+    30
 }
 
 impl Default for ProductivityConfig {

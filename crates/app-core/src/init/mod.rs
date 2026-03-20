@@ -184,6 +184,7 @@ impl AppCore {
 
         let shutdown_token = CancellationToken::new();
 
+
         // ── Phase 5: Productivity ────────────────────────────────────────
         let productivity::ProductivityResult {
             dashboard_poll_interval_secs,
@@ -207,6 +208,7 @@ impl AppCore {
         )
         .await;
 
+
         // ── Phase 6: Coaching ────────────────────────────────────────────
         let coaching::CoachingResult {
             intervention_rx,
@@ -228,12 +230,15 @@ impl AppCore {
         )
         .await;
 
+
         // ── Phase 7: Cognitive (capture, file watcher, work context) ─────
         cognitive::init_cognitive(&mut config, &storage_pool, &activity_svc, &shutdown_token).await;
+
 
         // ── Phase 8: Launcher ─────────────────────────────────────────────
         let launcher::LauncherResult { launcher_engine } =
             launcher::init_launcher(&config, &storage_pool, &shutdown_token).await;
+
 
         // ── Assemble AppCore ─────────────────────────────────────────────
         let core = AppCore {
@@ -363,6 +368,7 @@ impl AppCore {
             });
         }
 
+
         // ── Post-core background services ────────────────────────────────
         cognitive::spawn_post_core_services(
             &core,
@@ -371,8 +377,10 @@ impl AppCore {
             &shutdown_token,
         );
 
+
         // Spawn background services (agent loop + channel manager).
         spawn_background(inbound_rx, channel_manager, &agent, &shutdown_token);
+
 
         // Spawn periodic situation recomputation (every 2 min).
         coaching::spawn_situation_recompute(

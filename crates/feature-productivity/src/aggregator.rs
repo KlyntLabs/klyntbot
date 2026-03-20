@@ -141,10 +141,10 @@ impl DailyAggregator {
         // Top apps
         let top_apps: Vec<AppUsage> = top_app_rows
             .into_iter()
-            .map(|(app_name, duration_secs)| AppUsage {
+            .map(|(app_name, duration_secs, category)| AppUsage {
                 app_name,
                 duration_secs,
-                category: None,
+                category,
             })
             .collect();
 
@@ -176,14 +176,18 @@ impl DailyAggregator {
             .sum::<i64>()
             * 60;
         let interruptions_count: i64 = sessions.iter().map(|s| s.interruptions).sum();
-        let avg_session_quality = if sessions.is_empty() {
-            None
-        } else {
+        let avg_session_quality = {
+            // Try focus session quality scores first
             let scores: Vec<f64> = sessions.iter().filter_map(|s| s.quality_score).collect();
-            if scores.is_empty() {
-                None
-            } else {
+            if !scores.is_empty() {
                 Some(scores.iter().sum::<f64>() / scores.len() as f64)
+            } else if total_active_secs > 0 {
+                // Derive quality from session metrics: productive ratio + low distraction
+                let productive_ratio = productive_secs as f64 / total_active_secs as f64;
+                let distraction_ratio = distracting_secs as f64 / total_active_secs as f64;
+                Some((productive_ratio * 0.7 + (1.0 - distraction_ratio) * 0.3).clamp(0.0, 1.0))
+            } else {
+                None
             }
         };
 
@@ -222,7 +226,16 @@ impl DailyAggregator {
         // falling back to the legacy formula when no scored sessions exist.
         let score = if let Some(ref scorer) = self.quality_scorer {
             match scorer.score_day(date).await {
-                Ok(Some(daily_score)) => daily_score.overall_score,
+                Ok(Some(daily_score)) => {
+                    // Also use intelligence quality for the "Quality" metric
+                    // when focus sessions don't have their own quality scores.
+                    // Normalize from 0-100 to 0-1 for the ScoreBar.
+                    if summary.avg_session_quality.is_none() {
+                        summary.avg_session_quality =
+                            Some(daily_score.overall_score / 100.0);
+                    }
+                    daily_score.overall_score
+                }
                 _ => compute_productivity_score(&summary),
             }
         } else {
