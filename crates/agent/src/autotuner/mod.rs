@@ -239,24 +239,6 @@ impl AutoTunerOrchestrator {
             let domain_event_bus = domain_event_bus.clone();
             tokio::task::block_in_place(|| {
                 rt.block_on(async move {
-                    // Record autotuner start date (first run only) for Phase 2 readiness.
-                    if orch
-                        .learning_state
-                        .get_value("autotuner_started_at")
-                        .await
-                        .ok()
-                        .flatten()
-                        .is_none()
-                    {
-                        let _ = orch
-                            .learning_state
-                            .set(
-                                "autotuner_started_at",
-                                &serde_json::Value::String(Utc::now().to_rfc3339()),
-                            )
-                            .await;
-                    }
-
                     // Check if paused.
                     if let Ok(Some(val)) = orch.learning_state.get_value(PAUSED_KEY).await {
                         if val.as_bool().unwrap_or(false) {

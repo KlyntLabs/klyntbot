@@ -15,6 +15,8 @@ use crate::situation::UserSituation;
 
 /// RRF constant — same as used in retrieval.rs BM25 merge.
 const RRF_K: f64 = 60.0;
+/// Minimum relevance score for a fact to be included in results.
+const MIN_FACT_SCORE: f64 = 0.3;
 
 /// Unified memory service that merges conversation recall and cognitive facts.
 ///
@@ -104,7 +106,7 @@ impl UnifiedMemoryService {
         {
             Ok(facts) => facts
                 .into_iter()
-                .filter(|f| f.score > 0.3)
+                .filter(|f| f.score > MIN_FACT_SCORE)
                 .map(|f| {
                     let content = format!(
                         "{}: {} = {}",
@@ -160,7 +162,7 @@ impl UnifiedMemoryService {
         {
             Ok(facts) => facts
                 .into_iter()
-                .filter(|f| f.score > 0.3)
+                .filter(|f| f.score > MIN_FACT_SCORE)
                 .map(|f| MemoryEntry {
                     id: f.fact.id,
                     content: format!(
@@ -218,7 +220,7 @@ impl UnifiedMemoryService {
         {
             Ok(facts) => Ok(facts
                 .into_iter()
-                .filter(|f| f.score > 0.3)
+                .filter(|f| f.score > MIN_FACT_SCORE)
                 .map(|f| MemoryEntry {
                     id: f.fact.id,
                     content: format!(

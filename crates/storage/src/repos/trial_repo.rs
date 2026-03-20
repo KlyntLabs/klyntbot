@@ -67,8 +67,8 @@ CREATE TABLE IF NOT EXISTS autotuner_shadow_retrieval_log (
     variant_avg_age_days REAL NOT NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
-CREATE INDEX IF NOT EXISTS idx_shadow_retrieval_log_trial
-    ON autotuner_shadow_retrieval_log(trial_id);
+CREATE INDEX IF NOT EXISTS idx_shadow_retrieval_log_trial_created
+    ON autotuner_shadow_retrieval_log(trial_id, created_at);
 "#;
 
 /// Repository for autotuner experiment + trial persistence.

@@ -113,25 +113,27 @@ impl AutoTunerHook for AutoTunerHookImpl {
             session_key: format!("shadow:{chat_id}"),
         };
 
-        // Collect shadow predictions, then batch-insert via concurrent futures.
+        // Parse trial params once — reused for classification and retrieval.
         use autotuner::ShadowClassifier;
+        let parsed_trials: Vec<(&TrialRow, TrialParams)> = active_trials
+            .iter()
+            .filter_map(|trial| {
+                serde_json::from_str(&trial.params)
+                    .map(|p| (trial, p))
+                    .map_err(|e| {
+                        warn!("autotuner hook: failed to parse trial {} params: {e}", trial.id);
+                        e
+                    })
+                    .ok()
+            })
+            .collect();
+
+        // Shadow classification
         let mut insert_futs = Vec::new();
-
-        for trial in &active_trials {
-            let params: TrialParams = match serde_json::from_str(&trial.params) {
-                Ok(p) => p,
-                Err(e) => {
-                    warn!(
-                        "autotuner hook: failed to parse trial {} params: {e}",
-                        trial.id
-                    );
-                    continue;
-                }
-            };
-
+        for (trial, params) in &parsed_trials {
             let prediction = match self
                 .shadow_classifier
-                .classify_shadow(message, &context, &params)
+                .classify_shadow(message, &context, params)
                 .await
             {
                 Ok(p) => p,
@@ -179,7 +181,7 @@ impl AutoTunerHook for AutoTunerHookImpl {
         // Execute all inserts concurrently instead of sequentially.
         futures_util::future::join_all(insert_futs).await;
 
-        // Shadow retrieval (Phase 2)
+        // Shadow retrieval (Phase 2) — control retrieval hoisted outside loop
         if let Some(ref retriever) = self.shadow_retriever {
             if self.orchestrator.is_phase2_ready() {
                 let champion_params = self
@@ -187,35 +189,39 @@ impl AutoTunerHook for AutoTunerHookImpl {
                     .try_current_champion_params()
                     .unwrap_or_default();
 
-                for trial in &active_trials {
-                    let params: TrialParams = match serde_json::from_str(&trial.params) {
-                        Ok(p) => p,
-                        Err(_) => continue,
-                    };
+                // Retrieve control result once for all trials
+                let control_result = match retriever
+                    .retrieve_shadow(message, &context, &champion_params)
+                    .await
+                {
+                    Ok(r) => r,
+                    Err(e) => {
+                        debug!("shadow retrieval (control) failed: {e}");
+                        return;
+                    }
+                };
+                let control_id_set: HashSet<&str> =
+                    control_result.memory_ids.iter().map(|s| s.as_str()).collect();
+
+                for (trial, params) in &parsed_trials {
                     if !params.has_memory_params() {
                         continue;
                     }
 
                     let variant_result =
-                        match retriever.retrieve_shadow(message, &context, &params).await {
+                        match retriever.retrieve_shadow(message, &context, params).await {
                             Ok(r) => r,
                             Err(e) => {
                                 debug!("shadow retrieval failed for trial {}: {e}", trial.id);
                                 continue;
                             }
                         };
-                    let control_result = match retriever
-                        .retrieve_shadow(message, &context, &champion_params)
-                        .await
-                    {
-                        Ok(r) => r,
-                        Err(e) => {
-                            debug!("shadow retrieval (control) failed: {e}");
-                            continue;
-                        }
-                    };
 
-                    let overlap = count_id_overlap(&variant_result.memory_ids, &control_result.memory_ids);
+                    let overlap = variant_result
+                        .memory_ids
+                        .iter()
+                        .filter(|id| control_id_set.contains(id.as_str()))
+                        .count();
                     if let Err(e) = self
                         .trial_repo
                         .insert_shadow_retrieval_log(
@@ -262,12 +268,6 @@ impl AutoTunerHook for AutoTunerHookImpl {
         // nightly promotion), return None and let the caller use Config defaults.
         self.orchestrator.try_current_champion_params()
     }
-}
-
-/// Count the number of IDs that appear in both lists.
-fn count_id_overlap(a: &[String], b: &[String]) -> usize {
-    let set: HashSet<&str> = b.iter().map(|s| s.as_str()).collect();
-    a.iter().filter(|id| set.contains(id.as_str())).count()
 }
 
 #[cfg(test)]

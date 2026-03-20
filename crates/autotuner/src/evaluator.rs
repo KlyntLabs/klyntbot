@@ -177,7 +177,7 @@ impl ConstraintEvaluator {
                     threshold: self.max_retrieval_precision_drop,
                     actual: precision_drop,
                     description: format!(
-                        "Precision dropped {:.1}% (max {:.1}%)",
+                        "retrieval_precision dropped by {:.1}% but max allowed is {:.1}%",
                         precision_drop * 100.0,
                         self.max_retrieval_precision_drop * 100.0,
                     ),
@@ -194,7 +194,7 @@ impl ConstraintEvaluator {
                     threshold: self.max_correction_rate_increase,
                     actual: increase,
                     description: format!(
-                        "Correction rate increased {:.1}% (max {:.1}%)",
+                        "correction_rate regressed by {:.1}% but max allowed is {:.1}%",
                         increase * 100.0,
                         self.max_correction_rate_increase * 100.0,
                     ),
