@@ -186,7 +186,7 @@ pub fn parameter_distance(a: &TrialParams, b: &TrialParams) -> f64 {
 /// Flatten all `Option<f64>` fields of `TrialParams` to a fixed-size array,
 /// treating `None` as `0.0`.  The ordering must be stable so that distances are
 /// comparable.
-fn trial_params_as_array(p: &TrialParams) -> [f64; 8] {
+fn trial_params_as_array(p: &TrialParams) -> [f64; 16] {
     [
         p.skill_keyword_weight.unwrap_or(0.0),
         p.skill_semantic_weight.unwrap_or(0.0),
@@ -196,6 +196,14 @@ fn trial_params_as_array(p: &TrialParams) -> [f64; 8] {
         p.relevance_weight_semantic.unwrap_or(0.0),
         p.relevance_weight_retrievability.unwrap_or(0.0),
         p.relevance_weight_situation.unwrap_or(0.0),
+        p.fsrs_desired_retention.unwrap_or(0.0),
+        p.accumulate_promote_threshold.map(|v| v as f64).unwrap_or(0.0),
+        p.accumulate_min_days.map(|v| v as f64).unwrap_or(0.0),
+        p.vector_top_k.map(|v| v as f64).unwrap_or(0.0),
+        p.min_similarity.unwrap_or(0.0),
+        p.relevance_weight_importance.unwrap_or(0.0),
+        p.relevance_weight_frequency.unwrap_or(0.0),
+        p.relevance_weight_temporal.unwrap_or(0.0),
     ]
 }
 

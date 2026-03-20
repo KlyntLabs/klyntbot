@@ -240,6 +240,14 @@ pub fn affected_param_names(old: &TrialParams, new: &TrialParams) -> Vec<String>
     check_field!(relevance_weight_semantic);
     check_field!(relevance_weight_retrievability);
     check_field!(relevance_weight_situation);
+    check_field!(fsrs_desired_retention);
+    check_field!(accumulate_promote_threshold);
+    check_field!(accumulate_min_days);
+    check_field!(vector_top_k);
+    check_field!(min_similarity);
+    check_field!(relevance_weight_importance);
+    check_field!(relevance_weight_frequency);
+    check_field!(relevance_weight_temporal);
     names
 }
 

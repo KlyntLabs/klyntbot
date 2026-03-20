@@ -171,7 +171,15 @@ below; unsafe suggestions are silently discarded by the evaluator.\n\n",
 | llm_classifier_timeout_ms      | 500   | 5000  | 250   | Integer |\n\
 | relevance_weight_semantic      | 0.10  | 0.60  | 0.05  | |\n\
 | relevance_weight_retrievability| 0.05  | 0.40  | 0.05  | |\n\
-| relevance_weight_situation     | 0.05  | 0.40  | 0.05  | |\n\n",
+| relevance_weight_situation     | 0.05  | 0.40  | 0.05  | |\n\
+| fsrs_desired_retention         | 0.70  | 0.99  | 0.01  | FSRS target retention for spaced repetition |\n\
+| accumulate_promote_threshold   | 2     | 15    | 1     | Min observations before promoting to fact |\n\
+| accumulate_min_days            | 1     | 10    | 1     | Min days of observation before promotion |\n\
+| vector_top_k                   | 10    | 100   | 5     | Number of candidate vectors to retrieve |\n\
+| min_similarity                 | 0.30  | 0.80  | 0.05  | Cosine similarity threshold for retrieval |\n\
+| relevance_weight_importance    | 0.05  | 0.40  | 0.05  | Weight for fact importance in ranking |\n\
+| relevance_weight_frequency     | 0.02  | 0.30  | 0.02  | Weight for access frequency in ranking |\n\
+| relevance_weight_temporal      | 0.01  | 0.20  | 0.01  | Weight for temporal recency in ranking |\n\n",
     );
 
     // ---- 9. Promotion constraints ------------------------------------------
@@ -265,6 +273,7 @@ mod tests {
             relevance_weight_semantic: Some(0.30),
             relevance_weight_retrievability: Some(0.20),
             relevance_weight_situation: Some(0.25),
+            ..Default::default()
         }
     }
 

@@ -583,6 +583,7 @@ pub async fn run_bootstrap_replay(orch: &AutoTunerOrchestrator) -> common::Resul
             relevance_weight_semantic: Some(rng.random_range(0.10..=0.50)),
             relevance_weight_retrievability: Some(rng.random_range(0.05..=0.40)),
             relevance_weight_situation: Some(rng.random_range(0.10..=0.40)),
+            ..Default::default()
         })
         .collect();
 
