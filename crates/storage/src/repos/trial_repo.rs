@@ -50,6 +50,9 @@ CREATE TABLE IF NOT EXISTS autotuner_shadow_log (
 
 CREATE INDEX IF NOT EXISTS idx_autotuner_shadow_log_trial_id
     ON autotuner_shadow_log(trial_id);
+
+CREATE INDEX IF NOT EXISTS idx_autotuner_shadow_log_chat_id
+    ON autotuner_shadow_log(chat_id);
 "#;
 
 /// Repository for autotuner experiment + trial persistence.

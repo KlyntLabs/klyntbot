@@ -93,8 +93,6 @@ pub struct AgentRuntime {
     current_event_tx: RwLock<Option<tokio::sync::mpsc::Sender<AgentEvent>>>,
     /// Bundled dependencies for squad chat mode — always set together.
     squad_deps: Option<SquadDeps>,
-    /// AutoTuner orchestrator — provides champion params for live classification.
-    autotuner: Option<Arc<crate::autotuner::AutoTunerOrchestrator>>,
     /// AutoTuner hook — runs shadow classification and records ground truth.
     autotuner_hook: Option<Arc<dyn AutoTunerHook>>,
 }
@@ -129,7 +127,6 @@ impl AgentRuntime {
             delegation_self_ref: std::sync::OnceLock::new(),
             current_event_tx: RwLock::new(None),
             squad_deps: None,
-            autotuner: None,
             autotuner_hook: None,
         }
     }
@@ -183,15 +180,6 @@ impl AgentRuntime {
             chat_params,
             blackboard_repo,
         });
-        self
-    }
-
-    /// Set the autotuner orchestrator for champion param application.
-    pub fn with_autotuner(
-        mut self,
-        orchestrator: Arc<crate::autotuner::AutoTunerOrchestrator>,
-    ) -> Self {
-        self.autotuner = Some(orchestrator);
         self
     }
 
@@ -252,15 +240,6 @@ impl AgentRuntime {
             hook.on_message_received(message, ctx.chat_id.as_str())
                 .await;
         }
-
-        // Step 0b: Read champion params from autotuner (if active).
-        // Currently used for transparency logging; IntentAnalyzer reads directly
-        // from its own autotuner reference for per-message threshold overrides.
-        let _champion_params = if let Some(ref orchestrator) = self.autotuner {
-            orchestrator.current_champion_params().await
-        } else {
-            None
-        };
 
         // Step 1: Match message to orchestrator skill via SkillRouter
         let mut profile = {

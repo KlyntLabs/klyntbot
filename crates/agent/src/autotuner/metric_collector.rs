@@ -20,12 +20,12 @@ impl AgentMetricCollector {
 impl MetricSource for AgentMetricCollector {
     async fn collect_metrics(
         &self,
-        _since: DateTime<Utc>,
+        since: DateTime<Utc>,
         _trial_id: Option<Uuid>,
     ) -> common::Result<MetricSnapshot> {
         let stats = self
             .strategy_repo
-            .get_overall_stats()
+            .get_stats_since(since)
             .await
             .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
 

@@ -25,15 +25,15 @@ use tracing::{error, info, warn};
 pub const JOB_AUTOTUNER_NIGHTLY: &str = "__klyntbot_autotuner_nightly";
 
 /// Key used to persist the current champion in the learning_state table.
-const CHAMPION_KEY: &str = "autotuner_champion";
+pub const CHAMPION_KEY: &str = "autotuner_champion";
 /// Key used to persist the previous champion (for rollback).
-const PREVIOUS_CHAMPION_KEY: &str = "autotuner_previous_champion";
+pub const PREVIOUS_CHAMPION_KEY: &str = "autotuner_previous_champion";
 /// Key used to persist the paused flag.
-const PAUSED_KEY: &str = "autotuner_paused";
+pub const PAUSED_KEY: &str = "autotuner_paused";
 /// Key used to persist the experiment pace preference.
-const EXPERIMENT_PACE_KEY: &str = "autotuner_experiment_pace";
+pub const EXPERIMENT_PACE_KEY: &str = "autotuner_experiment_pace";
 /// Key used to persist the previous cycle recommendation.
-const RECOMMENDATION_KEY: &str = "autotuner_recommendation";
+pub const RECOMMENDATION_KEY: &str = "autotuner_recommendation";
 
 /// Thin glue that holds the current champion state and exposes it to the
 /// agent runtime.  The nightly cycle updates the champion via
@@ -121,8 +121,11 @@ impl AutoTunerOrchestrator {
     /// Replace the champion after a successful promotion, persisting both
     /// the old (for rollback) and new champion to the learning_state table.
     pub async fn update_champion(&self, new_champion: Champion) {
+        // Acquire write lock once to avoid double-lock.
+        let mut guard = self.champion.write().await;
+        let old_champion = guard.clone();
+
         // Save the old champion as previous (for rollback).
-        let old_champion = self.champion.read().await.clone();
         if let Ok(old_json) = serde_json::to_value(&old_champion) {
             if let Err(e) = self
                 .learning_state
@@ -138,7 +141,7 @@ impl AutoTunerOrchestrator {
                 error!("failed to persist new champion: {e}");
             }
         }
-        *self.champion.write().await = new_champion;
+        *guard = new_champion;
     }
 
     /// Build a summary for the transparency panel / events.
@@ -236,7 +239,7 @@ impl AutoTunerOrchestrator {
                             impact_summary: format!(
                                 "Evaluated {} trials, {} passed constraints",
                                 result.completed_count,
-                                result.completed_count - result.failed_constraints.len(),
+                                result.completed_count.saturating_sub(result.failed_constraints.len()),
                             ),
                             consecutive_regression_days: 0,
                         };
@@ -286,10 +289,13 @@ impl AutoTunerOrchestrator {
                                         restored.consecutive_regression_days = 0;
                                         // Persist the reverted champion.
                                         if let Ok(json) = serde_json::to_value(&restored) {
-                                            let _ = orch
+                                            if let Err(e) = orch
                                                 .learning_state
                                                 .set(CHAMPION_KEY, &json)
-                                                .await;
+                                                .await
+                                            {
+                                                error!(error = %e, "Failed to persist reverted champion");
+                                            }
                                         }
                                         *champ = restored;
                                     }
@@ -454,7 +460,9 @@ async fn run_llm_generation(orch: &AutoTunerOrchestrator) -> common::Result<()> 
 
     // Persist the recommendation for the next cycle.
     if let Ok(rec_json) = serde_json::to_value(&generation.recommendation_for_next_cycle) {
-        let _ = orch.learning_state.set(RECOMMENDATION_KEY, &rec_json).await;
+        if let Err(e) = orch.learning_state.set(RECOMMENDATION_KEY, &rec_json).await {
+            warn!(error = %e, "failed to persist recommendation for next cycle");
+        }
     }
 
     // Create experiment record.

@@ -171,8 +171,8 @@ impl ConstraintEvaluator {
 /// champion explore more of the parameter space, so they are preferred when
 /// multiple trials pass all promotion constraints.
 pub fn parameter_distance(a: &TrialParams, b: &TrialParams) -> f64 {
-    let fields_a = trial_params_as_vec(a);
-    let fields_b = trial_params_as_vec(b);
+    let fields_a = trial_params_as_array(a);
+    let fields_b = trial_params_as_array(b);
 
     let sum_sq: f64 = fields_a
         .iter()
@@ -183,10 +183,11 @@ pub fn parameter_distance(a: &TrialParams, b: &TrialParams) -> f64 {
     sum_sq.sqrt()
 }
 
-/// Flatten all `Option<f64>` fields of `TrialParams` to a `Vec<f64>`, treating
-/// `None` as `0.0`.  The ordering must be stable so that distances are comparable.
-fn trial_params_as_vec(p: &TrialParams) -> Vec<f64> {
-    vec![
+/// Flatten all `Option<f64>` fields of `TrialParams` to a fixed-size array,
+/// treating `None` as `0.0`.  The ordering must be stable so that distances are
+/// comparable.
+fn trial_params_as_array(p: &TrialParams) -> [f64; 8] {
+    [
         p.skill_keyword_weight.unwrap_or(0.0),
         p.skill_semantic_weight.unwrap_or(0.0),
         p.skill_activation_threshold.unwrap_or(0.0),

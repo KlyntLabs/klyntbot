@@ -1,5 +1,6 @@
 //! AutoTuner transparency handlers — status, history, revert, pause/resume.
 
+use agent::autotuner::{PAUSED_KEY, PREVIOUS_CHAMPION_KEY};
 use desktop_shared::errors::ApiError;
 use serde::{Deserialize, Serialize};
 use tracing::info;
@@ -21,11 +22,7 @@ impl AppCore {
             let champion = orch.champion_summary().await;
 
             // Read the paused flag from the learning state repo.
-            let paused = match orch
-                .learning_state_repo()
-                .get_value("autotuner_paused")
-                .await
-            {
+            let paused = match orch.learning_state_repo().get_value(PAUSED_KEY).await {
                 Ok(Some(val)) => val.as_bool().unwrap_or(false),
                 _ => false,
             };
@@ -80,7 +77,7 @@ impl AppCore {
 
             // Load previous champion from LearningStateRepo.
             let prev_json = learning_state
-                .get_value("autotuner_previous_champion")
+                .get_value(PREVIOUS_CHAMPION_KEY)
                 .await
                 .map_err(|e| {
                     ApiError::new("INTERNAL", format!("failed to load previous champion: {e}"))
@@ -123,7 +120,7 @@ impl AppCore {
     pub async fn autotuner_pause(&self) -> Result<(), ApiError> {
         if let Some(orch) = self.autotuner_orchestrator() {
             orch.learning_state_repo()
-                .set("autotuner_paused", &serde_json::Value::Bool(true))
+                .set(PAUSED_KEY, &serde_json::Value::Bool(true))
                 .await
                 .map_err(|e| {
                     ApiError::new("INTERNAL", format!("failed to set paused state: {e}"))
@@ -141,7 +138,7 @@ impl AppCore {
     pub async fn autotuner_resume(&self) -> Result<(), ApiError> {
         if let Some(orch) = self.autotuner_orchestrator() {
             orch.learning_state_repo()
-                .delete("autotuner_paused")
+                .delete(PAUSED_KEY)
                 .await
                 .map_err(|e| {
                     ApiError::new("INTERNAL", format!("failed to clear paused state: {e}"))

@@ -5,10 +5,12 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use autotuner::ShadowContext;
+use chrono::{DateTime, Utc};
 use common::TrialParams;
 use config::OrchestratorConfig;
 use providers::DynProvider;
-use storage::TrialRepo;
+use storage::{TrialRepo, TrialRow};
+use tokio::sync::RwLock;
 use tracing::{debug, warn};
 
 use super::AutoTunerOrchestrator;
@@ -35,12 +37,17 @@ pub trait AutoTunerHook: Send + Sync {
     fn current_champion_params(&self) -> Option<TrialParams>;
 }
 
+/// How long to cache active trials before re-querying the DB (seconds).
+const ACTIVE_TRIALS_CACHE_TTL_SECS: i64 = 60;
+
 /// Concrete implementation of [`AutoTunerHook`] that runs shadow classification
 /// for active trials and logs predictions to the shadow_log table.
 pub struct AutoTunerHookImpl {
     orchestrator: Arc<AutoTunerOrchestrator>,
     trial_repo: TrialRepo,
     shadow_classifier: super::shadow_classifier::AgentShadowClassifier,
+    /// Cached active trials with timestamp to avoid querying DB per message.
+    active_trials_cache: RwLock<(DateTime<Utc>, Vec<TrialRow>)>,
 }
 
 impl AutoTunerHookImpl {
@@ -57,6 +64,7 @@ impl AutoTunerHookImpl {
             shadow_classifier: super::shadow_classifier::AgentShadowClassifier::new(
                 provider, model, config,
             ),
+            active_trials_cache: RwLock::new((DateTime::<Utc>::MIN_UTC, Vec::new())),
         }
     }
 }
@@ -68,12 +76,21 @@ impl AutoTunerHook for AutoTunerHookImpl {
             return;
         }
 
-        // Get active trials from the database
-        let active_trials = match self.trial_repo.get_active_trials().await {
-            Ok(trials) => trials,
-            Err(e) => {
-                warn!("autotuner hook: failed to get active trials: {e}");
-                return;
+        // Read cached active trials; refresh from DB if stale.
+        let active_trials = {
+            let (last_fetched, cached) = self.active_trials_cache.read().await.clone();
+            if Utc::now() - last_fetched > chrono::Duration::seconds(ACTIVE_TRIALS_CACHE_TTL_SECS) {
+                let fresh = match self.trial_repo.get_active_trials().await {
+                    Ok(trials) => trials,
+                    Err(e) => {
+                        warn!("autotuner hook: failed to get active trials: {e}");
+                        return;
+                    }
+                };
+                *self.active_trials_cache.write().await = (Utc::now(), fresh.clone());
+                fresh
+            } else {
+                cached
             }
         };
 
@@ -87,7 +104,10 @@ impl AutoTunerHook for AutoTunerHookImpl {
             session_key: format!("shadow:{chat_id}"),
         };
 
-        // Run shadow classification for each active trial
+        // Collect shadow predictions, then batch-insert via concurrent futures.
+        use autotuner::ShadowClassifier;
+        let mut insert_futs = Vec::new();
+
         for trial in &active_trials {
             let params: TrialParams = match serde_json::from_str(&trial.params) {
                 Ok(p) => p,
@@ -100,7 +120,6 @@ impl AutoTunerHook for AutoTunerHookImpl {
                 }
             };
 
-            use autotuner::ShadowClassifier;
             let prediction = match self
                 .shadow_classifier
                 .classify_shadow(message, &context, &params)
@@ -116,34 +135,40 @@ impl AutoTunerHook for AutoTunerHookImpl {
                 }
             };
 
-            // Log prediction to shadow_log (control values are "unknown" — filled
-            // in on_message_completed or by the nightly evaluation cycle).
-            if let Err(e) = self
-                .trial_repo
-                .insert_shadow_log(
-                    &trial.id,
-                    &timestamp,
-                    chat_id,
-                    &prediction.predicted_orchestrator,
-                    &prediction.predicted_mode,
-                    prediction.confidence as f64,
-                    prediction.predicted_iteration_budget as i64,
-                    "pending", // control orchestrator — updated after live classification
-                    "pending", // control mode — updated after live classification
-                )
-                .await
-            {
-                warn!(
-                    "autotuner hook: failed to insert shadow log for trial {}: {e}",
-                    trial.id
-                );
-            } else {
-                debug!(
-                    "autotuner hook: shadow logged trial {} → mode={}, confidence={:.2}",
-                    trial.id, prediction.predicted_mode, prediction.confidence
-                );
-            }
+            let trial_id = trial.id.clone();
+            let ts = timestamp.clone();
+            let cid = chat_id.to_string();
+            let repo = self.trial_repo.clone();
+
+            insert_futs.push(async move {
+                if let Err(e) = repo
+                    .insert_shadow_log(
+                        &trial_id,
+                        &ts,
+                        &cid,
+                        &prediction.predicted_orchestrator,
+                        &prediction.predicted_mode,
+                        prediction.confidence as f64,
+                        prediction.predicted_iteration_budget as i64,
+                        "pending",
+                        "pending",
+                    )
+                    .await
+                {
+                    warn!(
+                        "autotuner hook: failed to insert shadow log for trial {trial_id}: {e}"
+                    );
+                } else {
+                    debug!(
+                        "autotuner hook: shadow logged trial {trial_id} → mode={}, confidence={:.2}",
+                        prediction.predicted_mode, prediction.confidence
+                    );
+                }
+            });
         }
+
+        // Execute all inserts concurrently instead of sequentially.
+        futures_util::future::join_all(insert_futs).await;
     }
 
     async fn on_message_completed(

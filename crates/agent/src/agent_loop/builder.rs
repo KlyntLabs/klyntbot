@@ -1374,10 +1374,8 @@ impl AgentLoopBuilder {
         // Inject tool registry for delegation support
         runtime = runtime.with_tool_registry(Arc::clone(&tool_registry));
 
-        // Inject autotuner orchestrator and shadow hook
+        // Inject autotuner shadow hook
         if let Some(ref orchestrator) = self.autotuner {
-            runtime = runtime.with_autotuner(Arc::clone(orchestrator));
-
             // Build the concrete AutoTunerHook for shadow classification
             if let Some(ref pool) = self.pool {
                 let trial_repo = storage::TrialRepo::new(pool.clone());
