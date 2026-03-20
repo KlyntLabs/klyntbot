@@ -72,6 +72,7 @@ pub struct TrialResult {
     pub user_satisfaction: Option<f64>,
     // Phase 2
     pub retrieval_precision: f64,
+    pub retrieval_recall: f64,
     pub memory_freshness: f64,
 }
 

@@ -43,6 +43,7 @@ impl MetricSource for AgentMetricCollector {
         let (
             stats,
             correction_count,
+            memory_miss_count,
             token_info,
             routing_stability,
             memory_relevance_opt,
@@ -52,6 +53,8 @@ impl MetricSource for AgentMetricCollector {
             self.strategy_repo.get_stats_since(since),
             self.event_log_repo
                 .count_by_event_type("UserCorrectedAI", since),
+            self.event_log_repo
+                .count_by_event_type_and_data("UserCorrectedAI", "memory_miss", since),
             async {
                 let tokens = self.usage_repo.total_tokens_since(since).await.unwrap_or(0);
                 let (reqs, _) = self
@@ -97,6 +100,7 @@ impl MetricSource for AgentMetricCollector {
 
         let stats = stats.map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         let correction_count = correction_count.unwrap_or(0);
+        let memory_miss_count = memory_miss_count.unwrap_or(0);
         let (total_tokens, total_requests) = token_info;
         let routing_stability = routing_stability.unwrap_or(1.0);
 
@@ -112,6 +116,11 @@ impl MetricSource for AgentMetricCollector {
             (correction_count as f64 / total as f64).min(1.0)
         };
         let avg_tokens_per_message = total_tokens as f64 / total_requests.max(1) as f64;
+
+        // retrieval_recall: 1.0 - (memory_miss_corrections / total_messages)
+        // Higher is better — 1.0 means no memory misses.
+        let total = stats.total_records.max(1) as f64;
+        let retrieval_recall = (1.0 - memory_miss_count as f64 / total).max(0.0);
 
         // memory_relevance: fraction of messages where memories were retrieved.
         // Falls back to 1.0 when no records have the field populated yet
@@ -131,6 +140,7 @@ impl MetricSource for AgentMetricCollector {
             user_satisfaction: stats.avg_satisfaction,
             total_messages: stats.total_records as u32,
             retrieval_precision,
+            retrieval_recall,
             memory_freshness,
         })
     }

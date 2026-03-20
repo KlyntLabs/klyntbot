@@ -176,6 +176,24 @@ impl EventLogRepo {
         .await
     }
 
+    /// Count domain events where the JSON data contains a specific substring.
+    pub async fn count_by_event_type_and_data(
+        &self,
+        event_type: &str,
+        data_contains: &str,
+        since: DateTime<Utc>,
+    ) -> Result<i64, sqlx::Error> {
+        sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM domain_event_log
+             WHERE event_type = ?1 AND data LIKE ?2 AND timestamp >= ?3",
+        )
+        .bind(event_type)
+        .bind(format!("%{data_contains}%"))
+        .bind(since.to_rfc3339())
+        .fetch_one(&self.pool)
+        .await
+    }
+
     /// Delete events older than the given number of days.
     pub async fn prune_old_events(&self, older_than_days: i64) -> Result<u64, sqlx::Error> {
         let cutoff = format!("-{older_than_days} days");

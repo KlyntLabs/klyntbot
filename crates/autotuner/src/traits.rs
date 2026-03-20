@@ -71,6 +71,8 @@ pub struct MetricSnapshot {
     pub total_messages: u32,
     // Phase 2: fraction of messages where shadow retrieval overlapped with control
     pub retrieval_precision: f64,
+    // Phase 2: inverse of memory-miss rate (1.0 - memory_miss_corrections / total_messages)
+    pub retrieval_recall: f64,
     // Phase 2: average age (days) of retrieved memories
     pub memory_freshness: f64,
 }

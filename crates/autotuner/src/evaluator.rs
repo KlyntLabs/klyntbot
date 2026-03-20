@@ -185,6 +185,23 @@ impl ConstraintEvaluator {
             }
         }
 
+        // --- Phase 2: retrieval recall must not drop > threshold ---
+        if baseline.retrieval_recall > 0.0 {
+            let recall_drop = baseline.retrieval_recall - trial.retrieval_recall;
+            if recall_drop > self.max_retrieval_precision_drop {
+                failures.push(ConstraintFailure {
+                    metric: "retrieval_recall".into(),
+                    threshold: self.max_retrieval_precision_drop,
+                    actual: recall_drop,
+                    description: format!(
+                        "retrieval_recall dropped by {:.1}% but max allowed is {:.1}%",
+                        recall_drop * 100.0,
+                        self.max_retrieval_precision_drop * 100.0,
+                    ),
+                });
+            }
+        }
+
         // --- Phase 2: correction rate must not increase > threshold (protect Phase 1) ---
         if trial.correction_rate > baseline.correction_rate {
             let increase = trial.correction_rate - baseline.correction_rate;

@@ -48,6 +48,7 @@ pub fn aggregate_to_result(trial_id: Uuid, snapshots: &[MetricSnapshot]) -> Tria
             .iter()
             .map(|s| s.retrieval_precision * w(s))
             .sum(),
+        retrieval_recall: snapshots.iter().map(|s| s.retrieval_recall * w(s)).sum(),
         memory_freshness: snapshots.iter().map(|s| s.memory_freshness * w(s)).sum(),
         user_satisfaction: {
             let sats: Vec<(f64, f64)> = snapshots

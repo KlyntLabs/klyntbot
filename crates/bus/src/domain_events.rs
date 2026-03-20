@@ -294,6 +294,8 @@ pub enum FeedbackResponse {
 pub enum CorrectionKind {
     Reaction,
     KeywordPrefix,
+    /// User indicated the AI forgot something they previously mentioned.
+    MemoryMiss,
 }
 
 /// Broadcast bus for DomainEvents.
@@ -404,6 +406,10 @@ mod tests {
         let kind2 = CorrectionKind::KeywordPrefix;
         let json2 = serde_json::to_string(&kind2).unwrap();
         assert_eq!(json2, "\"keyword_prefix\"");
+
+        let kind3 = CorrectionKind::MemoryMiss;
+        let json3 = serde_json::to_string(&kind3).unwrap();
+        assert_eq!(json3, "\"memory_miss\"");
     }
 
     #[test]

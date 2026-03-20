@@ -446,8 +446,9 @@ impl AgentLoop {
             msg.channel, msg.sender_id, preview
         );
 
-        // Detect correction prefix BEFORE acquiring session lock
+        // Detect correction prefix and memory miss BEFORE acquiring session lock
         let correction_strength = detect_correction_prefix(&msg.content);
+        let is_memory_miss = detect_memory_miss(&msg.content);
 
         // Get or create session — returns per-session Arc<Mutex<Session>>
         let session_key = msg.session_key();
@@ -459,8 +460,8 @@ impl AgentLoop {
         // Mutate session and collect data under the per-session lock
         let (history, embed_msg_id, session_squad_id, last_assistant_content) = {
             let mut session = session_arc.lock().await;
-            // Only capture last assistant message if a correction prefix was detected
-            let last_assistant = if correction_strength.is_some() {
+            // Capture last assistant message if a correction or memory miss was detected
+            let last_assistant = if correction_strength.is_some() || is_memory_miss {
                 session
                     .messages
                     .iter()
@@ -504,15 +505,33 @@ impl AgentLoop {
                 };
 
                 if should_emit {
+                    // Use MemoryMiss kind if the message also indicates a memory miss
+                    let kind = if is_memory_miss {
+                        bus::CorrectionKind::MemoryMiss
+                    } else {
+                        bus::CorrectionKind::KeywordPrefix
+                    };
                     self.emit_correction_signal(
                         msg.chat_id.as_str(),
                         original.clone(),
                         msg.content.clone(),
-                        bus::CorrectionKind::KeywordPrefix,
+                        kind,
                         strength,
                     )
                     .await;
                 }
+            }
+        } else if is_memory_miss {
+            // Memory miss without a general correction prefix — emit standalone
+            if let Some(ref original) = last_assistant_content {
+                self.emit_correction_signal(
+                    msg.chat_id.as_str(),
+                    original.clone(),
+                    msg.content.clone(),
+                    bus::CorrectionKind::MemoryMiss,
+                    0.8,
+                )
+                .await;
             }
         }
 
@@ -829,8 +848,9 @@ impl AgentLoop {
         session_key: String,
         squad_mode: Option<String>,
     ) -> Result<StreamingHandle> {
-        // Detect correction prefix BEFORE setup_session adds the user message
+        // Detect correction prefix and memory miss BEFORE setup_session adds the user message
         let correction_strength = detect_correction_prefix(&content);
+        let is_memory_miss = detect_memory_miss(&content);
 
         // Read last assistant message (if correction detected) and tick the cooldown
         // counter before setup_session mutates the session. Mirrors the two-phase
@@ -840,7 +860,7 @@ impl AgentLoop {
             self.session_manager.get_or_create(&session_key, None).await
         {
             let mut session = session_arc.lock().await;
-            let last_asst = if correction_strength.is_some() {
+            let last_asst = if correction_strength.is_some() || is_memory_miss {
                 session
                     .messages
                     .iter()
@@ -870,11 +890,16 @@ impl AgentLoop {
                         let mut session = session_arc.lock().await;
                         session.correction_cooldown = 3;
                     }
+                    let kind = if is_memory_miss {
+                        bus::CorrectionKind::MemoryMiss
+                    } else {
+                        bus::CorrectionKind::KeywordPrefix
+                    };
                     self.emit_correction_signal(
                         &session_key,
                         original.clone(),
                         content.clone(),
-                        bus::CorrectionKind::KeywordPrefix,
+                        kind,
                         strength,
                     )
                     .await;
@@ -885,6 +910,19 @@ impl AgentLoop {
             } else {
                 false
             }
+        } else if is_memory_miss {
+            // Memory miss without a general correction prefix — emit standalone
+            if let Some(ref original) = last_assistant_content {
+                self.emit_correction_signal(
+                    &session_key,
+                    original.clone(),
+                    content.clone(),
+                    bus::CorrectionKind::MemoryMiss,
+                    0.8,
+                )
+                .await;
+            }
+            true
         } else {
             false
         };
@@ -1027,6 +1065,30 @@ fn detect_correction_prefix(message: &str) -> Option<f64> {
     None
 }
 
+/// Detects if a user message indicates the AI forgot a previously mentioned fact.
+/// Returns true when the user signals a memory retrieval miss.
+fn detect_memory_miss(message: &str) -> bool {
+    let lower = message.to_lowercase();
+    let check = &lower[..lower.len().min(120)];
+
+    const PHRASES: &[&str] = &[
+        "i already told you",
+        "i mentioned",
+        "as i said",
+        "i said before",
+        "remember when i",
+        "i told you",
+        "you should know",
+        "we talked about",
+        "we discussed",
+        "you forgot",
+        "don't you remember",
+        "i already said",
+    ];
+
+    PHRASES.iter().any(|phrase| check.contains(phrase))
+}
+
 #[cfg(test)]
 mod correction_tests {
     use super::detect_correction_prefix;
@@ -1071,6 +1133,26 @@ mod correction_tests {
 
         // After 3 messages: ready to fire again
         assert_eq!(session.correction_cooldown, 0);
+    }
+
+    #[test]
+    fn detects_memory_miss_phrases() {
+        use super::detect_memory_miss;
+        assert!(detect_memory_miss("I already told you about my meeting"));
+        assert!(detect_memory_miss("We discussed this yesterday"));
+        assert!(detect_memory_miss("You forgot that I prefer dark mode"));
+        assert!(detect_memory_miss("Don't you remember my schedule?"));
+        assert!(detect_memory_miss("I mentioned my deadline earlier"));
+        assert!(detect_memory_miss("As I said, the project is due Friday"));
+    }
+
+    #[test]
+    fn memory_miss_ignores_normal_messages() {
+        use super::detect_memory_miss;
+        assert!(!detect_memory_miss("What's the weather?"));
+        assert!(!detect_memory_miss("Help me plan my day"));
+        assert!(!detect_memory_miss("No, that's wrong")); // correction but not memory miss
+        assert!(!detect_memory_miss("Tell me about rust traits"));
     }
 
     #[test]
