@@ -638,6 +638,7 @@ impl AgentLoopBuilder {
             };
 
         // ── Wire memory retrieval + InsightForge ─────────────────────
+        let mut memory_service_for_shadow: Option<Arc<cognitive::UnifiedMemoryService>> = None;
         let context_engine = if let Some(fact_repo) = cognitive_fact_repo {
             let mut retriever = cognitive::UnifiedMemoryService::new(fact_repo)
                 .with_recall_opt(recall_service.clone())
@@ -648,7 +649,10 @@ impl AgentLoopBuilder {
             if let Some(ref sit) = self.user_situation {
                 retriever = retriever.with_situation(Arc::clone(sit));
             }
-            let retriever: Arc<dyn context_engine::MemoryRetriever> = Arc::new(retriever);
+            let memory_service = Arc::new(retriever);
+            memory_service_for_shadow = Some(Arc::clone(&memory_service));
+            let retriever: Arc<dyn context_engine::MemoryRetriever> = memory_service
+                as Arc<dyn context_engine::MemoryRetriever>;
 
             // Create InsightForge with the same retriever
             let forge_config = context_engine::InsightForgeConfig {
@@ -1379,14 +1383,36 @@ impl AgentLoopBuilder {
             // Build the concrete AutoTunerHook for shadow classification
             if let Some(ref pool) = self.pool {
                 let trial_repo = storage::TrialRepo::new(pool.clone());
-                let hook = Arc::new(crate::autotuner::hooks::AutoTunerHookImpl::new(
+                let mut hook = crate::autotuner::hooks::AutoTunerHookImpl::new(
                     Arc::clone(orchestrator),
                     trial_repo,
                     provider.clone(),
                     &config.agents.defaults.model,
                     &config.orchestrator,
-                ));
-                runtime = runtime.with_autotuner_hook(hook);
+                );
+
+                // Wire Phase 2 shadow retriever if memory service is available
+                if let Some(ref mem_svc) = memory_service_for_shadow {
+                    let config_defaults = [
+                        config.cognitive.relevance_weight_semantic,
+                        config.cognitive.relevance_weight_retrievability,
+                        config.cognitive.relevance_weight_importance,
+                        config.cognitive.relevance_weight_frequency,
+                        config.cognitive.relevance_weight_situation,
+                        config.cognitive.relevance_weight_temporal,
+                    ];
+                    let shadow_retriever = Arc::new(
+                        crate::autotuner::shadow_retriever::AgentShadowRetriever::new(
+                            Arc::clone(mem_svc),
+                            config_defaults,
+                        ),
+                    );
+                    hook = hook.with_shadow_retriever(
+                        shadow_retriever as Arc<dyn autotuner::ShadowRetriever>,
+                    );
+                }
+
+                runtime = runtime.with_autotuner_hook(Arc::new(hook));
             }
         }
 
