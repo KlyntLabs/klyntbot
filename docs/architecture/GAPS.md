@@ -7,7 +7,7 @@
 
 - **0 High** priority gaps -- OKR, Project CRUD, and Note UI gaps resolved
 - **5 Medium** priority gaps -- secondary features or partially integrated
-- **6 Low** priority gaps -- nice-to-have, internal-only, or debug-only
+- **5 Low** priority gaps -- nice-to-have, internal-only, or debug-only
 
 ---
 
@@ -64,7 +64,7 @@
 |------|----------|--------------|----------------|
 | `note_search_semantic` | `commands/notes.rs` | `note_search_hybrid` supersedes it | **Keep** -- useful for MCP clients; mark as secondary |
 | `workflow_get` | `commands/workflows.rs` | Frontend uses `workflow_list` + `workflow_get_effective` | **Keep** -- needed for future single-workflow edit |
-| `cron_status` | `commands/cron.rs` | Frontend fetches `cron_list` but not `cron_status` | **Wire** into automations page status badge |
+| `cron_status` | `commands/cron.rs` | ~~Frontend fetches `cron_list` but not `cron_status`~~ | **Done** -- wired into automations page header as status badge |
 | `finance_exchange_rates` | `commands/finance.rs` | Backend implements rates; no UI to display them | **Wire** into finance overview currency section |
 | `finance_report_income` | `commands/finance.rs` | Income report not displayed | **Wire** into cash flow page |
 | `finance_report_trends` | `commands/finance.rs` | Trends report not displayed | **Wire** into finance charts |
@@ -224,11 +224,8 @@ Config sections are exposed via `config_get_section` / `config_update_section`. 
 8. **Workspace File Browser** -- `workspace_*` commands have no frontend.
     - Effort: 1 day
 
-9. **Cron Status Badge** -- `cron_status` not called; could show system health in automations page.
-    - Effort: 0.5 days
-
-10. **Various Config Sections** -- Many config sections (confidence, conversation, content, skills, packs, scenario, orchestrator) have no settings UI. These are advanced tuning parameters that most users will never need.
+9. **Various Config Sections** -- Many config sections (confidence, conversation, content, skills, packs, scenario, orchestrator) have no settings UI. These are advanced tuning parameters that most users will never need.
     - Effort: Low priority; expose on demand
 
-11. **Flashcard Edit/Delete** -- `flashcard_update` and `flashcard_delete` not called from frontend.
+10. **Flashcard Edit/Delete** -- `flashcard_update` and `flashcard_delete` not called from frontend.
     - Effort: 0.5 days

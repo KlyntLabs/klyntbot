@@ -11,6 +11,7 @@ import type {
   CronJobUpdateParams,
   CronOrigin,
   CronSchedule,
+  CronStatusResponse,
 } from "@shared/types";
 import { Toggle } from "@shared/ui";
 import { Clock, Play, Plus, Search, Trash2, X } from "lucide-react";
@@ -596,6 +597,8 @@ export function AutomationsPage() {
     refetch,
   } = useQuery<CronJob[]>("cron_list", { includeDisabled: true }, []);
 
+  const { data: status } = useQuery<CronStatusResponse | null>("cron_status", {}, null);
+
   const { mutate: enableJob } = useMutation<CronJob, { id: string; enabled: boolean }>(
     "cron_enable",
   );
@@ -880,6 +883,23 @@ export function AutomationsPage() {
             />
           </div>
         </div>
+
+        {status && (
+          <div className="flex items-center gap-2 mr-3">
+            <span
+              className={cn(
+                "inline-block w-1.5 h-1.5 rounded-full",
+                status.enabled ? "bg-green-500" : "bg-red-500",
+              )}
+            />
+            <span className="text-[11px] text-muted-foreground">
+              {status.enabled ? "Running" : "Stopped"}
+              {status.enabled && status.nextWakeAtMs != null && (
+                <span className="text-dim"> · next {relativeTime(status.nextWakeAtMs)}</span>
+              )}
+            </span>
+          </div>
+        )}
 
         <button
           type="button"
