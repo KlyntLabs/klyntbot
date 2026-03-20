@@ -179,6 +179,64 @@ impl UnifiedMemoryService {
         }
     }
 
+    /// Retrieve memories using overridden retrieval parameters (for shadow scoring).
+    pub async fn retrieve_with_overrides(
+        &self,
+        query: &str,
+        vector_top_k: usize,
+        min_similarity: f64,
+        relevance_weights: [f64; 6],
+    ) -> common::Result<Vec<MemoryEntry>> {
+        if !self.config.dynamic_facts_enabled || query.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let situational_boost = self.current_situational_boost().await;
+        let params = RetrievalParams {
+            limit: vector_top_k, // use top_k as limit since we want all retrieved candidates
+            vector_top_k,
+            min_similarity,
+            situational_boost,
+            max_stability: self.config.max_stability,
+            relevance_weight_semantic: relevance_weights[0],
+            relevance_weight_retrievability: relevance_weights[1],
+            relevance_weight_importance: relevance_weights[2],
+            relevance_weight_frequency: relevance_weights[3],
+            relevance_weight_situation: relevance_weights[4],
+            relevance_weight_temporal: relevance_weights[5],
+            scope_chain: Vec::new(),
+        };
+
+        match retrieve_relevant_facts(
+            &self.fact_repo,
+            self.embedder.as_deref(),
+            query,
+            USER_MODEL_DOMAINS,
+            &params,
+        )
+        .await
+        {
+            Ok(facts) => Ok(facts
+                .into_iter()
+                .filter(|f| f.score > 0.3)
+                .map(|f| MemoryEntry {
+                    id: f.fact.id,
+                    content: format!(
+                        "{}: {} = {}",
+                        f.fact.subject, f.fact.predicate, f.fact.object
+                    ),
+                    score: f.score,
+                    source: MemorySource::CognitiveFact,
+                    raw_score: f.score,
+                })
+                .collect()),
+            Err(e) => {
+                warn!("Shadow retrieval failed: {e}");
+                Ok(Vec::new())
+            }
+        }
+    }
+
     async fn fetch_recalls(&self, query: &str, limit: usize) -> Vec<(String, f64, String)> {
         let Some(ref recall) = self.recall else {
             return Vec::new();
