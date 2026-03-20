@@ -616,11 +616,27 @@ fn event_to_observation(event: &DomainEvent) -> Option<Observation> {
         DomainEvent::UserCorrectedAI {
             original,
             correction,
+            ..
         } => Some(Observation {
             domain: "meta".into(),
             content: format!("User corrected: '{original}' → '{correction}'"),
             importance: 1.0,
             source_event: "UserCorrectedAI".into(),
+            timestamp: now,
+        }),
+        DomainEvent::AutotunerDecision {
+            trial_id,
+            verdict,
+            improvement_pct,
+            affected_params,
+        } => Some(Observation {
+            domain: "meta".into(),
+            content: format!(
+                "Autotuner {verdict}: trial {trial_id}, improvement {improvement_pct:.1}%, params: {}",
+                affected_params.join(", ")
+            ),
+            importance: 0.8,
+            source_event: "AutotunerDecision".into(),
             timestamp: now,
         }),
         DomainEvent::BudgetAlert {
@@ -998,6 +1014,7 @@ fn event_type_key(event: &DomainEvent) -> String {
         DomainEvent::TaskStatusChanged { .. } => "TaskStatusChanged".into(),
         DomainEvent::TaskPriorityChanged { .. } => "TaskPriorityChanged".into(),
         DomainEvent::TaskFieldUpdated { .. } => "TaskFieldUpdated".into(),
+        DomainEvent::AutotunerDecision { .. } => "AutotunerDecision".into(),
         DomainEvent::ContradictionDetected { .. } => "ContradictionDetected".into(),
         DomainEvent::NoteContentChanged { .. } => "NoteContentChanged".into(),
         DomainEvent::NoteDeleted { .. } => "NoteDeleted".into(),

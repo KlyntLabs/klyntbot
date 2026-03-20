@@ -23,6 +23,9 @@ use tools::RoutingContext;
 
 use super::AgentEvent;
 
+/// Window (in minutes) to retroactively mark shadow log entries as corrected.
+const CORRECTION_WINDOW_MINUTES: i32 = 15;
+
 /// Handle for consuming streaming agent output.
 pub struct StreamingHandle {
     /// Agent events (content chunks, tool status).
@@ -69,8 +72,10 @@ pub struct AgentLoop {
     /// MCP manager for external server connections (kept alive for the agent's lifetime).
     /// Wrapped in Mutex so `shutdown(&self)` can take ownership for graceful disconnect.
     pub(crate) mcp_manager: tokio::sync::Mutex<Option<mcp::McpManager>>,
-    /// Shared DomainEventBus for cross-feature communication (cognitive + coaching).
-    pub(crate) _domain_event_bus: Option<Arc<bus::DomainEventBus>>,
+    /// Shared DomainEventBus for cross-feature communication (cognitive + coaching + autotuner).
+    pub(crate) domain_event_bus: Option<Arc<bus::DomainEventBus>>,
+    /// Trial repo for marking shadow log entries as corrected (autotuner).
+    pub(crate) trial_repo: Option<storage::TrialRepo>,
     /// Background consolidation service for cognitive memory (kept alive for graceful shutdown).
     /// Wrapped in Mutex so `shutdown(&self)` can take ownership for graceful stop.
     pub(crate) cognitive_bg_service:
@@ -152,7 +157,64 @@ impl AgentLoop {
             }
         }
 
+        // Emit correction signal for negative reactions
+        if score == 0.0 {
+            // Read last assistant message from session
+            let session_key = msg.session_key();
+            let last_assistant = if let Ok(session_arc) = self
+                .session_manager
+                .get_or_create(session_key.as_str(), None)
+                .await
+            {
+                let session = session_arc.lock().await;
+                session
+                    .messages
+                    .iter()
+                    .rev()
+                    .find(|m| m.role == "assistant")
+                    .map(|m| m.content.clone())
+            } else {
+                None
+            };
+
+            self.emit_correction_signal(
+                msg.chat_id.as_str(),
+                last_assistant.unwrap_or_default(),
+                msg.content.clone(),
+                bus::CorrectionKind::Reaction,
+                1.0,
+            )
+            .await;
+        }
+
         Ok(())
+    }
+
+    /// Emit a UserCorrectedAI correction signal and mark shadow log entries.
+    async fn emit_correction_signal(
+        &self,
+        chat_id: &str,
+        original: String,
+        correction: String,
+        kind: bus::CorrectionKind,
+        strength: f64,
+    ) {
+        if let Some(ref bus) = self.domain_event_bus {
+            bus.publish(bus::DomainEvent::UserCorrectedAI {
+                original,
+                correction,
+                kind,
+                strength,
+            });
+        }
+        if let Some(ref trial_repo) = self.trial_repo {
+            if let Err(e) = trial_repo
+                .mark_recent_messages_corrected(chat_id, CORRECTION_WINDOW_MINUTES)
+                .await
+            {
+                warn!("Failed to mark shadow log entries as corrected: {}", e);
+            }
+        }
     }
 
     /// Extract the inbound receiver from the agent loop.
@@ -384,6 +446,9 @@ impl AgentLoop {
             msg.channel, msg.sender_id, preview
         );
 
+        // Detect correction prefix BEFORE acquiring session lock
+        let correction_strength = detect_correction_prefix(&msg.content);
+
         // Get or create session — returns per-session Arc<Mutex<Session>>
         let session_key = msg.session_key();
         let session_arc = self
@@ -392,13 +457,24 @@ impl AgentLoop {
             .await?;
 
         // Mutate session and collect data under the per-session lock
-        let (history, embed_msg_id, session_squad_id) = {
+        let (history, embed_msg_id, session_squad_id, last_assistant_content) = {
             let mut session = session_arc.lock().await;
+            // Only capture last assistant message if a correction prefix was detected
+            let last_assistant = if correction_strength.is_some() {
+                session
+                    .messages
+                    .iter()
+                    .rev()
+                    .find(|m| m.role == "assistant")
+                    .map(|m| m.content.clone())
+            } else {
+                None
+            };
             session.add_message("user", &msg.content);
             let msg_id = session.messages.last().map(|m| m.id.clone());
             let history = session.get_history(self.history_limit).to_vec();
             let squad_id = session.squad_id.clone();
-            (history, msg_id, squad_id)
+            (history, msg_id, squad_id, last_assistant)
             // per-session lock released here
         };
 
@@ -409,6 +485,20 @@ impl AgentLoop {
 
         // Ingest user message into activity log (fire-and-forget)
         self.ingest_chat_message(session_key.as_str(), "user", &msg.content);
+
+        // Keyword-based correction detection — emit signal when user corrects the AI
+        if let Some(strength) = correction_strength {
+            if let Some(ref original) = last_assistant_content {
+                self.emit_correction_signal(
+                    msg.chat_id.as_str(),
+                    original.clone(),
+                    msg.content.clone(),
+                    bus::CorrectionKind::KeywordPrefix,
+                    strength,
+                )
+                .await;
+            }
+        }
 
         // Run through pipeline
         let mut routing_ctx = RoutingContext::new(msg.channel.clone(), msg.chat_id.clone());
@@ -427,7 +517,7 @@ impl AgentLoop {
         self.ingest_chat_message(session_key.as_str(), "assistant", &response_content);
 
         // Publish chat turn to cognitive consolidation pipeline
-        if let Some(bus) = &self._domain_event_bus {
+        if let Some(bus) = &self.domain_event_bus {
             bus.publish(bus::DomainEvent::ChatTurnCompleted {
                 user_message: msg.content.clone(),
                 session_key: session_key.to_string(),
@@ -818,6 +908,52 @@ fn reaction_to_satisfaction(emoji: &str) -> Option<f32> {
         "\u{1F44E}" => Some(0.0),                     // 👎
         "\u{1F615}" => Some(0.0),                     // 😕
         _ => None,
+    }
+}
+
+/// Detects if a user message starts with a correction phrase.
+/// Returns the correction strength (1.0 for strong, 0.8 for soft) or None.
+fn detect_correction_prefix(message: &str) -> Option<f64> {
+    let lower = message.to_lowercase();
+    let check = &lower[..lower.len().min(80)];
+
+    const STRONG: &[&str] = &["no,", "no ", "wrong", "that's not", "incorrect"];
+    const SOFT: &[&str] = &["i meant", "try again", "redo", "not quite", "never mind"];
+
+    for prefix in STRONG {
+        if check.starts_with(prefix) {
+            return Some(1.0);
+        }
+    }
+    for prefix in SOFT {
+        if check.starts_with(prefix) {
+            return Some(0.8);
+        }
+    }
+    None
+}
+
+#[cfg(test)]
+mod correction_tests {
+    use super::detect_correction_prefix;
+
+    #[test]
+    fn detects_strong_corrections() {
+        assert_eq!(detect_correction_prefix("No, that's wrong"), Some(1.0));
+        assert_eq!(detect_correction_prefix("wrong answer"), Some(1.0));
+        assert_eq!(detect_correction_prefix("incorrect, I wanted"), Some(1.0));
+    }
+
+    #[test]
+    fn detects_soft_corrections() {
+        assert_eq!(detect_correction_prefix("I meant the other one"), Some(0.8));
+        assert_eq!(detect_correction_prefix("try again please"), Some(0.8));
+    }
+
+    #[test]
+    fn ignores_normal_messages() {
+        assert_eq!(detect_correction_prefix("What's the weather?"), None);
+        assert_eq!(detect_correction_prefix("Hello there"), None);
     }
 }
 

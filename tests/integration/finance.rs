@@ -869,7 +869,10 @@ async fn tx_update_rejects_negative_amount() {
     let tx_id = make_test_tx(&tool, &ctx).await;
 
     let result = tool
-        .execute(json!({"action": "tx_update", "id": tx_id, "amount": -500}), &ctx)
+        .execute(
+            json!({"action": "tx_update", "id": tx_id, "amount": -500}),
+            &ctx,
+        )
         .await;
     assert!(result.is_err(), "tx_update should reject negative amounts");
 }
@@ -881,7 +884,10 @@ async fn tx_update_rejects_zero_amount() {
     let tx_id = make_test_tx(&tool, &ctx).await;
 
     let result = tool
-        .execute(json!({"action": "tx_update", "id": tx_id, "amount": 0}), &ctx)
+        .execute(
+            json!({"action": "tx_update", "id": tx_id, "amount": 0}),
+            &ctx,
+        )
         .await;
     assert!(result.is_err(), "tx_update should reject zero amounts");
 }

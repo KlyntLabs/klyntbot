@@ -576,7 +576,8 @@ impl AgentRuntime {
             let tokens = router_result.usage.prompt_tokens + router_result.usage.completion_tokens;
             hook.on_message_completed(
                 ctx.chat_id.as_str(),
-                false, // user_corrected — updated later via reaction/feedback
+                &agent_name,
+                analysis.mode.short_name(),
                 tokens,
                 pipeline_elapsed_ms,
             )

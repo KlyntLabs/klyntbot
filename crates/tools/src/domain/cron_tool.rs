@@ -358,7 +358,10 @@ mod tests {
             "every_seconds": 300
         });
         let result = tool.execute(args, &test_ctx()).await;
-        assert!(result.is_ok(), "every_seconds should bypass cron validation");
+        assert!(
+            result.is_ok(),
+            "every_seconds should bypass cron validation"
+        );
         assert_eq!(handler.call_count(), 1);
     }
 }

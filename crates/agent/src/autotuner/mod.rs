@@ -12,6 +12,7 @@ use autotuner::{
     build_generation_prompt, Champion, ChampionSummary, ExperimentSummary, GenerationContext,
     GenerationResponse, MetricSource, NightlyCycle, TrialSummaryForPrompt,
 };
+use bus::DomainEventBus;
 use common::TrialParams;
 use config::AutoTunerConfig;
 use providers::{ChatParams, DynProvider, Message};
@@ -180,6 +181,7 @@ impl AutoTunerOrchestrator {
         autotuner_config: AutoTunerConfig,
         trial_repo: TrialRepo,
         metric_source: Arc<dyn MetricSource>,
+        domain_event_bus: Option<Arc<DomainEventBus>>,
     ) {
         let rt = tokio::runtime::Handle::current();
         let cycle = Arc::new(NightlyCycle::new(
@@ -193,6 +195,7 @@ impl AutoTunerOrchestrator {
             let orch = Arc::clone(&orchestrator);
             let cycle = Arc::clone(&cycle);
             let rollback_threshold = rollback_threshold;
+            let domain_event_bus = domain_event_bus.clone();
             tokio::task::block_in_place(|| {
                 rt.block_on(async move {
                     // Check if paused.
@@ -221,6 +224,28 @@ impl AutoTunerOrchestrator {
                         "autotuner nightly cycle completed"
                     );
 
+                    // Log per-trial evaluation results for observability.
+                    for (trial_id, trial_result) in &result.evaluated_trials {
+                        let verdict = if result
+                            .promotion
+                            .as_ref()
+                            .map(|(pid, _, _)| pid)
+                            == Some(trial_id)
+                        {
+                            "PASS"
+                        } else {
+                            "FAIL"
+                        };
+                        info!(
+                            trial_id = %trial_id,
+                            correction_rate = %format!("{:.3}", trial_result.correction_rate),
+                            accuracy = %format!("{:.3}", trial_result.classification_accuracy),
+                            messages = trial_result.messages_scored,
+                            verdict = verdict,
+                            "Autotuner: trial evaluated"
+                        );
+                    }
+
                     // Handle promotion: update champion with new trial params + metrics.
                     if let Some((trial_id, trial_result, params)) = result.promotion {
                         info!(
@@ -244,6 +269,18 @@ impl AutoTunerOrchestrator {
                             consecutive_regression_days: 0,
                         };
                         orch.update_champion(new_champion).await;
+
+                        // Emit domain event for promotion.
+                        if let Some(ref bus) = domain_event_bus {
+                            bus.publish(bus::DomainEvent::AutotunerDecision {
+                                trial_id: trial_id.to_string(),
+                                verdict: autotuner::TrialStatus::Promoted
+                                    .as_str()
+                                    .to_string(),
+                                improvement_pct: 0.0,
+                                affected_params: vec![],
+                            });
+                        }
                     }
 
                     // Handle regression: increment counter, trigger rollback when threshold met.
@@ -254,7 +291,8 @@ impl AutoTunerOrchestrator {
                         let days = champ.consecutive_regression_days;
                         warn!(
                             consecutive_days = days,
-                            rollback_threshold, "champion regression detected"
+                            rollback_threshold,
+                            "autotuner: champion regression detected"
                         );
 
                         if days >= rollback_threshold {
@@ -264,8 +302,11 @@ impl AutoTunerOrchestrator {
                                     if let Ok(prev_champion) =
                                         serde_json::from_value::<Champion>(prev_json)
                                     {
+                                        // Capture trial_id before overwriting champ.
+                                        let rolled_back_trial_id = champ.trial_id;
+
                                         // Mark the reverted trial as Reverted in TrialRepo.
-                                        if let Some(trial_id) = champ.trial_id {
+                                        if let Some(trial_id) = rolled_back_trial_id {
                                             if let Err(e) = orch
                                                 .trial_repo
                                                 .update_trial_status(
@@ -298,6 +339,23 @@ impl AutoTunerOrchestrator {
                                             }
                                         }
                                         *champ = restored;
+
+                                        // Emit domain event for rollback.
+                                        if let Some(ref bus) = domain_event_bus {
+                                            let trial_str = rolled_back_trial_id
+                                                .map(|id| id.to_string())
+                                                .unwrap_or_default();
+                                            bus.publish(
+                                                bus::DomainEvent::AutotunerDecision {
+                                                    trial_id: trial_str,
+                                                    verdict: autotuner::TrialStatus::Reverted
+                                                        .as_str()
+                                                        .to_string(),
+                                                    improvement_pct: 0.0,
+                                                    affected_params: vec![],
+                                                },
+                                            );
+                                        }
                                     }
                                 }
                                 Ok(None) => {

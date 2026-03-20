@@ -96,6 +96,9 @@ pub fn evaluate_salience(event: &DomainEvent) -> SalienceVerdict {
         DomainEvent::TaskPriorityChanged { .. } => SalienceVerdict::Accumulate,
         DomainEvent::TaskFieldUpdated { .. } => SalienceVerdict::Accumulate,
 
+        // Autotuner decisions — always extract for cognitive processing
+        DomainEvent::AutotunerDecision { .. } => SalienceVerdict::Extract,
+
         // Contradiction detection — always extract for cognitive processing
         DomainEvent::ContradictionDetected { .. } => SalienceVerdict::Extract,
 
@@ -124,6 +127,8 @@ mod tests {
         let verdict = evaluate_salience(&DomainEvent::UserCorrectedAI {
             original: "You like afternoon work".into(),
             correction: "No, I prefer mornings".into(),
+            kind: bus::CorrectionKind::Reaction,
+            strength: 1.0,
         });
         assert_eq!(verdict, SalienceVerdict::Extract);
     }

@@ -104,6 +104,9 @@ impl AppCore {
             "UserCorrectedAI" => bus::DomainEvent::UserCorrectedAI {
                 original: payload["original"].as_str().unwrap_or("").to_string(),
                 correction: payload["correction"].as_str().unwrap_or("").to_string(),
+                kind: serde_json::from_value(payload["kind"].clone())
+                    .unwrap_or(bus::CorrectionKind::KeywordPrefix),
+                strength: payload["strength"].as_f64().unwrap_or(1.0),
             },
             "BudgetAlert" => bus::DomainEvent::BudgetAlert {
                 category: payload["category"]

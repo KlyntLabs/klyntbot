@@ -115,8 +115,16 @@ pub(super) async fn init_cron(
             .await
             .map_err(|e| format!("autotuner migration failed: {e}"))?;
         let strategy_repo = repos.strategies.clone();
-        let metric_source: Arc<dyn autotuner::MetricSource> =
-            Arc::new(agent::autotuner::metric_collector::AgentMetricCollector::new(strategy_repo));
+        let event_log_repo = cognitive::EventLogRepo::new(repos.pool().clone());
+        let usage_repo = repos.usage.clone();
+        let metric_source: Arc<dyn autotuner::MetricSource> = Arc::new(
+            agent::autotuner::metric_collector::AgentMetricCollector::new(
+                strategy_repo,
+                event_log_repo,
+                usage_repo,
+                trial_repo.clone(),
+            ),
+        );
         let learning_state = repos.learning_state.clone();
         let champion =
             agent::autotuner::AutoTunerOrchestrator::load_champion(&learning_state).await;
@@ -134,6 +142,7 @@ pub(super) async fn init_cron(
             config.autotuner.clone(),
             trial_repo,
             metric_source,
+            Some(Arc::clone(domain_event_bus)),
         );
         info!("autotuner nightly cycle handler registered");
         Some(orchestrator)

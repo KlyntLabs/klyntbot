@@ -52,8 +52,6 @@ impl ActivityLogSubscriber {
             }
         });
 
-        Self {
-            _handle: handle,
-        }
+        Self { _handle: handle }
     }
 }

@@ -18,11 +18,26 @@ export interface ExperimentSummary {
   started_at: string;
 }
 
+export interface BrainGrowth {
+  correctionsCaptured7d: number;
+  trialsEvaluated7d: number;
+  promotedThisWeek: number;
+  status: string;
+}
+
+export interface MetricsHealth {
+  correctionRateAvailable: boolean;
+  tokenRateAvailable: boolean;
+  stabilityAvailable: boolean;
+}
+
 export interface AutoTunerStatus {
   enabled: boolean;
   champion: ChampionSummary;
   activeExperiment: ExperimentSummary | null;
   paused: boolean;
+  brainGrowth: BrainGrowth | null;
+  metricsHealth: MetricsHealth | null;
 }
 
 export interface ParamChange {

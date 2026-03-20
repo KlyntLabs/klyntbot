@@ -291,6 +291,7 @@ fn wire_event_channels(core: &AppCore, channels: EventChannels, app_handle: &tau
                             bus::DomainEvent::ToolCallExecuted { .. } => "general",
                             bus::DomainEvent::BehavioralPatternDetected { .. } => "learning",
                             bus::DomainEvent::ContradictionDetected { .. } => "learning",
+                            bus::DomainEvent::AutotunerDecision { .. } => "learning",
                         };
                         let salience_str = match salience {
                             cognitive::types::SalienceVerdict::Extract => "extract",
@@ -349,7 +350,9 @@ fn wire_event_channels(core: &AppCore, channels: EventChannels, app_handle: &tau
 
 /// Center a window on the monitor where the cursor is currently located.
 /// All coordinates are in physical pixels for consistent comparison.
-fn center_on_cursor_monitor(window: &tauri::WebviewWindow) -> Result<(), Box<dyn std::error::Error>> {
+fn center_on_cursor_monitor(
+    window: &tauri::WebviewWindow,
+) -> Result<(), Box<dyn std::error::Error>> {
     // cursor_position() returns PhysicalPosition<f64>
     let cursor = window.cursor_position()?;
     let monitors = window.available_monitors()?;

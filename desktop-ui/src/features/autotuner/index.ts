@@ -11,4 +11,11 @@ export { useAutoTunerHistory } from "./hooks/useAutoTunerHistory";
 export { useAutoTunerStatus } from "./hooks/useAutoTunerStatus";
 
 // Types
-export type { AutoTunerStatus, ChampionSummary, ExperimentSummary, ParamChange } from "./types";
+export type {
+  AutoTunerStatus,
+  BrainGrowth,
+  ChampionSummary,
+  ExperimentSummary,
+  MetricsHealth,
+  ParamChange,
+} from "./types";

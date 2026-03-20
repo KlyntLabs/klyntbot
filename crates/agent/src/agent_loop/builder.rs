@@ -1465,7 +1465,14 @@ impl AgentLoopBuilder {
             _session_cleanup_token: session_cleanup_token,
             _memory_maintenance_token: memory_maintenance_token,
             mcp_manager: tokio::sync::Mutex::new(mcp_manager),
-            _domain_event_bus: self.domain_event_bus,
+            domain_event_bus: self.domain_event_bus,
+            trial_repo: if self.autotuner.is_some() {
+                self.pool
+                    .as_ref()
+                    .map(|p| storage::TrialRepo::new(p.clone()))
+            } else {
+                None
+            },
             cognitive_bg_service: tokio::sync::Mutex::new(cognitive_bg_service),
             _inference_loop_token,
             activity_svc: self.activity_svc,

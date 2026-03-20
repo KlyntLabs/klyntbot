@@ -23,6 +23,8 @@ pub struct CycleResult {
     pub completed_count: usize,
     /// Trials that failed one or more promotion constraints, with descriptions.
     pub failed_constraints: Vec<(Uuid, Vec<String>)>,
+    /// All evaluated trials with their aggregated results (for observability logging).
+    pub evaluated_trials: Vec<(Uuid, TrialResult)>,
 }
 
 /// Orchestrates the nightly evaluation-and-promotion cycle.
@@ -84,6 +86,7 @@ impl NightlyCycle {
         let baseline = &champion.baseline_metrics;
         let mut candidates: Vec<(Uuid, TrialResult, TrialParams, f64)> = Vec::new();
         let mut failed_constraints: Vec<(Uuid, Vec<String>)> = Vec::new();
+        let mut evaluated_trials: Vec<(Uuid, TrialResult)> = Vec::new();
         let mut completed_count: usize = 0;
 
         for row in &active_trials {
@@ -109,6 +112,7 @@ impl NightlyCycle {
             }
 
             completed_count += 1;
+            evaluated_trials.push((trial_id, result.clone()));
 
             // Evaluate promotion constraints.
             let verdict = self.evaluator.evaluate(&result, baseline);
@@ -164,6 +168,7 @@ impl NightlyCycle {
             regression,
             completed_count,
             failed_constraints,
+            evaluated_trials,
         })
     }
 

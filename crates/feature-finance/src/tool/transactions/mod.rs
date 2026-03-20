@@ -317,9 +317,7 @@ impl FinanceTool {
         let new_amount = p.optional_i64("amount")?;
         if let Some(amt) = new_amount {
             if amt <= 0 {
-                return Err(
-                    ToolError::InvalidParams("Amount must be positive".to_string()).into(),
-                );
+                return Err(ToolError::InvalidParams("Amount must be positive".to_string()).into());
             }
         }
         let category = p.optional_str("category")?;

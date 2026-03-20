@@ -248,6 +248,14 @@ pub enum DomainEvent {
     UserCorrectedAI {
         original: String,
         correction: String,
+        kind: CorrectionKind,
+        strength: f64,
+    },
+    AutotunerDecision {
+        trial_id: String,
+        verdict: String,
+        improvement_pct: f64,
+        affected_params: Vec<String>,
     },
 
     // -- Coaching feedback --
@@ -279,6 +287,13 @@ pub enum FeedbackResponse {
     Helpful,
     Dismissed,
     StopSuggesting,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CorrectionKind {
+    Reaction,
+    KeywordPrefix,
 }
 
 /// Broadcast bus for DomainEvents.
@@ -376,5 +391,56 @@ mod tests {
         let json = serde_json::to_string(&event).unwrap();
         let deserialized: DomainEvent = serde_json::from_str(&json).unwrap();
         assert!(matches!(deserialized, DomainEvent::UserStatedFact { .. }));
+    }
+
+    #[test]
+    fn correction_kind_roundtrip() {
+        let kind = CorrectionKind::Reaction;
+        let json = serde_json::to_string(&kind).unwrap();
+        assert_eq!(json, "\"reaction\"");
+        let parsed: CorrectionKind = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, CorrectionKind::Reaction);
+
+        let kind2 = CorrectionKind::KeywordPrefix;
+        let json2 = serde_json::to_string(&kind2).unwrap();
+        assert_eq!(json2, "\"keyword_prefix\"");
+    }
+
+    #[test]
+    fn user_corrected_ai_with_kind_roundtrip() {
+        let event = DomainEvent::UserCorrectedAI {
+            original: "test".into(),
+            correction: "fixed".into(),
+            kind: CorrectionKind::Reaction,
+            strength: 1.0,
+        };
+        let json = serde_json::to_string(&event).unwrap();
+        let parsed: DomainEvent = serde_json::from_str(&json).unwrap();
+        match parsed {
+            DomainEvent::UserCorrectedAI { kind, strength, .. } => {
+                assert_eq!(kind, CorrectionKind::Reaction);
+                assert!((strength - 1.0).abs() < f64::EPSILON);
+            }
+            _ => panic!("Expected UserCorrectedAI"),
+        }
+    }
+
+    #[test]
+    fn autotuner_decision_roundtrip() {
+        let event = DomainEvent::AutotunerDecision {
+            trial_id: "abc-123".into(),
+            verdict: "promoted".into(),
+            improvement_pct: 12.5,
+            affected_params: vec!["heuristic_confidence_threshold".into()],
+        };
+        let json = serde_json::to_string(&event).unwrap();
+        assert!(json.contains("promoted"));
+        let parsed: DomainEvent = serde_json::from_str(&json).unwrap();
+        match parsed {
+            DomainEvent::AutotunerDecision { verdict, .. } => {
+                assert_eq!(verdict, "promoted");
+            }
+            _ => panic!("Expected AutotunerDecision"),
+        }
     }
 }

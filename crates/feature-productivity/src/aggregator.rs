@@ -231,8 +231,7 @@ impl DailyAggregator {
                     // when focus sessions don't have their own quality scores.
                     // Normalize from 0-100 to 0-1 for the ScoreBar.
                     if summary.avg_session_quality.is_none() {
-                        summary.avg_session_quality =
-                            Some(daily_score.overall_score / 100.0);
+                        summary.avg_session_quality = Some(daily_score.overall_score / 100.0);
                     }
                     daily_score.overall_score
                 }

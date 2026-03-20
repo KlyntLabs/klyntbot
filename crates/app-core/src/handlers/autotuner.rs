@@ -9,11 +9,30 @@ use crate::state::AppCore;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct BrainGrowth {
+    pub corrections_captured_7d: i64,
+    pub trials_evaluated_7d: i64,
+    pub promoted_this_week: i64,
+    pub status: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MetricsHealth {
+    pub correction_rate_available: bool,
+    pub token_rate_available: bool,
+    pub stability_available: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AutoTunerStatus {
     pub enabled: bool,
     pub champion: autotuner::ChampionSummary,
     pub active_experiment: Option<autotuner::ExperimentSummary>,
     pub paused: bool,
+    pub brain_growth: Option<BrainGrowth>,
+    pub metrics_health: Option<MetricsHealth>,
 }
 
 impl AppCore {
@@ -33,11 +52,56 @@ impl AppCore {
                 Err(_) => None,
             };
 
+            // ── Brain growth: 7-day feedback loop stats ──────────────
+            let seven_days_ago = chrono::Utc::now() - chrono::Duration::days(7);
+            let trial_repo = orch.trial_repo();
+
+            let (corrections_7d, trials_7d, promoted_7d, total_messages) = tokio::join!(
+                async {
+                    match &self.event_log_repo {
+                        Some(repo) => repo
+                            .count_by_event_type("UserCorrectedAI", seven_days_ago)
+                            .await
+                            .unwrap_or(0),
+                        None => 0,
+                    }
+                },
+                trial_repo.count_trials_since(seven_days_ago),
+                trial_repo.count_promoted_since(seven_days_ago),
+                self.repos.strategies.count_all(),
+            );
+            let trials_7d = trials_7d.unwrap_or(0);
+            let promoted_7d = promoted_7d.unwrap_or(0);
+            let total_messages = total_messages.unwrap_or(0);
+
+            let growth_status = if corrections_7d == 0 || total_messages < 50 {
+                "needs_feedback".into()
+            } else if promoted_7d == 0 {
+                "adapting".into()
+            } else {
+                "growing".into()
+            };
+
+            let brain_growth = Some(BrainGrowth {
+                corrections_captured_7d: corrections_7d,
+                trials_evaluated_7d: trials_7d,
+                promoted_this_week: promoted_7d,
+                status: growth_status,
+            });
+
+            let metrics_health = Some(MetricsHealth {
+                correction_rate_available: corrections_7d > 0,
+                token_rate_available: true,
+                stability_available: true,
+            });
+
             Ok(AutoTunerStatus {
                 enabled: orch.is_active(),
                 champion,
                 active_experiment,
                 paused,
+                brain_growth,
+                metrics_health,
             })
         } else {
             Ok(AutoTunerStatus {
@@ -51,6 +115,8 @@ impl AppCore {
                 },
                 active_experiment: None,
                 paused: false,
+                brain_growth: None,
+                metrics_health: None,
             })
         }
     }

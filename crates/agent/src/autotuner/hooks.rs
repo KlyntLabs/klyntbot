@@ -28,7 +28,8 @@ pub trait AutoTunerHook: Send + Sync {
     async fn on_message_completed(
         &self,
         chat_id: &str,
-        user_corrected: bool,
+        orchestrator_name: &str,
+        execution_mode: &str,
         tokens_used: u32,
         response_time_ms: u64,
     );
@@ -173,18 +174,22 @@ impl AutoTunerHook for AutoTunerHookImpl {
 
     async fn on_message_completed(
         &self,
-        _chat_id: &str,
-        _user_corrected: bool,
+        chat_id: &str,
+        orchestrator_name: &str,
+        execution_mode: &str,
         _tokens_used: u32,
         _response_time_ms: u64,
     ) {
-        // TODO: Record ground truth — update the most recent shadow_log entries
-        // for this chat_id with the actual control_orchestrator, control_mode,
-        // and user_corrected values. This requires a TrialRepo method to update
-        // the most recent shadow_log row by chat_id.
-        //
-        // For now, the nightly evaluation cycle handles metric aggregation from
-        // the shadow_log + strategy_records tables.
+        if !self.orchestrator.is_active() {
+            return;
+        }
+        if let Err(e) = self
+            .trial_repo
+            .update_shadow_log_ground_truth(chat_id, orchestrator_name, execution_mode)
+            .await
+        {
+            tracing::warn!(error = %e, "Failed to update shadow log ground truth");
+        }
     }
 
     fn current_champion_params(&self) -> Option<TrialParams> {

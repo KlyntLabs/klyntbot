@@ -1,5 +1,6 @@
 //! Repository for autotuner experiment and trial tables.
 
+use chrono::{DateTime, Utc};
 use sqlx::SqlitePool;
 
 use crate::error::StorageError;
@@ -209,10 +210,130 @@ impl TrialRepo {
         .await?;
         Ok(rows)
     }
+
+    // ── Shadow log helpers ────────────────────────────────────────────
+
+    /// Back-fill the ground-truth orchestrator and mode for a recent shadow log
+    /// entry whose control fields were originally set to `'pending'`.
+    pub async fn update_shadow_log_ground_truth(
+        &self,
+        chat_id: &str,
+        control_orchestrator: &str,
+        control_mode: &str,
+    ) -> Result<(), StorageError> {
+        sqlx::query(
+            "UPDATE autotuner_shadow_log
+             SET control_orchestrator = ?1, control_mode = ?2
+             WHERE chat_id = ?3
+               AND control_orchestrator = 'pending'
+               AND created_at >= datetime('now', '-60 seconds')",
+        )
+        .bind(control_orchestrator)
+        .bind(control_mode)
+        .bind(chat_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Flag the two most recent shadow log entries for a chat within the given
+    /// window as user-corrected.  Uses a subquery because SQLite does not
+    /// support `ORDER BY` / `LIMIT` directly on `UPDATE`.
+    pub async fn mark_recent_messages_corrected(
+        &self,
+        chat_id: &str,
+        window_minutes: i32,
+    ) -> Result<(), StorageError> {
+        sqlx::query(
+            "UPDATE autotuner_shadow_log
+             SET user_corrected = 1
+             WHERE id IN (
+                 SELECT id FROM autotuner_shadow_log
+                 WHERE chat_id = ?1
+                   AND created_at >= datetime('now', ?2)
+                 ORDER BY created_at DESC LIMIT 2
+             )",
+        )
+        .bind(chat_id)
+        .bind(format!("-{} minutes", window_minutes))
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Compute the fraction of shadow log entries where the predicted mode
+    /// matched the ground-truth control mode.  Returns `1.0` when there are no
+    /// qualifying rows (no data ⇒ perfect agreement by convention).
+    pub async fn shadow_log_agreement_rate(
+        &self,
+        trial_id: Option<&str>,
+        since: DateTime<Utc>,
+    ) -> Result<f64, StorageError> {
+        // Format as YYYY-MM-DD HH:MM:SS to match SQLite's datetime() output.
+        let since_str = since.format("%Y-%m-%d %H:%M:%S").to_string();
+        let (total, agreed): (i64, i64) = if let Some(tid) = trial_id {
+            sqlx::query_as::<_, (i64, i64)>(
+                "SELECT COUNT(*) AS total,
+                        COALESCE(SUM(CASE WHEN predicted_mode = control_mode THEN 1 ELSE 0 END), 0) AS agreed
+                 FROM autotuner_shadow_log
+                 WHERE trial_id = ?1 AND control_mode != 'pending'
+                   AND created_at >= ?2",
+            )
+            .bind(tid)
+            .bind(&since_str)
+            .fetch_one(&self.pool)
+            .await?
+        } else {
+            sqlx::query_as::<_, (i64, i64)>(
+                "SELECT COUNT(*) AS total,
+                        COALESCE(SUM(CASE WHEN predicted_mode = control_mode THEN 1 ELSE 0 END), 0) AS agreed
+                 FROM autotuner_shadow_log
+                 WHERE control_mode != 'pending' AND created_at >= ?1",
+            )
+            .bind(&since_str)
+            .fetch_one(&self.pool)
+            .await?
+        };
+        Ok(if total == 0 {
+            1.0
+        } else {
+            agreed as f64 / total as f64
+        })
+    }
+
+    // ── Trial counting helpers ────────────────────────────────────────
+
+    /// Count trials that reached a terminal status (completed, promoted, or
+    /// reverted) since the given timestamp.
+    pub async fn count_trials_since(&self, since: DateTime<Utc>) -> Result<i64, StorageError> {
+        let since_str = since.format("%Y-%m-%d %H:%M:%S").to_string();
+        Ok(sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM autotuner_trials
+             WHERE status IN ('completed', 'promoted', 'reverted')
+               AND completed_at >= ?1",
+        )
+        .bind(&since_str)
+        .fetch_one(&self.pool)
+        .await?)
+    }
+
+    /// Count trials that were promoted since the given timestamp.
+    pub async fn count_promoted_since(&self, since: DateTime<Utc>) -> Result<i64, StorageError> {
+        let since_str = since.format("%Y-%m-%d %H:%M:%S").to_string();
+        Ok(sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM autotuner_trials
+             WHERE status = 'promoted' AND completed_at >= ?1",
+        )
+        .bind(&since_str)
+        .fetch_one(&self.pool)
+        .await?)
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use chrono::Utc;
+
     use super::*;
 
     async fn setup() -> TrialRepo {
@@ -292,5 +413,122 @@ mod tests {
         // Should no longer appear in active list
         let active = repo.get_active_trials().await.unwrap();
         assert!(active.is_empty());
+    }
+
+    /// Helper to insert a shadow log entry with sensible defaults for tests.
+    async fn insert_test_shadow_log(
+        repo: &TrialRepo,
+        trial_id: &str,
+        chat_id: &str,
+        predicted_mode: &str,
+        control_orchestrator: &str,
+        control_mode: &str,
+    ) {
+        repo.insert_shadow_log(
+            trial_id,
+            "2026-03-19T12:00:00Z",
+            chat_id,
+            "general",
+            predicted_mode,
+            0.85,
+            5,
+            control_orchestrator,
+            control_mode,
+        )
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn update_ground_truth_fills_pending() {
+        let repo = setup().await;
+        let exp = make_experiment("exp-gt");
+        repo.create_experiment(&exp).await.unwrap();
+        let trial = make_trial("trial-gt", "exp-gt", "active");
+        repo.create_trial(&trial).await.unwrap();
+
+        // Insert a shadow log with control_orchestrator = "pending"
+        insert_test_shadow_log(&repo, "trial-gt", "chat-1", "direct", "pending", "pending").await;
+
+        // Update the ground truth
+        repo.update_shadow_log_ground_truth("chat-1", "general", "reactive")
+            .await
+            .unwrap();
+
+        // Verify via agreement rate — predicted_mode="direct" vs control_mode="reactive"
+        // means 0% agreement
+        let rate = repo
+            .shadow_log_agreement_rate(Some("trial-gt"), Utc::now() - chrono::Duration::hours(1))
+            .await
+            .unwrap();
+        assert!(
+            (rate - 0.0).abs() < f64::EPSILON,
+            "Expected 0.0 agreement when predicted != control, got {rate}"
+        );
+    }
+
+    #[tokio::test]
+    async fn mark_corrected_within_window() {
+        let pool = sqlx::SqlitePool::connect("sqlite::memory:").await.unwrap();
+        sqlx::query("PRAGMA foreign_keys=ON;")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query(MIGRATION_SQL).execute(&pool).await.unwrap();
+        let repo = TrialRepo::new(pool.clone());
+
+        let exp = make_experiment("exp-mc");
+        repo.create_experiment(&exp).await.unwrap();
+        let trial = make_trial("trial-mc", "exp-mc", "active");
+        repo.create_trial(&trial).await.unwrap();
+
+        // Insert two shadow log entries for the same chat
+        insert_test_shadow_log(&repo, "trial-mc", "chat-2", "direct", "general", "direct").await;
+        insert_test_shadow_log(
+            &repo, "trial-mc", "chat-2", "reactive", "general", "reactive",
+        )
+        .await;
+
+        // Mark recent messages as corrected (large window to catch them)
+        repo.mark_recent_messages_corrected("chat-2", 60)
+            .await
+            .unwrap();
+
+        // Verify that user_corrected was actually set to 1 in the database.
+        let corrected = sqlx::query_scalar::<_, i64>(
+            "SELECT user_corrected FROM autotuner_shadow_log WHERE chat_id = ?1 ORDER BY created_at DESC LIMIT 1",
+        )
+        .bind("chat-2")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(corrected, 1, "user_corrected should be set to 1");
+    }
+
+    #[tokio::test]
+    async fn agreement_rate_no_data_returns_one() {
+        let repo = setup().await;
+
+        let rate = repo
+            .shadow_log_agreement_rate(None, Utc::now() - chrono::Duration::hours(1))
+            .await
+            .unwrap();
+
+        assert!(
+            (rate - 1.0).abs() < f64::EPSILON,
+            "Expected 1.0 when no shadow log data exists, got {rate}"
+        );
+    }
+
+    #[tokio::test]
+    async fn count_trials_and_promoted_empty() {
+        let repo = setup().await;
+
+        let since = Utc::now() - chrono::Duration::days(7);
+        let total = repo.count_trials_since(since).await.unwrap();
+        let promoted = repo.count_promoted_since(since).await.unwrap();
+
+        assert_eq!(total, 0, "Expected 0 completed trials on empty DB");
+        assert_eq!(promoted, 0, "Expected 0 promoted trials on empty DB");
     }
 }
