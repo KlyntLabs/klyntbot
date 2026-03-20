@@ -470,6 +470,9 @@ impl AgentLoop {
             } else {
                 None
             };
+            if session.correction_cooldown > 0 {
+                session.correction_cooldown -= 1;
+            }
             session.add_message("user", &msg.content);
             let msg_id = session.messages.last().map(|m| m.id.clone());
             let history = session.get_history(self.history_limit).to_vec();
@@ -487,16 +490,29 @@ impl AgentLoop {
         self.ingest_chat_message(session_key.as_str(), "user", &msg.content);
 
         // Keyword-based correction detection — emit signal when user corrects the AI
+        // Rate-limited: max 1 keyword correction per 3 messages per session.
         if let Some(strength) = correction_strength {
             if let Some(ref original) = last_assistant_content {
-                self.emit_correction_signal(
-                    msg.chat_id.as_str(),
-                    original.clone(),
-                    msg.content.clone(),
-                    bus::CorrectionKind::KeywordPrefix,
-                    strength,
-                )
-                .await;
+                let should_emit = {
+                    let mut session = session_arc.lock().await;
+                    if session.correction_cooldown > 0 {
+                        false
+                    } else {
+                        session.correction_cooldown = 3;
+                        true
+                    }
+                };
+
+                if should_emit {
+                    self.emit_correction_signal(
+                        msg.chat_id.as_str(),
+                        original.clone(),
+                        msg.content.clone(),
+                        bus::CorrectionKind::KeywordPrefix,
+                        strength,
+                    )
+                    .await;
+                }
             }
         }
 
@@ -508,6 +524,14 @@ impl AgentLoop {
         let response_content = self
             .run_pipeline(&msg.content, history, &routing_ctx, None, None)
             .await?;
+
+        // Prepend acknowledgement when a keyword correction was detected
+        let response_content = if correction_strength.is_some() && last_assistant_content.is_some()
+        {
+            format!("Noted — adjusting for next time.\n\n{response_content}")
+        } else {
+            response_content
+        };
 
         // Save assistant response to session
         self.save_to_session(session_key.as_str(), &response_content)
@@ -805,6 +829,66 @@ impl AgentLoop {
         session_key: String,
         squad_mode: Option<String>,
     ) -> Result<StreamingHandle> {
+        // Detect correction prefix BEFORE setup_session adds the user message
+        let correction_strength = detect_correction_prefix(&content);
+
+        // Read last assistant message (if correction detected) and tick the cooldown
+        // counter before setup_session mutates the session. Mirrors the two-phase
+        // lock pattern in process_message: first lock decrements cooldown + captures
+        // last assistant; second lock gates the emit.
+        let (last_assistant_content, cooldown_after_decrement) = if let Ok(session_arc) =
+            self.session_manager.get_or_create(&session_key, None).await
+        {
+            let mut session = session_arc.lock().await;
+            let last_asst = if correction_strength.is_some() {
+                session
+                    .messages
+                    .iter()
+                    .rev()
+                    .find(|m| m.role == "assistant")
+                    .map(|m| m.content.clone())
+            } else {
+                None
+            };
+            if session.correction_cooldown > 0 {
+                session.correction_cooldown -= 1;
+            }
+            let cd = session.correction_cooldown;
+            (last_asst, cd)
+        } else {
+            (None, 0)
+        };
+
+        // Emit correction signal (rate-limited: max 1 keyword correction per 3 messages)
+        let correction_emitted = if let Some(strength) = correction_strength {
+            if let Some(ref original) = last_assistant_content {
+                if cooldown_after_decrement == 0 {
+                    // Set cooldown under a fresh lock (mirrors process_message's second lock)
+                    if let Ok(session_arc) =
+                        self.session_manager.get_or_create(&session_key, None).await
+                    {
+                        let mut session = session_arc.lock().await;
+                        session.correction_cooldown = 3;
+                    }
+                    self.emit_correction_signal(
+                        &session_key,
+                        original.clone(),
+                        content.clone(),
+                        bus::CorrectionKind::KeywordPrefix,
+                        strength,
+                    )
+                    .await;
+                    true
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+
         let history = self
             .setup_session(&content, &session_key, "streaming direct")
             .await?;
@@ -832,6 +916,9 @@ impl AgentLoop {
         let cancel_token = CancellationToken::new();
         let cancel_clone = cancel_token.clone();
 
+        // Whether to prepend correction acknowledgement to response
+        let prepend_correction_ack = correction_emitted;
+
         // Clone Arcs for the spawned task
         let agent = Arc::clone(self);
         let sk = session_key.clone();
@@ -849,6 +936,13 @@ impl AgentLoop {
                 .await
             {
                 Ok(response) => {
+                    // Prepend acknowledgement when a keyword correction was detected
+                    let response = if prepend_correction_ack {
+                        format!("Noted — adjusting for next time.\n\n{response}")
+                    } else {
+                        response
+                    };
+
                     // Save to session BEFORE emitting Done so the message ID
                     // is available and the DB row exists when the streaming
                     // relay tries to update metadata.
@@ -954,6 +1048,37 @@ mod correction_tests {
     fn ignores_normal_messages() {
         assert_eq!(detect_correction_prefix("What's the weather?"), None);
         assert_eq!(detect_correction_prefix("Hello there"), None);
+    }
+
+    #[test]
+    fn rate_limiter_cooldown_mechanics() {
+        use session::Session;
+
+        // Fresh session: cooldown is 0 (ready to fire)
+        let session = Session::new("test:chat");
+        assert_eq!(session.correction_cooldown, 0);
+
+        // Simulate emission: set cooldown to 3
+        let mut session = session;
+        session.correction_cooldown = 3;
+
+        // Simulate 3 messages decrementing
+        for i in (0..3).rev() {
+            assert!(session.correction_cooldown > 0, "Should be rate-limited");
+            session.correction_cooldown -= 1;
+            assert_eq!(session.correction_cooldown, i as u32);
+        }
+
+        // After 3 messages: ready to fire again
+        assert_eq!(session.correction_cooldown, 0);
+    }
+
+    #[test]
+    fn excluded_phrases_return_none() {
+        assert_eq!(detect_correction_prefix("not sure about that"), None);
+        assert_eq!(detect_correction_prefix("hold on let me think"), None);
+        assert_eq!(detect_correction_prefix("actually that reminds me"), None);
+        assert_eq!(detect_correction_prefix("wait before that"), None);
     }
 }
 

@@ -39,6 +39,10 @@ pub struct Session {
     /// Optional squad ID — when set, this session uses multi-persona squad execution.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub squad_id: Option<String>,
+
+    /// Messages remaining before next keyword correction can fire (0 = ready).
+    #[serde(default)]
+    pub correction_cooldown: u32,
 }
 
 impl Session {
@@ -52,6 +56,7 @@ impl Session {
             updated_at: now,
             metadata: HashMap::new(),
             squad_id: None,
+            correction_cooldown: 0,
         }
     }
 
@@ -205,6 +210,7 @@ impl SessionManager {
             updated_at: row.updated_at,
             metadata,
             squad_id: row.squad_id,
+            correction_cooldown: 0,
         }
     }
 

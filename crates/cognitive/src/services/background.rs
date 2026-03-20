@@ -625,20 +625,34 @@ fn event_to_observation(event: &DomainEvent) -> Option<Observation> {
             timestamp: now,
         }),
         DomainEvent::AutotunerDecision {
-            trial_id,
             verdict,
             improvement_pct,
             affected_params,
-        } => Some(Observation {
-            domain: "meta".into(),
-            content: format!(
-                "Autotuner {verdict}: trial {trial_id}, improvement {improvement_pct:.1}%, params: {}",
+            ..
+        } => {
+            let params_text = if affected_params.is_empty() {
+                "general parameters".into()
+            } else {
                 affected_params.join(", ")
-            ),
-            importance: 0.8,
-            source_event: "AutotunerDecision".into(),
-            timestamp: now,
-        }),
+            };
+            let content = if verdict == "reverted" {
+                format!(
+                    "I noticed a recent change to {params_text} wasn't working well and reverted to my previous approach."
+                )
+            } else {
+                format!(
+                    "I refined how I handle your requests — adjusted {params_text}, \
+                     improving response alignment by {improvement_pct:.1}%."
+                )
+            };
+            Some(Observation {
+                domain: "meta".into(),
+                content,
+                importance: if verdict == "reverted" { 0.9 } else { 0.8 },
+                source_event: "AutotunerDecision".into(),
+                timestamp: now,
+            })
+        }
         DomainEvent::BudgetAlert {
             category,
             spent,

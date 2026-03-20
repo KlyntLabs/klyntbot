@@ -18,7 +18,7 @@ use config::AutoTunerConfig;
 use providers::{ChatParams, DynProvider, Message};
 use scheduling::{CronSchedule, CronService, JobCallback};
 use storage::rows::trial::{ExperimentRow, TrialRow};
-use storage::{LearningStateRepo, TrialRepo};
+use storage::{LearningStateRepo, OverallStats, StrategyRepo, TrialRepo};
 use tokio::sync::RwLock;
 use tracing::{error, info, warn};
 
@@ -46,6 +46,8 @@ pub struct AutoTunerOrchestrator {
     trial_repo: TrialRepo,
     provider: DynProvider,
     model: String,
+    strategy_repo: Option<StrategyRepo>,
+    episodic_memory_repo: Option<cognitive::EpisodicMemoryRepo>,
 }
 
 impl AutoTunerOrchestrator {
@@ -64,7 +66,21 @@ impl AutoTunerOrchestrator {
             trial_repo,
             provider,
             model,
+            strategy_repo: None,
+            episodic_memory_repo: None,
         }
+    }
+
+    /// Set the strategy repo for generation context enrichment.
+    pub fn with_strategy_repo(mut self, repo: StrategyRepo) -> Self {
+        self.strategy_repo = Some(repo);
+        self
+    }
+
+    /// Set the episodic memory repo for generation context enrichment.
+    pub fn with_episodic_memory_repo(mut self, repo: cognitive::EpisodicMemoryRepo) -> Self {
+        self.episodic_memory_repo = Some(repo);
+        self
     }
 
     /// Load the persisted champion from the learning_state table, falling
@@ -253,6 +269,20 @@ impl AutoTunerOrchestrator {
                             correction_rate = trial_result.correction_rate,
                             "promoting trial to champion"
                         );
+
+                        // Compute event fields before moving values into new_champion.
+                        let improvement_pct =
+                            if champion.baseline_metrics.correction_rate > 0.0 {
+                                (champion.baseline_metrics.correction_rate
+                                    - trial_result.correction_rate)
+                                    / champion.baseline_metrics.correction_rate
+                                    * 100.0
+                            } else {
+                                0.0
+                            };
+                        let affected_params =
+                            autotuner::affected_param_names(&champion.params, &params);
+
                         let new_champion = Champion {
                             trial_id: Some(trial_id),
                             params,
@@ -277,8 +307,8 @@ impl AutoTunerOrchestrator {
                                 verdict: autotuner::TrialStatus::Promoted
                                     .as_str()
                                     .to_string(),
-                                improvement_pct: 0.0,
-                                affected_params: vec![],
+                                improvement_pct,
+                                affected_params,
                             });
                         }
                     }
@@ -325,6 +355,26 @@ impl AutoTunerOrchestrator {
                                             "auto-rollback triggered after {days} regression days \
                                              — reverting to previous champion"
                                         );
+
+                                        // Compute event fields before overwriting champ.
+                                        let rollback_improvement_pct = if prev_champion
+                                            .baseline_metrics
+                                            .correction_rate
+                                            > 0.0
+                                        {
+                                            (prev_champion.baseline_metrics.correction_rate
+                                                - champ.baseline_metrics.correction_rate)
+                                                / prev_champion.baseline_metrics.correction_rate
+                                                * 100.0
+                                        } else {
+                                            0.0
+                                        };
+                                        let rollback_affected_params =
+                                            autotuner::affected_param_names(
+                                                &champ.params,
+                                                &prev_champion.params,
+                                            );
+
                                         // Reset regression counter on the previous champion.
                                         let mut restored = prev_champion;
                                         restored.consecutive_regression_days = 0;
@@ -351,8 +401,8 @@ impl AutoTunerOrchestrator {
                                                     verdict: autotuner::TrialStatus::Reverted
                                                         .as_str()
                                                         .to_string(),
-                                                    improvement_pct: 0.0,
-                                                    affected_params: vec![],
+                                                    improvement_pct: rollback_improvement_pct,
+                                                    affected_params: rollback_affected_params,
                                                 },
                                             );
                                         }
@@ -453,6 +503,61 @@ impl AutoTunerOrchestrator {
     }
 }
 
+/// Build a human-readable 7-day trend summary from strategy stats and agreement rate.
+fn build_trend_summary(stats: &OverallStats, agreement_rate: f64) -> String {
+    let satisfaction = stats
+        .avg_satisfaction
+        .map(|s| format!("{:.0}%", s * 100.0))
+        .unwrap_or_else(|| "no data".into());
+    format!(
+        "Last 7 days: {} messages processed, {:.1}% classification accuracy, \
+         {}ms avg response time, {:.1}% routing stability, {} user satisfaction.",
+        stats.total_records,
+        stats.accuracy * 100.0,
+        stats.avg_response_time_ms,
+        agreement_rate * 100.0,
+        satisfaction,
+    )
+}
+
+/// Build a behavioral context string from per-strategy summaries.
+fn build_behavioral_context(summaries: &[storage::StrategySummaryRow]) -> String {
+    if summaries.is_empty() {
+        return "No strategy data available for the past 7 days.".to_string();
+    }
+    let mut lines = Vec::with_capacity(summaries.len() + 1);
+    lines.push("Per-strategy breakdown (last 7 days):".to_string());
+    for s in summaries {
+        let accuracy = if s.sample_count > 0 {
+            s.correct_count as f64 / s.sample_count as f64 * 100.0
+        } else {
+            0.0
+        };
+        lines.push(format!(
+            "- {}: {} samples, {:.1}% accuracy, {:.2} avg escalations",
+            s.predicted_strategy, s.sample_count, accuracy, s.avg_escalations,
+        ));
+    }
+    lines.join("\n")
+}
+
+/// Build a memory snapshot string from recent episodic memories.
+fn build_memory_snapshot(memories: &[cognitive::EpisodicMemory]) -> String {
+    if memories.is_empty() {
+        return "No recent episodic memories.".to_string();
+    }
+    let mut lines = Vec::with_capacity(memories.len() + 1);
+    lines.push(format!("Recent episodic memories ({}):", memories.len()));
+    for m in memories {
+        let summary = m
+            .summary
+            .as_deref()
+            .unwrap_or_else(|| &m.content[..m.content.len().min(80)]);
+        lines.push(format!("- [{}] {}", m.domain.as_str(), summary));
+    }
+    lines.join("\n")
+}
+
 /// Run the LLM generation step: build context, call the LLM, parse the response,
 /// and create an experiment + trial records.
 async fn run_llm_generation(orch: &AutoTunerOrchestrator) -> common::Result<()> {
@@ -488,13 +593,53 @@ async fn run_llm_generation(orch: &AutoTunerOrchestrator) -> common::Result<()> 
         _ => None,
     };
 
+    // ── Build enriched context from real data (fall back to placeholders) ──
+    let seven_days_ago = chrono::Utc::now() - chrono::Duration::days(7);
+
+    let trend_summary = if let Some(ref strategy_repo) = orch.strategy_repo {
+        let stats = strategy_repo
+            .get_stats_since(seven_days_ago)
+            .await
+            .unwrap_or(OverallStats {
+                total_records: 0,
+                accuracy: 0.0,
+                avg_response_time_ms: 0,
+                avg_satisfaction: None,
+            });
+        let agreement_rate = orch
+            .trial_repo
+            .shadow_log_agreement_rate(None, seven_days_ago)
+            .await
+            .unwrap_or(1.0);
+        build_trend_summary(&stats, agreement_rate)
+    } else {
+        "Trend data not yet available.".to_string()
+    };
+
+    let behavioral_context = if let Some(ref strategy_repo) = orch.strategy_repo {
+        let summaries = strategy_repo
+            .get_strategy_summaries(seven_days_ago)
+            .await
+            .unwrap_or_default();
+        build_behavioral_context(&summaries)
+    } else {
+        "Behavioral data not yet available.".to_string()
+    };
+
+    let memory_snapshot = if let Some(ref episodic_repo) = orch.episodic_memory_repo {
+        let memories = episodic_repo.list_recent(10).await.unwrap_or_default();
+        build_memory_snapshot(&memories)
+    } else {
+        "Memory snapshot not yet available.".to_string()
+    };
+
     let context = GenerationContext {
         champion_params: champion.params.clone(),
         champion_metrics: champion.baseline_metrics.clone(),
         recent_trials,
-        trend_summary: "Trend data not yet available.".to_string(),
-        behavioral_context: "Behavioral data not yet available.".to_string(),
-        memory_snapshot: "Memory snapshot not yet available.".to_string(),
+        trend_summary,
+        behavioral_context,
+        memory_snapshot,
         previous_recommendation,
         experiment_pace,
     };
@@ -715,5 +860,109 @@ mod tests {
         let orch = make_orch(champion, true).await;
         let summary = orch.champion_summary().await;
         assert!(summary.days_active >= 3);
+    }
+
+    #[test]
+    fn build_trend_summary_formats_correctly() {
+        let stats = OverallStats {
+            total_records: 150,
+            accuracy: 0.873,
+            avg_response_time_ms: 420,
+            avg_satisfaction: Some(0.82),
+        };
+        let result = build_trend_summary(&stats, 0.91);
+        assert!(result.contains("150 messages processed"));
+        assert!(result.contains("87.3% classification accuracy"));
+        assert!(result.contains("420ms avg response time"));
+        assert!(result.contains("91.0% routing stability"));
+        assert!(result.contains("82% user satisfaction"));
+    }
+
+    #[test]
+    fn build_trend_summary_handles_no_satisfaction() {
+        let stats = OverallStats {
+            total_records: 0,
+            accuracy: 0.0,
+            avg_response_time_ms: 0,
+            avg_satisfaction: None,
+        };
+        let result = build_trend_summary(&stats, 1.0);
+        assert!(result.contains("no data"));
+    }
+
+    #[test]
+    fn build_behavioral_context_with_data() {
+        let summaries = vec![
+            storage::StrategySummaryRow {
+                predicted_strategy: "DirectResponse".to_string(),
+                sample_count: 80,
+                correct_count: 72,
+                avg_escalations: 0.1,
+            },
+            storage::StrategySummaryRow {
+                predicted_strategy: "ToolAssisted".to_string(),
+                sample_count: 40,
+                correct_count: 35,
+                avg_escalations: 1.5,
+            },
+        ];
+        let result = build_behavioral_context(&summaries);
+        assert!(result.contains("DirectResponse"));
+        assert!(result.contains("80 samples"));
+        assert!(result.contains("90.0% accuracy"));
+        assert!(result.contains("ToolAssisted"));
+    }
+
+    #[test]
+    fn build_behavioral_context_empty() {
+        let result = build_behavioral_context(&[]);
+        assert!(result.contains("No strategy data"));
+    }
+
+    #[test]
+    fn build_memory_snapshot_with_data() {
+        let memories = vec![
+            cognitive::EpisodicMemory {
+                id: "m1".into(),
+                domain: "productivity".into(),
+                content: "Completed sprint review with team".into(),
+                summary: Some("Sprint review completed".into()),
+                importance: 0.8,
+                occurred_at: "2026-03-19T10:00:00".into(),
+                recorded_at: "2026-03-19T10:00:00".into(),
+                stability: 1.0,
+                last_accessed: None,
+                access_count: 0,
+                project_id: None,
+                scope_type: "system".into(),
+                scope_id: None,
+            },
+            cognitive::EpisodicMemory {
+                id: "m2".into(),
+                domain: "finance".into(),
+                content: "Reviewed monthly budget allocation".into(),
+                summary: None,
+                importance: 0.6,
+                occurred_at: "2026-03-18T14:00:00".into(),
+                recorded_at: "2026-03-18T14:00:00".into(),
+                stability: 1.0,
+                last_accessed: None,
+                access_count: 0,
+                project_id: None,
+                scope_type: "system".into(),
+                scope_id: None,
+            },
+        ];
+        let result = build_memory_snapshot(&memories);
+        assert!(result.contains("[productivity]"));
+        assert!(result.contains("Sprint review completed"));
+        assert!(result.contains("[finance]"));
+        assert!(result.contains("Reviewed monthly budget allocation"));
+    }
+
+    #[test]
+    fn build_memory_snapshot_empty() {
+        let result = build_memory_snapshot(&[]);
+        assert!(result.contains("No recent episodic memories"));
     }
 }

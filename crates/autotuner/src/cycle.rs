@@ -222,6 +222,27 @@ fn correction_improvement(trial: &TrialResult, baseline: &TrialResult) -> f64 {
     (baseline.correction_rate - trial.correction_rate) / baseline.correction_rate
 }
 
+/// Returns the names of `TrialParams` fields that differ between two param sets.
+pub fn affected_param_names(old: &TrialParams, new: &TrialParams) -> Vec<String> {
+    let mut names = Vec::new();
+    macro_rules! check_field {
+        ($field:ident) => {
+            if old.$field != new.$field {
+                names.push(stringify!($field).to_string());
+            }
+        };
+    }
+    check_field!(skill_keyword_weight);
+    check_field!(skill_semantic_weight);
+    check_field!(skill_activation_threshold);
+    check_field!(heuristic_confidence_threshold);
+    check_field!(llm_classifier_timeout_ms);
+    check_field!(relevance_weight_semantic);
+    check_field!(relevance_weight_retrievability);
+    check_field!(relevance_weight_situation);
+    names
+}
+
 /// Small bonus for parameter-space diversity, scaled to [0, 0.1].
 fn diversity_bonus(distance: f64, max_distance: f64) -> f64 {
     if max_distance <= 0.0 {
@@ -577,6 +598,25 @@ mod tests {
         assert!((super::diversity_bonus(10.0, 10.0) - 0.1).abs() < 1e-9);
         assert!((super::diversity_bonus(0.0, 10.0) - 0.0).abs() < 1e-9);
         assert!((super::diversity_bonus(5.0, 0.0) - 0.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn affected_param_names_finds_differences() {
+        let old = TrialParams {
+            heuristic_confidence_threshold: Some(0.7),
+            skill_keyword_weight: Some(0.5),
+            ..Default::default()
+        };
+        let new = TrialParams {
+            heuristic_confidence_threshold: Some(0.8),
+            skill_keyword_weight: Some(0.5),
+            skill_semantic_weight: Some(0.3),
+            ..Default::default()
+        };
+        let names = super::affected_param_names(&old, &new);
+        assert!(names.contains(&"heuristic_confidence_threshold".to_string()));
+        assert!(names.contains(&"skill_semantic_weight".to_string()));
+        assert!(!names.contains(&"skill_keyword_weight".to_string()));
     }
 
     // ── Integration tests ──────────────────────────────────────────────

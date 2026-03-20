@@ -128,14 +128,19 @@ pub(super) async fn init_cron(
         let learning_state = repos.learning_state.clone();
         let champion =
             agent::autotuner::AutoTunerOrchestrator::load_champion(&learning_state).await;
-        let orchestrator = Arc::new(agent::autotuner::AutoTunerOrchestrator::new(
-            champion,
-            true,
-            learning_state,
-            trial_repo.clone(),
-            autotuner_provider,
-            config.agents.defaults.model.clone(),
-        ));
+        let episodic_memory_repo = cognitive::EpisodicMemoryRepo::new(repos.pool().clone());
+        let orchestrator = Arc::new(
+            agent::autotuner::AutoTunerOrchestrator::new(
+                champion,
+                true,
+                learning_state,
+                trial_repo.clone(),
+                autotuner_provider,
+                config.agents.defaults.model.clone(),
+            )
+            .with_strategy_repo(repos.strategies.clone())
+            .with_episodic_memory_repo(episodic_memory_repo),
+        );
         agent::autotuner::AutoTunerOrchestrator::register_nightly_cycle(
             Arc::clone(&orchestrator),
             &mut cron_service,

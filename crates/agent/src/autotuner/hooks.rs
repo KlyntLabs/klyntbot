@@ -264,6 +264,78 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn on_message_completed_updates_ground_truth() {
+        let pool = storage::StoragePool::connect_in_memory().await.unwrap();
+        let trial_repo = TrialRepo::new(pool.inner().clone());
+        trial_repo.migrate().await.unwrap();
+        let orchestrator = make_orchestrator(&pool, true).await;
+
+        // Create experiment + trial + shadow log entry with pending ground truth
+        let exp = storage::rows::trial::ExperimentRow {
+            id: "exp-gt".to_string(),
+            hypothesis: "test".to_string(),
+            trend_analysis: "test".to_string(),
+            recommendation_for_next: "test".to_string(),
+            created_at: chrono::Utc::now().to_rfc3339(),
+        };
+        trial_repo.create_experiment(&exp).await.unwrap();
+
+        let trial = storage::rows::trial::TrialRow {
+            id: "trial-gt".to_string(),
+            experiment_id: "exp-gt".to_string(),
+            params: serde_json::to_string(&TrialParams::default()).unwrap(),
+            generation_reasoning: "test".to_string(),
+            status: "active".to_string(),
+            created_at: chrono::Utc::now().to_rfc3339(),
+            completed_at: None,
+            result: None,
+        };
+        trial_repo.create_trial(&trial).await.unwrap();
+
+        // Insert a shadow log with pending ground truth
+        trial_repo
+            .insert_shadow_log(
+                "trial-gt",
+                &chrono::Utc::now().to_rfc3339(),
+                "chat-gt",
+                "general",
+                "direct",
+                0.9,
+                1,
+                "pending",
+                "pending",
+            )
+            .await
+            .unwrap();
+
+        let hook = AutoTunerHookImpl::new(
+            orchestrator,
+            trial_repo.clone(),
+            Arc::new(PanickingProvider) as DynProvider,
+            "mock",
+            &OrchestratorConfig::default(),
+        );
+
+        // Call on_message_completed — should update ground truth from "pending"
+        hook.on_message_completed("chat-gt", "general", "reactive", 100, 500)
+            .await;
+
+        // Verify ground truth was filled: predicted_mode=direct vs control_mode=reactive
+        // means 0% agreement for this trial
+        let rate = trial_repo
+            .shadow_log_agreement_rate(
+                Some("trial-gt"),
+                chrono::Utc::now() - chrono::Duration::hours(1),
+            )
+            .await
+            .unwrap();
+        assert!(
+            (rate - 0.0).abs() < f64::EPSILON,
+            "Expected 0.0 agreement (predicted=direct, actual=reactive), got {rate}"
+        );
+    }
+
+    #[tokio::test]
     async fn hook_runs_shadow_classification_for_active_trials() {
         let pool = storage::StoragePool::connect_in_memory().await.unwrap();
         let trial_repo = TrialRepo::new(pool.inner().clone());
