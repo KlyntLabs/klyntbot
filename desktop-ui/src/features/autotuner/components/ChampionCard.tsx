@@ -1,14 +1,24 @@
 import { useMutation } from "@shared/hooks/useMutation";
 import { FlaskConical, Pause, Play, RotateCcw, Trophy } from "lucide-react";
-import type { AutoTunerStatus } from "../types";
+import type { AutoTunerStatus, MetricsHealth } from "../types";
+import { BrainHealthBadge } from "./BrainHealthBadge";
 
 interface ChampionCardProps {
   status: AutoTunerStatus;
   onRefetch: () => void;
 }
 
+function MetricDot({ available, label }: { available: boolean; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span className={`h-1.5 w-1.5 rounded-full ${available ? "bg-success" : "bg-dim"}`} />
+      <span className="text-[10px] font-light text-dim">{label}</span>
+    </span>
+  );
+}
+
 export function ChampionCard({ status, onRefetch }: ChampionCardProps) {
-  const { champion, activeExperiment, paused } = status;
+  const { champion, activeExperiment, paused, brainGrowth, metricsHealth } = status;
 
   const { mutate: revert, loading: reverting } = useMutation("autotuner_revert");
   const { mutate: pause } = useMutation("autotuner_pause");
@@ -75,6 +85,18 @@ export function ChampionCard({ status, onRefetch }: ChampionCardProps) {
         </p>
       </div>
 
+      {/* Brain health */}
+      {brainGrowth && (
+        <div className="mt-1 pt-3 border-t border-border flex flex-col gap-2">
+          <BrainHealthBadge />
+          <p className="text-[10px] font-light text-dim">
+            {brainGrowth.correctionsCaptured7d} corrections &middot; {brainGrowth.trialsEvaluated7d}{" "}
+            evaluated &middot; {brainGrowth.promotedThisWeek} promoted
+          </p>
+          {metricsHealth && <MetricsHealthDots health={metricsHealth} />}
+        </div>
+      )}
+
       {/* Active experiment */}
       {activeExperiment && (
         <div className="mt-1 pt-3 border-t border-border flex flex-col gap-1">
@@ -91,6 +113,16 @@ export function ChampionCard({ status, onRefetch }: ChampionCardProps) {
           </p>
         </div>
       )}
+    </div>
+  );
+}
+
+function MetricsHealthDots({ health }: { health: MetricsHealth }) {
+  return (
+    <div className="flex items-center gap-3">
+      <MetricDot available={health.correctionRateAvailable} label="Corrections" />
+      <MetricDot available={health.tokenRateAvailable} label="Tokens" />
+      <MetricDot available={health.stabilityAvailable} label="Stability" />
     </div>
   );
 }

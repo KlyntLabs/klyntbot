@@ -1,4 +1,4 @@
-import { AmbientIndicator } from "@features/autotuner";
+import { AmbientIndicator, PromotionToast, usePromotionListener } from "@features/autotuner";
 import { ipc } from "@shared/hooks/useIpc";
 import { useQuery } from "@shared/hooks/useQuery";
 import { useSetToggle } from "@shared/hooks/useSetToggle";
@@ -105,6 +105,15 @@ export function ChatPage() {
       return next;
     });
   }, []);
+
+  // ── Autotuner promotion toast ──────────────────────────────────────────
+  const [promotionImpact, setPromotionImpact] = useState<string | null>(null);
+  usePromotionListener((impact) => setPromotionImpact(impact));
+  useEffect(() => {
+    if (!promotionImpact) return;
+    const timer = setTimeout(() => setPromotionImpact(null), 15_000);
+    return () => clearTimeout(timer);
+  }, [promotionImpact]);
 
   const lastAssistantTransparency = useMemo(() => {
     for (let i = chat.messages.length - 1; i >= 0; i--) {
@@ -367,6 +376,14 @@ export function ChatPage() {
         </div>
 
         <CoachingNudge isStreaming={chat.isStreaming} />
+
+        {promotionImpact && (
+          <div className="px-6 pb-2">
+            <div className="max-w-3xl mx-auto">
+              <PromotionToast impact={promotionImpact} onDismiss={() => setPromotionImpact(null)} />
+            </div>
+          </div>
+        )}
 
         <ChatInput
           input={chat.input}

@@ -615,6 +615,7 @@ fn run_desktop_app() {
             commands::autotuner::autotuner_revert,
             commands::autotuner::autotuner_pause,
             commands::autotuner::autotuner_resume,
+            commands::autotuner::autotuner_set_pace,
             // Window
             // Work Contexts
             commands::work_context::list_work_contexts,

@@ -14,6 +14,7 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "autotuner_revert",
     "autotuner_pause",
     "autotuner_resume",
+    "autotuner_set_pace",
 ];
 
 #[tauri::command]
@@ -44,6 +45,14 @@ pub async fn autotuner_resume(state: State<'_, Arc<AppCore>>) -> Result<(), ApiE
     state.autotuner_resume().await
 }
 
+#[tauri::command]
+pub async fn autotuner_set_pace(
+    state: State<'_, Arc<AppCore>>,
+    pace: String,
+) -> Result<(), ApiError> {
+    state.autotuner_set_pace(&pace).await
+}
+
 // ── Dev server dispatch ──────────────────────────────────────────────────
 
 #[cfg(debug_assertions)]
@@ -52,7 +61,7 @@ pub(crate) async fn dispatch_dev(
     core: &AppCore,
     body: &serde_json::Value,
 ) -> Option<Result<serde_json::Value, ApiError>> {
-    use super::dev_helpers as dev;
+    use super::dev_helpers::{self as dev, try_field};
     Some(match cmd {
         "autotuner_status" => dev::val(core.autotuner_status().await),
         "autotuner_history" => {
@@ -62,6 +71,10 @@ pub(crate) async fn dispatch_dev(
         "autotuner_revert" => dev::val(core.autotuner_revert().await),
         "autotuner_pause" => dev::val(core.autotuner_pause().await),
         "autotuner_resume" => dev::val(core.autotuner_resume().await),
+        "autotuner_set_pace" => {
+            let pace = try_field!(dev::get_str(body, "pace"));
+            dev::val(core.autotuner_set_pace(&pace).await)
+        }
         _ => return None,
     })
 }

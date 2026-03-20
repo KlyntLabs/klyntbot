@@ -38,6 +38,7 @@ export interface AutoTunerStatus {
   paused: boolean;
   brainGrowth: BrainGrowth | null;
   metricsHealth: MetricsHealth | null;
+  experimentPace: string | null;
 }
 
 export interface ParamChange {

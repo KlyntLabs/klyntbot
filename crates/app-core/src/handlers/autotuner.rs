@@ -1,6 +1,6 @@
 //! AutoTuner transparency handlers — status, history, revert, pause/resume.
 
-use agent::autotuner::{PAUSED_KEY, PREVIOUS_CHAMPION_KEY};
+use agent::autotuner::{EXPERIMENT_PACE_KEY, PAUSED_KEY, PREVIOUS_CHAMPION_KEY};
 use desktop_shared::errors::ApiError;
 use serde::{Deserialize, Serialize};
 use tracing::info;
@@ -33,6 +33,7 @@ pub struct AutoTunerStatus {
     pub paused: bool,
     pub brain_growth: Option<BrainGrowth>,
     pub metrics_health: Option<MetricsHealth>,
+    pub experiment_pace: Option<String>,
 }
 
 impl AppCore {
@@ -44,6 +45,19 @@ impl AppCore {
             let paused = match orch.learning_state_repo().get_value(PAUSED_KEY).await {
                 Ok(Some(val)) => val.as_bool().unwrap_or(false),
                 _ => false,
+            };
+
+            // Read experiment pace preference, defaulting to "balanced".
+            let experiment_pace = match orch
+                .learning_state_repo()
+                .get_value(EXPERIMENT_PACE_KEY)
+                .await
+            {
+                Ok(Some(val)) => val
+                    .as_str()
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|| "balanced".into()),
+                _ => "balanced".into(),
             };
 
             // Get the most recent active experiment as the current experiment.
@@ -102,6 +116,7 @@ impl AppCore {
                 paused,
                 brain_growth,
                 metrics_health,
+                experiment_pace: Some(experiment_pace),
             })
         } else {
             Ok(AutoTunerStatus {
@@ -117,6 +132,7 @@ impl AppCore {
                 paused: false,
                 brain_growth: None,
                 metrics_health: None,
+                experiment_pace: None,
             })
         }
     }
@@ -217,5 +233,31 @@ impl AppCore {
                 "AutoTuner is not enabled",
             ))
         }
+    }
+
+    pub async fn autotuner_set_pace(&self, pace: &str) -> Result<(), ApiError> {
+        let orch = self
+            .autotuner_orchestrator()
+            .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "AutoTuner is not enabled"))?;
+        match pace {
+            "conservative" | "balanced" | "bold" => {}
+            _ => {
+                return Err(ApiError::new(
+                    "VALIDATION",
+                    "pace must be conservative, balanced, or bold",
+                ))
+            }
+        }
+        orch.learning_state_repo()
+            .set(
+                EXPERIMENT_PACE_KEY,
+                &serde_json::Value::String(pace.into()),
+            )
+            .await
+            .map_err(|e| {
+                ApiError::new("INTERNAL", format!("failed to set experiment pace: {e}"))
+            })?;
+        info!(pace, "autotuner experiment pace updated");
+        Ok(())
     }
 }

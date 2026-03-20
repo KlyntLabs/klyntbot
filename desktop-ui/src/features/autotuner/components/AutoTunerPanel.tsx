@@ -1,6 +1,7 @@
 import { useAutoTunerHistory } from "../hooks/useAutoTunerHistory";
 import { useAutoTunerStatus } from "../hooks/useAutoTunerStatus";
 import { ChampionCard } from "./ChampionCard";
+import { ExperimentPaceControl } from "./ExperimentPaceControl";
 import { ExperimentTimeline } from "./ExperimentTimeline";
 
 export function AutoTunerPanel() {
@@ -37,6 +38,7 @@ export function AutoTunerPanel() {
   return (
     <div className="flex flex-col gap-3">
       <ChampionCard status={status} onRefetch={refetch} />
+      {status.enabled && !status.paused && <ExperimentPaceControl />}
       <ExperimentTimeline experiments={history} loading={historyLoading} />
     </div>
   );
