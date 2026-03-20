@@ -36,6 +36,29 @@ pub struct ShadowPrediction {
     pub deferred_to_llm: bool,
 }
 
+/// Runs memory retrieval with trial parameter overrides for shadow scoring.
+/// Returns a summary struct rather than raw MemoryEntry to avoid a dependency
+/// from autotuner (L4) on cognitive (L5). The concrete AgentShadowRetriever
+/// in the agent crate converts MemoryEntry → ShadowRetrievalResult.
+#[async_trait]
+pub trait ShadowRetriever: Send + Sync {
+    async fn retrieve_shadow(
+        &self,
+        query: &str,
+        context: &ShadowContext,
+        params: &TrialParams,
+    ) -> common::Result<ShadowRetrievalResult>;
+}
+
+/// Result of a shadow memory retrieval for one trial variant.
+#[derive(Debug, Clone)]
+pub struct ShadowRetrievalResult {
+    pub memory_ids: Vec<String>,
+    pub avg_score: f64,
+    pub avg_age_days: f64,
+    pub total_retrieved: usize,
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct MetricSnapshot {
     pub correction_rate: f64,
@@ -46,4 +69,8 @@ pub struct MetricSnapshot {
     pub memory_relevance: f64,
     pub user_satisfaction: Option<f64>,
     pub total_messages: u32,
+    // Phase 2: fraction of messages where shadow retrieval overlapped with control
+    pub retrieval_precision: f64,
+    // Phase 2: average age (days) of retrieved memories
+    pub memory_freshness: f64,
 }

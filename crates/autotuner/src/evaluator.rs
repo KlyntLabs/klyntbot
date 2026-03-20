@@ -229,6 +229,7 @@ mod tests {
             routing_stability: 0.90,
             memory_relevance: 0.80,
             user_satisfaction: None,
+            ..Default::default()
         }
     }
 
@@ -252,6 +253,7 @@ mod tests {
             routing_stability: 0.8505,
             memory_relevance: 0.7656,
             user_satisfaction: None,
+            ..Default::default()
         };
 
         let verdict = evaluator.evaluate(&trial, &b);

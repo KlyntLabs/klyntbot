@@ -110,6 +110,8 @@ impl MetricSource for AgentMetricCollector {
             memory_relevance,
             user_satisfaction: stats.avg_satisfaction,
             total_messages: stats.total_records as u32,
+            retrieval_precision: 0.0, // Phase 2: wired in Task 6
+            memory_freshness: 0.0,    // Phase 2: wired in Task 6
         })
     }
 }

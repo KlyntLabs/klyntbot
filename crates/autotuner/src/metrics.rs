@@ -44,6 +44,11 @@ pub fn aggregate_to_result(trial_id: Uuid, snapshots: &[MetricSnapshot]) -> Tria
             .sum(),
         routing_stability: snapshots.iter().map(|s| s.routing_stability * w(s)).sum(),
         memory_relevance: snapshots.iter().map(|s| s.memory_relevance * w(s)).sum(),
+        retrieval_precision: snapshots
+            .iter()
+            .map(|s| s.retrieval_precision * w(s))
+            .sum(),
+        memory_freshness: snapshots.iter().map(|s| s.memory_freshness * w(s)).sum(),
         user_satisfaction: {
             let sats: Vec<(f64, f64)> = snapshots
                 .iter()
@@ -73,6 +78,7 @@ mod tests {
             memory_relevance: 0.50,
             user_satisfaction: Some(0.30),
             total_messages: 10,
+            ..Default::default()
         };
         let large = MetricSnapshot {
             correction_rate: 0.10,
@@ -83,6 +89,7 @@ mod tests {
             memory_relevance: 0.85,
             user_satisfaction: Some(0.80),
             total_messages: 90,
+            ..Default::default()
         };
 
         let result = aggregate_to_result(Uuid::nil(), &[small, large]);
@@ -142,6 +149,7 @@ mod tests {
             memory_relevance: 0.80,
             user_satisfaction: None,
             total_messages: 42,
+            ..Default::default()
         };
         let result = aggregate_to_result(Uuid::nil(), &[snap]);
         assert_eq!(result.messages_scored, 42);

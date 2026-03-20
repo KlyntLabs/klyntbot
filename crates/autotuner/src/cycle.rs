@@ -309,6 +309,7 @@ mod tests {
                 routing_stability: 0.90,
                 memory_relevance: 0.80,
                 user_satisfaction: None,
+                ..Default::default()
             },
             reason_for_promotion: "baseline".into(),
             impact_summary: "baseline".into(),
@@ -398,6 +399,7 @@ mod tests {
                 memory_relevance: 0.79,
                 user_satisfaction: None,
                 total_messages: 100,
+                ..Default::default()
             },
         );
         trial_snapshots.insert(
@@ -411,6 +413,7 @@ mod tests {
                 memory_relevance: 0.78,
                 user_satisfaction: None,
                 total_messages: 100,
+                ..Default::default()
             },
         );
 
@@ -488,6 +491,7 @@ mod tests {
                 memory_relevance: 0.79,
                 user_satisfaction: None,
                 total_messages: 100,
+                ..Default::default()
             },
         );
 
@@ -680,6 +684,7 @@ mod tests {
                 memory_relevance: 0.78,
                 user_satisfaction: None,
                 total_messages: 100,
+                ..Default::default()
             },
         );
 
@@ -697,6 +702,7 @@ mod tests {
                 memory_relevance: 0.79,
                 user_satisfaction: None,
                 total_messages: 100,
+                ..Default::default()
             },
         );
 
@@ -713,6 +719,7 @@ mod tests {
                 memory_relevance: 0.81,
                 user_satisfaction: None,
                 total_messages: 100,
+                ..Default::default()
             },
         );
 
@@ -820,6 +827,7 @@ mod tests {
                 memory_relevance: 0.78,
                 user_satisfaction: None,
                 total_messages: 100,
+                ..Default::default()
             },
         );
 
@@ -836,6 +844,7 @@ mod tests {
                 memory_relevance: 0.79,
                 user_satisfaction: None,
                 total_messages: 100,
+                ..Default::default()
             },
         );
 
@@ -853,6 +862,7 @@ mod tests {
                 memory_relevance: 0.736,
                 user_satisfaction: None,
                 total_messages: 100,
+                ..Default::default()
             },
         );
 

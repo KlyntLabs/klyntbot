@@ -70,6 +70,9 @@ pub struct TrialResult {
     pub routing_stability: f64,
     pub memory_relevance: f64,
     pub user_satisfaction: Option<f64>,
+    // Phase 2
+    pub retrieval_precision: f64,
+    pub memory_freshness: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

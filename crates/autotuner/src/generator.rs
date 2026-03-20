@@ -288,6 +288,7 @@ mod tests {
             routing_stability: 0.92,
             memory_relevance: 0.82,
             user_satisfaction: Some(0.75),
+            ..Default::default()
         }
     }
 
