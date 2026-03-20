@@ -8,6 +8,7 @@ import {
   GitBranch,
   ListChecks,
   Plug,
+  Rocket,
   SlidersHorizontal,
   User,
   Wrench,
@@ -26,6 +27,7 @@ const sections = [
   { label: "Git", path: "/settings/git", icon: GitBranch },
   { label: "Environments", path: "/settings/environments", icon: Container },
   { label: "Tasks & Notifications", path: "/settings/tasks", icon: ListChecks },
+  { label: "Launcher", path: "/settings/launcher", icon: Rocket },
   { label: "Integrations", path: "/settings/integrations", icon: Cable },
   { label: "Archived threads", path: "/settings/archived", icon: Archive },
 ];

@@ -73,6 +73,12 @@ interface LearningData {
   minOutcomesForAdaptation?: number;
 }
 
+interface ProviderManagerData {
+  primary?: string;
+  fallback?: string;
+  classifierModel?: string;
+}
+
 // ── Component ────────────────────────────────────────────────────────
 
 export function PersonalizationSettings() {
@@ -100,6 +106,9 @@ export function PersonalizationSettings() {
     { section: "cognitive" },
     {},
   );
+
+  const { data: providerManager, refetch: refetchProviderManager } =
+    useQuery<ProviderManagerData>("config_get_section", { section: "providerManager" }, {});
 
   // ── Provider state ───────────────────────────────────────────────
 
@@ -231,6 +240,35 @@ export function PersonalizationSettings() {
       toast.show("Failed to save cognitive config");
     } finally {
       setSavingCognitive(false);
+    }
+  };
+
+  // ── Provider Manager state ──────────────────────────────────────
+
+  const [pmEdits, setPmEdits] = useState<Record<string, unknown>>({});
+  const [savingPm, setSavingPm] = useState(false);
+
+  const pmVal = (key: string): string => {
+    if (key in pmEdits) return (pmEdits[key] ?? "") as string;
+    return ((providerManager as Record<string, unknown>)[key] ?? "") as string;
+  };
+
+  const hasPmChanges = Object.keys(pmEdits).length > 0;
+
+  const saveProviderManager = async () => {
+    setSavingPm(true);
+    try {
+      const patch: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(pmEdits)) {
+        patch[k] = v || null;
+      }
+      await ipc("config_update_section", { section: "providerManager", patch });
+      setPmEdits({});
+      refetchProviderManager();
+    } catch {
+      toast.show("Failed to save provider routing config");
+    } finally {
+      setSavingPm(false);
     }
   };
 
@@ -484,6 +522,71 @@ export function PersonalizationSettings() {
             </label>
 
             {hasLearningChanges && <SaveButton onClick={saveLearning} saving={savingLearning} />}
+          </div>
+        </SettingsCard>
+
+        {/* ── Provider Routing ──────────────────────────────────── */}
+        <SettingsCard title="Provider routing">
+          <div className="space-y-3">
+            <p className="text-[11px] text-dim">
+              Configure primary and fallback providers for automatic failover
+            </p>
+
+            <label className="block">
+              <span className="block text-[11px] text-muted-foreground mb-1">Primary provider</span>
+              <select
+                value={pmVal("primary")}
+                onChange={(e) => setPmEdits((prev) => ({ ...prev, primary: e.target.value }))}
+                className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+              >
+                <option value="" className="bg-popover">
+                  Auto (use agent default)
+                </option>
+                {PROVIDERS.map((p) => (
+                  <option key={p.value} value={p.value} className="bg-popover">
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block">
+              <span className="block text-[11px] text-muted-foreground mb-1">
+                Fallback provider
+              </span>
+              <select
+                value={pmVal("fallback")}
+                onChange={(e) => setPmEdits((prev) => ({ ...prev, fallback: e.target.value }))}
+                className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+              >
+                <option value="" className="bg-popover">
+                  None
+                </option>
+                {PROVIDERS.map((p) => (
+                  <option key={p.value} value={p.value} className="bg-popover">
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block">
+              <span className="block text-[11px] text-muted-foreground mb-1">
+                Classifier model
+              </span>
+              <p className="text-[11px] text-dim mb-1">
+                Model used to classify request complexity for routing decisions
+              </p>
+              <input
+                type="text"
+                value={pmVal("classifierModel")}
+                onChange={(e) => setPmEdits((prev) => ({ ...prev, classifierModel: e.target.value }))}
+                placeholder="e.g. claude-haiku"
+                className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+              />
+            </label>
+
+            {hasPmChanges && <SaveButton onClick={saveProviderManager} saving={savingPm} />}
           </div>
         </SettingsCard>
       </div>

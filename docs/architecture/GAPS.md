@@ -6,7 +6,7 @@
 ## Summary
 
 - **0 High** priority gaps -- OKR, Project CRUD, and Note UI gaps resolved
-- **7 Medium** priority gaps -- secondary features or partially integrated
+- **5 Medium** priority gaps -- secondary features or partially integrated
 - **6 Low** priority gaps -- nice-to-have, internal-only, or debug-only
 
 ---
@@ -170,7 +170,7 @@ Config sections are exposed via `config_get_section` / `config_update_section`. 
 | `notes` | Various | struct | **No** | Low |
 | `productivity` | `enabled`, `tracking.*`, `focus.*` | various | **No** | Medium |
 | `orchestrator` | Various | struct | **No** | Low |
-| `providerManager` | `primary`, `fallback`, routing | struct | **No** | Medium |
+| `providerManager` | `primary`, `fallback`, routing | struct | Yes (Personalization) | -- |
 | `cognitive` | `provider`, `model`, `temperature`, `maxTokens`, `reflectionMaxTokens` | various | Yes (Personalization) | -- |
 | `user` | `name` | string | Yes (setup wizard) | -- |
 | `workContext` | Various | struct | **No** | Low |
@@ -180,7 +180,7 @@ Config sections are exposed via `config_get_section` / `config_update_section`. 
 | `skills` | Various | struct | **No** | Low |
 | `integrations` | `aiTools.*` | struct | Partial (setup wizard AI tools step) | Low |
 | `language` | `sourceLang`, `targetLang`, `proficiency` | strings | Partial (via `useLanguageConfig` query) | Low |
-| `launcher` | `sources.*` (apps, clipboard, scripts, etc.) | struct | **No** | Medium |
+| `launcher` | `sources.*` (apps, clipboard, scripts, etc.) | struct | Yes (Launcher settings) | -- |
 | `scenario` | Various | struct | **No** | Low |
 | `shortcuts` | `launcher`, `tray`, `quickCapture` | strings | Yes (General settings) | -- |
 | `plugins` | `enabled`, `directory`, `autoUpdate` | various | **No** | Medium |
@@ -213,30 +213,22 @@ Config sections are exposed via `config_get_section` / `config_update_section`. 
    - Effort: 1 day
    - Add income report + trends charts to finance pages
 
-6. **Launcher Config UI** -- Launcher search sources (`launcher.sources.*`) not configurable from settings.
-    - Effort: 0.5 days
-    - Add launcher preferences section
-
-7. **Provider Manager Config** -- `providerManager` (primary/fallback routing) has no UI.
-    - Effort: 0.5 days
-    - Add provider fallback configuration to Personalization settings
-
 ### Low Priority (nice-to-have or internal-only)
 
-8. **Entity Graph Explorer** -- `entity_search`, `entity_merge`, `entity_get_neighborhood` exist but no dedicated entity management UI.
+6. **Entity Graph Explorer** -- `entity_search`, `entity_merge`, `entity_get_neighborhood` exist but no dedicated entity management UI.
     - Effort: 2 days
 
-9. **Agent Profiles UI** -- `agent_*` commands for managing custom agent profiles have no frontend.
+7. **Agent Profiles UI** -- `agent_*` commands for managing custom agent profiles have no frontend.
     - Effort: 1 day
 
-10. **Workspace File Browser** -- `workspace_*` commands have no frontend.
+8. **Workspace File Browser** -- `workspace_*` commands have no frontend.
     - Effort: 1 day
 
-11. **Cron Status Badge** -- `cron_status` not called; could show system health in automations page.
+9. **Cron Status Badge** -- `cron_status` not called; could show system health in automations page.
     - Effort: 0.5 days
 
-12. **Various Config Sections** -- Many config sections (confidence, conversation, content, skills, packs, scenario, orchestrator) have no settings UI. These are advanced tuning parameters that most users will never need.
+10. **Various Config Sections** -- Many config sections (confidence, conversation, content, skills, packs, scenario, orchestrator) have no settings UI. These are advanced tuning parameters that most users will never need.
     - Effort: Low priority; expose on demand
 
-13. **Flashcard Edit/Delete** -- `flashcard_update` and `flashcard_delete` not called from frontend.
+11. **Flashcard Edit/Delete** -- `flashcard_update` and `flashcard_delete` not called from frontend.
     - Effort: 0.5 days
