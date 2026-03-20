@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use autotuner::{
     build_generation_prompt, Champion, ChampionSummary, ExperimentSummary, GenerationContext,
-    GenerationResponse, MetricSource, NightlyCycle, TrialSummaryForPrompt,
+    GenerationResponse, MetricSource, NightlyCycle, ShadowClassifier, TrialSummaryForPrompt,
 };
 use bus::DomainEventBus;
 use common::TrialParams;
@@ -35,6 +35,8 @@ pub const PAUSED_KEY: &str = "autotuner_paused";
 pub const EXPERIMENT_PACE_KEY: &str = "autotuner_experiment_pace";
 /// Key used to persist the previous cycle recommendation.
 pub const RECOMMENDATION_KEY: &str = "autotuner_recommendation";
+/// Key used to persist the promotion toast count for the desktop UI.
+pub const TOAST_COUNT_KEY: &str = "autotuner_promotion_toast_count";
 
 /// Thin glue that holds the current champion state and exposes it to the
 /// agent runtime.  The nightly cycle updates the champion via
@@ -48,6 +50,7 @@ pub struct AutoTunerOrchestrator {
     model: String,
     strategy_repo: Option<StrategyRepo>,
     episodic_memory_repo: Option<cognitive::EpisodicMemoryRepo>,
+    session_repo: Option<storage::SessionRepo>,
 }
 
 impl AutoTunerOrchestrator {
@@ -68,6 +71,7 @@ impl AutoTunerOrchestrator {
             model,
             strategy_repo: None,
             episodic_memory_repo: None,
+            session_repo: None,
         }
     }
 
@@ -80,6 +84,12 @@ impl AutoTunerOrchestrator {
     /// Set the episodic memory repo for generation context enrichment.
     pub fn with_episodic_memory_repo(mut self, repo: cognitive::EpisodicMemoryRepo) -> Self {
         self.episodic_memory_repo = Some(repo);
+        self
+    }
+
+    /// Set the session repo for bootstrap replay (seeding first experiment from history).
+    pub fn with_session_repo(mut self, repo: storage::SessionRepo) -> Self {
+        self.session_repo = Some(repo);
         self
     }
 
@@ -501,6 +511,237 @@ impl AutoTunerOrchestrator {
         }
         Ok(summaries)
     }
+}
+
+/// Run bootstrap replay: seed the first experiment from real historical session data.
+///
+/// Skips if experiments already exist (not first startup). Loads sessions from the
+/// last 7 days, runs shadow classification with random parameter perturbations,
+/// matches predictions against strategy_records ground truth, and creates an
+/// experiment with the top 3 variants ranked by accuracy.
+pub async fn run_bootstrap_replay(orch: &AutoTunerOrchestrator) -> common::Result<()> {
+    use rand::Rng;
+    use rand::SeedableRng;
+
+    // 1. Check if experiments already exist — skip if so (not first startup).
+    let existing = orch
+        .trial_repo
+        .get_experiments(1)
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(format!("check experiments: {e}")))?;
+    if !existing.is_empty() {
+        info!("bootstrap replay: experiments already exist, skipping");
+        return Ok(());
+    }
+
+    // 2. Need session_repo and strategy_repo.
+    let session_repo = match &orch.session_repo {
+        Some(r) => r,
+        None => {
+            info!("bootstrap replay: no session_repo configured, skipping");
+            return Ok(());
+        }
+    };
+    let strategy_repo = match &orch.strategy_repo {
+        Some(r) => r,
+        None => {
+            info!("bootstrap replay: no strategy_repo configured, skipping");
+            return Ok(());
+        }
+    };
+
+    // 3. Load sessions from last 7 days.
+    let seven_days_ago = chrono::Utc::now() - chrono::Duration::days(7);
+    let sessions = session_repo
+        .list_sessions_since(seven_days_ago)
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(format!("list sessions: {e}")))?;
+    if sessions.is_empty() {
+        info!("bootstrap replay: no recent sessions found, skipping");
+        return Ok(());
+    }
+
+    // 4. Load strategy_records for ground truth matching.
+    let strategy_records = strategy_repo
+        .list_by_date_range(seven_days_ago, chrono::Utc::now())
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(format!("list strategy records: {e}")))?;
+    if strategy_records.is_empty() {
+        info!("bootstrap replay: no strategy records found, skipping");
+        return Ok(());
+    }
+
+    // 5. Generate 5 random parameter perturbations.
+    let mut rng = rand::rngs::SmallRng::from_os_rng();
+    let perturbations: Vec<TrialParams> = (0..5)
+        .map(|_| TrialParams {
+            skill_keyword_weight: Some(rng.random_range(0.30..=0.90)),
+            skill_semantic_weight: Some(rng.random_range(0.10..=0.70)),
+            skill_activation_threshold: Some(rng.random_range(0.20..=0.70)),
+            heuristic_confidence_threshold: Some(rng.random_range(0.60..=0.95)),
+            llm_classifier_timeout_ms: None,
+            relevance_weight_semantic: Some(rng.random_range(0.10..=0.50)),
+            relevance_weight_retrievability: Some(rng.random_range(0.05..=0.40)),
+            relevance_weight_situation: Some(rng.random_range(0.10..=0.40)),
+        })
+        .collect();
+
+    // 6. Build the shadow classifier.
+    let config = config::OrchestratorConfig::default();
+    let classifier = shadow_classifier::AgentShadowClassifier::new(
+        orch.provider.clone(),
+        &orch.model,
+        &config,
+    );
+
+    // 7. For each session's user messages, run shadow classification and compare
+    //    against ground truth strategy_records (matched by chat_id + timestamp ±30s).
+    let mut variant_scores: Vec<(usize, u32, u32)> = (0..5).map(|i| (i, 0u32, 0u32)).collect();
+
+    // Collect user messages from sessions (limit to 50 sessions to keep it fast).
+    let session_limit = sessions.len().min(50);
+    for session in sessions.iter().take(session_limit) {
+        let messages = session_repo
+            .get_messages(&session.key)
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(format!("get messages: {e}")))?;
+
+        // Extract chat_id from session key (format: "channel:chat_id").
+        let chat_id = session
+            .key
+            .split_once(':')
+            .map(|(_, id)| id)
+            .unwrap_or(&session.key)
+            .to_string();
+
+        let user_messages: Vec<_> = messages
+            .iter()
+            .filter(|m| m.role == "user")
+            .collect();
+
+        for msg in &user_messages {
+            let shadow_ctx = autotuner::ShadowContext {
+                chat_id: chat_id.clone(),
+                session_key: session.key.clone(),
+            };
+
+            // Find matching ground truth: strategy_record with same chat_id
+            // and timestamp within 30 seconds.
+            let ground_truth = strategy_records.iter().find(|sr| {
+                sr.chat_id.as_deref() == Some(&chat_id)
+                    && (sr.timestamp - msg.timestamp).num_seconds().abs() <= 30
+            });
+
+            let actual_mode = match ground_truth {
+                Some(sr) => sr.actual_strategy.clone(),
+                None => continue, // No ground truth for this message, skip.
+            };
+
+            // Run each perturbation and score it.
+            for (idx, params) in perturbations.iter().enumerate() {
+                match classifier
+                    .classify_shadow(&msg.content, &shadow_ctx, params)
+                    .await
+                {
+                    Ok(prediction) => {
+                        variant_scores[idx].2 += 1; // total
+                        if prediction.predicted_mode == actual_mode {
+                            variant_scores[idx].1 += 1; // correct
+                        }
+                    }
+                    Err(_) => {
+                        // Count as attempted but incorrect.
+                        variant_scores[idx].2 += 1;
+                    }
+                }
+            }
+        }
+    }
+
+    // 8. Sort results by accuracy descending.
+    variant_scores.sort_by(|a, b| {
+        let acc_a = if a.2 > 0 {
+            a.1 as f64 / a.2 as f64
+        } else {
+            0.0
+        };
+        let acc_b = if b.2 > 0 {
+            b.1 as f64 / b.2 as f64
+        } else {
+            0.0
+        };
+        acc_b.partial_cmp(&acc_a).unwrap_or(std::cmp::Ordering::Equal)
+    });
+
+    // Need at least one scored variant.
+    if variant_scores.iter().all(|v| v.2 == 0) {
+        info!("bootstrap replay: no messages matched ground truth, skipping");
+        return Ok(());
+    }
+
+    // 9. Create experiment with top 3 variants as active trials.
+    let experiment_id = uuid::Uuid::new_v4();
+    let now = chrono::Utc::now().to_rfc3339();
+    let top_accuracy = if variant_scores[0].2 > 0 {
+        variant_scores[0].1 as f64 / variant_scores[0].2 as f64 * 100.0
+    } else {
+        0.0
+    };
+
+    let experiment_row = ExperimentRow {
+        id: experiment_id.to_string(),
+        hypothesis: format!(
+            "Bootstrap replay: seeded from {} sessions, {} strategy records. \
+             Top variant accuracy: {:.1}%",
+            session_limit,
+            strategy_records.len(),
+            top_accuracy,
+        ),
+        trend_analysis: "Initial bootstrap — no prior experiments.".to_string(),
+        recommendation_for_next: "Continue with nightly LLM-generated experiments.".to_string(),
+        created_at: now.clone(),
+    };
+    orch.trial_repo
+        .create_experiment(&experiment_row)
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(format!("create experiment: {e}")))?;
+
+    let variant_count = variant_scores.len().min(3);
+    for &(idx, correct, total) in variant_scores.iter().take(3) {
+        let accuracy = if total > 0 {
+            correct as f64 / total as f64 * 100.0
+        } else {
+            0.0
+        };
+        let trial_id = uuid::Uuid::new_v4();
+        let params_json = serde_json::to_string(&perturbations[idx]).unwrap_or_default();
+        let trial_row = TrialRow {
+            id: trial_id.to_string(),
+            experiment_id: experiment_id.to_string(),
+            params: params_json,
+            generation_reasoning: format!(
+                "Bootstrap replay variant: {correct}/{total} correct ({accuracy:.1}% accuracy)"
+            ),
+            status: autotuner::TrialStatus::Active.as_str().to_string(),
+            created_at: now.clone(),
+            completed_at: None,
+            result: None,
+        };
+        orch.trial_repo
+            .create_trial(&trial_row)
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(format!("create trial: {e}")))?;
+    }
+
+    info!(
+        experiment_id = %experiment_id,
+        variants = variant_count,
+        sessions_scanned = session_limit,
+        strategy_records = strategy_records.len(),
+        "bootstrap replay: seeded initial experiment from historical data"
+    );
+
+    Ok(())
 }
 
 /// Build a human-readable 7-day trend summary from strategy stats and agreement rate.
@@ -964,5 +1205,136 @@ mod tests {
     fn build_memory_snapshot_empty() {
         let result = build_memory_snapshot(&[]);
         assert!(result.contains("No recent episodic memories"));
+    }
+
+    #[tokio::test]
+    async fn bootstrap_replay_noop_when_experiments_exist() {
+        let pool = setup_test_pool().await;
+        let learning_state = LearningStateRepo::new(pool.clone());
+        let trial_repo = TrialRepo::new(pool.clone());
+        let provider: DynProvider = Arc::new(providers::NoopProvider);
+
+        // Pre-create an experiment so bootstrap sees it's not first startup.
+        let exp = ExperimentRow {
+            id: uuid::Uuid::new_v4().to_string(),
+            hypothesis: "existing experiment".into(),
+            trend_analysis: "n/a".into(),
+            recommendation_for_next: "n/a".into(),
+            created_at: chrono::Utc::now().to_rfc3339(),
+        };
+        trial_repo.create_experiment(&exp).await.unwrap();
+
+        let orch = AutoTunerOrchestrator::new(
+            Champion::default(),
+            true,
+            learning_state,
+            trial_repo,
+            provider,
+            "test-model".to_string(),
+        );
+        // No session/strategy repos needed — should return early.
+        let result = run_bootstrap_replay(&orch).await;
+        assert!(result.is_ok());
+
+        // Verify no new experiments were created (still just the 1 we inserted).
+        let exps = orch.trial_repo.get_experiments(10).await.unwrap();
+        assert_eq!(exps.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn bootstrap_replay_noop_when_no_session_repo() {
+        let orch = make_orch(Champion::default(), true).await;
+        // No session_repo set — should return Ok early.
+        let result = run_bootstrap_replay(&orch).await;
+        assert!(result.is_ok());
+        // No experiments created.
+        let exps = orch.trial_repo.get_experiments(10).await.unwrap();
+        assert!(exps.is_empty());
+    }
+
+    #[tokio::test]
+    async fn bootstrap_replay_creates_experiment_with_history() {
+        // Use the full StoragePool to get sessions + strategy tables via migrations.
+        let storage_pool = storage::StoragePool::connect_in_memory().await.unwrap();
+        let raw_pool = storage_pool.inner().clone();
+
+        // Create autotuner tables on the same pool using individual statements
+        // (sqlx::query with multi-statement can leave connection in bad state).
+        for stmt in storage::repos::trial_repo::MIGRATION_SQL.split(';') {
+            let trimmed = stmt.trim();
+            if !trimmed.is_empty() {
+                sqlx::query(trimmed).execute(&raw_pool).await.unwrap();
+            }
+        }
+        let trial_repo = TrialRepo::new(raw_pool.clone());
+
+        let session_repo = storage::SessionRepo::new(raw_pool.clone());
+        let strategy_repo = StrategyRepo::new(raw_pool.clone());
+        let learning_state = LearningStateRepo::new(raw_pool.clone());
+        let provider: DynProvider = Arc::new(providers::NoopProvider);
+
+        // Create a session with a user message.
+        let session_key = "telegram:123";
+        session_repo
+            .upsert_session(session_key, &serde_json::json!({"title": "test"}), None)
+            .await
+            .unwrap();
+        let msg_ts = chrono::Utc::now();
+        session_repo
+            .batch_add_messages(
+                session_key,
+                &[uuid::Uuid::new_v4()],
+                &["user".to_string()],
+                &["create a task to review PR".to_string()],
+                &[msg_ts],
+                &[None],
+                &[None],
+                &[None],
+                &[None],
+            )
+            .await
+            .unwrap();
+
+        // Create a matching strategy record (same chat_id, timestamp within 30s).
+        let sr = storage::rows::learning::StrategyRecordRow {
+            id: uuid::Uuid::new_v4(),
+            timestamp: msg_ts,
+            request_id: "req-1".to_string(),
+            predicted_strategy: "ToolAssisted".to_string(),
+            actual_strategy: "reactive".to_string(),
+            escalation_count: 0,
+            iterations_used: 2,
+            max_iterations: 5,
+            success: true,
+            user_satisfaction: None,
+            response_time_ms: 300,
+            chat_id: Some("123".to_string()),
+            tool_name: None,
+            tool_success: None,
+            tool_duration_ms: None,
+            complexity_signals: serde_json::Value::Null,
+            execution_mode: None,
+            retrieved_memory_count: None,
+        };
+        strategy_repo.create(&sr).await.unwrap();
+
+        let orch = AutoTunerOrchestrator::new(
+            Champion::default(),
+            true,
+            learning_state,
+            trial_repo,
+            provider,
+            "test-model".to_string(),
+        )
+        .with_session_repo(session_repo)
+        .with_strategy_repo(strategy_repo);
+
+        let result = run_bootstrap_replay(&orch).await;
+        assert!(result.is_ok());
+
+        // Verify an experiment was created with trials.
+        let exps = orch.trial_repo.get_experiments(10).await.unwrap();
+        assert_eq!(exps.len(), 1);
+        assert!(exps[0].hypothesis.contains("Bootstrap replay"));
     }
 }

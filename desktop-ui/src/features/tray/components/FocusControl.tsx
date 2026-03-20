@@ -1,3 +1,4 @@
+import { useAutoTunerStatus } from "@features/autotuner";
 import { FOCUS_PRESETS, type FocusSettings, type useFocusTimer } from "@shared/hooks/useFocusTimer";
 import { formatElapsed, formatHumanDuration } from "@shared/lib/dates";
 import { Checkbox } from "@shared/ui";
@@ -12,7 +13,7 @@ import {
   Square,
   X,
 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 // ── SVG ring geometry ───────────────────────────────────────────────
 
@@ -136,6 +137,30 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const { data: autotunerStatus } = useAutoTunerStatus();
+  const [learningBannerDismissed, setLearningBannerDismissed] = useState(false);
+
+  // Reset the one-time banner each time a new focus session starts
+  useEffect(() => {
+    if (phase === "focus") setLearningBannerDismissed(false);
+  }, [phase]);
+
+  const showLearningLine =
+    phase === "focus" &&
+    autotunerStatus?.enabled &&
+    (autotunerStatus.champion?.days_active ?? 0) > 3 &&
+    !learningBannerDismissed;
+
+  // Auto-dismiss the learning banner after 8 seconds
+  useEffect(() => {
+    if (showLearningLine) {
+      const timer = setTimeout(() => {
+        setLearningBannerDismissed(true);
+      }, 8000);
+      return () => clearTimeout(timer);
+    }
+  }, [showLearningLine]);
 
   const isActive = phase === "focus" || phase === "break";
   const isBreak = phase === "break";
@@ -302,6 +327,10 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
             <p className="text-[10px] text-muted-foreground truncate max-w-[120px] mt-0.5">
               {timer.actionTitle}
             </p>
+          )}
+
+          {showLearningLine && (
+            <p className="text-[11px] text-muted/50 mt-1.5">Learning how you focus best...</p>
           )}
         </div>
       </div>

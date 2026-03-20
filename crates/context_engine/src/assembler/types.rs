@@ -51,4 +51,7 @@ pub struct AssembledContext {
     pub budget_remaining: usize,
     /// Context version — incremented on each expand() call.
     pub version: u32,
+    /// Number of memory entries retrieved from the memory retriever/InsightForge.
+    /// Used by the autotuner to compute the `memory_relevance` metric.
+    pub retrieved_memory_count: usize,
 }

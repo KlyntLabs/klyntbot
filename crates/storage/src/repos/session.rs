@@ -275,6 +275,30 @@ impl SessionRepo {
         Ok(())
     }
 
+    /// List sessions updated since a cutoff date, ordered by updated_at descending.
+    pub async fn list_sessions_since(
+        &self,
+        since: chrono::DateTime<Utc>,
+    ) -> Result<Vec<SessionListRow>, StorageError> {
+        let rows = sqlx::query_as::<_, SessionListRow>(
+            "SELECT s.key, s.metadata, s.created_at, s.updated_at,
+                    COALESCE(counts.cnt, 0) AS message_count,
+                    s.project_id, s.conversation_type, s.pinned, s.squad_id
+             FROM sessions s
+             LEFT JOIN (
+                 SELECT session_key, COUNT(*) AS cnt
+                 FROM session_messages
+                 GROUP BY session_key
+             ) counts ON counts.session_key = s.key
+             WHERE s.updated_at >= ?1
+             ORDER BY s.updated_at DESC",
+        )
+        .bind(since)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
+    }
+
     /// Delete a session and all its messages (CASCADE).
     pub async fn delete_session(&self, key: &str) -> Result<bool, StorageError> {
         let result = sqlx::query("DELETE FROM sessions WHERE key = ?1")

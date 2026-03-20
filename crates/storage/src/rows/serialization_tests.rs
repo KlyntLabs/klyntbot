@@ -529,6 +529,7 @@ mod tests {
                     tool_duration_ms: None,
                     complexity_signals: serde_json::json!({}),
                     execution_mode: None,
+                    retrieved_memory_count: None,
                 })
                 .unwrap(),
             ),

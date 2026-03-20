@@ -42,6 +42,8 @@ pub struct StrategyRecordRow {
     pub tool_duration_ms: Option<i64>,
     pub complexity_signals: serde_json::Value,
     pub execution_mode: Option<String>,
+    /// Number of memory entries retrieved from the context engine for this message.
+    pub retrieved_memory_count: Option<i32>,
 }
 
 /// Row struct for the `enrichment_feedback` table.

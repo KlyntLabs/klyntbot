@@ -1,3 +1,5 @@
+import { useMutation } from "@shared/hooks/useMutation";
+import { useQuery } from "@shared/hooks/useQuery";
 import { useEffect, useRef } from "react";
 import { useAutoTunerStatus } from "./useAutoTunerStatus";
 
@@ -5,11 +7,17 @@ const MAX_PROMOTIONS = 3;
 
 export function usePromotionListener(onPromotion: (impact: string) => void) {
   const { data: status } = useAutoTunerStatus();
+  const { data: toastCount } = useQuery<number>("autotuner_get_toast_count", undefined, 0);
+  const { mutate: incrementToastCount } = useMutation<number>("autotuner_increment_toast_count");
   const prevTrialIdRef = useRef<string | null | undefined>(undefined);
   const callbackRef = useRef(onPromotion);
-  const countRef = useRef(0);
+  const toastCountRef = useRef(toastCount ?? 0);
 
   callbackRef.current = onPromotion;
+
+  useEffect(() => {
+    toastCountRef.current = toastCount ?? 0;
+  }, [toastCount]);
 
   useEffect(() => {
     const currentTrialId = status?.champion?.trial_id ?? null;
@@ -24,12 +32,12 @@ export function usePromotionListener(onPromotion: (impact: string) => void) {
     if (
       currentTrialId !== null &&
       currentTrialId !== prevTrialIdRef.current &&
-      countRef.current < MAX_PROMOTIONS
+      toastCountRef.current < MAX_PROMOTIONS
     ) {
-      countRef.current += 1;
+      incrementToastCount({});
       callbackRef.current(status?.champion?.impact ?? "Tuning applied");
     }
 
     prevTrialIdRef.current = currentTrialId;
-  }, [status?.champion?.trial_id, status?.champion?.impact]);
+  }, [status?.champion?.trial_id, status?.champion?.impact, incrementToastCount]);
 }

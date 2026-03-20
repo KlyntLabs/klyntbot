@@ -616,6 +616,8 @@ fn run_desktop_app() {
             commands::autotuner::autotuner_pause,
             commands::autotuner::autotuner_resume,
             commands::autotuner::autotuner_set_pace,
+            commands::autotuner::autotuner_get_toast_count,
+            commands::autotuner::autotuner_increment_toast_count,
             // Window
             // Work Contexts
             commands::work_context::list_work_contexts,

@@ -1,6 +1,6 @@
 //! AutoTuner transparency handlers — status, history, revert, pause/resume.
 
-use agent::autotuner::{EXPERIMENT_PACE_KEY, PAUSED_KEY, PREVIOUS_CHAMPION_KEY};
+use agent::autotuner::{EXPERIMENT_PACE_KEY, PAUSED_KEY, PREVIOUS_CHAMPION_KEY, TOAST_COUNT_KEY};
 use desktop_shared::errors::ApiError;
 use serde::{Deserialize, Serialize};
 use tracing::info;
@@ -235,6 +235,49 @@ impl AppCore {
         }
     }
 
+    pub async fn autotuner_get_toast_count(&self) -> Result<i64, ApiError> {
+        let orch = self
+            .autotuner_orchestrator()
+            .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "AutoTuner is not enabled"))?;
+        let count = match orch
+            .learning_state_repo()
+            .get_value(TOAST_COUNT_KEY)
+            .await
+        {
+            Ok(Some(val)) => val.as_i64().unwrap_or(0),
+            _ => 0,
+        };
+        Ok(count)
+    }
+
+    pub async fn autotuner_increment_toast_count(&self) -> Result<i64, ApiError> {
+        let orch = self
+            .autotuner_orchestrator()
+            .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "AutoTuner is not enabled"))?;
+        let current = match orch
+            .learning_state_repo()
+            .get_value(TOAST_COUNT_KEY)
+            .await
+        {
+            Ok(Some(val)) => val.as_i64().unwrap_or(0),
+            _ => 0,
+        };
+        let new_count = current + 1;
+        orch.learning_state_repo()
+            .set(
+                TOAST_COUNT_KEY,
+                &serde_json::Value::Number(new_count.into()),
+            )
+            .await
+            .map_err(|e| {
+                ApiError::new(
+                    "INTERNAL",
+                    format!("failed to set promotion toast count: {e}"),
+                )
+            })?;
+        Ok(new_count)
+    }
+
     pub async fn autotuner_set_pace(&self, pace: &str) -> Result<(), ApiError> {
         let orch = self
             .autotuner_orchestrator()
@@ -249,10 +292,7 @@ impl AppCore {
             }
         }
         orch.learning_state_repo()
-            .set(
-                EXPERIMENT_PACE_KEY,
-                &serde_json::Value::String(pace.into()),
-            )
+            .set(EXPERIMENT_PACE_KEY, &serde_json::Value::String(pace.into()))
             .await
             .map_err(|e| {
                 ApiError::new("INTERNAL", format!("failed to set experiment pace: {e}"))

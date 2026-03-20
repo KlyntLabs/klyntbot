@@ -301,6 +301,28 @@ impl TrialRepo {
         })
     }
 
+    /// Compute the correction rate for a specific trial from the shadow log.
+    /// Returns `(total, corrected)` where `total` is the count of non-pending
+    /// rows and `corrected` is the count where `user_corrected = 1`.
+    pub async fn correction_rate_for_trial(
+        &self,
+        trial_id: &str,
+        since: DateTime<Utc>,
+    ) -> Result<(i64, i64), StorageError> {
+        let since_str = since.format("%Y-%m-%d %H:%M:%S").to_string();
+        sqlx::query_as::<_, (i64, i64)>(
+            "SELECT COUNT(*) AS total,
+                    COALESCE(SUM(CASE WHEN user_corrected = 1 THEN 1 ELSE 0 END), 0) AS corrected
+             FROM autotuner_shadow_log
+             WHERE trial_id = ?1 AND created_at >= ?2 AND control_mode != 'pending'",
+        )
+        .bind(trial_id)
+        .bind(&since_str)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(Into::into)
+    }
+
     // ── Trial counting helpers ────────────────────────────────────────
 
     /// Count trials that reached a terminal status (completed, promoted, or
@@ -518,6 +540,64 @@ mod tests {
             (rate - 1.0).abs() < f64::EPSILON,
             "Expected 1.0 when no shadow log data exists, got {rate}"
         );
+    }
+
+    #[tokio::test]
+    async fn correction_rate_for_trial_computes_correctly() {
+        let repo = setup().await;
+
+        // Setup: create experiment + trial
+        let exp = make_experiment("exp-cr");
+        repo.create_experiment(&exp).await.unwrap();
+        let trial = make_trial("trial-cr", "exp-cr", "active");
+        repo.create_trial(&trial).await.unwrap();
+
+        // Insert 3 shadow log rows with control_mode = 'pending' initially
+        insert_test_shadow_log(&repo, "trial-cr", "chat-cr-1", "direct", "pending", "pending")
+            .await;
+        insert_test_shadow_log(&repo, "trial-cr", "chat-cr-2", "direct", "pending", "pending")
+            .await;
+        insert_test_shadow_log(&repo, "trial-cr", "chat-cr-3", "direct", "pending", "pending")
+            .await;
+
+        // Back-fill ground truth so control_mode != 'pending'
+        repo.update_shadow_log_ground_truth("chat-cr-1", "general", "direct")
+            .await
+            .unwrap();
+        repo.update_shadow_log_ground_truth("chat-cr-2", "general", "direct")
+            .await
+            .unwrap();
+        repo.update_shadow_log_ground_truth("chat-cr-3", "general", "direct")
+            .await
+            .unwrap();
+
+        // Mark one entry as user-corrected
+        repo.mark_recent_messages_corrected("chat-cr-3", 60)
+            .await
+            .unwrap();
+
+        let since = Utc::now() - chrono::Duration::hours(1);
+        let (total, corrected) = repo
+            .correction_rate_for_trial("trial-cr", since)
+            .await
+            .unwrap();
+
+        assert_eq!(total, 3, "Expected 3 non-pending rows");
+        assert_eq!(corrected, 1, "Expected 1 corrected row");
+    }
+
+    #[tokio::test]
+    async fn correction_rate_for_trial_empty_returns_zero() {
+        let repo = setup().await;
+
+        let since = Utc::now() - chrono::Duration::hours(1);
+        let (total, corrected) = repo
+            .correction_rate_for_trial("nonexistent-trial", since)
+            .await
+            .unwrap();
+
+        assert_eq!(total, 0, "Expected 0 total on empty data");
+        assert_eq!(corrected, 0, "Expected 0 corrected on empty data");
     }
 
     #[tokio::test]

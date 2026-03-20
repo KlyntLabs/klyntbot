@@ -47,8 +47,9 @@ impl StrategyRepo {
                                            max_iterations, success, user_satisfaction,
                                            response_time_ms, chat_id,
                                            tool_name, tool_success, tool_duration_ms,
-                                           complexity_signals, execution_mode)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)
+                                           complexity_signals, execution_mode,
+                                           retrieved_memory_count)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)
              RETURNING *",
         )
         .bind(row.id)
@@ -68,6 +69,7 @@ impl StrategyRepo {
         .bind(row.tool_duration_ms)
         .bind(&row.complexity_signals)
         .bind(&row.execution_mode)
+        .bind(row.retrieved_memory_count)
         .fetch_one(&self.pool)
         .await?;
         Ok(result)
@@ -258,6 +260,30 @@ impl StrategyRepo {
         })
     }
 
+    /// Compute memory relevance as the fraction of messages where memories were
+    /// retrieved (retrieved_memory_count > 0) out of all messages that have the
+    /// field populated (non-NULL). Returns `None` if no records have the field set.
+    pub async fn memory_relevance_since(
+        &self,
+        since: DateTime<Utc>,
+    ) -> Result<Option<f64>, StorageError> {
+        let row: (i64, i64) = sqlx::query_as(
+            "SELECT COUNT(*),
+                    COALESCE(SUM(CASE WHEN retrieved_memory_count > 0 THEN 1 ELSE 0 END), 0)
+             FROM strategy_records
+             WHERE timestamp >= ?1 AND retrieved_memory_count IS NOT NULL",
+        )
+        .bind(since)
+        .fetch_one(&self.pool)
+        .await?;
+
+        if row.0 == 0 {
+            Ok(None)
+        } else {
+            Ok(Some(row.1 as f64 / row.0 as f64))
+        }
+    }
+
     delete_older_than_impl!("strategy_records", "timestamp");
 
     /// Get per-tool stats (only for records where tool_name is non-null).
@@ -305,6 +331,7 @@ mod tests {
             tool_duration_ms: None,
             complexity_signals: serde_json::Value::Null,
             execution_mode: None,
+            retrieved_memory_count: None,
         };
 
         let created = repo.create(&row).await.unwrap();
@@ -337,6 +364,7 @@ mod tests {
             tool_duration_ms: None,
             complexity_signals: serde_json::Value::Null,
             execution_mode: None,
+            retrieved_memory_count: None,
         };
 
         let created = repo.create(&row).await.unwrap();
@@ -369,6 +397,7 @@ mod tests {
             tool_duration_ms: None,
             complexity_signals: serde_json::Value::Null,
             execution_mode: None,
+            retrieved_memory_count: None,
         };
         repo.create(&row).await.unwrap();
 
@@ -424,6 +453,7 @@ mod tests {
             tool_duration_ms: None,
             complexity_signals: serde_json::Value::Null,
             execution_mode: None,
+            retrieved_memory_count: None,
         };
         let newer = StrategyRecordRow {
             id: uuid::Uuid::new_v4(),
@@ -443,6 +473,7 @@ mod tests {
             tool_duration_ms: None,
             complexity_signals: serde_json::Value::Null,
             execution_mode: None,
+            retrieved_memory_count: None,
         };
 
         repo.create(&older).await.unwrap();
@@ -488,6 +519,7 @@ mod tests {
             tool_duration_ms: None,
             complexity_signals: serde_json::Value::Null,
             execution_mode: None,
+            retrieved_memory_count: None,
         };
         repo.create(&row).await.unwrap();
         assert_eq!(repo.count_all().await.unwrap(), 1);
@@ -525,6 +557,7 @@ mod tests {
                 tool_duration_ms: None,
                 complexity_signals: serde_json::Value::Null,
                 execution_mode: None,
+                retrieved_memory_count: None,
             };
             repo.create(&row).await.unwrap();
         }
@@ -565,6 +598,7 @@ mod tests {
                 tool_duration_ms: Some(50),
                 complexity_signals: serde_json::Value::Null,
                 execution_mode: None,
+                retrieved_memory_count: None,
             };
             repo.create(&row).await.unwrap();
         }
@@ -574,5 +608,130 @@ mod tests {
         let todo = stats.iter().find(|s| s.tool_name == "todo").unwrap();
         assert_eq!(todo.total_calls, 3);
         assert_eq!(todo.success_count, 2);
+    }
+
+    #[tokio::test]
+    async fn test_memory_relevance_since_empty() {
+        let pool = crate::StoragePool::connect_in_memory().await.unwrap();
+        let repo = StrategyRepo::new(pool.inner().clone());
+        let since = chrono::Utc::now() - chrono::Duration::hours(1);
+
+        // No records at all → None
+        let result = repo.memory_relevance_since(since).await.unwrap();
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_memory_relevance_since_all_null() {
+        let pool = crate::StoragePool::connect_in_memory().await.unwrap();
+        let repo = StrategyRepo::new(pool.inner().clone());
+        let since = chrono::Utc::now() - chrono::Duration::hours(1);
+
+        // Record with retrieved_memory_count = NULL (legacy data) → None
+        let row = StrategyRecordRow {
+            id: uuid::Uuid::new_v4(),
+            timestamp: chrono::Utc::now(),
+            request_id: "req-null".to_string(),
+            predicted_strategy: "DirectResponse".to_string(),
+            actual_strategy: "DirectResponse".to_string(),
+            escalation_count: 0,
+            iterations_used: 1,
+            max_iterations: 1,
+            success: true,
+            user_satisfaction: None,
+            response_time_ms: 100,
+            chat_id: None,
+            tool_name: None,
+            tool_success: None,
+            tool_duration_ms: None,
+            complexity_signals: serde_json::Value::Null,
+            execution_mode: None,
+            retrieved_memory_count: None,
+        };
+        repo.create(&row).await.unwrap();
+
+        let result = repo.memory_relevance_since(since).await.unwrap();
+        assert!(result.is_none(), "NULL records should be excluded");
+    }
+
+    #[tokio::test]
+    async fn test_memory_relevance_since_mixed() {
+        let pool = crate::StoragePool::connect_in_memory().await.unwrap();
+        let repo = StrategyRepo::new(pool.inner().clone());
+        let since = chrono::Utc::now() - chrono::Duration::hours(1);
+
+        // Record with memories retrieved
+        let with_mem = StrategyRecordRow {
+            id: uuid::Uuid::new_v4(),
+            timestamp: chrono::Utc::now(),
+            request_id: "req-mem".to_string(),
+            predicted_strategy: "DirectResponse".to_string(),
+            actual_strategy: "DirectResponse".to_string(),
+            escalation_count: 0,
+            iterations_used: 1,
+            max_iterations: 1,
+            success: true,
+            user_satisfaction: None,
+            response_time_ms: 100,
+            chat_id: None,
+            tool_name: None,
+            tool_success: None,
+            tool_duration_ms: None,
+            complexity_signals: serde_json::Value::Null,
+            execution_mode: None,
+            retrieved_memory_count: Some(3),
+        };
+        repo.create(&with_mem).await.unwrap();
+
+        // Record without memories
+        let without_mem = StrategyRecordRow {
+            id: uuid::Uuid::new_v4(),
+            timestamp: chrono::Utc::now(),
+            request_id: "req-no-mem".to_string(),
+            predicted_strategy: "DirectResponse".to_string(),
+            actual_strategy: "DirectResponse".to_string(),
+            escalation_count: 0,
+            iterations_used: 1,
+            max_iterations: 1,
+            success: true,
+            user_satisfaction: None,
+            response_time_ms: 100,
+            chat_id: None,
+            tool_name: None,
+            tool_success: None,
+            tool_duration_ms: None,
+            complexity_signals: serde_json::Value::Null,
+            execution_mode: None,
+            retrieved_memory_count: Some(0),
+        };
+        repo.create(&without_mem).await.unwrap();
+
+        // Record with NULL (legacy) — should be excluded from computation
+        let legacy = StrategyRecordRow {
+            id: uuid::Uuid::new_v4(),
+            timestamp: chrono::Utc::now(),
+            request_id: "req-legacy".to_string(),
+            predicted_strategy: "DirectResponse".to_string(),
+            actual_strategy: "DirectResponse".to_string(),
+            escalation_count: 0,
+            iterations_used: 1,
+            max_iterations: 1,
+            success: true,
+            user_satisfaction: None,
+            response_time_ms: 100,
+            chat_id: None,
+            tool_name: None,
+            tool_success: None,
+            tool_duration_ms: None,
+            complexity_signals: serde_json::Value::Null,
+            execution_mode: None,
+            retrieved_memory_count: None,
+        };
+        repo.create(&legacy).await.unwrap();
+
+        // 1 with memories / 2 non-null records = 0.5 (legacy NULL excluded)
+        let result = repo.memory_relevance_since(since).await.unwrap();
+        assert!(result.is_some());
+        assert!((result.unwrap() - 0.5).abs() < f64::EPSILON);
     }
 }

@@ -239,9 +239,15 @@ impl ContextEngine {
         // 3. Retrieve memories and allocate budget (Priority::RetrievedMemory)
         // Skip memory retrieval only for Clarification mode (no RAG needed).
         // DirectResponse still needs retrieval for personalized conversational answers.
-        let memory_content = match &request.strategy {
-            ExecutionStrategy::Clarification { .. } => None,
-            _ => self.retrieve_memory(request).await,
+        let (memory_content, retrieved_memory_count) = match &request.strategy {
+            ExecutionStrategy::Clarification { .. } => (None, 0),
+            _ => {
+                let result = self.retrieve_memory(request).await;
+                match result {
+                    Some((text, count)) => (Some(text), count),
+                    None => (None, 0),
+                }
+            }
         };
         let memory_tokens = memory_content
             .as_deref()
@@ -350,11 +356,13 @@ impl ContextEngine {
             inventory,
             budget_remaining,
             version: 0,
+            retrieved_memory_count,
         }
     }
 
     /// Retrieve relevant memories for the request via embedding-based retrieval.
-    async fn retrieve_memory(&self, request: &ContextRequest) -> Option<String> {
+    /// Returns the formatted memory text and the number of entries retrieved.
+    async fn retrieve_memory(&self, request: &ContextRequest) -> Option<(String, usize)> {
         let retriever = self.memory_retriever.as_ref()?;
 
         // Use InsightForge if available and appropriate
@@ -380,6 +388,8 @@ impl ContextEngine {
         if entries.is_empty() {
             return None;
         }
+
+        let entry_count = entries.len();
 
         let (facts, rest): (Vec<_>, Vec<_>) = entries
             .into_iter()
@@ -420,7 +430,7 @@ impl ContextEngine {
             }
         }
 
-        Some(text)
+        Some((text, entry_count))
     }
 
     fn estimate_text(&self, text: &str) -> usize {
@@ -856,6 +866,7 @@ mod tests {
 
         // Clarification mode should NOT include memory
         assert_eq!(result.messages.len(), 1);
+        assert_eq!(result.retrieved_memory_count, 0);
         assert!(result
             .budget_report
             .per_priority
@@ -1060,6 +1071,7 @@ mod tests {
             inventory: ContextInventory::new(),
             budget_remaining: 5000,
             version: 0,
+            retrieved_memory_count: 0,
         };
         initial.inventory.upsert(ContextInventoryItem {
             source_name: "deferred_test".into(),
@@ -1097,6 +1109,7 @@ mod tests {
             inventory: ContextInventory::new(),
             budget_remaining: 5000,
             version: 0,
+            retrieved_memory_count: 0,
         };
 
         let ctx = test_source_context();
@@ -1133,6 +1146,13 @@ mod tests {
         };
 
         let result = engine.assemble(request).await;
+
+        // Verify retrieved_memory_count matches the number of mock entries
+        assert_eq!(
+            result.retrieved_memory_count, 2,
+            "Should report 2 retrieved memory entries"
+        );
+
         if let Message::System { content } = &result.messages[1] {
             assert!(
                 content.contains("## Relevant Facts"),
@@ -1167,6 +1187,7 @@ mod tests {
             inventory: ContextInventory::new(),
             budget_remaining: 5,
             version: 0,
+            retrieved_memory_count: 0,
         };
 
         let ctx = test_source_context();

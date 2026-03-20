@@ -518,6 +518,8 @@ impl AgentRuntime {
             params = params.with_planning_prompt(prompt);
         }
 
+        let retrieved_memory_count = assembled.retrieved_memory_count;
+
         let router_result = self
             .router
             .execute(
@@ -553,8 +555,14 @@ impl AgentRuntime {
             &event_tx,
             pipeline_elapsed_ms,
         );
-        let strategy_fut =
-            self.record_strategy(&analysis, &router_result, &validation, ctx, pipeline_start);
+        let strategy_fut = self.record_strategy(
+            &analysis,
+            &router_result,
+            &validation,
+            ctx,
+            pipeline_start,
+            retrieved_memory_count,
+        );
         let interaction_fut = async {
             if let Some(ref recorder) = self.interaction_recorder {
                 let tools_used: Vec<&str> =
@@ -818,6 +826,7 @@ impl AgentRuntime {
         validation: &ValidationResult,
         ctx: &RoutingContext,
         start: Instant,
+        retrieved_memory_count: usize,
     ) {
         let Some(ref strategy_repo) = self.strategy_repo else {
             return;
@@ -843,6 +852,7 @@ impl AgentRuntime {
             tool_duration_ms: result.tool_name.as_ref().map(|_| elapsed_ms),
             complexity_signals: serde_json::to_value(&analysis.signals).unwrap_or_default(),
             execution_mode: Some(result.final_mode.clone()),
+            retrieved_memory_count: Some(retrieved_memory_count as i32),
         };
 
         if let Err(e) = strategy_repo.create(&record).await {

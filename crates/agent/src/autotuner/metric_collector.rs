@@ -40,7 +40,14 @@ impl MetricSource for AgentMetricCollector {
     ) -> common::Result<MetricSnapshot> {
         let trial_id_str = trial_id.as_ref().map(|u| u.to_string());
 
-        let (stats, correction_count, token_info, routing_stability) = tokio::join!(
+        let (
+            stats,
+            correction_count,
+            token_info,
+            routing_stability,
+            memory_relevance_opt,
+            per_trial_correction,
+        ) = tokio::join!(
             self.strategy_repo.get_stats_since(since),
             self.event_log_repo
                 .count_by_event_type("UserCorrectedAI", since),
@@ -55,6 +62,17 @@ impl MetricSource for AgentMetricCollector {
             },
             self.trial_repo
                 .shadow_log_agreement_rate(trial_id_str.as_deref(), since),
+            self.strategy_repo.memory_relevance_since(since),
+            async {
+                if let Some(tid) = trial_id_str.as_deref() {
+                    self.trial_repo
+                        .correction_rate_for_trial(tid, since)
+                        .await
+                        .ok()
+                } else {
+                    None
+                }
+            },
         );
 
         let stats = stats.map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
@@ -62,12 +80,26 @@ impl MetricSource for AgentMetricCollector {
         let (total_tokens, total_requests) = token_info;
         let routing_stability = routing_stability.unwrap_or(1.0);
 
-        let total = stats.total_records.max(1);
-        let correction_rate = (correction_count as f64 / total as f64).min(1.0);
+        let correction_rate = if let Some((total, corrected)) = per_trial_correction {
+            if total == 0 {
+                0.0
+            } else {
+                (corrected as f64 / total as f64).min(1.0)
+            }
+        } else {
+            // System-wide fallback
+            let total = stats.total_records.max(1);
+            (correction_count as f64 / total as f64).min(1.0)
+        };
         let avg_tokens_per_message = total_tokens as f64 / total_requests.max(1) as f64;
 
-        // memory_relevance — Phase 2 placeholder
-        let memory_relevance = 1.0;
+        // memory_relevance: fraction of messages where memories were retrieved.
+        // Falls back to 1.0 when no records have the field populated yet
+        // (e.g. historical data from before this column was added).
+        let memory_relevance = match memory_relevance_opt {
+            Ok(Some(val)) => val,
+            _ => 1.0,
+        };
 
         Ok(MetricSnapshot {
             correction_rate,
@@ -130,7 +162,9 @@ mod tests {
 
         let since = Utc::now() - chrono::Duration::hours(1);
 
-        // 1. Insert a strategy record so get_stats_since returns total_records > 0
+        // 1. Insert strategy records so get_stats_since returns total_records > 0.
+        //    Two records: one with memories retrieved (3), one without (0).
+        //    Expected memory_relevance = 1/2 = 0.5.
         let strategy_row = storage::rows::learning::StrategyRecordRow {
             id: uuid::Uuid::new_v4(),
             timestamp: Utc::now(),
@@ -149,8 +183,31 @@ mod tests {
             tool_duration_ms: None,
             complexity_signals: serde_json::Value::Null,
             execution_mode: None,
+            retrieved_memory_count: Some(3),
         };
         strategy_repo.create(&strategy_row).await.unwrap();
+
+        let strategy_row_no_mem = storage::rows::learning::StrategyRecordRow {
+            id: uuid::Uuid::new_v4(),
+            timestamp: Utc::now(),
+            request_id: "req-metric-test-2".to_string(),
+            predicted_strategy: "DirectResponse".to_string(),
+            actual_strategy: "DirectResponse".to_string(),
+            escalation_count: 0,
+            iterations_used: 1,
+            max_iterations: 1,
+            success: true,
+            user_satisfaction: None,
+            response_time_ms: 400,
+            chat_id: Some("test-chat-2".to_string()),
+            tool_name: None,
+            tool_success: None,
+            tool_duration_ms: None,
+            complexity_signals: serde_json::Value::Null,
+            execution_mode: None,
+            retrieved_memory_count: Some(0),
+        };
+        strategy_repo.create(&strategy_row_no_mem).await.unwrap();
 
         // 2. Insert a domain event with event_type = "UserCorrectedAI"
         event_log_repo
@@ -239,7 +296,42 @@ mod tests {
         let collector =
             AgentMetricCollector::new(strategy_repo, event_log_repo, usage_repo, trial_repo);
 
-        let snapshot = collector
+        // ── System-wide fallback (trial_id = None) ───────────────────────
+        let snapshot_system = collector.collect_metrics(since, None).await.unwrap();
+
+        // correction_rate = 1 correction / 2 strategy records = 0.5
+        assert!(
+            snapshot_system.correction_rate > 0.0,
+            "Expected system-wide correction_rate > 0.0, got {}",
+            snapshot_system.correction_rate
+        );
+
+        // avg_tokens_per_message = 300 tokens / 1 request = 300.0
+        assert!(
+            snapshot_system.avg_tokens_per_message > 0.0,
+            "Expected avg_tokens_per_message > 0.0, got {}",
+            snapshot_system.avg_tokens_per_message
+        );
+
+        // routing_stability: no trial_id → all shadow log rows (50% agreement)
+        assert!(
+            snapshot_system.routing_stability >= 0.0 && snapshot_system.routing_stability <= 1.0,
+            "Expected routing_stability in [0,1], got {}",
+            snapshot_system.routing_stability
+        );
+
+        // memory_relevance = 1 record with memories / 2 total records = 0.5
+        assert!(
+            (snapshot_system.memory_relevance - 0.5).abs() < f64::EPSILON,
+            "Expected memory_relevance = 0.5, got {}",
+            snapshot_system.memory_relevance
+        );
+
+        // total_messages should be 2 (from the strategy records)
+        assert_eq!(snapshot_system.total_messages, 2);
+
+        // ── Per-trial path (unmatched UUID → 0 shadow rows → 0.0) ────────
+        let snapshot_trial = collector
             .collect_metrics(
                 since,
                 Some(Uuid::parse_str("00000000-0000-0000-0000-000000000000").unwrap()),
@@ -247,32 +339,10 @@ mod tests {
             .await
             .unwrap();
 
-        // correction_rate = 1 correction / 1 strategy record = 1.0
-        assert!(
-            snapshot.correction_rate > 0.0,
-            "Expected correction_rate > 0.0, got {}",
-            snapshot.correction_rate
+        assert_eq!(
+            snapshot_trial.correction_rate, 0.0,
+            "Expected per-trial correction_rate = 0.0 for unmatched UUID, got {}",
+            snapshot_trial.correction_rate
         );
-
-        // avg_tokens_per_message = 300 tokens / 1 request = 300.0
-        assert!(
-            snapshot.avg_tokens_per_message > 0.0,
-            "Expected avg_tokens_per_message > 0.0, got {}",
-            snapshot.avg_tokens_per_message
-        );
-
-        // routing_stability is computed from shadow log (50% agreement for trial-metric)
-        // but we passed a random UUID, so it won't match — verify it's a valid value
-        assert!(
-            snapshot.routing_stability >= 0.0 && snapshot.routing_stability <= 1.0,
-            "Expected routing_stability in [0,1], got {}",
-            snapshot.routing_stability
-        );
-
-        // memory_relevance is still placeholder
-        assert_eq!(snapshot.memory_relevance, 1.0);
-
-        // total_messages should be 1 (from the strategy record)
-        assert_eq!(snapshot.total_messages, 1);
     }
 }

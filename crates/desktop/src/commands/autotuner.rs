@@ -15,6 +15,8 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "autotuner_pause",
     "autotuner_resume",
     "autotuner_set_pace",
+    "autotuner_get_toast_count",
+    "autotuner_increment_toast_count",
 ];
 
 #[tauri::command]
@@ -53,6 +55,18 @@ pub async fn autotuner_set_pace(
     state.autotuner_set_pace(&pace).await
 }
 
+#[tauri::command]
+pub async fn autotuner_get_toast_count(state: State<'_, Arc<AppCore>>) -> Result<i64, ApiError> {
+    state.autotuner_get_toast_count().await
+}
+
+#[tauri::command]
+pub async fn autotuner_increment_toast_count(
+    state: State<'_, Arc<AppCore>>,
+) -> Result<i64, ApiError> {
+    state.autotuner_increment_toast_count().await
+}
+
 // ── Dev server dispatch ──────────────────────────────────────────────────
 
 #[cfg(debug_assertions)]
@@ -75,6 +89,8 @@ pub(crate) async fn dispatch_dev(
             let pace = try_field!(dev::get_str(body, "pace"));
             dev::val(core.autotuner_set_pace(&pace).await)
         }
+        "autotuner_get_toast_count" => dev::val(core.autotuner_get_toast_count().await),
+        "autotuner_increment_toast_count" => dev::val(core.autotuner_increment_toast_count().await),
         _ => return None,
     })
 }

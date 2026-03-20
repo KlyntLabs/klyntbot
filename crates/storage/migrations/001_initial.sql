@@ -272,7 +272,8 @@ CREATE TABLE strategy_records (
     tool_success       INTEGER,
     tool_duration_ms   INTEGER,
     complexity_signals TEXT NOT NULL DEFAULT '{}',
-    execution_mode     TEXT
+    execution_mode     TEXT,
+    retrieved_memory_count INTEGER
 );
 CREATE INDEX idx_strategy_records_chat_id ON strategy_records(chat_id);
 
