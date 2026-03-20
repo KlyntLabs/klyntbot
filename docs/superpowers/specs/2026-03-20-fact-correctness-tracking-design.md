@@ -29,13 +29,16 @@ The autotuner Phase 2 tunes `accumulate_promote_threshold` and `accumulate_min_d
 ### Formula
 
 ```
-domain_health = (active_facts - fast_failures) / total_facts
+domain_health = (total_facts - fast_failures) / total_facts
 ```
 
 Where (within a 90-day rolling window per domain):
-- `total_facts` = all facts created in the window
-- `active_facts` = facts where `superseded_at IS NULL`
-- `fast_failures` = facts superseded within 7 days of `recorded_at`
+- `total_facts` = all facts created in the window (both active and superseded)
+- `fast_failures` = facts superseded within 7 days of `recorded_at` (extraction errors)
+
+Note: `active_facts` is still computed for the UI (displayed in the widget) but is NOT
+used in the health formula. The formula measures "what fraction of extractions were not
+fast failures" — slow supersessions (real-world changes after 7+ days) are not penalized.
 
 **Why fast-failure distinction:** Facts superseded within 7 days are likely extraction errors. Facts superseded after 30+ days are often legitimate real-world changes (user changed jobs, moved, etc.). Fast failures are the signal; slow supersessions are natural evolution.
 
@@ -68,7 +71,7 @@ pub struct DomainHealthRow {
 impl DomainHealthRow {
     pub fn health_score(&self) -> f64 {
         if self.total_facts == 0 { return 1.0; }
-        ((self.active_facts - self.fast_failures) as f64 / self.total_facts as f64)
+        ((self.total_facts - self.fast_failures) as f64 / self.total_facts as f64)
             .clamp(0.0, 1.0)
     }
 }
@@ -96,7 +99,7 @@ Add `promotion_accuracy: f64` to `MetricSnapshot` and `TrialResult` (following t
 
 ### Constraint
 
-Add to `ConstraintEvaluator`: **promotion_accuracy must not drop > 5%** (same threshold as `retrieval_precision`). Reuses `max_retrieval_precision_drop` config field.
+Add to `ConstraintEvaluator`: **promotion_accuracy must not drop by more than 0.05 absolute** (e.g., from 0.90 to 0.85). Uses a dedicated `max_promotion_accuracy_drop: f64` field in `AutoTunerConfig` (default 0.05), NOT reusing `max_retrieval_precision_drop`.
 
 ### Closed Loop Behavior
 
@@ -109,7 +112,7 @@ When the autotuner tests a more aggressive `accumulate_promote_threshold`:
 
 ### Where the `SemanticFactRepo` Comes From
 
-`AgentMetricCollector` currently holds `StrategyRepo`, `EventLogRepo`, `UsageRepo`, and `TrialRepo`. Add `SemanticFactRepo` as a fifth dependency. It's already constructed during cognitive init and available at the `init/cron.rs` wiring site.
+`AgentMetricCollector` currently holds `StrategyRepo`, `EventLogRepo`, `UsageRepo`, and `TrialRepo`. Add `SemanticFactRepo` as a fifth dependency. The `agent` crate already depends on `cognitive` (see `cognitive::EventLogRepo` import in `metric_collector.rs`), so no new crate dependency is needed. `SemanticFactRepo` is constructed from `repos.pool().clone()` at the `init/cron.rs` wiring site.
 
 ---
 
@@ -155,7 +158,7 @@ pub struct DomainHealthEntry {
   - Green: >= 85%
   - Amber: 70-84%
   - Red: < 70%
-- Clicking a domain pill opens a popover listing 2-3 facts superseded this month
+- Domain pills are clickable but drill-down popover is deferred to v2
 - "Last updated: 2 days ago" line at bottom
 
 **Data fetching:** `useQuery("memory_health")` — no custom hook needed.
@@ -172,9 +175,9 @@ To compute the trend arrow, the `memory_health` handler runs the same query twic
 - Once for the current 90-day window
 - Once for the previous 7-day snapshot (stored in `LearningStateRepo` as `"knowledge_trust_snapshot"`)
 
-After computing the current score, persist it:
+After computing the current score, persist it via `self.repos.learning_state` (accessible on `AppCore` through the `Repos` struct):
 ```rust
-learning_state.set("knowledge_trust_snapshot", &json!({
+self.repos.learning_state.set("knowledge_trust_snapshot", &json!({
     "score": overall,
     "computed_at": Utc::now().to_rfc3339(),
 })).await;
@@ -193,10 +196,12 @@ The trend is `current - previous_snapshot`. If no previous snapshot exists, `tre
 | `crates/autotuner/src/trial.rs` | Modify | Add `promotion_accuracy` to `TrialResult` |
 | `crates/autotuner/src/metrics.rs` | Modify | Add `promotion_accuracy` to `aggregate_to_result` |
 | `crates/autotuner/src/evaluator.rs` | Modify | Add promotion_accuracy constraint check |
-| `crates/agent/src/autotuner/metric_collector.rs` | Modify | Wire `fact_health_by_domain` into `collect_metrics` |
-| `crates/app-core/src/handlers/cognitive/` | Modify | Add `memory_health` handler |
-| `crates/desktop/src/commands/` | Modify | Add `memory_health` Tauri command |
-| `crates/desktop-shared/src/` | Modify | Add response types |
+| `crates/config/src/schema/autotuner.rs` | Modify | Add `max_promotion_accuracy_drop` field |
+| `crates/agent/src/autotuner/metric_collector.rs` | Modify | Wire `fact_health_by_domain` into `collect_metrics`, add `SemanticFactRepo` dep |
+| `crates/app-core/src/init/cron.rs` | Modify | Pass `SemanticFactRepo` to `AgentMetricCollector` |
+| `crates/app-core/src/handlers/cognitive/memory.rs` | Modify | Add `memory_health` handler |
+| `crates/desktop/src/commands/cognitive.rs` | Modify | Add `memory_health` Tauri command + update `DEV_COMMANDS` |
+| `crates/desktop-shared/src/cognitive_commands.rs` | Modify | Add `MemoryHealthResponse` + `DomainHealthEntry` |
 | `desktop-ui/src/features/autotuner/components/KnowledgeTrustWidget.tsx` | Create | Dashboard widget |
 | System > Memory page | Modify | Mount `KnowledgeTrustWidget` |
 
