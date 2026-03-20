@@ -166,14 +166,14 @@ impl EventLogRepo {
         event_type: &str,
         since: DateTime<Utc>,
     ) -> Result<i64, sqlx::Error> {
-        Ok(sqlx::query_scalar::<_, i64>(
+        sqlx::query_scalar::<_, i64>(
             "SELECT COUNT(*) FROM domain_event_log
              WHERE event_type = ?1 AND timestamp >= ?2",
         )
         .bind(event_type)
         .bind(since.to_rfc3339())
         .fetch_one(&self.pool)
-        .await?)
+        .await
     }
 
     /// Delete events older than the given number of days.
