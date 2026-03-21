@@ -227,6 +227,56 @@ impl SignalAccumulator {
                     None
                 }
             }
+            "retention_drop_important" => {
+                // Fires when digest signals indicate fading important atoms
+                let fading_signals: Vec<_> = self.window.iter()
+                    .filter(|s| s.event_type == "CoachingLearningDigest"
+                        && s.metadata.amount.map_or(false, |a| a > 0.0))
+                    .collect();
+                if !fading_signals.is_empty() {
+                    Some(TriggerFired {
+                        condition_name: "retention_drop_important".into(),
+                        confidence: 0.85,
+                        context: format!(
+                            "{} digest signal(s) with fading atoms in window",
+                            fading_signals.len()
+                        ),
+                    })
+                } else {
+                    None
+                }
+            }
+            "learning_momentum_shift" => {
+                // Fires when there is any learning activity (both creation and review)
+                let created = self.count_events("KnowledgeAtomCreated");
+                let reviewed = self.count_events("AtomFlashcardReviewed");
+                if created >= 1 && reviewed >= 1 {
+                    Some(TriggerFired {
+                        condition_name: "learning_momentum_shift".into(),
+                        confidence: 0.7,
+                        context: format!(
+                            "{created} atom(s) created + {reviewed} review(s) in window"
+                        ),
+                    })
+                } else {
+                    None
+                }
+            }
+            "domain_retention_decline" => {
+                // Fires when digest signals indicate domain-level weakness
+                let digest_count = self.count_events("CoachingLearningDigest");
+                if digest_count >= 2 {
+                    Some(TriggerFired {
+                        condition_name: "domain_retention_decline".into(),
+                        confidence: 0.8,
+                        context: format!(
+                            "{digest_count} learning digest(s) suggest domain retention decline"
+                        ),
+                    })
+                } else {
+                    None
+                }
+            }
             _ => None,
         }
     }

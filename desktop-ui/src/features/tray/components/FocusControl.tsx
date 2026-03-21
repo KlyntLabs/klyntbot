@@ -1,6 +1,9 @@
 import { useAutoTunerStatus } from "@features/autotuner";
+import { MicroReviewPrompt } from "@features/coaching/components/MicroReviewPrompt";
 import { FOCUS_PRESETS, type FocusSettings, type useFocusTimer } from "@shared/hooks/useFocusTimer";
+import { useQuery } from "@shared/hooks/useQuery";
 import { formatElapsed, formatHumanDuration } from "@shared/lib/dates";
+import { isTauri } from "@shared/lib/utils";
 import { Checkbox } from "@shared/ui";
 import {
   ChevronRight,
@@ -140,6 +143,25 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
 
   const { data: autotunerStatus } = useAutoTunerStatus();
   const [learningBannerDismissed, setLearningBannerDismissed] = useState(false);
+
+  // Micro-review prompt: show when idle and there are due flashcards
+  const { data: dueCount } = useQuery<number>("flashcard_total_due", undefined, 0);
+  const [reviewPromptDismissed, setReviewPromptDismissed] = useState(false);
+
+  const handleReviewAccept = async () => {
+    if (isTauri) {
+      const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
+      const { emit } = await import("@tauri-apps/api/event");
+      const mainWindow = await WebviewWindow.getByLabel("main");
+      if (mainWindow) {
+        await emit("navigate", { path: "/learn/review" });
+        await mainWindow.show();
+        await mainWindow.setFocus();
+      }
+      const { getCurrentWindow } = await import("@tauri-apps/api/window");
+      await getCurrentWindow().hide();
+    }
+  };
 
   // Reset the one-time banner each time a new focus session starts
   useEffect(() => {
@@ -353,6 +375,17 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
               {preset.label} {preset.focusDuration}/{preset.shortBreak}
             </button>
           ))}
+        </div>
+      )}
+
+      {/* ── Micro-review prompt (idle + due cards) ────────────────── */}
+      {phase === "idle" && !reviewPromptDismissed && (dueCount ?? 0) > 0 && (
+        <div className="mt-3 px-1">
+          <MicroReviewPrompt
+            dueCount={dueCount ?? 0}
+            onAccept={handleReviewAccept}
+            onSkip={() => setReviewPromptDismissed(true)}
+          />
         </div>
       )}
 

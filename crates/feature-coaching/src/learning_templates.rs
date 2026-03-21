@@ -31,7 +31,7 @@ pub fn learning_message(pattern_name: &str, description: &str) -> LearningMessag
             message: format!("\u{1f4da} {description}"),
             intervention_type: InterventionType::ChatMessage,
         },
-        "high_importance_retention_decay" => LearningMessage {
+        "retention_decay_detected" => LearningMessage {
             message: format!("\u{1f514} {description}"),
             intervention_type: InterventionType::ChatMessage,
         },

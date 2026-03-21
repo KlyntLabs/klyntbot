@@ -240,7 +240,28 @@ impl KnowledgeAtomRepo {
     }
 
     /// Restore an archived atom to active status.
+    ///
+    /// Atoms archived more than 7 days ago cannot be restored.
     pub async fn restore(&self, id: &str) -> Result<KnowledgeAtomRow, sqlx::Error> {
+        // Enforce 7-day restore window
+        let atom = sqlx::query_as::<_, KnowledgeAtomRow>(
+            "SELECT * FROM knowledge_atoms WHERE id = ?1",
+        )
+        .bind(id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        if let Some(archived_at) = &atom.archived_at {
+            if let Ok(ts) = chrono::DateTime::parse_from_rfc3339(archived_at) {
+                let days = (Utc::now() - ts.with_timezone(&Utc)).num_days();
+                if days > 7 {
+                    return Err(sqlx::Error::Protocol(
+                        "Atom archived more than 7 days ago — cannot restore".to_string(),
+                    ));
+                }
+            }
+        }
+
         let now = Utc::now().to_rfc3339();
         sqlx::query(
             r#"

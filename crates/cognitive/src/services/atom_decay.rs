@@ -1,7 +1,7 @@
 //! Daily atom decay cycle — applies tiered salience decay and FSRS retention
 //! recomputation to stale knowledge atoms, auto-archiving forgotten ones.
 
-use crate::repos::KnowledgeAtomRepo;
+use crate::repos::{KnowledgeAtomRepo, ReviewStatsRepo};
 use bus::DomainEventBus;
 use sqlx::SqlitePool;
 use tracing::{info, warn};
@@ -85,10 +85,14 @@ pub async fn run_decay_cycle(pool: &SqlitePool, bus: &DomainEventBus) -> common:
     let weakest = topics.first().map(|t| t.name.clone());
     let strongest = topics.last().map(|t| t.name.clone());
 
+    // Compute current review streak from review_log
+    let review_stats = ReviewStatsRepo::new(pool.clone());
+    let streak = review_stats.current_streak().await.unwrap_or(0);
+
     bus.publish(bus::DomainEvent::CoachingLearningDigest {
         fading_count,
         archived_count,
-        streak_days: 0, // TODO: compute from review_log in Phase 3
+        streak_days: streak,
         strongest_topic: strongest,
         weakest_topic: weakest,
     });

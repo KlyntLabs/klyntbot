@@ -13,6 +13,7 @@ use bus::DomainEvent;
 use cognitive::situation::UserSituation;
 
 use crate::feedback::FeedbackTracker;
+use crate::learning_templates;
 use crate::pattern_detector::PatternDetector;
 use crate::reasoner::{CoachingReasonerHandler, InterventionType, ReasonerInput};
 use crate::router::{DeliveredIntervention, InterventionRouter, RoutingResult};
@@ -133,7 +134,61 @@ impl CoachingService {
                                 det.detect_patterns()
                             };
 
-                            // Build reasoner input
+                            // Fast-path: use deterministic templates for learning patterns
+                            let learning_patterns: Vec<_> = patterns.iter()
+                                .filter(|p| p.domain == "learning")
+                                .collect();
+
+                            if !learning_patterns.is_empty() {
+                                for pattern in &learning_patterns {
+                                    let msg = learning_templates::learning_message(
+                                        &pattern.name, &pattern.description,
+                                    );
+                                    let intervention = DeliveredIntervention {
+                                        id: uuid::Uuid::new_v4().to_string(),
+                                        intervention_type: msg.intervention_type,
+                                        message: msg.message,
+                                        trigger_name: pattern.name.clone(),
+                                        delivered_at: chrono::Utc::now(),
+                                    };
+
+                                    // Route through rate limiter
+                                    let routing = {
+                                        let decision = crate::reasoner::CoachingDecision {
+                                            should_intervene: true,
+                                            confidence: pattern.confidence,
+                                            message: Some(intervention.message.clone()),
+                                            intervention_type: intervention.intervention_type.clone(),
+                                            reasoning: format!("learning template: {}", pattern.name),
+                                            observations: vec![],
+                                        };
+                                        let mut r = router.lock().await;
+                                        r.route(&decision, &pattern.name)
+                                    };
+
+                                    match routing {
+                                        RoutingResult::Delivered(routed) => {
+                                            debug!(
+                                                "Learning intervention delivered: {} via {:?}",
+                                                pattern.name, routed.intervention_type
+                                            );
+                                            {
+                                                let mut fb = feedback.lock().await;
+                                                fb.record_delivery(&routed);
+                                            }
+                                            persist_intervention(intervention_log.as_ref(), &routed).await;
+                                            let _ = intervention_tx.send(routed).await;
+                                        }
+                                        RoutingResult::RateLimited { reason } => {
+                                            debug!("Learning intervention rate-limited: {reason}");
+                                        }
+                                        RoutingResult::Skipped => {}
+                                    }
+                                }
+                                continue;
+                            }
+
+                            // Non-learning patterns: pass through LLM reasoner
                             let input = ReasonerInput {
                                 situation: sit.clone(),
                                 trigger: trigger.clone(),
