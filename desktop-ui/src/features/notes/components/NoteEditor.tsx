@@ -18,6 +18,7 @@ import type { VimMode } from "./editor/vim";
 import { getVimPlugin, VIM_SAVE_EVENT } from "./editor/vim";
 import { WikiLinkMenu } from "./editor/WikiLinkNode";
 import { LinkInsertDialog } from "./LinkInsertDialog";
+import { KnowledgeAtomsPanel } from "./KnowledgeAtomsPanel";
 import { NoteVersionHistory } from "./NoteVersionHistory";
 
 const VERSION_INTERVAL_MS = 5 * 60 * 1000; // Minimum interval between auto-saving version snapshots
@@ -449,6 +450,7 @@ export function NoteEditor({
           ) : (
             <div className="flex-1 overflow-y-auto min-h-0 relative">
               <EditorContentWrapper editor={editor} className={editorContentClass} />
+              <KnowledgeAtomsPanel noteId={note.id} />
               {/* Vim command line at bottom of editor area */}
               {vimEnabled && commandLine && (
                 <div className="absolute bottom-0 left-0 right-0">
