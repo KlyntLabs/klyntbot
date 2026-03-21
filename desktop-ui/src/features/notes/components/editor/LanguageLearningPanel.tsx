@@ -28,7 +28,8 @@ export function LanguageLearningPanel({
   onClearSelection,
 }: LanguageLearningPanelProps) {
   const { result, loading, error, translate } = useLanguageBreakdown();
-  const { saving, savedCount, saveWords, dismissSaved } = useVocabularySave();
+  const { saving, saved, savedCount, errorMessage, saveWords, dismissSaved, dismissError } =
+    useVocabularySave();
 
   // Auto-translate on mount or when source text / language pair changes.
   // Skip when source === target (no meaningful translation).
@@ -60,17 +61,31 @@ export function LanguageLearningPanel({
         </div>
       )}
 
-      {/* Save feedback snackbar */}
+      {/* Save success feedback */}
       {savedCount !== null && (
         <div className="mx-3 mt-2 flex items-center justify-between rounded-md bg-green-500/10 px-3 py-2 text-xs text-green-400">
           <span>
-            Saved {savedCount} word{savedCount !== 1 ? "s" : ""} to &ldquo;
+            Saved {savedCount} word{savedCount !== 1 ? "s" : ""} + knowledge atoms to &ldquo;
             {noteTitle}&rdquo;
           </span>
           <button
             type="button"
             onClick={dismissSaved}
             className="text-green-300 hover:text-green-200"
+          >
+            &times;
+          </button>
+        </div>
+      )}
+
+      {/* Save error feedback */}
+      {errorMessage && (
+        <div className="mx-3 mt-2 flex items-center justify-between rounded-md bg-red-500/10 px-3 py-2 text-xs text-red-400">
+          <span>Save failed: {errorMessage}</span>
+          <button
+            type="button"
+            onClick={dismissError}
+            className="text-red-300 hover:text-red-200"
           >
             &times;
           </button>
@@ -87,7 +102,12 @@ export function LanguageLearningPanel({
 
       {/* Section 2: Words (always expanded) */}
       {result && (
-        <WordsSection words={result.words} onSaveWords={handleSaveWords} saving={saving} />
+        <WordsSection
+          words={result.words}
+          onSaveWords={handleSaveWords}
+          saving={saving}
+          saved={saved}
+        />
       )}
 
       {/* Section 3: Grammar (collapsed by default) */}

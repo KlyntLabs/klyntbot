@@ -1,17 +1,26 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { WordBreakdown } from "../../../hooks/useLanguageBreakdown";
 
 interface WordsSectionProps {
   words: WordBreakdown[];
   onSaveWords: (words: WordBreakdown[]) => void;
   saving: boolean;
+  saved: boolean;
 }
 
-export function WordsSection({ words, onSaveWords, saving }: WordsSectionProps) {
+export function WordsSection({ words, onSaveWords, saving, saved }: WordsSectionProps) {
   const [selected, setSelected] = useState<Set<string>>(() => {
-    // Pre-select new words
     return new Set(words.filter((w) => w.isNew).map((w) => w.word));
   });
+  const prevSavedRef = useRef(saved);
+
+  // Clear selection after successful save
+  useEffect(() => {
+    if (!prevSavedRef.current && saved) {
+      setSelected(new Set());
+    }
+    prevSavedRef.current = saved;
+  }, [saved]);
 
   const toggle = useCallback((word: string) => {
     setSelected((prev) => {
@@ -35,6 +44,18 @@ export function WordsSection({ words, onSaveWords, saving }: WordsSectionProps) 
     if (toSave.length > 0) onSaveWords(toSave);
   }, [words, selected, onSaveWords]);
 
+  const buttonLabel = saving
+    ? "Saving..."
+    : saved
+      ? "Saved!"
+      : `Save ${selected.size} word${selected.size !== 1 ? "s" : ""}`;
+
+  const buttonClass = saving
+    ? "rounded-md bg-brand/50 px-2.5 py-1 text-[10px] font-semibold text-black cursor-wait"
+    : saved
+      ? "rounded-md bg-green-500 px-2.5 py-1 text-[10px] font-semibold text-black"
+      : "rounded-md bg-brand px-2.5 py-1 text-[10px] font-semibold text-black hover:bg-brand/90 active:scale-95 transition-all";
+
   return (
     <div className="border-b border-border px-3 py-3">
       {/* Header */}
@@ -43,21 +64,23 @@ export function WordsSection({ words, onSaveWords, saving }: WordsSectionProps) 
           Words ({words.length})
         </span>
         <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={selected.size === words.length ? deselectAll : selectAll}
-            className="text-[10px] text-muted-foreground hover:text-primary transition-colors"
-          >
-            {selected.size === words.length ? "Deselect all" : "Select all"}
-          </button>
-          {selected.size > 0 && (
+          {!saved && (
+            <button
+              type="button"
+              onClick={selected.size === words.length ? deselectAll : selectAll}
+              className="text-[10px] text-muted-foreground hover:text-primary transition-colors"
+            >
+              {selected.size === words.length ? "Deselect all" : "Select all"}
+            </button>
+          )}
+          {(selected.size > 0 || saved) && (
             <button
               type="button"
               onClick={handleSave}
-              disabled={saving}
-              className="rounded-md bg-brand px-2.5 py-1 text-[10px] font-semibold text-black hover:bg-brand/90 disabled:opacity-50"
+              disabled={saving || saved}
+              className={buttonClass}
             >
-              {saving ? "Saving..." : `Save ${selected.size} word${selected.size !== 1 ? "s" : ""}`}
+              {buttonLabel}
             </button>
           )}
         </div>
@@ -71,6 +94,7 @@ export function WordsSection({ words, onSaveWords, saving }: WordsSectionProps) 
             word={word}
             isSelected={selected.has(word.word)}
             onToggle={() => toggle(word.word)}
+            disabled={saving}
           />
         ))}
       </div>
@@ -82,16 +106,19 @@ function WordRow({
   word,
   isSelected,
   onToggle,
+  disabled,
 }: {
   word: WordBreakdown;
   isSelected: boolean;
   onToggle: () => void;
+  disabled: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onToggle}
-      className={`flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left transition-colors ${
+      disabled={disabled}
+      className={`flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left transition-colors disabled:opacity-50 ${
         isSelected ? "bg-brand/8 ring-1 ring-brand/20" : "hover:bg-surface-hover"
       }`}
     >
