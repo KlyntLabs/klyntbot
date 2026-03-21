@@ -58,7 +58,7 @@ Each sub-route is a separate top-level route in `router.tsx` wrapping its page i
 
 The History tab requires **persistent intervention history**. Currently, `coaching_pending_interventions` only returns in-memory pending interventions that expire after 10 minutes. Once expired, interventions and their feedback status are lost.
 
-**New table:** `coaching_intervention_log` — append to `crates/cognitive/migrations/001_cognitive_tables.sql` (pre-release, in-place update per CLAUDE.md convention) and bump the `FeatureMigration` version.
+**New table:** `coaching_intervention_log` — append to `crates/cognitive/migrations/001_cognitive_tables.sql` (pre-release, in-place update per CLAUDE.md convention) and bump the `FeatureMigration` version from 9 to 10 in `crates/cognitive/src/repos/mod.rs`.
 
 ```sql
 CREATE TABLE IF NOT EXISTS coaching_intervention_log (
@@ -73,13 +73,27 @@ CREATE TABLE IF NOT EXISTS coaching_intervention_log (
 ```
 
 **New repo:** `CoachingInterventionLogRepo` in `crates/storage/src/repos/` with:
-- `insert(intervention)` — fire-and-forget persistence (see sync/async note below)
+- `insert(intervention)` — async, called after releasing the `FeedbackTracker` mutex lock
 - `update_feedback(id, feedback, feedback_at)` — called from `coaching_submit_feedback` handler
 - `list_recent(limit)` — returns recent interventions with feedback status
 
 Must also be registered in `Repos` aggregate struct (`crates/storage/src/repos/mod.rs`) and wired into `AppCore` state via `init_coaching()` in `crates/app-core/src/init/coaching.rs`.
 
-**New command:** `coaching_intervention_log` — returns `Vec<InterventionLogResponse>` with fields: `id`, `interventionType`, `message`, `triggerName`, `feedback`, `deliveredAt`, `feedbackAt`. Must be added to `DEV_COMMANDS` (gated `#[cfg(test)]`) and `dispatch_dev` (gated `#[cfg(debug_assertions)]`) in `crates/desktop/src/commands/cognitive.rs`.
+**New command:** `coaching_intervention_log` — returns `Vec<InterventionLogResponse>`. Must be added to `DEV_COMMANDS` (gated `#[cfg(test)]`) and `dispatch_dev` (gated `#[cfg(debug_assertions)]`) in `crates/desktop/src/commands/cognitive.rs`.
+
+**New DTO:** `InterventionLogResponse` in `crates/desktop-shared/src/cognitive_commands.rs` with `#[serde(rename_all = "camelCase")]`:
+
+```rust
+pub struct InterventionLogResponse {
+    pub id: String,
+    pub intervention_type: String,
+    pub message: String,
+    pub trigger_name: String,
+    pub feedback: Option<String>,      // "helpful" | "dismissed" | "stop" | "ignored" | None
+    pub delivered_at: String,          // serializes as deliveredAt
+    pub feedback_at: Option<String>,   // serializes as feedbackAt
+}
+```
 
 **Modified handler: `coaching_submit_feedback`** — two changes:
 1. Write feedback to `coaching_intervention_log` via `repo.update_feedback()` — this is the primary persistence path for retroactive feedback.
@@ -89,7 +103,7 @@ Wire values passed by the frontend must be exact lowercase strings: `"helpful"`,
 
 **Modified handler: `coaching_report_ignored`** — also write `feedback = 'ignored'` to `coaching_intervention_log` so the History tab can distinguish ignored from no-feedback.
 
-**Modified service: `FeedbackTracker::record_delivery()`** — this is a synchronous `&mut self` method called inside a `Mutex` lock scope. To persist without blocking or deadlocking, use `tokio::spawn` to fire-and-forget the async DB insert after releasing the lock. Pass the repo clone and intervention data to the spawned task. Do NOT await inside the mutex guard.
+**Modified service: `CoachingService` delivery path** — `FeedbackTracker` is held behind `tokio::Mutex`, so the lock is async-safe. After calling `record_delivery()` and dropping the lock, issue the async `repo.insert()` call directly in the same task context — no `tokio::spawn` needed. The pattern is: `{ let mut fb = feedback.lock().await; fb.record_delivery(&intervention); }` then `repo.insert(&intervention).await;` outside the lock scope.
 
 ### Data Flow
 
@@ -200,7 +214,7 @@ desktop-ui/src/features/coaching/
 | `crates/desktop/src/commands/cognitive.rs` | Add `coaching_intervention_log` command + `DEV_COMMANDS` (`#[cfg(test)]`) + `dispatch_dev` (`#[cfg(debug_assertions)]`) |
 | `crates/app-core/src/handlers/coaching.rs` | Add `coaching_intervention_log()` handler; modify `coaching_submit_feedback()` for DB fallback; modify `coaching_report_ignored()` to persist |
 | `crates/app-core/src/init/coaching.rs` | Wire `CoachingInterventionLogRepo` into `AppCore` state |
-| `crates/feature-coaching/src/feedback.rs` | Modify `record_delivery()` to fire-and-forget persist via `tokio::spawn` |
+| `crates/feature-coaching/src/service.rs` | Add `repo.insert()` call after `record_delivery()` lock scope |
 | `crates/cognitive/migrations/001_cognitive_tables.sql` | Append `coaching_intervention_log` table, bump migration version |
 
 ---
@@ -211,7 +225,7 @@ desktop-ui/src/features/coaching/
 - Tab buttons use `glass-button-active` for selected state (matching `FinanceLayout`)
 - Timestamps displayed via `formatTime()` from `@shared/lib/dates.ts`
 - Feedback badges use semantic colors: green (helpful), orange (dismissed), gray (ignored), neutral/dim (no feedback)
-- Data fetching via `useQuery(cmd, args)` with 5s polling for real-time data (health card, history)
+- Data fetching via `useQuery(cmd, args)` — 5s polling for `coaching_situation` only; default 30s stale time for all other queries
 - Mutations via `useMutation(cmd)` with optimistic updates on feedback submission
 - Empty states for all tabs when no data is available
 - Loading states via standard `useQuery` `isLoading` pattern
