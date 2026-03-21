@@ -25,6 +25,9 @@ interface SplitEditorProps {
   note: Note;
   splitMode: SplitMode;
   onSave: (params: NoteUpdateParams) => void;
+  targetLangOverride?: string;
+  sourceTextOverride?: string;
+  onClearSourceOverride?: () => void;
 }
 
 const EMPTY: PaneContent = { html: "", markdown: "" };
@@ -65,7 +68,14 @@ function parseSplitStore(note: Note): SplitContentStore {
 const NOOP_NAV_NOTE = () => {};
 const NOOP_NAV_ENTITY = () => {};
 
-export function SplitEditor({ note, splitMode, onSave }: SplitEditorProps) {
+export function SplitEditor({
+  note,
+  splitMode,
+  onSave,
+  targetLangOverride,
+  sourceTextOverride,
+  onClearSourceOverride,
+}: SplitEditorProps) {
   const onSaveRef = useRef(onSave);
   onSaveRef.current = onSave;
   const noteIdRef = useRef(note.id);
@@ -332,10 +342,9 @@ export function SplitEditor({ note, splitMode, onSave }: SplitEditorProps) {
   }, [splitMode]);
 
   // ── Language config for translation mode ─────────────
-  const { sourceLang, targetLang } = useLanguageConfig(
-    note.perspectiveConfig,
-    leftContentRef.current.markdown,
-  );
+  const langConfig = useLanguageConfig(note.perspectiveConfig, leftContentRef.current.markdown);
+  const sourceLang = langConfig.sourceLang;
+  const targetLang = targetLangOverride ?? langConfig.targetLang;
 
   // ── Annotation mode: track active annotation ─────────
   const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null);
@@ -420,9 +429,13 @@ export function SplitEditor({ note, splitMode, onSave }: SplitEditorProps) {
             <LanguageLearningPanel
               noteId={note.id}
               noteTitle={note.title}
-              sourceText={leftContentRef.current.markdown || leftContentRef.current.html}
+              sourceText={
+                sourceTextOverride || leftContentRef.current.markdown || leftContentRef.current.html
+              }
               sourceLang={sourceLang}
               targetLang={targetLang}
+              isSelection={!!sourceTextOverride}
+              onClearSelection={onClearSourceOverride}
             />
           ) : splitMode === "annotation" ? (
             <AnnotationSidebar

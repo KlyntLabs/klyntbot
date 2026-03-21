@@ -9,8 +9,14 @@ interface PerspectiveEntry {
   params?: Record<string, unknown>;
 }
 
+export interface LanguagePair {
+  sourceLang?: string;
+  targetLang?: string;
+}
+
 interface PerspectiveConfig {
   sections: Record<string, PerspectiveEntry | null>;
+  languagePair?: LanguagePair;
 }
 
 const EMPTY_CONFIG: PerspectiveConfig = { sections: {} };
@@ -106,11 +112,24 @@ export function usePerspective(
     [saveConfig],
   );
 
+  const setLanguagePair = useCallback(
+    (pair: LanguagePair) => {
+      setConfig((prev) => {
+        const next = { ...prev, languagePair: { ...prev.languagePair, ...pair } };
+        saveConfig(next);
+        return next;
+      });
+    },
+    [saveConfig],
+  );
+
   return {
     activePerspective,
     focusedSectionId,
     allPerspectives: config.sections,
+    languagePair: config.languagePair,
     setPerspective,
     clearPerspective,
+    setLanguagePair,
   };
 }

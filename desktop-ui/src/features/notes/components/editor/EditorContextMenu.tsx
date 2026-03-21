@@ -1,14 +1,32 @@
 import * as ContextMenu from "@radix-ui/react-context-menu";
-import { type ReactNode, useCallback, useState } from "react";
+import { type ReactNode, useCallback, useRef, useState } from "react";
+
+const TRANSLATE_LANGUAGES = [
+  { code: "zh", label: "Chinese", native: "中文" },
+  { code: "ja", label: "Japanese", native: "日本語" },
+  { code: "ko", label: "Korean", native: "한국어" },
+  { code: "vi", label: "Vietnamese", native: "Tiếng Việt" },
+  { code: "en", label: "English", native: "English" },
+  { code: "es", label: "Spanish", native: "Español" },
+  { code: "fr", label: "French", native: "Français" },
+  { code: "de", label: "German", native: "Deutsch" },
+  { code: "ru", label: "Russian", native: "Русский" },
+  { code: "ar", label: "Arabic", native: "العربية" },
+  { code: "th", label: "Thai", native: "ไทย" },
+  { code: "hi", label: "Hindi", native: "हिन्दी" },
+  { code: "pt", label: "Portuguese", native: "Português" },
+];
 
 interface EditorContextMenuProps {
   children: ReactNode;
   onAnnotate: () => void;
   onFlashcard: () => void;
   onTranslate: () => void;
+  onTranslateTo: (targetLang: string, selectedText?: string) => void;
   onAskAI: () => void;
   onLinkedView: () => void;
   onApplyPerspective: (type: string) => void;
+  noteTargetLang?: string;
 }
 
 export function EditorContextMenu({
@@ -16,17 +34,21 @@ export function EditorContextMenu({
   onAnnotate,
   onFlashcard,
   onTranslate,
+  onTranslateTo,
   onAskAI,
   onLinkedView,
   onApplyPerspective,
+  noteTargetLang,
 }: EditorContextMenuProps) {
-  // Snapshot selection when the menu opens — before Radix collapses it
   const [hadSelection, setHadSelection] = useState(false);
+  const selectionTextRef = useRef("");
 
   const handleOpenChange = useCallback((open: boolean) => {
     if (open) {
       const sel = window.getSelection();
-      setHadSelection(!!sel && !sel.isCollapsed && sel.toString().trim().length > 0);
+      const text = sel?.toString().trim() ?? "";
+      setHadSelection(text.length > 0);
+      selectionTextRef.current = text;
     }
   }, []);
 
@@ -58,6 +80,34 @@ export function EditorContextMenu({
           <MenuItem onClick={onLinkedView} shortcut="⌥L">
             Linked View
           </MenuItem>
+
+          {/* Translate to... submenu */}
+          <ContextMenu.Sub>
+            <ContextMenu.SubTrigger className="flex items-center justify-between rounded-md px-2 py-1.5 text-xs text-primary outline-none select-none data-[highlighted]:bg-surface-hover">
+              {hadSelection ? "Translate selection to…" : "Translate to…"}
+              <span className="text-muted ml-4">▸</span>
+            </ContextMenu.SubTrigger>
+            <ContextMenu.Portal>
+              <ContextMenu.SubContent className="glass-panel min-w-[180px] max-h-[320px] overflow-y-auto rounded-lg p-1.5 shadow-xl">
+                {TRANSLATE_LANGUAGES.map((lang) => (
+                  <ContextMenu.Item
+                    key={lang.code}
+                    onClick={() =>
+                      onTranslateTo(lang.code, hadSelection ? selectionTextRef.current : undefined)
+                    }
+                    className="flex items-center justify-between rounded-md px-2 py-1.5 text-xs text-primary outline-none select-none data-[highlighted]:bg-surface-hover"
+                  >
+                    <span>
+                      {lang.native} <span className="text-muted">({lang.label})</span>
+                    </span>
+                    {noteTargetLang === lang.code && (
+                      <span className="text-brand text-[10px]">●</span>
+                    )}
+                  </ContextMenu.Item>
+                ))}
+              </ContextMenu.SubContent>
+            </ContextMenu.Portal>
+          </ContextMenu.Sub>
 
           <ContextMenu.Separator className="my-1 h-px bg-border" />
 

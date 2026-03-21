@@ -50,11 +50,11 @@ impl PatternDetector {
     pub fn detect_patterns(&self) -> Vec<DetectedPattern> {
         let mut patterns = Vec::new();
 
-        // Afternoon energy drop: distraction streaks consistently after 3pm
+        // Afternoon energy drop: distraction streaks consistently after 3pm local time
         if let Some(distractions) = self.history.get("distraction_streak") {
             let afternoon_count = distractions
                 .iter()
-                .filter(|(ts, _)| ts.hour() >= 15)
+                .filter(|(ts, _)| ts.with_timezone(&chrono::Local).hour() >= 15)
                 .count();
             let total = distractions.len().max(1);
             if afternoon_count >= 3 && (afternoon_count as f64 / total as f64) > 0.5 {
@@ -126,6 +126,14 @@ impl PatternDetector {
         }
 
         patterns
+    }
+
+    /// Seed test trigger data for debugging pattern detection UI.
+    pub fn seed_test_triggers(&mut self, condition: &str, count: usize) {
+        let entry = self.history.entry(condition.to_string()).or_default();
+        for _ in 0..count {
+            entry.push_back((chrono::Local::now().to_utc(), "seeded for testing".into()));
+        }
     }
 
     /// Get the number of historical entries for a condition.

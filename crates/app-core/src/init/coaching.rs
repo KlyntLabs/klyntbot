@@ -17,6 +17,7 @@ pub(super) struct CoachingResult {
     pub intervention_router: Option<Arc<Mutex<InterventionRouter>>>,
     pub feedback_tracker: Option<Arc<Mutex<FeedbackTracker>>>,
     pub coaching_service: Option<feature_coaching::CoachingService>,
+    pub coaching_intervention_log_repo: Option<storage::CoachingInterventionLogRepo>,
 }
 
 /// Initialize coaching pipeline (desktop mode only).
@@ -42,12 +43,14 @@ pub(super) async fn init_coaching(
         intervention_router,
         feedback_tracker,
         coaching_service,
+        coaching_intervention_log_repo,
     ) = if mode == common::AppMode::Desktop {
         // Initialize coaching engine state.
         let signal_accumulator = Arc::new(Mutex::new(SignalAccumulator::new()));
         let pattern_detector = Arc::new(Mutex::new(PatternDetector::new()));
         let intervention_router = Arc::new(Mutex::new(InterventionRouter::new(Default::default())));
         let coaching_repo = storage::CoachingStrategyRepo::new(storage_pool.inner().clone());
+        let intervention_log_repo = storage::CoachingInterventionLogRepo::new(storage_pool.inner().clone());
         let mut tracker = FeedbackTracker::new().with_repo(coaching_repo);
         tracker.load_from_db().await;
         let feedback_tracker = Arc::new(Mutex::new(tracker));
@@ -85,6 +88,7 @@ pub(super) async fn init_coaching(
             user_situation.clone(),
             coaching_reasoner,
             intervention_tx.clone(),
+            Some(intervention_log_repo.clone()),
             coaching_cancel,
         );
         info!("coaching service started");
@@ -95,12 +99,13 @@ pub(super) async fn init_coaching(
             Some(intervention_router),
             Some(feedback_tracker),
             Some(coaching_service),
+            Some(intervention_log_repo),
         )
     } else {
         // Server mode: drop intervention_tx so intervention_rx.recv() returns None immediately.
         drop(intervention_tx);
         info!("coaching service skipped (server mode)");
-        (None, None, None, None, None)
+        (None, None, None, None, None, None)
     };
 
     CoachingResult {
@@ -110,6 +115,7 @@ pub(super) async fn init_coaching(
         intervention_router,
         feedback_tracker,
         coaching_service,
+        coaching_intervention_log_repo,
     }
 }
 

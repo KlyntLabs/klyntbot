@@ -526,4 +526,3 @@ export function purityToOpacity(purity: number | null | undefined): number {
   if (purity == null) return 0.65;
   return 0.5 + Math.min(1, purity) * 0.4; // range: 0.5 – 0.9
 }
-

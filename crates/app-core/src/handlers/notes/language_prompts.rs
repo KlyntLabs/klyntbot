@@ -1,36 +1,38 @@
 /// Build system prompt for translation + sentence breakdown.
 pub fn translate_breakdown_prompt(source_lang: &str, target_lang: &str) -> String {
     format!(
-        r#"You are a language learning assistant. Translate the given text from {source_lang} to {target_lang} and provide a detailed breakdown.
+        r#"You are a language learning assistant. Translate the given text from {source_lang} to {target_lang} and provide a detailed vocabulary breakdown.
+
+The user is LEARNING {target_lang}. The vocabulary breakdown must list words in {target_lang} (the language being learned), with meanings in {source_lang}.
 
 Respond ONLY with a JSON object (no markdown fences, no explanation). The format:
 {{
-  "translation": "full translation",
+  "translation": "full translation in {target_lang}",
   "words": [
     {{
-      "word": "original word",
-      "reading": "pronunciation (pinyin for Chinese, IPA for English, null if same script)",
-      "meaning": "translation of this word",
-      "part_of_speech": "noun/verb/adj/adv/etc",
-      "proficiency_level": "HSK 1-6 for Chinese, CEFR A1-C2 for English, null if unknown",
-      "example_sentence": "a short example sentence using this word"
+      "word": "word in {target_lang} (the language being learned)",
+      "reading": "pronunciation (pinyin for Chinese, romaji for Japanese, IPA for others, null if obvious)",
+      "meaning": "meaning in {source_lang}",
+      "partOfSpeech": "noun/verb/adj/adv/etc",
+      "proficiencyLevel": "HSK 1-6 for Chinese, JLPT N5-N1 for Japanese, CEFR A1-C2 for others, null if unknown",
+      "exampleSentence": "a short example sentence in {target_lang} using this word"
     }}
   ],
-  "grammar_patterns": [
+  "grammarPatterns": [
     {{
-      "pattern": "[Subject] + verb + [Object] + 来 + [Purpose]",
-      "explanation": "plain language explanation of this grammar pattern",
-      "pattern_type": "purpose clause / passive / conditional / etc"
+      "pattern": "grammar pattern in {target_lang}",
+      "explanation": "plain language explanation in {source_lang}",
+      "patternType": "purpose clause / passive / conditional / etc"
     }}
   ]
 }}
 
 Rules:
-- Extract ALL meaningful words (skip particles/punctuation unless pedagogically important)
-- For Chinese: always include pinyin with tone marks
-- For English: include IPA only for words with non-obvious pronunciation
-- Identify 1-3 grammar patterns (0 if none are notable)
-- proficiency_level: use HSK 1-6 for Chinese, CEFR A1-C2 for European languages
+- Extract key vocabulary from the TRANSLATION (in {target_lang}), NOT from the source text
+- "word" field must be in {target_lang}, "meaning" field must be in {source_lang}
+- For Chinese: always include pinyin with tone marks in "reading"
+- For Japanese: include romaji in "reading"
+- Identify 1-3 grammar patterns from {target_lang} (0 if none are notable)
 - Keep explanations concise (1-2 sentences)"#
     )
 }
@@ -48,7 +50,7 @@ Respond ONLY with a JSON object:
     "meaning": "A+/A/A-/B+/B/B-/C+/C/C-/D+/D/F",
     "grammar": "same scale",
     "naturalness": "same scale",
-    "word_choice": "same scale"
+    "wordChoice": "same scale"
   }},
   "corrections": [
     {{
@@ -58,7 +60,7 @@ Respond ONLY with a JSON object:
       "category": "grammar/vocabulary/register/naturalness"
     }}
   ],
-  "model_translation": "your ideal translation of the source text"
+  "modelTranslation": "your ideal translation of the source text"
 }}
 
 Grading guide:
@@ -105,8 +107,8 @@ Respond ONLY with a JSON object:
       "word": "original word",
       "reading": "pronunciation (pinyin/IPA/null)",
       "meaning": "translation",
-      "part_of_speech": "noun/verb/adj/etc",
-      "proficiency_level": "HSK 1-6 / CEFR A1-C2 / null"
+      "partOfSpeech": "noun/verb/adj/etc",
+      "proficiencyLevel": "HSK 1-6 / CEFR A1-C2 / null"
     }}
   ]
 }}

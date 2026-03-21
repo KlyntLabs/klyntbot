@@ -40,6 +40,20 @@ const TargetsPage = lazy(() =>
   import("../features/finance").then((m) => ({ default: m.TargetsPage })),
 );
 
+// ── Coaching Feature ────────────────────────────────────────
+const CoachingLayout = lazy(() =>
+  import("../features/coaching").then((m) => ({ default: m.CoachingLayout })),
+);
+const CoachingOverviewPage = lazy(() =>
+  import("../features/coaching").then((m) => ({ default: m.CoachingOverviewPage })),
+);
+const CoachingPatternsPage = lazy(() =>
+  import("../features/coaching").then((m) => ({ default: m.PatternsPage })),
+);
+const CoachingHistoryPage = lazy(() =>
+  import("../features/coaching").then((m) => ({ default: m.HistoryPage })),
+);
+
 // ── Projects Feature ─────────────────────────────────────────────
 const ProjectDetailPage = lazy(() =>
   import("../features/projects").then((m) => ({ default: m.ProjectDetailPage })),
@@ -207,6 +221,30 @@ export const router = createHashRouter([
       { path: "/finance/targets", element: <TargetsPage /> },
       { path: "/finance/goals", element: <Navigate to="/finance/targets" replace /> },
       { path: "/finance/liabilities", element: <Navigate to="/finance/targets" replace /> },
+      {
+        path: "/coaching",
+        element: (
+          <CoachingLayout>
+            <CoachingOverviewPage />
+          </CoachingLayout>
+        ),
+      },
+      {
+        path: "/coaching/patterns",
+        element: (
+          <CoachingLayout>
+            <CoachingPatternsPage />
+          </CoachingLayout>
+        ),
+      },
+      {
+        path: "/coaching/history",
+        element: (
+          <CoachingLayout>
+            <CoachingHistoryPage />
+          </CoachingLayout>
+        ),
+      },
       { path: "/debug", element: <Navigate to="/system/events" replace /> },
       { path: "/settings", element: <Navigate to="/settings/general" replace /> },
       {

@@ -68,6 +68,7 @@ pub struct AppCore {
     pub pattern_detector: Option<Arc<Mutex<PatternDetector>>>,
     pub intervention_router: Option<Arc<Mutex<InterventionRouter>>>,
     pub feedback_tracker: Option<Arc<Mutex<FeedbackTracker>>>,
+    pub coaching_intervention_log_repo: Option<storage::CoachingInterventionLogRepo>,
     pub user_situation: Option<Arc<Mutex<UserSituation>>>,
     pub coaching_service: Option<Arc<Mutex<feature_coaching::CoachingService>>>,
     /// Cognitive LLM provider — shared across reflection, cron, and status reporting.
@@ -162,6 +163,12 @@ impl AppCore {
 
     pub fn feedback_tracker(&self) -> Result<&Arc<Mutex<FeedbackTracker>>, ApiError> {
         self.feedback_tracker
+            .as_ref()
+            .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "coaching engine is not available"))
+    }
+
+    pub fn coaching_log_repo(&self) -> Result<&storage::CoachingInterventionLogRepo, ApiError> {
+        self.coaching_intervention_log_repo
             .as_ref()
             .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "coaching engine is not available"))
     }

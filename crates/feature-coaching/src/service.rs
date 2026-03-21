@@ -35,6 +35,7 @@ impl CoachingService {
         situation: Arc<Mutex<UserSituation>>,
         reasoner: Arc<dyn CoachingReasonerHandler>,
         intervention_tx: mpsc::Sender<DeliveredIntervention>,
+        intervention_log: Option<storage::CoachingInterventionLogRepo>,
         cancel: CancellationToken,
     ) -> Self {
         let cancel_clone = cancel.clone();
@@ -81,6 +82,7 @@ impl CoachingService {
                                             let mut fb = feedback.lock().await;
                                             fb.record_delivery(&intervention);
                                         }
+                                        persist_intervention(intervention_log.as_ref(), &intervention).await;
                                         let _ = intervention_tx.send(intervention).await;
                                     }
 
@@ -166,6 +168,8 @@ impl CoachingService {
                                         let mut fb = feedback.lock().await;
                                         fb.record_delivery(&intervention);
                                     }
+                                    // Persist to intervention log
+                                    persist_intervention(intervention_log.as_ref(), &intervention).await;
                                     // Send to consumer
                                     let _ = intervention_tx.send(intervention).await;
                                 }
@@ -299,6 +303,27 @@ async fn update_situation_from_event(situation: &Arc<Mutex<UserSituation>>, even
     }
 }
 
+/// Persist a delivered intervention to the coaching_intervention_log table.
+async fn persist_intervention(
+    log_repo: Option<&storage::CoachingInterventionLogRepo>,
+    intervention: &DeliveredIntervention,
+) {
+    if let Some(repo) = log_repo {
+        if let Err(e) = repo
+            .insert(
+                &intervention.id,
+                intervention.intervention_type.as_str(),
+                &intervention.message,
+                &intervention.trigger_name,
+                &intervention.delivered_at.to_rfc3339(),
+            )
+            .await
+        {
+            warn!("failed to persist intervention to log: {e}");
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -351,6 +376,7 @@ mod tests {
             situation,
             reasoner,
             intervention_tx,
+            None,
             cancel.clone(),
         );
 
@@ -408,6 +434,7 @@ mod tests {
             situation,
             reasoner,
             tx,
+            None,
             cancel.clone(),
         );
 

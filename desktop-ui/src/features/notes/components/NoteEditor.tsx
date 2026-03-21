@@ -183,10 +183,22 @@ export function NoteEditor({
   const handleTranslate = useCallback(() => {
     onSplitModeChange?.("translation");
   }, [onSplitModeChange]);
-  const { activePerspective, focusedSectionId, setPerspective } = usePerspective(
-    note.id,
-    editor,
-    (note as Record<string, unknown>).perspectiveConfig as string | null | undefined,
+  const { activePerspective, focusedSectionId, setPerspective, setLanguagePair, languagePair } =
+    usePerspective(
+      note.id,
+      editor,
+      (note as Record<string, unknown>).perspectiveConfig as string | null | undefined,
+    );
+
+  const [translateSelection, setTranslateSelection] = useState<string | undefined>();
+
+  const handleTranslateTo = useCallback(
+    (targetLang: string, selectedText?: string) => {
+      setLanguagePair({ targetLang });
+      setTranslateSelection(selectedText);
+      onSplitModeChange?.("translation");
+    },
+    [setLanguagePair, onSplitModeChange],
   );
 
   // Annotation popover state
@@ -406,6 +418,7 @@ export function NoteEditor({
           onAnnotate={handleAnnotate}
           onFlashcard={handleFlashcard}
           onTranslate={handleTranslate}
+          onTranslateTo={handleTranslateTo}
           onAskAI={handleAskAI}
           onLinkedView={() => {
             if (focusedSectionId) setPerspective(focusedSectionId, "linked-view");
@@ -414,6 +427,7 @@ export function NoteEditor({
             if (focusedSectionId)
               setPerspective(focusedSectionId, type as "linked-view" | "annotated" | "study-mode");
           }}
+          noteTargetLang={languagePair?.targetLang}
         >
           {activeSplitMode ? (
             <div className="flex-1 flex flex-col min-h-0">
@@ -423,7 +437,14 @@ export function NoteEditor({
                   onSplitModeChange?.(mode === "single" ? null : (mode as SplitMode))
                 }
               />
-              <SplitEditor note={note} splitMode={activeSplitMode} onSave={onSave} />
+              <SplitEditor
+                note={note}
+                splitMode={activeSplitMode}
+                onSave={onSave}
+                targetLangOverride={languagePair?.targetLang}
+                sourceTextOverride={translateSelection}
+                onClearSourceOverride={() => setTranslateSelection(undefined)}
+              />
             </div>
           ) : (
             <div className="flex-1 overflow-y-auto min-h-0 relative">

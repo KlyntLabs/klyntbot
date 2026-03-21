@@ -199,6 +199,21 @@ pub async fn coaching_report_ignored(
 }
 
 #[tauri::command]
+pub async fn coaching_intervention_log(
+    state: State<'_, Arc<AppCore>>,
+    limit: Option<i64>,
+) -> Result<Vec<desktop_shared::cognitive_commands::InterventionLogResponse>, ApiError> {
+    state.coaching_intervention_log(limit).await
+}
+
+#[tauri::command]
+pub async fn coaching_seed_patterns(
+    state: State<'_, Arc<AppCore>>,
+) -> Result<bool, ApiError> {
+    state.coaching_seed_patterns().await
+}
+
+#[tauri::command]
 pub async fn cognitive_inject_event(
     state: State<'_, Arc<AppCore>>,
     event_type: String,
@@ -247,7 +262,9 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "coaching_signals",
     "coaching_patterns",
     "coaching_feedback_stats",
+    "coaching_intervention_log",
     "coaching_router_status",
+    "coaching_seed_patterns",
     "coaching_pending_interventions",
     "coaching_reset_dismissals",
     "coaching_clear_signals",
@@ -322,6 +339,7 @@ pub(crate) async fn dispatch_dev(
             core.coaching_reset_dismissals(dev::get(body, "trigger_name"))
                 .await,
         ),
+        "coaching_seed_patterns" => dev::val(core.coaching_seed_patterns().await),
         "coaching_clear_signals" => dev::val(core.coaching_clear_signals().await),
         "coaching_submit_feedback" => dev::val(
             core.coaching_submit_feedback(
@@ -333,6 +351,9 @@ pub(crate) async fn dispatch_dev(
         "coaching_report_ignored" => dev::val(
             core.coaching_report_ignored(dev::get(body, "intervention_id").unwrap_or_default())
                 .await,
+        ),
+        "coaching_intervention_log" => dev::val(
+            core.coaching_intervention_log(dev::get(body, "limit")).await,
         ),
         "memory_health" => dev::val(core.memory_health().await),
         _ => return None,

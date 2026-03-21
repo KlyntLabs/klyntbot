@@ -14,6 +14,8 @@ interface LanguageLearningPanelProps {
   sourceText: string;
   sourceLang: string;
   targetLang: string;
+  isSelection?: boolean;
+  onClearSelection?: () => void;
 }
 
 export function LanguageLearningPanel({
@@ -22,13 +24,16 @@ export function LanguageLearningPanel({
   sourceText,
   sourceLang,
   targetLang,
+  isSelection,
+  onClearSelection,
 }: LanguageLearningPanelProps) {
   const { result, loading, error, translate } = useLanguageBreakdown();
   const { saving, savedCount, saveWords, dismissSaved } = useVocabularySave();
 
-  // Auto-translate on mount or when source text changes
+  // Auto-translate on mount or when source text / language pair changes.
+  // Skip when source === target (no meaningful translation).
   useEffect(() => {
-    if (sourceText.trim().length > 5) {
+    if (sourceText.trim().length > 5 && sourceLang !== targetLang) {
       translate(sourceText, sourceLang, targetLang);
     }
   }, [sourceText, sourceLang, targetLang, translate]);
@@ -39,6 +44,22 @@ export function LanguageLearningPanel({
 
   return (
     <div className="flex h-full flex-col overflow-y-auto">
+      {/* Selection indicator */}
+      {isSelection && (
+        <div className="flex items-center justify-between border-b border-brand/20 bg-brand/5 px-3 py-1.5">
+          <span className="text-[10px] text-brand">Translating selection</span>
+          {onClearSelection && (
+            <button
+              type="button"
+              onClick={onClearSelection}
+              className="text-[10px] text-muted-foreground hover:text-primary"
+            >
+              Translate full document
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Save feedback snackbar */}
       {savedCount !== null && (
         <div className="mx-3 mt-2 flex items-center justify-between rounded-md bg-green-500/10 px-3 py-2 text-xs text-green-400">

@@ -1,5 +1,5 @@
 import { DEV_SSE_BASE, isTauri } from "@shared/lib/utils";
-import { Activity, Boxes, Brain, Cpu, GitBranch, Grid3x3, Radio } from "lucide-react";
+import { Boxes, Brain, Cpu, GitBranch, Grid3x3, Radio } from "lucide-react";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useParams } from "react-router";
 
@@ -21,11 +21,6 @@ const InferenceTab = lazy(() =>
 const MemoryTab = lazy(() =>
   import("@features/debug/components/tabs/MemoryTab").then((m) => ({
     default: m.MemoryTab,
-  })),
-);
-const CoachingTab = lazy(() =>
-  import("@features/debug/components/tabs/CoachingTab").then((m) => ({
-    default: m.CoachingTab,
   })),
 );
 const EventsTab = lazy(() =>
@@ -50,7 +45,6 @@ type SystemTab =
   | "categories"
   | "inference"
   | "memory"
-  | "coaching"
   | "events"
   | "pipeline";
 
@@ -59,7 +53,6 @@ const tabs: { id: SystemTab; label: string; icon: typeof Brain }[] = [
   { id: "categories", label: "Categories", icon: Grid3x3 },
   { id: "inference", label: "Inference", icon: Cpu },
   { id: "memory", label: "Memory", icon: Brain },
-  { id: "coaching", label: "Coaching", icon: Activity },
   { id: "events", label: "Events", icon: Radio },
   { id: "pipeline", label: "Pipeline", icon: GitBranch },
 ];
@@ -138,7 +131,6 @@ export function SystemPage() {
           {activeTab === "categories" && <CategoriesTab />}
           {activeTab === "inference" && <InferenceTab />}
           {activeTab === "memory" && <MemoryTab />}
-          {activeTab === "coaching" && <CoachingTab />}
           {activeTab === "events" && <EventsTab />}
           {activeTab === "pipeline" && <PipelineTab />}
         </Suspense>

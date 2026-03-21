@@ -3,6 +3,7 @@
 pub mod action_repo;
 pub mod agent_task;
 pub mod area;
+pub mod coaching_intervention_log;
 pub mod coaching_strategy;
 pub mod cron;
 pub mod custom_column;
@@ -40,6 +41,7 @@ pub mod usage;
 pub use action_repo::{ActionFilter, ActionPatch, ActionRepo};
 pub use agent_task::AgentTaskRepo;
 pub use area::AreaRepo;
+pub use coaching_intervention_log::{CoachingInterventionLogRepo, InterventionLogRow};
 pub use coaching_strategy::{CoachingStrategyRepo, CoachingStrategyRow, UpsertCoachingStrategy};
 pub use cron::CronRepo;
 pub use custom_column::CustomColumnRepo;

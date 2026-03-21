@@ -158,6 +158,18 @@ pub struct RouterStatusResponse {
     pub daily_limit: usize,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InterventionLogResponse {
+    pub id: String,
+    pub intervention_type: String,
+    pub message: String,
+    pub trigger_name: String,
+    pub feedback: Option<String>,
+    pub delivered_at: String,
+    pub feedback_at: Option<String>,
+}
+
 // ── Events DTOs ─────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

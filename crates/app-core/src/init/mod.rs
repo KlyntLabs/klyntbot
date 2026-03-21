@@ -215,6 +215,7 @@ impl AppCore {
             intervention_router,
             feedback_tracker,
             coaching_service,
+            coaching_intervention_log_repo,
         } = coaching::init_coaching(
             mode,
             &config,
@@ -261,6 +262,7 @@ impl AppCore {
             pattern_detector,
             intervention_router,
             feedback_tracker,
+            coaching_intervention_log_repo,
             user_situation: Some(user_situation),
             coaching_service: coaching_service.map(|cs| Arc::new(Mutex::new(cs))),
             cognitive_provider,

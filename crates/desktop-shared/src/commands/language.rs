@@ -27,6 +27,7 @@ pub struct WordBreakdown {
     pub part_of_speech: String,
     pub proficiency_level: Option<String>,
     pub example_sentence: Option<String>,
+    #[serde(default)]
     pub is_new: bool,
 }
 
