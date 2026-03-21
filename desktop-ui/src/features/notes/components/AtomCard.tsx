@@ -44,10 +44,13 @@ export function AtomCard({ atom, onAccept, onDismiss, onReviewDone }: AtomCardPr
         isSuggested ? "opacity-60" : "hover:bg-surface-hover"
       }`}
     >
-      {/* Subject + context on one line */}
-      <span className="text-xs font-medium text-primary truncate min-w-0 flex-1">
-        {atom.subject}
-      </span>
+      {/* Subject + meaning on one line */}
+      <div className="flex items-center gap-1.5 min-w-0 flex-1 truncate">
+        <span className="text-xs font-medium text-primary shrink-0">{atom.subject}</span>
+        {atom.sourceContext && (
+          <span className="text-[10px] text-muted truncate">{atom.sourceContext}</span>
+        )}
+      </div>
 
       {/* Right side: retention + action */}
       <div className="flex items-center gap-1 shrink-0">
