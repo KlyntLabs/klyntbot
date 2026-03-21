@@ -167,6 +167,66 @@ impl SignalAccumulator {
                     None
                 }
             }
+            "flashcard_reviewed" => {
+                let count = self.count_events("AtomFlashcardReviewed");
+                if count >= 1 {
+                    Some(TriggerFired {
+                        condition_name: "flashcard_reviewed".into(),
+                        confidence: 0.9,
+                        context: format!("{count} flashcard review(s) in window"),
+                    })
+                } else {
+                    None
+                }
+            }
+            "atom_created" => {
+                let count = self.count_events("KnowledgeAtomCreated");
+                if count >= 1 {
+                    Some(TriggerFired {
+                        condition_name: "atom_created".into(),
+                        confidence: 0.9,
+                        context: format!("{count} atom(s) created in window"),
+                    })
+                } else {
+                    None
+                }
+            }
+            "coaching_learning_digest" => {
+                let count = self.count_events("CoachingLearningDigest");
+                if count >= 1 {
+                    Some(TriggerFired {
+                        condition_name: "coaching_learning_digest".into(),
+                        confidence: 0.9,
+                        context: format!("{count} learning digest(s) in window"),
+                    })
+                } else {
+                    None
+                }
+            }
+            "knowledge_transfer" => {
+                let count = self.count_events("KnowledgeTransferDetected");
+                if count >= 1 {
+                    Some(TriggerFired {
+                        condition_name: "knowledge_transfer".into(),
+                        confidence: 0.8,
+                        context: format!("{count} knowledge transfer(s) detected"),
+                    })
+                } else {
+                    None
+                }
+            }
+            "learning_streak_milestone" => {
+                let count = self.count_events("RetentionMilestoneReached");
+                if count >= 1 {
+                    Some(TriggerFired {
+                        condition_name: "learning_streak_milestone".into(),
+                        confidence: 0.9,
+                        context: format!("{count} retention milestone(s) reached"),
+                    })
+                } else {
+                    None
+                }
+            }
             _ => None,
         }
     }

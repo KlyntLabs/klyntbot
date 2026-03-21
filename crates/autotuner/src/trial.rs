@@ -75,6 +75,8 @@ pub struct TrialResult {
     pub retrieval_recall: f64,
     pub memory_freshness: f64,
     pub promotion_accuracy: f64,
+    // Phase 3
+    pub knowledge_retention_score: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

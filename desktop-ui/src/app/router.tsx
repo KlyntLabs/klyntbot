@@ -28,6 +28,9 @@ const LearnPage = lazy(() => import("../features/learn").then((m) => ({ default:
 const KnowledgeHealthPage = lazy(() =>
   import("../features/learn").then((m) => ({ default: m.KnowledgeHealth })),
 );
+const FocusedReviewPage = lazy(() =>
+  import("../features/learn").then((m) => ({ default: m.FocusedReview })),
+);
 
 // ── Finance Feature ──────────────────────────────────────────────
 const FinanceOverviewPage = lazy(() =>
@@ -214,6 +217,7 @@ export const router = createHashRouter([
       { path: "/notes", element: <KnowledgeBasePage /> },
       { path: "/learn", element: <LearnPage /> },
       { path: "/learn/knowledge", element: <KnowledgeHealthPage /> },
+      { path: "/learn/review/:topicId?", element: <FocusedReviewPage /> },
       { path: "/automations", element: <AutomationsPage /> },
       { path: "/categories", element: <Navigate to="/system/categories" replace /> },
       { path: "/finance", element: <FinanceOverviewPage /> },

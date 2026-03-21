@@ -201,6 +201,7 @@ const JOB_ATOM_DECAY: &str = "__klyntbot_atom_decay_daily";
 const JOB_FINANCE_BUDGET_CHECK: &str = "__klyntbot_finance_budget_check";
 const JOB_FINANCE_PRICE_REFRESH: &str = "__klyntbot_finance_price_refresh";
 const JOB_FINANCE_HEALTH_CHECK: &str = "__klyntbot_finance_health_check";
+const JOB_MORNING_BRIEFING: &str = "__klyntbot_morning_briefing";
 
 /// Register individual cron handlers (must be called before wrapping CronService in Arc).
 #[allow(clippy::too_many_arguments)]
@@ -468,6 +469,41 @@ fn register_cron_callbacks(
         );
     }
 
+    // ── morning_briefing ──────────────────────────────────────────────
+    {
+        let pool = repos.pool().clone();
+        let rt = rt.clone();
+        cron_service.register_handler(
+            JOB_MORNING_BRIEFING,
+            Arc::new(move |_job: &scheduling::CronJob| {
+                let pool = pool.clone();
+                tokio::task::block_in_place(|| {
+                    rt.block_on(async {
+                        let atom_repo = cognitive::KnowledgeAtomRepo::new(pool.clone());
+                        let review_stats = cognitive::ReviewStatsRepo::new(pool.clone());
+
+                        let (fading_res, streak_res) = tokio::join!(
+                            atom_repo.list_fading_important(5),
+                            review_stats.current_streak(),
+                        );
+                        let fading_count = fading_res.map(|v| v.len()).unwrap_or(0);
+                        let streak = streak_res.unwrap_or(0);
+
+                        if fading_count > 0 {
+                            info!(
+                                "Morning briefing: {fading_count} fading atoms, streak={streak}"
+                            );
+                        }
+
+                        Ok(Some(format!(
+                            "Morning briefing: {fading_count} fading, streak={streak}"
+                        )))
+                    })
+                })
+            }),
+        );
+    }
+
     // ── proactive_scan ───────────────────────────────────────────────────
     if tasks_config.proactive_suggestions {
         let handler = proactive_handler.clone();
@@ -646,6 +682,16 @@ async fn ensure_cron_jobs(
             tz: Some(config.timezone.clone()),
         },
         "Daily knowledge atom decay"
+    );
+
+    // Morning knowledge health briefing (9 AM local)
+    ensure_job!(
+        JOB_MORNING_BRIEFING,
+        scheduling::CronSchedule::Cron {
+            expr: "0 9 * * *".to_string(),
+            tz: Some(config.timezone.clone()),
+        },
+        "Morning knowledge health briefing"
     );
 
     // Proactive suggestion scan (every 4 hours)

@@ -1,4 +1,4 @@
-import { Activity, GraduationCap, Play, Plus } from "lucide-react";
+import { Activity, Focus, GraduationCap, Play, Plus } from "lucide-react";
 import { Link } from "react-router";
 import { useLearnDashboard } from "../hooks/useLearnDashboard";
 import { DeckList } from "./DeckList";
@@ -114,6 +114,22 @@ export function DashboardHome({
           generating={generating}
         />
       </div>
+
+      {/* Focused review link */}
+      <Link
+        to="/learn/review"
+        className="glass-card p-4 flex items-center gap-3 transition-all duration-200 hover:bg-white/[0.06] group"
+      >
+        <div className="p-1.5 rounded-lg bg-purple-500/10">
+          <Focus size={16} className="text-purple-400" strokeWidth={1.5} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <span className="text-sm font-medium text-foreground">Focused Review</span>
+          <p className="text-[12px] text-muted-foreground">
+            Review all due cards in a distraction-free session
+          </p>
+        </div>
+      </Link>
 
       {/* Knowledge Health link */}
       <Link

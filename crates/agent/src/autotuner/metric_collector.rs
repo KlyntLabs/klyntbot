@@ -14,6 +14,7 @@ pub struct AgentMetricCollector {
     usage_repo: storage::UsageRepo,
     trial_repo: storage::TrialRepo,
     fact_repo: cognitive::SemanticFactRepo,
+    review_stats: cognitive::ReviewStatsRepo,
 }
 
 impl AgentMetricCollector {
@@ -24,12 +25,14 @@ impl AgentMetricCollector {
         trial_repo: storage::TrialRepo,
         fact_repo: cognitive::SemanticFactRepo,
     ) -> Self {
+        let review_stats = cognitive::ReviewStatsRepo::new(fact_repo.pool().clone());
         Self {
             strategy_repo,
             event_log_repo,
             usage_repo,
             trial_repo,
             fact_repo,
+            review_stats,
         }
     }
 }
@@ -53,6 +56,7 @@ impl MetricSource for AgentMetricCollector {
             per_trial_correction,
             phase2_metrics,
             fact_health_result,
+            knowledge_retention_result,
         ) = tokio::join!(
             self.strategy_repo.get_stats_since(since),
             self.event_log_repo
@@ -104,6 +108,8 @@ impl MetricSource for AgentMetricCollector {
             },
             // Fact health (Knowledge Trust) for promotion_accuracy
             self.fact_repo.fact_health_by_domain(90),
+            // Phase 3: importance-weighted avg retention across active knowledge atoms
+            self.review_stats.knowledge_retention_score(),
         );
         let (retrieval_precision, memory_freshness) = phase2_metrics;
 
@@ -111,6 +117,8 @@ impl MetricSource for AgentMetricCollector {
             Ok(ref domains) => cognitive::DomainHealthRow::average_health(domains),
             _ => 1.0,
         };
+
+        let knowledge_retention_score = knowledge_retention_result.unwrap_or(1.0);
 
         let stats = stats.map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         let correction_count = correction_count.unwrap_or(0);
@@ -157,6 +165,7 @@ impl MetricSource for AgentMetricCollector {
             retrieval_recall,
             memory_freshness,
             promotion_accuracy,
+            knowledge_retention_score,
         })
     }
 }

@@ -1,6 +1,8 @@
 //! Pattern detection layer — aggregates accumulated signals into higher-level
 //! patterns that are input to the coaching reasoner.
 
+mod learning_patterns;
+
 use std::collections::{HashMap, VecDeque};
 
 use chrono::{DateTime, Timelike, Utc};
@@ -122,6 +124,46 @@ impl PatternDetector {
                     description: format!("Focus quality declining triggered {} times", focus.len()),
                     domain: "productivity".into(),
                 });
+            }
+        }
+
+        // --- Learning patterns ---
+
+        // Study streak detection (milestones + at-risk).
+        if let Some(reviews) = self.history.get("flashcard_reviewed") {
+            if let Some(p) = learning_patterns::detect_study_streak(reviews) {
+                patterns.push(p);
+            }
+        }
+
+        // Retention decay from digest signals.
+        if let Some(digests) = self.history.get("coaching_learning_digest") {
+            if let Some(p) = learning_patterns::detect_retention_decay(digests) {
+                patterns.push(p);
+            }
+        }
+
+        // Learning momentum: compare atom creation vs review rates.
+        {
+            let empty = VecDeque::new();
+            let creations = self.history.get("atom_created").unwrap_or(&empty);
+            let reviews = self.history.get("flashcard_reviewed").unwrap_or(&empty);
+            if let Some(p) = learning_patterns::detect_learning_momentum(creations, reviews) {
+                patterns.push(p);
+            }
+        }
+
+        // Domain retention gap from repeated digest signals.
+        if let Some(digests) = self.history.get("coaching_learning_digest") {
+            if let Some(p) = learning_patterns::detect_domain_gap(digests) {
+                patterns.push(p);
+            }
+        }
+
+        // Knowledge transfer events.
+        if let Some(transfers) = self.history.get("knowledge_transfer") {
+            if let Some(p) = learning_patterns::detect_knowledge_transfer(transfers) {
+                patterns.push(p);
             }
         }
 

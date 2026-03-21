@@ -220,6 +220,7 @@ mod tests {
             commands::language::DEV_COMMANDS,
             commands::atoms::DEV_COMMANDS,
             commands::knowledge_health::DEV_COMMANDS,
+            commands::morning_briefing::DEV_COMMANDS,
         ];
         // chat_send is handled inline in dev_server.rs
         let mut set: BTreeSet<String> = modules

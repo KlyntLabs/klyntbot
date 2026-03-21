@@ -44,6 +44,9 @@ export function AtomCard({ atom, onAccept, onDismiss, onReviewDone }: AtomCardPr
 
       {/* Right side: retention + action */}
       <div className="flex items-center gap-1 shrink-0">
+        {atom.retentionPct < 0.5 && (
+          <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse shrink-0" />
+        )}
         <span
           className={`text-[9px] font-medium tabular-nums ${retentionTextColor(atom.retentionPct)}`}
         >

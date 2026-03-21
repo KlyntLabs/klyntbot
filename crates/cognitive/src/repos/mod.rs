@@ -15,6 +15,7 @@ pub mod markdown_parser;
 pub mod persona;
 pub mod persona_accuracy;
 pub mod procedural_rule;
+pub mod review_stats;
 pub mod semantic_fact;
 pub mod squad;
 
@@ -40,6 +41,7 @@ pub use markdown_parser::parse_markdown_to_tree;
 pub use persona::{NewPersona, PersonaRepo, PersonaRow, PersonaUpdate};
 pub use persona_accuracy::{PersonaAccuracy, PersonaAccuracyRepo};
 pub use procedural_rule::ProceduralRuleRepo;
+pub use review_stats::{DailyReviewStat, DomainRetentionStat, ReviewStatsRepo};
 pub use semantic_fact::SemanticFactRepo;
 pub use squad::{NewSquad, ResolvedSquad, SquadMemberRow, SquadRepo, SquadRow};
 

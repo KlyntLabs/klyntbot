@@ -70,6 +70,9 @@ pub(super) async fn dispatch(
     if let Some(r) = commands::knowledge_health::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }
+    if let Some(r) = commands::morning_briefing::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
     if let Some(r) = commands::project_sources::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }

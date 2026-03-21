@@ -529,6 +529,35 @@ impl KnowledgeAtomRepo {
         Ok(rows.into_iter().collect())
     }
 
+    /// Count atoms created since the given RFC3339 timestamp.
+    pub async fn count_created_since(&self, since: &str) -> Result<i64, sqlx::Error> {
+        let row: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM knowledge_atoms WHERE created_at > ?1",
+        )
+        .bind(since)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(row.0)
+    }
+
+    /// List fading important atoms (retention < 0.6, importance > 0.7, active).
+    pub async fn list_fading_important(
+        &self,
+        limit: i64,
+    ) -> Result<Vec<KnowledgeAtomRow>, sqlx::Error> {
+        sqlx::query_as::<_, KnowledgeAtomRow>(
+            r#"SELECT * FROM knowledge_atoms
+               WHERE status = 'active'
+                 AND retention_pct < 0.6
+                 AND personal_importance > 0.7
+               ORDER BY retention_pct ASC
+               LIMIT ?1"#,
+        )
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+    }
+
     /// Check migration status: (migrated, atom_count).
     pub async fn migration_status(&self) -> Result<(bool, usize), sqlx::Error> {
         let sentinel: Option<(String,)> =

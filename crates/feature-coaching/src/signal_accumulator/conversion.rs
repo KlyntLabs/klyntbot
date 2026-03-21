@@ -100,6 +100,58 @@ pub(super) fn event_to_signal(event: &DomainEvent, timestamp: DateTime<Utc>) -> 
                 ..Default::default()
             },
         ),
+        DomainEvent::AtomFlashcardReviewed { quality, .. } => (
+            "AtomFlashcardReviewed",
+            SignalMetadata {
+                amount: Some(*quality as f64),
+                ..Default::default()
+            },
+        ),
+        DomainEvent::KnowledgeAtomCreated { domain, .. } => (
+            "KnowledgeAtomCreated",
+            SignalMetadata {
+                category: Some(domain.clone()),
+                ..Default::default()
+            },
+        ),
+        DomainEvent::KnowledgeAtomArchived { reason, .. } => (
+            "KnowledgeAtomArchived",
+            SignalMetadata {
+                category: Some(reason.clone()),
+                ..Default::default()
+            },
+        ),
+        DomainEvent::RetentionMilestoneReached {
+            new_retention_pct, ..
+        } => (
+            "RetentionMilestoneReached",
+            SignalMetadata {
+                amount: Some(*new_retention_pct),
+                ..Default::default()
+            },
+        ),
+        DomainEvent::KnowledgeTransferDetected {
+            from_domain,
+            to_domain,
+            confidence,
+            ..
+        } => (
+            "KnowledgeTransferDetected",
+            SignalMetadata {
+                category: Some(format!("{from_domain}->{to_domain}")),
+                amount: Some(*confidence),
+                ..Default::default()
+            },
+        ),
+        DomainEvent::CoachingLearningDigest {
+            fading_count, ..
+        } => (
+            "CoachingLearningDigest",
+            SignalMetadata {
+                amount: Some(*fading_count as f64),
+                ..Default::default()
+            },
+        ),
         _ => ("Other", SignalMetadata::default()),
     };
 

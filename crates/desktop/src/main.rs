@@ -391,6 +391,8 @@ fn run_desktop_app() {
             // Knowledge Health
             commands::knowledge_health::knowledge_health_summary,
             commands::knowledge_health::knowledge_topic_detail,
+            // Morning Briefing
+            commands::morning_briefing::morning_briefing_summary,
             // Areas
             commands::areas::area_list,
             commands::areas::area_create,

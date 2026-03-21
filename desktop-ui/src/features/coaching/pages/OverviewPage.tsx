@@ -6,6 +6,7 @@ import { Check, RefreshCw, Trash2, X, XCircle } from "lucide-react";
 import { useEffect } from "react";
 import { useNavigate } from "react-router";
 import { FeedbackBadge } from "../components/FeedbackBadge";
+import { MorningBriefing } from "../components/MorningBriefing";
 import type { DetectedPattern, InterventionLog } from "../types";
 
 // ── Inline types (matching Rust backend) ─────────────────
@@ -216,6 +217,9 @@ export function CoachingOverviewPage() {
 
   return (
     <div className="flex flex-col gap-4">
+      {/* ── 0. Morning Briefing — Knowledge Health ───── */}
+      <MorningBriefing />
+
       {/* ── 1. User Situation ──────────────────────────── */}
       <div className="glass-card rounded-xl p-5">
         <h2 className="text-[13px] font-medium text-muted-foreground mb-3">User Situation</h2>

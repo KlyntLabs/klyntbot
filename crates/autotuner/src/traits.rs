@@ -77,4 +77,7 @@ pub struct MetricSnapshot {
     pub memory_freshness: f64,
     // Phase 2: fact extraction quality (1.0 - fast_failure_rate)
     pub promotion_accuracy: f64,
+    /// Phase 3: importance-weighted avg retention across active knowledge atoms.
+    /// Long-term metric — changes over weeks, not per-trial.
+    pub knowledge_retention_score: f64,
 }

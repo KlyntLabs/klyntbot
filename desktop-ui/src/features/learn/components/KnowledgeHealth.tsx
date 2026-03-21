@@ -1,5 +1,5 @@
 import { retentionBarColor, retentionTextColor } from "@shared/lib/retention";
-import { Activity, ArrowLeft, Brain } from "lucide-react";
+import { Activity, ArrowLeft, Brain, Play } from "lucide-react";
 import { Link } from "react-router";
 import type { TopicHealth } from "../hooks/useKnowledgeHealth";
 import { useKnowledgeHealth } from "../hooks/useKnowledgeHealth";
@@ -36,6 +36,15 @@ function TopicRow({ topic }: { topic: TopicHealth }) {
       >
         {pct}%
       </span>
+
+      {/* Review button */}
+      <Link
+        to={`/learn/review/${topic.id}`}
+        className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium text-purple-400 hover:bg-purple-500/15 transition-colors shrink-0"
+      >
+        <Play size={10} strokeWidth={1.5} />
+        Review
+      </Link>
     </div>
   );
 }
