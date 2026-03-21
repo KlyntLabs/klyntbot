@@ -380,6 +380,13 @@ fn run_desktop_app() {
             commands::language::language_save_vocabulary,
             commands::language::language_detect_confusables,
             commands::language::language_enrich_annotation,
+            // Knowledge Atoms
+            commands::atoms::atoms_for_note,
+            commands::atoms::atom_accept,
+            commands::atoms::atom_dismiss,
+            commands::atoms::atom_restore,
+            commands::atoms::atom_next_card,
+            commands::atoms::atoms_migration_status,
             // Areas
             commands::areas::area_list,
             commands::areas::area_create,
