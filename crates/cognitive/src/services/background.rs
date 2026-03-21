@@ -1033,6 +1033,17 @@ fn event_type_key(event: &DomainEvent) -> String {
         DomainEvent::NoteContentChanged { .. } => "NoteContentChanged".into(),
         DomainEvent::NoteDeleted { .. } => "NoteDeleted".into(),
         DomainEvent::TaskHierarchyChanged { .. } => "TaskHierarchyChanged".into(),
+        DomainEvent::KnowledgeAtomCreated { .. } => "KnowledgeAtomCreated".into(),
+        DomainEvent::KnowledgeAtomAccepted { .. } => "KnowledgeAtomAccepted".into(),
+        DomainEvent::KnowledgeAtomArchived { .. } => "KnowledgeAtomArchived".into(),
+        DomainEvent::AtomFlashcardReviewed { .. } => "AtomFlashcardReviewed".into(),
+        DomainEvent::AtomReinforced { .. } => "AtomReinforced".into(),
+        DomainEvent::AtomInteracted { .. } => "AtomInteracted".into(),
+        DomainEvent::RetentionMilestoneReached { .. } => "RetentionMilestoneReached".into(),
+        DomainEvent::TranslationCompleted { .. } => "TranslationCompleted".into(),
+        DomainEvent::NoteStudied { .. } => "NoteStudied".into(),
+        DomainEvent::KnowledgeTransferDetected { .. } => "KnowledgeTransferDetected".into(),
+        DomainEvent::CoachingLearningDigest { .. } => "CoachingLearningDigest".into(),
     }
 }
 

@@ -272,6 +272,74 @@ pub enum DomainEvent {
         detail: String,
     },
 
+    // -- Knowledge Atoms --
+    KnowledgeAtomCreated {
+        atom_id: String,
+        atom_type: String,
+        domain: String,
+        source_note_id: Option<String>,
+        personal_importance: f64,
+    },
+    KnowledgeAtomAccepted {
+        atom_id: String,
+        atom_type: String,
+    },
+    KnowledgeAtomArchived {
+        atom_id: String,
+        reason: String,
+    },
+    AtomFlashcardReviewed {
+        atom_id: String,
+        card_id: String,
+        quality: u8,
+        recall_speed_ms: u64,
+        new_retention_pct: f64,
+        source_note_id: Option<String>,
+    },
+    AtomReinforced {
+        atom_id: String,
+        referencing_note_id: String,
+        new_salience: f64,
+    },
+    AtomInteracted {
+        atom_id: String,
+        interaction_type: String,
+        note_id: Option<String>,
+    },
+    RetentionMilestoneReached {
+        atom_id: String,
+        topic_id: Option<String>,
+        new_retention_pct: f64,
+        milestone: String,
+        previous_pct: f64,
+    },
+    TranslationCompleted {
+        note_id: String,
+        source_lang: String,
+        target_lang: String,
+        word_count: usize,
+        is_selection: bool,
+    },
+    NoteStudied {
+        note_id: String,
+        duration_secs: u64,
+        atoms_reviewed: usize,
+        mode: String,
+    },
+    KnowledgeTransferDetected {
+        atom_id: String,
+        from_domain: String,
+        to_domain: String,
+        confidence: f64,
+    },
+    CoachingLearningDigest {
+        fading_count: usize,
+        archived_count: usize,
+        streak_days: usize,
+        strongest_topic: Option<String>,
+        weakest_topic: Option<String>,
+    },
+
     // -- Contradiction detection (Phase 3 prep) --
     ContradictionDetected {
         existing_subject: String,

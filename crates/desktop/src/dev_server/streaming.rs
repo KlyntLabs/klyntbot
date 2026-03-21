@@ -261,5 +261,16 @@ fn domain_for_event(event: &bus::DomainEvent) -> &'static str {
         bus::DomainEvent::BehavioralPatternDetected { .. } => "learning",
         bus::DomainEvent::ContradictionDetected { .. } => "learning",
         bus::DomainEvent::AutotunerDecision { .. } => "learning",
+        bus::DomainEvent::KnowledgeAtomCreated { .. }
+        | bus::DomainEvent::KnowledgeAtomAccepted { .. }
+        | bus::DomainEvent::KnowledgeAtomArchived { .. }
+        | bus::DomainEvent::AtomFlashcardReviewed { .. }
+        | bus::DomainEvent::AtomReinforced { .. }
+        | bus::DomainEvent::AtomInteracted { .. }
+        | bus::DomainEvent::RetentionMilestoneReached { .. }
+        | bus::DomainEvent::TranslationCompleted { .. }
+        | bus::DomainEvent::NoteStudied { .. }
+        | bus::DomainEvent::KnowledgeTransferDetected { .. }
+        | bus::DomainEvent::CoachingLearningDigest { .. } => "learning",
     }
 }

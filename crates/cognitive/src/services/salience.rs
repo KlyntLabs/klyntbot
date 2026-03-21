@@ -102,6 +102,19 @@ pub fn evaluate_salience(event: &DomainEvent) -> SalienceVerdict {
         // Contradiction detection — always extract for cognitive processing
         DomainEvent::ContradictionDetected { .. } => SalienceVerdict::Extract,
 
+        // Knowledge Atoms
+        DomainEvent::KnowledgeAtomAccepted { .. } => SalienceVerdict::Extract,
+        DomainEvent::RetentionMilestoneReached { .. } => SalienceVerdict::Extract,
+        DomainEvent::AtomFlashcardReviewed { .. } => SalienceVerdict::Accumulate,
+        DomainEvent::TranslationCompleted { .. } => SalienceVerdict::Accumulate,
+        DomainEvent::AtomReinforced { .. } => SalienceVerdict::Accumulate,
+        DomainEvent::NoteStudied { .. } => SalienceVerdict::Accumulate,
+        DomainEvent::KnowledgeTransferDetected { .. } => SalienceVerdict::Accumulate,
+        DomainEvent::KnowledgeAtomCreated { .. } => SalienceVerdict::Discard,
+        DomainEvent::KnowledgeAtomArchived { .. } => SalienceVerdict::Discard,
+        DomainEvent::AtomInteracted { .. } => SalienceVerdict::Discard,
+        DomainEvent::CoachingLearningDigest { .. } => SalienceVerdict::Discard,
+
         // BookIndex events — discarded from cognitive extraction (handled by BookIndex updater)
         DomainEvent::NoteContentChanged { .. } => SalienceVerdict::Discard,
         DomainEvent::NoteDeleted { .. } => SalienceVerdict::Discard,
