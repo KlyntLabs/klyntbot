@@ -1,5 +1,6 @@
 mod agents;
 mod annotations;
+mod atoms;
 mod areas;
 mod calendar;
 mod capture;
@@ -21,6 +22,7 @@ mod workspace;
 
 pub use agents::*;
 pub use annotations::*;
+pub use atoms::*;
 pub use areas::*;
 pub use calendar::*;
 pub use capture::*;
