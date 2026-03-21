@@ -197,12 +197,6 @@ export const router = createHashRouter([
       { path: "/notes", element: <KnowledgeBasePage /> },
       { path: "/learn", element: <LearnPage /> },
       { path: "/automations", element: <AutomationsPage /> },
-      // Redirect old routes
-      { path: "/productivity", element: <Navigate to="/" replace /> },
-      { path: "/productivity/day/:date", element: <Navigate to="/" replace /> },
-      { path: "/productivity/week/:weekStart", element: <Navigate to="/" replace /> },
-      { path: "/productivity/month/:yearMonth", element: <Navigate to="/" replace /> },
-      { path: "/productivity/categories", element: <Navigate to="/system/categories" replace /> },
       { path: "/categories", element: <Navigate to="/system/categories" replace /> },
       { path: "/finance", element: <FinanceOverviewPage /> },
       { path: "/finance/cashflow", element: <CashFlowPage /> },

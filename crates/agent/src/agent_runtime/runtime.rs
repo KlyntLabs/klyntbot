@@ -283,7 +283,7 @@ impl AgentRuntime {
 
         // Step 2b: Squad detection — if a squad_id is set, fan out to personas
         if let (Some(ref squad_id), Some(ref deps)) = (&ctx.squad_id, &self.squad_deps) {
-            return self
+            let result = self
                 .run_squad_execution(
                     message,
                     history,
@@ -296,6 +296,15 @@ impl AgentRuntime {
                     ctx.squad_mode.as_deref(),
                 )
                 .await;
+
+            // Write ground truth for shadow classification (Step 0a wrote the shadow log).
+            if let Some(ref hook) = self.autotuner_hook {
+                let elapsed = pipeline_start.elapsed().as_millis() as u64;
+                hook.on_message_completed(ctx.chat_id.as_str(), "squad", "reactive", 0, elapsed)
+                    .await;
+            }
+
+            return result;
         }
 
         // Step 3: Filter MCP tool names to those the matched agent can access

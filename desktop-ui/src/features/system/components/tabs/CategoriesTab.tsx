@@ -1,4 +1,4 @@
-import { CategoriesPage } from "@features/productivity/pages/CategoriesPage";
+import { CategoriesPage } from "../categories/CategoriesPage";
 
 export function CategoriesTab() {
   return <CategoriesPage />;

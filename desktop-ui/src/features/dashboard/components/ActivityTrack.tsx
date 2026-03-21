@@ -12,6 +12,7 @@ import { useQuery } from "@shared/hooks/useQuery";
 import type { MergeableEvent } from "@shared/lib/activity-sessions";
 import { mergeActivitySessions } from "@shared/lib/activity-sessions";
 import { formatHumanDuration, minutesSinceMidnight, TZ_OFFSET_MINS } from "@shared/lib/dates";
+import { purityToOpacity, qualityToColor, resolveActivityColor } from "@shared/lib/productivity";
 import { cn } from "@shared/lib/utils";
 import type {
   ActivityCategory,
@@ -21,7 +22,6 @@ import type {
   TimelineEntry,
 } from "@shared/types";
 import { useMemo, useState } from "react";
-import { purityToOpacity, qualityToColor, resolveActivityColor } from "../productivity/shared";
 
 export interface SessionBlock {
   startMin: number;

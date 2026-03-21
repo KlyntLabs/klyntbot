@@ -1,12 +1,12 @@
 import { useEvent } from "@shared/hooks/useEvent";
 import { useQuery } from "@shared/hooks/useQuery";
 import { formatTime } from "@shared/lib/dates";
+import { AppIcon, getAppColor } from "@shared/lib/productivity";
 import type { ActivitySwitchPayload, ActivityTimeline } from "@shared/types";
 import { useEffect, useRef, useState } from "react";
-import { AppIcon, getAppColor } from "../lib/constants";
 
 const BROWSER_RE =
-  /\s*[-–—]\s*(?:Google Chrome|Safari|Firefox|Arc|Brave Browser|Microsoft Edge|Orion|Vivaldi|Opera|Chromium|Zen Browser)(?:\s*[-–—]\s*.+)?$/i;
+  /\s*[-\u2013\u2014]\s*(?:Google Chrome|Safari|Firefox|Arc|Brave Browser|Microsoft Edge|Orion|Vivaldi|Opera|Chromium|Zen Browser)(?:\s*[-\u2013\u2014]\s*.+)?$/i;
 
 function stripBrowserSuffix(title: string): string {
   return title.replace(BROWSER_RE, "").trim();

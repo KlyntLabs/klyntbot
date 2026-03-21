@@ -1,4 +1,3 @@
-import { ActivityFeed } from "@features/productivity/components/ActivityFeed";
 import { useEvent } from "@shared/hooks/useEvent";
 import { useQuery } from "@shared/hooks/useQuery";
 import { formatHumanDuration, minutesSinceMidnight, TZ_OFFSET_MINS } from "@shared/lib/dates";
@@ -16,6 +15,7 @@ import { type LayerKey, useEnabledLayers, useSidebarOpen } from "../lib/layers";
 import { ActivityTrack, type SessionBlock } from "./ActivityTrack";
 import { CalendarTrack } from "./CalendarTrack";
 import { ContextRibbon } from "./ContextRibbon";
+import { ActivityFeed } from "./productivity/ActivityFeed";
 import { SummaryPanel } from "./SummaryPanel";
 
 const DEFAULT_HOUR_HEIGHT = 60;

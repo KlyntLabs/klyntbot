@@ -1,10 +1,10 @@
 import { ipc } from "@shared/hooks/useIpc";
 import { useMutation } from "@shared/hooks/useMutation";
 import { formatHumanDuration } from "@shared/lib/dates";
+import { getCategoryColor } from "@shared/lib/productivity";
 import type { ActivityCategory, TrackedApp } from "@shared/types";
 import { Search } from "lucide-react";
 import { useMemo, useState } from "react";
-import { getCategoryColor } from "../lib/constants";
 
 interface TrackedAppsListProps {
   apps: TrackedApp[];

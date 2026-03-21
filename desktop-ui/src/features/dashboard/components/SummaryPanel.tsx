@@ -1,18 +1,14 @@
-import { GoalsProgress } from "@features/productivity/components/GoalsProgress";
-import { HourlyHeatmap } from "@features/productivity/components/HourlyHeatmap";
-import { PatternsCard } from "@features/productivity/components/PatternsCard";
-import {
-  ProductivityScoreRing,
-  ScoreBar,
-} from "@features/productivity/components/ProductivityScoreRing";
-import { getAppColor } from "@features/productivity/lib/constants";
-import { resolveActivityColor, resolveCategoryLabel } from "@features/productivity/shared";
 import { useQuery } from "@shared/hooks/useQuery";
 import { formatHumanDuration, TZ_OFFSET_MINS, todayISO } from "@shared/lib/dates";
+import { getAppColor, resolveActivityColor, resolveCategoryLabel } from "@shared/lib/productivity";
 import type { ProductivitySummary, TimelineEntry, TimelineSummary } from "@shared/types";
 import { Brain, ExternalLink, Lightbulb, X } from "lucide-react";
 import { useNavigate } from "react-router";
 import type { SessionBlock } from "./ActivityTrack";
+import { GoalsProgress } from "./productivity/GoalsProgress";
+import { HourlyHeatmap } from "./productivity/HourlyHeatmap";
+import { PatternsCard } from "./productivity/PatternsCard";
+import { ProductivityScoreRing, ScoreBar } from "./productivity/ProductivityScoreRing";
 
 /* ─── Intelligence types ──────────────────────────────── */
 

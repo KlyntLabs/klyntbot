@@ -1,8 +1,8 @@
 import { useEvent } from "@shared/hooks/useEvent";
 import { ipc } from "@shared/hooks/useIpc";
+import { AppIcon, getAppColor } from "@shared/lib/productivity";
 import type { AutoFocusPayload } from "@shared/types";
 import { useCallback, useState } from "react";
-import { AppIcon, getAppColor } from "../lib/constants";
 
 export function AutoFocusToast() {
   const [session, setSession] = useState<AutoFocusPayload | null>(null);

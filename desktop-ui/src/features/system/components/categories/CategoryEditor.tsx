@@ -1,12 +1,12 @@
 import { useMutation } from "@shared/hooks/useMutation";
-import type { ActivityCategory } from "@shared/types";
-import { Palette, Save, Trash2, X } from "lucide-react";
-import { useState } from "react";
 import {
   CATEGORY_TYPE_GROUPS,
   DEFAULT_CATEGORY_COLOR,
   getCategoryTypeColor,
-} from "../lib/constants";
+} from "@shared/lib/productivity";
+import type { ActivityCategory } from "@shared/types";
+import { Palette, Save, Trash2, X } from "lucide-react";
+import { useState } from "react";
 
 interface CategoryEditorProps {
   category: ActivityCategory | null;

@@ -1,5 +1,6 @@
 /**
- * Shared constants and components for productivity widgets.
+ * Productivity domain utilities: app brand colors/icons, category colors,
+ * score color thresholds, and activity-type color resolvers.
  */
 
 import { AppWindow } from "lucide-react";
@@ -118,7 +119,6 @@ export const APP_COLORS: Record<string, string> = {
   "mastodon.social": "#6364FF",
 };
 
-// Shared SVG icon elements — defined once, referenced by multiple keys.
 const chromeIcon = (
   <svg viewBox="0 0 16 16" className="w-3.5 h-3.5" aria-hidden="true">
     <circle cx="8" cy="8" r="7" fill="none" stroke="#4285F4" strokeWidth="1.5" />
@@ -290,13 +290,15 @@ const facebookIcon = (
     />
   </svg>
 );
+// Uses unique ID to avoid SVG gradient collisions when multiple icons render simultaneously.
+const IG_GRADIENT_ID = "ig-prod-grad";
 const instagramIcon = (
   <svg viewBox="0 0 16 16" className="w-3.5 h-3.5" aria-hidden="true">
-    <rect x="2" y="2" width="12" height="12" rx="4" fill="url(#ig)" />
+    <rect x="2" y="2" width="12" height="12" rx="4" fill={`url(#${IG_GRADIENT_ID})`} />
     <circle cx="8" cy="8" r="3" fill="none" stroke="white" strokeWidth="1.2" />
     <circle cx="11.5" cy="4.5" r="0.8" fill="white" />
     <defs>
-      <linearGradient id="ig" x1="2" y1="14" x2="14" y2="2">
+      <linearGradient id={IG_GRADIENT_ID} x1="2" y1="14" x2="14" y2="2">
         <stop stopColor="#FFDC80" />
         <stop offset="0.5" stopColor="#F56040" />
         <stop offset="1" stopColor="#833AB4" />
@@ -487,6 +489,22 @@ export function resolveActivityColor(categoryType: string | undefined, isIdle: b
   return "var(--brand)";
 }
 
+/** Resolve category type to a human-readable label. */
+export function resolveCategoryLabel(categoryType: string): string {
+  if (categoryType === "productive") return "Productive";
+  if (categoryType === "distracting") return "Distracting";
+  if (categoryType === "neutral") return "Neutral";
+  return "Uncategorized";
+}
+
+/** Score color thresholds — shared between ScoreRing and stats widgets. */
+export function scoreColor(score: number): string {
+  if (score >= 80) return "var(--success)";
+  if (score >= 60) return "var(--brand)";
+  if (score >= 40) return "var(--text-muted-foreground)";
+  return "var(--destructive)";
+}
+
 /**
  * Map a quality score (0–100) to a perceptually smooth color.
  * 0 → red, 50 → amber/yellow, 100 → green.
@@ -494,9 +512,7 @@ export function resolveActivityColor(categoryType: string | undefined, isIdle: b
  */
 export function qualityToColor(score: number): string {
   const clamped = Math.max(0, Math.min(100, score));
-  // Hue: 25° (red-orange) → 85° (yellow-green) → 145° (green)
   const hue = 25 + (clamped / 100) * 120;
-  // Lightness: slightly brighter for higher scores
   const lightness = 0.52 + (clamped / 100) * 0.1;
   const chroma = 0.16 + (clamped / 100) * 0.04;
   return `oklch(${lightness.toFixed(2)} ${chroma.toFixed(2)} ${hue.toFixed(0)})`;
@@ -511,74 +527,3 @@ export function purityToOpacity(purity: number | null | undefined): number {
   return 0.5 + Math.min(1, purity) * 0.4; // range: 0.5 – 0.9
 }
 
-/** Resolve category type to a human-readable label. */
-export function resolveCategoryLabel(categoryType: string): string {
-  if (categoryType === "productive") return "Productive";
-  if (categoryType === "distracting") return "Distracting";
-  if (categoryType === "neutral") return "Neutral";
-  return "Uncategorized";
-}
-
-// scoreColor lives in constants.tsx — import from there.
-export { scoreColor } from "./constants";
-
-/** Build the standard Focus/Active/Breaks donut segments. */
-export function buildBreakdownSegments(
-  totalActive: number,
-  totalFocus: number,
-  totalBreak: number,
-): { name: string; value: number; color: string }[] {
-  return [
-    { name: "Focus", value: totalFocus, color: "var(--brand)" },
-    { name: "Active", value: totalActive - totalFocus - totalBreak, color: "var(--purple)" },
-    { name: "Breaks", value: totalBreak, color: "var(--info)" },
-  ];
-}
-
-/** Productivity legend items for bar charts. */
-export const PRODUCTIVITY_LEGEND = [
-  { label: "Productive", color: "var(--success)" },
-  { label: "Neutral", color: "var(--text-muted-foreground)" },
-  { label: "Distracting", color: "var(--destructive)" },
-] as const;
-
-interface TooltipPayloadEntry {
-  dataKey: string;
-  value: number;
-  fill: string;
-}
-
-interface ChartTooltipProps {
-  active?: boolean;
-  payload?: TooltipPayloadEntry[];
-  label?: string;
-}
-
-/** Shared tooltip for recharts bar charts. */
-export function ChartTooltip({ active, payload, label }: ChartTooltipProps) {
-  if (!active || !payload?.length) return null;
-  const total = payload.reduce((s: number, p: TooltipPayloadEntry) => s + (p.value || 0), 0);
-  return (
-    <div
-      className="rounded-lg px-3 py-2 text-[11px]"
-      style={{
-        background: "var(--surface-floating)",
-        border: "1px solid var(--border)",
-        boxShadow: "var(--shadow-tooltip)",
-      }}
-    >
-      <div className="font-medium text-foreground mb-1">{label}</div>
-      {payload.map((p: TooltipPayloadEntry) => (
-        <div key={p.dataKey} className="flex items-center gap-2 text-muted-foreground font-light">
-          <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: p.fill }} />
-          <span className="capitalize">{p.dataKey}</span>
-          <span className="ml-auto tabular-nums">{p.value}h</span>
-        </div>
-      ))}
-      <div className="border-t border-border-subtle mt-1 pt-1 flex justify-between text-foreground font-medium">
-        <span>Total</span>
-        <span className="tabular-nums">{total.toFixed(1)}h</span>
-      </div>
-    </div>
-  );
-}

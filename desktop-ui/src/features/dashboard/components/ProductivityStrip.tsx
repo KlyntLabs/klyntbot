@@ -4,9 +4,9 @@
  */
 
 import { formatHumanDuration } from "@shared/lib/dates";
+import { scoreColor } from "@shared/lib/productivity";
 import type { ProductivitySummary } from "@shared/types";
 import { useState } from "react";
-import { scoreColor } from "../productivity/shared";
 
 interface ProductivityStripProps {
   summary: ProductivitySummary | null;

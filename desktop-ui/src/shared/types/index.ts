@@ -156,7 +156,6 @@ export type {
   InsightPayload,
   IntelligenceSession,
   LearnedRule,
-  ProductivityPeriod,
   ProductivityProject,
   ProductivitySummary,
   ProjectUsage,

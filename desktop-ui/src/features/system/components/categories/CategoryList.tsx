@@ -1,13 +1,13 @@
 import { useMutation } from "@shared/hooks/useMutation";
-import type { ActivityCategory } from "@shared/types";
-import { Plus } from "lucide-react";
-import { useMemo } from "react";
 import {
   CATEGORY_TYPE_GROUPS,
   DEFAULT_CATEGORY_COLOR,
   getCategoryColor,
   getCategoryTypeColor,
-} from "../lib/constants";
+} from "@shared/lib/productivity";
+import type { ActivityCategory } from "@shared/types";
+import { Plus } from "lucide-react";
+import { useMemo } from "react";
 
 interface CategoryListProps {
   categories: ActivityCategory[];

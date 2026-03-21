@@ -281,8 +281,6 @@ export interface HourlyBreakdown {
   productiveRatio: number;
 }
 
-export type ProductivityPeriod = "day" | "week" | "month";
-
 // ── Mutation Parameters ─────────────────────────────────────
 
 export interface GoalCreateParams {

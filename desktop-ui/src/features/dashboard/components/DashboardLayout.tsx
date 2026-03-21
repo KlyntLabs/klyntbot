@@ -1,6 +1,3 @@
-import { AutoFocusToast } from "@features/productivity/components/AutoFocusToast";
-import { FocusStateIndicator } from "@features/productivity/components/FocusStateIndicator";
-import { FocusTrayIndicator } from "@features/productivity/components/FocusTrayIndicator";
 import { MiniCalendar } from "@shared/components/MiniCalendar";
 import { useClickOutside } from "@shared/hooks/useClickOutside";
 import { todayISO, toLocalISO } from "@shared/lib/dates";
@@ -18,6 +15,9 @@ import {
   useSidebarToggle,
 } from "../lib/layers";
 import { CalendarSync } from "./CalendarSync";
+import { AutoFocusToast } from "./productivity/AutoFocusToast";
+import { FocusStateIndicator } from "./productivity/FocusStateIndicator";
+import { FocusTrayIndicator } from "./productivity/FocusTrayIndicator";
 
 type ViewMode = "day" | "week" | "month" | "year";
 
