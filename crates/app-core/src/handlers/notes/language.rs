@@ -61,6 +61,19 @@ impl AppCore {
             word.is_new = existing.is_empty();
         }
 
+        // Emit TranslationCompleted event
+        if let Some(note_id) = &params.note_id {
+            if let Some(bus) = &self.domain_event_bus {
+                let _ = bus.publish(bus::DomainEvent::TranslationCompleted {
+                    note_id: note_id.clone(),
+                    source_lang: params.source_lang.clone(),
+                    target_lang: params.target_lang.clone(),
+                    word_count: result.words.len(),
+                    is_selection: params.is_selection,
+                });
+            }
+        }
+
         Ok(result)
     }
 

@@ -346,6 +346,78 @@ pub fn normalize_domain_event(event: &bus::DomainEvent) -> ActivityLogEntry {
                 serde_json::to_value(event).ok(),
             ),
 
+            bus::DomainEvent::AtomReinforced {
+                atom_id,
+                referencing_note_id,
+                ..
+            } => (
+                ActivitySource::DomainEvent,
+                ActivityActor::System,
+                "atom_reinforced",
+                Some("atom"),
+                Some(atom_id.as_str()),
+                None,
+                Some(format!("Atom reinforced from note {referencing_note_id}")),
+                None,
+            ),
+            bus::DomainEvent::RetentionMilestoneReached {
+                atom_id, milestone, ..
+            } => (
+                ActivitySource::DomainEvent,
+                ActivityActor::System,
+                "retention_milestone",
+                Some("atom"),
+                Some(atom_id.as_str()),
+                None,
+                Some(format!("Retention milestone reached: {milestone}")),
+                serde_json::to_value(event).ok(),
+            ),
+            bus::DomainEvent::KnowledgeTransferDetected {
+                atom_id,
+                from_domain,
+                to_domain,
+                ..
+            } => (
+                ActivitySource::DomainEvent,
+                ActivityActor::System,
+                "knowledge_transfer",
+                Some("atom"),
+                Some(atom_id.as_str()),
+                None,
+                Some(format!("Knowledge transfer: {from_domain} → {to_domain}")),
+                serde_json::to_value(event).ok(),
+            ),
+            bus::DomainEvent::AtomInteracted {
+                atom_id,
+                interaction_type,
+                ..
+            } => (
+                ActivitySource::DomainEvent,
+                ActivityActor::User,
+                "atom_interacted",
+                Some("atom"),
+                Some(atom_id.as_str()),
+                None,
+                Some(format!("Atom interaction: {interaction_type}")),
+                None,
+            ),
+            bus::DomainEvent::CoachingLearningDigest {
+                fading_count,
+                streak_days,
+                ..
+            } => (
+                ActivitySource::DomainEvent,
+                ActivityActor::System,
+                "learning_digest",
+                None,
+                None,
+                None,
+                Some(format!(
+                    "Learning digest: {fading_count} fading, {streak_days} day streak"
+                )),
+                serde_json::to_value(event).ok(),
+            ),
+
             // Catch-all for remaining variants
             _ => (
                 ActivitySource::DomainEvent,

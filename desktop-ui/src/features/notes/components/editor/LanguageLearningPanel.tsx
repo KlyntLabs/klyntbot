@@ -34,9 +34,9 @@ export function LanguageLearningPanel({
   // Skip when source === target (no meaningful translation).
   useEffect(() => {
     if (sourceText.trim().length > 5 && sourceLang !== targetLang) {
-      translate(sourceText, sourceLang, targetLang);
+      translate(sourceText, sourceLang, targetLang, noteId, isSelection);
     }
-  }, [sourceText, sourceLang, targetLang, translate]);
+  }, [sourceText, sourceLang, targetLang, noteId, isSelection, translate]);
 
   const handleSaveWords = (words: WordBreakdown[]) => {
     saveWords(words, noteId, noteTitle);
@@ -82,7 +82,7 @@ export function LanguageLearningPanel({
         translation={result?.translation ?? null}
         loading={loading}
         error={error}
-        onRetry={() => translate(sourceText, sourceLang, targetLang)}
+        onRetry={() => translate(sourceText, sourceLang, targetLang, noteId, isSelection)}
       />
 
       {/* Section 2: Words (always expanded) */}

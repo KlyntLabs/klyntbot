@@ -8,6 +8,10 @@ pub struct TranslateBreakdownParams {
     pub text: String,
     pub source_lang: String,
     pub target_lang: String,
+    #[serde(default)]
+    pub note_id: Option<String>,
+    #[serde(default)]
+    pub is_selection: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

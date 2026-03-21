@@ -29,13 +29,13 @@ export function useLanguageBreakdown() {
   const [error, setError] = useState<string | null>(null);
   const requestIdRef = useRef(0);
 
-  const translate = useCallback(async (text: string, sourceLang: string, targetLang: string) => {
+  const translate = useCallback(async (text: string, sourceLang: string, targetLang: string, noteId?: string, isSelection?: boolean) => {
     const id = ++requestIdRef.current;
     setLoading(true);
     setError(null);
     try {
       const response = await ipc<TranslateBreakdownResponse>("language_translate_breakdown", {
-        params: { text, sourceLang, targetLang },
+        params: { text, sourceLang, targetLang, noteId: noteId ?? null, isSelection: isSelection ?? false },
       });
       // Only apply result if this is still the latest request
       if (id === requestIdRef.current) {

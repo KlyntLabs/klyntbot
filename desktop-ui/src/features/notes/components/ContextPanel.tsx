@@ -25,6 +25,89 @@ interface ContextPanelProps {
   onOpenInsight?: () => void;
 }
 
+// ── Table of Contents ─────────────────────────────────────────────────────
+
+interface TocHeading {
+  level: number;
+  text: string;
+  index: number;
+}
+
+function parseHeadings(html: string | null | undefined): TocHeading[] {
+  if (!html) return [];
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, "text/html");
+  const headings: TocHeading[] = [];
+  const els = doc.querySelectorAll("h1, h2, h3");
+  els.forEach((el, i) => {
+    const text = (el.textContent || "").trim();
+    if (text) {
+      headings.push({ level: Number.parseInt(el.tagName[1]), text, index: i });
+    }
+  });
+  return headings;
+}
+
+function scrollToHeading(text: string, index: number) {
+  const editorEl = document.querySelector(".editor-content");
+  if (!editorEl) return;
+  const headings = editorEl.querySelectorAll("h1, h2, h3");
+  // Match by index among all headings in the live editor DOM
+  const target = headings[index];
+  if (target) {
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+}
+
+const TOC_STYLES: Record<number, { size: string; weight: string; opacity: string }> = {
+  1: { size: "text-[11px]", weight: "font-medium", opacity: "opacity-90" },
+  2: { size: "text-[10.5px]", weight: "font-normal", opacity: "opacity-70" },
+  3: { size: "text-[10px]", weight: "font-normal", opacity: "opacity-55" },
+};
+
+function TableOfContents({ bodyHtml }: { bodyHtml?: string | null }) {
+  const headings = useMemo(() => parseHeadings(bodyHtml), [bodyHtml]);
+
+  if (headings.length === 0) {
+    return null;
+  }
+
+  const minLevel = Math.min(...headings.map((h) => h.level));
+
+  return (
+    <div>
+      <div className="text-[10px] font-medium text-dim uppercase tracking-wider mb-2">
+        Table of Contents
+      </div>
+      <nav className="relative border-l border-border-subtle ml-1">
+        {headings.map((h) => {
+          const style = TOC_STYLES[h.level] || TOC_STYLES[3];
+          const depth = h.level - minLevel;
+          return (
+            <button
+              key={`${h.index}-${h.text}`}
+              type="button"
+              onClick={() => scrollToHeading(h.text, h.index)}
+              className={`group flex items-center gap-1.5 w-full text-left ${style.size} ${style.weight} text-muted-foreground truncate py-[3px] pr-1 transition-all duration-150 hover:text-foreground hover:bg-white/[0.03] rounded-r-md`}
+              style={{ paddingLeft: `${8 + depth * 10}px` }}
+              title={h.text}
+            >
+              <span
+                className={`shrink-0 rounded-full bg-brand transition-opacity duration-150 ${style.opacity} group-hover:opacity-100`}
+                style={{
+                  width: h.level === 1 ? 4 : 3,
+                  height: h.level === 1 ? 4 : 3,
+                }}
+              />
+              <span className="truncate">{h.text}</span>
+            </button>
+          );
+        })}
+      </nav>
+    </div>
+  );
+}
+
 // ── More section (collapsed by default) ──────────────────────────────────
 
 function MoreSection({ note }: { note: Note }) {
@@ -48,13 +131,8 @@ function MoreSection({ note }: { note: Note }) {
 
       {!collapsed && (
         <div className="px-3 pb-3 space-y-3">
-          {/* Table of Contents placeholder */}
-          <div>
-            <div className="text-[10px] font-medium text-dim uppercase tracking-wider mb-1">
-              Table of Contents
-            </div>
-            <div className="text-[10px] text-dim italic">Table of contents coming soon</div>
-          </div>
+          {/* Table of Contents */}
+          <TableOfContents bodyHtml={note.bodyHtml} />
 
           {/* Note Metadata */}
           <div className="border-t border-border-subtle pt-2">

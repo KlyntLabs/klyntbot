@@ -83,6 +83,14 @@ impl KnowledgeAtomRepo {
         let id = Uuid::new_v4().to_string();
         let now = Utc::now().to_rfc3339();
 
+        // Only set last_interaction_ts for active atoms (user-intentional).
+        // Suggested atoms have never been interacted with.
+        let interaction_ts: Option<&str> = if atom.status == "active" {
+            Some(&now)
+        } else {
+            None
+        };
+
         sqlx::query(
             r#"
             INSERT INTO knowledge_atoms
@@ -110,7 +118,7 @@ impl KnowledgeAtomRepo {
         .bind(&atom.semantic_fact_id)
         .bind(atom.personal_importance)
         .bind(&atom.status)
-        .bind(&now)
+        .bind(interaction_ts)
         .bind(&atom.metadata)
         .bind(&atom.topic_id)
         .bind(&now)

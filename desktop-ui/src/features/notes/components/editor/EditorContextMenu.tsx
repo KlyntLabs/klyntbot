@@ -56,7 +56,11 @@ export function EditorContextMenu({
     <ContextMenu.Root onOpenChange={handleOpenChange}>
       <ContextMenu.Trigger asChild>{children}</ContextMenu.Trigger>
       <ContextMenu.Portal>
-        <ContextMenu.Content className="glass-panel min-w-[200px] rounded-lg p-1.5 shadow-xl">
+        <ContextMenu.Content
+          className="glass-panel min-w-[200px] rounded-lg p-1.5 shadow-xl"
+          onOpenAutoFocus={(e) => e.preventDefault()}
+          onCloseAutoFocus={(e) => e.preventDefault()}
+        >
           {hadSelection && (
             <>
               <ContextMenu.Label className="px-2 py-1 text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
