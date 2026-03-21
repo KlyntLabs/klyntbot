@@ -9,6 +9,7 @@ pub mod failed_observation;
 pub mod flashcard;
 pub mod gt_link;
 pub mod insight_cache;
+pub mod knowledge_atom;
 pub mod markdown_parser;
 pub mod persona;
 pub mod persona_accuracy;
@@ -30,6 +31,7 @@ pub use flashcard::{
     CardType, DeckSummary, FlashcardRepo, FlashcardRow, NewFlashcard, ReviewLogEntry, ReviewQuality,
 };
 pub use gt_link::SqliteGTLinkRepo;
+pub use knowledge_atom::{KnowledgeAtomRepo, KnowledgeAtomRow, KnowledgeTopicRow, NewKnowledgeAtom};
 #[allow(deprecated)]
 pub use insight_cache::{InsightCacheRepo, InsightCacheRow};
 pub use markdown_parser::parse_markdown_to_tree;
