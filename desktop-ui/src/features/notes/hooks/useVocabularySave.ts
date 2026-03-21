@@ -1,6 +1,6 @@
 import { ipc } from "@shared/hooks/useIpc";
 import { invalidateQueries } from "@shared/hooks/useQuery";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { WordBreakdown } from "./useLanguageBreakdown";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
@@ -9,6 +9,24 @@ export function useVocabularySave() {
   const [state, setState] = useState<SaveState>("idle");
   const [savedCount, setSavedCount] = useState<number | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Clean up timer on unmount
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
+
+  const resetAfterDelay = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      setState("idle");
+      setSavedCount(null);
+      setErrorMessage(null);
+      timerRef.current = null;
+    }, 5000);
+  }, []);
 
   const saveWords = useCallback(
     async (words: WordBreakdown[], noteId: string | null, deck: string) => {
@@ -29,28 +47,24 @@ export function useVocabularySave() {
         setSavedCount(words.length);
         invalidateQueries("flashcard_");
         invalidateQueries("atoms_for_note");
-        setTimeout(() => {
-          setState("idle");
-          setSavedCount(null);
-        }, 5000);
+        resetAfterDelay();
       } catch (e: unknown) {
         setState("error");
         setErrorMessage(e instanceof Error ? e.message : "Failed to save words");
-        setTimeout(() => {
-          setState("idle");
-          setErrorMessage(null);
-        }, 5000);
+        resetAfterDelay();
       }
     },
-    [],
+    [resetAfterDelay],
   );
 
   const dismissSaved = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
     setSavedCount(null);
     setState("idle");
   }, []);
 
   const dismissError = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
     setErrorMessage(null);
     setState("idle");
   }, []);

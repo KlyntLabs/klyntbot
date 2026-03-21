@@ -148,20 +148,20 @@ impl KnowledgeAtomRepo {
         domain: &str,
         subjects: &[String],
     ) -> Result<std::collections::HashSet<String>, sqlx::Error> {
-        let mut existing = std::collections::HashSet::new();
-        for subject in subjects {
-            let row: Option<(String,)> = sqlx::query_as(
-                "SELECT subject FROM knowledge_atoms WHERE subject = ?1 AND domain = ?2 AND status != 'archived' LIMIT 1",
-            )
-            .bind(subject)
-            .bind(domain)
-            .fetch_optional(&self.pool)
-            .await?;
-            if let Some((s,)) = row {
-                existing.insert(s);
-            }
+        if subjects.is_empty() {
+            return Ok(std::collections::HashSet::new());
         }
-        Ok(existing)
+        let placeholders: Vec<String> = (0..subjects.len()).map(|i| format!("?{}", i + 2)).collect();
+        let query = format!(
+            "SELECT DISTINCT subject FROM knowledge_atoms WHERE subject IN ({}) AND domain = ?1 AND status != 'archived'",
+            placeholders.join(", ")
+        );
+        let mut q = sqlx::query_as::<_, (String,)>(&query).bind(domain);
+        for s in subjects {
+            q = q.bind(s);
+        }
+        let rows = q.fetch_all(&self.pool).await?;
+        Ok(rows.into_iter().map(|(s,)| s).collect())
     }
 
     pub async fn get(&self, id: &str) -> Result<Option<KnowledgeAtomRow>, sqlx::Error> {

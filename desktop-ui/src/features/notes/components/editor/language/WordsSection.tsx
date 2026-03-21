@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { WordBreakdown } from "../../../hooks/useLanguageBreakdown";
 
 interface WordsSectionProps {
@@ -12,14 +12,10 @@ export function WordsSection({ words, onSaveWords, saving, saved }: WordsSection
   const [selected, setSelected] = useState<Set<string>>(() => {
     return new Set(words.filter((w) => w.isNew).map((w) => w.word));
   });
-  const prevSavedRef = useRef(saved);
 
-  // Clear selection after successful save
+  // Clear selection when save completes
   useEffect(() => {
-    if (!prevSavedRef.current && saved) {
-      setSelected(new Set());
-    }
-    prevSavedRef.current = saved;
+    if (saved) setSelected(new Set());
   }, [saved]);
 
   const toggle = useCallback((word: string) => {

@@ -19,6 +19,7 @@ import { NavigationSidebar } from "../components/NavigationSidebar";
 import { NoteCreationDialog } from "../components/NoteCreationDialog";
 import { NoteEditorPanel } from "../components/NoteEditorPanel";
 import { NoteFinder } from "../components/NoteFinder";
+import { ShortcutHelpDialog } from "../components/ShortcutHelpDialog";
 import { VersionHistoryOverlay } from "../components/VersionHistoryOverlay";
 import { useCardGeneration } from "../hooks/useCardGeneration";
 import { useInbox } from "../hooks/useInbox";
@@ -73,6 +74,7 @@ export default function KnowledgeBasePage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [showNoteFinder, setShowNoteFinder] = useState(false);
+  const [showShortcutHelp, setShowShortcutHelp] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
 
   // ── Card Generation ──────────────────────────────────────────────────
@@ -354,6 +356,17 @@ export default function KnowledgeBasePage() {
         return;
       }
 
+      // "?" to show shortcut help — only when not typing in an input
+      if (e.key === "?" && !e.metaKey && !e.ctrlKey) {
+        const tag = (e.target as HTMLElement)?.tagName;
+        const editable = (e.target as HTMLElement)?.isContentEditable;
+        if (!editable && tag !== "INPUT" && tag !== "TEXTAREA") {
+          e.preventDefault();
+          setShowShortcutHelp(true);
+          return;
+        }
+      }
+
       const mod = e.metaKey || e.ctrlKey;
       if (!mod) return;
 
@@ -614,6 +627,9 @@ export default function KnowledgeBasePage() {
         }}
         noteId={selectedNote?.id ?? null}
       />
+
+      {/* Shortcut Help Dialog */}
+      <ShortcutHelpDialog open={showShortcutHelp} onClose={() => setShowShortcutHelp(false)} />
     </div>
   );
 }

@@ -15,12 +15,6 @@ function retentionColor(pct: number): string {
   return "text-red-400";
 }
 
-function retentionBg(pct: number): string {
-  if (pct >= 0.8) return "bg-green-500/15";
-  if (pct >= 0.5) return "bg-amber-500/15";
-  return "bg-red-500/15";
-}
-
 export function AtomCard({ atom, onAccept, onDismiss, onReviewDone }: AtomCardProps) {
   const [isReviewing, setIsReviewing] = useState(false);
 
@@ -65,6 +59,7 @@ export function AtomCard({ atom, onAccept, onDismiss, onReviewDone }: AtomCardPr
             <button
               type="button"
               onClick={() => onAccept?.(atom.id)}
+              aria-label="Accept suggestion"
               className="rounded px-1.5 py-0.5 text-[9px] font-medium text-brand hover:bg-brand/15 transition-colors"
             >
               +

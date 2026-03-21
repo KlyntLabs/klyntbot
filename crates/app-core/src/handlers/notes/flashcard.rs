@@ -92,19 +92,6 @@ impl AppCore {
             // Use 0.9 (desired retention) as a conservative estimate for the stored metric.
             let retention_pct = 0.9_f64;
 
-            // Read previous retention for milestone detection
-            let previous_pct = if let Some(atom_repo) = &self.knowledge_atom_repo {
-                atom_repo
-                    .get(atom_id)
-                    .await
-                    .ok()
-                    .flatten()
-                    .map(|a| a.retention_pct)
-                    .unwrap_or(0.0)
-            } else {
-                0.0
-            };
-
             if let Some(bus) = &self.domain_event_bus {
                 let _ = bus.publish(bus::DomainEvent::AtomFlashcardReviewed {
                     atom_id: atom_id.clone(),
@@ -114,19 +101,9 @@ impl AppCore {
                     new_retention_pct: retention_pct,
                     source_note_id: card.source_note_id.clone(),
                 });
-
-                // Emit RetentionMilestoneReached when crossing 50% or 80% thresholds
-                for (threshold, label) in [(0.5, "50%"), (0.8, "80%")] {
-                    if previous_pct < threshold && retention_pct >= threshold {
-                        let _ = bus.publish(bus::DomainEvent::RetentionMilestoneReached {
-                            atom_id: atom_id.clone(),
-                            topic_id: None,
-                            new_retention_pct: retention_pct,
-                            milestone: label.to_string(),
-                            previous_pct,
-                        });
-                    }
-                }
+                // NOTE: RetentionMilestoneReached is emitted by the Phase 2 decay cron
+                // when retention drops below thresholds and then recovers via review.
+                // Not meaningful here since retention_pct is a static 0.9 estimate.
             }
             // Update atom retention + touch last_interaction_ts in one DB call
             if let Some(atom_repo) = &self.knowledge_atom_repo {

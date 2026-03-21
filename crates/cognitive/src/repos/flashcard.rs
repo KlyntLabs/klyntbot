@@ -228,20 +228,20 @@ impl FlashcardRepo {
         deck: &str,
         fronts: &[String],
     ) -> Result<std::collections::HashSet<String>, sqlx::Error> {
-        let mut existing = std::collections::HashSet::new();
-        for front in fronts {
-            let row: Option<(String,)> = sqlx::query_as(
-                "SELECT front FROM flashcards WHERE front = ?1 AND deck = ?2 LIMIT 1",
-            )
-            .bind(front)
-            .bind(deck)
-            .fetch_optional(&self.pool)
-            .await?;
-            if let Some((f,)) = row {
-                existing.insert(f);
-            }
+        if fronts.is_empty() {
+            return Ok(std::collections::HashSet::new());
         }
-        Ok(existing)
+        let placeholders: Vec<String> = (0..fronts.len()).map(|i| format!("?{}", i + 2)).collect();
+        let query = format!(
+            "SELECT DISTINCT front FROM flashcards WHERE front IN ({}) AND deck = ?1",
+            placeholders.join(", ")
+        );
+        let mut q = sqlx::query_as::<_, (String,)>(&query).bind(deck);
+        for f in fronts {
+            q = q.bind(f);
+        }
+        let rows = q.fetch_all(&self.pool).await?;
+        Ok(rows.into_iter().map(|(f,)| f).collect())
     }
 
     /// Fetch cards in `deck` that are due for review.
