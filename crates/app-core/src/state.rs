@@ -103,6 +103,8 @@ pub struct AppCore {
     pub insight_service: Option<Arc<feature_insights::InsightService>>,
     /// Flashcard repo for FSRS spaced repetition (None when cognitive feature unavailable).
     pub flashcard_repo: Option<cognitive::FlashcardRepo>,
+    /// Knowledge atom repo (None when cognitive feature unavailable).
+    pub knowledge_atom_repo: Option<cognitive::KnowledgeAtomRepo>,
     /// Persona repo for Insight Review personas (None when cognitive feature unavailable).
     pub persona_repo: Option<cognitive::PersonaRepo>,
     /// Squad repo for Insight Review persona squads (None when cognitive feature unavailable).
@@ -197,6 +199,13 @@ impl AppCore {
         self.flashcard_repo
             .as_ref()
             .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "Flashcard repo not available"))
+    }
+
+    /// Return knowledge atom repo or a "not available" error.
+    pub fn knowledge_atom_repo(&self) -> Result<&cognitive::KnowledgeAtomRepo, ApiError> {
+        self.knowledge_atom_repo
+            .as_ref()
+            .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "Knowledge atom repo not available"))
     }
 
     /// Return launcher search engine or a "feature disabled" error.

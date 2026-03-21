@@ -72,6 +72,10 @@ impl KnowledgeAtomRepo {
         Self { pool }
     }
 
+    pub fn pool(&self) -> &SqlitePool {
+        &self.pool
+    }
+
     pub async fn create(
         &self,
         atom: &NewKnowledgeAtom,

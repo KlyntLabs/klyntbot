@@ -11,7 +11,7 @@ fn parse_json_col(s: Option<&str>) -> Option<serde_json::Value> {
 }
 
 /// Map a FlashcardRow to a FlashcardResponse.
-pub(super) fn flashcard_to_response(r: cognitive::FlashcardRow) -> FlashcardResponse {
+pub(crate) fn flashcard_to_response(r: cognitive::FlashcardRow) -> FlashcardResponse {
     FlashcardResponse {
         id: r.id,
         deck: r.deck,

@@ -298,6 +298,9 @@ impl AppCore {
             flashcard_repo: Some(::cognitive::FlashcardRepo::new(
                 storage_pool.inner().clone(),
             )),
+            knowledge_atom_repo: Some(::cognitive::KnowledgeAtomRepo::new(
+                storage_pool.inner().clone(),
+            )),
             persona_repo: Some(::cognitive::PersonaRepo::new(storage_pool.inner().clone())),
             squad_repo: Some(::cognitive::SquadRepo::new(storage_pool.inner().clone())),
             autotuner,

@@ -129,6 +129,10 @@ impl FlashcardRepo {
         Self { pool }
     }
 
+    pub fn pool(&self) -> &SqlitePool {
+        &self.pool
+    }
+
     /// Insert a batch of new flashcards. All cards are immediately due.
     pub async fn create_batch(
         &self,
