@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router";
 import { useAtomActions, useKnowledgeAtoms } from "../hooks/useKnowledgeAtoms";
 import { AtomCard } from "./AtomCard";
 import { BulkAcceptModal } from "./BulkAcceptModal";
@@ -11,6 +12,21 @@ export function KnowledgeAtomsPanel({ noteId }: KnowledgeAtomsPanelProps) {
   const { activeAtoms, suggestedAtoms, refetch } = useKnowledgeAtoms(noteId);
   const { accept, dismiss } = useAtomActions(noteId);
   const [bulkModalOpen, setBulkModalOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const highlightAtomId = searchParams.get("atomId");
+  const scrolledRef = useRef(false);
+
+  // Scroll to highlighted atom on deep link
+  useEffect(() => {
+    if (!highlightAtomId || scrolledRef.current) return;
+    const el = document.querySelector(`[data-atom-id="${highlightAtomId}"]`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      scrolledRef.current = true;
+      // Clear atomId from URL after scrolling
+      setSearchParams({}, { replace: true });
+    }
+  }, [highlightAtomId, setSearchParams]);
 
   const totalCount = activeAtoms.length + suggestedAtoms.length;
 
@@ -38,7 +54,9 @@ export function KnowledgeAtomsPanel({ noteId }: KnowledgeAtomsPanelProps) {
       {activeAtoms.length > 0 && (
         <div className="-mx-1">
           {activeAtoms.map((atom) => (
-            <AtomCard key={atom.id} atom={atom} onReviewDone={refetch} />
+            <div key={atom.id} data-atom-id={atom.id}>
+              <AtomCard atom={atom} onReviewDone={refetch} />
+            </div>
           ))}
         </div>
       )}

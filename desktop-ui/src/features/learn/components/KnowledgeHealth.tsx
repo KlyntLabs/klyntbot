@@ -56,12 +56,31 @@ function TopicRow({ topic }: { topic: TopicHealth }) {
 type Tab = "topics" | "trends" | "graph";
 
 function TrendsTab() {
-  const { data: retentionData } = useRetentionHistory(30);
+  const [days, setDays] = useState<30 | 90>(30);
+  const { data: retentionData } = useRetentionHistory(days);
   return (
     <div className="glass-card rounded-xl p-5">
-      <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
-        Retention Trends (30 days)
-      </h2>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          Retention Trends
+        </h2>
+        <div className="flex items-center gap-1">
+          {([30, 90] as const).map((d) => (
+            <button
+              type="button"
+              key={d}
+              onClick={() => setDays(d)}
+              className={`px-2 py-0.5 text-[10px] rounded-md transition-colors ${
+                days === d
+                  ? "bg-brand/20 text-brand font-medium"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {d}d
+            </button>
+          ))}
+        </div>
+      </div>
       <RetentionChart data={retentionData.overall} />
     </div>
   );
