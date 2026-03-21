@@ -66,8 +66,8 @@ pub fn cognitive_migrations() -> Vec<FeatureMigration> {
     vec![
         FeatureMigration {
             feature_name: "cognitive".to_string(),
-            version: 9,
-            description: "Cognitive tables + squads + scope columns + persona skill fields + blackboard + persona accuracy"
+            version: 11,
+            description: "Cognitive tables + squads + scope columns + persona skill fields + blackboard + persona accuracy + coaching intervention log + knowledge atoms"
                 .to_string(),
             sql: include_str!("../../migrations/001_cognitive_tables.sql").to_string(),
         },

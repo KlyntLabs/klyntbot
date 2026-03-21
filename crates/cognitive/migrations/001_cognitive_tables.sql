@@ -444,12 +444,54 @@ CREATE TABLE IF NOT EXISTS squad_members (
 
 CREATE INDEX IF NOT EXISTS idx_squad_members_persona ON squad_members(persona_id);
 
+-- ── Knowledge Topics ────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS knowledge_topics (
+    id              TEXT PRIMARY KEY NOT NULL,
+    name            TEXT NOT NULL,
+    domain          TEXT NOT NULL,
+    atom_count      INTEGER NOT NULL DEFAULT 0,
+    avg_retention   REAL NOT NULL DEFAULT 1.0,
+    created_at      TEXT NOT NULL
+);
+
+-- ── Knowledge Atoms ─────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS knowledge_atoms (
+    id                  TEXT PRIMARY KEY NOT NULL,
+    subject             TEXT NOT NULL,
+    atom_type           TEXT NOT NULL CHECK (atom_type IN ('vocabulary', 'concept', 'skill', 'fact')),
+    domain              TEXT NOT NULL,
+    source_note_id      TEXT,
+    source_range        TEXT,
+    source_context      TEXT,
+    secondary_sources   TEXT,
+    semantic_fact_id    TEXT,
+    retention_pct       REAL NOT NULL DEFAULT 1.0,
+    stability           REAL NOT NULL DEFAULT 1.0,
+    difficulty          REAL NOT NULL DEFAULT 5.0,
+    personal_importance REAL NOT NULL DEFAULT 0.7,
+    status              TEXT NOT NULL DEFAULT 'suggested' CHECK (status IN ('suggested', 'active', 'archived')),
+    salience            REAL NOT NULL DEFAULT 1.0,
+    last_interaction_ts TEXT,
+    archived_at         TEXT,
+    metadata            TEXT,
+    topic_id            TEXT REFERENCES knowledge_topics(id),
+    created_at          TEXT NOT NULL,
+    updated_at          TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_atoms_note ON knowledge_atoms(source_note_id) WHERE status != 'archived';
+CREATE INDEX IF NOT EXISTS idx_atoms_last_interaction ON knowledge_atoms(last_interaction_ts) WHERE status = 'active';
+CREATE INDEX IF NOT EXISTS idx_atoms_topic ON knowledge_atoms(topic_id);
+CREATE INDEX IF NOT EXISTS idx_atoms_status ON knowledge_atoms(status, salience);
+CREATE INDEX IF NOT EXISTS idx_atoms_subject ON knowledge_atoms(subject, domain) WHERE status != 'archived';
+
 -- ── Flashcards (FSRS-5 spaced repetition) ─────────────────────────
 
 CREATE TABLE IF NOT EXISTS flashcards (
     id TEXT PRIMARY KEY,
     source_note_id TEXT,
     source_context TEXT,
+    atom_id         TEXT REFERENCES knowledge_atoms(id),
     deck TEXT NOT NULL DEFAULT 'general',
     front TEXT NOT NULL,
     back TEXT NOT NULL,
@@ -578,3 +620,17 @@ CREATE TABLE IF NOT EXISTS persona_accuracy (
 );
 
 CREATE INDEX IF NOT EXISTS idx_persona_accuracy_persona ON persona_accuracy(persona_id);
+
+-- Coaching intervention history (persistent log for dashboard + retroactive feedback)
+CREATE TABLE IF NOT EXISTS coaching_intervention_log (
+    id TEXT PRIMARY KEY,
+    intervention_type TEXT NOT NULL,
+    message TEXT NOT NULL,
+    trigger_name TEXT NOT NULL,
+    feedback TEXT,
+    delivered_at TEXT NOT NULL,
+    feedback_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_coaching_intervention_log_delivered
+    ON coaching_intervention_log(delivered_at DESC);
