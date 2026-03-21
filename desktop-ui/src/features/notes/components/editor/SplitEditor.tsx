@@ -1,7 +1,6 @@
 import type { Note, NoteUpdateParams } from "@shared/types";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLanguageConfig } from "../../hooks/useLanguageConfig";
-import { KnowledgeAtomsPanel } from "../KnowledgeAtomsPanel";
 import { AnnotationSidebar } from "./AnnotationSidebar";
 import { EditorContentWrapper, useNoteEditor } from "./EditorCore";
 import { LanguageLearningPanel } from "./LanguageLearningPanel";
@@ -427,20 +426,17 @@ export function SplitEditor({
           onScroll={() => handleSyncScroll("right")}
         >
           {splitMode === "translation" ? (
-            <>
-              <LanguageLearningPanel
-                noteId={note.id}
-                noteTitle={note.title}
-                sourceText={
-                  sourceTextOverride || leftContentRef.current.markdown || leftContentRef.current.html
-                }
-                sourceLang={sourceLang}
-                targetLang={targetLang}
-                isSelection={!!sourceTextOverride}
-                onClearSelection={onClearSourceOverride}
-              />
-              <KnowledgeAtomsPanel noteId={note.id} />
-            </>
+            <LanguageLearningPanel
+              noteId={note.id}
+              noteTitle={note.title}
+              sourceText={
+                sourceTextOverride || leftContentRef.current.markdown || leftContentRef.current.html
+              }
+              sourceLang={sourceLang}
+              targetLang={targetLang}
+              isSelection={!!sourceTextOverride}
+              onClearSelection={onClearSourceOverride}
+            />
           ) : splitMode === "annotation" ? (
             <AnnotationSidebar
               noteId={note.id}
