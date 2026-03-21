@@ -15,6 +15,7 @@ pub mod markdown_parser;
 pub mod persona;
 pub mod persona_accuracy;
 pub mod procedural_rule;
+pub mod retention_history;
 pub mod review_stats;
 pub mod semantic_fact;
 pub mod squad;
@@ -41,6 +42,7 @@ pub use markdown_parser::parse_markdown_to_tree;
 pub use persona::{NewPersona, PersonaRepo, PersonaRow, PersonaUpdate};
 pub use persona_accuracy::{PersonaAccuracy, PersonaAccuracyRepo};
 pub use procedural_rule::ProceduralRuleRepo;
+pub use retention_history::{DailyRetentionPoint, DomainRetentionHistory, RetentionHistoryRepo};
 pub use review_stats::{DailyReviewStat, DomainRetentionStat, ReviewStatsRepo};
 pub use semantic_fact::SemanticFactRepo;
 pub use squad::{NewSquad, ResolvedSquad, SquadMemberRow, SquadRepo, SquadRow};
@@ -72,8 +74,8 @@ pub fn cognitive_migrations() -> Vec<FeatureMigration> {
     vec![
         FeatureMigration {
             feature_name: "cognitive".to_string(),
-            version: 12,
-            description: "Cognitive tables + squads + scope columns + persona skill fields + blackboard + persona accuracy + coaching intervention log + knowledge atoms + atom extraction cache"
+            version: 13,
+            description: "Cognitive tables + squads + scope columns + persona skill fields + blackboard + persona accuracy + coaching intervention log + knowledge atoms + atom extraction cache + action_url on coaching_intervention_log"
                 .to_string(),
             sql: include_str!("../../migrations/001_cognitive_tables.sql").to_string(),
         },

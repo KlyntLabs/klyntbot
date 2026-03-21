@@ -1,8 +1,12 @@
 import { retentionBarColor, retentionTextColor } from "@shared/lib/retention";
 import { Activity, ArrowLeft, Brain, Play } from "lucide-react";
+import { useState } from "react";
 import { Link } from "react-router";
 import type { TopicHealth } from "../hooks/useKnowledgeHealth";
 import { useKnowledgeHealth } from "../hooks/useKnowledgeHealth";
+import { useRetentionHistory } from "../hooks/useRetentionHistory";
+import { AtomGraph } from "./AtomGraph";
+import { RetentionChart } from "./RetentionChart";
 
 function TopicRow({ topic }: { topic: TopicHealth }) {
   const pct = Math.round(topic.avgRetention * 100);
@@ -49,8 +53,23 @@ function TopicRow({ topic }: { topic: TopicHealth }) {
   );
 }
 
+type Tab = "topics" | "trends" | "graph";
+
+function TrendsTab() {
+  const { data: retentionData } = useRetentionHistory(30);
+  return (
+    <div className="glass-card rounded-xl p-5">
+      <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
+        Retention Trends (30 days)
+      </h2>
+      <RetentionChart data={retentionData.overall} />
+    </div>
+  );
+}
+
 export function KnowledgeHealth() {
   const { data: health, loading } = useKnowledgeHealth();
+  const [activeTab, setActiveTab] = useState<Tab>("topics");
 
   const avgPct = Math.round(health.avgRetention * 100);
   const isEmpty = health.topics.length === 0 && !loading;
@@ -89,25 +108,55 @@ export function KnowledgeHealth() {
         </div>
       </div>
 
-      {/* Topic list */}
-      {isEmpty ? (
-        <div className="glass-card rounded-xl p-8 text-center">
-          <Brain size={32} className="mx-auto text-muted-foreground mb-3" strokeWidth={1.5} />
-          <p className="text-sm text-muted-foreground">
-            No knowledge atoms yet. Accept suggested atoms from your notes to start tracking
-            retention.
-          </p>
-        </div>
-      ) : (
+      {/* Tab bar */}
+      <div className="flex items-center gap-1 border-b border-border/30 pb-0">
+        {(["topics", "trends", "graph"] as const).map((tab) => (
+          <button
+            type="button"
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`px-3 py-2 text-xs font-medium capitalize transition-colors border-b-2 -mb-px ${
+              activeTab === tab
+                ? "border-brand text-brand"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab content */}
+      {activeTab === "topics" &&
+        (isEmpty ? (
+          <div className="glass-card rounded-xl p-8 text-center">
+            <Brain size={32} className="mx-auto text-muted-foreground mb-3" strokeWidth={1.5} />
+            <p className="text-sm text-muted-foreground">
+              No knowledge atoms yet. Accept suggested atoms from your notes to start tracking
+              retention.
+            </p>
+          </div>
+        ) : (
+          <div className="glass-card rounded-xl p-5">
+            <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
+              Topics ({health.topics.length})
+            </h2>
+            <div className="divide-y divide-border/30">
+              {health.topics.map((topic) => (
+                <TopicRow key={topic.id} topic={topic} />
+              ))}
+            </div>
+          </div>
+        ))}
+
+      {activeTab === "trends" && <TrendsTab />}
+
+      {activeTab === "graph" && (
         <div className="glass-card rounded-xl p-5">
           <h2 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
-            Topics ({health.topics.length})
+            Knowledge Graph
           </h2>
-          <div className="divide-y divide-border/30">
-            {health.topics.map((topic) => (
-              <TopicRow key={topic.id} topic={topic} />
-            ))}
-          </div>
+          <AtomGraph />
         </div>
       )}
     </div>

@@ -17,6 +17,7 @@ pub struct DeliveredIntervention {
     pub message: String,
     pub delivered_at: DateTime<Utc>,
     pub trigger_name: String,
+    pub action_url: Option<String>,
 }
 
 /// Routing decision after rate limiting.
@@ -157,6 +158,7 @@ impl InterventionRouter {
             message: decision.message.clone().unwrap_or_default(),
             delivered_at: now,
             trigger_name: trigger_name.to_string(),
+            action_url: None,
         };
 
         debug!(

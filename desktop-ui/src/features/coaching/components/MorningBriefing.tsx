@@ -8,6 +8,7 @@ interface FadingAtom {
   subject: string;
   retentionPct: number;
   domain: string;
+  sourceNoteId?: string;
 }
 
 interface TopicStat {
@@ -133,7 +134,16 @@ export function MorningBriefing() {
               {summary.fadingAtoms.slice(0, 5).map((atom) => {
                 const pct = Math.round(atom.retentionPct * 100);
                 return (
-                  <div key={atom.id} className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    key={atom.id}
+                    className="flex items-center gap-2 w-full text-left hover:bg-white/5 rounded px-1 -mx-1 transition-colors"
+                    onClick={() => {
+                      if (atom.sourceNoteId) {
+                        navigate(`/notes?noteId=${atom.sourceNoteId}&atomId=${atom.id}`);
+                      }
+                    }}
+                  >
                     <span className="text-[11px] text-foreground truncate flex-1">
                       {atom.subject}
                     </span>
@@ -142,7 +152,7 @@ export function MorningBriefing() {
                     >
                       {pct}%
                     </span>
-                  </div>
+                  </button>
                 );
               })}
             </div>

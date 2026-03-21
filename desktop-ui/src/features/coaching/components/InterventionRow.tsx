@@ -2,6 +2,7 @@ import { useMutation } from "@shared/hooks/useMutation";
 import { invalidateQueries } from "@shared/hooks/useQuery";
 import { formatTime } from "@shared/lib/dates";
 import { ThumbsUp, X } from "lucide-react";
+import { useNavigate } from "react-router";
 import { FeedbackBadge } from "./FeedbackBadge";
 
 interface InterventionRowProps {
@@ -11,6 +12,7 @@ interface InterventionRowProps {
   triggerName: string;
   feedback: string | null;
   deliveredAt: string;
+  actionUrl?: string;
 }
 
 export function InterventionRow({
@@ -20,7 +22,9 @@ export function InterventionRow({
   triggerName,
   feedback,
   deliveredAt,
+  actionUrl,
 }: InterventionRowProps) {
+  const navigate = useNavigate();
   const { mutate: submitFeedback } = useMutation("coaching_submit_feedback");
 
   const handleFeedback = async (response: string) => {
@@ -46,6 +50,16 @@ export function InterventionRow({
           <span className="text-[9px] text-dim">{triggerName}</span>
         </div>
       </div>
+
+      {actionUrl && (
+        <button
+          type="button"
+          onClick={() => navigate(actionUrl)}
+          className="text-[10px] text-brand hover:underline shrink-0"
+        >
+          Open →
+        </button>
+      )}
 
       <div className="flex items-center gap-2 shrink-0">
         <FeedbackBadge feedback={feedback} />

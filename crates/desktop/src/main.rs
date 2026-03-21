@@ -393,6 +393,8 @@ fn run_desktop_app() {
             commands::knowledge_health::knowledge_topic_detail,
             // Morning Briefing
             commands::morning_briefing::morning_briefing_summary,
+            // Retention History
+            commands::retention_history::retention_history,
             // Areas
             commands::areas::area_list,
             commands::areas::area_create,

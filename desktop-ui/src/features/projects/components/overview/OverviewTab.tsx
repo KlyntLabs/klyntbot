@@ -1,3 +1,4 @@
+import { RelevantAtoms } from "@shared/components/RelevantAtoms";
 import { ActivityTimeline } from "./ActivityTimeline";
 import { CoachingCard } from "./CoachingCard";
 import { HealthScoreCard } from "./HealthScoreCard";
@@ -25,6 +26,9 @@ export function OverviewTab() {
 
       {/* Row 3 — Activity Timeline */}
       <ActivityTimeline />
+
+      {/* Row 4 — Related Knowledge */}
+      <RelevantAtoms />
     </div>
   );
 }

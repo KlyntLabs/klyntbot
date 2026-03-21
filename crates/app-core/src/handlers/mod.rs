@@ -5,6 +5,7 @@ pub mod atoms;
 pub mod autotuner;
 pub mod knowledge_health;
 pub mod morning_briefing;
+pub mod retention_history;
 pub mod capture;
 pub mod chat;
 pub mod coaching;

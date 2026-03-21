@@ -202,6 +202,7 @@ const JOB_FINANCE_BUDGET_CHECK: &str = "__klyntbot_finance_budget_check";
 const JOB_FINANCE_PRICE_REFRESH: &str = "__klyntbot_finance_price_refresh";
 const JOB_FINANCE_HEALTH_CHECK: &str = "__klyntbot_finance_health_check";
 const JOB_MORNING_BRIEFING: &str = "__klyntbot_morning_briefing";
+const JOB_WEEKLY_KNOWLEDGE_DIGEST: &str = "__klyntbot_weekly_knowledge_digest";
 
 /// Register individual cron handlers (must be called before wrapping CronService in Arc).
 #[allow(clippy::too_many_arguments)]
@@ -504,6 +505,49 @@ fn register_cron_callbacks(
         );
     }
 
+    // ── weekly_knowledge_digest ──────────────────────────────────────────
+    {
+        let pool = repos.pool().clone();
+        let rt = rt.clone();
+        cron_service.register_handler(
+            JOB_WEEKLY_KNOWLEDGE_DIGEST,
+            Arc::new(move |_job: &scheduling::CronJob| {
+                let pool = pool.clone();
+                tokio::task::block_in_place(|| {
+                    rt.block_on(async {
+                        let atom_repo = cognitive::KnowledgeAtomRepo::new(pool.clone());
+                        let review_stats = cognitive::ReviewStatsRepo::new(pool.clone());
+
+                        let topic_count_fut = sqlx::query_as::<_, (i64,)>(
+                            "SELECT COUNT(DISTINCT topic_id) FROM knowledge_atoms WHERE status = 'active' AND topic_id IS NOT NULL",
+                        )
+                        .fetch_one(&pool);
+
+                        let (streak, topic_count, fading, daily) = tokio::join!(
+                            review_stats.current_streak(),
+                            topic_count_fut,
+                            atom_repo.list_fading_important(10),
+                            review_stats.daily_reviews(7),
+                        );
+                        let streak = streak.unwrap_or(0);
+                        let topic_count = topic_count.map(|r| r.0).unwrap_or(0);
+                        let fading_count = fading.unwrap_or_default().len();
+                        let reviews_week: i64 =
+                            daily.unwrap_or_default().iter().map(|d| d.review_count).sum();
+
+                        info!(
+                            "Weekly knowledge digest: streak={streak}, reviews={reviews_week}, \
+                             fading={fading_count}, topics={topic_count}",
+                        );
+                        Ok(Some(format!(
+                            "Weekly digest: streak={streak}, fading={fading_count}"
+                        )))
+                    })
+                })
+            }),
+        );
+    }
+
     // ── proactive_scan ───────────────────────────────────────────────────
     if tasks_config.proactive_suggestions {
         let handler = proactive_handler.clone();
@@ -692,6 +736,16 @@ async fn ensure_cron_jobs(
             tz: Some(config.timezone.clone()),
         },
         "Morning knowledge health briefing"
+    );
+
+    // Weekly knowledge health digest (Sunday 6 PM local)
+    ensure_job!(
+        JOB_WEEKLY_KNOWLEDGE_DIGEST,
+        scheduling::CronSchedule::Cron {
+            expr: "0 18 * * 0".to_string(),
+            tz: Some(config.timezone.clone()),
+        },
+        "Weekly knowledge health digest"
     );
 
     // Proactive suggestion scan (every 4 hours)

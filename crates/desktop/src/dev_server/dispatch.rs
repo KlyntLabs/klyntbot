@@ -73,6 +73,9 @@ pub(super) async fn dispatch(
     if let Some(r) = commands::morning_briefing::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }
+    if let Some(r) = commands::retention_history::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
     if let Some(r) = commands::project_sources::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }

@@ -629,7 +629,8 @@ CREATE TABLE IF NOT EXISTS coaching_intervention_log (
     trigger_name TEXT NOT NULL,
     feedback TEXT,
     delivered_at TEXT NOT NULL,
-    feedback_at TEXT
+    feedback_at TEXT,
+    action_url TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_coaching_intervention_log_delivered

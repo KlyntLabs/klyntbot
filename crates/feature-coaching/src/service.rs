@@ -144,12 +144,18 @@ impl CoachingService {
                                     let msg = learning_templates::learning_message(
                                         &pattern.name, &pattern.description,
                                     );
+                                    let action_url = match pattern.name.as_str() {
+                                        n if n.starts_with("study_streak_") => Some("/learn/review".to_string()),
+                                        "retention_decay_detected" | "domain_retention_gap" => Some("/learn/knowledge".to_string()),
+                                        _ => None,
+                                    };
                                     let intervention = DeliveredIntervention {
                                         id: uuid::Uuid::new_v4().to_string(),
                                         intervention_type: msg.intervention_type,
                                         message: msg.message,
                                         trigger_name: pattern.name.clone(),
                                         delivered_at: chrono::Utc::now(),
+                                        action_url,
                                     };
 
                                     // Route through rate limiter
@@ -304,6 +310,7 @@ async fn build_focus_debrief(
                 message,
                 delivered_at: chrono::Utc::now(),
                 trigger_name: "focus_session_debrief".into(),
+                action_url: None,
             })
         }
         Ok(_) => {
@@ -323,6 +330,7 @@ async fn build_focus_debrief(
                     ),
                     delivered_at: chrono::Utc::now(),
                     trigger_name: "focus_session_debrief".into(),
+                    action_url: None,
                 })
             } else {
                 None
@@ -371,6 +379,7 @@ async fn persist_intervention(
                 &intervention.message,
                 &intervention.trigger_name,
                 &intervention.delivered_at.to_rfc3339(),
+                intervention.action_url.as_deref(),
             )
             .await
         {

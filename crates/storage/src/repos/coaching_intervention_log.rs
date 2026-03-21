@@ -13,6 +13,7 @@ pub struct InterventionLogRow {
     pub feedback: Option<String>,
     pub delivered_at: String,
     pub feedback_at: Option<String>,
+    pub action_url: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -32,17 +33,19 @@ impl CoachingInterventionLogRepo {
         message: &str,
         trigger_name: &str,
         delivered_at: &str,
+        action_url: Option<&str>,
     ) -> Result<(), StorageError> {
         sqlx::query(
             "INSERT OR IGNORE INTO coaching_intervention_log
-                (id, intervention_type, message, trigger_name, delivered_at)
-             VALUES (?1, ?2, ?3, ?4, ?5)",
+                (id, intervention_type, message, trigger_name, delivered_at, action_url)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
         )
         .bind(id)
         .bind(intervention_type)
         .bind(message)
         .bind(trigger_name)
         .bind(delivered_at)
+        .bind(action_url)
         .execute(&self.pool)
         .await?;
         Ok(())
@@ -67,7 +70,7 @@ impl CoachingInterventionLogRepo {
 
     pub async fn list_recent(&self, limit: i64) -> Result<Vec<InterventionLogRow>, StorageError> {
         let rows = sqlx::query_as::<_, InterventionLogRow>(
-            "SELECT id, intervention_type, message, trigger_name, feedback, delivered_at, feedback_at
+            "SELECT id, intervention_type, message, trigger_name, feedback, delivered_at, feedback_at, action_url
              FROM coaching_intervention_log
              ORDER BY delivered_at DESC
              LIMIT ?1",
@@ -93,7 +96,8 @@ mod tests {
                 trigger_name TEXT NOT NULL,
                 feedback TEXT,
                 delivered_at TEXT NOT NULL,
-                feedback_at TEXT
+                feedback_at TEXT,
+                action_url TEXT
             )",
         )
         .execute(&pool)
@@ -105,7 +109,7 @@ mod tests {
     #[tokio::test]
     async fn test_insert_and_list() {
         let repo = setup().await;
-        repo.insert("int-1", "ChatMessage", "Take a break", "distraction_streak", "2026-03-21T10:00:00Z")
+        repo.insert("int-1", "ChatMessage", "Take a break", "distraction_streak", "2026-03-21T10:00:00Z", None)
             .await
             .unwrap();
 
@@ -119,7 +123,7 @@ mod tests {
     #[tokio::test]
     async fn test_update_feedback() {
         let repo = setup().await;
-        repo.insert("int-2", "DashboardCard", "Focus now", "overdue_pressure", "2026-03-21T11:00:00Z")
+        repo.insert("int-2", "DashboardCard", "Focus now", "overdue_pressure", "2026-03-21T11:00:00Z", None)
             .await
             .unwrap();
 
@@ -141,10 +145,10 @@ mod tests {
     #[tokio::test]
     async fn test_insert_duplicate_is_ignored() {
         let repo = setup().await;
-        repo.insert("dup-1", "ChatMessage", "msg1", "trigger1", "2026-03-21T12:00:00Z")
+        repo.insert("dup-1", "ChatMessage", "msg1", "trigger1", "2026-03-21T12:00:00Z", None)
             .await
             .unwrap();
-        repo.insert("dup-1", "ChatMessage", "msg2", "trigger2", "2026-03-21T13:00:00Z")
+        repo.insert("dup-1", "ChatMessage", "msg2", "trigger2", "2026-03-21T13:00:00Z", None)
             .await
             .unwrap();
 

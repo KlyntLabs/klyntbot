@@ -107,9 +107,15 @@ export default function KnowledgeBasePage() {
   // Pre-select note from URL search params (e.g. /notes?noteId=xxx)
   useEffect(() => {
     const noteId = searchParams.get("noteId");
+    const atomId = searchParams.get("atomId");
     if (noteId) {
       setSelectedNoteId(noteId);
-      setSearchParams({}, { replace: true });
+      // Keep atomId in params briefly so KnowledgeAtomsPanel can read it
+      if (atomId) {
+        setSearchParams({ atomId }, { replace: true });
+      } else {
+        setSearchParams({}, { replace: true });
+      }
     }
   }, [searchParams, setSearchParams]);
 
