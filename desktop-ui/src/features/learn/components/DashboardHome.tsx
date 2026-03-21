@@ -1,4 +1,5 @@
-import { GraduationCap, Play, Plus } from "lucide-react";
+import { Activity, GraduationCap, Play, Plus } from "lucide-react";
+import { Link } from "react-router";
 import { useLearnDashboard } from "../hooks/useLearnDashboard";
 import { DeckList } from "./DeckList";
 import { QuickGenerate } from "./QuickGenerate";
@@ -113,6 +114,20 @@ export function DashboardHome({
           generating={generating}
         />
       </div>
+
+      {/* Knowledge Health link */}
+      <Link
+        to="/learn/knowledge"
+        className="glass-card p-4 flex items-center gap-3 transition-all duration-200 hover:bg-white/[0.06] group"
+      >
+        <div className="p-1.5 rounded-lg bg-green-500/10">
+          <Activity size={16} className="text-green-400" strokeWidth={1.5} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <span className="text-sm font-medium text-foreground">Knowledge Health</span>
+          <p className="text-[12px] text-muted-foreground">Track retention across topics</p>
+        </div>
+      </Link>
 
       {/* Deck list */}
       <DeckList decks={decks} onReviewDeck={onStartReview} />

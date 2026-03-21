@@ -63,6 +63,7 @@ interface CognitiveData {
   temperature?: number;
   maxTokens?: number;
   reflectionMaxTokens?: number;
+  atomExtraction?: { enabled?: boolean };
 }
 
 interface LearningData {
@@ -236,6 +237,9 @@ export function PersonalizationSettings() {
       if ("model" in cognitiveEdits) patch.model = cognitiveEdits.model || null;
       if ("temperature" in cognitiveEdits) patch.temperature = cognitiveEdits.temperature;
       if ("maxTokens" in cognitiveEdits) patch.maxTokens = cognitiveEdits.maxTokens;
+      if ("atomExtraction.enabled" in cognitiveEdits) {
+        patch.atomExtraction = { enabled: cognitiveEdits["atomExtraction.enabled"] };
+      }
       await ipc("config_update_section", { section: "cognitive", patch });
       refetchCognitive();
       setCognitiveEdits({});
@@ -423,6 +427,27 @@ export function PersonalizationSettings() {
                   className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
                 />
               )}
+            </div>
+
+            <div className="flex items-center justify-between pt-1 border-t border-border">
+              <div>
+                <span className="text-[12px] text-muted-foreground">
+                  Auto-extract knowledge atoms
+                </span>
+                <p className="text-[11px] text-dim">
+                  Automatically extract concepts and facts from notes
+                </p>
+              </div>
+              <Toggle
+                checked={
+                  "atomExtraction.enabled" in cognitiveEdits
+                    ? (cognitiveEdits["atomExtraction.enabled"] as boolean)
+                    : (cognitive.atomExtraction?.enabled ?? true)
+                }
+                onChange={(v) =>
+                  setCognitiveEdits((prev) => ({ ...prev, "atomExtraction.enabled": v }))
+                }
+              />
             </div>
 
             {hasCognitiveChanges && (

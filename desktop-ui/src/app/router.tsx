@@ -25,6 +25,9 @@ const KnowledgeBasePage = lazy(() =>
 
 // ── Learn Feature ────────────────────────────────────────────────
 const LearnPage = lazy(() => import("../features/learn").then((m) => ({ default: m.LearnPage })));
+const KnowledgeHealthPage = lazy(() =>
+  import("../features/learn").then((m) => ({ default: m.KnowledgeHealth })),
+);
 
 // ── Finance Feature ──────────────────────────────────────────────
 const FinanceOverviewPage = lazy(() =>
@@ -210,6 +213,7 @@ export const router = createHashRouter([
       { path: "/chat", element: <ChatPage /> },
       { path: "/notes", element: <KnowledgeBasePage /> },
       { path: "/learn", element: <LearnPage /> },
+      { path: "/learn/knowledge", element: <KnowledgeHealthPage /> },
       { path: "/automations", element: <AutomationsPage /> },
       { path: "/categories", element: <Navigate to="/system/categories" replace /> },
       { path: "/finance", element: <FinanceOverviewPage /> },

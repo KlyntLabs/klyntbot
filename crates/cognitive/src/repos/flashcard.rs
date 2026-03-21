@@ -564,6 +564,28 @@ impl FlashcardRepo {
         Ok(result.rows_affected())
     }
 
+    /// Count flashcards linked to each atom_id.
+    pub async fn count_by_atom_ids(
+        &self,
+        atom_ids: &[String],
+    ) -> Result<std::collections::HashMap<String, i64>, sqlx::Error> {
+        if atom_ids.is_empty() {
+            return Ok(Default::default());
+        }
+        let placeholders: Vec<String> =
+            (0..atom_ids.len()).map(|i| format!("?{}", i + 1)).collect();
+        let query = format!(
+            "SELECT atom_id, COUNT(*) FROM flashcards WHERE atom_id IN ({}) GROUP BY atom_id",
+            placeholders.join(", ")
+        );
+        let mut q = sqlx::query_as::<_, (String, i64)>(&query);
+        for id in atom_ids {
+            q = q.bind(id);
+        }
+        let rows = q.fetch_all(&self.pool).await?;
+        Ok(rows.into_iter().collect())
+    }
+
     /// Load FSRS-5 weights and desired retention.
     async fn load_fsrs_params(&self) -> Result<([f64; 19], f64), sqlx::Error> {
         #[derive(sqlx::FromRow)]

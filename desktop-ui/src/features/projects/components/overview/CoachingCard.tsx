@@ -14,9 +14,7 @@ export function CoachingCard() {
       role="button"
       tabIndex={0}
     >
-      <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-3">
-        Coaching
-      </p>
+      <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-3">Coaching</p>
 
       {nudge ? (
         <div className="flex flex-col gap-2">

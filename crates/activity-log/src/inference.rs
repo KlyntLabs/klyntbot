@@ -683,6 +683,16 @@ fn infer_context_type(event: &ActivityLogEntry) -> WorkContextType {
     {
         WorkContextType::Coding
     }
+    // 1b. Learning: knowledge atom & flashcard activities
+    else if action.contains("flashcard_reviewed")
+        || action.contains("translation_completed")
+        || action.contains("note_studied")
+        || action.contains("atom_created")
+        || action.contains("atom_accepted")
+        || action.contains("atom_reinforced")
+    {
+        WorkContextType::Learning
+    }
     // 2. Research: browsers, search, reading, documentation
     else if action.contains("search")
         || action.contains("browse")

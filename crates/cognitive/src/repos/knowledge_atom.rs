@@ -376,6 +376,159 @@ impl KnowledgeAtomRepo {
         Ok(())
     }
 
+    /// List active atoms that haven't been interacted with for N days.
+    pub async fn list_stale_active(
+        &self,
+        stale_days: i64,
+    ) -> Result<Vec<KnowledgeAtomRow>, sqlx::Error> {
+        let cutoff = (Utc::now() - chrono::Duration::days(stale_days)).to_rfc3339();
+        sqlx::query_as::<_, KnowledgeAtomRow>(
+            r#"
+            SELECT * FROM knowledge_atoms
+            WHERE status = 'active'
+              AND (last_interaction_ts IS NULL OR last_interaction_ts < ?1)
+            "#,
+        )
+        .bind(&cutoff)
+        .fetch_all(&self.pool)
+        .await
+    }
+
+    /// Apply salience decay and retention update to a single atom.
+    pub async fn apply_decay(
+        &self,
+        id: &str,
+        new_salience: f64,
+        new_retention_pct: f64,
+    ) -> Result<(), sqlx::Error> {
+        let now = Utc::now().to_rfc3339();
+        sqlx::query(
+            "UPDATE knowledge_atoms SET salience = ?2, retention_pct = ?3, updated_at = ?4 WHERE id = ?1",
+        )
+        .bind(id)
+        .bind(new_salience)
+        .bind(new_retention_pct)
+        .bind(&now)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Get a single topic by id.
+    pub async fn get_topic(&self, topic_id: &str) -> Result<Option<KnowledgeTopicRow>, sqlx::Error> {
+        sqlx::query_as::<_, KnowledgeTopicRow>("SELECT * FROM knowledge_topics WHERE id = ?1")
+            .bind(topic_id)
+            .fetch_optional(&self.pool)
+            .await
+    }
+
+    /// List non-archived atoms belonging to a topic, ordered by salience descending.
+    pub async fn list_for_topic(
+        &self,
+        topic_id: &str,
+    ) -> Result<Vec<KnowledgeAtomRow>, sqlx::Error> {
+        sqlx::query_as::<_, KnowledgeAtomRow>(
+            r#"
+            SELECT * FROM knowledge_atoms
+            WHERE topic_id = ?1
+              AND status != 'archived'
+            ORDER BY salience DESC
+            "#,
+        )
+        .bind(topic_id)
+        .fetch_all(&self.pool)
+        .await
+    }
+
+    /// List all topics with their atom counts and avg retention (for health dashboard).
+    pub async fn list_topics_with_atoms(&self) -> Result<Vec<KnowledgeTopicRow>, sqlx::Error> {
+        sqlx::query_as::<_, KnowledgeTopicRow>(
+            "SELECT * FROM knowledge_topics WHERE atom_count > 0 ORDER BY avg_retention ASC",
+        )
+        .fetch_all(&self.pool)
+        .await
+    }
+
+    /// Find existing active atoms matching a subject in other notes (for reinforcement detection).
+    pub async fn find_by_subject_across_notes(
+        &self,
+        subject: &str,
+        exclude_note_id: &str,
+    ) -> Result<Vec<KnowledgeAtomRow>, sqlx::Error> {
+        sqlx::query_as::<_, KnowledgeAtomRow>(
+            r#"
+            SELECT * FROM knowledge_atoms
+            WHERE subject = ?1
+              AND source_note_id != ?2
+              AND status = 'active'
+            "#,
+        )
+        .bind(subject)
+        .bind(exclude_note_id)
+        .fetch_all(&self.pool)
+        .await
+    }
+
+    /// Boost an atom's salience (capped at 1.0) and record a secondary source.
+    pub async fn boost_salience(
+        &self,
+        id: &str,
+        boost: f64,
+        referencing_note_id: &str,
+    ) -> Result<f64, sqlx::Error> {
+        let now = Utc::now().to_rfc3339();
+        let atom = sqlx::query_as::<_, KnowledgeAtomRow>(
+            "SELECT * FROM knowledge_atoms WHERE id = ?1",
+        )
+        .bind(id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        let new_salience = (atom.salience + boost).min(1.0);
+
+        // Append to secondary_sources JSON array
+        let mut sources: Vec<serde_json::Value> = atom
+            .secondary_sources
+            .as_deref()
+            .and_then(|s| serde_json::from_str(s).ok())
+            .unwrap_or_default();
+        sources.push(serde_json::json!({ "noteId": referencing_note_id, "ts": &now }));
+        let sources_json = serde_json::to_string(&sources).unwrap_or_else(|_| "[]".to_string());
+
+        sqlx::query(
+            "UPDATE knowledge_atoms SET salience = ?2, secondary_sources = ?3, last_interaction_ts = ?4, updated_at = ?4 WHERE id = ?1",
+        )
+        .bind(id)
+        .bind(new_salience)
+        .bind(&sources_json)
+        .bind(&now)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(new_salience)
+    }
+
+    /// Batch-fetch topic names by IDs.
+    pub async fn get_topic_names(
+        &self,
+        ids: &[String],
+    ) -> Result<std::collections::HashMap<String, String>, sqlx::Error> {
+        if ids.is_empty() {
+            return Ok(Default::default());
+        }
+        let placeholders: Vec<String> = (0..ids.len()).map(|i| format!("?{}", i + 1)).collect();
+        let query = format!(
+            "SELECT id, name FROM knowledge_topics WHERE id IN ({})",
+            placeholders.join(", ")
+        );
+        let mut q = sqlx::query_as::<_, (String, String)>(&query);
+        for id in ids {
+            q = q.bind(id);
+        }
+        let rows = q.fetch_all(&self.pool).await?;
+        Ok(rows.into_iter().collect())
+    }
+
     /// Check migration status: (migrated, atom_count).
     pub async fn migration_status(&self) -> Result<(bool, usize), sqlx::Error> {
         let sentinel: Option<(String,)> =
@@ -530,5 +683,146 @@ mod tests {
 
         assert_eq!(topic1.id, topic2.id);
         assert_eq!(topic1.name, "Japanese Vocab");
+    }
+
+    #[tokio::test]
+    async fn test_list_stale_active() {
+        let pool = cognitive_test_pool().await;
+        let repo = KnowledgeAtomRepo::new(pool);
+
+        // Create an atom with old interaction timestamp
+        let atom = repo
+            .create(&NewKnowledgeAtom {
+                subject: "old atom".to_string(),
+                atom_type: "concept".to_string(),
+                domain: "test".to_string(),
+                personal_importance: 0.7,
+                status: "active".to_string(),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+
+        // Manually set last_interaction_ts to 30 days ago
+        let old_ts = (Utc::now() - chrono::Duration::days(30)).to_rfc3339();
+        sqlx::query("UPDATE knowledge_atoms SET last_interaction_ts = ?2 WHERE id = ?1")
+            .bind(&atom.id)
+            .bind(&old_ts)
+            .execute(&repo.pool)
+            .await
+            .unwrap();
+
+        // Create a fresh atom
+        repo.create(&NewKnowledgeAtom {
+            subject: "fresh atom".to_string(),
+            atom_type: "concept".to_string(),
+            domain: "test".to_string(),
+            personal_importance: 0.7,
+            status: "active".to_string(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+        let stale = repo.list_stale_active(7).await.unwrap();
+        assert_eq!(stale.len(), 1);
+        assert_eq!(stale[0].subject, "old atom");
+    }
+
+    #[tokio::test]
+    async fn test_apply_decay() {
+        let pool = cognitive_test_pool().await;
+        let repo = KnowledgeAtomRepo::new(pool);
+
+        let atom = repo
+            .create(&NewKnowledgeAtom {
+                subject: "decaying".to_string(),
+                atom_type: "concept".to_string(),
+                domain: "test".to_string(),
+                personal_importance: 0.7,
+                status: "active".to_string(),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+
+        repo.apply_decay(&atom.id, 0.5, 0.6).await.unwrap();
+        let updated = repo.get(&atom.id).await.unwrap().unwrap();
+        assert!((updated.salience - 0.5).abs() < 0.01);
+        assert!((updated.retention_pct - 0.6).abs() < 0.01);
+    }
+
+    #[tokio::test]
+    async fn test_find_by_subject_across_notes() {
+        let pool = cognitive_test_pool().await;
+        let repo = KnowledgeAtomRepo::new(pool);
+
+        repo.create(&NewKnowledgeAtom {
+            subject: "shared concept".to_string(),
+            atom_type: "concept".to_string(),
+            domain: "test".to_string(),
+            source_note_id: Some("note-1".to_string()),
+            personal_importance: 0.7,
+            status: "active".to_string(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+        repo.create(&NewKnowledgeAtom {
+            subject: "shared concept".to_string(),
+            atom_type: "concept".to_string(),
+            domain: "test".to_string(),
+            source_note_id: Some("note-2".to_string()),
+            personal_importance: 0.7,
+            status: "active".to_string(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+        let found = repo
+            .find_by_subject_across_notes("shared concept", "note-1")
+            .await
+            .unwrap();
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].source_note_id.as_deref(), Some("note-2"));
+    }
+
+    #[tokio::test]
+    async fn test_boost_salience() {
+        let pool = cognitive_test_pool().await;
+        let repo = KnowledgeAtomRepo::new(pool);
+
+        let atom = repo
+            .create(&NewKnowledgeAtom {
+                subject: "boostable".to_string(),
+                atom_type: "concept".to_string(),
+                domain: "test".to_string(),
+                source_note_id: Some("note-1".to_string()),
+                personal_importance: 0.7,
+                status: "active".to_string(),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+
+        // Set initial salience to 0.5
+        repo.apply_decay(&atom.id, 0.5, atom.retention_pct)
+            .await
+            .unwrap();
+
+        let new_salience = repo
+            .boost_salience(&atom.id, 0.3, "note-2")
+            .await
+            .unwrap();
+        assert!((new_salience - 0.8).abs() < 0.01);
+
+        let updated = repo.get(&atom.id).await.unwrap().unwrap();
+        assert!(updated.secondary_sources.is_some());
+        let sources: Vec<serde_json::Value> =
+            serde_json::from_str(updated.secondary_sources.as_deref().unwrap()).unwrap();
+        assert_eq!(sources.len(), 1);
+        assert_eq!(sources[0]["noteId"], "note-2");
     }
 }

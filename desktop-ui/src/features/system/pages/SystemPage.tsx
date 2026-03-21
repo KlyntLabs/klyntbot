@@ -40,13 +40,7 @@ const COGNITIVE_SSE_EVENTS = [
   "cognitive:consolidation",
 ];
 
-type SystemTab =
-  | "contexts"
-  | "categories"
-  | "inference"
-  | "memory"
-  | "events"
-  | "pipeline";
+type SystemTab = "contexts" | "categories" | "inference" | "memory" | "events" | "pipeline";
 
 const tabs: { id: SystemTab; label: string; icon: typeof Brain }[] = [
   { id: "contexts", label: "Contexts", icon: Boxes },

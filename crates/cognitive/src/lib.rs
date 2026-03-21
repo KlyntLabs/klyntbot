@@ -37,6 +37,7 @@ pub use repos::{
 };
 #[allow(deprecated)]
 pub use repos::{InsightCacheRepo, InsightCacheRow};
+pub use repos::AtomExtractionCache;
 pub use repos::{KnowledgeAtomRepo, KnowledgeAtomRow, KnowledgeTopicRow, NewKnowledgeAtom};
 pub use repos::{NewPersona, PersonaRepo, PersonaRow, PersonaUpdate};
 pub use repos::{NewSquad, ResolvedSquad, SquadMemberRow, SquadRepo, SquadRow};

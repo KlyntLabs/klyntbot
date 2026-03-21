@@ -69,11 +69,7 @@ function Gauge({
   return (
     <div className="flex flex-col items-center gap-1">
       <div className="relative w-16 h-16">
-        <svg
-          className="w-16 h-16 -rotate-90"
-          viewBox="0 0 36 36"
-          aria-hidden="true"
-        >
+        <svg className="w-16 h-16 -rotate-90" viewBox="0 0 36 36" aria-hidden="true">
           <circle
             className="text-white/[0.08]"
             strokeWidth="3"
@@ -99,9 +95,7 @@ function Gauge({
           {pct}%
         </span>
       </div>
-      <span className="text-[10px] text-muted-foreground text-center leading-tight">
-        {label}
-      </span>
+      <span className="text-[10px] text-muted-foreground text-center leading-tight">{label}</span>
     </div>
   );
 }
@@ -169,12 +163,11 @@ export function CoachingOverviewPage() {
     undefined,
     DEFAULT_ROUTER,
   );
-  const { data: interventions, refetch: rInt } =
-    useQuery<CoachingIntervention[]>(
-      "coaching_pending_interventions",
-      undefined,
-      [],
-    );
+  const { data: interventions, refetch: rInt } = useQuery<CoachingIntervention[]>(
+    "coaching_pending_interventions",
+    undefined,
+    [],
+  );
   const { data: history, refetch: rHist } = useQuery<InterventionLog[]>(
     "coaching_intervention_log",
     { limit: 5 },
@@ -197,10 +190,8 @@ export function CoachingOverviewPage() {
 
   // Mutations
   const { mutate: clearSignals } = useMutation("coaching_clear_signals");
-  const { mutate: resetDismissals } =
-    useMutation("coaching_reset_dismissals");
-  const { mutate: submitFeedback } =
-    useMutation("coaching_submit_feedback");
+  const { mutate: resetDismissals } = useMutation("coaching_reset_dismissals");
+  const { mutate: submitFeedback } = useMutation("coaching_submit_feedback");
 
   const handleClearSignals = async () => {
     await clearSignals({} as never);
@@ -227,50 +218,28 @@ export function CoachingOverviewPage() {
     <div className="flex flex-col gap-4">
       {/* ── 1. User Situation ──────────────────────────── */}
       <div className="glass-card rounded-xl p-5">
-        <h2 className="text-[13px] font-medium text-muted-foreground mb-3">
-          User Situation
-        </h2>
+        <h2 className="text-[13px] font-medium text-muted-foreground mb-3">User Situation</h2>
         <div className="flex items-start gap-4">
           <Gauge label="Energy" value={situation.energyLevel} />
           <Gauge label="Focus" value={situation.focusState} />
-          <Gauge
-            label="Deadline"
-            value={situation.deadlinePressure}
-            color="text-destructive"
-          />
-          <Gauge
-            label="Distraction"
-            value={situation.distractionRisk}
-            color="text-brand"
-          />
-          <Gauge
-            label="Receptivity"
-            value={situation.coachingReceptivity}
-            color="text-success"
-          />
+          <Gauge label="Deadline" value={situation.deadlinePressure} color="text-destructive" />
+          <Gauge label="Distraction" value={situation.distractionRisk} color="text-brand" />
+          <Gauge label="Receptivity" value={situation.coachingReceptivity} color="text-success" />
           <div className="flex flex-col gap-1 ml-4 text-[11px]">
             <span className="text-muted-foreground">
               Hours active:{" "}
-              <span className="tabular-nums">
-                {situation.hoursActiveToday.toFixed(1)}h
-              </span>
+              <span className="tabular-nums">{situation.hoursActiveToday.toFixed(1)}h</span>
             </span>
             <span className="text-muted-foreground">
               Since break:{" "}
-              <span className="tabular-nums">
-                {situation.minsSinceBreak.toFixed(0)}min
-              </span>
+              <span className="tabular-nums">{situation.minsSinceBreak.toFixed(0)}min</span>
             </span>
             <span className="text-muted-foreground">
               Context switches:{" "}
-              <span className="tabular-nums">
-                {situation.recentContextSwitches}
-              </span>
+              <span className="tabular-nums">{situation.recentContextSwitches}</span>
             </span>
             {situation.taskAvoidanceDetected && (
-              <span className="text-brand font-medium">
-                Task avoidance detected
-              </span>
+              <span className="text-brand font-medium">Task avoidance detected</span>
             )}
           </div>
         </div>
@@ -284,19 +253,14 @@ export function CoachingOverviewPage() {
           </h2>
           <div className="flex flex-col gap-2">
             {interventions.map((iv) => (
-              <div
-                key={iv.id}
-                className="p-3 rounded-lg bg-accent/30 border border-brand/30"
-              >
+              <div key={iv.id} className="p-3 rounded-lg bg-accent/30 border border-brand/30">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-[10px] px-1.5 py-0.5 bg-brand/20 text-brand rounded font-medium">
                         {iv.interventionType}
                       </span>
-                      <span className="text-[10px] text-muted-foreground">
-                        {iv.triggerName}
-                      </span>
+                      <span className="text-[10px] text-muted-foreground">{iv.triggerName}</span>
                     </div>
                     <p className="text-[12px] text-muted-foreground leading-relaxed">
                       {iv.message}
@@ -342,9 +306,7 @@ export function CoachingOverviewPage() {
           {/* Signal Accumulator */}
           <div className="glass-card rounded-xl p-5">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-[13px] font-medium text-muted-foreground">
-                Signal Accumulator
-              </h2>
+              <h2 className="text-[13px] font-medium text-muted-foreground">Signal Accumulator</h2>
               <button
                 type="button"
                 onClick={handleClearSignals}
@@ -359,13 +321,8 @@ export function CoachingOverviewPage() {
             {signals.triggers.length > 0 && (
               <div className="mt-2 flex flex-col gap-1">
                 {signals.triggers.map((t) => (
-                  <div
-                    key={t.name}
-                    className="flex items-center justify-between text-[11px]"
-                  >
-                    <span className="text-muted-foreground">
-                      {t.name}
-                    </span>
+                  <div key={t.name} className="flex items-center justify-between text-[11px]">
+                    <span className="text-muted-foreground">{t.name}</span>
                     <span className="text-muted-foreground tabular-nums">
                       {t.cooldownRemainingSecs > 0
                         ? `${t.cooldownRemainingSecs}s cooldown`
@@ -380,9 +337,7 @@ export function CoachingOverviewPage() {
           {/* Detected Patterns preview */}
           <div className="glass-card rounded-xl p-5">
             <div className="flex items-baseline justify-between mb-3">
-              <h2 className="text-[13px] font-medium text-muted-foreground">
-                Detected Patterns
-              </h2>
+              <h2 className="text-[13px] font-medium text-muted-foreground">Detected Patterns</h2>
               {patterns.length > 0 && (
                 <button
                   type="button"
@@ -414,8 +369,8 @@ export function CoachingOverviewPage() {
               </div>
             ) : (
               <p className="text-[11px] text-muted-foreground">
-                No patterns detected yet. Patterns emerge as the
-                coaching system observes your work habits over time.
+                No patterns detected yet. Patterns emerge as the coaching system observes your work
+                habits over time.
               </p>
             )}
           </div>
@@ -447,9 +402,7 @@ export function CoachingOverviewPage() {
           {/* Strategy Feedback */}
           <div className="glass-card rounded-xl p-5">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-[13px] font-medium text-muted-foreground">
-                Strategy Feedback
-              </h2>
+              <h2 className="text-[13px] font-medium text-muted-foreground">Strategy Feedback</h2>
               <button
                 type="button"
                 onClick={handleResetDismissals}
@@ -462,38 +415,19 @@ export function CoachingOverviewPage() {
               <table className="w-full text-[12px]">
                 <thead>
                   <tr className="border-b border-border-subtle">
-                    <th className="text-left p-2 text-muted-foreground font-normal">
-                      Trigger
-                    </th>
-                    <th className="text-left p-2 text-muted-foreground font-normal">
-                      Type
-                    </th>
-                    <th className="text-left p-2 text-muted-foreground font-normal">
-                      Used
-                    </th>
-                    <th className="text-left p-2 text-muted-foreground font-normal">
-                      Accept
-                    </th>
-                    <th className="text-left p-2 text-muted-foreground font-normal">
-                      Effect
-                    </th>
+                    <th className="text-left p-2 text-muted-foreground font-normal">Trigger</th>
+                    <th className="text-left p-2 text-muted-foreground font-normal">Type</th>
+                    <th className="text-left p-2 text-muted-foreground font-normal">Used</th>
+                    <th className="text-left p-2 text-muted-foreground font-normal">Accept</th>
+                    <th className="text-left p-2 text-muted-foreground font-normal">Effect</th>
                   </tr>
                 </thead>
                 <tbody>
                   {feedback.map((s) => (
-                    <tr
-                      key={s.strategyType}
-                      className="border-b border-border-subtle"
-                    >
-                      <td className="p-2 text-muted-foreground">
-                        {s.strategyType}
-                      </td>
-                      <td className="p-2 text-muted-foreground">
-                        {s.domain}
-                      </td>
-                      <td className="p-2 text-muted-foreground tabular-nums">
-                        {s.timesUsed}
-                      </td>
+                    <tr key={s.strategyType} className="border-b border-border-subtle">
+                      <td className="p-2 text-muted-foreground">{s.strategyType}</td>
+                      <td className="p-2 text-muted-foreground">{s.domain}</td>
+                      <td className="p-2 text-muted-foreground tabular-nums">{s.timesUsed}</td>
                       <td className="p-2 text-muted-foreground tabular-nums">
                         {(s.acceptanceRate * 100).toFixed(0)}%
                       </td>
@@ -504,10 +438,7 @@ export function CoachingOverviewPage() {
                   ))}
                   {feedback.length === 0 && (
                     <tr>
-                      <td
-                        colSpan={5}
-                        className="p-4 text-center text-muted-foreground"
-                      >
+                      <td colSpan={5} className="p-4 text-center text-muted-foreground">
                         No feedback data
                       </td>
                     </tr>
@@ -536,24 +467,19 @@ export function CoachingOverviewPage() {
             {history.length > 0 ? (
               <div className="flex flex-col gap-2">
                 {history.map((h) => (
-                  <div
-                    key={h.id}
-                    className="flex items-center gap-3 py-1.5"
-                  >
+                  <div key={h.id} className="flex items-center gap-3 py-1.5">
                     <span className="text-[10px] text-dim tabular-nums w-14 shrink-0">
                       {formatTime(h.deliveredAt)}
                     </span>
-                    <p className="text-[11px] text-foreground truncate flex-1">
-                      {h.message}
-                    </p>
+                    <p className="text-[11px] text-foreground truncate flex-1">{h.message}</p>
                     <FeedbackBadge feedback={h.feedback} />
                   </div>
                 ))}
               </div>
             ) : (
               <p className="text-[11px] text-muted-foreground">
-                No coaching interventions yet. The system will start
-                offering suggestions as it learns your patterns.
+                No coaching interventions yet. The system will start offering suggestions as it
+                learns your patterns.
               </p>
             )}
           </div>

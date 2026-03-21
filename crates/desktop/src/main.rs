@@ -386,7 +386,11 @@ fn run_desktop_app() {
             commands::atoms::atom_dismiss,
             commands::atoms::atom_restore,
             commands::atoms::atom_next_card,
+            commands::atoms::atoms_bulk_accept,
             commands::atoms::atoms_migration_status,
+            // Knowledge Health
+            commands::knowledge_health::knowledge_health_summary,
+            commands::knowledge_health::knowledge_topic_detail,
             // Areas
             commands::areas::area_list,
             commands::areas::area_create,

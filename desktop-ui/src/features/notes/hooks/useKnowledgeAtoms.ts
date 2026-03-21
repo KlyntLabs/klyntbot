@@ -1,7 +1,6 @@
 import { ipc } from "@shared/hooks/useIpc";
 import { useMutation } from "@shared/hooks/useMutation";
 import { invalidateQueries, useQuery } from "@shared/hooks/useQuery";
-import { useCallback } from "react";
 
 export interface KnowledgeAtomResponse {
   id: string;
@@ -52,43 +51,26 @@ export function useAtomActions(noteId: string | null) {
   const { mutate: dismissMutate } = useAtomDismiss();
   const { mutate: restoreMutate } = useAtomRestore();
 
-  const invalidate = useCallback(() => {
+  const invalidate = () => {
     invalidateQueries("atoms_for_note");
-  }, []);
+  };
 
-  const accept = useCallback(
-    async (atomId: string, personalImportance?: number) => {
-      await acceptMutate({ atomId, personalImportance } as never);
-      invalidate();
-    },
-    [acceptMutate, invalidate],
-  );
+  const accept = async (atomId: string, personalImportance?: number) => {
+    await acceptMutate({ atomId, personalImportance } as never);
+    invalidate();
+  };
 
-  const dismiss = useCallback(
-    async (atomId: string) => {
-      await dismissMutate({ atomId } as never);
-      invalidate();
-    },
-    [dismissMutate, invalidate],
-  );
+  const dismiss = async (atomId: string) => {
+    await dismissMutate({ atomId } as never);
+    invalidate();
+  };
 
-  const restore = useCallback(
-    async (atomId: string) => {
-      await restoreMutate({ atomId } as never);
-      invalidate();
-    },
-    [restoreMutate, invalidate],
-  );
+  const restore = async (atomId: string) => {
+    await restoreMutate({ atomId } as never);
+    invalidate();
+  };
 
-  const acceptAll = useCallback(
-    async (atoms: KnowledgeAtomResponse[]) => {
-      await Promise.all(atoms.map((atom) => acceptMutate({ atomId: atom.id } as never)));
-      invalidate();
-    },
-    [acceptMutate, invalidate],
-  );
-
-  return { accept, dismiss, restore, acceptAll };
+  return { accept, dismiss, restore };
 }
 
 export async function fetchNextCard(atomId: string) {

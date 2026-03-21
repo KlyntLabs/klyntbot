@@ -17,8 +17,8 @@ import { VimCommandLine } from "./editor/VimCommandLine";
 import type { VimMode } from "./editor/vim";
 import { getVimPlugin, VIM_SAVE_EVENT } from "./editor/vim";
 import { WikiLinkMenu } from "./editor/WikiLinkNode";
-import { LinkInsertDialog } from "./LinkInsertDialog";
 import { KnowledgeAtomsPanel } from "./KnowledgeAtomsPanel";
+import { LinkInsertDialog } from "./LinkInsertDialog";
 import { NoteVersionHistory } from "./NoteVersionHistory";
 
 const VERSION_INTERVAL_MS = 5 * 60 * 1000; // Minimum interval between auto-saving version snapshots

@@ -3,6 +3,7 @@ pub mod annotations;
 pub mod areas;
 pub mod atoms;
 pub mod autotuner;
+pub mod knowledge_health;
 pub mod capture;
 pub mod chat;
 pub mod coaching;

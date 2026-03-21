@@ -1,18 +1,14 @@
+import { retentionTextColor } from "@shared/lib/retention";
 import { useState } from "react";
 import type { KnowledgeAtomResponse } from "../hooks/useKnowledgeAtoms";
 import { InlineReview } from "./InlineReview";
+import { WhyThisPopover } from "./WhyThisPopover";
 
 interface AtomCardProps {
   atom: KnowledgeAtomResponse;
   onAccept?: (atomId: string) => void;
   onDismiss?: (atomId: string) => void;
   onReviewDone?: () => void;
-}
-
-function retentionColor(pct: number): string {
-  if (pct >= 0.8) return "text-green-400";
-  if (pct >= 0.5) return "text-amber-400";
-  return "text-red-400";
 }
 
 export function AtomCard({ atom, onAccept, onDismiss, onReviewDone }: AtomCardProps) {
@@ -32,7 +28,7 @@ export function AtomCard({ atom, onAccept, onDismiss, onReviewDone }: AtomCardPr
 
   const isSuggested = atom.status === "suggested";
 
-  return (
+  const cardContent = (
     <div
       className={`flex items-center gap-2 rounded-md px-2 py-1 transition-colors ${
         isSuggested ? "opacity-60" : "hover:bg-surface-hover"
@@ -49,7 +45,7 @@ export function AtomCard({ atom, onAccept, onDismiss, onReviewDone }: AtomCardPr
       {/* Right side: retention + action */}
       <div className="flex items-center gap-1 shrink-0">
         <span
-          className={`text-[9px] font-medium tabular-nums ${retentionColor(atom.retentionPct)}`}
+          className={`text-[9px] font-medium tabular-nums ${retentionTextColor(atom.retentionPct)}`}
         >
           {Math.round(atom.retentionPct * 100)}%
         </span>
@@ -84,4 +80,14 @@ export function AtomCard({ atom, onAccept, onDismiss, onReviewDone }: AtomCardPr
       </div>
     </div>
   );
+
+  if (isSuggested) {
+    return (
+      <WhyThisPopover sourceContext={atom.sourceContext} domain={atom.domain}>
+        {cardContent}
+      </WhyThisPopover>
+    );
+  }
+
+  return cardContent;
 }

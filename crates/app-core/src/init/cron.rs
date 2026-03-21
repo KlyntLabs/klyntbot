@@ -197,6 +197,7 @@ const JOB_WEEKLY_REFLECTION: &str = "__klyntbot_cognitive_weekly_reflection";
 const JOB_WEEKLY_REPORT: &str = "__klyntbot_weekly_report";
 const JOB_DAILY_PLANNING: &str = "__klyntbot_daily_planning";
 const JOB_FINANCE_DAILY_REVIEW: &str = "__klyntbot_finance_daily_review";
+const JOB_ATOM_DECAY: &str = "__klyntbot_atom_decay_daily";
 const JOB_FINANCE_BUDGET_CHECK: &str = "__klyntbot_finance_budget_check";
 const JOB_FINANCE_PRICE_REFRESH: &str = "__klyntbot_finance_price_refresh";
 const JOB_FINANCE_HEALTH_CHECK: &str = "__klyntbot_finance_health_check";
@@ -443,6 +444,30 @@ fn register_cron_callbacks(
         }));
     }
 
+    // ── atom_decay_daily ───────────────────────────────────────────────
+    {
+        let pool = repos.pool().clone();
+        let bus = Arc::clone(domain_event_bus);
+        let rt = rt.clone();
+        cron_service.register_handler(
+            JOB_ATOM_DECAY,
+            Arc::new(move |_job: &scheduling::CronJob| {
+                let pool = pool.clone();
+                let bus = Arc::clone(&bus);
+                tokio::task::block_in_place(|| {
+                    rt.block_on(async {
+                        if let Err(e) =
+                            cognitive::services::atom_decay::run_decay_cycle(&pool, &bus).await
+                        {
+                            warn!("Atom decay cycle failed: {e}");
+                        }
+                        Ok(None)
+                    })
+                })
+            }),
+        );
+    }
+
     // ── proactive_scan ───────────────────────────────────────────────────
     if tasks_config.proactive_suggestions {
         let handler = proactive_handler.clone();
@@ -612,6 +637,16 @@ async fn ensure_cron_jobs(
             "Finance data health check"
         );
     }
+
+    // Daily atom decay (3 AM local)
+    ensure_job!(
+        JOB_ATOM_DECAY,
+        scheduling::CronSchedule::Cron {
+            expr: "0 3 * * *".to_string(),
+            tz: Some(config.timezone.clone()),
+        },
+        "Daily knowledge atom decay"
+    );
 
     // Proactive suggestion scan (every 4 hours)
     if tasks_config.proactive_suggestions {

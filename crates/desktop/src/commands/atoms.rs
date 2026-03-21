@@ -1,6 +1,7 @@
 use desktop_shared::commands::{
-    AtomAcceptParams, AtomDismissParams, AtomMigrationStatusResponse, AtomNextCardParams,
-    AtomRestoreParams, AtomsForNoteParams, FlashcardResponse, KnowledgeAtomResponse,
+    AtomAcceptParams, AtomBulkAcceptParams, AtomDismissParams, AtomMigrationStatusResponse,
+    AtomNextCardParams, AtomRestoreParams, AtomsForNoteParams, FlashcardResponse,
+    KnowledgeAtomResponse,
 };
 use desktop_shared::errors::ApiError;
 use std::sync::Arc;
@@ -49,6 +50,14 @@ pub async fn atom_next_card(
 }
 
 #[tauri::command]
+pub async fn atoms_bulk_accept(
+    state: State<'_, Arc<AppCore>>,
+    params: AtomBulkAcceptParams,
+) -> Result<Vec<KnowledgeAtomResponse>, ApiError> {
+    state.atoms_bulk_accept(params).await
+}
+
+#[tauri::command]
 pub async fn atoms_migration_status(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<AtomMigrationStatusResponse, ApiError> {
@@ -64,6 +73,7 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "atom_dismiss",
     "atom_restore",
     "atom_next_card",
+    "atoms_bulk_accept",
     "atoms_migration_status",
 ];
 
@@ -80,6 +90,7 @@ pub(crate) async fn dispatch_dev(
         "atom_dismiss" => dev::val(core.atom_dismiss(try_field!(dev::parse_params(body))).await),
         "atom_restore" => dev::val(core.atom_restore(try_field!(dev::parse_params(body))).await),
         "atom_next_card" => dev::val(core.atom_next_card(try_field!(dev::parse_params(body))).await),
+        "atoms_bulk_accept" => dev::val(core.atoms_bulk_accept(try_field!(dev::parse_params(body))).await),
         "atoms_migration_status" => dev::val(core.atoms_migration_status().await),
         _ => return None,
     })

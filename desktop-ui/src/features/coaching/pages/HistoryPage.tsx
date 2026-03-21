@@ -26,9 +26,9 @@ export function HistoryPage() {
 
   return (
     <div className="glass-card rounded-xl p-5">
-        {history.map((h) => (
-          <InterventionRow key={h.id} {...h} />
-        ))}
+      {history.map((h) => (
+        <InterventionRow key={h.id} {...h} />
+      ))}
     </div>
   );
 }

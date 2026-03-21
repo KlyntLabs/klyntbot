@@ -29,29 +29,44 @@ export function useLanguageBreakdown() {
   const [error, setError] = useState<string | null>(null);
   const requestIdRef = useRef(0);
 
-  const translate = useCallback(async (text: string, sourceLang: string, targetLang: string, noteId?: string, isSelection?: boolean) => {
-    const id = ++requestIdRef.current;
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await ipc<TranslateBreakdownResponse>("language_translate_breakdown", {
-        params: { text, sourceLang, targetLang, noteId: noteId ?? null, isSelection: isSelection ?? false },
-      });
-      // Only apply result if this is still the latest request
-      if (id === requestIdRef.current) {
-        setResult(response);
+  const translate = useCallback(
+    async (
+      text: string,
+      sourceLang: string,
+      targetLang: string,
+      noteId?: string,
+      isSelection?: boolean,
+    ) => {
+      const id = ++requestIdRef.current;
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await ipc<TranslateBreakdownResponse>("language_translate_breakdown", {
+          params: {
+            text,
+            sourceLang,
+            targetLang,
+            noteId: noteId ?? null,
+            isSelection: isSelection ?? false,
+          },
+        });
+        // Only apply result if this is still the latest request
+        if (id === requestIdRef.current) {
+          setResult(response);
+        }
+      } catch (e: unknown) {
+        if (id === requestIdRef.current) {
+          const msg = e instanceof Error ? e.message : "Translation failed";
+          setError(msg);
+        }
+      } finally {
+        if (id === requestIdRef.current) {
+          setLoading(false);
+        }
       }
-    } catch (e: unknown) {
-      if (id === requestIdRef.current) {
-        const msg = e instanceof Error ? e.message : "Translation failed";
-        setError(msg);
-      }
-    } finally {
-      if (id === requestIdRef.current) {
-        setLoading(false);
-      }
-    }
-  }, []);
+    },
+    [],
+  );
 
   const reset = useCallback(() => {
     requestIdRef.current++;

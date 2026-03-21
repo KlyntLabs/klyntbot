@@ -108,6 +108,10 @@ pub struct CognitiveConfig {
     /// BookIndex configuration for hierarchical retrieval.
     #[serde(default)]
     pub book_index: BookIndexConfig,
+
+    /// Auto-extraction of knowledge atoms from notes.
+    #[serde(default)]
+    pub atom_extraction: AtomExtractionConfig,
 }
 
 impl Default for CognitiveConfig {
@@ -139,6 +143,7 @@ impl Default for CognitiveConfig {
             insight_forge_total_limit: default_insight_forge_total_limit(),
             insight_forge_per_source_timeout_ms: default_insight_forge_per_source_timeout_ms(),
             book_index: BookIndexConfig::default(),
+            atom_extraction: AtomExtractionConfig::default(),
         }
     }
 }
@@ -303,4 +308,28 @@ fn default_pagerank_damping() -> f64 {
 }
 fn default_pagerank_iterations() -> u32 {
     20
+}
+
+// -- Atom Extraction config --
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AtomExtractionConfig {
+    #[serde(default = "super::core::default_true")]
+    pub enabled: bool,
+    #[serde(default = "default_extraction_max_tokens")]
+    pub max_tokens: u32,
+}
+
+fn default_extraction_max_tokens() -> u32 {
+    1024
+}
+
+impl Default for AtomExtractionConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            max_tokens: default_extraction_max_tokens(),
+        }
+    }
 }

@@ -135,6 +135,28 @@ pub(super) fn spawn_post_core_services(
         });
     }
 
+    // Start atom extraction service (auto-extract concepts from notes).
+    if let Some(ref provider) = core.cognitive_provider {
+        // try_read() is fine here — config lock is uncontested during init
+        if let Ok(config) = core.config.try_read() {
+            let extraction_config = config.cognitive.atom_extraction.clone();
+            drop(config);
+            if extraction_config.enabled {
+                let pool = core.storage_pool.inner().clone();
+                let bus = Arc::clone(domain_event_bus);
+                let token = shutdown_token.child_token();
+                cognitive::services::atom_extraction::AtomExtractionService::start(
+                    pool,
+                    provider.clone(),
+                    bus,
+                    extraction_config,
+                    token,
+                );
+                info!("atom extraction service started");
+            }
+        }
+    }
+
     // Spawn event log persistence — writes domain & pipeline events to DB.
     if let Some(ref event_log_repo) = core.event_log_repo {
         spawn_event_log_persistence(

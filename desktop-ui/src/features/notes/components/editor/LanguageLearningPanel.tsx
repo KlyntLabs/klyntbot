@@ -1,8 +1,8 @@
 import { useEffect } from "react";
-import { KnowledgeAtomsPanel } from "../KnowledgeAtomsPanel";
 import type { WordBreakdown } from "../../hooks/useLanguageBreakdown";
 import { useLanguageBreakdown } from "../../hooks/useLanguageBreakdown";
 import { useVocabularySave } from "../../hooks/useVocabularySave";
+import { KnowledgeAtomsPanel } from "../KnowledgeAtomsPanel";
 import { CollapsibleSection } from "./language/CollapsibleSection";
 import { ConfusableSection } from "./language/ConfusableSection";
 import { PracticeSection } from "./language/PracticeSection";
@@ -83,11 +83,7 @@ export function LanguageLearningPanel({
       {errorMessage && (
         <div className="mx-3 mt-2 flex items-center justify-between rounded-md bg-red-500/10 px-3 py-2 text-xs text-red-400">
           <span>Save failed: {errorMessage}</span>
-          <button
-            type="button"
-            onClick={dismissError}
-            className="text-red-300 hover:text-red-200"
-          >
+          <button type="button" onClick={dismissError} className="text-red-300 hover:text-red-200">
             &times;
           </button>
         </div>

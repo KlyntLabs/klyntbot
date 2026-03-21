@@ -634,3 +634,10 @@ CREATE TABLE IF NOT EXISTS coaching_intervention_log (
 
 CREATE INDEX IF NOT EXISTS idx_coaching_intervention_log_delivered
     ON coaching_intervention_log(delivered_at DESC);
+
+-- ── Atom Extraction Cache (content-hash dedup) ────────────────────
+CREATE TABLE IF NOT EXISTS atom_extraction_cache (
+    note_id       TEXT PRIMARY KEY NOT NULL,
+    content_hash  TEXT NOT NULL,
+    extracted_at  TEXT NOT NULL
+);

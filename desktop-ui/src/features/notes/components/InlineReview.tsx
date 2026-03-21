@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
 import { ipc } from "@shared/hooks/useIpc";
 import { invalidateQueries } from "@shared/hooks/useQuery";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReviewQuality } from "../hooks/useFlashcards";
-import { fetchNextCard, type FlashcardForReview } from "../hooks/useKnowledgeAtoms";
+import { type FlashcardForReview, fetchNextCard } from "../hooks/useKnowledgeAtoms";
 
 interface InlineReviewProps {
   atomId: string;

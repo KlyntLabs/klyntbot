@@ -35,6 +35,13 @@ pub struct AtomNextCardParams {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct AtomBulkAcceptParams {
+    pub atom_ids: Vec<String>,
+    pub personal_importance: f64,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AtomMigrationStatusParams {}
 
 // ── Responses ───────────────────────────────────────────────────
