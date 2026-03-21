@@ -133,6 +133,7 @@ impl AppCore {
                 cognitive::NewFlashcard {
                     source_note_id: params.note_id.clone(),
                     source_context: c.source_context.clone(),
+                    atom_id: None,
                     deck: params.deck.clone(),
                     front: c.front.clone(),
                     back: c.back.clone(),

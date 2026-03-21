@@ -131,6 +131,7 @@ impl AppCore {
             new_cards.push(cognitive::NewFlashcard {
                 source_note_id: params.note_id.clone(),
                 source_context: item.example_sentence.clone(),
+                atom_id: None,
                 deck: params.deck.clone(),
                 front: item.word.clone(),
                 back: item.meaning.clone(),

@@ -418,6 +418,7 @@ impl AppCore {
                     } else {
                         Some(format!("From: {}", q.source_notes.join(", ")))
                     },
+                    atom_id: None,
                     deck: params.deck_name.clone(),
                     front: q.question.clone(),
                     back: q.correct_answer.clone(),

@@ -57,6 +57,7 @@ pub enum ReviewQuality {
 pub struct NewFlashcard {
     pub source_note_id: Option<String>,
     pub source_context: Option<String>,
+    pub atom_id: Option<String>,
     pub deck: String,
     pub front: String,
     pub back: String,
@@ -74,6 +75,7 @@ pub struct FlashcardRow {
     pub id: String,
     pub source_note_id: Option<String>,
     pub source_context: Option<String>,
+    pub atom_id: Option<String>,
     pub deck: String,
     pub front: String,
     pub back: String,
@@ -146,24 +148,25 @@ impl FlashcardRepo {
             sqlx::query(
                 r#"
                 INSERT INTO flashcards
-                    (id, source_note_id, source_context,
+                    (id, source_note_id, source_context, atom_id,
                      deck, front, back, card_type,
                      cloze_data, vocab_data, image_data, tags,
                      stability, difficulty, due_at, last_reviewed_at,
                      review_count, lapses, state, suspended, recall_speed_ms,
                      created_at, updated_at)
                 VALUES
-                    (?1, ?2, ?3,
-                     ?4, ?5, ?6, ?7,
-                     ?8, ?9, ?10, ?11,
-                     ?12, ?13, ?14, NULL,
+                    (?1, ?2, ?3, ?4,
+                     ?5, ?6, ?7, ?8,
+                     ?9, ?10, ?11, ?12,
+                     ?13, ?14, ?15, NULL,
                      0, 0, 'new', 0, NULL,
-                     ?15, ?15)
+                     ?16, ?16)
                 "#,
             )
             .bind(&id)
             .bind(&card.source_note_id)
             .bind(&card.source_context)
+            .bind(&card.atom_id)
             .bind(&card.deck)
             .bind(&card.front)
             .bind(&card.back)
@@ -550,6 +553,7 @@ mod tests {
         NewFlashcard {
             source_note_id: source_note_id.map(|s| s.to_string()),
             source_context: None,
+            atom_id: None,
             deck: deck.to_string(),
             front: "What is 2 + 2?".to_string(),
             back: "4".to_string(),
@@ -567,6 +571,7 @@ mod tests {
         NewFlashcard {
             source_note_id: Some("note-lang".to_string()),
             source_context: Some("食べてみる is used in casual speech".to_string()),
+            atom_id: None,
             deck: deck.to_string(),
             front: "食べてみる".to_string(),
             back: "to try eating".to_string(),

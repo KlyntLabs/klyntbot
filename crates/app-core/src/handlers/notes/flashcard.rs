@@ -106,6 +106,7 @@ impl AppCore {
         let card = cognitive::NewFlashcard {
             source_note_id: params.source_note_id,
             source_context: None,
+            atom_id: None,
             deck: params.deck,
             front: params.front,
             back: params.back,
