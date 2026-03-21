@@ -85,6 +85,28 @@ impl AppCore {
             .record_review(&params.card_id, quality, params.recall_speed_ms)
             .await
             .map_err(|e: sqlx::Error| ApiError::new("INTERNAL_ERROR", e.to_string()))?;
+
+        // Emit AtomFlashcardReviewed if card is linked to an atom
+        if let Some(atom_id) = &card.atom_id {
+            if let Some(bus) = &self.domain_event_bus {
+                let _ = bus.publish(bus::DomainEvent::AtomFlashcardReviewed {
+                    atom_id: atom_id.clone(),
+                    card_id: card.id.clone(),
+                    quality: quality as u8,
+                    recall_speed_ms: params.recall_speed_ms.unwrap_or(0) as u64,
+                    new_retention_pct: card.stability, // stability approximates retention
+                    source_note_id: card.source_note_id.clone(),
+                });
+            }
+            // Update atom retention from card metrics
+            if let Some(atom_repo) = &self.knowledge_atom_repo {
+                let _ = atom_repo
+                    .update_retention(atom_id, card.stability, card.stability, card.difficulty)
+                    .await;
+                let _ = atom_repo.touch(atom_id).await;
+            }
+        }
+
         Ok(flashcard_to_response(card))
     }
 

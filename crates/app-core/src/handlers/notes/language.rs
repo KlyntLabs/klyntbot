@@ -175,6 +175,77 @@ impl AppCore {
             .await
             .map_err(map_cognitive_err)?;
 
+        // Create Knowledge Atoms alongside flashcards
+        if let Some(atom_repo) = &self.knowledge_atom_repo {
+            let target_lang = params.deck.clone();
+            let domain = format!("language:{target_lang}");
+            let topic = atom_repo
+                .get_or_create_topic(&target_lang, &domain)
+                .await
+                .ok();
+
+            let mut new_atoms = Vec::new();
+            for item in &params.words {
+                let vocab_metadata = serde_json::json!({
+                    "word": item.word,
+                    "reading": item.reading,
+                    "meaning": item.meaning,
+                    "partOfSpeech": item.part_of_speech,
+                    "exampleSentence": item.example_sentence,
+                });
+
+                new_atoms.push(cognitive::NewKnowledgeAtom {
+                    subject: item.word.clone(),
+                    atom_type: "vocabulary".to_string(),
+                    domain: domain.clone(),
+                    source_note_id: params.note_id.clone(),
+                    source_context: item.example_sentence.clone(),
+                    personal_importance: 0.7,
+                    status: "active".to_string(),
+                    metadata: Some(serde_json::to_string(&vocab_metadata).unwrap_or_default()),
+                    topic_id: topic.as_ref().map(|t| t.id.clone()),
+                    ..Default::default()
+                });
+            }
+
+            if let Ok(created_atoms) = atom_repo.create_batch(new_atoms).await {
+                // Link flashcards to atoms by matching word/front
+                for card in &created {
+                    if let Some(atom) = created_atoms.iter().find(|a| a.subject == card.front) {
+                        let _ = sqlx::query(
+                            "UPDATE flashcards SET atom_id = ?1 WHERE id = ?2",
+                        )
+                        .bind(&atom.id)
+                        .bind(&card.id)
+                        .execute(flashcard_repo.pool())
+                        .await;
+                    }
+                }
+
+                // Emit events
+                if let Some(bus) = &self.domain_event_bus {
+                    for atom in &created_atoms {
+                        let _ = bus.publish(bus::DomainEvent::KnowledgeAtomCreated {
+                            atom_id: atom.id.clone(),
+                            atom_type: atom.atom_type.clone(),
+                            domain: atom.domain.clone(),
+                            source_note_id: atom.source_note_id.clone(),
+                            personal_importance: atom.personal_importance,
+                        });
+                        let _ = bus.publish(bus::DomainEvent::KnowledgeAtomAccepted {
+                            atom_id: atom.id.clone(),
+                            atom_type: atom.atom_type.clone(),
+                        });
+                    }
+                }
+
+                // Update topic aggregates
+                if let Some(topic) = &topic {
+                    let _ = atom_repo.update_topic_aggregates(&topic.id).await;
+                }
+            }
+        }
+
         Ok(created
             .into_iter()
             .map(super::flashcard::flashcard_to_response)
