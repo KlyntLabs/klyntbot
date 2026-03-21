@@ -1046,6 +1046,7 @@ impl IntentClassifier {
         tool_names: &[&str],
         params: &ChatParams,
         strategy_context: Option<&str>,
+        timeout_override: Option<Duration>,
     ) -> Result<IntentAnalysis> {
         let mut prompt = CLASSIFICATION_PROMPT
             .replace("{message}", message)
@@ -1058,8 +1059,9 @@ impl IntentClassifier {
 
         let messages = vec![Message::user(prompt)];
 
+        let timeout = timeout_override.unwrap_or(self.timeout);
         let result =
-            tokio::time::timeout(self.timeout, self.provider.chat(&messages, None, params)).await;
+            tokio::time::timeout(timeout, self.provider.chat(&messages, None, params)).await;
 
         let response = match result {
             Ok(Ok(r)) => r,
@@ -1550,9 +1552,27 @@ impl IntentAnalyzer {
         threshold
     }
 
+    /// Resolve the LLM classifier timeout from champion params or config default.
+    fn effective_llm_classifier_timeout(&self) -> Option<Duration> {
+        if let Some(ref orchestrator) = self.autotuner {
+            if let Some(params) = orchestrator.try_current_champion_params() {
+                if let Some(timeout_ms) = params.llm_classifier_timeout_ms {
+                    return Some(Duration::from_millis(timeout_ms));
+                }
+            }
+        }
+        if let Some(ref overrides) = self.overrides {
+            if let Some(timeout_ms) = overrides.llm_classifier_timeout_ms {
+                return Some(Duration::from_millis(timeout_ms));
+            }
+        }
+        None
+    }
+
     /// Run LLM classifier (Layer 3) with fallback handling.
     async fn classify_with_llm(&self, message: &str, tool_names: &[&str]) -> IntentAnalysis {
         let strategy_context = self.build_strategy_context().await;
+        let timeout = self.effective_llm_classifier_timeout();
         match self
             .classifier
             .classify(
@@ -1560,6 +1580,7 @@ impl IntentAnalyzer {
                 tool_names,
                 &self.classifier_params,
                 strategy_context.as_deref(),
+                timeout,
             )
             .await
         {
@@ -1914,6 +1935,7 @@ mod tests {
                 &["web_search", "web_fetch"],
                 &default_params(),
                 None,
+                None,
             )
             .await
             .unwrap();
@@ -1933,7 +1955,7 @@ mod tests {
         let response = r#"{"mode":"direct","estimated_tool_calls":0,"has_sequential_deps":false,"failure_risk":"low","requires_state_tracking":false,"requires_retries":false,"confidence":0.95,"reasoning":"Simple greeting"}"#;
         let classifier = IntentClassifier::new(mock_provider(response), Duration::from_secs(2));
         let result = classifier
-            .classify("hello", &[], &default_params(), None)
+            .classify("hello", &[], &default_params(), None, None)
             .await
             .unwrap();
         assert!(matches!(result.mode, ExecutionMode::Direct));
@@ -1944,7 +1966,7 @@ mod tests {
         let response = r#"{"mode":"reactive","estimated_tool_calls":2,"has_sequential_deps":false,"failure_risk":"low","requires_state_tracking":false,"requires_retries":false,"confidence":0.85,"reasoning":"Needs search"}"#;
         let classifier = IntentClassifier::new(mock_provider(response), Duration::from_secs(2));
         let result = classifier
-            .classify("search for tasks", &["todo"], &default_params(), None)
+            .classify("search for tasks", &["todo"], &default_params(), None, None)
             .await
             .unwrap();
         assert!(matches!(
@@ -1960,7 +1982,7 @@ mod tests {
             Duration::from_secs(2),
         );
         let result = classifier
-            .classify("hello", &[], &default_params(), None)
+            .classify("hello", &[], &default_params(), None, None)
             .await
             .unwrap();
         assert!(matches!(
@@ -1975,7 +1997,7 @@ mod tests {
         let response = r#"Sure: {"mode":"direct","estimated_tool_calls":0,"has_sequential_deps":false,"failure_risk":"low","requires_state_tracking":false,"requires_retries":false,"confidence":0.9,"reasoning":"Greeting"} done"#;
         let classifier = IntentClassifier::new(mock_provider(response), Duration::from_secs(2));
         let result = classifier
-            .classify("hi", &[], &default_params(), None)
+            .classify("hi", &[], &default_params(), None, None)
             .await
             .unwrap();
         assert!(matches!(result.mode, ExecutionMode::Direct));

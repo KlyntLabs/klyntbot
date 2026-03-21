@@ -131,6 +131,7 @@ pub(super) async fn init_cron(
         let champion =
             agent::autotuner::AutoTunerOrchestrator::load_champion(&learning_state).await;
         let episodic_memory_repo = cognitive::EpisodicMemoryRepo::new(repos.pool().clone());
+        let memory_param_sink = Arc::new(std::sync::RwLock::new(None));
         let orchestrator = Arc::new(
             agent::autotuner::AutoTunerOrchestrator::new(
                 champion,
@@ -142,7 +143,8 @@ pub(super) async fn init_cron(
             )
             .with_strategy_repo(repos.strategies.clone())
             .with_episodic_memory_repo(episodic_memory_repo)
-            .with_session_repo(repos.sessions.clone()),
+            .with_session_repo(repos.sessions.clone())
+            .with_memory_param_sink(Arc::clone(&memory_param_sink)),
         );
         // Spawn bootstrap replay as a background task to seed the first experiment
         // from historical session data (no-op if experiments already exist).

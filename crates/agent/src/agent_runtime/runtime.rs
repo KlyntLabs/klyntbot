@@ -245,7 +245,11 @@ impl AgentRuntime {
         let mut profile = {
             let catalog = self.skill_catalog.read().await;
             let router = self.skill_router.read().await;
-            Arc::clone(router.select_orchestrator(message, &catalog))
+            let champion_params = self
+                .autotuner_hook
+                .as_ref()
+                .and_then(|h| h.current_champion_params());
+            Arc::clone(router.select_orchestrator(message, &catalog, champion_params.as_ref()))
         };
         let mut agent_name = profile.name.clone();
         debug!("AgentRuntime: matched skill '{}'", agent_name);
@@ -1290,7 +1294,7 @@ mod tests {
         let (catalog, router) = make_skill_catalog_and_router();
         let catalog = catalog.read().await;
         let router = router.read().await;
-        let selected = router.select_orchestrator("create a task to review budget", &catalog);
+        let selected = router.select_orchestrator("create a task to review budget", &catalog, None);
         assert_eq!(selected.name, "task-management");
     }
 

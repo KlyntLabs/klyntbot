@@ -55,6 +55,9 @@ pub struct AutoTunerOrchestrator {
     strategy_repo: Option<StrategyRepo>,
     episodic_memory_repo: Option<cognitive::EpisodicMemoryRepo>,
     session_repo: Option<storage::SessionRepo>,
+    /// Shared lock for live memory param injection. Written on champion promotion,
+    /// read by UnifiedMemoryService on each retrieval.
+    memory_param_sink: Option<Arc<std::sync::RwLock<Option<common::TrialParams>>>>,
 }
 
 impl AutoTunerOrchestrator {
@@ -76,6 +79,7 @@ impl AutoTunerOrchestrator {
             strategy_repo: None,
             episodic_memory_repo: None,
             session_repo: None,
+            memory_param_sink: None,
         }
     }
 
@@ -95,6 +99,27 @@ impl AutoTunerOrchestrator {
     pub fn with_session_repo(mut self, repo: storage::SessionRepo) -> Self {
         self.session_repo = Some(repo);
         self
+    }
+
+    /// Set the shared lock for propagating champion memory params to live retrieval.
+    pub fn with_memory_param_sink(
+        mut self,
+        sink: Arc<std::sync::RwLock<Option<common::TrialParams>>>,
+    ) -> Self {
+        // Seed with current champion params so live retrieval uses them immediately.
+        if let Ok(champion) = self.champion.try_read() {
+            if champion.trial_id.is_some() {
+                let mut guard = sink.write().unwrap_or_else(|e| e.into_inner());
+                *guard = Some(champion.params.clone());
+            }
+        }
+        self.memory_param_sink = Some(sink);
+        self
+    }
+
+    /// Expose the shared lock so the builder can pass it to UnifiedMemoryService.
+    pub fn memory_param_sink(&self) -> Option<Arc<std::sync::RwLock<Option<common::TrialParams>>>> {
+        self.memory_param_sink.clone()
     }
 
     /// Load the persisted champion from the learning_state table, falling
@@ -186,6 +211,21 @@ impl AutoTunerOrchestrator {
             }
         }
         *guard = new_champion;
+
+        // Extract sink data before dropping the tokio write lock — avoids holding
+        // the async lock while acquiring the std::sync lock on the sink.
+        let sink_value = if guard.trial_id.is_some() {
+            Some(guard.params.clone())
+        } else {
+            None
+        };
+        drop(guard);
+
+        // Propagate memory params to live retrieval via shared lock.
+        if let Some(ref sink) = self.memory_param_sink {
+            let mut param_guard = sink.write().unwrap_or_else(|e| e.into_inner());
+            *param_guard = sink_value;
+        }
     }
 
     /// Build a summary for the transparency panel / events.

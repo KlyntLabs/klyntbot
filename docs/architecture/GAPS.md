@@ -6,7 +6,7 @@
 ## Summary
 
 - **0 High** priority gaps -- OKR, Project CRUD, and Note UI gaps resolved
-- **5 Medium** priority gaps -- secondary features or partially integrated
+- **4 Medium** priority gaps -- secondary features or partially integrated
 - **5 Low** priority gaps -- nice-to-have, internal-only, or debug-only
 
 ---
@@ -43,9 +43,6 @@
 | `flashcard_update` | `notes.rs` | Update flashcard content | Low | Add edit capability in flashcard deck view |
 | `flashcard_delete` | `notes.rs` | Delete flashcard | Low | Add delete button in flashcard view |
 | `flashcard_get_all_due` | `notes.rs` | Get all due cards across decks | Low | Used in learn page -- may already work via `useReviewSession` |
-| `productivity_projects_list` | `productivity.rs` | List productivity projects | Medium | Add project management in productivity settings |
-| `productivity_project_upsert` | `productivity.rs` | Create/update productivity project | Medium | Add project form in productivity settings |
-| `productivity_project_delete` | `productivity.rs` | Delete productivity project | Medium | Add delete action in productivity project list |
 
 ### Partially Integrated (called from frontend but only in debug/limited contexts)
 
@@ -80,7 +77,7 @@
 | **feature-tasks** | Complete (CRUD, focus, suggestions, decompose, forecast) | **Full UI** in `features/tasks/` | -- | -- |
 | **feature-finance** | Complete (accounts, transactions, budgets, goals, liabilities, portfolios, investments, reports) | **Full UI** in `features/finance/` (overview, cash flow, investments, targets) | Low | Income report + trends charts missing |
 | **feature-notes** | Complete (CRUD, notebooks, links, search, insights, personas, flashcards, versions, annotations, archive) | **Full UI** in `features/notes/` (editor, graph, insights, flashcards, language) + archive/tag filtering via `TagsExplorer` | -- | -- |
-| **feature-productivity** | Complete (tracking, focus, goals, categories, calendar, insights, distraction, patterns, hourly breakdown) | **Full UI** in `features/productivity/` (day/week/month views, focus timer, goals, categories, insights) | Low | Project management section missing |
+| **feature-productivity** | Complete (tracking, focus, goals, categories, calendar, insights, distraction, patterns, hourly breakdown) | **Full UI** in `features/productivity/` (day/week/month views, focus timer, goals, categories, insights) | -- | -- |
 | **feature-coaching** | Complete (signal accumulation, pattern detection, intervention routing, feedback) | **Partial UI** -- debug CoachingTab + nudge banners in chat | Medium | Dedicated coaching dashboard with patterns/feedback history |
 | **feature-insights** | Complete (insight review, versions, evolution, personas, scenarios, knowledge growth, flashcard gen) | **Full UI** integrated into notes insight panels | -- | -- |
 | **feature-launcher** | Complete (search, dashboard, clipboard, scripts, system commands, app index) | **Full UI** in `features/launcher/` | -- | -- |
@@ -197,35 +194,31 @@ Config sections are exposed via `config_get_section` / `config_update_section`. 
    - Effort: 2 days
    - Build a dedicated coaching insights page or integrate into productivity
 
-2. **Productivity Projects** -- `productivity_projects_list`, `productivity_project_upsert`, `productivity_project_delete` are not called from any UI.
-   - Effort: 1 day
-   - Add project assignment in productivity category settings
-
-3. **Plugin Management UI** -- `plugin-runtime` has WASM plugin support but no settings page for plugin management.
+2. **Plugin Management UI** -- `plugin-runtime` has WASM plugin support but no settings page for plugin management.
    - Effort: 1 day
    - Add plugin list with install/enable/disable in settings
 
-4. **Project Context Panels** -- `project_conversations_list`, `project_memories_list`, `project_source_*` commands exist but no UI shows project conversations, memories, or sources.
+3. **Project Context Panels** -- `project_conversations_list`, `project_memories_list`, `project_source_*` commands exist but no UI shows project conversations, memories, or sources.
    - Effort: 1-2 days
    - Add sidebar panels to project detail view
 
-5. **Finance Reports** -- `finance_report_income`, `finance_report_trends`, `finance_exchange_rates` have no UI.
+4. **Finance Reports** -- `finance_report_income`, `finance_report_trends`, `finance_exchange_rates` have no UI.
    - Effort: 1 day
    - Add income report + trends charts to finance pages
 
 ### Low Priority (nice-to-have or internal-only)
 
-6. **Entity Graph Explorer** -- `entity_search`, `entity_merge`, `entity_get_neighborhood` exist but no dedicated entity management UI.
+5. **Entity Graph Explorer** -- `entity_search`, `entity_merge`, `entity_get_neighborhood` exist but no dedicated entity management UI.
     - Effort: 2 days
 
-7. **Agent Profiles UI** -- `agent_*` commands for managing custom agent profiles have no frontend.
+6. **Agent Profiles UI** -- `agent_*` commands for managing custom agent profiles have no frontend.
     - Effort: 1 day
 
-8. **Workspace File Browser** -- `workspace_*` commands have no frontend.
+7. **Workspace File Browser** -- `workspace_*` commands have no frontend.
     - Effort: 1 day
 
-9. **Various Config Sections** -- Many config sections (confidence, conversation, content, skills, packs, scenario, orchestrator) have no settings UI. These are advanced tuning parameters that most users will never need.
+8. **Various Config Sections** -- Many config sections (confidence, conversation, content, skills, packs, scenario, orchestrator) have no settings UI. These are advanced tuning parameters that most users will never need.
     - Effort: Low priority; expose on demand
 
-10. **Flashcard Edit/Delete** -- `flashcard_update` and `flashcard_delete` not called from frontend.
+9. **Flashcard Edit/Delete** -- `flashcard_update` and `flashcard_delete` not called from frontend.
     - Effort: 0.5 days

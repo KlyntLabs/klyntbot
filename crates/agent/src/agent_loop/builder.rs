@@ -649,6 +649,12 @@ impl AgentLoopBuilder {
             if let Some(ref sit) = self.user_situation {
                 retriever = retriever.with_situation(Arc::clone(sit));
             }
+            // Wire live champion memory params into retrieval
+            if let Some(ref orchestrator) = self.autotuner {
+                if let Some(sink) = orchestrator.memory_param_sink() {
+                    retriever = retriever.with_champion_overrides(sink);
+                }
+            }
             let memory_service = Arc::new(retriever);
             memory_service_for_shadow = Some(Arc::clone(&memory_service));
             let retriever: Arc<dyn context_engine::MemoryRetriever> =

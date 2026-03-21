@@ -47,13 +47,17 @@ impl SkillRouter {
     }
 
     /// Select the best orchestrator for a message. Keyword-only (no embeddings).
-    /// For full blended scoring, use `select_orchestrator_blended`.
+    /// When `champion_params` is provided, uses tuned keyword/semantic weights.
     pub fn select_orchestrator<'a>(
         &self,
         message: &str,
         catalog: &'a SkillCatalog,
+        champion_params: Option<&common::TrialParams>,
     ) -> &'a Arc<SkillPackage> {
-        self.select_orchestrator_blended(message, &[], catalog, None, None)
+        let (kw_w, sem_w) = champion_params
+            .map(|p| (p.skill_keyword_weight, p.skill_semantic_weight))
+            .unwrap_or((None, None));
+        self.select_orchestrator_blended(message, &[], catalog, kw_w, sem_w)
     }
 
     /// Select orchestrator with blended keyword + semantic scoring.
@@ -106,12 +110,15 @@ impl SkillRouter {
     }
 
     /// Activate non-orchestrator skills relevant to the message.
+    /// `activation_threshold` overrides the default 0.4 when provided.
     pub fn activate_skills<'a>(
         &self,
         message: &str,
         query_embedding: &[f32],
         catalog: &'a SkillCatalog,
+        activation_threshold: Option<f64>,
     ) -> Vec<&'a Arc<SkillPackage>> {
+        let threshold = activation_threshold.unwrap_or(SKILL_ACTIVATION_THRESHOLD);
         let kw_scores = self.keyword_scores(message, catalog);
         let mut scored: Vec<(&Arc<SkillPackage>, f64)> = Vec::new();
 
@@ -128,7 +135,7 @@ impl SkillRouter {
             };
 
             let blended = kw_score * 0.7 + sem_score * 0.3;
-            if blended >= SKILL_ACTIVATION_THRESHOLD {
+            if blended >= threshold {
                 scored.push((pkg, blended));
             }
         }
@@ -200,7 +207,7 @@ mod tests {
     fn test_select_orchestrator_falls_back_to_general() {
         let catalog = make_test_catalog();
         let router = SkillRouter::new(&catalog);
-        let selected = router.select_orchestrator("hello there!", &catalog);
+        let selected = router.select_orchestrator("hello there!", &catalog, None);
         assert_eq!(selected.name, "general");
     }
 
@@ -208,7 +215,7 @@ mod tests {
     fn test_select_orchestrator_only_returns_orchestrators() {
         let catalog = make_test_catalog();
         let router = SkillRouter::new(&catalog);
-        let selected = router.select_orchestrator("search the web for me", &catalog);
+        let selected = router.select_orchestrator("search the web for me", &catalog, None);
         assert_eq!(selected.skill_type, SkillType::Orchestrator);
     }
 
@@ -222,13 +229,13 @@ mod tests {
         let catalog = SkillCatalog::discover_sync(&[source]).unwrap();
         let router = SkillRouter::new(&catalog);
 
-        let pkg = router.select_orchestrator("weekly report", &catalog);
+        let pkg = router.select_orchestrator("weekly report", &catalog, None);
         assert_eq!(
             pkg.name, "task-management",
             "weekly report should route to task-management"
         );
 
-        let pkg = router.select_orchestrator("finance report", &catalog);
+        let pkg = router.select_orchestrator("finance report", &catalog, None);
         assert_eq!(
             pkg.name, "finance-management",
             "finance report should route to finance-management"

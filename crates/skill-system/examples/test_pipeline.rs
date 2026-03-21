@@ -48,7 +48,7 @@ fn main() {
     let mut pass = 0;
     let mut fail = 0;
     for (msg, expected) in &test_messages {
-        let selected = router.select_orchestrator(msg, &catalog);
+        let selected = router.select_orchestrator(msg, &catalog, None);
         let status = if selected.name == *expected {
             pass += 1;
             "PASS"
