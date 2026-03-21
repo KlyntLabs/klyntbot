@@ -1,3 +1,4 @@
+import { KnowledgeTrustWidget } from "@features/autotuner";
 import { useMutation } from "@shared/hooks/useMutation";
 import { invalidateQueries, useQuery } from "@shared/hooks/useQuery";
 import { Play, Plus, Trash2 } from "lucide-react";
@@ -160,6 +161,8 @@ export function MemoryTab() {
 
   return (
     <div className="space-y-6">
+      <KnowledgeTrustWidget />
+
       {/* UserModel Summary Cards */}
       <div>
         <h2 className="text-[13px] font-medium text-muted-foreground mb-3">User Model</h2>

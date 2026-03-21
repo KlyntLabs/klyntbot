@@ -643,12 +643,33 @@ mod tests {
         repo.create_trial(&trial).await.unwrap();
 
         // Insert 3 shadow log rows with control_mode = 'pending' initially
-        insert_test_shadow_log(&repo, "trial-cr", "chat-cr-1", "direct", "pending", "pending")
-            .await;
-        insert_test_shadow_log(&repo, "trial-cr", "chat-cr-2", "direct", "pending", "pending")
-            .await;
-        insert_test_shadow_log(&repo, "trial-cr", "chat-cr-3", "direct", "pending", "pending")
-            .await;
+        insert_test_shadow_log(
+            &repo,
+            "trial-cr",
+            "chat-cr-1",
+            "direct",
+            "pending",
+            "pending",
+        )
+        .await;
+        insert_test_shadow_log(
+            &repo,
+            "trial-cr",
+            "chat-cr-2",
+            "direct",
+            "pending",
+            "pending",
+        )
+        .await;
+        insert_test_shadow_log(
+            &repo,
+            "trial-cr",
+            "chat-cr-3",
+            "direct",
+            "pending",
+            "pending",
+        )
+        .await;
 
         // Back-fill ground truth so control_mode != 'pending'
         repo.update_shadow_log_ground_truth("chat-cr-1", "general", "direct")

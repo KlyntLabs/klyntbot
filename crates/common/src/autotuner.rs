@@ -29,11 +29,11 @@ pub struct TrialParams {
     // and the service is restarted. Shadow scoring cannot evaluate these — they are
     // "promotion-time" params, not "per-message" params.
     pub accumulate_promote_threshold: Option<usize>, // default 5, bounds [2, 15]
-    pub accumulate_min_days: Option<usize>,           // default 3, bounds [1, 10]
+    pub accumulate_min_days: Option<usize>,          // default 3, bounds [1, 10]
 
     // Phase 2: Vector search
-    pub vector_top_k: Option<usize>,    // default 30, bounds [10, 100]
-    pub min_similarity: Option<f64>,    // default 0.55, bounds [0.30, 0.80]
+    pub vector_top_k: Option<usize>, // default 30, bounds [10, 100]
+    pub min_similarity: Option<f64>, // default 0.55, bounds [0.30, 0.80]
 
     // Phase 2: Remaining 3 relevance weights (completes the 6-factor set)
     pub relevance_weight_importance: Option<f64>, // default 0.15, bounds [0.05, 0.40]

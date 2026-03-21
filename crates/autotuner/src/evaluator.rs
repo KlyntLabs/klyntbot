@@ -55,6 +55,8 @@ pub struct ConstraintEvaluator {
     max_retrieval_precision_drop: f64,
     /// correction_rate must not increase by more than this absolute amount (protects Phase 1 gains).
     max_correction_rate_increase: f64,
+    /// promotion_accuracy must not drop by more than this absolute amount.
+    max_promotion_accuracy_drop: f64,
 }
 
 impl ConstraintEvaluator {
@@ -68,6 +70,7 @@ impl ConstraintEvaluator {
             max_memory_relevance_decrease: config.max_memory_relevance_decrease,
             max_retrieval_precision_drop: config.max_retrieval_precision_drop,
             max_correction_rate_increase: config.max_correction_rate_increase,
+            max_promotion_accuracy_drop: config.max_promotion_accuracy_drop,
         }
     }
 
@@ -219,6 +222,23 @@ impl ConstraintEvaluator {
             }
         }
 
+        // --- Phase 2: promotion accuracy must not drop > threshold ---
+        if baseline.promotion_accuracy > 0.0 {
+            let accuracy_drop = baseline.promotion_accuracy - trial.promotion_accuracy;
+            if accuracy_drop > self.max_promotion_accuracy_drop {
+                failures.push(ConstraintFailure {
+                    metric: "promotion_accuracy".into(),
+                    threshold: self.max_promotion_accuracy_drop,
+                    actual: accuracy_drop,
+                    description: format!(
+                        "promotion_accuracy dropped by {:.1}% but max allowed is {:.1}%",
+                        accuracy_drop * 100.0,
+                        self.max_promotion_accuracy_drop * 100.0,
+                    ),
+                });
+            }
+        }
+
         ConstraintVerdict { failures }
     }
 }
@@ -256,7 +276,9 @@ fn trial_params_as_array(p: &TrialParams) -> [f64; 16] {
         p.relevance_weight_retrievability.unwrap_or(0.0),
         p.relevance_weight_situation.unwrap_or(0.0),
         p.fsrs_desired_retention.unwrap_or(0.0),
-        p.accumulate_promote_threshold.map(|v| v as f64).unwrap_or(0.0),
+        p.accumulate_promote_threshold
+            .map(|v| v as f64)
+            .unwrap_or(0.0),
         p.accumulate_min_days.map(|v| v as f64).unwrap_or(0.0),
         p.vector_top_k.map(|v| v as f64).unwrap_or(0.0),
         p.min_similarity.unwrap_or(0.0),
@@ -478,6 +500,32 @@ mod tests {
         assert!(
             dist_far > dist_close,
             "Expected far ({dist_far:.4}) > close ({dist_close:.4})",
+        );
+    }
+
+    #[test]
+    fn fails_when_promotion_accuracy_drops() {
+        let evaluator = default_evaluator();
+        let b = TrialResult {
+            promotion_accuracy: 0.90,
+            ..baseline()
+        };
+
+        // Drops from 0.90 to 0.80 = 0.10 drop, max allowed 0.05
+        let trial = TrialResult {
+            correction_rate: 0.18,
+            promotion_accuracy: 0.80,
+            ..b.clone()
+        };
+
+        let verdict = evaluator.evaluate(&trial, &b);
+        assert!(
+            verdict
+                .failures
+                .iter()
+                .any(|f| f.metric == "promotion_accuracy"),
+            "Expected promotion_accuracy failure, got: {:?}",
+            verdict.failures,
         );
     }
 }

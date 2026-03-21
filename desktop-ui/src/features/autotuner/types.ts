@@ -46,3 +46,20 @@ export interface ParamChange {
   old_value: number;
   new_value: number;
 }
+
+export interface MemoryHealthResponse {
+  overall: number;
+  domains: DomainHealthEntry[];
+  totalFacts90d: number;
+  fastFailures90d: number;
+  trendPct: number | null;
+  computedAt: string;
+}
+
+export interface DomainHealthEntry {
+  domain: string;
+  score: number;
+  totalFacts: number;
+  activeFacts: number;
+  fastFailures: number;
+}

@@ -221,6 +221,29 @@ pub struct RuleCreateParams {
     pub confidence: f64,
 }
 
+// ── Knowledge Trust DTOs ────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MemoryHealthResponse {
+    pub overall: f64,
+    pub domains: Vec<DomainHealthEntry>,
+    pub total_facts_90d: i64,
+    pub fast_failures_90d: i64,
+    pub trend_pct: Option<f64>,
+    pub computed_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DomainHealthEntry {
+    pub domain: String,
+    pub score: f64,
+    pub total_facts: i64,
+    pub active_facts: i64,
+    pub fast_failures: i64,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CompactionResultResponse {

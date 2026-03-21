@@ -75,4 +75,6 @@ pub struct MetricSnapshot {
     pub retrieval_recall: f64,
     // Phase 2: average age (days) of retrieved memories
     pub memory_freshness: f64,
+    // Phase 2: fact extraction quality (1.0 - fast_failure_rate)
+    pub promotion_accuracy: f64,
 }

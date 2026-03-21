@@ -13,6 +13,7 @@ pub struct AgentMetricCollector {
     event_log_repo: cognitive::EventLogRepo,
     usage_repo: storage::UsageRepo,
     trial_repo: storage::TrialRepo,
+    fact_repo: cognitive::SemanticFactRepo,
 }
 
 impl AgentMetricCollector {
@@ -21,12 +22,14 @@ impl AgentMetricCollector {
         event_log_repo: cognitive::EventLogRepo,
         usage_repo: storage::UsageRepo,
         trial_repo: storage::TrialRepo,
+        fact_repo: cognitive::SemanticFactRepo,
     ) -> Self {
         Self {
             strategy_repo,
             event_log_repo,
             usage_repo,
             trial_repo,
+            fact_repo,
         }
     }
 }
@@ -49,12 +52,16 @@ impl MetricSource for AgentMetricCollector {
             memory_relevance_opt,
             per_trial_correction,
             phase2_metrics,
+            fact_health_result,
         ) = tokio::join!(
             self.strategy_repo.get_stats_since(since),
             self.event_log_repo
                 .count_by_event_type("UserCorrectedAI", since),
-            self.event_log_repo
-                .count_by_event_type_and_data("UserCorrectedAI", "memory_miss", since),
+            self.event_log_repo.count_by_event_type_and_data(
+                "UserCorrectedAI",
+                "memory_miss",
+                since
+            ),
             async {
                 let tokens = self.usage_repo.total_tokens_since(since).await.unwrap_or(0);
                 let (reqs, _) = self
@@ -95,8 +102,15 @@ impl MetricSource for AgentMetricCollector {
                     (0.0, 0.0)
                 }
             },
+            // Fact health (Knowledge Trust) for promotion_accuracy
+            self.fact_repo.fact_health_by_domain(90),
         );
         let (retrieval_precision, memory_freshness) = phase2_metrics;
+
+        let promotion_accuracy = match fact_health_result {
+            Ok(ref domains) => cognitive::DomainHealthRow::average_health(domains),
+            _ => 1.0,
+        };
 
         let stats = stats.map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         let correction_count = correction_count.unwrap_or(0);
@@ -142,6 +156,7 @@ impl MetricSource for AgentMetricCollector {
             retrieval_precision,
             retrieval_recall,
             memory_freshness,
+            promotion_accuracy,
         })
     }
 }
@@ -159,8 +174,13 @@ mod tests {
         let usage_repo = storage::UsageRepo::new(inner.clone());
         let trial_repo = storage::TrialRepo::new(inner.clone());
         trial_repo.migrate().await.unwrap();
-        let collector =
-            AgentMetricCollector::new(strategy_repo, event_log_repo, usage_repo, trial_repo);
+        let collector = AgentMetricCollector::new(
+            strategy_repo,
+            event_log_repo,
+            usage_repo,
+            trial_repo,
+            cognitive::SemanticFactRepo::new(inner.clone()),
+        );
 
         let since = Utc::now() - chrono::Duration::days(1);
         let snapshot = collector.collect_metrics(since, None).await.unwrap();
@@ -325,8 +345,13 @@ mod tests {
             .await
             .unwrap();
 
-        let collector =
-            AgentMetricCollector::new(strategy_repo, event_log_repo, usage_repo, trial_repo);
+        let collector = AgentMetricCollector::new(
+            strategy_repo,
+            event_log_repo,
+            usage_repo,
+            trial_repo,
+            cognitive::SemanticFactRepo::new(inner.clone()),
+        );
 
         // ── System-wide fallback (trial_id = None) ───────────────────────
         let snapshot_system = collector.collect_metrics(since, None).await.unwrap();

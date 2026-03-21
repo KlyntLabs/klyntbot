@@ -651,8 +651,8 @@ impl AgentLoopBuilder {
             }
             let memory_service = Arc::new(retriever);
             memory_service_for_shadow = Some(Arc::clone(&memory_service));
-            let retriever: Arc<dyn context_engine::MemoryRetriever> = memory_service
-                as Arc<dyn context_engine::MemoryRetriever>;
+            let retriever: Arc<dyn context_engine::MemoryRetriever> =
+                memory_service as Arc<dyn context_engine::MemoryRetriever>;
 
             // Create InsightForge with the same retriever
             let forge_config = context_engine::InsightForgeConfig {

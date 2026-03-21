@@ -47,6 +47,13 @@ pub async fn cognitive_memory_stats(
     state.cognitive_memory_stats().await
 }
 
+#[tauri::command]
+pub async fn memory_health(
+    state: State<'_, Arc<AppCore>>,
+) -> Result<MemoryHealthResponse, ApiError> {
+    state.memory_health().await
+}
+
 // ── Coaching Reads ──────────────────────────────────────────────────────
 
 #[tauri::command]
@@ -246,6 +253,7 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "coaching_clear_signals",
     "coaching_submit_feedback",
     "coaching_report_ignored",
+    "memory_health",
 ];
 
 #[cfg(debug_assertions)]
@@ -326,6 +334,7 @@ pub(crate) async fn dispatch_dev(
             core.coaching_report_ignored(dev::get(body, "intervention_id").unwrap_or_default())
                 .await,
         ),
+        "memory_health" => dev::val(core.memory_health().await),
         _ => return None,
     })
 }

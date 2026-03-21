@@ -26,6 +26,7 @@ CREATE INDEX IF NOT EXISTS idx_semantic_facts_domain ON semantic_facts(domain);
 CREATE INDEX IF NOT EXISTS idx_semantic_facts_subject ON semantic_facts(subject, predicate);
 CREATE INDEX IF NOT EXISTS idx_semantic_facts_active ON semantic_facts(valid_until) WHERE valid_until IS NULL;
 CREATE INDEX IF NOT EXISTS idx_semantic_facts_scope ON semantic_facts(scope_type, scope_id);
+CREATE INDEX IF NOT EXISTS idx_semantic_facts_recorded_at ON semantic_facts(recorded_at);
 
 CREATE TABLE IF NOT EXISTS episodic_memories (
     id              TEXT PRIMARY KEY,

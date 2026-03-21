@@ -39,6 +39,8 @@ pub const EXPERIMENT_PACE_KEY: &str = "autotuner_experiment_pace";
 pub const RECOMMENDATION_KEY: &str = "autotuner_recommendation";
 /// Key used to persist the promotion toast count for the desktop UI.
 pub const TOAST_COUNT_KEY: &str = "autotuner_promotion_toast_count";
+/// Key used to persist a Knowledge Trust score snapshot for trend computation.
+pub const KNOWLEDGE_TRUST_SNAPSHOT_KEY: &str = "knowledge_trust_snapshot";
 
 /// Thin glue that holds the current champion state and exposes it to the
 /// agent runtime.  The nightly cycle updates the champion via
@@ -604,11 +606,8 @@ pub async fn run_bootstrap_replay(orch: &AutoTunerOrchestrator) -> common::Resul
 
     // 6. Build the shadow classifier.
     let config = config::OrchestratorConfig::default();
-    let classifier = shadow_classifier::AgentShadowClassifier::new(
-        orch.provider.clone(),
-        &orch.model,
-        &config,
-    );
+    let classifier =
+        shadow_classifier::AgentShadowClassifier::new(orch.provider.clone(), &orch.model, &config);
 
     // 7. For each session's user messages, run shadow classification and compare
     //    against ground truth strategy_records (matched by chat_id + timestamp ±30s).
@@ -630,10 +629,7 @@ pub async fn run_bootstrap_replay(orch: &AutoTunerOrchestrator) -> common::Resul
             .unwrap_or(&session.key)
             .to_string();
 
-        let user_messages: Vec<_> = messages
-            .iter()
-            .filter(|m| m.role == "user")
-            .collect();
+        let user_messages: Vec<_> = messages.iter().filter(|m| m.role == "user").collect();
 
         for msg in &user_messages {
             let shadow_ctx = autotuner::ShadowContext {
@@ -686,7 +682,9 @@ pub async fn run_bootstrap_replay(orch: &AutoTunerOrchestrator) -> common::Resul
         } else {
             0.0
         };
-        acc_b.partial_cmp(&acc_a).unwrap_or(std::cmp::Ordering::Equal)
+        acc_b
+            .partial_cmp(&acc_a)
+            .unwrap_or(std::cmp::Ordering::Equal)
     });
 
     // Need at least one scored variant.

@@ -239,11 +239,7 @@ impl AppCore {
         let orch = self
             .autotuner_orchestrator()
             .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "AutoTuner is not enabled"))?;
-        let count = match orch
-            .learning_state_repo()
-            .get_value(TOAST_COUNT_KEY)
-            .await
-        {
+        let count = match orch.learning_state_repo().get_value(TOAST_COUNT_KEY).await {
             Ok(Some(val)) => val.as_i64().unwrap_or(0),
             _ => 0,
         };
@@ -254,11 +250,7 @@ impl AppCore {
         let orch = self
             .autotuner_orchestrator()
             .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "AutoTuner is not enabled"))?;
-        let current = match orch
-            .learning_state_repo()
-            .get_value(TOAST_COUNT_KEY)
-            .await
-        {
+        let current = match orch.learning_state_repo().get_value(TOAST_COUNT_KEY).await {
             Ok(Some(val)) => val.as_i64().unwrap_or(0),
             _ => 0,
         };

@@ -570,6 +570,7 @@ fn run_desktop_app() {
             commands::cognitive::cognitive_episodic_list,
             commands::cognitive::cognitive_rules_list,
             commands::cognitive::cognitive_memory_stats,
+            commands::cognitive::memory_health,
             commands::cognitive::coaching_situation,
             commands::cognitive::coaching_signals,
             commands::cognitive::coaching_patterns,

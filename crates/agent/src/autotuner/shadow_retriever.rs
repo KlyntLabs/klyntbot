@@ -6,8 +6,8 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use autotuner::{ShadowContext, ShadowRetrievalResult, ShadowRetriever};
 use chrono::{DateTime, Utc};
-use common::TrialParams;
 use cognitive::UnifiedMemoryService;
+use common::TrialParams;
 
 /// Shadow retriever backed by the agent's [`UnifiedMemoryService`].
 ///

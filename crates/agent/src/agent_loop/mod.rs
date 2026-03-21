@@ -856,28 +856,27 @@ impl AgentLoop {
         // counter before setup_session mutates the session. Mirrors the two-phase
         // lock pattern in process_message: first lock decrements cooldown + captures
         // last assistant; second lock gates the emit.
-        let (last_assistant_content, cooldown_after_decrement) = if let Ok(session_arc) =
-            self.session_manager.get_or_create(&session_key, None).await
-        {
-            let mut session = session_arc.lock().await;
-            let last_asst = if correction_strength.is_some() || is_memory_miss {
-                session
-                    .messages
-                    .iter()
-                    .rev()
-                    .find(|m| m.role == "assistant")
-                    .map(|m| m.content.clone())
+        let (last_assistant_content, cooldown_after_decrement) =
+            if let Ok(session_arc) = self.session_manager.get_or_create(&session_key, None).await {
+                let mut session = session_arc.lock().await;
+                let last_asst = if correction_strength.is_some() || is_memory_miss {
+                    session
+                        .messages
+                        .iter()
+                        .rev()
+                        .find(|m| m.role == "assistant")
+                        .map(|m| m.content.clone())
+                } else {
+                    None
+                };
+                if session.correction_cooldown > 0 {
+                    session.correction_cooldown -= 1;
+                }
+                let cd = session.correction_cooldown;
+                (last_asst, cd)
             } else {
-                None
+                (None, 0)
             };
-            if session.correction_cooldown > 0 {
-                session.correction_cooldown -= 1;
-            }
-            let cd = session.correction_cooldown;
-            (last_asst, cd)
-        } else {
-            (None, 0)
-        };
 
         // Emit correction signal (rate-limited: max 1 keyword correction per 3 messages)
         let correction_emitted = if let Some(strength) = correction_strength {

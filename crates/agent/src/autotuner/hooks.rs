@@ -121,7 +121,10 @@ impl AutoTunerHook for AutoTunerHookImpl {
                 serde_json::from_str(&trial.params)
                     .map(|p| (trial, p))
                     .map_err(|e| {
-                        warn!("autotuner hook: failed to parse trial {} params: {e}", trial.id);
+                        warn!(
+                            "autotuner hook: failed to parse trial {} params: {e}",
+                            trial.id
+                        );
                         e
                     })
                     .ok()
@@ -200,8 +203,11 @@ impl AutoTunerHook for AutoTunerHookImpl {
                         return;
                     }
                 };
-                let control_id_set: HashSet<&str> =
-                    control_result.memory_ids.iter().map(|s| s.as_str()).collect();
+                let control_id_set: HashSet<&str> = control_result
+                    .memory_ids
+                    .iter()
+                    .map(|s| s.as_str())
+                    .collect();
 
                 for (trial, params) in &parsed_trials {
                     if !params.has_memory_params() {
@@ -236,7 +242,10 @@ impl AutoTunerHook for AutoTunerHookImpl {
                         )
                         .await
                     {
-                        warn!("failed to insert shadow retrieval log for trial {}: {e}", trial.id);
+                        warn!(
+                            "failed to insert shadow retrieval log for trial {}: {e}",
+                            trial.id
+                        );
                     }
                 }
             }
