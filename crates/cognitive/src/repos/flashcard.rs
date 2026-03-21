@@ -197,6 +197,31 @@ impl FlashcardRepo {
         Ok(rows)
     }
 
+    /// Get the next review card for an atom: due card first, fallback to most recent.
+    pub async fn next_for_atom(
+        &self,
+        atom_id: &str,
+    ) -> Result<Option<FlashcardRow>, sqlx::Error> {
+        let now = Utc::now().to_rfc3339();
+        // Single query: prioritize due cards, then fall back to most recently created
+        sqlx::query_as::<_, FlashcardRow>(
+            r#"
+            SELECT * FROM flashcards
+            WHERE atom_id = ?1
+              AND suspended = 0
+            ORDER BY
+                CASE WHEN due_at IS NULL OR due_at <= ?2 THEN 0 ELSE 1 END,
+                due_at ASC,
+                created_at DESC
+            LIMIT 1
+            "#,
+        )
+        .bind(atom_id)
+        .bind(&now)
+        .fetch_optional(&self.pool)
+        .await
+    }
+
     /// Fetch cards in `deck` that are due for review.
     pub async fn get_due_cards(
         &self,

@@ -11,7 +11,6 @@ export function KnowledgeAtomsPanel({ noteId }: KnowledgeAtomsPanelProps) {
 
   const totalCount = activeAtoms.length + suggestedAtoms.length;
 
-  if (loading && totalCount === 0) return null;
   if (totalCount === 0) return null;
 
   return (

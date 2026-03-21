@@ -1,7 +1,7 @@
 /* TipTap editor styles */
 
 .editor-content {
-  padding: 1.75rem 2rem;
+  padding: 0.75rem 2rem;
   outline: none;
   min-height: 100%;
   color: var(--color-primary);

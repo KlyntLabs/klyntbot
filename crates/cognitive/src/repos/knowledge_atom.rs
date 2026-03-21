@@ -233,7 +233,7 @@ impl KnowledgeAtomRepo {
             .await
     }
 
-    /// Update retention metrics after a flashcard review.
+    /// Update retention metrics after a flashcard review. Also touches last_interaction_ts.
     pub async fn update_retention(
         &self,
         id: &str,
@@ -248,6 +248,7 @@ impl KnowledgeAtomRepo {
             SET retention_pct = ?2,
                 stability = ?3,
                 difficulty = ?4,
+                last_interaction_ts = ?5,
                 updated_at = ?5
             WHERE id = ?1
             "#,
@@ -335,13 +336,30 @@ impl KnowledgeAtomRepo {
 
     /// Recompute aggregates for all topics.
     pub async fn update_all_topic_aggregates(&self) -> Result<(), sqlx::Error> {
-        let topics = sqlx::query_as::<_, KnowledgeTopicRow>("SELECT * FROM knowledge_topics")
-            .fetch_all(&self.pool)
-            .await?;
-        for topic in &topics {
-            self.update_topic_aggregates(&topic.id).await?;
+        let topic_ids: Vec<(String,)> =
+            sqlx::query_as("SELECT id FROM knowledge_topics")
+                .fetch_all(&self.pool)
+                .await?;
+        for (id,) in &topic_ids {
+            self.update_topic_aggregates(id).await?;
         }
         Ok(())
+    }
+
+    /// Check migration status: (migrated, atom_count).
+    pub async fn migration_status(&self) -> Result<(bool, usize), sqlx::Error> {
+        let sentinel: Option<(String,)> =
+            sqlx::query_as("SELECT id FROM knowledge_atoms WHERE subject = '__atoms_migration_v1__'")
+                .fetch_optional(&self.pool)
+                .await?;
+
+        let count: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM knowledge_atoms WHERE subject != '__atoms_migration_v1__'",
+        )
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok((sentinel.is_some(), count.0 as usize))
     }
 }
 

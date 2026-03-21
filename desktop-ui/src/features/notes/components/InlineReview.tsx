@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ipc } from "@shared/hooks/useIpc";
 import { invalidateQueries } from "@shared/hooks/useQuery";
+import type { ReviewQuality } from "../hooks/useFlashcards";
 import { fetchNextCard, type FlashcardForReview } from "../hooks/useKnowledgeAtoms";
 
 interface InlineReviewProps {
@@ -8,13 +9,11 @@ interface InlineReviewProps {
   onDone: () => void;
 }
 
-type ReviewQuality = "again" | "hard" | "good" | "easy";
-
 export function InlineReview({ atomId, onDone }: InlineReviewProps) {
   const [card, setCard] = useState<FlashcardForReview | null>(null);
   const [loading, setLoading] = useState(true);
   const [revealed, setRevealed] = useState(false);
-  const [rating, setRating] = useState(false);
+  const [isSubmitting, setRating] = useState(false);
   const startTimeRef = useRef(Date.now());
 
   useEffect(() => {
@@ -34,7 +33,7 @@ export function InlineReview({ atomId, onDone }: InlineReviewProps) {
 
   const handleRate = useCallback(
     async (quality: ReviewQuality) => {
-      if (!card || rating) return;
+      if (!card || isSubmitting) return;
       setRating(true);
       const recallSpeedMs = Date.now() - startTimeRef.current;
       try {
@@ -46,7 +45,7 @@ export function InlineReview({ atomId, onDone }: InlineReviewProps) {
         onDone();
       }
     },
-    [card, rating, onDone],
+    [card, isSubmitting, onDone],
   );
 
   if (loading) {
@@ -101,8 +100,8 @@ export function InlineReview({ atomId, onDone }: InlineReviewProps) {
                 key={q}
                 type="button"
                 onClick={() => handleRate(q)}
-                disabled={rating}
-                className={`rounded-md px-2 py-1 text-[10px] font-medium transition-colors disabled:opacity-50 ${ratingStyle(q)}`}
+                disabled={isSubmitting}
+                className={`rounded-md px-2 py-1 text-[10px] font-medium transition-colors disabled:opacity-50 ${isSubmittingStyle(q)}`}
               >
                 {q.charAt(0).toUpperCase() + q.slice(1)}
               </button>
@@ -114,7 +113,7 @@ export function InlineReview({ atomId, onDone }: InlineReviewProps) {
   );
 }
 
-function ratingStyle(quality: ReviewQuality): string {
+function isSubmittingStyle(quality: ReviewQuality): string {
   switch (quality) {
     case "again":
       return "bg-red-500/15 text-red-400 hover:bg-red-500/25";

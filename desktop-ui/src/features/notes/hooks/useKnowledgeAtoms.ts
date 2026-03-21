@@ -82,9 +82,7 @@ export function useAtomActions(noteId: string | null) {
 
   const acceptAll = useCallback(
     async (atoms: KnowledgeAtomResponse[]) => {
-      for (const atom of atoms) {
-        await acceptMutate({ atomId: atom.id } as never);
-      }
+      await Promise.all(atoms.map((atom) => acceptMutate({ atomId: atom.id } as never)));
       invalidate();
     },
     [acceptMutate, invalidate],

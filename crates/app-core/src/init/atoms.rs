@@ -59,21 +59,21 @@ pub async fn migrate_vocab_to_atoms(pool: &SqlitePool) -> common::Result<usize> 
         facts.len()
     );
 
+    let domain = "language:unknown".to_string();
+    let topic = atom_repo
+        .get_or_create_topic("Migrated Vocabulary", &domain)
+        .await
+        .map_err(map_db)?;
+
     let mut count = 0;
     for fact in &facts {
-        let domain = "language:unknown".to_string();
-        let topic = atom_repo
-            .get_or_create_topic(&domain, &domain)
-            .await
-            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
-
         let note_id = parse_note_source(&fact.source);
 
         let atom = atom_repo
             .create(&NewKnowledgeAtom {
                 subject: fact.subject.clone(),
                 atom_type: "vocabulary".to_string(),
-                domain,
+                domain: domain.clone(),
                 source_note_id: note_id,
                 source_context: Some(fact.object.clone()),
                 semantic_fact_id: Some(fact.id.clone()),
@@ -84,7 +84,7 @@ pub async fn migrate_vocab_to_atoms(pool: &SqlitePool) -> common::Result<usize> 
                 ..Default::default()
             })
             .await
-            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            .map_err(map_db)?;
 
         // Link existing flashcard if found
         if let Err(e) = sqlx::query(

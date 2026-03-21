@@ -88,22 +88,25 @@ impl AppCore {
 
         // Emit AtomFlashcardReviewed if card is linked to an atom
         if let Some(atom_id) = &card.atom_id {
+            // FSRS-5: R(t) = (1 + t/(9*S))^(-1). Just-reviewed card → t≈0 → R≈1.0.
+            // Use 0.9 (desired retention) as a conservative estimate for the stored metric.
+            let retention_pct = 0.9_f64;
+
             if let Some(bus) = &self.domain_event_bus {
                 let _ = bus.publish(bus::DomainEvent::AtomFlashcardReviewed {
                     atom_id: atom_id.clone(),
                     card_id: card.id.clone(),
                     quality: quality as u8,
                     recall_speed_ms: params.recall_speed_ms.unwrap_or(0) as u64,
-                    new_retention_pct: card.stability, // stability approximates retention
+                    new_retention_pct: retention_pct,
                     source_note_id: card.source_note_id.clone(),
                 });
             }
-            // Update atom retention from card metrics
+            // Update atom retention + touch last_interaction_ts in one DB call
             if let Some(atom_repo) = &self.knowledge_atom_repo {
                 let _ = atom_repo
-                    .update_retention(atom_id, card.stability, card.stability, card.difficulty)
+                    .update_retention(atom_id, retention_pct, card.stability, card.difficulty)
                     .await;
-                let _ = atom_repo.touch(atom_id).await;
             }
         }
 

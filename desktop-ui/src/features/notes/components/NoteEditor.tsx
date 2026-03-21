@@ -35,6 +35,7 @@ interface NoteEditorProps {
   onGenerateCards?: (selectedText?: string) => void;
   splitMode?: SplitMode | null;
   onSplitModeChange?: (mode: SplitMode | null) => void;
+  editorFocusRef?: React.MutableRefObject<(() => void) | undefined>;
 }
 
 export function NoteEditor({
@@ -47,6 +48,7 @@ export function NoteEditor({
   onGenerateCards,
   splitMode,
   onSplitModeChange,
+  editorFocusRef,
 }: NoteEditorProps) {
   const activeSplitMode = splitMode ?? (note.splitMode as SplitMode | null);
   const navigate = useNavigate();
@@ -169,6 +171,13 @@ export function NoteEditor({
 
   // Resolve entity mentions and wiki links — grays out non-existent references
   useEntityResolution(editor);
+
+  // Expose focus function to parent (for title → editor transition)
+  useEffect(() => {
+    if (editorFocusRef && editor) {
+      editorFocusRef.current = () => editor.commands.focus();
+    }
+  }, [editor, editorFocusRef]);
 
   // ── Annotation & Perspective hooks ────────────────────────────────
   const { annotations, createAnnotation, updateAnnotation, deleteAnnotation } = useAnnotations(
@@ -384,36 +393,6 @@ export function NoteEditor({
   return (
     <div className="flex-1 flex gap-2 min-w-0 min-h-0">
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
-        {/* Controls bar */}
-        <div className="px-2 pb-0 shrink-0">
-          <EditorToolbar
-            editor={editor}
-            vimEnabled={vimEnabled}
-            vimMode={vimMode}
-            onToggleVim={toggleVim}
-            onOpenLinkDialog={() => setLinkDialog({ type: "link", isOpen: true })}
-            onOpenImageDialog={() => setLinkDialog({ type: "image", isOpen: true })}
-            onGenerateCards={onGenerateCards}
-            onToggleSplitMode={onSplitModeChange ? handleToggleSplitMode : undefined}
-            splitModeActive={!!activeSplitMode}
-            onToggleFocusMode={onToggleFocusMode}
-            onToggleGraphMode={() => onViewModeChange(viewMode === "graph" ? "editor" : "graph")}
-            onToggleVersionHistory={() => setShowHistory(!showHistory)}
-            focusModeActive={focusModeActive}
-            graphModeActive={viewMode === "graph"}
-            versionHistoryActive={showHistory}
-          />
-        </div>
-
-        {/* Gradient separator */}
-        <div
-          className="h-[2px] mx-2 mt-2 shrink-0"
-          style={{
-            background:
-              "linear-gradient(90deg, transparent 0%, var(--brand) 30%, rgba(167, 139, 250, 0.6) 50%, var(--brand) 70%, transparent 100%)",
-          }}
-        />
-
         {/* Content: body */}
         <EditorContextMenu
           onAnnotate={handleAnnotate}
@@ -467,6 +446,36 @@ export function NoteEditor({
         {editor && <SlashMenu editor={editor} />}
         {editor && <WikiLinkMenu editor={editor} currentNoteTitle={note.title} />}
         {editor && <EntityMentionMenu editor={editor} />}
+
+        {/* Gradient separator */}
+        <div
+          className="h-[2px] mx-2 mb-2 shrink-0"
+          style={{
+            background:
+              "linear-gradient(90deg, transparent 0%, var(--brand) 30%, rgba(167, 139, 250, 0.6) 50%, var(--brand) 70%, transparent 100%)",
+          }}
+        />
+
+        {/* Controls bar */}
+        <div className="px-2 pt-0 shrink-0">
+          <EditorToolbar
+            editor={editor}
+            vimEnabled={vimEnabled}
+            vimMode={vimMode}
+            onToggleVim={toggleVim}
+            onOpenLinkDialog={() => setLinkDialog({ type: "link", isOpen: true })}
+            onOpenImageDialog={() => setLinkDialog({ type: "image", isOpen: true })}
+            onGenerateCards={onGenerateCards}
+            onToggleSplitMode={onSplitModeChange ? handleToggleSplitMode : undefined}
+            splitModeActive={!!activeSplitMode}
+            onToggleFocusMode={onToggleFocusMode}
+            onToggleGraphMode={() => onViewModeChange(viewMode === "graph" ? "editor" : "graph")}
+            onToggleVersionHistory={() => setShowHistory(!showHistory)}
+            focusModeActive={focusModeActive}
+            graphModeActive={viewMode === "graph"}
+            versionHistoryActive={showHistory}
+          />
+        </div>
       </div>
 
       {showHistory && <NoteVersionHistory noteId={note.id} onRestore={handleRestore} />}

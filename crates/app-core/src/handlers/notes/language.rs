@@ -222,7 +222,7 @@ impl AppCore {
                     }
                 }
 
-                // Emit events
+                // Emit events (atoms are created as "active" — no separate Accepted event needed)
                 if let Some(bus) = &self.domain_event_bus {
                     for atom in &created_atoms {
                         let _ = bus.publish(bus::DomainEvent::KnowledgeAtomCreated {
@@ -231,10 +231,6 @@ impl AppCore {
                             domain: atom.domain.clone(),
                             source_note_id: atom.source_note_id.clone(),
                             personal_importance: atom.personal_importance,
-                        });
-                        let _ = bus.publish(bus::DomainEvent::KnowledgeAtomAccepted {
-                            atom_id: atom.id.clone(),
-                            atom_type: atom.atom_type.clone(),
                         });
                     }
                 }
