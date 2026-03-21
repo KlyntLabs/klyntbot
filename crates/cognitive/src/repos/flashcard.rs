@@ -222,6 +222,28 @@ impl FlashcardRepo {
         .await
     }
 
+    /// Find existing card fronts in a deck (for dedup before batch create).
+    pub async fn find_existing_fronts(
+        &self,
+        deck: &str,
+        fronts: &[String],
+    ) -> Result<std::collections::HashSet<String>, sqlx::Error> {
+        let mut existing = std::collections::HashSet::new();
+        for front in fronts {
+            let row: Option<(String,)> = sqlx::query_as(
+                "SELECT front FROM flashcards WHERE front = ?1 AND deck = ?2 LIMIT 1",
+            )
+            .bind(front)
+            .bind(deck)
+            .fetch_optional(&self.pool)
+            .await?;
+            if let Some((f,)) = row {
+                existing.insert(f);
+            }
+        }
+        Ok(existing)
+    }
+
     /// Fetch cards in `deck` that are due for review.
     pub async fn get_due_cards(
         &self,

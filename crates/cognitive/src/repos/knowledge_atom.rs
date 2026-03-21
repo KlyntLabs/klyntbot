@@ -142,6 +142,28 @@ impl KnowledgeAtomRepo {
         Ok(rows)
     }
 
+    /// Find existing atom subjects in a domain (for dedup before batch create).
+    pub async fn find_existing_subjects(
+        &self,
+        domain: &str,
+        subjects: &[String],
+    ) -> Result<std::collections::HashSet<String>, sqlx::Error> {
+        let mut existing = std::collections::HashSet::new();
+        for subject in subjects {
+            let row: Option<(String,)> = sqlx::query_as(
+                "SELECT subject FROM knowledge_atoms WHERE subject = ?1 AND domain = ?2 AND status != 'archived' LIMIT 1",
+            )
+            .bind(subject)
+            .bind(domain)
+            .fetch_optional(&self.pool)
+            .await?;
+            if let Some((s,)) = row {
+                existing.insert(s);
+            }
+        }
+        Ok(existing)
+    }
+
     pub async fn get(&self, id: &str) -> Result<Option<KnowledgeAtomRow>, sqlx::Error> {
         sqlx::query_as::<_, KnowledgeAtomRow>("SELECT * FROM knowledge_atoms WHERE id = ?1")
             .bind(id)

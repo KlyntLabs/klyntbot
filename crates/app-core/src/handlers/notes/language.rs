@@ -130,9 +130,20 @@ impl AppCore {
         let sf_repo = SemanticFactRepo::new(self.storage_pool.inner().clone());
 
         let now = chrono::Utc::now().to_rfc3339();
+
+        // Dedup: skip words that already have flashcards in this deck
+        let fronts: Vec<String> = params.words.iter().map(|w| w.word.clone()).collect();
+        let existing_fronts = flashcard_repo
+            .find_existing_fronts(&params.deck, &fronts)
+            .await
+            .unwrap_or_default();
+
         let mut new_cards = Vec::new();
 
         for item in &params.words {
+            if existing_fronts.contains(&item.word) {
+                continue; // Skip duplicate
+            }
             let vocab_data = serde_json::json!({
                 "word": item.word,
                 "reading": item.reading,
@@ -197,8 +208,17 @@ impl AppCore {
                 .await
                 .ok();
 
+            // Dedup: skip words that already have atoms in this domain
+            let existing_atom_subjects = atom_repo
+                .find_existing_subjects(&domain, &fronts)
+                .await
+                .unwrap_or_default();
+
             let mut new_atoms = Vec::new();
             for item in &params.words {
+                if existing_atom_subjects.contains(&item.word) {
+                    continue; // Skip duplicate atom
+                }
                 let vocab_metadata = serde_json::json!({
                     "word": item.word,
                     "reading": item.reading,
