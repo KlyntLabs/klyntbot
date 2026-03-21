@@ -40,55 +40,49 @@ export function AtomCard({ atom, onAccept, onDismiss, onReviewDone }: AtomCardPr
 
   return (
     <div
-      className={`rounded-lg border px-3 py-2 transition-colors ${
-        isSuggested ? "border-border/50 opacity-70" : "border-border bg-surface-base"
+      className={`flex items-center gap-2 rounded-md px-2 py-1 transition-colors ${
+        isSuggested ? "opacity-60" : "hover:bg-surface-hover"
       }`}
     >
-      <div className="flex items-center justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <span className="text-xs font-medium text-primary truncate block">{atom.subject}</span>
-          {atom.sourceContext && (
-            <span className="text-[10px] text-muted truncate block mt-0.5">
-              {atom.sourceContext.slice(0, 60)}
-            </span>
-          )}
-        </div>
+      {/* Subject + context on one line */}
+      <span className="text-xs font-medium text-primary truncate min-w-0 flex-1">
+        {atom.subject}
+      </span>
 
-        <div className="flex items-center gap-1.5 shrink-0">
-          {/* Retention badge */}
-          <span
-            className={`rounded-full px-1.5 py-0.5 text-[9px] font-medium ${retentionBg(atom.retentionPct)} ${retentionColor(atom.retentionPct)}`}
-          >
-            {Math.round(atom.retentionPct * 100)}%
-          </span>
+      {/* Right side: retention + action */}
+      <div className="flex items-center gap-1 shrink-0">
+        <span
+          className={`text-[9px] font-medium tabular-nums ${retentionColor(atom.retentionPct)}`}
+        >
+          {Math.round(atom.retentionPct * 100)}%
+        </span>
 
-          {isSuggested ? (
-            <>
-              <button
-                type="button"
-                onClick={() => onAccept?.(atom.id)}
-                className="rounded bg-brand/15 px-1.5 py-0.5 text-[10px] font-medium text-brand hover:bg-brand/25 transition-colors"
-              >
-                Accept
-              </button>
-              <button
-                type="button"
-                onClick={() => onDismiss?.(atom.id)}
-                className="text-muted hover:text-primary text-[10px] transition-colors"
-              >
-                ✕
-              </button>
-            </>
-          ) : (
+        {isSuggested ? (
+          <>
             <button
               type="button"
-              onClick={() => setIsReviewing(true)}
-              className="rounded bg-purple-500/15 px-1.5 py-0.5 text-[10px] font-medium text-purple-400 hover:bg-purple-500/25 transition-colors"
+              onClick={() => onAccept?.(atom.id)}
+              className="rounded px-1.5 py-0.5 text-[9px] font-medium text-brand hover:bg-brand/15 transition-colors"
             >
-              Review
+              +
             </button>
-          )}
-        </div>
+            <button
+              type="button"
+              onClick={() => onDismiss?.(atom.id)}
+              className="text-muted hover:text-primary text-[9px] transition-colors px-0.5"
+            >
+              ✕
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setIsReviewing(true)}
+            className="rounded px-1.5 py-0.5 text-[9px] font-medium text-purple-400 hover:bg-purple-500/15 transition-colors"
+          >
+            Review
+          </button>
+        )}
       </div>
     </div>
   );

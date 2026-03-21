@@ -14,9 +14,9 @@ export function KnowledgeAtomsPanel({ noteId }: KnowledgeAtomsPanelProps) {
   if (totalCount === 0) return null;
 
   return (
-    <div className="border-b border-border px-3 py-3">
+    <div className="border-b border-border px-3 py-2">
       {/* Header */}
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center justify-between mb-1">
         <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
           Knowledge Atoms ({totalCount})
         </span>
@@ -33,7 +33,7 @@ export function KnowledgeAtomsPanel({ noteId }: KnowledgeAtomsPanelProps) {
 
       {/* Active atoms */}
       {activeAtoms.length > 0 && (
-        <div className="space-y-1">
+        <div className="-mx-1">
           {activeAtoms.map((atom) => (
             <AtomCard key={atom.id} atom={atom} onReviewDone={refetch} />
           ))}
@@ -44,12 +44,12 @@ export function KnowledgeAtomsPanel({ noteId }: KnowledgeAtomsPanelProps) {
       {suggestedAtoms.length > 0 && (
         <>
           {activeAtoms.length > 0 && (
-            <div className="my-2 border-t border-border/50" />
+            <div className="my-1 border-t border-border/30" />
           )}
-          <span className="text-[9px] text-muted-foreground uppercase tracking-wider mb-1 block">
+          <span className="text-[9px] text-muted-foreground uppercase tracking-wider mb-0.5 block px-1">
             Suggested
           </span>
-          <div className="space-y-1">
+          <div className="-mx-1">
             {suggestedAtoms.map((atom) => (
               <AtomCard
                 key={atom.id}
