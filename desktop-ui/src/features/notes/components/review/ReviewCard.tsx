@@ -7,6 +7,7 @@ import { GradeActions } from "./GradeActions";
 import { GradeDisplay } from "./GradeDisplay";
 import { MultipleChoiceInput } from "./MultipleChoiceInput";
 import { SelfGradeInput } from "./SelfGradeInput";
+import { SocraticPanel } from "./SocraticPanel";
 import { TypedAnswerInput } from "./TypedAnswerInput";
 import { VoiceInput } from "./VoiceInput";
 
@@ -15,6 +16,7 @@ interface ReviewCardProps {
   cardPhase: CardPhase;
   mode: AnswerMode;
   gradeResult: GradeResult | null;
+  lastAnswer: string;
   onSubmitAnswer: (answer: string) => void;
   onConfirmRating: (quality?: ReviewQuality) => void;
   onExplain: () => void;
@@ -57,6 +59,7 @@ export function ReviewCard({
   cardPhase,
   mode,
   gradeResult,
+  lastAnswer,
   onSubmitAnswer,
   onConfirmRating,
   onExplain,
@@ -94,6 +97,13 @@ export function ReviewCard({
               onSaveInsight={onSaveInsight}
               onJumpToSource={onJumpToSource}
             />
+            {cardPhase === "socratic" && (
+              <SocraticPanel
+                cardId={card.id}
+                userAnswer={lastAnswer}
+                gradeExplanation={gradeResult.explanation ?? ""}
+              />
+            )}
           </>
         )}
     </div>

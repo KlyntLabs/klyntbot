@@ -21,6 +21,7 @@ interface ActiveReviewState {
   queue: Flashcard[];
   currentIndex: number;
   gradeResult: GradeResult | null;
+  lastAnswer: string;
   selectedMode: AnswerMode;
   selectedDeck: string | null;
   sessionId: string;
@@ -39,6 +40,7 @@ function initialState(): ActiveReviewState {
     queue: [],
     currentIndex: 0,
     gradeResult: null,
+    lastAnswer: "",
     selectedMode: "auto",
     selectedDeck: null,
     sessionId: makeSessionId(),
@@ -94,7 +96,13 @@ export function useActiveReview() {
       if (nextIndex >= prev.queue.length) {
         return { ...prev, phase: "complete", cardPhase: "answering", currentIndex: nextIndex };
       }
-      return { ...prev, currentIndex: nextIndex, cardPhase: "answering", gradeResult: null };
+      return {
+        ...prev,
+        currentIndex: nextIndex,
+        cardPhase: "answering",
+        gradeResult: null,
+        lastAnswer: "",
+      };
     });
   }
 
@@ -168,7 +176,7 @@ export function useActiveReview() {
           statsRef.current.weakCards.push({ front: current.front, score: result.score ?? 0 });
         }
 
-        patchState({ gradeResult: result, cardPhase: "graded" });
+        patchState({ gradeResult: result, cardPhase: "graded", lastAnswer: text });
       } catch (e: unknown) {
         patchState({
           cardPhase: "answering",
@@ -235,6 +243,7 @@ export function useActiveReview() {
     current,
     remaining,
     gradeResult: state.gradeResult,
+    lastAnswer: state.lastAnswer,
     selectedMode: state.selectedMode,
     selectedDeck: state.selectedDeck,
     sessionId: state.sessionId,

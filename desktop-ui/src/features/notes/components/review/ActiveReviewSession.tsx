@@ -20,6 +20,7 @@ export function ActiveReviewSession({ layout: _layout, onClose }: ActiveReviewSe
     current,
     remaining,
     gradeResult,
+    lastAnswer,
     selectedMode,
     avgScore,
     error,
@@ -190,6 +191,7 @@ export function ActiveReviewSession({ layout: _layout, onClose }: ActiveReviewSe
         cardPhase={cardPhase}
         mode={selectedMode}
         gradeResult={gradeResult}
+        lastAnswer={lastAnswer}
         onSubmitAnswer={submitAnswer}
         onConfirmRating={confirmRating}
         onExplain={requestExplanation}
