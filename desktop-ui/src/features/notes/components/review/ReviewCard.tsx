@@ -1,4 +1,6 @@
+import { ipc } from "@shared/hooks/useIpc";
 import type { AnswerMode, GradeResult } from "@shared/types/notes";
+import { useEffect, useState } from "react";
 import type { CardPhase } from "../../hooks/useActiveReview";
 import type { Flashcard, ReviewQuality } from "../../hooks/useFlashcards";
 import { CardFront } from "./CardFront";
@@ -17,6 +19,7 @@ interface ReviewCardProps {
   mode: AnswerMode;
   gradeResult: GradeResult | null;
   lastAnswer: string;
+  propagationCount?: number;
   onSubmitAnswer: (answer: string) => void;
   onConfirmRating: (quality?: ReviewQuality) => void;
   onExplain: () => void;
@@ -25,41 +28,13 @@ interface ReviewCardProps {
   onSelfRate: (quality: ReviewQuality) => void;
 }
 
-function AnswerInput({
-  card,
-  mode,
-  onSubmit,
-  onSelfRate,
-}: {
-  card: Flashcard;
-  mode: AnswerMode;
-  onSubmit: (answer: string) => void;
-  onSelfRate: (quality: ReviewQuality) => void;
-}) {
-  switch (mode) {
-    case "self_grade":
-      return <SelfGradeInput card={card} onRate={onSelfRate} />;
-    case "multiple_choice":
-      return <MultipleChoiceInput correctAnswer={card.back} distractors={[]} onSelect={onSubmit} />;
-    case "cloze_fill": {
-      const clozeText = card.cardType === "cloze" ? card.front : card.front;
-      return <ClozeInput clozeText={clozeText} onSubmit={onSubmit} />;
-    }
-    case "voice":
-      return <VoiceInput onSubmit={onSubmit} />;
-    case "typed":
-    case "auto":
-    default:
-      return <TypedAnswerInput onSubmit={onSubmit} />;
-  }
-}
-
 export function ReviewCard({
   card,
   cardPhase,
   mode,
   gradeResult,
   lastAnswer,
+  propagationCount = 0,
   onSubmitAnswer,
   onConfirmRating,
   onExplain,
@@ -67,15 +42,59 @@ export function ReviewCard({
   onJumpToSource,
   onSelfRate,
 }: ReviewCardProps) {
+  const [distractors, setDistractors] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (mode !== "multiple_choice" || cardPhase !== "answering") return;
+    setDistractors([]);
+    ipc<{ distractors: string[]; cached: boolean }>("flashcard_generate_distractors", {
+      cardId: card.id,
+      count: 3,
+    })
+      .then((res) => setDistractors(res.distractors))
+      .catch(() => setDistractors([]));
+  }, [mode, card.id, cardPhase]);
+
+  function renderAnswerInput() {
+    switch (mode) {
+      case "self_grade":
+        return <SelfGradeInput card={card} onRate={onSelfRate} />;
+      case "multiple_choice":
+        if (distractors.length === 0) {
+          return (
+            <div className="flex items-center gap-2 py-3 justify-center">
+              <span className="text-[10px] text-dim">Generating options...</span>
+              <span className="w-3 h-3 rounded-full border border-accent/40 border-t-accent animate-spin" />
+            </div>
+          );
+        }
+        return (
+          <MultipleChoiceInput
+            correctAnswer={card.back}
+            distractors={distractors}
+            onSelect={onSubmitAnswer}
+          />
+        );
+      case "cloze_fill": {
+        const clozeText = card.cardType === "cloze" ? card.front : card.front;
+        return <ClozeInput clozeText={clozeText} onSubmit={onSubmitAnswer} />;
+      }
+      case "voice":
+        return <VoiceInput onSubmit={onSubmitAnswer} />;
+      case "typed":
+      case "auto":
+      default:
+        return <TypedAnswerInput onSubmit={onSubmitAnswer} />;
+    }
+  }
+
   return (
     <div className="flex flex-col gap-3">
       {/* Card front — always visible */}
       <CardFront card={card} />
 
       {/* Answer input — shown during answering phase */}
-      {cardPhase === "answering" && (
-        <AnswerInput card={card} mode={mode} onSubmit={onSubmitAnswer} onSelfRate={onSelfRate} />
-      )}
+      {cardPhase === "answering" && renderAnswerInput()}
 
       {/* Grading spinner */}
       {cardPhase === "grading" && (
@@ -89,7 +108,7 @@ export function ReviewCard({
       {(cardPhase === "graded" || cardPhase === "socratic" || cardPhase === "confirming") &&
         gradeResult && (
           <>
-            <GradeDisplay result={gradeResult} />
+            <GradeDisplay result={gradeResult} propagationCount={propagationCount} />
             <GradeActions
               result={gradeResult}
               onConfirm={onConfirmRating}

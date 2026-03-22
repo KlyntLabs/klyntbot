@@ -1,7 +1,9 @@
 import type { GradeResult } from "@shared/types/notes";
+import { PropagationRipple } from "./PropagationRipple";
 
 interface GradeDisplayProps {
   result: GradeResult;
+  propagationCount?: number;
 }
 
 function scoreBadgeClass(score: number | null): string {
@@ -17,7 +19,7 @@ function scoreLabel(score: number | null): string {
   return `${Math.round(score * 100)}%`;
 }
 
-export function GradeDisplay({ result }: GradeDisplayProps) {
+export function GradeDisplay({ result, propagationCount = 0 }: GradeDisplayProps) {
   const { score, diffHighlights, expectedAnswer, explanation, socraticSuggestion } = result;
 
   return (
@@ -73,6 +75,9 @@ export function GradeDisplay({ result }: GradeDisplayProps) {
           <p className="mt-1.5 text-muted-foreground leading-relaxed">{socraticSuggestion}</p>
         </details>
       )}
+
+      {/* Propagation ripple */}
+      <PropagationRipple count={propagationCount} />
     </div>
   );
 }

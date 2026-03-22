@@ -23,6 +23,7 @@ export function ActiveReviewSession({ layout: _layout, onClose }: ActiveReviewSe
     lastAnswer,
     selectedMode,
     avgScore,
+    stats,
     error,
     fetchDecks,
     startReview,
@@ -192,6 +193,7 @@ export function ActiveReviewSession({ layout: _layout, onClose }: ActiveReviewSe
         mode={selectedMode}
         gradeResult={gradeResult}
         lastAnswer={lastAnswer}
+        propagationCount={stats.current.propagationCount}
         onSubmitAnswer={submitAnswer}
         onConfirmRating={confirmRating}
         onExplain={requestExplanation}
