@@ -60,15 +60,16 @@ impl NoteIntent {
     /// Resolve effective intent from note override + notebook default.
     /// When notebook_intent is None (orphan note with no notebook), defaults to Study.
     pub fn effective(note_override: Option<&str>, notebook_intent: Option<&str>) -> Self {
-        let raw = note_override.or(notebook_intent).unwrap_or("study");
+        let raw = note_override.or(notebook_intent).unwrap_or("capture");
         match raw {
+            "study" => Self::Study,
             "research" => Self::Research,
-            "capture" => Self::Capture,
-            // Deliberate catch-all: any unrecognized value (typo, future intent added
-            // to DB before Rust enum is updated) falls back to Study. The CHECK
-            // constraint prevents invalid values in normal operation; this is a
-            // defensive fallback, not silent error swallowing.
-            _ => Self::Study,
+            // Deliberate catch-all: orphan notes (no notebook) and any unrecognized
+            // value fall back to Capture — minimal interference by default. The CHECK
+            // constraint prevents invalid values in normal operation; this fallback
+            // ensures orphans (quick dumps, imported notes) don't silently trigger
+            // atom extraction.
+            _ => Self::Capture,
         }
     }
 }
@@ -80,7 +81,7 @@ New fields on `NoteRow` and `NotebookRow`:
 - `Note` domain model gains `intent: NoteIntent` (resolved at load time)
 - `Notebook` domain model gains `intent: NoteIntent`
 
-Orphan notes (no notebook, `notebook_id = NULL`) resolve to `Study` by default. The `LEFT JOIN` in `resolve_note_intent` returns `NULL` for `nb.intent` which maps to `None` in the Rust signature.
+Orphan notes (no notebook, `notebook_id = NULL`) resolve to `Capture` by default — minimal interference. Quick dumps, imported meeting notes, and "just write this down" moments don't trigger atom extraction. The `LEFT JOIN` in `resolve_note_intent` returns `NULL` for `nb.intent` which maps to `None` → `Capture` in the Rust signature.
 
 #### IPC contract changes (desktop-shared)
 
@@ -120,9 +121,9 @@ Both `NoteResponse` and `NotebookResponse` in `desktop-shared/src/commands/notes
 
 | Tab | Data Source | Description |
 |-----|------------|-------------|
+| Cross-domain Links | Entity overlap + vector similarity + +/-7 day temporal window | Results grouped by domain: Finance, Episodic, Notes, Tasks/Projects. **First tab** — the "aha" connection moment. |
 | Evidence Map | `note_entity_mentions` + `EntityRepo` relationships + backlinks | Entity graph with relationships, mention counts, and source notes |
 | Source Trail | `note_links` (wikilinks) + `get_backlinks_with_context()` | Provenance chain showing cites/cited-by with context snippets |
-| Cross-domain Links | Entity overlap + vector similarity + +/-7 day temporal window | Results grouped by domain: Finance, Episodic, Notes, Tasks/Projects |
 | Risks, Gaps & Next Steps | Entity graph holes + dead wikilinks + sparse connections | Actionable items with suggested actions: "Create note", "Link transaction", "Create task" |
 
 **LLM-driven (opt-in via "Deepen with AI" button):**
@@ -319,6 +320,10 @@ What's the purpose of this notebook?
 ```
 
 Default: Study. Light inference from title: titles containing "analysis", "review", "Q2", "project", "research" pre-select Research with "Recommended for analysis" badge.
+
+#### Editor toolbar conditioning
+
+The "Generate Cards" button in the editor toolbar is only visible when `effectiveIntent === 'study'`. Research and Capture users don't see flashcard noise — reinforces the promise that non-study intents are free from learning machinery. If a user overrides a research note to study, the button appears immediately.
 
 #### Sidebar hints
 
