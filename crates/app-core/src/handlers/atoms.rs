@@ -148,7 +148,7 @@ impl AppCore {
         }
 
         if let Some(bus) = &self.domain_event_bus {
-            let _ = bus.publish(DomainEvent::KnowledgeAtomAccepted {
+            bus.publish(DomainEvent::KnowledgeAtomAccepted {
                 atom_id: atom.id.clone(),
                 atom_type: atom.atom_type.clone(),
             });
@@ -169,7 +169,7 @@ impl AppCore {
         repo.dismiss(&params.atom_id).await.map_err(map_db)?;
 
         if let Some(bus) = &self.domain_event_bus {
-            let _ = bus.publish(DomainEvent::KnowledgeAtomArchived {
+            bus.publish(DomainEvent::KnowledgeAtomArchived {
                 atom_id: params.atom_id.clone(),
                 reason: "user_dismissed".to_string(),
             });
@@ -237,7 +237,7 @@ impl AppCore {
             }
 
             if let Some(bus) = &self.domain_event_bus {
-                let _ = bus.publish(DomainEvent::KnowledgeAtomAccepted {
+                bus.publish(DomainEvent::KnowledgeAtomAccepted {
                     atom_id: atom.id.clone(),
                     atom_type: atom.atom_type.clone(),
                 });

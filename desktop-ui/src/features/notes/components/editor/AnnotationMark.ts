@@ -79,6 +79,14 @@ export const AnnotationMark = Mark.create<AnnotationMarkOptions>({
         window.dispatchEvent(new CustomEvent("editor-action", { detail: { action: "flashcard" } }));
         return true;
       },
+      "Alt-t": () => {
+        window.dispatchEvent(new CustomEvent("editor-action", { detail: { action: "translate" } }));
+        return true;
+      },
+      "Alt-i": () => {
+        window.dispatchEvent(new CustomEvent("editor-action", { detail: { action: "ask-ai" } }));
+        return true;
+      },
     };
   },
 });

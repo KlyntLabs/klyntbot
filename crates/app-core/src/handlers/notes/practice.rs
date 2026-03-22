@@ -382,7 +382,7 @@ impl AppCore {
                 // Emit KnowledgeAtomCreated events
                 if let Some(bus) = &self.domain_event_bus {
                     for atom in &created_atom {
-                        let _ = bus.publish(bus::DomainEvent::KnowledgeAtomCreated {
+                        bus.publish(bus::DomainEvent::KnowledgeAtomCreated {
                             atom_id: atom.id.clone(),
                             atom_type: atom.atom_type.clone(),
                             domain: atom.domain.clone(),
@@ -402,7 +402,7 @@ impl AppCore {
 
         // Emit PracticeUnitCompleted event
         if let Some(bus) = &self.domain_event_bus {
-            let _ = bus.publish(bus::DomainEvent::PracticeUnitCompleted {
+            bus.publish(bus::DomainEvent::PracticeUnitCompleted {
                 session_id: session.id.clone(),
                 note_id: session.note_id.clone(),
                 unit_index: params.index,
@@ -520,7 +520,7 @@ impl AppCore {
 
         // Emit PracticeSessionCompleted event
         if let Some(bus) = &self.domain_event_bus {
-            let _ = bus.publish(bus::DomainEvent::PracticeSessionCompleted {
+            bus.publish(bus::DomainEvent::PracticeSessionCompleted {
                 session_id: session.id.clone(),
                 note_id: session.note_id.clone(),
                 units_completed: results.len() as u32,

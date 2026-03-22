@@ -90,6 +90,7 @@ export function EditorContextMenu({
               </MenuItem>
               <MenuItem
                 onClick={() => onTranslate(selectionTextRef.current, selectionRectRef.current)}
+                shortcut="⌥T"
               >
                 Translate
               </MenuItem>
@@ -110,7 +111,9 @@ export function EditorContextMenu({
           <ContextMenu.Label className="px-2 py-1 text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
             AI Actions
           </ContextMenu.Label>
-          <MenuItem onClick={onAskAI}>Ask AI</MenuItem>
+          <MenuItem onClick={onAskAI} shortcut="⌥I">
+            Ask AI
+          </MenuItem>
         </ContextMenu.Content>
       </ContextMenu.Portal>
     </ContextMenu.Root>

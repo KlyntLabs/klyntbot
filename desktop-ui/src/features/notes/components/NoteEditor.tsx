@@ -191,6 +191,7 @@ export function NoteEditor({
     editor,
     note.id,
     createAnnotation,
+    onGenerateCards,
   );
 
   // ── Quick-translate popup ──────────────────────────────────────────
@@ -305,16 +306,31 @@ export function NoteEditor({
     [deleteAnnotation],
   );
 
-  // Listen for editor-action events (keyboard shortcuts from AnnotationMark)
+  // Listen for editor-action events (keyboard shortcuts from AnnotationMark + vim leader keys)
   useEffect(() => {
     const handler = (e: Event) => {
       const { action } = (e as CustomEvent<{ action: string }>).detail;
-      if (action === "annotate") handleAnnotate();
-      else if (action === "flashcard") handleFlashcard();
+      if (action === "annotate") {
+        handleAnnotate();
+      } else if (action === "flashcard") {
+        handleFlashcard();
+      } else if (action === "translate") {
+        const sel = window.getSelection();
+        const text = sel?.toString().trim() ?? "";
+        if (!text) return;
+        let rect: { top: number; left: number } | undefined;
+        if (sel && sel.rangeCount > 0) {
+          const r = sel.getRangeAt(0).getBoundingClientRect();
+          rect = { top: r.bottom + 8, left: r.left };
+        }
+        handleTranslate(text, rect);
+      } else if (action === "ask-ai") {
+        handleAskAI();
+      }
     };
     window.addEventListener("editor-action", handler);
     return () => window.removeEventListener("editor-action", handler);
-  }, [handleAnnotate, handleFlashcard]);
+  }, [handleAnnotate, handleFlashcard, handleTranslate, handleAskAI]);
 
   // Flush on note change and update editor content
   useEffect(() => {

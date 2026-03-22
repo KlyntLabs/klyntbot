@@ -65,7 +65,7 @@ impl AppCore {
         // Emit TranslationCompleted event
         if let Some(note_id) = &params.note_id {
             if let Some(bus) = &self.domain_event_bus {
-                let _ = bus.publish(bus::DomainEvent::TranslationCompleted {
+                bus.publish(bus::DomainEvent::TranslationCompleted {
                     note_id: note_id.clone(),
                     source_lang: params.source_lang.clone(),
                     target_lang: params.target_lang.clone(),
@@ -259,7 +259,7 @@ impl AppCore {
                 // Emit events (atoms are created as "active" — no separate Accepted event needed)
                 if let Some(bus) = &self.domain_event_bus {
                     for atom in &created_atoms {
-                        let _ = bus.publish(bus::DomainEvent::KnowledgeAtomCreated {
+                        bus.publish(bus::DomainEvent::KnowledgeAtomCreated {
                             atom_id: atom.id.clone(),
                             atom_type: atom.atom_type.clone(),
                             domain: atom.domain.clone(),
@@ -405,7 +405,7 @@ impl AppCore {
         Ok(result)
     }
 
-    /// Quick-translate a short text selection with vocabulary extraction.
+    /// Quick-translate a short text selection (translation only, no vocabulary).
     pub async fn language_quick_translate(
         &self,
         params: QuickTranslateParams,
@@ -416,7 +416,7 @@ impl AppCore {
             .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "LLM provider not configured"))?;
 
         let config = self.config.read().await;
-        let chat_params = providers::cognitive_chat_params(&config, 2048);
+        let chat_params = providers::cognitive_chat_params(&config, 512);
         drop(config);
 
         let system =
@@ -433,28 +433,15 @@ impl AppCore {
             .await
             .map_err(|e| ApiError::new("LLM_ERROR", e.to_string()))?;
 
-        let text = response
+        let translation = response
             .content
-            .ok_or_else(|| ApiError::new("LLM_ERROR", "Empty response from LLM"))?;
+            .ok_or_else(|| ApiError::new("LLM_ERROR", "Empty response from LLM"))?
+            .trim()
+            .to_string();
 
-        let cleaned = common::helpers::strip_llm_fences(&text);
-        let mut result: QuickTranslateResponse = serde_json::from_str(cleaned).map_err(|e| {
-            ApiError::new(
-                "PARSE_ERROR",
-                format!("Failed to parse quick translate response: {e}"),
-            )
-        })?;
-
-        // Mark words as new/known via SemanticFactRepo
-        let sf_repo = SemanticFactRepo::new(self.storage_pool.inner().clone());
-        for word in &mut result.words {
-            let existing = sf_repo
-                .find_vocabulary_by_subject(&word.word)
-                .await
-                .unwrap_or_default();
-            word.is_new = existing.is_empty();
-        }
-
-        Ok(result)
+        Ok(QuickTranslateResponse {
+            translation,
+            words: vec![],
+        })
     }
 }

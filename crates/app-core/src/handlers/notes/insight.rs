@@ -1262,7 +1262,7 @@ async fn run_insight_pipeline(args: InsightPipelineArgs) {
             perspectives,
         };
         let persona_ids: Vec<String> = personas.iter().map(|p| p.id.clone()).collect();
-        match service
+        if let Ok(row) = service
             .store_insight(
                 &note_id,
                 &content,
@@ -1274,20 +1274,17 @@ async fn run_insight_pipeline(args: InsightPipelineArgs) {
             )
             .await
         {
-            Ok(row) => {
-                if let Some(gap_content) = &content.gap_analysis {
-                    let pool = pool.clone();
-                    let note_id = note_id.clone();
-                    let insight_id = row.id.clone();
-                    let gap_content = gap_content.clone();
-                    let bus = domain_event_bus.clone();
-                    tokio::spawn(async move {
-                        create_atoms_from_gaps(&pool, &note_id, &gap_content, &insight_id, &bus)
-                            .await;
-                    });
-                }
+            if let Some(gap_content) = &content.gap_analysis {
+                let pool = pool.clone();
+                let note_id = note_id.clone();
+                let insight_id = row.id.clone();
+                let gap_content = gap_content.clone();
+                let bus = domain_event_bus.clone();
+                tokio::spawn(async move {
+                    create_atoms_from_gaps(&pool, &note_id, &gap_content, &insight_id, &bus)
+                        .await;
+                });
             }
-            Err(_) => {}
         }
     }
 }

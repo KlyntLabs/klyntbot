@@ -93,7 +93,7 @@ impl AppCore {
             let retention_pct = 0.9_f64;
 
             if let Some(bus) = &self.domain_event_bus {
-                let _ = bus.publish(bus::DomainEvent::AtomFlashcardReviewed {
+                bus.publish(bus::DomainEvent::AtomFlashcardReviewed {
                     atom_id: atom_id.clone(),
                     card_id: card.id.clone(),
                     quality: quality as u8,
