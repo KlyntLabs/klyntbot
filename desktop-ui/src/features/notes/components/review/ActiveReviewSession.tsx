@@ -5,6 +5,7 @@ import type { DeckSummary, ReviewQuality } from "../../hooks/useFlashcards";
 import { ModeSelector } from "./ModeSelector";
 import { ReviewCard } from "./ReviewCard";
 import { SessionProgress } from "./SessionProgress";
+import { SessionSummary } from "./SessionSummary";
 
 interface ActiveReviewSessionProps {
   layout: "compact" | "fullscreen";
@@ -158,20 +159,12 @@ export function ActiveReviewSession({ layout: _layout, onClose }: ActiveReviewSe
 
   if (phase === "complete") {
     return (
-      <div className="flex flex-col items-center justify-center gap-3 py-8">
-        <BookOpen size={24} className="text-accent" />
-        <p className="text-[12px] text-foreground font-medium">Review complete!</p>
-        {avgScore != null && (
-          <p className="text-[10px] text-dim">Average score: {Math.round(avgScore * 100)}%</p>
-        )}
-        <button
-          type="button"
-          onClick={onClose}
-          className="text-[10px] px-3 py-1 rounded-md bg-white/[0.06] text-muted-foreground hover:text-foreground"
-        >
-          Done
-        </button>
-      </div>
+      <SessionSummary
+        stats={stats.current}
+        onClose={onClose}
+        onSaveInsight={() => {}}
+        onReviewWeak={() => {}}
+      />
     );
   }
 
