@@ -130,9 +130,10 @@ impl AppCore {
         let seven_days = now + chrono::Duration::days(7);
         let cutoff = seven_days.to_rfc3339();
 
+        #[allow(clippy::unnecessary_map_or)] // is_none_or requires Rust 1.82, MSRV is 1.75
         let prerequisites: Vec<FlashcardResponse> = linked
             .into_iter()
-            .filter(|c| c.due_at.as_deref().is_none_or(|d| d <= cutoff.as_str()))
+            .filter(|c| c.due_at.as_deref().map_or(true, |d| d <= cutoff.as_str()))
             .take(3)
             .map(flashcard_to_response)
             .collect();

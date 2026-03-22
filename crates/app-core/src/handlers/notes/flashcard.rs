@@ -7,6 +7,23 @@ use desktop_shared::commands::{
 };
 use desktop_shared::errors::ApiError;
 
+/// Cosine similarity between two vectors: dot(a,b) / (||a|| * ||b||).
+fn cosine_similarity(a: &[f32], b: &[f32]) -> f64 {
+    let (mut dot, mut norm_a, mut norm_b) = (0.0_f64, 0.0_f64, 0.0_f64);
+    for (x, y) in a.iter().zip(b.iter()) {
+        let (xf, yf) = (*x as f64, *y as f64);
+        dot += xf * yf;
+        norm_a += xf * xf;
+        norm_b += yf * yf;
+    }
+    let denom = norm_a.sqrt() * norm_b.sqrt();
+    if denom == 0.0 {
+        0.0
+    } else {
+        dot / denom
+    }
+}
+
 fn parse_json_col(s: Option<&str>) -> Option<serde_json::Value> {
     s.and_then(|v| serde_json::from_str(v).ok())
 }
@@ -171,9 +188,9 @@ impl AppCore {
         if let (Some(engine), Some(vs)) = (self.embedding_engine.clone(), self.vector_store.clone())
         {
             let row_for_embed = row.clone();
-            let pool_opt = self.flashcard_repo.as_ref().map(|r| r.pool().clone());
+            let repo_opt = self.flashcard_repo.clone();
             tokio::spawn(async move {
-                embed_flashcard_batch(engine, &vs, &[row_for_embed], pool_opt.as_ref()).await;
+                embed_flashcard_batch(engine, &vs, &[row_for_embed], repo_opt.as_ref()).await;
             });
         }
 
@@ -266,26 +283,21 @@ impl AppCore {
             }
         };
 
-        // Search flashcard_embeddings for "{card_id}_back"
+        // Fetch the stored back-side embedding directly by ID
         let back_id = format!("{card_id}_back");
-        let results = match vs
-            .search_similar("flashcard_embeddings", &answer_vec, 5, 0.0)
-            .await
-        {
-            Ok(r) => r,
+        let back_vec = match vs.get_embedding("flashcard_embeddings", &back_id).await {
+            Ok(Some(v)) => v,
+            Ok(None) => {
+                tracing::debug!(card_id, "no back embedding found");
+                return 0.0;
+            }
             Err(e) => {
-                tracing::debug!(card_id, "flashcard embedding search failed: {e}");
+                tracing::debug!(card_id, "flashcard embedding lookup failed: {e}");
                 return 0.0;
             }
         };
 
-        // Find the exact back-side match
-        for (id, score) in &results {
-            if id == &back_id {
-                return score.clamp(0.0, 1.0);
-            }
-        }
-
-        0.0
+        // Compute cosine similarity in-process
+        cosine_similarity(&answer_vec, &back_vec).clamp(0.0, 1.0)
     }
 }

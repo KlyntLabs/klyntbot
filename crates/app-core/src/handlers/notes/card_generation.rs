@@ -33,67 +33,51 @@ use crate::state::AppCore;
 ///
 /// When `pool` is provided, `back_embedding_updated_at` is stamped after a successful
 /// back embedding upsert.
+/// Embed one side (front or back) of a flashcard into `flashcard_embeddings`.
+///
+/// Returns `true` if the embedding was successfully stored.
+async fn embed_one_side(
+    engine: &Arc<EmbeddingEngine>,
+    vector_store: &VectorStore,
+    card_id: &str,
+    text: &str,
+    side: &str,
+) -> bool {
+    let truncated = common::truncate_at_boundary(text, 2000).to_string();
+    match engine.clone().embed_async(truncated).await {
+        Ok(vec) => {
+            let id = format!("{card_id}_{side}");
+            let extras: &[(&str, &str)] = &[("card_id", card_id), ("side", side)];
+            if let Err(e) = vector_store
+                .upsert_embedding("flashcard_embeddings", &id, &vec, extras)
+                .await
+            {
+                tracing::warn!(card_id, side, "flashcard embedding upsert failed: {e}");
+                return false;
+            }
+            true
+        }
+        Err(e) => {
+            tracing::warn!(card_id, side, "flashcard embedding failed: {e}");
+            false
+        }
+    }
+}
+
 pub(crate) async fn embed_flashcard_batch(
     engine: Arc<EmbeddingEngine>,
     vector_store: &VectorStore,
     cards: &[cognitive::FlashcardRow],
-    pool: Option<&sqlx::SqlitePool>,
+    repo: Option<&cognitive::FlashcardRepo>,
 ) {
     for card in cards {
         let card_id = card.id.as_str();
 
-        // Embed front
-        {
-            let text = common::truncate_at_boundary(&card.front, 2000).to_string();
-            match engine.clone().embed_async(text).await {
-                Ok(vec) => {
-                    let id = format!("{card_id}_front");
-                    let extras: &[(&str, &str)] = &[("card_id", card_id), ("side", "front")];
-                    if let Err(e) = vector_store
-                        .upsert_embedding("flashcard_embeddings", &id, &vec, extras)
-                        .await
-                    {
-                        tracing::warn!(card_id, "flashcard front embedding upsert failed: {e}");
-                    }
-                }
-                Err(e) => {
-                    tracing::warn!(card_id, "flashcard front embedding failed: {e}");
-                }
-            }
-        }
+        embed_one_side(&engine, vector_store, card_id, &card.front, "front").await;
 
-        // Embed back
-        {
-            let text = common::truncate_at_boundary(&card.back, 2000).to_string();
-            match engine.clone().embed_async(text).await {
-                Ok(vec) => {
-                    let id = format!("{card_id}_back");
-                    let extras: &[(&str, &str)] = &[("card_id", card_id), ("side", "back")];
-                    match vector_store
-                        .upsert_embedding("flashcard_embeddings", &id, &vec, extras)
-                        .await
-                    {
-                        Ok(()) => {
-                            // Stamp the timestamp now that the back embedding is stored.
-                            if let Some(p) = pool {
-                                let now_str = chrono::Utc::now().to_rfc3339();
-                                let _ = sqlx::query(
-                                    "UPDATE flashcards SET back_embedding_updated_at = ?1 WHERE id = ?2",
-                                )
-                                .bind(&now_str)
-                                .bind(card_id)
-                                .execute(p)
-                                .await;
-                            }
-                        }
-                        Err(e) => {
-                            tracing::warn!(card_id, "flashcard back embedding upsert failed: {e}");
-                        }
-                    }
-                }
-                Err(e) => {
-                    tracing::warn!(card_id, "flashcard back embedding failed: {e}");
-                }
+        if embed_one_side(&engine, vector_store, card_id, &card.back, "back").await {
+            if let Some(r) = repo {
+                let _ = r.update_embedding_timestamp(card_id).await;
             }
         }
     }
@@ -258,9 +242,9 @@ impl AppCore {
         if let (Some(engine), Some(vs)) = (self.embedding_engine.clone(), self.vector_store.clone())
         {
             let rows_for_embed = rows.clone();
-            let pool_opt = self.flashcard_repo.as_ref().map(|r| r.pool().clone());
+            let repo_opt = self.flashcard_repo.clone();
             tokio::spawn(async move {
-                embed_flashcard_batch(engine, &vs, &rows_for_embed, pool_opt.as_ref()).await;
+                embed_flashcard_batch(engine, &vs, &rows_for_embed, repo_opt.as_ref()).await;
             });
         }
 

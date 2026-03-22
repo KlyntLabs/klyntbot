@@ -121,21 +121,21 @@ impl AppCore {
 
         // 2. Try exact match
         if let Some(score) = grade_exact_match(&params.user_answer, expected) {
-            return Ok(GradeResultResponse {
-                score: Some(score),
-                suggested_rating: score_to_rating(score).to_string(),
-                grading_method: "exact_match".to_string(),
-                explanation: Some("Exact match!".to_string()),
-                diff_highlights: vec![DiffSegmentResponse {
-                    text: params.user_answer.clone(),
-                    status: "match".to_string(),
-                }],
-                expected_answer: expected.clone(),
-                coaching_nudge: None,
-                socratic_suggestion: None,
-                key_concepts_present: vec![],
-                key_concepts_missing: vec![],
-            });
+            let mut resp = build_response(
+                score,
+                "exact_match",
+                expected,
+                Some("Exact match!".to_string()),
+                None,
+                None,
+                vec![],
+                vec![],
+            );
+            resp.diff_highlights = vec![DiffSegmentResponse {
+                text: params.user_answer.clone(),
+                status: "match".to_string(),
+            }];
+            return Ok(resp);
         }
 
         // 3. Read config thresholds
@@ -152,7 +152,6 @@ impl AppCore {
 
         // 5. Try semantic grading
         if let Some(score) = grade_semantic(cosine_sim, accept_threshold, fail_threshold) {
-            let rating = score_to_rating(score);
             let explanation = if score >= 0.85 {
                 format!(
                     "Semantically very close (similarity: {:.2}). Auto-accepted.",
@@ -165,31 +164,16 @@ impl AppCore {
                 )
             };
 
-            // Publish knowledge atom event for low-scoring semantic answers.
-            if score < 0.6 {
-                if let Some(bus) = &self.domain_event_bus {
-                    bus.publish(bus::DomainEvent::KnowledgeAtomCreated {
-                        atom_id: uuid::Uuid::new_v4().to_string(),
-                        atom_type: "flashcard_weak_spot".to_string(),
-                        domain: card.deck.clone(),
-                        source_note_id: card.source_note_id.clone(),
-                        personal_importance: 0.7,
-                    });
-                }
-            }
-
-            return Ok(GradeResultResponse {
-                score: Some(score),
-                suggested_rating: rating.to_string(),
-                grading_method: "semantic".to_string(),
-                explanation: Some(explanation),
-                diff_highlights: vec![],
-                expected_answer: expected.clone(),
-                coaching_nudge: None,
-                socratic_suggestion: None,
-                key_concepts_present: vec![],
-                key_concepts_missing: vec![],
-            });
+            return Ok(build_response(
+                score,
+                "semantic",
+                expected,
+                Some(explanation),
+                None,
+                None,
+                vec![],
+                vec![],
+            ));
         }
 
         // 6. Borderline — call LLM
@@ -205,44 +189,33 @@ impl AppCore {
         let response = match llm_result {
             Ok(result) => {
                 let score = result.score.clamp(0.0, 1.0);
-                let diff_highlights = build_diff_highlights(
-                    &result.key_concepts_present,
-                    &result.key_concepts_missing,
-                );
-
-                GradeResultResponse {
-                    score: Some(score),
-                    suggested_rating: score_to_rating(score).to_string(),
-                    grading_method: "llm".to_string(),
-                    explanation: result.explanation,
-                    diff_highlights,
-                    expected_answer: expected.clone(),
-                    coaching_nudge: result.coaching_nudge,
-                    socratic_suggestion: result.socratic_suggestion,
-                    key_concepts_present: result.key_concepts_present,
-                    key_concepts_missing: result.key_concepts_missing,
-                }
+                build_response(
+                    score,
+                    "llm",
+                    expected,
+                    result.explanation,
+                    result.coaching_nudge,
+                    result.socratic_suggestion,
+                    result.key_concepts_present,
+                    result.key_concepts_missing,
+                )
             }
             Err(_) => {
                 // 7. LLM failure — fall back to semantic score
                 let fallback_score = 0.85 * cosine_sim; // scale down slightly
-                let rating = score_to_rating(fallback_score);
-
-                GradeResultResponse {
-                    score: Some(fallback_score),
-                    suggested_rating: rating.to_string(),
-                    grading_method: "semantic_fallback".to_string(),
-                    explanation: Some(format!(
+                build_response(
+                    fallback_score,
+                    "semantic_fallback",
+                    expected,
+                    Some(format!(
                         "AI grading temporarily unavailable. Score based on semantic similarity ({:.2}).",
                         cosine_sim
                     )),
-                    diff_highlights: vec![],
-                    expected_answer: expected.clone(),
-                    coaching_nudge: None,
-                    socratic_suggestion: None,
-                    key_concepts_present: vec![],
-                    key_concepts_missing: vec![],
-                }
+                    None,
+                    None,
+                    vec![],
+                    vec![],
+                )
             }
         };
 
@@ -397,20 +370,43 @@ Be concise — 2-4 sentences max."#
 
 /// Build diff highlights from key concepts present/missing.
 fn build_diff_highlights(present: &[String], missing: &[String]) -> Vec<DiffSegmentResponse> {
-    let mut highlights = Vec::new();
-    for concept in present {
-        highlights.push(DiffSegmentResponse {
-            text: concept.clone(),
+    present
+        .iter()
+        .map(|c| DiffSegmentResponse {
+            text: c.clone(),
             status: "match".to_string(),
-        });
-    }
-    for concept in missing {
-        highlights.push(DiffSegmentResponse {
-            text: concept.clone(),
+        })
+        .chain(missing.iter().map(|c| DiffSegmentResponse {
+            text: c.clone(),
             status: "missing".to_string(),
-        });
+        }))
+        .collect()
+}
+
+/// Construct a `GradeResultResponse` from common fields.
+#[allow(clippy::too_many_arguments)]
+fn build_response(
+    score: f64,
+    method: &str,
+    expected_answer: &str,
+    explanation: Option<String>,
+    coaching_nudge: Option<String>,
+    socratic_suggestion: Option<String>,
+    key_concepts_present: Vec<String>,
+    key_concepts_missing: Vec<String>,
+) -> GradeResultResponse {
+    GradeResultResponse {
+        score: Some(score),
+        suggested_rating: score_to_rating(score).to_string(),
+        grading_method: method.to_string(),
+        explanation,
+        diff_highlights: build_diff_highlights(&key_concepts_present, &key_concepts_missing),
+        expected_answer: expected_answer.to_string(),
+        coaching_nudge,
+        socratic_suggestion,
+        key_concepts_present,
+        key_concepts_missing,
     }
-    highlights
 }
 
 #[cfg(test)]

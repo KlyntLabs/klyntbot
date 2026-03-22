@@ -44,6 +44,7 @@ export function ReviewCard({
 }: ReviewCardProps) {
   const [distractors, setDistractors] = useState<string[]>([]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: cardPhase intentionally excluded to prevent re-firing on phase transitions
   useEffect(() => {
     if (mode !== "multiple_choice" || cardPhase !== "answering") return;
     setDistractors([]);
@@ -53,7 +54,7 @@ export function ReviewCard({
     })
       .then((res) => setDistractors(res.distractors))
       .catch(() => setDistractors([]));
-  }, [mode, card.id, cardPhase]);
+  }, [mode, card.id]);
 
   function renderAnswerInput() {
     switch (mode) {
@@ -76,7 +77,7 @@ export function ReviewCard({
           />
         );
       case "cloze_fill": {
-        const clozeText = card.cardType === "cloze" ? card.front : card.front;
+        const clozeText = card.front;
         return <ClozeInput clozeText={clozeText} onSubmit={onSubmitAnswer} />;
       }
       case "voice":

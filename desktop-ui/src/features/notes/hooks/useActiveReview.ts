@@ -101,7 +101,7 @@ export function useActiveReview() {
           durationSeconds: Math.round((Date.now() - s.startTime) / 1000),
           modesUsed: Object.keys(s.modeUsage),
           propagationCount: s.propagationCount,
-          weakCardIds: s.weakCards.map((w) => w.front),
+          weakCardIds: s.weakCards.map((w) => w.id),
           sessionData: JSON.stringify(s),
           status,
         });
@@ -203,7 +203,11 @@ export function useActiveReview() {
 
         // Track weak cards (score < 0.6)
         if ((result.score ?? 1) < 0.6) {
-          statsRef.current.weakCards.push({ front: current.front, score: result.score ?? 0 });
+          statsRef.current.weakCards.push({
+            id: current.id,
+            front: current.front,
+            score: result.score ?? 0,
+          });
         }
 
         patchState({ gradeResult: result, cardPhase: "graded", lastAnswer: text });

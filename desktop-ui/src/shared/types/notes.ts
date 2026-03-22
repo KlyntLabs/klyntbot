@@ -25,7 +25,7 @@ export interface SessionStats {
   cardsReviewed: number;
   totalScore: number;
   modeUsage: Record<string, { count: number; totalScore: number }>;
-  weakCards: Array<{ front: string; score: number }>;
+  weakCards: Array<{ id: string; front: string; score: number }>;
   propagationCount: number;
   startTime: number;
 }

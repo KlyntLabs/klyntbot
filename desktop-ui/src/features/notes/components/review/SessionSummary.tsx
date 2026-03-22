@@ -57,6 +57,7 @@ export function SessionSummary({
 
   // ── Timed beats ───────────────────────────────────────────────────────────
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: beats should only trigger once on mount
   useEffect(() => {
     setBeat1(true);
 
@@ -71,7 +72,7 @@ export function SessionSummary({
       clearTimeout(t3);
       clearTimeout(tp);
     };
-  }, [shouldShowPulse]);
+  }, []);
 
   // ── Render ────────────────────────────────────────────────────────────────
 
