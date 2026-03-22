@@ -304,11 +304,14 @@ When a card scores < 0.30 (Again):
 
 ### Propagation visibility
 
-On ~20% of reviews that trigger boosts, show inline in GradeDisplay:
+Show the propagation ripple inline in GradeDisplay:
 "This review quietly strengthened 3 linked concepts across your notes."
 Tap → tiny inline graph preview (2–4 connected nodes). Another tap → full note graph view.
 
-Smart sampling keeps it special — not on every card.
+**Adaptive sampling rate:**
+- First 20 reviews (new user or post-update): show on **40%** of reviews that trigger boosts. The system needs to earn trust by showing the magic early.
+- After 20 reviews: taper to **20%**. The user now trusts the system is working and doesn't need constant proof.
+- Never show on self-grade mode reviews.
 
 ### User controls
 
@@ -476,12 +479,22 @@ interface SessionSummary {
 - "Deepest chain: Stability → Forgetting curve → Interval calculation"
 - "3 weak spots surfaced — [Create coaching session]"
 
-### Reflection Pulse (after Beat 3)
+### Reflection Pulse (after Beat 3, context-aware)
 
-A gentle auto-generated prompt that disappears if ignored:
-> "What felt different about today's answers compared to last week?"
+A gentle auto-generated prompt that disappears if ignored — but only shown when it matters:
 
-User can type 1–2 sentences or tap "Skip." The response becomes a new EpisodicMemory that coaching can reference later ("Last month you said stability felt confusing — today you nailed it").
+**Trigger conditions (any one):**
+- Session avgScore < 0.75 (struggle session — reflection is most valuable here)
+- 7-day review streak reached (milestone moment)
+- Graph strengthened > 5 connections (big web growth)
+- First session after a 3+ day gap (re-entry moment)
+
+**Not shown:** on routine high-score sessions where the user is just cruising. This keeps the magic rare and personal — over-shown magic becomes noise.
+
+**Pre-filled context:** When triggered, the prompt includes a one-sentence cognitive-memory insight:
+> "Last month you said stability felt confusing — today you nailed it. What changed?"
+
+User can type 1–2 sentences or tap "Skip." The response becomes a new EpisodicMemory that coaching can reference later.
 
 ### SessionSummary actions
 
@@ -612,6 +625,34 @@ All existing flashcard commands stay unchanged.
 | Productivity    | Fullscreen sessions = deep work, compact = micro-habits             |
 | Launcher        | "Start focus review on [deck]" quick action                        |
 | Insights        | "Knowledge Web Health" chart from propagation data                  |
+
+---
+
+## First-Review Tutorial Deck
+
+A built-in "Welcome to Active Recall" deck (5 cards) ships with the app. It forces the complete flow on day one so the second-brain promise lands immediately:
+
+**Cards:** Simple, universal knowledge questions (not Klyntbot-specific — e.g., "What is spaced repetition?", "Why does active recall beat passive review?"). Easy enough to answer partially, triggering the full grading + Socratic experience.
+
+**Trigger:** One-tap "Try Active Recall" button on the learning dashboard. Shown:
+- On first launch after the active recall update
+- When a user has zero review history
+- Dismissible ("I'll explore on my own") but gently persistent (shows again next session)
+
+**Flow forces all features:**
+1. Card 1–2: Typed answer → full grading pipeline → diff highlights
+2. Card 3: Socratic suggestion auto-expands (not just collapsible)
+3. Card 4: Graph propagation ripple shown (regardless of sampling rate)
+4. Card 5: Intentionally tricky → likely triggers prerequisite injection
+5. SessionSummary: All three beats + Reflection Pulse (regardless of trigger conditions)
+
+**Inline tooltips on first use** (shown once, never again):
+- On AnswerInput: "Type what you remember — your second brain will verify"
+- On GradeDisplay: "AI-verified, not self-rated — your scheduling just got honest"
+- On PropagationRipple: "Your knowledge web is growing — every review strengthens connected ideas"
+- On Reflection Pulse: "This is meta-learning — your future self will thank you"
+
+The tutorial deck is excluded from stats and streaks. After completion, it can be deleted or kept for reference.
 
 ---
 

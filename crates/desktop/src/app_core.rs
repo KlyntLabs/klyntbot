@@ -228,10 +228,7 @@ fn wire_event_channels(core: &AppCore, channels: EventChannels, app_handle: &tau
                 .and_then(|w| w.is_focused().ok())
                 .unwrap_or(false);
             if !main_focused {
-                if let Some(tray_window) = handle.get_webview_window("tray") {
-                    let _ = tray_window.show();
-                    let _ = tray_window.set_focus();
-                }
+                crate::focus_timer::open_tray_window(handle);
             }
         },
     );
