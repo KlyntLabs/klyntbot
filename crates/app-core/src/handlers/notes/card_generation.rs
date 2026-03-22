@@ -1,10 +1,70 @@
+use std::sync::Arc;
+
 use desktop_shared::commands::{
     FlashcardGenerateParams, FlashcardGenerateResponse, FlashcardResponse,
     FlashcardSaveGeneratedParams, GeneratedCardPreview,
 };
 use desktop_shared::errors::ApiError;
+use storage::VectorStore;
+use tools::embedding_engine::EmbeddingEngine;
 
 use crate::state::AppCore;
+
+/// Embed both front and back of a batch of flashcard rows into `flashcard_embeddings`.
+///
+/// This is fire-and-forget: errors are logged but not propagated.
+/// Each card produces two embedding records with composite IDs:
+///   - `"{card_id}_front"` (side = "front")
+///   - `"{card_id}_back"`  (side = "back")
+pub(crate) async fn embed_flashcard_batch(
+    engine: Arc<EmbeddingEngine>,
+    vector_store: &VectorStore,
+    cards: &[cognitive::FlashcardRow],
+) {
+    for card in cards {
+        let card_id = card.id.as_str();
+
+        // Embed front
+        {
+            let text = common::truncate_at_boundary(&card.front, 2000).to_string();
+            match engine.clone().embed_async(text).await {
+                Ok(vec) => {
+                    let id = format!("{card_id}_front");
+                    let extras: &[(&str, &str)] = &[("card_id", card_id), ("side", "front")];
+                    if let Err(e) = vector_store
+                        .upsert_embedding("flashcard_embeddings", &id, &vec, extras)
+                        .await
+                    {
+                        tracing::warn!(card_id, "flashcard front embedding upsert failed: {e}");
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!(card_id, "flashcard front embedding failed: {e}");
+                }
+            }
+        }
+
+        // Embed back
+        {
+            let text = common::truncate_at_boundary(&card.back, 2000).to_string();
+            match engine.clone().embed_async(text).await {
+                Ok(vec) => {
+                    let id = format!("{card_id}_back");
+                    let extras: &[(&str, &str)] = &[("card_id", card_id), ("side", "back")];
+                    if let Err(e) = vector_store
+                        .upsert_embedding("flashcard_embeddings", &id, &vec, extras)
+                        .await
+                    {
+                        tracing::warn!(card_id, "flashcard back embedding upsert failed: {e}");
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!(card_id, "flashcard back embedding failed: {e}");
+                }
+            }
+        }
+    }
+}
 
 impl AppCore {
     /// Generate flashcard previews from a note or raw text.
@@ -154,6 +214,15 @@ impl AppCore {
             .create_batch(cards)
             .await
             .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?;
+
+        // Fire-and-forget: embed all saved cards in the background.
+        if let (Some(engine), Some(vs)) = (self.embedding_engine.clone(), self.vector_store.clone())
+        {
+            let rows_for_embed = rows.clone();
+            tokio::spawn(async move {
+                embed_flashcard_batch(engine, &vs, &rows_for_embed).await;
+            });
+        }
 
         Ok(rows
             .into_iter()

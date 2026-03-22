@@ -1,3 +1,4 @@
+use crate::handlers::notes::card_generation::embed_flashcard_batch;
 use crate::state::AppCore;
 use cognitive::repos::flashcard::ReviewQuality;
 use desktop_shared::commands::{
@@ -152,6 +153,17 @@ impl AppCore {
             .create_single(card)
             .await
             .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?;
+
+        // Fire-and-forget: embed the newly created card in the background.
+        if let (Some(engine), Some(vs)) =
+            (self.embedding_engine.clone(), self.vector_store.clone())
+        {
+            let row_for_embed = row.clone();
+            tokio::spawn(async move {
+                embed_flashcard_batch(engine, &vs, &[row_for_embed]).await;
+            });
+        }
+
         Ok(flashcard_to_response(row))
     }
 
@@ -215,5 +227,57 @@ impl AppCore {
         repo.total_due_count()
             .await
             .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))
+    }
+
+    /// Compute cosine similarity between a user's answer and the stored back-side
+    /// embedding for a given card.
+    ///
+    /// Returns a score in [0.0, 1.0]. Returns 0.0 if:
+    /// - No embedding engine is available
+    /// - No vector store is available
+    /// - The card has no stored embedding
+    /// - Embedding the user answer fails
+    pub async fn compute_answer_similarity(
+        &self,
+        card_id: &str,
+        user_answer: &str,
+    ) -> f64 {
+        let (Some(engine), Some(vs)) =
+            (self.embedding_engine.clone(), self.vector_store.clone())
+        else {
+            return 0.0;
+        };
+
+        // Embed the user's answer
+        let text = common::truncate_at_boundary(user_answer, 2000).to_string();
+        let answer_vec = match engine.embed_async(text).await {
+            Ok(v) => v,
+            Err(e) => {
+                tracing::debug!(card_id, "answer embedding failed: {e}");
+                return 0.0;
+            }
+        };
+
+        // Search flashcard_embeddings for "{card_id}_back"
+        let back_id = format!("{card_id}_back");
+        let results = match vs
+            .search_similar("flashcard_embeddings", &answer_vec, 5, 0.0)
+            .await
+        {
+            Ok(r) => r,
+            Err(e) => {
+                tracing::debug!(card_id, "flashcard embedding search failed: {e}");
+                return 0.0;
+            }
+        };
+
+        // Find the exact back-side match
+        for (id, score) in &results {
+            if id == &back_id {
+                return score.clamp(0.0, 1.0);
+            }
+        }
+
+        0.0
     }
 }

@@ -126,6 +126,10 @@ impl AppCore {
         } else {
             None
         };
+        // Keep a clone of embedding_engine and vector_store for AppCore fields
+        // (used by flashcard embedding and compute_answer_similarity).
+        let appcore_embedding_engine = Some(Arc::clone(&embedding_engine));
+        let appcore_vector_store = vector_store.clone();
 
         // ── Insight embedder (reuses the same EmbeddingEngine) ──
         let insight_embedder: Arc<dyn feature_insights::InsightEmbedder> =
@@ -277,6 +281,8 @@ impl AppCore {
             activity_ingestion_service: Some(Arc::clone(&activity_svc)),
             event_emitter: event_emitter.unwrap_or_else(|| Arc::new(NoopEmitter)),
             note_embedding_handler,
+            embedding_engine: appcore_embedding_engine,
+            vector_store: appcore_vector_store,
             launcher_engine,
             proactive_handler,
             suggestion_applier,

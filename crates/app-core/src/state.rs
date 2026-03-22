@@ -14,7 +14,7 @@ use feature_notes::repo::{NoteRepo, PracticeSessionRepo};
 use feature_productivity::repos::ProductivityRepos;
 use feature_productivity::{DailyAggregator, FocusManager, NudgeService, ProductivityEngine};
 use scheduling::CronService;
-use storage::{Repos, StoragePool};
+use storage::{Repos, StoragePool, VectorStore};
 use tokio::sync::{broadcast, oneshot, Mutex, RwLock};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info};
@@ -91,6 +91,10 @@ pub struct AppCore {
     /// Note embedding handler for semantic search (None when vector store unavailable).
     pub note_embedding_handler:
         Option<Arc<dyn feature_notes::handlers::embedding::NoteEmbeddingHandler>>,
+    /// Embedding engine for on-demand text embedding (shared across embedding tasks).
+    pub embedding_engine: Option<Arc<tools::embedding_engine::EmbeddingEngine>>,
+    /// LanceDB vector store for semantic similarity search (None when unavailable).
+    pub vector_store: Option<VectorStore>,
     /// Launcher search engine (None when launcher feature is disabled).
     pub launcher_engine: Option<Arc<LauncherSearchEngine>>,
     /// Proactive suggestion handler (None when tasks AI is not configured).

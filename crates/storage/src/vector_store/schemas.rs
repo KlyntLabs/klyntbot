@@ -90,6 +90,16 @@ pub(crate) fn entity_embedding_schema() -> Schema {
     ])
 }
 
+pub(crate) fn flashcard_embedding_schema() -> Schema {
+    Schema::new(vec![
+        Field::new("id", DataType::Utf8, false),
+        vector_field(),
+        Field::new("card_id", DataType::Utf8, false),
+        Field::new("side", DataType::Utf8, false),
+        Field::new("timestamp", DataType::Utf8, false),
+    ])
+}
+
 pub(crate) fn cognitive_fact_schema() -> Schema {
     Schema::new(vec![
         Field::new("id", DataType::Utf8, false),
