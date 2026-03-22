@@ -8,6 +8,7 @@ export interface SessionSummaryProps {
   onClose: () => void;
   onSaveInsight: () => void;
   onReviewWeak: () => void;
+  onSaveReflection?: (text: string) => void;
 }
 
 // ── Score ring helpers ───────────────────────────────────────────────────────
@@ -28,6 +29,7 @@ export function SessionSummary({
   onClose,
   onSaveInsight,
   onReviewWeak,
+  onSaveReflection,
 }: SessionSummaryProps) {
   const [beat1, setBeat1] = useState(false);
   const [beat2, setBeat2] = useState(false);
@@ -193,10 +195,15 @@ export function SessionSummary({
           <div className="flex justify-end">
             <button
               type="button"
-              onClick={() => setPulseDismissed(true)}
+              onClick={() => {
+                if (reflectionText.trim() && onSaveReflection) {
+                  onSaveReflection(reflectionText.trim());
+                }
+                setPulseDismissed(true);
+              }}
               className="text-[9px] text-dim hover:text-muted-foreground"
             >
-              Skip
+              {reflectionText.trim() ? "Save & close" : "Skip"}
             </button>
           </div>
         </div>

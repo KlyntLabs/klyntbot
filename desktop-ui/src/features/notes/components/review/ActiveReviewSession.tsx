@@ -1,3 +1,4 @@
+import { ipc } from "@shared/hooks/useIpc";
 import { BookOpen, X } from "lucide-react";
 import { useCallback, useEffect } from "react";
 import { useActiveReview } from "../../hooks/useActiveReview";
@@ -22,6 +23,7 @@ export function ActiveReviewSession({ layout: _layout, onClose }: ActiveReviewSe
     gradeResult,
     lastAnswer,
     selectedMode,
+    selectedDeck,
     avgScore,
     stats,
     error,
@@ -41,6 +43,36 @@ export function ActiveReviewSession({ layout: _layout, onClose }: ActiveReviewSe
     }
     onClose();
   }, [phase, saveSession, onClose, stats]);
+
+  const handleSaveInsight = useCallback(async () => {
+    const s = stats.current;
+    const avgPct = s.cardsReviewed > 0 ? Math.round((s.totalScore / s.cardsReviewed) * 100) : 0;
+    const weakList = s.weakCards
+      .map((w) => `- ${w.front} (${Math.round(w.score * 100)}%)`)
+      .join("\n");
+    const body = `# Review Session\n\n**Score:** ${avgPct}%\n**Cards:** ${s.cardsReviewed}\n\n${weakList ? `## Weak spots\n${weakList}` : "All cards held strong."}`;
+
+    try {
+      await ipc("note_create", { title: `Review ${new Date().toLocaleDateString()}`, body });
+    } catch {
+      // best-effort
+    }
+  }, [stats]);
+
+  const handleJumpToSource = useCallback(() => {
+    if (current?.sourceNoteId) {
+      window.dispatchEvent(
+        new CustomEvent("navigate-to-note", { detail: { noteId: current.sourceNoteId } }),
+      );
+      handleExit();
+    }
+  }, [current, handleExit]);
+
+  const handleReviewWeak = useCallback(() => {
+    if (selectedDeck) {
+      startReview(selectedDeck);
+    }
+  }, [selectedDeck, startReview]);
 
   // Fetch decks on mount
   useEffect(() => {
@@ -89,12 +121,12 @@ export function ActiveReviewSession({ layout: _layout, onClose }: ActiveReviewSe
           break;
         case "s":
           if (cardPhase === "graded" || cardPhase === "socratic") {
-            // Gap 5 will implement save-insight; no-op for now
+            handleSaveInsight();
           }
           break;
         case "j":
           if (cardPhase === "graded" || cardPhase === "socratic") {
-            // Gap 5 will implement jump-to-source; no-op for now
+            handleJumpToSource();
           }
           break;
         case "Tab":
@@ -109,7 +141,17 @@ export function ActiveReviewSession({ layout: _layout, onClose }: ActiveReviewSe
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [phase, cardPhase, confirmRating, requestExplanation, handleExit, switchMode, selectedMode]);
+  }, [
+    phase,
+    cardPhase,
+    confirmRating,
+    requestExplanation,
+    handleExit,
+    switchMode,
+    selectedMode,
+    handleSaveInsight,
+    handleJumpToSource,
+  ]);
 
   // ── Idle — initial loading state ─────────────────────────────────────────
 
@@ -186,8 +228,18 @@ export function ActiveReviewSession({ layout: _layout, onClose }: ActiveReviewSe
       <SessionSummary
         stats={stats.current}
         onClose={onClose}
-        onSaveInsight={() => {}}
-        onReviewWeak={() => {}}
+        onSaveInsight={handleSaveInsight}
+        onReviewWeak={handleReviewWeak}
+        onSaveReflection={async (text) => {
+          try {
+            await ipc("note_create", {
+              title: `Reflection ${new Date().toLocaleDateString()}`,
+              body: text,
+            });
+          } catch {
+            // best-effort
+          }
+        }}
       />
     );
   }
@@ -224,12 +276,8 @@ export function ActiveReviewSession({ layout: _layout, onClose }: ActiveReviewSe
         onSubmitAnswer={submitAnswer}
         onConfirmRating={confirmRating}
         onExplain={requestExplanation}
-        onSaveInsight={() => {
-          // Task 11 will implement this
-        }}
-        onJumpToSource={() => {
-          // Task 11 will implement this
-        }}
+        onSaveInsight={handleSaveInsight}
+        onJumpToSource={handleJumpToSource}
         onSelfRate={(quality: ReviewQuality) => {
           confirmRating(quality);
         }}
