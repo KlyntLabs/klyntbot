@@ -66,6 +66,94 @@ export const tasksModule: SimulatorModule = {
             count++;
         }
         console.log(`  ${count} tasks created across ${Object.keys(world.projects).length} projects`);
+
+        // Create task groups
+        await client.post<CreateResponse>("group_create", {
+            projectId: world.projects.apiRedesign.id,
+            name: "Sprint 1",
+            color: "#3B82F6",
+        });
+        await client.post<CreateResponse>("group_create", {
+            projectId: world.projects.apiRedesign.id,
+            name: "Sprint 2",
+            color: "#10B981",
+        });
+        await client.post<CreateResponse>("group_create", {
+            projectId: world.projects.parisTrip.id,
+            name: "Before Trip",
+            color: "#F59E0B",
+        });
+        console.log(`  3 task groups created`);
+
+        // Create custom columns
+        const complexityCol = await client.post<CreateResponse>("custom_column_create", {
+            projectId: world.projects.apiRedesign.id,
+            name: "Complexity",
+            columnType: "select",
+            options: ["low", "medium", "high"],
+        });
+        const storyPointsCol = await client.post<CreateResponse>("custom_column_create", {
+            projectId: world.projects.apiRedesign.id,
+            name: "Story Points",
+            columnType: "number",
+        });
+        console.log(`  2 custom columns created`);
+
+        // Set custom column values on API redesign tasks
+        const authTask = world.createdTasks.get("auth-layer");
+        const jwtTask = world.createdTasks.get("jwt-refresh");
+        const rateLimitTask = world.createdTasks.get("rate-limiting");
+        const apiDocsTask = world.createdTasks.get("api-docs");
+
+        if (authTask) {
+            await client.post("custom_column_value_set", {
+                taskId: authTask.id,
+                columnId: complexityCol.id,
+                value: "high",
+            });
+            await client.post("custom_column_value_set", {
+                taskId: authTask.id,
+                columnId: storyPointsCol.id,
+                value: 8,
+            });
+        }
+        if (jwtTask) {
+            await client.post("custom_column_value_set", {
+                taskId: jwtTask.id,
+                columnId: complexityCol.id,
+                value: "high",
+            });
+            await client.post("custom_column_value_set", {
+                taskId: jwtTask.id,
+                columnId: storyPointsCol.id,
+                value: 5,
+            });
+        }
+        if (rateLimitTask) {
+            await client.post("custom_column_value_set", {
+                taskId: rateLimitTask.id,
+                columnId: complexityCol.id,
+                value: "medium",
+            });
+            await client.post("custom_column_value_set", {
+                taskId: rateLimitTask.id,
+                columnId: storyPointsCol.id,
+                value: 3,
+            });
+        }
+        if (apiDocsTask) {
+            await client.post("custom_column_value_set", {
+                taskId: apiDocsTask.id,
+                columnId: complexityCol.id,
+                value: "low",
+            });
+            await client.post("custom_column_value_set", {
+                taskId: apiDocsTask.id,
+                columnId: storyPointsCol.id,
+                value: 2,
+            });
+        }
+        console.log(`  custom column values set on 4 tasks`);
     },
 
     async simulateDay(world, client, day) {

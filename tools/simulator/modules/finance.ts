@@ -96,6 +96,117 @@ export const financeModule: SimulatorModule = {
             category: "entertainment",
         });
         console.log(`  3 budgets created`);
+
+        // Create 2 portfolios
+        const retirement = await client.post<CreateResponse>("finance_portfolio_create", {
+            name: "Retirement 401k",
+            description: "Tax-advantaged retirement",
+            currency: "USD",
+        });
+        const brokeragePortfolio = await client.post<CreateResponse>("finance_portfolio_create", {
+            name: "Brokerage",
+            description: "General investment account",
+            currency: "USD",
+        });
+        console.log(`  2 portfolios created`);
+
+        // Create investments in each portfolio
+        await client.post<CreateResponse>("finance_investment_create", {
+            portfolioId: retirement.id,
+            assetType: "etf",
+            symbol: "VTI",
+            name: "Vanguard Total Stock Market",
+            costBasis: 1500000,
+            quantity: "65.5",
+            currency: "USD",
+        });
+        await client.post<CreateResponse>("finance_investment_create", {
+            portfolioId: retirement.id,
+            assetType: "etf",
+            symbol: "VXUS",
+            name: "Vanguard Total International Stock",
+            costBasis: 800000,
+            quantity: "42.3",
+            currency: "USD",
+        });
+        await client.post<CreateResponse>("finance_investment_create", {
+            portfolioId: retirement.id,
+            assetType: "bond",
+            symbol: "BND",
+            name: "Vanguard Total Bond Market",
+            costBasis: 500000,
+            quantity: "30.0",
+            currency: "USD",
+        });
+        await client.post<CreateResponse>("finance_investment_create", {
+            portfolioId: brokeragePortfolio.id,
+            assetType: "etf",
+            symbol: "VOO",
+            name: "Vanguard S&P 500",
+            costBasis: 1200000,
+            quantity: "28.7",
+            currency: "USD",
+        });
+        await client.post<CreateResponse>("finance_investment_create", {
+            portfolioId: brokeragePortfolio.id,
+            assetType: "etf",
+            symbol: "QQQ",
+            name: "Invesco QQQ Trust",
+            costBasis: 600000,
+            quantity: "15.2",
+            currency: "USD",
+        });
+        await client.post<CreateResponse>("finance_investment_create", {
+            portfolioId: brokeragePortfolio.id,
+            assetType: "etf",
+            symbol: "SCHD",
+            name: "Schwab US Dividend Equity",
+            costBasis: 400000,
+            quantity: "22.1",
+            currency: "USD",
+        });
+        console.log(`  6 investments created across 2 portfolios`);
+
+        // Create finance goals
+        await client.post<CreateResponse>("finance_goal_create", {
+            name: "Emergency Fund",
+            goalType: "savings",
+            targetAmount: 2500000,
+            currentAmount: 1800000,
+            monthlyContribution: 50000,
+            currency: "USD",
+        });
+        await client.post<CreateResponse>("finance_goal_create", {
+            name: "Paris Trip Fund",
+            goalType: "savings",
+            targetAmount: 450000,
+            currentAmount: 200000,
+            deadline: "2026-03-15",
+            currency: "USD",
+            monthlyContribution: 25000,
+        });
+        console.log(`  2 finance goals created`);
+
+        // Create liabilities
+        await client.post<CreateResponse>("finance_liability_create", {
+            name: "Student Loan",
+            liabilityType: "loan",
+            principal: 2500000,
+            remaining: 1800000,
+            interestRate: 4.5,
+            monthlyPayment: 28000,
+            currency: "USD",
+        });
+        await client.post<CreateResponse>("finance_liability_create", {
+            name: "Credit Card Balance",
+            liabilityType: "revolving",
+            principal: 45000,
+            remaining: 45000,
+            interestRate: 19.99,
+            monthlyPayment: 15000,
+            currency: "USD",
+        });
+        console.log(`  2 liabilities created`);
     },
 
     async simulateDay(world, client, day) {

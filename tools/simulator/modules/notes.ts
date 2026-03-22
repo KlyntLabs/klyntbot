@@ -36,23 +36,28 @@ export const notesModule: SimulatorModule = {
 
     async simulateDay(world, client, day) {
         switch (day.dayOfWeek) {
-            case 0: // Monday — meeting notes with @task mentions
+            case 0: // Monday — meeting notes with @task mentions + inbox captures
                 await createMeetingNote(world, client, day);
+                await createInboxItems(client);
                 break;
             case 1: // Tuesday — research notes with wikilinks
                 await createResearchNote(world, client, day);
                 break;
-            case 2: // Wednesday — retrospective with @project mentions
+            case 2: // Wednesday — retrospective with @project mentions + version snapshot
                 await createRetroNote(world, client, day);
+                await snapshotRecentNote(world, client, "api-retro");
                 break;
-            case 3: // Thursday — study notes
+            case 3: // Thursday — study notes + annotation
                 await createStudyNote(world, client, day);
+                await annotateStudyNote(world, client);
+                await snapshotRecentNote(world, client, "oauth-patterns");
                 break;
             case 4: // Friday — journal entry
                 await createJournalNote(world, client, day);
                 break;
-            case 5: // Saturday — light personal
+            case 5: // Saturday — light personal + version snapshot
                 await createPersonalNote(world, client, day);
+                await snapshotRecentNote(world, client, "auth-meeting-notes");
                 break;
             case 6: // Sunday — light personal
                 await createWeeklyReflection(world, client, day);
@@ -325,4 +330,52 @@ ${recentLinks || "No connected notes yet"}`;
     });
     world.createdNotes.set(`reflection-day${day.dayIndex}`, { id: res.id, title: "Sunday Planning & Reflection" });
     console.log(`  notes: created Sunday planning note`);
+}
+
+// ── Note versions, annotations, inbox ───────────────────────────────
+
+async function snapshotRecentNote(world: World, client: ApiClient, noteKey: string): Promise<void> {
+    const note = world.createdNotes.get(noteKey);
+    if (!note) return;
+    try {
+        await client.postFlat("note_version_create", { note_id: note.id });
+        console.log(`  notes: version snapshot for "${note.title}"`);
+    } catch {
+        // Version creation may fail if note doesn't exist yet
+    }
+}
+
+async function annotateStudyNote(world: World, client: ApiClient): Promise<void> {
+    const note = world.createdNotes.get("oauth-patterns");
+    if (!note) return;
+    try {
+        await client.post("annotation_create", {
+            noteId: note.id,
+            markId: crypto.randomUUID(),
+            content: "Key concept — remember this for the auth migration",
+            quotedText: "OAuth 2.0",
+        });
+        await client.post("annotation_create", {
+            noteId: note.id,
+            markId: crypto.randomUUID(),
+            content: "Compare with our current implementation in the API redesign",
+            quotedText: "PKCE",
+        });
+        console.log(`  notes: 2 annotations added to study note`);
+    } catch {
+        // Annotation creation may fail
+    }
+}
+
+async function createInboxItems(client: ApiClient): Promise<void> {
+    await client.post("inbox_create", {
+        content: "Look into rate limiting libraries for the API",
+    });
+    await client.post("inbox_create", {
+        content: "Sarah mentioned a good French podcast — check it out",
+    });
+    await client.post("inbox_create", {
+        content: "Read up on PKCE flow for mobile OAuth clients",
+    });
+    console.log(`  notes: 3 inbox items captured`);
 }
