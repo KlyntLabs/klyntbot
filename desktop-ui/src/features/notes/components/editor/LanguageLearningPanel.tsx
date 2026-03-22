@@ -2,7 +2,6 @@ import { useEffect } from "react";
 import type { WordBreakdown } from "../../hooks/useLanguageBreakdown";
 import { useLanguageBreakdown } from "../../hooks/useLanguageBreakdown";
 import { useVocabularySave } from "../../hooks/useVocabularySave";
-import { KnowledgeAtomsPanel } from "../KnowledgeAtomsPanel";
 import { CollapsibleSection } from "./language/CollapsibleSection";
 import { ConfusableSection } from "./language/ConfusableSection";
 import { PracticeSection } from "./language/PracticeSection";
@@ -142,9 +141,6 @@ export function LanguageLearningPanel({
 
       {/* Section 5: Confusables (renders its own container, only visible when matches found) */}
       {result && <ConfusableSection words={result.words} sourceLang={sourceLang} />}
-
-      {/* Section 6: Knowledge Atoms for this note */}
-      <KnowledgeAtomsPanel noteId={noteId} />
     </div>
   );
 }

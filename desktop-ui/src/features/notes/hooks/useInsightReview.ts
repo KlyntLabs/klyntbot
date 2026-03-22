@@ -6,7 +6,7 @@ import { useCallback, useRef, useState } from "react";
 // Public types
 // ---------------------------------------------------------------------------
 
-export type TabId = "synthesis" | "gaps" | "assessment" | "concept-map" | "perspectives";
+export type TabId = "atoms" | "synthesis" | "gaps" | "assessment" | "concept-map" | "perspectives";
 export type TabStatus = "idle" | "streaming" | "loading" | "done" | "error";
 
 export interface QuizQuestion {
@@ -142,7 +142,7 @@ const INITIAL_STATE: InsightReviewState = {
   noteId: null,
   insightReviewId: null,
   contentHash: null,
-  activeTab: "synthesis",
+  activeTab: "atoms",
   tabs: {
     synthesis: { status: "idle", content: "" },
     gaps: { status: "idle", content: "" },

@@ -27,6 +27,16 @@ export function AtomCard({ atom, onAccept, onDismiss, onReviewDone }: AtomCardPr
   }
 
   const isSuggested = atom.status === "suggested";
+  const metadata = atom.metadata
+    ? (() => {
+        try {
+          return JSON.parse(atom.metadata);
+        } catch {
+          return null;
+        }
+      })()
+    : null;
+  const isFromGaps = metadata?.source === "gap_analysis";
 
   const cardContent = (
     <div
@@ -37,6 +47,11 @@ export function AtomCard({ atom, onAccept, onDismiss, onReviewDone }: AtomCardPr
       {/* Subject + meaning on one line */}
       <div className="flex items-center gap-1.5 min-w-0 flex-1 truncate">
         <span className="text-xs font-medium text-primary shrink-0">{atom.subject}</span>
+        {isFromGaps && (
+          <span className="text-[8px] px-1 py-0.5 rounded bg-amber-500/15 text-amber-400 shrink-0">
+            From gaps
+          </span>
+        )}
         {atom.sourceContext && (
           <span className="text-[10px] text-muted truncate">{atom.sourceContext}</span>
         )}

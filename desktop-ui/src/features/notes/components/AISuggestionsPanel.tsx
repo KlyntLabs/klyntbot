@@ -148,7 +148,7 @@ export function AISuggestionsPanel({
               className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-accent text-muted-foreground hover:bg-accent/80 hover:text-foreground transition-colors disabled:text-dim disabled:cursor-not-allowed"
             >
               <Brain size={10} />
-              Insight Review
+              Learn
             </button>
             <button
               type="button"

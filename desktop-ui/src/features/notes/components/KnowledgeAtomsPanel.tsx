@@ -6,9 +6,11 @@ import { BulkAcceptModal } from "./BulkAcceptModal";
 
 interface KnowledgeAtomsPanelProps {
   noteId: string | null;
+  /** "inline" = below editor (returns null when empty), "panel" = inside Learn panel (shows empty state) */
+  variant?: "inline" | "panel";
 }
 
-export function KnowledgeAtomsPanel({ noteId }: KnowledgeAtomsPanelProps) {
+export function KnowledgeAtomsPanel({ noteId, variant = "inline" }: KnowledgeAtomsPanelProps) {
   const { activeAtoms, suggestedAtoms, refetch } = useKnowledgeAtoms(noteId);
   const { accept, dismiss } = useAtomActions(noteId);
   const [bulkModalOpen, setBulkModalOpen] = useState(false);
@@ -16,24 +18,35 @@ export function KnowledgeAtomsPanel({ noteId }: KnowledgeAtomsPanelProps) {
   const highlightAtomId = searchParams.get("atomId");
   const scrolledRef = useRef(false);
 
-  // Scroll to highlighted atom on deep link
   useEffect(() => {
     if (!highlightAtomId || scrolledRef.current) return;
     const el = document.querySelector(`[data-atom-id="${highlightAtomId}"]`);
     if (el) {
       el.scrollIntoView({ behavior: "smooth", block: "center" });
       scrolledRef.current = true;
-      // Clear atomId from URL after scrolling
       setSearchParams({}, { replace: true });
     }
   }, [highlightAtomId, setSearchParams]);
 
   const totalCount = activeAtoms.length + suggestedAtoms.length;
 
-  if (totalCount === 0) return null;
+  if (totalCount === 0) {
+    if (variant === "inline") return null;
+    return (
+      <div className="flex-1 flex items-center justify-center p-6">
+        <p className="text-[11px] text-muted-foreground text-center">
+          No knowledge atoms yet. Atoms are auto-extracted when you write — check back after saving
+          some content.
+        </p>
+      </div>
+    );
+  }
+
+  const wrapperClass =
+    variant === "panel" ? "flex-1 overflow-y-auto px-3 py-2" : "border-b border-border px-3 py-2";
 
   return (
-    <div className="border-b border-border px-3 py-2">
+    <div className={wrapperClass}>
       {/* Header */}
       <div className="flex items-center justify-between mb-1">
         <span className="text-[10px] text-muted-foreground uppercase tracking-wider">

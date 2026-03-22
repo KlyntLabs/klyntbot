@@ -145,6 +145,7 @@ impl AppCore {
                 ::cognitive::EpisodicMemoryRepo::new(storage_pool.inner().clone()),
                 ::cognitive::ProceduralRuleRepo::new(storage_pool.inner().clone()),
                 ::cognitive::repos::EntityRepo::new(storage_pool.inner().clone()),
+                ::cognitive::KnowledgeAtomRepo::new(storage_pool.inner().clone()),
             ),
         );
 

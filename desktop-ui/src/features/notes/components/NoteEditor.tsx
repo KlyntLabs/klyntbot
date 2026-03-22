@@ -17,7 +17,6 @@ import { VimCommandLine } from "./editor/VimCommandLine";
 import type { VimMode } from "./editor/vim";
 import { getVimPlugin, VIM_SAVE_EVENT } from "./editor/vim";
 import { WikiLinkMenu } from "./editor/WikiLinkNode";
-import { KnowledgeAtomsPanel } from "./KnowledgeAtomsPanel";
 import { LinkInsertDialog } from "./LinkInsertDialog";
 import { NoteVersionHistory } from "./NoteVersionHistory";
 
@@ -429,7 +428,6 @@ export function NoteEditor({
           ) : (
             <div className="flex-1 overflow-y-auto min-h-0 relative">
               <EditorContentWrapper editor={editor} className={editorContentClass} />
-              <KnowledgeAtomsPanel noteId={note.id} />
               {/* Vim command line at bottom of editor area */}
               {vimEnabled && commandLine && (
                 <div className="absolute bottom-0 left-0 right-0">

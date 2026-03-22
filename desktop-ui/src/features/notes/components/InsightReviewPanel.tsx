@@ -25,6 +25,7 @@ import type {
 import { useInsightSSE } from "../hooks/useInsightSSE";
 import { useInsightVersions } from "../hooks/useInsightVersions";
 import { usePersonas } from "../hooks/usePersonas";
+import { AtomsTab } from "./insight/AtomsTab";
 import { ChangesBanner } from "./insight/ChangesBanner";
 import { ConceptMapTab } from "./insight/ConceptMapTab";
 import { FlashcardReview } from "./insight/FlashcardReview";
@@ -58,6 +59,7 @@ interface InsightReviewPanelProps {
 // ---------------------------------------------------------------------------
 
 const TABS: { id: TabId; label: string }[] = [
+  { id: "atoms", label: "Atoms" },
   { id: "synthesis", label: "Synthesis" },
   { id: "gaps", label: "Gap Analysis" },
   { id: "assessment", label: "Self-Assessment" },
@@ -85,6 +87,8 @@ function statusDotClass(status: TabStatus): string {
 
 function tabStatus(state: InsightReviewState, tabId: TabId): TabStatus {
   switch (tabId) {
+    case "atoms":
+      return "done";
     case "synthesis":
       return state.tabs.synthesis.status;
     case "gaps":
@@ -139,6 +143,8 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
   // Get active tab content as text
   const getActiveContent = useCallback((): string => {
     switch (state.activeTab) {
+      case "atoms":
+        return "";
       case "synthesis":
         return state.tabs.synthesis.content;
       case "gaps":
@@ -191,7 +197,7 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
       {/* Header */}
       <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border shrink-0">
         <Brain size={14} className="text-purple shrink-0" />
-        <span className="text-[12px] font-medium text-foreground flex-1">Insight Review</span>
+        <span className="text-[12px] font-medium text-foreground flex-1">Learn</span>
         <div className="relative">
           <button
             type="button"
@@ -230,7 +236,7 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
           type="button"
           onClick={() => actions.close()}
           className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-          aria-label="Close Insight Review"
+          aria-label="Close"
         >
           <X size={14} />
         </button>
@@ -255,7 +261,7 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
       {state.changesSummary && <ChangesBanner summary={state.changesSummary} />}
 
       {/* Knowledge growth metrics */}
-      <KnowledgeGrowthMetrics isOpen={state.isOpen} />
+      <KnowledgeGrowthMetrics noteId={state.noteId} />
 
       {/* Tab bar */}
       <div className="flex border-b border-border shrink-0 overflow-x-auto">
@@ -312,7 +318,9 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
 
       {/* Content area */}
       <div className="flex-1 overflow-y-auto p-4 min-h-0">
-        {activeStatus === "idle" || activeStatus === "error" ? (
+        {state.activeTab === "atoms" ? (
+          <AtomsTab noteId={state.noteId} />
+        ) : activeStatus === "idle" || activeStatus === "error" ? (
           <div className="flex flex-col items-center justify-center h-full gap-3">
             <p className="text-[11px] text-dim">
               {activeStatus === "error" ? "Generation failed" : "No content generated yet"}

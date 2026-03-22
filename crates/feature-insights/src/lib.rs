@@ -4,7 +4,6 @@ pub mod merge;
 pub mod progress;
 pub mod progress_repo;
 pub mod prompt_builder;
-pub mod prompts;
 pub mod repo;
 pub mod scope;
 pub mod service;
