@@ -2,10 +2,13 @@ import type { AnswerMode, GradeResult } from "@shared/types/notes";
 import type { CardPhase } from "../../hooks/useActiveReview";
 import type { Flashcard, ReviewQuality } from "../../hooks/useFlashcards";
 import { CardFront } from "./CardFront";
+import { ClozeInput } from "./ClozeInput";
 import { GradeActions } from "./GradeActions";
 import { GradeDisplay } from "./GradeDisplay";
+import { MultipleChoiceInput } from "./MultipleChoiceInput";
 import { SelfGradeInput } from "./SelfGradeInput";
 import { TypedAnswerInput } from "./TypedAnswerInput";
+import { VoiceInput } from "./VoiceInput";
 
 interface ReviewCardProps {
   card: Flashcard;
@@ -18,6 +21,35 @@ interface ReviewCardProps {
   onSaveInsight: () => void;
   onJumpToSource: () => void;
   onSelfRate: (quality: ReviewQuality) => void;
+}
+
+function AnswerInput({
+  card,
+  mode,
+  onSubmit,
+  onSelfRate,
+}: {
+  card: Flashcard;
+  mode: AnswerMode;
+  onSubmit: (answer: string) => void;
+  onSelfRate: (quality: ReviewQuality) => void;
+}) {
+  switch (mode) {
+    case "self_grade":
+      return <SelfGradeInput card={card} onRate={onSelfRate} />;
+    case "multiple_choice":
+      return <MultipleChoiceInput correctAnswer={card.back} distractors={[]} onSelect={onSubmit} />;
+    case "cloze_fill": {
+      const clozeText = card.cardType === "cloze" ? card.front : card.front;
+      return <ClozeInput clozeText={clozeText} onSubmit={onSubmit} />;
+    }
+    case "voice":
+      return <VoiceInput onSubmit={onSubmit} />;
+    case "typed":
+    case "auto":
+    default:
+      return <TypedAnswerInput onSubmit={onSubmit} />;
+  }
 }
 
 export function ReviewCard({
@@ -38,12 +70,9 @@ export function ReviewCard({
       <CardFront card={card} />
 
       {/* Answer input — shown during answering phase */}
-      {cardPhase === "answering" &&
-        (mode === "self_grade" ? (
-          <SelfGradeInput card={card} onRate={onSelfRate} />
-        ) : (
-          <TypedAnswerInput onSubmit={onSubmitAnswer} />
-        ))}
+      {cardPhase === "answering" && (
+        <AnswerInput card={card} mode={mode} onSubmit={onSubmitAnswer} onSelfRate={onSelfRate} />
+      )}
 
       {/* Grading spinner */}
       {cardPhase === "grading" && (

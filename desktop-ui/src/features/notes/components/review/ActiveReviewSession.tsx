@@ -2,6 +2,7 @@ import { BookOpen, X } from "lucide-react";
 import { useEffect } from "react";
 import { useActiveReview } from "../../hooks/useActiveReview";
 import type { DeckSummary, ReviewQuality } from "../../hooks/useFlashcards";
+import { ModeSelector } from "./ModeSelector";
 import { ReviewCard } from "./ReviewCard";
 import { SessionProgress } from "./SessionProgress";
 
@@ -26,6 +27,7 @@ export function ActiveReviewSession({ layout: _layout, onClose }: ActiveReviewSe
     submitAnswer,
     confirmRating,
     requestExplanation,
+    switchMode,
     skipCard,
   } = useActiveReview();
 
@@ -209,14 +211,17 @@ export function ActiveReviewSession({ layout: _layout, onClose }: ActiveReviewSe
         }}
       />
 
-      {/* Skip */}
-      <button
-        type="button"
-        onClick={skipCard}
-        className="text-[9px] text-dim hover:text-foreground text-center"
-      >
-        Skip card
-      </button>
+      {/* Mode selector + skip */}
+      <div className="flex items-center justify-between gap-2">
+        <ModeSelector current={selectedMode} onChange={switchMode} />
+        <button
+          type="button"
+          onClick={skipCard}
+          className="shrink-0 text-[9px] text-dim hover:text-foreground"
+        >
+          Skip
+        </button>
+      </div>
     </div>
   );
 }
