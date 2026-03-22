@@ -1,5 +1,5 @@
 import { BookOpen, X } from "lucide-react";
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import { useActiveReview } from "../../hooks/useActiveReview";
 import type { DeckSummary, ReviewQuality } from "../../hooks/useFlashcards";
 import { ModeSelector } from "./ModeSelector";
@@ -32,7 +32,15 @@ export function ActiveReviewSession({ layout: _layout, onClose }: ActiveReviewSe
     requestExplanation,
     switchMode,
     skipCard,
+    saveSession,
   } = useActiveReview();
+
+  const handleExit = useCallback(() => {
+    if (phase === "reviewing" && stats.current.cardsReviewed > 0) {
+      saveSession("abandoned");
+    }
+    onClose();
+  }, [phase, saveSession, onClose, stats]);
 
   // Fetch decks on mount
   useEffect(() => {
@@ -79,15 +87,29 @@ export function ActiveReviewSession({ layout: _layout, onClose }: ActiveReviewSe
             requestExplanation();
           }
           break;
+        case "s":
+          if (cardPhase === "graded" || cardPhase === "socratic") {
+            // Gap 5 will implement save-insight; no-op for now
+          }
+          break;
+        case "j":
+          if (cardPhase === "graded" || cardPhase === "socratic") {
+            // Gap 5 will implement jump-to-source; no-op for now
+          }
+          break;
+        case "Tab":
+          e.preventDefault();
+          switchMode(selectedMode === "self_grade" ? "typed" : "self_grade");
+          break;
         case "Escape":
-          onClose();
+          handleExit();
           break;
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [phase, cardPhase, confirmRating, requestExplanation, onClose]);
+  }, [phase, cardPhase, confirmRating, requestExplanation, handleExit, switchMode, selectedMode]);
 
   // ── Idle — initial loading state ─────────────────────────────────────────
 
@@ -128,7 +150,7 @@ export function ActiveReviewSession({ layout: _layout, onClose }: ActiveReviewSe
         <div className="flex items-center gap-2">
           <span className="text-[11px] text-foreground font-medium">Choose a deck to review</span>
           <div className="flex-1" />
-          <button type="button" onClick={onClose} className="p-1 text-dim hover:text-foreground">
+          <button type="button" onClick={handleExit} className="p-1 text-dim hover:text-foreground">
             <X size={12} />
           </button>
         </div>
@@ -179,7 +201,12 @@ export function ActiveReviewSession({ layout: _layout, onClose }: ActiveReviewSe
   return (
     <div className="flex flex-col gap-3 p-3">
       {/* Progress */}
-      <SessionProgress remaining={remaining} total={total} avgScore={avgScore} onExit={onClose} />
+      <SessionProgress
+        remaining={remaining}
+        total={total}
+        avgScore={avgScore}
+        onExit={handleExit}
+      />
 
       {/* Error */}
       {error && (

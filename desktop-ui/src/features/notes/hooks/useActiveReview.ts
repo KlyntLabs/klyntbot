@@ -90,11 +90,41 @@ export function useActiveReview() {
     stats.modeUsage[mode] = bucket;
   }
 
+  const saveSession = useCallback(
+    async (status: "completed" | "abandoned") => {
+      const s = statsRef.current;
+      try {
+        await ipc("flashcard_save_session", {
+          sessionId: state.sessionId,
+          cardsReviewed: s.cardsReviewed,
+          avgScore: s.cardsReviewed > 0 ? s.totalScore / s.cardsReviewed : 0,
+          durationSeconds: Math.round((Date.now() - s.startTime) / 1000),
+          modesUsed: Object.keys(s.modeUsage),
+          propagationCount: s.propagationCount,
+          weakCardIds: s.weakCards.map((w) => w.front),
+          sessionData: JSON.stringify(s),
+          status,
+        });
+      } catch {
+        // best-effort
+      }
+    },
+    [state.sessionId],
+  );
+
   function advanceQueue() {
     setState((prev) => {
       const nextIndex = prev.currentIndex + 1;
       if (nextIndex >= prev.queue.length) {
-        return { ...prev, phase: "complete", cardPhase: "answering", currentIndex: nextIndex };
+        // Fire-and-forget session save
+        saveSession("completed");
+        return {
+          ...prev,
+          phase: "complete",
+          cardPhase: "answering",
+          currentIndex: nextIndex,
+          lastAnswer: "",
+        };
       }
       return {
         ...prev,
@@ -217,9 +247,16 @@ export function useActiveReview() {
     patchState({ cardPhase: "socratic" });
   }, []);
 
-  const switchMode = useCallback((mode: AnswerMode) => {
-    patchState({ selectedMode: mode });
-  }, []);
+  const switchMode = useCallback(
+    (mode: AnswerMode) => {
+      patchState({ selectedMode: mode });
+      // Persist preference for this deck
+      if (state.selectedDeck) {
+        ipc("flashcard_save_mode_preference", { deck: state.selectedDeck, mode }).catch(() => {});
+      }
+    },
+    [state.selectedDeck],
+  );
 
   const skipCard = useCallback(async () => {
     if (!current) return;
@@ -259,6 +296,7 @@ export function useActiveReview() {
     requestExplanation,
     switchMode,
     skipCard,
+    saveSession,
   };
 }
 
