@@ -194,12 +194,11 @@ export function NoteEditor({
     createAnnotation,
   );
 
-  const { activePerspective, focusedSectionId, setPerspective, setLanguagePair, languagePair } =
-    usePerspective(
-      note.id,
-      editor,
-      (note as Record<string, unknown>).perspectiveConfig as string | null | undefined,
-    );
+  const { setLanguagePair, languagePair } = usePerspective(
+    note.id,
+    editor,
+    (note as Record<string, unknown>).perspectiveConfig as string | null | undefined,
+  );
 
   const [translateSelection, setTranslateSelection] = useState<string | undefined>();
 
@@ -271,11 +270,9 @@ export function NoteEditor({
 
       const annId = highlight.getAttribute("data-annotation-id");
       if (!annId) return;
-      const ann = annotationsRef.current.find(
-        (a) => a.markId === annId || a.id === annId,
-      );
-      const text = ann?.content || ann?.aiSuggestion || ann?.quotedText || "Annotation — double-click to view";
-
+      const ann = annotationsRef.current.find((a) => a.markId === annId || a.id === annId);
+      const text =
+        ann?.content || ann?.aiSuggestion || ann?.quotedText || "Annotation — double-click to view";
 
       const rect = highlight.getBoundingClientRect();
       setAnnotationTooltip({
@@ -315,13 +312,10 @@ export function NoteEditor({
       const { action } = (e as CustomEvent<{ action: string }>).detail;
       if (action === "annotate") handleAnnotate();
       else if (action === "flashcard") handleFlashcard();
-      else if (action === "linked-view" && focusedSectionId) {
-        setPerspective(focusedSectionId, "linked-view");
-      }
     };
     window.addEventListener("editor-action", handler);
     return () => window.removeEventListener("editor-action", handler);
-  }, [handleAnnotate, handleFlashcard, focusedSectionId, setPerspective]);
+  }, [handleAnnotate, handleFlashcard]);
 
   // Flush on note change and update editor content
   useEffect(() => {
@@ -470,13 +464,6 @@ export function NoteEditor({
           onTranslate={handleTranslate}
           onTranslateTo={handleTranslateTo}
           onAskAI={handleAskAI}
-          onLinkedView={() => {
-            if (focusedSectionId) setPerspective(focusedSectionId, "linked-view");
-          }}
-          onApplyPerspective={(type) => {
-            if (focusedSectionId)
-              setPerspective(focusedSectionId, type as "linked-view" | "annotated" | "study-mode");
-          }}
           onRemoveAnnotation={handleRemoveAnnotation}
           noteTargetLang={languagePair?.targetLang}
         >
@@ -594,22 +581,23 @@ export function NoteEditor({
       )}
 
       {/* Annotation hover tooltip */}
-      {annotationTooltip && createPortal(
-        <div
-          className="fixed z-[60] max-w-[240px] rounded-lg px-2.5 py-1.5 text-xs text-primary leading-relaxed line-clamp-3 pointer-events-none"
-          style={{
-            top: annotationTooltip.position.top,
-            left: annotationTooltip.position.left,
-            transform: "translate(-50%, -100%)",
-            background: "var(--surface-floating)",
-            border: "1px solid var(--glass-border)",
-            boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
-          }}
-        >
-          {annotationTooltip.text}
-        </div>,
-        document.body,
-      )}
+      {annotationTooltip &&
+        createPortal(
+          <div
+            className="fixed z-[60] max-w-[240px] rounded-lg px-2.5 py-1.5 text-xs text-primary leading-relaxed line-clamp-3 pointer-events-none"
+            style={{
+              top: annotationTooltip.position.top,
+              left: annotationTooltip.position.left,
+              transform: "translate(-50%, -100%)",
+              background: "var(--surface-floating)",
+              border: "1px solid var(--glass-border)",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+            }}
+          >
+            {annotationTooltip.text}
+          </div>,
+          document.body,
+        )}
 
       {/* Link/Image insert dialog */}
       <LinkInsertDialog

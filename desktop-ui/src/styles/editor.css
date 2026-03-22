@@ -10,6 +10,12 @@
   caret-color: var(--brand);
 }
 
+/* CSS Highlight API — preserves selection highlight when context menu is open.
+   Matches the native ::selection color so there's no visible change. */
+::highlight(editor-context-selection) {
+  background-color: rgba(255, 255, 255, 0.35);
+}
+
 .editor-content > *:first-child {
   margin-top: 0;
 }

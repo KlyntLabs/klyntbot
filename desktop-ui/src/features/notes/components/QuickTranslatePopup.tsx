@@ -64,13 +64,31 @@ export function QuickTranslatePopup({
         <div className="flex items-center gap-2 py-1">
           <svg width="24" height="8" viewBox="0 0 24 8" className="text-brand">
             <circle cx="4" cy="4" r="3" fill="currentColor" opacity="0.3">
-              <animate attributeName="opacity" values="0.3;1;0.3" dur="1s" repeatCount="indefinite" begin="0s" />
+              <animate
+                attributeName="opacity"
+                values="0.3;1;0.3"
+                dur="1s"
+                repeatCount="indefinite"
+                begin="0s"
+              />
             </circle>
             <circle cx="12" cy="4" r="3" fill="currentColor" opacity="0.3">
-              <animate attributeName="opacity" values="0.3;1;0.3" dur="1s" repeatCount="indefinite" begin="0.2s" />
+              <animate
+                attributeName="opacity"
+                values="0.3;1;0.3"
+                dur="1s"
+                repeatCount="indefinite"
+                begin="0.2s"
+              />
             </circle>
             <circle cx="20" cy="4" r="3" fill="currentColor" opacity="0.3">
-              <animate attributeName="opacity" values="0.3;1;0.3" dur="1s" repeatCount="indefinite" begin="0.4s" />
+              <animate
+                attributeName="opacity"
+                values="0.3;1;0.3"
+                dur="1s"
+                repeatCount="indefinite"
+                begin="0.4s"
+              />
             </circle>
           </svg>
           <span className="text-xs text-muted">Translating...</span>

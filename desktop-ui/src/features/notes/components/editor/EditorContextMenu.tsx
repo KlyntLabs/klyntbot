@@ -22,10 +22,12 @@ interface EditorContextMenuProps {
   onAnnotate: () => void;
   onFlashcard: () => void;
   onTranslate: (selectedText: string, rect?: { top: number; left: number }) => void;
-  onTranslateTo: (targetLang: string, selectedText?: string, rect?: { top: number; left: number }) => void;
+  onTranslateTo: (
+    targetLang: string,
+    selectedText?: string,
+    rect?: { top: number; left: number },
+  ) => void;
   onAskAI: () => void;
-  onLinkedView: () => void;
-  onApplyPerspective: (type: string) => void;
   onRemoveAnnotation?: (annotationId: string) => void;
   noteTargetLang?: string;
 }
@@ -37,14 +39,13 @@ export function EditorContextMenu({
   onTranslate,
   onTranslateTo,
   onAskAI,
-  onLinkedView,
-  onApplyPerspective,
   onRemoveAnnotation,
   noteTargetLang,
 }: EditorContextMenuProps) {
   const [hadSelection, setHadSelection] = useState(false);
   const [annotationId, setAnnotationId] = useState<string | null>(null);
   const selectionTextRef = useRef("");
+  const savedRangeRef = useRef<Range | null>(null);
   const selectionRectRef = useRef<{ top: number; left: number } | undefined>(undefined);
 
   const handleOpenChange = useCallback((open: boolean) => {
@@ -65,8 +66,28 @@ export function EditorContextMenu({
       const el = focusNode instanceof HTMLElement ? focusNode : focusNode?.parentElement;
       const annEl = el?.closest(".annotation-highlight") as HTMLElement | null;
       setAnnotationId(annEl?.getAttribute("data-annotation-id") ?? null);
+
+      // Save range for CSS Highlight API (non-destructive visual highlight)
+      if (text.length > 0 && sel && sel.rangeCount > 0) {
+        savedRangeRef.current = sel.getRangeAt(0).cloneRange();
+        try {
+          // @ts-expect-error CSS Highlight API — Chromium 105+
+          const highlight = new Highlight(savedRangeRef.current);
+          // @ts-expect-error CSS Highlight API
+          CSS.highlights?.set("editor-context-selection", highlight);
+        } catch {
+          // Fallback: no visual highlight on older browsers
+        }
+      }
     } else {
       setAnnotationId(null);
+      savedRangeRef.current = null;
+      try {
+        // @ts-expect-error CSS Highlight API
+        CSS.highlights?.delete("editor-context-selection");
+      } catch {
+        // ignore
+      }
     }
   }, []);
 
@@ -78,6 +99,7 @@ export function EditorContextMenu({
           className="glass-panel min-w-[200px] rounded-lg p-1.5 shadow-xl"
           onOpenAutoFocus={(e) => e.preventDefault()}
           onCloseAutoFocus={(e) => e.preventDefault()}
+          onFocusOutside={(e) => e.preventDefault()}
         >
           {hadSelection && (
             <>
@@ -102,7 +124,11 @@ export function EditorContextMenu({
                       <ContextMenu.Item
                         key={lang.code}
                         onClick={() =>
-                          onTranslateTo(lang.code, selectionTextRef.current, selectionRectRef.current)
+                          onTranslateTo(
+                            lang.code,
+                            selectionTextRef.current,
+                            selectionRectRef.current,
+                          )
                         }
                         className="flex items-center justify-between rounded-md px-2 py-1.5 text-xs text-primary outline-none select-none data-[highlighted]:bg-surface-hover"
                       >
@@ -124,9 +150,7 @@ export function EditorContextMenu({
           {/* Remove annotation — only when right-clicking on annotated text */}
           {annotationId && onRemoveAnnotation && (
             <>
-              <MenuItem
-                onClick={() => onRemoveAnnotation(annotationId)}
-              >
+              <MenuItem onClick={() => onRemoveAnnotation(annotationId)}>
                 <span className="text-red-400">Remove annotation</span>
               </MenuItem>
               <ContextMenu.Separator className="my-1 h-px bg-border" />
@@ -137,25 +161,6 @@ export function EditorContextMenu({
             AI Actions
           </ContextMenu.Label>
           <MenuItem onClick={onAskAI}>Ask AI</MenuItem>
-          <MenuItem onClick={onLinkedView} shortcut="⌥L">
-            Linked View
-          </MenuItem>
-
-          <ContextMenu.Separator className="my-1 h-px bg-border" />
-
-          <ContextMenu.Sub>
-            <ContextMenu.SubTrigger className="flex items-center justify-between rounded-md px-2 py-1.5 text-xs text-primary outline-none select-none data-[highlighted]:bg-surface-hover">
-              Apply Perspective
-              <span className="text-muted ml-4">▸</span>
-            </ContextMenu.SubTrigger>
-            <ContextMenu.Portal>
-              <ContextMenu.SubContent className="glass-panel min-w-[160px] rounded-lg p-1.5 shadow-xl">
-                <MenuItem onClick={() => onApplyPerspective("linked-view")}>Linked View</MenuItem>
-                <MenuItem onClick={() => onApplyPerspective("annotated")}>Annotated</MenuItem>
-                <MenuItem onClick={() => onApplyPerspective("study-mode")}>Study Mode</MenuItem>
-              </ContextMenu.SubContent>
-            </ContextMenu.Portal>
-          </ContextMenu.Sub>
         </ContextMenu.Content>
       </ContextMenu.Portal>
     </ContextMenu.Root>
