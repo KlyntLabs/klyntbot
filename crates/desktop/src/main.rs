@@ -373,6 +373,7 @@ fn run_desktop_app() {
             commands::notes::flashcard_save_mode_preference,
             commands::notes::flashcard_get_mode_preference,
             commands::notes::flashcard_get_prerequisites,
+            commands::notes::flashcard_save_session,
             // Annotations
             commands::annotations::annotation_create,
             commands::annotations::annotation_update,

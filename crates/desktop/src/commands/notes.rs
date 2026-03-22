@@ -627,6 +627,14 @@ pub async fn flashcard_get_prerequisites(
     state.flashcard_get_prerequisites(&card_id).await
 }
 
+#[tauri::command]
+pub async fn flashcard_save_session(
+    state: State<'_, Arc<AppCore>>,
+    params: desktop_shared::commands::ReviewSessionSaveParams,
+) -> Result<(), ApiError> {
+    state.flashcard_save_session(params).await
+}
+
 // ── Dev server dispatch ─────────────────────────────────────────────
 
 #[cfg(test)]
@@ -698,6 +706,7 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "flashcard_save_mode_preference",
     "flashcard_get_mode_preference",
     "flashcard_get_prerequisites",
+    "flashcard_save_session",
 ];
 
 #[cfg(debug_assertions)]
@@ -989,6 +998,12 @@ pub(crate) async fn dispatch_dev(
             let card_id = try_field!(dev::get_str(body, "cardId"));
             dev::val(core.flashcard_get_prerequisites(&card_id).await)
         }
+        "flashcard_save_session" => dev::val(
+            core.flashcard_save_session(try_field!(dev::parse_params::<
+                desktop_shared::commands::ReviewSessionSaveParams,
+            >(body)))
+            .await,
+        ),
         _ => return None,
     })
 }

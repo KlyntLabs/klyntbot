@@ -635,3 +635,20 @@ pub struct PersonaChatMessage {
 pub struct PersonaChatResponse {
     pub reply: String,
 }
+
+// ── Review Session ────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReviewSessionSaveParams {
+    pub session_id: String,
+    pub cards_reviewed: i32,
+    pub avg_score: f64,
+    pub duration_seconds: i32,
+    pub modes_used: Vec<String>,
+    pub propagation_count: i32,
+    pub weak_card_ids: Vec<String>,
+    pub session_data: String,
+    /// "completed" | "abandoned"
+    pub status: String,
+}
