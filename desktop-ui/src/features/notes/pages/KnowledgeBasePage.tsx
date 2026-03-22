@@ -13,7 +13,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import { CardGenerationModal } from "../components/CardGenerationModal";
 import { ContextPanel } from "../components/ContextPanel";
-import type { SplitMode } from "../components/editor/SplitEditor";
 import { GraphView } from "../components/GraphView";
 import { NavigationSidebar } from "../components/NavigationSidebar";
 import { NoteCreationDialog } from "../components/NoteCreationDialog";
@@ -68,7 +67,9 @@ export default function KnowledgeBasePage() {
   const { items: inboxItems, deleteItem: deleteInboxItem } = useInbox();
 
   // ── Core state ────────────────────────────────────────────────────────
-  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
+  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(
+    () => localStorage.getItem("klynt:lastOpenNoteId"),
+  );
   const [viewMode, setViewMode] = useState<ViewMode>("editor");
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("three-panel");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -87,6 +88,15 @@ export default function KnowledgeBasePage() {
   insightStateRef.current = insightState;
   const insightActionsRef = useRef(insightActions);
   insightActionsRef.current = insightActions;
+
+  // Persist last-opened note for page refresh / navigation
+  useEffect(() => {
+    if (selectedNoteId) {
+      localStorage.setItem("klynt:lastOpenNoteId", selectedNoteId);
+    } else {
+      localStorage.removeItem("klynt:lastOpenNoteId");
+    }
+  }, [selectedNoteId]);
 
   // ── Sync Insight Review panel when switching notes ────────────────────
   useEffect(() => {
@@ -280,14 +290,6 @@ export default function KnowledgeBasePage() {
     [selectedNote, generateFromNote, generateFromText],
   );
 
-  const handleSplitModeChange = useCallback(
-    (mode: SplitMode | null) => {
-      if (!selectedNote) return;
-      updateNote({ id: selectedNote.id, splitMode: mode });
-    },
-    [selectedNote, updateNote],
-  );
-
   // ── Resize logic (left sidebar) ───────────────────────────────────────
   const onLeftResizeStart = useCallback((e: React.PointerEvent) => {
     e.preventDefault();
@@ -398,6 +400,16 @@ export default function KnowledgeBasePage() {
         // Cmd+Shift+G → toggle view mode
         e.preventDefault();
         setViewMode((prev) => (prev === "editor" ? "graph" : "editor"));
+      } else if ((e.key === "p" || e.key === "P") && e.shiftKey) {
+        // Cmd+Shift+P → toggle practice mode
+        e.preventDefault();
+        window.dispatchEvent(new CustomEvent("editor-mode-toggle", { detail: "toggle-practice" }));
+      } else if ((e.key === "a" || e.key === "A") && e.shiftKey) {
+        // Cmd+Shift+A → toggle annotation pane
+        e.preventDefault();
+        window.dispatchEvent(
+          new CustomEvent("editor-mode-toggle", { detail: "toggle-annotations" }),
+        );
       } else if ((e.key === "i" || e.key === "I") && e.shiftKey) {
         // Cmd+Shift+I → toggle Insight Review
         e.preventDefault();
@@ -520,8 +532,6 @@ export default function KnowledgeBasePage() {
               }
               focusModeActive={isFocusMode}
               onGenerateCards={handleGenerateCards}
-              splitMode={selectedNote?.splitMode as SplitMode | null}
-              onSplitModeChange={handleSplitModeChange}
             />
           </div>
         ) : (

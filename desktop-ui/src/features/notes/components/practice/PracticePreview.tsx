@@ -1,4 +1,4 @@
-import { Loader2, Play, RotateCcw } from "lucide-react";
+import { Loader2, Play, RotateCcw, X } from "lucide-react";
 import { createPortal } from "react-dom";
 
 // ── Types ────────────────────────────────────────────────
@@ -22,27 +22,27 @@ export interface PracticePreviewProps {
 
 // ── Helpers ──────────────────────────────────────────────
 
-const TYPE_COLORS: Record<string, string> = {
-  heading: "bg-purple/15 text-purple",
-  sentence: "bg-info/15 text-info",
-  pattern: "bg-warning/15 text-warning",
-  cultural: "bg-success/15 text-success",
-};
-
-function typeBadgeClass(type: string): string {
-  return TYPE_COLORS[type] ?? "bg-muted text-muted-foreground";
-}
-
 function deriveFocusSummary(segments: PreviewSegment[]): string {
   const counts: Record<string, number> = {};
   for (const s of segments) {
-    const focus = s.suggestedFocus;
-    counts[focus] = (counts[focus] ?? 0) + 1;
+    counts[s.suggestedFocus] = (counts[s.suggestedFocus] ?? 0) + 1;
   }
   const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
   const top = sorted.slice(0, 2).map(([f]) => f);
-  if (top.length === 0) return "";
-  return `Focus: ${top.join(" & ")}`;
+  return top.length > 0 ? top.join(" & ") : "";
+}
+
+function typeDot(type: string): string {
+  switch (type) {
+    case "heading":
+      return "bg-purple";
+    case "pattern":
+      return "bg-amber-400";
+    case "cultural":
+      return "bg-emerald-400";
+    default:
+      return "bg-white/20";
+  }
 }
 
 // ── Component ────────────────────────────────────────────
@@ -60,20 +60,28 @@ export function PracticePreview({
   const focusSummary = deriveFocusSummary(segments);
 
   return createPortal(
-    <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50">
-      {/* Backdrop dismiss */}
+    <div className="fixed inset-0 flex items-center justify-center z-50">
+      {/* Backdrop */}
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: backdrop dismiss */}
       <div
-        className="absolute inset-0"
+        className="absolute inset-0 bg-black/60 backdrop-blur-[2px]"
         onClick={onCancel}
-        role="presentation"
         onKeyDown={() => {}}
       />
 
-      <div className="relative glass-panel max-w-md w-full mx-4 rounded-2xl p-6 animate-[glass-appear_0.2s_ease-out]">
+      <div
+        className="relative max-w-[520px] w-full mx-4 rounded-xl overflow-hidden animate-[glass-appear_0.2s_ease-out]"
+        style={{
+          background: "var(--surface-floating)",
+          border: "1px solid rgba(255,255,255,0.08)",
+          boxShadow:
+            "0 24px 80px rgba(0,0,0,0.5), 0 0 1px rgba(255,255,255,0.1) inset, 0 0 40px rgba(167,139,250,0.06)",
+        }}
+      >
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-12 gap-3">
-            <Loader2 size={24} className="text-brand animate-spin" strokeWidth={1.5} />
-            <p className="text-sm text-muted-foreground">Preparing your session...</p>
+          <div className="flex flex-col items-center justify-center py-16 gap-3">
+            <Loader2 size={18} className="text-purple animate-spin" strokeWidth={1.5} />
+            <p className="text-[11px] text-muted">Preparing your session...</p>
           </div>
         ) : hasExistingSession ? (
           <ResumeView
@@ -114,68 +122,74 @@ function FirstVisitView({
   onCancel: () => void;
 }) {
   return (
-    <div className="flex flex-col gap-4">
+    <>
       {/* Header */}
-      <p className="text-brand text-xs uppercase tracking-widest font-medium">
-        Your Personal Language Gym
-      </p>
-
-      {/* Main stat */}
-      <div>
-        <p className="text-primary text-lg font-semibold">
-          {segments.length} unit{segments.length !== 1 ? "s" : ""} &middot; ~{estimatedMins} min
-        </p>
-        {focusSummary && <p className="text-muted-foreground text-sm mt-0.5">{focusSummary}</p>}
-      </div>
-
-      {/* Scrollable unit list */}
-      <div className="max-h-[240px] overflow-y-auto space-y-1 pr-1">
-        {segments.map((seg) => (
-          <div
-            key={seg.index}
-            className="flex items-center gap-2.5 py-1.5 px-2 rounded-lg hover:bg-white/[0.03] transition-colors"
-          >
-            <span className="text-dim text-xs w-5 text-right flex-shrink-0 tabular-nums">
-              {seg.index + 1}
-            </span>
-            <span className="text-sm text-foreground truncate flex-1 min-w-0">{seg.text}</span>
-            <span
-              className={`text-[10px] px-1.5 py-0.5 rounded-md flex-shrink-0 ${typeBadgeClass(seg.type)}`}
-            >
-              {seg.type}
-            </span>
+      <div className="px-6 pt-5 pb-3 flex items-start justify-between">
+        <div>
+          <p className="text-purple text-[10px] uppercase tracking-[0.12em] font-medium">
+            Practice Session
+          </p>
+          <div className="flex items-baseline gap-2 mt-1.5">
+            <span className="text-primary text-base font-semibold">{segments.length} units</span>
+            <span className="text-muted-foreground text-sm">~{estimatedMins} min</span>
           </div>
-        ))}
-      </div>
-
-      {/* Actions */}
-      <div className="flex flex-col items-center gap-3 pt-2">
-        <div className="flex items-center gap-3 w-full">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Edit segments
-          </button>
-          <button
-            type="button"
-            onClick={onStart}
-            className="flex-1 flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-brand text-white text-sm font-medium shadow-[0_0_20px_var(--brand-glow)] hover:bg-brand-hover transition-colors"
-          >
-            <Play size={14} />
-            Start Practice
-          </button>
+          {focusSummary && <p className="text-muted-foreground text-xs mt-0.5">{focusSummary}</p>}
         </div>
         <button
           type="button"
           onClick={onCancel}
-          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+          className="text-muted hover:text-primary p-1 -m-1 rounded transition-colors"
         >
-          Cancel
+          <X size={14} strokeWidth={1.5} />
         </button>
       </div>
-    </div>
+
+      {/* Segment list */}
+      <div
+        className="mx-4 mb-4 rounded-lg overflow-hidden"
+        style={{ background: "rgba(0,0,0,0.2)" }}
+      >
+        <div className="max-h-[300px] overflow-y-auto py-1.5">
+          {segments.map((seg) => (
+            <div
+              key={seg.index}
+              className="flex items-center gap-2.5 py-1.5 px-3.5 hover:bg-white/[0.03] transition-colors"
+            >
+              <span className="text-muted-foreground/50 text-[10px] w-5 text-right shrink-0 tabular-nums">
+                {seg.index + 1}
+              </span>
+              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${typeDot(seg.type)}`} />
+              <span className="text-xs text-muted-foreground truncate flex-1 min-w-0">
+                {seg.text}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="px-6 pb-5 flex items-center gap-3">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="text-xs text-muted hover:text-primary transition-colors"
+        >
+          Edit segments
+        </button>
+        <button
+          type="button"
+          onClick={onStart}
+          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-medium text-white transition-all hover:brightness-110"
+          style={{
+            background: "linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%)",
+            boxShadow: "0 0 20px rgba(167,139,250,0.25)",
+          }}
+        >
+          <Play size={11} fill="currentColor" />
+          Start Practice
+        </button>
+      </div>
+    </>
   );
 }
 
@@ -196,55 +210,80 @@ function ResumeView({
 }) {
   const total = segments.length;
   const current = existingSession.currentIndex;
+  const pct = Math.round((current / total) * 100);
   const scoreText =
-    existingSession.averageScore != null
-      ? ` \u00B7 ${Math.round(existingSession.averageScore)}% last time`
-      : "";
+    existingSession.averageScore != null ? `${Math.round(existingSession.averageScore)}%` : null;
 
   return (
-    <div className="flex flex-col gap-4">
+    <>
       {/* Header */}
-      <p className="text-brand text-xs uppercase tracking-widest font-medium">
-        Session in Progress
-      </p>
-
-      {/* Resume banner */}
-      <div className="glass-card p-4 flex items-center gap-3">
-        <div className="flex-1 min-w-0">
-          <p className="text-sm text-foreground font-medium">
-            Resume {current}/{total}
-            {scoreText}
+      <div className="px-6 pt-5 pb-3 flex items-start justify-between">
+        <div>
+          <p className="text-purple text-[10px] uppercase tracking-[0.12em] font-medium">
+            Resume Session
           </p>
-          <p className="text-xs text-muted-foreground mt-0.5">Pick up where you left off</p>
+          <div className="flex items-baseline gap-2 mt-1.5">
+            <span className="text-primary text-base font-semibold">
+              {current}/{total} completed
+            </span>
+            {scoreText && <span className="text-muted-foreground text-xs">{scoreText}</span>}
+          </div>
         </div>
-      </div>
-
-      {/* Actions */}
-      <div className="flex flex-col items-center gap-3">
-        <button
-          type="button"
-          onClick={onResume}
-          className="w-full flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-brand text-white text-sm font-medium shadow-[0_0_20px_var(--brand-glow)] hover:bg-brand-hover transition-colors"
-        >
-          <Play size={14} />
-          Resume
-        </button>
-        <button
-          type="button"
-          onClick={onStart}
-          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <RotateCcw size={12} />
-          Start fresh
-        </button>
         <button
           type="button"
           onClick={onCancel}
-          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+          className="text-muted hover:text-primary p-1 -m-1 rounded transition-colors"
         >
-          Cancel
+          <X size={14} strokeWidth={1.5} />
         </button>
       </div>
-    </div>
+
+      {/* Progress bar */}
+      <div className="mx-6 mb-5">
+        <div
+          className="h-1 rounded-full overflow-hidden"
+          style={{ background: "rgba(255,255,255,0.06)" }}
+        >
+          <div
+            className="h-full rounded-full bg-purple transition-all"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        <p className="text-[10px] text-muted mt-1.5">Pick up where you left off</p>
+      </div>
+
+      {/* Actions */}
+      <div className="px-6 pb-5 flex flex-col gap-2.5">
+        <button
+          type="button"
+          onClick={onResume}
+          className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-medium text-white transition-all hover:brightness-110"
+          style={{
+            background: "linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%)",
+            boxShadow: "0 0 20px rgba(167,139,250,0.25)",
+          }}
+        >
+          <Play size={11} fill="currentColor" />
+          Resume
+        </button>
+        <div className="flex items-center justify-center gap-4">
+          <button
+            type="button"
+            onClick={onStart}
+            className="flex items-center gap-1 text-[11px] text-muted hover:text-primary transition-colors"
+          >
+            <RotateCcw size={10} />
+            Start fresh
+          </button>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="text-[11px] text-muted hover:text-primary transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </>
   );
 }

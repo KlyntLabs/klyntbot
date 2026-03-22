@@ -1,6 +1,6 @@
 import { ipc } from "@shared/hooks/useIpc";
 import type { Note, NoteUpdateParams } from "@shared/types";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router";
 import { type AnnotationResponse, useAnnotations } from "../hooks/useAnnotations";
@@ -9,23 +9,33 @@ import { useLanguageConfig } from "../hooks/useLanguageConfig";
 import { usePerspective } from "../hooks/usePerspective";
 import { useQuickTranslate } from "../hooks/useQuickTranslate";
 import { useVocabularySave } from "../hooks/useVocabularySave";
+import { AnnotationPane } from "./AnnotationPane";
 import { AnnotationPopover } from "./AnnotationPopover";
 import { EditorContextMenu } from "./editor/EditorContextMenu";
 import { EditorContentWrapper, useEntityResolution, useNoteEditor } from "./editor/EditorCore";
 import { EditorToolbar } from "./editor/EditorToolbar";
 import { EntityMentionMenu } from "./editor/EntityMention";
 import { SlashMenu } from "./editor/SlashCommandMenu";
-import { SplitEditor, type SplitMode } from "./editor/SplitEditor";
-import { SplitToolbar } from "./editor/SplitToolbar";
 import { VimCommandLine } from "./editor/VimCommandLine";
 import type { VimMode } from "./editor/vim";
 import { getVimPlugin, VIM_SAVE_EVENT } from "./editor/vim";
 import { WikiLinkMenu } from "./editor/WikiLinkNode";
 import { LinkInsertDialog } from "./LinkInsertDialog";
 import { NoteVersionHistory } from "./NoteVersionHistory";
+import { PracticeMode } from "./practice/PracticeMode";
 import { QuickTranslatePopup } from "./QuickTranslatePopup";
 
 const VERSION_INTERVAL_MS = 5 * 60 * 1000; // Minimum interval between auto-saving version snapshots
+
+function parseSideNotes(splitContent: string | null | undefined): string {
+  if (!splitContent) return "";
+  try {
+    const data = JSON.parse(splitContent);
+    return data.sideNotes ?? "";
+  } catch {
+    return "";
+  }
+}
 
 type NotesViewMode = "editor" | "graph";
 
@@ -37,8 +47,6 @@ interface NoteEditorProps {
   onToggleFocusMode?: () => void;
   focusModeActive?: boolean;
   onGenerateCards?: (selectedText?: string) => void;
-  splitMode?: SplitMode | null;
-  onSplitModeChange?: (mode: SplitMode | null) => void;
   editorFocusRef?: React.MutableRefObject<(() => void) | undefined>;
 }
 
@@ -50,32 +58,23 @@ export function NoteEditor({
   onToggleFocusMode,
   focusModeActive,
   onGenerateCards,
-  splitMode,
-  onSplitModeChange,
   editorFocusRef,
 }: NoteEditorProps) {
-  const activeSplitMode = splitMode ?? (note.splitMode as SplitMode | null);
+  const [practiceActive, setPracticeActive] = useState(false);
+  const [sidePaneOpen, setSidePaneOpen] = useState(false);
+  const [paneSplit, setPaneSplit] = useState(0.6); // editor takes 60%
+  const resizingRef = useRef(false);
+  const splitContainerRef = useRef<HTMLDivElement>(null);
+  const pointerCleanupRef = useRef<(() => void) | null>(null);
   const navigate = useNavigate();
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastNoteIdRef = useRef(note.id);
   const pendingRef = useRef<{ html: string; markdown: string } | null>(null);
   const onSaveRef = useRef(onSave);
   onSaveRef.current = onSave;
-  // When splitContent exists, show only the left pane in single mode
-  // (body contains concatenated left+right for indexing — confusing to display)
-  const singlePaneContent = (() => {
-    if (note.splitContent) {
-      try {
-        const split = JSON.parse(note.splitContent);
-        return split.left?.html || split.left?.markdown || note.body || "";
-      } catch {
-        /* fall through */
-      }
-    }
-    return note.bodyHtml || note.body || "";
-  })();
-  const noteContentRef = useRef(singlePaneContent);
-  noteContentRef.current = singlePaneContent;
+  const noteContent = note.bodyHtml || note.body || "";
+  const noteContentRef = useRef(noteContent);
+  noteContentRef.current = noteContent;
   const lastVersionTimeRef = useRef(0);
   const [showHistory, setShowHistory] = useState(false);
 
@@ -200,8 +199,6 @@ export function NoteEditor({
     (note as Record<string, unknown>).perspectiveConfig as string | null | undefined,
   );
 
-  const [translateSelection, setTranslateSelection] = useState<string | undefined>();
-
   // ── Quick-translate popup ──────────────────────────────────────────
   const { sourceLang, targetLang } = useLanguageConfig(
     (note as Record<string, unknown>).perspectiveConfig as string | null | undefined,
@@ -209,6 +206,24 @@ export function NoteEditor({
   );
   const quickTranslate = useQuickTranslate(sourceLang, targetLang);
   const vocabSave = useVocabularySave();
+
+  // ── Annotation side pane ─────────────────────────────────────────
+  const sideNotesContent = useMemo(() => parseSideNotes(note.splitContent), [note.splitContent]);
+
+  const handleSideNotesChange = useCallback(
+    (html: string, markdown: string) => {
+      onSave({
+        id: note.id,
+        splitContent: JSON.stringify({ sideNotes: html, sideNotesMarkdown: markdown }),
+      });
+    },
+    [note.id, onSave],
+  );
+
+  // Clean up pointer listeners on unmount (in case drag is in progress)
+  useEffect(() => {
+    return () => pointerCleanupRef.current?.();
+  }, []);
 
   // Right-click "Translate" → show Quick Translate popup near the selected text
   const handleTranslate = useCallback(
@@ -254,7 +269,7 @@ export function NoteEditor({
 
   // Hover on annotation → show lightweight tooltip with annotation content
   const [annotationTooltip, setAnnotationTooltip] = useState<{
-    text: string;
+    html: string;
     position: { top: number; left: number };
   } | null>(null);
 
@@ -271,12 +286,12 @@ export function NoteEditor({
       const annId = highlight.getAttribute("data-annotation-id");
       if (!annId) return;
       const ann = annotationsRef.current.find((a) => a.markId === annId || a.id === annId);
-      const text =
-        ann?.content || ann?.aiSuggestion || ann?.quotedText || "Annotation — double-click to view";
+      const html = ann?.content || ann?.quotedText || "";
+      if (!html.replace(/<[^>]*>/g, "").trim()) return;
 
       const rect = highlight.getBoundingClientRect();
       setAnnotationTooltip({
-        text,
+        html,
         position: { top: rect.top - 4, left: rect.left + rect.width / 2 },
       });
     };
@@ -360,9 +375,9 @@ export function NoteEditor({
     [editor],
   );
 
-  // Cmd+S → force save (skip when split mode is active — SplitEditor handles its own)
+  // Cmd+S → force save (skip when practice mode is active)
   useEffect(() => {
-    if (activeSplitMode) return;
+    if (practiceActive) return;
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "s") {
         e.preventDefault();
@@ -371,7 +386,7 @@ export function NoteEditor({
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [flushSave, activeSplitMode]);
+  }, [flushSave, practiceActive]);
 
   // vim:save event → force save (dispatched by VimPlugin on :w command)
   useEffect(() => {
@@ -385,17 +400,16 @@ export function NoteEditor({
     return () => flushSave();
   }, [flushSave]);
 
-  // Cmd+Option+P → enter practice mode
+  // Cmd+Shift+P / Cmd+Shift+A — dispatched from KnowledgeBasePage keyboard handler
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.altKey && e.key === "p") {
-        e.preventDefault();
-        onSplitModeChange?.("practice");
-      }
+    const handler = (e: Event) => {
+      const action = (e as CustomEvent<string>).detail;
+      if (action === "toggle-practice") setPracticeActive((prev) => !prev);
+      else if (action === "toggle-annotations") setSidePaneOpen((prev) => !prev);
     };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, [onSplitModeChange]);
+    window.addEventListener("editor-mode-toggle", handler);
+    return () => window.removeEventListener("editor-mode-toggle", handler);
+  }, []);
 
   // Command line handlers
   const handleCommandLineSubmit = useCallback(
@@ -435,107 +449,135 @@ export function NoteEditor({
     ? `flex-1 min-h-0 overflow-y-auto vim-${vimMode}`
     : "flex-1 min-h-0 overflow-y-auto";
 
-  const handleToggleSplitMode = useCallback(() => {
-    if (activeSplitMode) {
-      onSplitModeChange?.(null);
-    } else {
-      onSplitModeChange?.("translation");
-    }
-  }, [activeSplitMode, onSplitModeChange]);
-
-  // Restore main editor content when leaving split mode — show left pane only
-  const prevSplitModeRef = useRef(activeSplitMode);
-  const restoreContentRef = useRef(singlePaneContent);
-  restoreContentRef.current = singlePaneContent;
-  useEffect(() => {
-    if (prevSplitModeRef.current && !activeSplitMode && editor) {
-      editor.commands.setContent(restoreContentRef.current);
-    }
-    prevSplitModeRef.current = activeSplitMode;
-  }, [activeSplitMode, editor]);
-
   return (
     <div className="flex-1 flex gap-2 min-w-0 min-h-0">
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
-        {/* Content: body */}
-        <EditorContextMenu
-          onAnnotate={handleAnnotate}
-          onFlashcard={handleFlashcard}
-          onTranslate={handleTranslate}
-          onTranslateTo={handleTranslateTo}
-          onAskAI={handleAskAI}
-          onRemoveAnnotation={handleRemoveAnnotation}
-          noteTargetLang={languagePair?.targetLang}
-        >
-          {activeSplitMode ? (
-            <div className="flex-1 flex flex-col min-h-0">
-              <SplitToolbar
-                currentMode={activeSplitMode}
-                onModeChange={(mode) =>
-                  onSplitModeChange?.(mode === "single" ? null : (mode as SplitMode))
-                }
-              />
-              <SplitEditor
-                note={note}
-                splitMode={activeSplitMode}
-                onSave={onSave}
-                onModeChange={(mode) =>
-                  onSplitModeChange?.(mode === "single" ? null : (mode as SplitMode))
-                }
-                targetLangOverride={languagePair?.targetLang}
-                sourceTextOverride={translateSelection}
-                onClearSourceOverride={() => setTranslateSelection(undefined)}
-              />
-            </div>
-          ) : (
-            <div className="flex-1 overflow-y-auto min-h-0 relative">
-              <EditorContentWrapper editor={editor} className={editorContentClass} />
-              {/* Vim command line at bottom of editor area */}
-              {vimEnabled && commandLine && (
-                <div className="absolute bottom-0 left-0 right-0">
-                  <VimCommandLine
-                    prefix={commandLine.prefix}
-                    onSubmit={handleCommandLineSubmit}
-                    onCancel={handleCommandLineCancel}
-                  />
+        {/* Practice mode — full takeover */}
+        {practiceActive ? (
+          <PracticeMode
+            noteId={note.id}
+            sourceText={note.body || ""}
+            sourceLang={sourceLang}
+            targetLang={targetLang}
+            onExit={() => setPracticeActive(false)}
+          />
+        ) : (
+          <>
+            {/* Content: body + optional side pane */}
+            <div ref={splitContainerRef} className="flex-1 flex min-h-0">
+              {/* Editor */}
+              <EditorContextMenu
+                onAnnotate={handleAnnotate}
+                onFlashcard={handleFlashcard}
+                onTranslate={handleTranslate}
+                onTranslateTo={handleTranslateTo}
+                onAskAI={handleAskAI}
+                onRemoveAnnotation={handleRemoveAnnotation}
+                noteTargetLang={languagePair?.targetLang}
+              >
+                <div
+                  className="flex-1 overflow-y-auto min-h-0 min-w-0 relative"
+                  style={sidePaneOpen ? { flex: `0 0 ${paneSplit * 100}%` } : undefined}
+                >
+                  <EditorContentWrapper editor={editor} className={editorContentClass} />
+                  {vimEnabled && commandLine && (
+                    <div className="absolute bottom-0 left-0 right-0">
+                      <VimCommandLine
+                        prefix={commandLine.prefix}
+                        onSubmit={handleCommandLineSubmit}
+                        onCancel={handleCommandLineCancel}
+                      />
+                    </div>
+                  )}
                 </div>
+              </EditorContextMenu>
+
+              {/* Resize handle + annotation pane */}
+              {sidePaneOpen && (
+                <>
+                  {/* biome-ignore lint/a11y/noStaticElementInteractions: resize handle */}
+                  <div
+                    className="w-1.5 shrink-0 cursor-col-resize group flex items-center justify-center hover:bg-purple/10 transition-colors"
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      resizingRef.current = true;
+                      const container = splitContainerRef.current;
+                      if (!container) return;
+                      const rect = container.getBoundingClientRect();
+                      const onMove = (ev: PointerEvent) => {
+                        if (!resizingRef.current) return;
+                        const ratio = (ev.clientX - rect.left) / rect.width;
+                        setPaneSplit(Math.max(0.3, Math.min(0.8, ratio)));
+                      };
+                      const onUp = () => {
+                        resizingRef.current = false;
+                        pointerCleanupRef.current = null;
+                        document.removeEventListener("pointermove", onMove);
+                        document.removeEventListener("pointerup", onUp);
+                      };
+                      document.addEventListener("pointermove", onMove);
+                      document.addEventListener("pointerup", onUp);
+                      pointerCleanupRef.current = onUp;
+                    }}
+                    onKeyDown={() => {}}
+                  >
+                    <div className="w-px h-full group-hover:bg-purple/40 transition-colors" />
+                  </div>
+
+                  <div className="flex-1 min-w-0 min-h-0 overflow-hidden border-l border-border">
+                    <AnnotationPane
+                      initialSideNotes={sideNotesContent}
+                      annotations={annotations}
+                      updateAnnotation={updateAnnotation}
+                      deleteAnnotation={deleteAnnotation}
+                      onClose={() => setSidePaneOpen(false)}
+                      onSideNotesChange={handleSideNotesChange}
+                      sourceLang={sourceLang}
+                      targetLang={targetLang}
+                    />
+                  </div>
+                </>
               )}
             </div>
-          )}
-        </EditorContextMenu>
-        {editor && <SlashMenu editor={editor} />}
-        {editor && <WikiLinkMenu editor={editor} currentNoteTitle={note.title} />}
-        {editor && <EntityMentionMenu editor={editor} />}
+            {editor && <SlashMenu editor={editor} />}
+            {editor && <WikiLinkMenu editor={editor} currentNoteTitle={note.title} />}
+            {editor && <EntityMentionMenu editor={editor} />}
 
-        {/* Gradient separator */}
-        <div
-          className="h-[2px] mx-2 mb-2 shrink-0"
-          style={{
-            background:
-              "linear-gradient(90deg, transparent 0%, var(--brand) 30%, rgba(167, 139, 250, 0.6) 50%, var(--brand) 70%, transparent 100%)",
-          }}
-        />
+            {/* Gradient separator */}
+            <div
+              className="h-[2px] mx-2 mb-2 shrink-0"
+              style={{
+                background:
+                  "linear-gradient(90deg, transparent 0%, var(--brand) 30%, rgba(167, 139, 250, 0.6) 50%, var(--brand) 70%, transparent 100%)",
+              }}
+            />
 
-        {/* Controls bar */}
-        <div className="px-2 pt-0 shrink-0">
-          <EditorToolbar
-            editor={editor}
-            vimEnabled={vimEnabled}
-            vimMode={vimMode}
-            onToggleVim={toggleVim}
-            onOpenLinkDialog={() => setLinkDialog({ type: "link", isOpen: true })}
-            onOpenImageDialog={() => setLinkDialog({ type: "image", isOpen: true })}
-            onGenerateCards={onGenerateCards}
-            onToggleSplitMode={onSplitModeChange ? handleToggleSplitMode : undefined}
-            splitModeActive={!!activeSplitMode}
-            onToggleFocusMode={onToggleFocusMode}
-            onToggleGraphMode={() => onViewModeChange(viewMode === "graph" ? "editor" : "graph")}
-            onToggleVersionHistory={() => setShowHistory(!showHistory)}
-            focusModeActive={focusModeActive}
-            graphModeActive={viewMode === "graph"}
-            versionHistoryActive={showHistory}
-          />
-        </div>
+            {/* Controls bar */}
+            <div className="px-2 pt-0 shrink-0">
+              <EditorToolbar
+                editor={editor}
+                vimEnabled={vimEnabled}
+                vimMode={vimMode}
+                onToggleVim={toggleVim}
+                onOpenLinkDialog={() => setLinkDialog({ type: "link", isOpen: true })}
+                onOpenImageDialog={() => setLinkDialog({ type: "image", isOpen: true })}
+                onGenerateCards={onGenerateCards}
+                onTogglePracticeMode={() => setPracticeActive((prev) => !prev)}
+                practiceActive={practiceActive}
+                onToggleAnnotationPane={() => setSidePaneOpen((prev) => !prev)}
+                annotationPaneActive={sidePaneOpen}
+                onToggleFocusMode={onToggleFocusMode}
+                onToggleGraphMode={() =>
+                  onViewModeChange(viewMode === "graph" ? "editor" : "graph")
+                }
+                onToggleVersionHistory={() => setShowHistory(!showHistory)}
+                focusModeActive={focusModeActive}
+                graphModeActive={viewMode === "graph"}
+                versionHistoryActive={showHistory}
+              />
+            </div>
+          </>
+        )}
       </div>
 
       {showHistory && <NoteVersionHistory noteId={note.id} onRestore={handleRestore} />}
@@ -573,7 +615,7 @@ export function NoteEditor({
             quickTranslate.dismiss();
           }}
           onPractice={() => {
-            onSplitModeChange?.("practice");
+            setPracticeActive(true);
             quickTranslate.dismiss();
           }}
           onDismiss={quickTranslate.dismiss}
@@ -584,18 +626,16 @@ export function NoteEditor({
       {annotationTooltip &&
         createPortal(
           <div
-            className="fixed z-[60] max-w-[240px] rounded-lg px-2.5 py-1.5 text-xs text-primary leading-relaxed line-clamp-3 pointer-events-none"
+            className="fixed z-[60] max-w-[280px] rounded-lg pointer-events-none bg-popover text-popover-foreground border border-border shadow-md editor-content-compact"
             style={{
               top: annotationTooltip.position.top,
               left: annotationTooltip.position.left,
               transform: "translate(-50%, -100%)",
-              background: "var(--surface-floating)",
-              border: "1px solid var(--glass-border)",
-              boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+              padding: "0.5rem 0.75rem",
             }}
-          >
-            {annotationTooltip.text}
-          </div>,
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: annotation content
+            dangerouslySetInnerHTML={{ __html: annotationTooltip.html }}
+          />,
           document.body,
         )}
 

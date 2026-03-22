@@ -468,7 +468,9 @@ export function SplitEditor({
             />
           ) : splitMode === "annotation" ? (
             <AnnotationSidebar
-              noteId={note.id}
+              annotations={[]}
+              updateAnnotation={async () => {}}
+              deleteAnnotation={async () => {}}
               activeAnnotationId={activeAnnotationId}
               onAnnotationClick={handleSidebarAnnotationClick}
               sourceLang={sourceLang}

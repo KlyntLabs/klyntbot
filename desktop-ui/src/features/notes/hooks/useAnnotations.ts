@@ -1,5 +1,5 @@
 import { ipc } from "@shared/hooks/useIpc";
-import { invalidateQueries, useQuery } from "@shared/hooks/useQuery";
+import { useQuery } from "@shared/hooks/useQuery";
 import type { Editor } from "@tiptap/react";
 import { useCallback, useEffect } from "react";
 
@@ -98,19 +98,22 @@ export function useAnnotations(noteId: string | null, editor: Editor | null) {
         });
         if (modified) editor.view.dispatch(tr);
 
-        invalidateQueries("annotation_list_for_note");
+        refetch();
       } catch {
         // Rollback: remove the optimistic mark
         editor.commands.unsetAnnotation(params.markId);
       }
     },
-    [editor],
+    [editor, refetch],
   );
 
-  const updateAnnotation = useCallback(async (params: AnnotationUpdateParams) => {
-    await ipc<AnnotationResponse>("annotation_update", { params });
-    invalidateQueries("annotation_list_for_note");
-  }, []);
+  const updateAnnotation = useCallback(
+    async (params: AnnotationUpdateParams) => {
+      await ipc<AnnotationResponse>("annotation_update", { params });
+      refetch();
+    },
+    [refetch],
+  );
 
   const deleteAnnotation = useCallback(
     async (id: string) => {
@@ -119,9 +122,9 @@ export function useAnnotations(noteId: string | null, editor: Editor | null) {
         editor.commands.unsetAnnotation(id);
       }
       await ipc<void>("annotation_delete", { id });
-      invalidateQueries("annotation_list_for_note");
+      refetch();
     },
-    [editor],
+    [editor, refetch],
   );
 
   return {

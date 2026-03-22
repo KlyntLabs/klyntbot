@@ -5,7 +5,6 @@ import {
   AlignRight,
   Bold,
   Code,
-  Columns,
   Expand,
   GitGraph,
   Heading1,
@@ -15,6 +14,7 @@ import {
   History,
   ImageIcon,
   Italic,
+  Languages,
   Link,
   List,
   ListChecks,
@@ -22,6 +22,7 @@ import {
   Minus,
   Quote,
   Sparkles,
+  StickyNote,
   Strikethrough,
   Table,
   Underline as UnderlineIcon,
@@ -40,11 +41,13 @@ interface EditorToolbarProps {
   onToggleFocusMode?: () => void;
   onToggleGraphMode?: () => void;
   onToggleVersionHistory?: () => void;
-  onToggleSplitMode?: () => void;
+  onTogglePracticeMode?: () => void;
+  onToggleAnnotationPane?: () => void;
+  practiceActive?: boolean;
+  annotationPaneActive?: boolean;
   focusModeActive?: boolean;
   graphModeActive?: boolean;
   versionHistoryActive?: boolean;
-  splitModeActive?: boolean;
 }
 
 interface ToolbarButton {
@@ -232,28 +235,44 @@ export function EditorToolbar({
   onToggleFocusMode,
   onToggleGraphMode,
   onToggleVersionHistory,
-  onToggleSplitMode,
+  onTogglePracticeMode,
+  onToggleAnnotationPane,
+  practiceActive,
+  annotationPaneActive,
   focusModeActive,
   graphModeActive,
   versionHistoryActive,
-  splitModeActive,
 }: EditorToolbarProps) {
   if (!editor) return null;
 
   const modeButtons = (
     <div className="flex items-center gap-0.5 ml-auto">
-      {onToggleSplitMode && (
+      {onTogglePracticeMode && (
         <button
           type="button"
-          onClick={onToggleSplitMode}
-          title="Split-pane editor"
+          onClick={onTogglePracticeMode}
+          title="Practice mode (⇧⌘P)"
           className={`p-1.5 rounded-lg transition-all ${
-            splitModeActive
-              ? "bg-brand/15 text-brand"
+            practiceActive
+              ? "bg-purple/15 text-purple"
               : "text-dim hover:text-muted-foreground hover:bg-card"
           }`}
         >
-          <Columns className="w-3.5 h-3.5" strokeWidth={1.5} />
+          <Languages className="w-3.5 h-3.5" strokeWidth={1.5} />
+        </button>
+      )}
+      {onToggleAnnotationPane && (
+        <button
+          type="button"
+          onClick={onToggleAnnotationPane}
+          title="Annotation pane (⇧⌘A)"
+          className={`p-1.5 rounded-lg transition-all ${
+            annotationPaneActive
+              ? "bg-purple/15 text-purple"
+              : "text-dim hover:text-muted-foreground hover:bg-card"
+          }`}
+        >
+          <StickyNote className="w-3.5 h-3.5" strokeWidth={1.5} />
         </button>
       )}
       {onGenerateCards && (

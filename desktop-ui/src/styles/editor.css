@@ -555,3 +555,83 @@
 .perspective-badge:hover {
   opacity: 0.8;
 }
+
+/* ── Compact editor for annotation notes ────────────────────── */
+.editor-content-compact {
+  padding: 0.1rem 0.25rem;
+  outline: none;
+  color: var(--color-primary);
+  font-size: 0.6875rem;
+  line-height: 1.45;
+  caret-color: var(--brand);
+}
+
+.editor-content-compact > *:first-child {
+  margin-top: 0;
+}
+
+.editor-content-compact p {
+  margin: 0.1rem 0;
+}
+
+.editor-content-compact h1,
+.editor-content-compact h2,
+.editor-content-compact h3 {
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin: 0.2rem 0 0.1rem;
+  color: var(--color-primary);
+}
+
+.editor-content-compact ul {
+  list-style-type: disc;
+  padding-left: 0.9rem;
+  margin: 0.1rem 0;
+}
+
+.editor-content-compact ol {
+  list-style-type: decimal;
+  padding-left: 0.9rem;
+  margin: 0.1rem 0;
+}
+
+.editor-content-compact li {
+  margin: 0;
+}
+
+.editor-content-compact li::marker {
+  color: color-mix(in srgb, var(--brand) 50%, var(--color-muted));
+}
+
+.editor-content-compact strong {
+  font-weight: 600;
+}
+
+.editor-content-compact em {
+  color: var(--color-muted-foreground);
+  font-style: italic;
+}
+
+.editor-content-compact blockquote {
+  border-left: 2px solid var(--border);
+  padding-left: 0.4rem;
+  margin: 0.1rem 0;
+  color: var(--color-muted-foreground);
+}
+
+.editor-content-compact code {
+  font-size: 0.625rem;
+  padding: 0.05rem 0.2rem;
+  border-radius: 3px;
+  background: var(--surface-hover);
+}
+
+.editor-content-compact .is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--color-muted-foreground);
+  opacity: 0.4;
+  pointer-events: none;
+  height: 0;
+  font-size: 0.6875rem;
+}

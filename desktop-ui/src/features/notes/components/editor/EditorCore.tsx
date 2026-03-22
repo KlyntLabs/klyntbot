@@ -206,6 +206,7 @@ interface UseNoteEditorOptions {
   onNavigateNote?: (noteId: string) => void;
   onNavigateEntity?: (entityType: string, entityId: string) => void;
   vimOptions?: VimModeOptions;
+  editorClass?: string;
 }
 
 /** Convert a file to base64 string. */
@@ -229,6 +230,7 @@ export function useNoteEditor({
   onNavigateNote,
   onNavigateEntity,
   vimOptions,
+  editorClass = "editor-content",
 }: UseNoteEditorOptions) {
   return useEditor({
     extensions: getEditorExtensions({
@@ -242,7 +244,7 @@ export function useNoteEditor({
       onUpdate(ed.getHTML(), ed.storage.markdown.getMarkdown());
     },
     editorProps: {
-      attributes: { class: "editor-content" },
+      attributes: { class: editorClass },
       scrollThreshold: { top: 80, bottom: 80, left: 0, right: 0 },
       scrollMargin: { top: 80, bottom: 80, left: 0, right: 0 },
       handlePaste: (view, event) => {
