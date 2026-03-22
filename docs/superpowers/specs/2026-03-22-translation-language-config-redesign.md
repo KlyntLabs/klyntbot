@@ -23,8 +23,8 @@ LANGUAGE
 
 - Each dropdown shows `flag + native name` for each language
 - A `text-[9px]` label below each reads "Source" / "Target"
-- On change, calls `setLanguagePair({ sourceLang, targetLang })` from `usePerspective` to persist to the note's `perspectiveConfig`
-- Defaults for new notes (no `perspectiveConfig` yet): `🇻🇳 Tiếng Việt` source → `🇬🇧 English` target, resolved from global config fallback in `useLanguageConfig`
+- On change, saves to the note's `perspectiveConfig` via `ipc("note_update")` — same mechanism `usePerspective.setLanguagePair()` uses
+- Defaults for new notes (no `perspectiveConfig` yet): whatever `useLanguageConfig` resolves from global config → auto-detect → fallback. For a user with `nativeLang: "vi"` and `targetLang: "en"` in global config, this shows `🇻🇳 Tiếng Việt → 🇬🇧 English`
 
 ### 2. Simplified Context Menu
 
@@ -42,39 +42,51 @@ The "Translate" item becomes a **direct action** — single click, no submenu:
 
 Removes `TRANSLATE_LANGUAGES` submenu from `EditorContextMenu`. The language pair is already resolved by `useLanguageConfig` from the note's `perspectiveConfig`.
 
-### 3. Data Flow
-
-No backend changes. The flow:
+### 3. Component Tree & Data Flow
 
 ```
-Panel dropdown change
-  → setLanguagePair({ sourceLang, targetLang })     // usePerspective (existing)
-  → ipc("note_update", { perspectiveConfig: ... })  // persists to SQLite
-
-Context menu "Translate" click
-  → useLanguageConfig reads perspectiveConfig        // already resolved
-  → triggerTranslateText(text, rect)                 // useQuickTranslate (existing)
-  → ipc("language_quick_translate", { text, sourceLang, targetLang })
+KnowledgeBasePage
+  ├── NoteEditorPanel → NoteEditor
+  │     ├── EditorContextMenu  ← "Translate" (single click, uses resolved lang pair)
+  │     ├── useLanguageConfig(perspectiveConfig)  ← resolves sourceLang/targetLang
+  │     ├── usePerspective  ← setLanguagePair() for context menu (existing)
+  │     └── useQuickTranslate  ← triggerTranslateText()
+  └── ContextPanel
+        └── AISuggestionsPanel  ← NEW: language dropdowns
+              ├── useLanguageConfig(perspectiveConfig)  ← resolves current pair for display
+              └── ipc("note_update", { perspectiveConfig })  ← saves changes directly
 ```
+
+**Key insight:** `AISuggestionsPanel` lives in `ContextPanel` (sibling of `NoteEditor`, not a child). Instead of threading callbacks up through `KnowledgeBasePage`, the panel handles language persistence internally:
+
+1. `ContextPanel` already receives `note: Note | null` — pass `perspectiveConfig` down to `AISuggestionsPanel`
+2. `AISuggestionsPanel` calls `useLanguageConfig(perspectiveConfig)` to resolve current languages for display
+3. On dropdown change, `AISuggestionsPanel` saves directly via `ipc("note_update", { id: noteId, params: { perspectiveConfig: updatedJson } })` — the same pattern `usePerspective` uses
+4. `NoteEditor`'s `useLanguageConfig` picks up the change on next render via the SWR cache invalidation from `note_update`
+
+No backend changes needed.
 
 ## Changes
 
 ### Files to modify
 
-1. **`AISuggestionsPanel.tsx`** — Add "Language" section with two dropdown selectors. New props: `sourceLang`, `targetLang`, `onLanguageChange(field, code)`.
+1. **`AISuggestionsPanel.tsx`** — Add "Language" section with two dropdown selectors. New prop: `perspectiveConfig: string | null`. Calls `useLanguageConfig` internally. Saves language changes via direct `ipc("note_update")`.
 
-2. **`EditorContextMenu.tsx`** — Remove `TRANSLATE_LANGUAGES` array and submenu. "Translate" becomes a `MenuItem` calling `onTranslate(selectedText, rect)`. Remove `onTranslateTo` prop and `noteTargetLang` prop.
+2. **`ContextPanel.tsx`** — Pass `note?.perspectiveConfig ?? null` (from existing `note` prop) to `AISuggestionsPanel`.
 
-3. **`NoteEditor.tsx`** — Pass `sourceLang`/`targetLang`/`onLanguageChange` to `AISuggestionsPanel`. Simplify `handleTranslateTo` → `handleTranslate` (no lang param, uses already-resolved language pair). Remove `onTranslateTo` from context menu wiring.
+3. **`EditorContextMenu.tsx`** — Remove `TRANSLATE_LANGUAGES` array and the `<ContextMenu.Sub>` submenu block. "Translate" becomes a plain `MenuItem` calling existing `onTranslate(selectedText, rect)`. Remove `onTranslateTo` prop and `noteTargetLang` prop.
 
-4. **New shared constant** — Move `TRANSLATE_LANGUAGES` to a shared constants file (e.g., `@shared/constants/languages.ts`) with flag emojis added. Used by both `AISuggestionsPanel` dropdowns and any future language selection UI.
+4. **`NoteEditor.tsx`** — Remove `handleTranslateTo` and its wiring to context menu. The existing `handleTranslate` already does what's needed. Remove `onTranslateTo` and `noteTargetLang` from `EditorContextMenu` props.
+
+5. **New shared constant** — Create `@shared/constants/languages.ts` (new `constants/` directory) with `LANGUAGES` array containing `{ code, label, native, flag }`. Reused by `AISuggestionsPanel` dropdowns.
 
 ### Files unchanged
 
 - `useLanguageConfig.ts` — already resolves per-note overrides from `perspectiveConfig`
-- `usePerspective.ts` — `setLanguagePair()` already persists to `perspectiveConfig`
+- `usePerspective.ts` — still used by `NoteEditor` for other perspective operations
 - `useQuickTranslate.ts` — already receives `sourceLang`/`targetLang` as params
 - `QuickTranslatePopup.tsx` — no changes
+- `KnowledgeBasePage.tsx` — no changes (data already flows through existing props)
 - All Rust backend — no changes
 
 ## Language List
@@ -95,7 +107,7 @@ Shared constant with flag emojis:
 | ar | 🇸🇦 | العربية |
 | th | 🇹🇭 | ไทย |
 | hi | 🇮🇳 | हिन्दी |
-| pt | 🇧🇷 | Português |
+| pt | 🇵🇹 | Português |
 
 ## Non-goals
 
