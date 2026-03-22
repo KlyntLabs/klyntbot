@@ -114,6 +114,19 @@ impl AppCore {
             }
         }
 
+        // Fire-and-forget: propagate review to related cards via knowledge graph (FIRe).
+        let prop_repo = repo.clone();
+        let prop_card = card.clone();
+        let prop_quality = params.quality.clone();
+        tokio::spawn(async move {
+            if let Err(e) =
+                super::graph_propagation::propagate_review(&prop_repo, &prop_card, &prop_quality)
+                    .await
+            {
+                tracing::warn!("Graph propagation failed: {e}");
+            }
+        });
+
         Ok(flashcard_to_response(card))
     }
 
@@ -155,8 +168,7 @@ impl AppCore {
             .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?;
 
         // Fire-and-forget: embed the newly created card in the background.
-        if let (Some(engine), Some(vs)) =
-            (self.embedding_engine.clone(), self.vector_store.clone())
+        if let (Some(engine), Some(vs)) = (self.embedding_engine.clone(), self.vector_store.clone())
         {
             let row_for_embed = row.clone();
             tokio::spawn(async move {
@@ -237,13 +249,8 @@ impl AppCore {
     /// - No vector store is available
     /// - The card has no stored embedding
     /// - Embedding the user answer fails
-    pub async fn compute_answer_similarity(
-        &self,
-        card_id: &str,
-        user_answer: &str,
-    ) -> f64 {
-        let (Some(engine), Some(vs)) =
-            (self.embedding_engine.clone(), self.vector_store.clone())
+    pub async fn compute_answer_similarity(&self, card_id: &str, user_answer: &str) -> f64 {
+        let (Some(engine), Some(vs)) = (self.embedding_engine.clone(), self.vector_store.clone())
         else {
             return 0.0;
         };

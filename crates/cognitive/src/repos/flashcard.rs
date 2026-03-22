@@ -211,10 +211,7 @@ impl FlashcardRepo {
     }
 
     /// Get the next review card for an atom: due card first, fallback to most recent.
-    pub async fn next_for_atom(
-        &self,
-        atom_id: &str,
-    ) -> Result<Option<FlashcardRow>, sqlx::Error> {
+    pub async fn next_for_atom(&self, atom_id: &str) -> Result<Option<FlashcardRow>, sqlx::Error> {
         let now = Utc::now().to_rfc3339();
         // Single query: prioritize due cards, then fall back to most recently created
         sqlx::query_as::<_, FlashcardRow>(
@@ -634,6 +631,126 @@ impl FlashcardRepo {
             }
             None => Ok((crate::services::fsrs5::DEFAULT_WEIGHTS, 0.9)),
         }
+    }
+
+    /// Find flashcards whose `source_note_id` is connected via the `note_links` table
+    /// to the given note. Both directions of the link are followed.
+    /// Limit 20, excludes the reviewed card, skips suspended.
+    pub async fn find_cards_linked_by_notes(
+        &self,
+        source_note_id: &str,
+        exclude_card_id: &str,
+    ) -> Result<Vec<FlashcardRow>, sqlx::Error> {
+        sqlx::query_as::<_, FlashcardRow>(
+            r#"
+            SELECT DISTINCT f.* FROM flashcards f
+            INNER JOIN note_links nl
+                ON (f.source_note_id = nl.target_id OR f.source_note_id = nl.source_id)
+            WHERE (nl.source_id = ?1 OR nl.target_id = ?1)
+              AND f.source_note_id != ?1
+              AND f.id != ?2
+              AND f.suspended = 0
+            LIMIT 20
+            "#,
+        )
+        .bind(source_note_id)
+        .bind(exclude_card_id)
+        .fetch_all(&self.pool)
+        .await
+    }
+
+    /// Find flashcards sharing the same atom domain as the given atom.
+    /// Joins `flashcards` → `knowledge_atoms` on matching domain.
+    /// Limit 20, excludes the reviewed card, skips suspended.
+    pub async fn find_cards_same_domain(
+        &self,
+        atom_id: &str,
+        exclude_card_id: &str,
+    ) -> Result<Vec<FlashcardRow>, sqlx::Error> {
+        sqlx::query_as::<_, FlashcardRow>(
+            r#"
+            SELECT f.* FROM flashcards f
+            INNER JOIN knowledge_atoms ka ON f.atom_id = ka.id
+            WHERE ka.domain = (SELECT domain FROM knowledge_atoms WHERE id = ?1)
+              AND f.id != ?2
+              AND f.suspended = 0
+            LIMIT 20
+            "#,
+        )
+        .bind(atom_id)
+        .bind(exclude_card_id)
+        .fetch_all(&self.pool)
+        .await
+    }
+
+    /// Extend a card's `due_at` by a fraction of its current interval.
+    /// Cap boost at 20% of the interval. Only applies to cards due within 48 hours.
+    pub async fn apply_propagation_boost(
+        &self,
+        card_id: &str,
+        boost_fraction: f64,
+    ) -> Result<(), sqlx::Error> {
+        let capped = boost_fraction.min(0.20);
+        let now = Utc::now().to_rfc3339();
+
+        // Only boost cards that are due within 48 hours from now.
+        // The boost extends due_at by `capped * interval_seconds` where
+        // interval = due_at - last_reviewed_at (or created_at).
+        sqlx::query(
+            r#"
+            UPDATE flashcards
+            SET due_at = datetime(due_at, '+' || CAST(
+                ROUND(?1 * (julianday(due_at) - julianday(COALESCE(last_reviewed_at, created_at))) * 86400)
+                AS INTEGER) || ' seconds'),
+                updated_at = ?3
+            WHERE id = ?2
+              AND suspended = 0
+              AND due_at IS NOT NULL
+              AND due_at <= datetime(?3, '+48 hours')
+              AND last_reviewed_at IS NOT NULL
+            "#,
+        )
+        .bind(capped)
+        .bind(card_id)
+        .bind(&now)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    /// Reduce a card's `due_at` by a tiny fraction (pull it forward).
+    /// Max penalty is 0.08. Only affects cards due within 72 hours.
+    pub async fn apply_propagation_penalty(
+        &self,
+        card_id: &str,
+        max_penalty: f64,
+    ) -> Result<(), sqlx::Error> {
+        let capped = max_penalty.min(0.08);
+        let now = Utc::now().to_rfc3339();
+
+        // Reduce due_at by `capped * interval_seconds` (pull due date closer).
+        sqlx::query(
+            r#"
+            UPDATE flashcards
+            SET due_at = datetime(due_at, '-' || CAST(
+                ROUND(?1 * (julianday(due_at) - julianday(COALESCE(last_reviewed_at, created_at))) * 86400)
+                AS INTEGER) || ' seconds'),
+                updated_at = ?3
+            WHERE id = ?2
+              AND suspended = 0
+              AND due_at IS NOT NULL
+              AND due_at <= datetime(?3, '+72 hours')
+              AND last_reviewed_at IS NOT NULL
+            "#,
+        )
+        .bind(capped)
+        .bind(card_id)
+        .bind(&now)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
     }
 }
 

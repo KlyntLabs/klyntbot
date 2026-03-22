@@ -4,6 +4,7 @@ mod crud;
 pub mod distractors;
 pub(crate) mod flashcard;
 pub mod grading;
+mod graph_propagation;
 mod inbox;
 mod insight;
 mod insight_context;

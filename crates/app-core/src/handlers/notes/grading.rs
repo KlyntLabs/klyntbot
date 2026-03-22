@@ -1,6 +1,6 @@
 use desktop_shared::commands::{
-    DiffSegmentResponse, FlashcardExplainParams, FlashcardExplainResponse,
-    FlashcardResponse, FlashcardSubmitAnswerParams, GradeResultResponse,
+    DiffSegmentResponse, FlashcardExplainParams, FlashcardExplainResponse, FlashcardResponse,
+    FlashcardSubmitAnswerParams, GradeResultResponse,
 };
 use desktop_shared::errors::ApiError;
 
@@ -342,22 +342,13 @@ Be concise — 2-4 sentences max."#
 
     /// Return prerequisite cards for a given card.
     ///
-    /// Placeholder — graph propagation (Task 7) will populate real prerequisites.
-    /// For now returns an empty vec so the Tauri command compiles and is callable.
+    /// Delegates to the graph propagation module which finds cards linked via
+    /// `note_links` that are due within 7 days.
     pub async fn flashcard_get_prerequisites(
         &self,
         card_id: &str,
     ) -> Result<Vec<FlashcardResponse>, ApiError> {
-        // Validate the card exists so callers get a proper NOT_FOUND rather than
-        // a silent empty list for a bad id.
-        let repo = self.flashcard_repo()?;
-        let _ = repo
-            .get_by_id(card_id)
-            .await
-            .map_err(|e| ApiError::new("STORAGE_ERROR", e.to_string()))?
-            .ok_or_else(|| ApiError::new("NOT_FOUND", "Flashcard not found"))?;
-
-        Ok(vec![])
+        self.flashcard_get_prerequisites_impl(card_id).await
     }
 }
 
