@@ -28,14 +28,14 @@ export function PracticeProgressHeader({
           className="absolute inset-0 bg-brand/10 rounded-full origin-left transition-[width] duration-300"
           style={{ width: `${progressPct}%` }}
         />
-        <span className="relative text-xs text-secondary z-10">{centerLabel}</span>
+        <span className="relative text-xs text-primary z-10">{centerLabel}</span>
       </div>
 
       {/* Right: exit button */}
       <button
         type="button"
         onClick={onExit}
-        className="text-xs text-muted hover:text-primary px-2.5 py-1 rounded-full border border-border hover:border-brand/40 transition-colors"
+        className="text-xs text-primary bg-surface-hover hover:bg-brand/20 hover:text-brand px-3 py-1 rounded-md transition-colors"
       >
         Exit &amp; Save
       </button>

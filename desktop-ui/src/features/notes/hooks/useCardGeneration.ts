@@ -48,9 +48,11 @@ export function useCardGeneration(): UseCardGenerationReturn {
 
     try {
       const response = await ipc<GenerateResponse>("flashcard_generate", {
-        noteId: noteId ?? null,
-        textContent: textContent ?? null,
-        deckHint: deckHint ?? null,
+        params: {
+          noteId: noteId ?? null,
+          textContent: textContent ?? null,
+          deckHint: deckHint ?? null,
+        },
       });
       setPreviews(response.cards);
       setDeckSuggestion(response.deckSuggestion);
@@ -98,9 +100,11 @@ export function useCardGeneration(): UseCardGenerationReturn {
       setSaving(true);
       try {
         await ipc("flashcard_save_generated", {
-          noteId,
-          deck,
-          cards: approvedCards,
+          params: {
+            noteId,
+            deck,
+            cards: approvedCards,
+          },
         });
         invalidateQueries("flashcard_");
         setPreviews([]);

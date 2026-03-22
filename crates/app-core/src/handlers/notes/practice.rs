@@ -73,15 +73,50 @@ fn grade_to_stability(grade: &str) -> f64 {
     }
 }
 
+/// Split note text into practice segments using line boundaries.
+///
+/// Each non-empty line becomes one segment. Lines without terminal sentence
+/// punctuation and shorter than 80 chars are classified as headings; everything
+/// else is a sentence. No LLM call — deterministic and instant.
+fn split_into_segments(text: &str) -> Vec<desktop_shared::commands::PracticeSegment> {
+    let mut segments = Vec::new();
+    let mut index = 0u32;
+
+    for line in text.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        let is_heading = trimmed.len() < 80
+            && !trimmed.ends_with('.')
+            && !trimmed.ends_with('!')
+            && !trimmed.ends_with('?')
+            && !trimmed.ends_with('\u{3002}') // 。
+            && !trimmed.ends_with('\u{ff01}') // ！
+            && !trimmed.ends_with('\u{ff1f}'); // ？
+
+        segments.push(desktop_shared::commands::PracticeSegment {
+            index,
+            text: trimmed.to_string(),
+            segment_type: if is_heading { "heading" } else { "sentence" }.to_string(),
+            suggested_focus: "vocabulary".to_string(),
+            skipped: false,
+        });
+        index += 1;
+    }
+
+    segments
+}
+
 impl AppCore {
-    /// Segment a note into practice-sized translation units via LLM.
+    /// Segment a note into practice-sized translation units.
     ///
-    /// Checks `perspective_config` on the note for a cached `practice_segments` key first.
+    /// Splits deterministically by line boundaries — no LLM call needed.
     pub async fn practice_segment_note(
         &self,
         params: PracticeSegmentParams,
     ) -> Result<PracticeSegmentResponse, ApiError> {
-        // Fetch the note
         let note = self
             .note_repo
             .get_note(&params.note_id)
@@ -89,111 +124,14 @@ impl AppCore {
             .map_err(map_cognitive_err)?
             .ok_or_else(|| ApiError::new("NOT_FOUND", "Note not found"))?;
 
-        // Check cache in perspective_config
-        if let Some(ref pc_json) = note.perspective_config {
-            if let Ok(pc) = serde_json::from_str::<serde_json::Value>(pc_json) {
-                if let Some(cached) = pc.get("practice_segments") {
-                    // Verify it matches the requested language pair
-                    let matches_langs = cached
-                        .get("source_lang")
-                        .and_then(|v| v.as_str())
-                        .is_some_and(|l| l == params.source_lang)
-                        && cached
-                            .get("target_lang")
-                            .and_then(|v| v.as_str())
-                            .is_some_and(|l| l == params.target_lang);
-
-                    if matches_langs {
-                        if let Ok(resp) =
-                            serde_json::from_value::<PracticeSegmentResponse>(cached.clone())
-                        {
-                            return Ok(resp);
-                        }
-                    }
-                }
-            }
-        }
-
-        // Not cached — call LLM
-        let provider = self
-            .cognitive_provider
-            .as_ref()
-            .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "LLM provider not configured"))?;
-
-        let config = self.config.read().await;
-        let chat_params = providers::cognitive_chat_params(&config, 2048);
-        drop(config);
-
-        let system =
-            practice_prompts::segmentation_prompt(&params.source_lang, &params.target_lang);
-        let messages = vec![
-            providers::Message::System { content: system },
-            providers::Message::User {
-                content: providers::UserContent::Text(note.body.clone()),
-            },
-        ];
-
-        let response = provider
-            .chat(&messages, None, &chat_params)
-            .await
-            .map_err(|e| ApiError::new("LLM_ERROR", e.to_string()))?;
-
-        let text = response
-            .content
-            .ok_or_else(|| ApiError::new("LLM_ERROR", "Empty response from LLM"))?;
-
-        let cleaned = common::helpers::strip_llm_fences(&text);
-        let segments: Vec<desktop_shared::commands::PracticeSegment> =
-            serde_json::from_str(cleaned).map_err(|e| {
-                ApiError::new(
-                    "PARSE_ERROR",
-                    format!("Failed to parse segmentation response: {e}"),
-                )
-            })?;
-
+        let segments = split_into_segments(&note.body);
         let estimated_mins = (segments.len() as f64 * 1.2).ceil() as u32;
-        let cached_at = chrono::Utc::now().to_rfc3339();
 
-        let resp = PracticeSegmentResponse {
-            segments: segments.clone(),
+        Ok(PracticeSegmentResponse {
+            segments,
             estimated_mins,
-            cached_at: Some(cached_at.clone()),
-        };
-
-        // Cache into perspective_config
-        let mut pc: serde_json::Value = note
-            .perspective_config
-            .as_deref()
-            .and_then(|s| serde_json::from_str(s).ok())
-            .unwrap_or_else(|| serde_json::json!({}));
-
-        pc["practice_segments"] = serde_json::json!({
-            "source_lang": params.source_lang,
-            "target_lang": params.target_lang,
-            "segments": segments,
-            "estimated_mins": estimated_mins,
-            "cached_at": cached_at,
-        });
-
-        let pc_str = serde_json::to_string(&pc).unwrap_or_default();
-        let _ = self
-            .note_repo
-            .update_note(
-                &params.note_id,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                Some(Some(&pc_str)),
-            )
-            .await;
-
-        Ok(resp)
+            cached_at: None,
+        })
     }
 
     /// Create a new practice session.

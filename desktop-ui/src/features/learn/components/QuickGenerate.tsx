@@ -1,3 +1,4 @@
+import { ThinkingDots } from "@shared/ui/ThinkingDots";
 import { Clipboard, FileText, Loader2, MessageSquare } from "lucide-react";
 import { useState } from "react";
 import { NotePicker } from "./NotePicker";
@@ -21,8 +22,8 @@ export function QuickGenerate({
   if (generating) {
     return (
       <div className="glass-card p-4 flex items-center justify-center gap-2">
-        <Loader2 size={16} className="text-brand animate-spin" strokeWidth={1.5} />
-        <span className="text-sm text-muted-foreground">Generating cards...</span>
+        <ThinkingDots size="sm" />
+        <span className="text-sm text-muted-foreground">Generating cards</span>
       </div>
     );
   }

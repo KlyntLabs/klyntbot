@@ -1,7 +1,16 @@
+import { ThinkingDots } from "@shared/ui/ThinkingDots";
 import { useEffect, useRef, useState } from "react";
 import type { PracticeCorrection, PracticeScores } from "../../hooks/usePracticeEvaluation";
 import { gradeBgClass, gradeColorClass } from "../../lib/gradeUtils";
 import { ConfidenceTap } from "./ConfidenceTap";
+
+function gradeToConfidence(grade: string): number {
+  if (grade === "A+" || grade === "A") return 5;
+  if (grade === "A-" || grade === "B+") return 4;
+  if (grade === "B" || grade === "B-") return 3;
+  if (grade === "C+" || grade === "C") return 2;
+  return 1;
+}
 
 // ── Props ─────────────────────────────────────────────────
 
@@ -64,22 +73,22 @@ function InputBar({
 
   return (
     <div className="flex flex-col gap-1">
-      <div className="flex items-center gap-2">
-        <p className="text-brand text-xs mb-1">{currentSegmentText}</p>
-        {loading && (
-          <span className="inline-block w-3 h-3 border-2 border-brand border-t-transparent rounded-full animate-spin" />
-        )}
-      </div>
-      <textarea
-        ref={textareaRef}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={handleKeyDown}
-        disabled={loading}
-        placeholder="Type your translation..."
-        rows={3}
-        className="bg-surface-hover border border-border rounded-lg p-3 text-sm text-primary resize-none placeholder:text-dim disabled:opacity-50"
-      />
+      {loading ? (
+        <div className="flex items-center gap-2 p-3">
+          <span className="text-xs text-muted">Evaluating</span>
+          <ThinkingDots size="sm" />
+        </div>
+      ) : (
+        <textarea
+          ref={textareaRef}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Type your translation..."
+          rows={2}
+          className="bg-transparent p-3 text-sm text-primary resize-none placeholder:text-dim focus:outline-none"
+        />
+      )}
       {error && <p className="text-red-400 text-xs">{error}</p>}
     </div>
   );
@@ -98,7 +107,7 @@ function EvalBar({
   onEdit: () => void;
   lastTranslation: string;
 }) {
-  const [confidence, setConfidence] = useState(4);
+  const [confidence, setConfidence] = useState(() => gradeToConfidence(evaluation.overallGrade));
   const [modelExpanded, setModelExpanded] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -247,7 +256,7 @@ export function PracticeBottomBar({
   };
 
   return (
-    <div className="border-t border-border px-4 py-3 shrink-0 min-h-[200px]">
+    <div className="border-t border-border px-4 py-2 shrink-0">
       {state === "input" ? (
         <InputBar
           currentSegmentText={currentSegmentText}

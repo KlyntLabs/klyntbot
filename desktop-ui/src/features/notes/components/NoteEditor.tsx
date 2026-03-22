@@ -6,7 +6,7 @@ import { useNavigate } from "react-router";
 import { type AnnotationResponse, useAnnotations } from "../hooks/useAnnotations";
 import { useEditorActions } from "../hooks/useEditorActions";
 import { useLanguageConfig } from "../hooks/useLanguageConfig";
-import { usePerspective } from "../hooks/usePerspective";
+
 import { useQuickTranslate } from "../hooks/useQuickTranslate";
 import { useVocabularySave } from "../hooks/useVocabularySave";
 import { AnnotationPane } from "./AnnotationPane";
@@ -193,15 +193,9 @@ export function NoteEditor({
     createAnnotation,
   );
 
-  const { setLanguagePair, languagePair } = usePerspective(
-    note.id,
-    editor,
-    (note as Record<string, unknown>).perspectiveConfig as string | null | undefined,
-  );
-
   // ── Quick-translate popup ──────────────────────────────────────────
   const { sourceLang, targetLang } = useLanguageConfig(
-    (note as Record<string, unknown>).perspectiveConfig as string | null | undefined,
+    note.perspectiveConfig,
     note.body ?? undefined,
   );
   const quickTranslate = useQuickTranslate(sourceLang, targetLang);
@@ -231,16 +225,6 @@ export function NoteEditor({
       quickTranslate.triggerTranslateText(selectedText, rect);
     },
     [quickTranslate.triggerTranslateText],
-  );
-
-  const handleTranslateTo = useCallback(
-    (targetLang: string, selectedText?: string, rect?: { top: number; left: number }) => {
-      setLanguagePair({ targetLang });
-      if (selectedText) {
-        quickTranslate.triggerTranslateText(selectedText, rect);
-      }
-    },
-    [setLanguagePair, quickTranslate.triggerTranslateText],
   );
 
   // Annotation popover state
@@ -470,10 +454,8 @@ export function NoteEditor({
                 onAnnotate={handleAnnotate}
                 onFlashcard={handleFlashcard}
                 onTranslate={handleTranslate}
-                onTranslateTo={handleTranslateTo}
                 onAskAI={handleAskAI}
                 onRemoveAnnotation={handleRemoveAnnotation}
-                noteTargetLang={languagePair?.targetLang}
               >
                 <div
                   className="flex-1 overflow-y-auto min-h-0 min-w-0 relative"
@@ -607,17 +589,8 @@ export function NoteEditor({
       {quickTranslate.selection && quickTranslate.position && (
         <QuickTranslatePopup
           translation={quickTranslate.translation}
-          words={quickTranslate.words}
           position={quickTranslate.position}
           loading={quickTranslate.loading}
-          onSaveWords={() => {
-            vocabSave.saveWords(quickTranslate.words, note.id, "quick-translate");
-            quickTranslate.dismiss();
-          }}
-          onPractice={() => {
-            setPracticeActive(true);
-            quickTranslate.dismiss();
-          }}
           onDismiss={quickTranslate.dismiss}
         />
       )}

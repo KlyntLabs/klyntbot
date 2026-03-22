@@ -1,4 +1,5 @@
 import { invalidateQueries } from "@shared/hooks/useQuery";
+import { ThinkingDots } from "@shared/ui/ThinkingDots";
 import { ArrowLeft, CheckCircle, Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
@@ -79,7 +80,7 @@ export function FocusedReview() {
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <Loader2 size={24} className="text-muted-foreground animate-spin" strokeWidth={1.5} />
+        <ThinkingDots />
       </div>
     );
   }

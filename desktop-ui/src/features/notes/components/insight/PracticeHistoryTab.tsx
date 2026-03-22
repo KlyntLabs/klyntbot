@@ -1,14 +1,17 @@
 import { useQuery } from "@shared/hooks/useQuery";
+import { useMemo } from "react";
 
+/** Matches PracticeSessionResponse from the backend (camelCase). */
 interface PracticeSession {
   id: string;
   noteId: string;
   status: string;
-  totalUnits: number;
-  completedUnits: number;
-  averageGrade: string | null;
-  createdAt: string;
-  updatedAt: string;
+  segments: string; // JSON array
+  currentIndex: number;
+  results: string; // JSON array
+  averageScore: number | null;
+  startedAt: string;
+  completedAt: string | null;
 }
 
 interface PracticeHistoryTabProps {
@@ -77,15 +80,30 @@ export function PracticeHistoryTab({ noteId }: PracticeHistoryTabProps) {
     );
   }
 
+  const segmentCounts = useMemo(
+    () =>
+      new Map(
+        (sessions ?? []).map((s) => {
+          try {
+            return [s.id, (JSON.parse(s.segments) as unknown[]).length] as const;
+          } catch {
+            return [s.id, 0] as const;
+          }
+        }),
+      ),
+    [sessions],
+  );
+
   return (
     <div className="space-y-2">
       {sessions.map((session) => {
         const badge = statusBadge(session.status);
+        const totalUnits = segmentCounts.get(session.id) ?? 0;
+        const completedUnits = session.currentIndex;
         const stats =
-          session.totalUnits > 0
-            ? `${session.completedUnits}/${session.totalUnits} units`
-            : "0 units";
-        const avgLabel = session.averageGrade ? ` \u00b7 avg: ${session.averageGrade}` : "";
+          totalUnits > 0 ? `${completedUnits}/${totalUnits} units` : `${completedUnits} units`;
+        const avgLabel =
+          session.averageScore != null ? ` \u00b7 ${session.averageScore.toFixed(1)}` : "";
 
         return (
           <div
@@ -94,7 +112,7 @@ export function PracticeHistoryTab({ noteId }: PracticeHistoryTabProps) {
           >
             <div className="flex items-center justify-between">
               <span className="text-[11px] text-muted-foreground">
-                {formatSessionDate(session.createdAt)}
+                {formatSessionDate(session.startedAt)}
               </span>
               <span
                 className={`text-[10px] font-medium rounded-full px-2 py-0.5 ${badge.className}`}

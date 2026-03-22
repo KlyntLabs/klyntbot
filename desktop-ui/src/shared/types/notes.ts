@@ -13,6 +13,7 @@ export interface Note {
   tags: string[];
   splitContent: string | null;
   splitMode: string | null;
+  perspectiveConfig: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -75,6 +76,7 @@ export interface NoteUpdateParams {
   color?: string | null;
   splitContent?: string | null;
   splitMode?: string | null;
+  perspectiveConfig?: string | null;
 }
 
 // ── Notebook Mutation Parameters ───────────────────────────

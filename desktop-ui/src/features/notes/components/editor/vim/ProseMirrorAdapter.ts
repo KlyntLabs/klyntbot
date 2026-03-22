@@ -290,6 +290,7 @@ export class ProseMirrorAdapter {
     const pos = typeof lineOrPos === "number" ? makePos(lineOrPos, ch ?? 0) : lineOrPos;
     const pmPos = this.model.toPMPos(pos.line, pos.ch);
     const tr = this.view.state.tr.setSelection(TextSelection.create(this.view.state.doc, pmPos));
+    tr.scrollIntoView();
     this.view.dispatch(tr);
   }
 
@@ -309,6 +310,7 @@ export class ProseMirrorAdapter {
     const tr = this.view.state.tr.setSelection(
       TextSelection.create(this.view.state.doc, pmAnchor, pmHead),
     );
+    tr.scrollIntoView();
     this.view.dispatch(tr);
   }
 
@@ -399,6 +401,17 @@ export class ProseMirrorAdapter {
 
   // ── Coordinate / scroll methods ───────────────────────────────────
 
+  /** Find the nearest scrollable ancestor (the element with overflow-y: auto/scroll). */
+  private getScrollParent(): HTMLElement {
+    let el = this.view.dom.parentElement;
+    while (el) {
+      const { overflowY } = getComputedStyle(el);
+      if (overflowY === "auto" || overflowY === "scroll") return el;
+      el = el.parentElement;
+    }
+    return this.view.dom;
+  }
+
   charCoords(pos: Pos, _mode?: string): CharCoords {
     const pmPos = this.model.toPMPos(pos.line, pos.ch);
     const coords = this.view.coordsAtPos(pmPos);
@@ -412,7 +425,7 @@ export class ProseMirrorAdapter {
   }
 
   getScrollInfo(): ScrollInfo {
-    const dom = this.view.dom;
+    const dom = this.getScrollParent();
     return {
       left: dom.scrollLeft,
       top: dom.scrollTop,
@@ -425,7 +438,7 @@ export class ProseMirrorAdapter {
 
   scrollTo(_x?: number | null, y?: number | null): void {
     if (y != null) {
-      this.view.dom.scrollTop = y;
+      this.getScrollParent().scrollTop = y;
     }
   }
 

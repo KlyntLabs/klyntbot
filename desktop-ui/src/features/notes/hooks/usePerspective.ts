@@ -29,7 +29,8 @@ export function usePerspective(
   const [config, setConfig] = useState<PerspectiveConfig>(() => {
     if (!perspectiveConfigJson) return EMPTY_CONFIG;
     try {
-      return JSON.parse(perspectiveConfigJson);
+      const parsed = JSON.parse(perspectiveConfigJson);
+      return { sections: {}, ...parsed };
     } catch {
       return EMPTY_CONFIG;
     }
@@ -62,7 +63,7 @@ export function usePerspective(
 
   const activePerspective = useMemo(() => {
     if (!focusedSectionId) return null;
-    return config.sections[focusedSectionId]?.active ?? null;
+    return config.sections?.[focusedSectionId]?.active ?? null;
   }, [focusedSectionId, config]);
 
   // Debounced save

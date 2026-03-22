@@ -1,3 +1,4 @@
+import { ThinkingDots } from "@shared/ui/ThinkingDots";
 import { Check, ChevronDown, ChevronUp, Loader2, Sparkles, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
@@ -173,8 +174,8 @@ export function CardGenerationModal({
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-2">
           {generating && (
             <div className="flex flex-col items-center justify-center py-12 gap-3">
-              <Loader2 size={24} className="text-brand animate-spin" strokeWidth={1.5} />
-              <p className="text-sm text-muted-foreground">Generating cards...</p>
+              <ThinkingDots />
+              <p className="text-sm text-muted-foreground">Generating cards</p>
             </div>
           )}
 

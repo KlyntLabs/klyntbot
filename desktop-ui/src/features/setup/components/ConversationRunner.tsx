@@ -1,3 +1,4 @@
+import { ThinkingDots } from "@shared/ui/ThinkingDots";
 import { useCallback, useRef } from "react";
 import { useNavigate } from "react-router";
 import { useConversationRunner } from "../hooks/useConversationRunner";
@@ -227,7 +228,7 @@ export function ConversationRunner() {
   if (isLoading) {
     return (
       <div className="fixed inset-0 flex items-center justify-center">
-        <div className="w-5 h-5 border-2 border-brand/30 border-t-brand rounded-full animate-spin" />
+        <ThinkingDots />
       </div>
     );
   }
@@ -314,7 +315,7 @@ export function ConversationRunner() {
           {/* Saving */}
           {isSaving && (
             <div className="mt-3 flex items-center gap-2 text-muted-foreground">
-              <div className="w-3 h-3 border-2 border-muted/30 border-t-muted rounded-full animate-spin" />
+              <ThinkingDots size="sm" />
               <span className="text-sm">Saving...</span>
             </div>
           )}

@@ -250,6 +250,7 @@ export function ContextPanel({
     >
       <AISuggestionsPanel
         noteId={noteId}
+        perspectiveConfig={note.perspectiveConfig}
         onSelectNote={onSelectNote}
         onOpenInsight={onOpenInsight}
       />

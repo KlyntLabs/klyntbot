@@ -1,3 +1,5 @@
+import { ThinkingDots } from "@shared/ui/ThinkingDots";
+
 interface TranslationSectionProps {
   translation: string | null;
   loading: boolean;
@@ -17,7 +19,7 @@ export function TranslationSection({
         <div className="text-[10px] text-muted-foreground uppercase tracking-wider">
           Translation
         </div>
-        {loading && <ThinkingDots />}
+        {loading && <ThinkingDots size="sm" />}
       </div>
       {loading && !translation && <TranslationSkeleton />}
       {error && (
@@ -39,15 +41,6 @@ export function TranslationSection({
   );
 }
 
-function ThinkingDots() {
-  return (
-    <span className="inline-flex items-center gap-0.5">
-      <span className="h-1 w-1 rounded-full bg-brand animate-[thinking_1.4s_ease-in-out_infinite]" />
-      <span className="h-1 w-1 rounded-full bg-brand animate-[thinking_1.4s_ease-in-out_0.2s_infinite]" />
-      <span className="h-1 w-1 rounded-full bg-brand animate-[thinking_1.4s_ease-in-out_0.4s_infinite]" />
-    </span>
-  );
-}
 
 function TranslationSkeleton() {
   return (

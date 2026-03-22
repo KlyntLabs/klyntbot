@@ -1,4 +1,5 @@
 import { isTauri } from "@shared/lib/utils";
+import { ThinkingDots } from "@shared/ui/ThinkingDots";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useRef } from "react";
 import { useLauncherStore } from "../stores/launcherStore";
@@ -35,7 +36,7 @@ export function LauncherInput() {
     <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
       {isSearching ? (
         <div className="w-5 h-5 shrink-0 flex items-center justify-center">
-          <div className="w-3.5 h-3.5 border-2 border-muted/40 border-t-muted rounded-full animate-spin" />
+          <ThinkingDots size="sm" />
         </div>
       ) : (
         <svg

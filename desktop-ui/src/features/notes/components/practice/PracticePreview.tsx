@@ -1,3 +1,4 @@
+import { ThinkingDots } from "@shared/ui/ThinkingDots";
 import { Loader2, Play, RotateCcw, X } from "lucide-react";
 import { createPortal } from "react-dom";
 
@@ -80,7 +81,7 @@ export function PracticePreview({
       >
         {loading ? (
           <div className="flex flex-col items-center justify-center py-16 gap-3">
-            <Loader2 size={18} className="text-purple animate-spin" strokeWidth={1.5} />
+            <ThinkingDots />
             <p className="text-[11px] text-muted">Preparing your session...</p>
           </div>
         ) : hasExistingSession ? (

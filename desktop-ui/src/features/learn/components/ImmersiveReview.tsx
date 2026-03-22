@@ -1,3 +1,4 @@
+import { ThinkingDots } from "@shared/ui/ThinkingDots";
 import { ArrowLeft, Edit3, ExternalLink, Lightbulb, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
@@ -72,7 +73,7 @@ export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <Loader2 size={24} className="text-muted-foreground animate-spin" strokeWidth={1.5} />
+        <ThinkingDots />
       </div>
     );
   }

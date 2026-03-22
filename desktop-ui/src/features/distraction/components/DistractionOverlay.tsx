@@ -1,4 +1,5 @@
 import { useEvent } from "@shared/hooks/useEvent";
+import { ThinkingDots } from "@shared/ui/ThinkingDots";
 import { ipc } from "@shared/hooks/useIpc";
 import { useTransparentBackground } from "@shared/hooks/useTransparentBackground";
 import { useWindowAutoResize } from "@shared/hooks/useWindowAutoResize";
@@ -108,7 +109,7 @@ export function DistractionOverlay() {
                 <div className="text-[10px] text-muted-foreground flex items-center gap-1.5">
                   {loading && (
                     <>
-                      <span className="w-2.5 h-2.5 border border-muted-foreground border-t-transparent rounded-full animate-spin" />
+                      <ThinkingDots size="sm" />
                       Analyzing...
                     </>
                   )}

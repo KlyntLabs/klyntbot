@@ -9,7 +9,6 @@ import {
   History,
   RefreshCw,
   RotateCcw,
-  Sliders,
   Sparkles,
   X,
 } from "lucide-react";
@@ -115,7 +114,6 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
   const [showPersonaManager, setShowPersonaManager] = useState(false);
   const [showSquadManager, setShowSquadManager] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  const [showScope, setShowScope] = useState(false);
   const [scopeConfig, setScopeConfig] = useState<ScopeConfig>(DEFAULT_SCOPE);
   const [showFlashcardReview, setShowFlashcardReview] = useState(false);
   const [allPersonas, personaActions] = usePersonas();
@@ -204,23 +202,7 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
       <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border shrink-0">
         <Brain size={14} className="text-purple shrink-0" />
         <span className="text-[12px] font-medium text-foreground flex-1">Learn</span>
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setShowScope((p) => !p)}
-            className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-            title="Scope Config"
-          >
-            <Sliders size={12} />
-          </button>
-          {showScope && (
-            <InsightScopePopover
-              value={scopeConfig}
-              onChange={setScopeConfig}
-              onClose={() => setShowScope(false)}
-            />
-          )}
-        </div>
+        <InsightScopePopover value={scopeConfig} onChange={setScopeConfig} />
         <button
           type="button"
           onClick={() => setShowHistory((p) => !p)}

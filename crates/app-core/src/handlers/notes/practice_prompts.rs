@@ -33,6 +33,10 @@ The user is translating a {source_lang} note into {target_lang}, sentence by sen
 Evaluate their translation with document-level awareness.
 Be specific: explain WHY something is better, not just what.
 
+IMPORTANT: The user is LEARNING {target_lang}. All explanations, encouragement, and hints
+MUST be written in {source_lang} so the user can understand them. Only the "suggested"
+correction and "model_translation" fields should be in {target_lang}.
+
 Return ONLY this exact JSON:
 {{
   "overall_grade": "A+ | A | A- | B+ | B | B- | C+ | C | C- | D+ | D | F",
@@ -45,13 +49,13 @@ Return ONLY this exact JSON:
   "corrections": [
     {{
       "original": "exact phrase from user",
-      "suggested": "better version",
-      "explanation": "why this is more natural or correct in this context"
+      "suggested": "better version in {target_lang}",
+      "explanation": "why this is more natural or correct — written in {source_lang}"
     }}
   ],
-  "model_translation": "polished version of the sentence",
-  "encouragement": "warm, short, personal comment referencing progress (max 15 words)",
-  "improvement_hint": "one micro-tip for next time (optional, null if grade >= A)"
+  "model_translation": "polished version of the sentence in {target_lang}",
+  "encouragement": "warm, short, personal comment in {source_lang} (max 15 words)",
+  "improvement_hint": "one micro-tip in {source_lang} for next time (optional, null if grade >= A)"
 }}"#
     )
 }
