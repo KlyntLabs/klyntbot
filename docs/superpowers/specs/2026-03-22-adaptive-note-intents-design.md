@@ -64,6 +64,10 @@ impl NoteIntent {
         match raw {
             "research" => Self::Research,
             "capture" => Self::Capture,
+            // Deliberate catch-all: any unrecognized value (typo, future intent added
+            // to DB before Rust enum is updated) falls back to Study. The CHECK
+            // constraint prevents invalid values in normal operation; this is a
+            // defensive fallback, not silent error swallowing.
             _ => Self::Study,
         }
     }
@@ -196,7 +200,7 @@ if intent == NoteIntent::Study {
 }
 ```
 
-This pattern also applies to `note_version_restore`, which calls `update_note` internally. The restore path must resolve intent and conditionally publish `NoteContentChanged` using the same logic above.
+This pattern also applies to `note_version_restore`. Note: `note_version_restore` calls `NoteRepo::update_note` directly (not `AppCore::note_update`), so the intent-fetch-and-gate logic must be added to the restore handler itself — it is NOT inherited from the `note_update` handler. The restore handler must: fetch notebook intent, resolve effective intent, and conditionally publish `NoteContentChanged` using the same logic above.
 
 #### Safety-net gating: service-side check
 
@@ -323,7 +327,10 @@ Notebooks show purpose icon next to title. Notes with `intent_override` differen
 #### InsightReviewPanel branching
 
 ```typescript
-const effectiveIntent = note.intentOverride ?? notebook.intent;
+// Use the server-resolved effective_intent (canonical source of truth).
+// Do NOT resolve locally via note.intentOverride ?? notebook.intent — the
+// server handles orphan notes, fallback logic, and future intent additions.
+const { effectiveIntent } = note;
 
 if (effectiveIntent === 'capture') return null;
 
@@ -394,4 +401,4 @@ pub struct RiskGapItem {
 - Integration tests: research tab IPC commands return correct data shapes
 - Frontend: verify panel hides for capture, swaps tabs for research vs study
 - Agent tool: verify `intent` parameter on create/search/list_by_entity filters correctly
-- Token regression: verify no background LLM calls for research/capture note saves
+- Token regression: subscribe to `DomainEventBus` in test, save a research/capture note, assert `NoteContentChanged` is never published (only `NoteUpdated`). This validates the primary gate without needing an LLM test double.
