@@ -38,10 +38,16 @@ intent TEXT NOT NULL DEFAULT 'study' CHECK (intent IN ('study', 'research', 'cap
 intent_override TEXT CHECK (intent_override IN ('study', 'research', 'capture'))
 ```
 
+#### Schema migration note
+
+Since SQLite `ALTER TABLE ADD COLUMN` silently ignores `CHECK` constraints, the new columns must be added directly to the `CREATE TABLE` statements in `001_create_notes.sql` (drop and recreate). Pre-release status means no user data to preserve.
+
 #### Domain model
 
 ```rust
-// common crate — shared enum used across all layers
+// feature-notes crate — domain enum for the notes subsystem
+// Lives in feature-notes (L4), not common (L0), because NoteIntent is
+// notes-domain-specific. cognitive (L5) already depends on feature-notes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum NoteIntent {
@@ -52,8 +58,9 @@ pub enum NoteIntent {
 
 impl NoteIntent {
     /// Resolve effective intent from note override + notebook default.
-    pub fn effective(note_override: Option<&str>, notebook_intent: &str) -> Self {
-        let raw = note_override.unwrap_or(notebook_intent);
+    /// When notebook_intent is None (orphan note with no notebook), defaults to Study.
+    pub fn effective(note_override: Option<&str>, notebook_intent: Option<&str>) -> Self {
+        let raw = note_override.or(notebook_intent).unwrap_or("study");
         match raw {
             "research" => Self::Research,
             "capture" => Self::Capture,
@@ -69,6 +76,14 @@ New fields on `NoteRow` and `NotebookRow`:
 - `Note` domain model gains `intent: NoteIntent` (resolved at load time)
 - `Notebook` domain model gains `intent: NoteIntent`
 
+Orphan notes (no notebook, `notebook_id = NULL`) resolve to `Study` by default. The `LEFT JOIN` in `resolve_note_intent` returns `NULL` for `nb.intent` which maps to `None` in the Rust signature.
+
+#### IPC contract changes (desktop-shared)
+
+Both `NoteResponse` and `NotebookResponse` in `desktop-shared/src/commands/notes.rs` gain new fields:
+- `NotebookResponse` + `intent: String`
+- `NoteResponse` + `intent_override: Option<String>` + `effective_intent: String` (pre-resolved for frontend convenience)
+
 #### Behavior matrix
 
 | Behavior | Study | Research | Capture |
@@ -76,10 +91,10 @@ New fields on `NoteRow` and `NotebookRow`:
 | Atom extraction (background LLM) | Full | Skipped | Skipped |
 | Embeddings | Yes | Yes | Yes |
 | Entity mention extraction | Yes | Yes | Yes |
-| Insight panel | 7 study tabs | 7 research tabs | Hidden |
+| Insight panel | 7 study tabs (all auto) | 7 research tabs (4 instant + 3 on-demand) | Hidden |
 | Background LLM calls on save | Atom extraction | None | None |
-| FSRS flashcard pipeline | Full | Available on manual override | None |
-| Flashcard generation (manual) | Yes | Yes | No (unless override) |
+| FSRS flashcard pipeline | Full (atom-linked) | Manual only (via editor toolbar "Generate Cards") | None |
+| Flashcard generation | Yes (editor toolbar + atom-linked) | Yes (editor toolbar only — no atom suggestions) | No (unless intent override to study) |
 
 ### 2. Research Tab Manifest & Progressive Disclosure
 
@@ -124,7 +139,7 @@ New fields on `NoteRow` and `NotebookRow`:
 
 #### Research prompt templates
 
-New prompts in `app-core/handlers/notes/insight_prompts.rs`:
+Add to the existing `app-core/handlers/notes/insight_prompts.rs` file (new public functions alongside the existing study prompt functions):
 
 - **Executive Summary**: "Synthesize the key findings, conclusions, and actionable insights from this research. Focus on what decisions this research supports, not what the reader should study."
 - **Hypothesis Tracker**: "Extract the explicit and implicit claims/hypotheses in this research. For each, assess confidence level (high/medium/low/speculative) based on supporting evidence found in the content and related context."
@@ -132,13 +147,36 @@ New prompts in `app-core/handlers/notes/insight_prompts.rs`:
 
 ### 3. Atom Extraction Gating & Capture Mode
 
-#### Primary gating: event publishing
+#### Fetching notebook intent in crud.rs
+
+The `note_create` and `note_update` handlers need the notebook's intent to resolve `effective_intent`. Since these handlers already have `notebook_id` from the note row, add a lightweight repo method:
+
+```rust
+// NoteRepo or NotebookRepo — single-column fetch
+pub async fn get_notebook_intent(&self, notebook_id: &str) -> Result<Option<String>> {
+    // Returns None if notebook doesn't exist (orphan note safety)
+    sqlx::query_scalar("SELECT intent FROM notebooks WHERE id = ?")
+        .bind(notebook_id)
+        .fetch_optional(&self.pool)
+        .await
+}
+```
+
+For orphan notes (`notebook_id = None`), skip the fetch and pass `None` to `NoteIntent::effective()`.
+
+#### Primary gating: suppress NoteContentChanged for non-study notes
+
+The key mechanism: `AtomExtractionService` only subscribes to `NoteContentChanged`. For non-study notes, we simply do not publish this event. `NoteUpdated` (already used for UI cache invalidation) continues to be published for all intents — it has no effect on atom extraction.
 
 ```rust
 // app-core/handlers/notes/crud.rs — after saving the note
+let notebook_intent = match note_row.notebook_id.as_deref() {
+    Some(nb_id) => self.repos.notebooks.get_notebook_intent(nb_id).await?,
+    None => None,
+};
 let intent = NoteIntent::effective(
     note_row.intent_override.as_deref(),
-    notebook_intent.as_str(),
+    notebook_intent.as_deref(),
 );
 
 // Entity mentions + links — always (all intents)
@@ -149,20 +187,20 @@ if let Some(handler) = &self.embedding_handler {
     tokio::spawn(/* embed_note — unchanged */);
 }
 
-// Domain events — conditional on intent
-match intent {
-    NoteIntent::Study => {
-        // NoteContentChanged triggers atom extraction
-        self.bus.publish(DomainEvent::NoteContentChanged { note_id, .. });
-    }
-    NoteIntent::Research | NoteIntent::Capture => {
-        // NoteUpdated for UI cache invalidation only — no atom extraction
-        self.bus.publish(DomainEvent::NoteUpdated { note_id, .. });
-    }
+// NoteUpdated — always (UI cache invalidation)
+self.bus.publish(DomainEvent::NoteUpdated { note_id: note_id.clone(), .. });
+
+// NoteContentChanged — study only (triggers atom extraction)
+if intent == NoteIntent::Study {
+    self.bus.publish(DomainEvent::NoteContentChanged { note_id, .. });
 }
 ```
 
+This pattern also applies to `note_version_restore`, which calls `update_note` internally. The restore path must resolve intent and conditionally publish `NoteContentChanged` using the same logic above.
+
 #### Safety-net gating: service-side check
+
+Defense-in-depth for race conditions (e.g., intent changes after `NoteContentChanged` was already queued):
 
 ```rust
 // cognitive/src/services/atom_extraction.rs — in event handler
@@ -176,7 +214,7 @@ DomainEvent::NoteContentChanged { note_id, .. } => {
 }
 ```
 
-`resolve_note_intent` query:
+`resolve_note_intent` query (returns `Option<String>` for both columns due to `LEFT JOIN`):
 ```sql
 SELECT n.intent_override, nb.intent
 FROM notes n
@@ -184,7 +222,7 @@ LEFT JOIN notebooks nb ON nb.id = n.notebook_id
 WHERE n.id = ?
 ```
 
-Dual gating: event-level (primary, prevents service from waking up) + service-level (safety net for race conditions during intent changes).
+Dual gating: event-level (primary, prevents `NoteContentChanged` from being published) + service-level (safety net for race conditions).
 
 #### Capture mode behavior
 
@@ -201,9 +239,11 @@ What Capture skips:
 
 #### Intent change handling
 
-- **Any -> Study**: publish `NoteContentChanged` to trigger atom extraction. Show prompt: "Switching to Study mode. Want to run a full analysis and generate flashcards now?" with [Yes - Analyze now] / [Later] options.
+- **Any -> Study**: show prompt: "Switching to Study mode. Want to run a full analysis and generate flashcards now?" with [Yes - Analyze now] / [Later]. "Yes" publishes `NoteContentChanged` via a dedicated `trigger_study_analysis(note_id)` handler that bypasses the normal debounce window (uses a separate event or resets the debounce map entry). "Later" defers — atom extraction triggers on the next normal save.
 - **Study -> Any**: existing atoms remain (not deleted), stop receiving FSRS updates, archive naturally via salience decay.
 - **Any direction**: insight panel swaps tab set immediately. Cached insights for old intent stay versioned in `InsightContent` — no data loss.
+
+Note: the existing 5-second debounce in `AtomExtractionService` would suppress a `NoteContentChanged` event if the user switches intent within 5 seconds of the last save. The `trigger_study_analysis` handler addresses this by either resetting the debounce entry or using a force flag on the event.
 
 #### Token impact estimate
 
@@ -235,6 +275,8 @@ Schema cost: ~45 additional tokens.
 - Called from general/task-management skills -> inherits notebook default
 - On `create`: sets `intent_override` only if explicitly passed (non-auto)
 - On `search`/`list_by_entity`: filters by intent when specified, returns all intents when omitted
+
+Add a new `NoteRepo::list_notes_by_entity_with_intent` method (or add an optional `intent` parameter to the existing `list_notes_by_entity`) to support intent-filtered entity queries.
 
 No changes to: `get`, `update`, `delete`, `list`, notebook/link/tag actions (remain intent-agnostic).
 
@@ -302,6 +344,8 @@ Tab manifests are static config objects defining: tab id, label, icon, source (`
 // LLM-driven (on-demand)
 "research_deepen_tab"          // note_id, tab_id -> streaming insight
 ```
+
+Per CLAUDE.md, every new command module with `#[tauri::command]` functions must export `pub const DEV_COMMANDS: &[&str]` listing all command names, and be registered in `dev_server/mod.rs`. The 5 new research IPC commands must be included. The `dev_server_covers_all_tauri_commands` test enforces this at compile time.
 
 #### Response types (desktop-shared)
 
