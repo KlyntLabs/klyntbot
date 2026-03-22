@@ -90,18 +90,6 @@ impl SignalAccumulator {
         _now: DateTime<Utc>,
     ) -> Option<TriggerFired> {
         match condition.name.as_str() {
-            "distraction_streak" => {
-                let distraction_count = self.count_events("DistractionDetected");
-                if distraction_count >= 3 {
-                    Some(TriggerFired {
-                        condition_name: "distraction_streak".into(),
-                        confidence: 0.8,
-                        context: format!("{distraction_count} distractions in last 30min"),
-                    })
-                } else {
-                    None
-                }
-            }
             "low_productivity" => {
                 // productive_ratio is not directly in UserSituation, use energy + distraction_risk
                 if situation.distraction_risk > 0.7 && situation.energy_level < 0.4 {
@@ -336,10 +324,10 @@ mod tests {
     }
 
     #[test]
-    fn test_distraction_streak_fires() {
+    fn test_distraction_events_no_longer_trigger() {
         let mut acc = SignalAccumulator::new();
 
-        for _ in 0..3 {
+        for _ in 0..5 {
             acc.push_event(&DomainEvent::DistractionDetected {
                 app: "reddit".into(),
                 duration_secs: None,
@@ -349,7 +337,9 @@ mod tests {
 
         let sit = situation_with(0.5, 0.5, 0.2);
         let fired = acc.evaluate(&sit);
-        assert!(fired
+        // distraction_streak condition removed — events are tracked for
+        // pattern detection but no longer trigger coaching popups
+        assert!(!fired
             .iter()
             .any(|t| t.condition_name == "distraction_streak"));
     }
@@ -389,26 +379,28 @@ mod tests {
     fn test_cooldown_prevents_re_fire() {
         let mut acc = SignalAccumulator::new();
 
-        for _ in 0..5 {
-            acc.push_event(&DomainEvent::DistractionDetected {
-                app: "reddit".into(),
-                duration_secs: None,
-                context: "test".into(),
-            });
-        }
+        acc.push_event(&DomainEvent::BudgetAlert {
+            category: "food".into(),
+            spent: 450.0,
+            limit: 500.0,
+        });
 
-        let sit = situation_with(0.5, 0.5, 0.2);
+        let sit = situation_with(0.0, 1.0, 0.0);
 
         // First evaluation fires
         let fired1 = acc.evaluate(&sit);
-        assert!(!fired1.is_empty());
+        assert!(fired1.iter().any(|t| t.condition_name == "budget_warning"));
+
+        // Push another budget alert
+        acc.push_event(&DomainEvent::BudgetAlert {
+            category: "food".into(),
+            spent: 480.0,
+            limit: 500.0,
+        });
 
         // Second evaluation — cooldown blocks
         let fired2 = acc.evaluate(&sit);
-        let distraction_fired = fired2
-            .iter()
-            .any(|t| t.condition_name == "distraction_streak");
-        assert!(!distraction_fired);
+        assert!(!fired2.iter().any(|t| t.condition_name == "budget_warning"));
     }
 
     #[test]

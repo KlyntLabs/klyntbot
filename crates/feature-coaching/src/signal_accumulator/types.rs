@@ -48,7 +48,10 @@ pub struct TriggerFired {
 /// Default built-in trigger conditions.
 pub(super) fn default_conditions() -> Vec<TriggerCondition> {
     vec![
-        TriggerCondition::new("distraction_streak", 900), // 15min cooldown
+        // distraction_streak removed — distraction data is still tracked for
+        // pattern detection (afternoon_energy_drop) and insights, but no longer
+        // triggers coaching popups. The distraction overlay handles real-time
+        // intervention for distracting apps.
         TriggerCondition::new("low_productivity", 1800),  // 30min cooldown
         TriggerCondition::new("deadline_approaching", 3600), // 1h cooldown
         TriggerCondition::new("focus_quality_declining", 1800),

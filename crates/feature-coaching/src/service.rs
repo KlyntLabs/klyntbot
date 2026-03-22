@@ -405,7 +405,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_coaching_service_processes_distraction_events() {
+    async fn test_coaching_service_processes_budget_events() {
         let accumulator = Arc::new(Mutex::new(SignalAccumulator::new()));
         let detector = Arc::new(Mutex::new(PatternDetector::new()));
         let router = Arc::new(Mutex::new(InterventionRouter::default()));
@@ -419,7 +419,7 @@ mod tests {
             decision: CoachingDecision {
                 should_intervene: true,
                 confidence: 0.8,
-                message: Some("Take a break!".into()),
+                message: Some("Check your budget!".into()),
                 intervention_type: InterventionType::ChatMessage,
                 reasoning: "test".into(),
                 observations: vec![],
@@ -444,14 +444,12 @@ mod tests {
             cancel.clone(),
         );
 
-        // Push 3 distraction events to trigger distraction_streak
-        for _ in 0..3 {
-            bus.publish(DomainEvent::DistractionDetected {
-                app: "reddit".into(),
-                duration_secs: None,
-                context: "test".into(),
-            });
-        }
+        // Push a budget alert to trigger budget_warning
+        bus.publish(DomainEvent::BudgetAlert {
+            category: "food".into(),
+            spent: 450.0,
+            limit: 500.0,
+        });
 
         // Wait briefly for processing
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
@@ -462,7 +460,7 @@ mod tests {
             intervention.is_ok(),
             "Expected an intervention to be delivered"
         );
-        assert_eq!(intervention.unwrap().message, "Take a break!");
+        assert_eq!(intervention.unwrap().message, "Check your budget!");
 
         cancel.cancel();
     }

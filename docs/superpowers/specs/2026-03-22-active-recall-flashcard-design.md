@@ -35,7 +35,7 @@ Grading is a **user-facing handler concern** (needs LLM, embeddings, UI feedback
 FlashcardSubmitAnswerParams {
     card_id: String,
     user_answer: String,
-    mode: AnswerMode,  // "typed" | "voice_transcript" | "cloze_fill"
+    mode: AnswerMode,  // "typed" | "voice" | "cloze_fill"
 }
 ```
 
@@ -43,7 +43,7 @@ FlashcardSubmitAnswerParams {
 
 ```rust
 GradeResult {
-    score: f64,                          // 0.0–1.0
+    score: Option<f64>,                   // 0.0–1.0, None for self_grade mode
     suggested_rating: ReviewQuality,     // mapped from score
     grading_method: GradingMethod,       // "semantic_auto" | "llm" | "exact_match" | "self_grade"
     explanation: Option<String>,         // LLM explanation for borderline/wrong
@@ -136,16 +136,18 @@ Returns coaching-style LLM response. Optionally saves the exchange as a new epis
 
 ### Config
 
-Exposed in `config.json` under `learning`:
+Exposed in `config.json` under `learning.activeRecall` (nested under existing `LearningConfig` to avoid collision with the existing adaptive confidence fields in `learning`):
 
 ```json
 {
   "learning": {
-    "semanticAutoAcceptThreshold": 0.78,
-    "semanticAutoFailThreshold": 0.45,
-    "graphPropagationStrength": "gentle",
-    "graphPropagationDailyCap": 15,
-    "defaultAnswerMode": "auto"
+    "activeRecall": {
+      "semanticAutoAcceptThreshold": 0.78,
+      "semanticAutoFailThreshold": 0.45,
+      "graphPropagationStrength": "gentle",
+      "graphPropagationDailyCap": 15,
+      "defaultAnswerMode": "auto"
+    }
   }
 }
 ```
@@ -182,7 +184,7 @@ ActiveReviewSession (layout: "compact" | "fullscreen")
 
 ### State management — `useActiveReview` hook
 
-Replaces `useFlashcards`. State machine:
+Replaces both `useFlashcards` (notes feature) and `useReviewSession` (learn feature). State machine:
 
 ```
 idle → deck_picker → reviewing → complete
@@ -195,7 +197,7 @@ interface ActiveReviewState {
   phase: "idle" | "deck_picker" | "reviewing" | "complete";
   cards: Flashcard[];
   currentIndex: number;
-  cardPhase: "answering" | "grading" | "graded" | "socratic";
+  cardPhase: "answering" | "grading" | "graded" | "socratic" | "confirming";
   currentAnswer: string;
   gradeResult: GradeResult | null;
   selectedMode: AnswerMode;
@@ -398,7 +400,7 @@ Cached in `card_distractors` column (JSON). Regenerated only on user request or 
 - **Future:** Whisper IPC command for offline/better accuracy (interface ready, not in v1)
 - Live transcript preview while recording
 - Tiny waveform visualizer during recording
-- On stop: transcript goes through standard `flashcard_submit_answer` with `mode: "voice_transcript"`
+- On stop: transcript goes through standard `flashcard_submit_answer` with `mode: "voice"`
 - Pronunciation is not graded in v1 — transcript graded as text
 
 ### Cloze fuzzy matching
@@ -499,27 +501,11 @@ User can type 1–2 sentences or tap "Skip." The response becomes a new Episodic
 1. **On low scores (< 0.6):** Create `SemanticFact` from `{user_answer, expected_answer, explanation}` via `DomainEvent::KnowledgeAtomCreated`.
 2. **On Socratic exchanges:** Q&A pair becomes `EpisodicMemory`. Cognitive pipeline can later surface "You had this same misconception 2 weeks ago."
 3. **On Reflection Pulse responses:** New `EpisodicMemory` event.
-4. **Session-level:** Publish `DomainEvent::FlashcardSessionCompleted { stats, weak_domains }`.
+4. **Session-level:** Publish a new `DomainEvent::FlashcardSessionCompleted` variant (to be added to `crates/bus/src/domain_events.rs`). Fields: `session_id: String`, `cards_reviewed: usize`, `avg_score: f64`, `weak_domains: Vec<String>`, `propagation_count: usize`.
 
 ### review_sessions table
 
-New table in cognitive schema:
-
-```sql
-CREATE TABLE IF NOT EXISTS review_sessions (
-    id TEXT PRIMARY KEY,
-    started_at TEXT NOT NULL,
-    completed_at TEXT,
-    cards_reviewed INTEGER DEFAULT 0,
-    avg_score REAL,
-    duration_seconds INTEGER,
-    modes_used TEXT,           -- JSON array
-    propagation_count INTEGER DEFAULT 0,
-    weak_card_ids TEXT,        -- JSON array
-    session_data TEXT,         -- full SessionSummary as JSON
-    status TEXT DEFAULT 'active'  -- 'active' | 'completed' | 'abandoned'
-);
-```
+New table in cognitive migrations — see Schema Changes Summary for full DDL with indexes.
 
 ### Production safeguards
 
@@ -527,7 +513,7 @@ CREATE TABLE IF NOT EXISTS review_sessions (
 - **Graceful exit** — mid-session close persists partial data, marks abandoned
 - **Offline-safe** — semantic pre-filter uses local fastembed, LLM grading degrades to semantic score
 - **Privacy** — answers never sent externally unless user explicitly saves as insight
-- **Self-grade tracking** — when self-grade escape hatch is used, `grading_method: "self_grade"` and `score: null` are recorded for coaching ("You've been self-grading a lot — want to try typed mode?")
+- **Self-grade tracking** — when self-grade escape hatch is used, `grading_method: "self_grade"` and `score: None` are recorded for coaching ("You've been self-grading a lot — want to try typed mode?")
 
 ---
 
@@ -535,13 +521,19 @@ CREATE TABLE IF NOT EXISTS review_sessions (
 
 ### flashcards table (alter)
 
+New columns added to `flashcards` in `crates/cognitive/migrations/001_cognitive_tables.sql` (consolidated, pre-release):
+
 - `back_embedding_updated_at TEXT` — tracks when back embedding was computed
 - `preferred_mode TEXT` — nullable, user's pinned mode for this card
 - `difficulty_estimate INTEGER` — 1-5, from LLM at generation time
 - `prerequisite_concepts TEXT` — JSON array, from LLM at generation time
 - `card_distractors TEXT` — JSON array, cached MC distractors
 
+**Rust struct updates required:** `FlashcardRow` (line 73, `crates/cognitive/src/repos/flashcard.rs`) must add all 5 new fields. `NewFlashcard` must add `difficulty_estimate: Option<i32>` and `prerequisite_concepts: Option<String>`. All `INSERT` and `SELECT *` queries in the repo must be updated to include the new columns.
+
 ### New tables
+
+Both tables go in `crates/cognitive/migrations/001_cognitive_tables.sql` (consolidated, pre-release):
 
 ```sql
 CREATE TABLE IF NOT EXISTS deck_preferences (
@@ -557,17 +549,40 @@ CREATE TABLE IF NOT EXISTS review_sessions (
     cards_reviewed INTEGER DEFAULT 0,
     avg_score REAL,
     duration_seconds INTEGER,
-    modes_used TEXT,
+    modes_used TEXT,           -- JSON array
     propagation_count INTEGER DEFAULT 0,
-    weak_card_ids TEXT,
-    session_data TEXT,
-    status TEXT DEFAULT 'active'
+    weak_card_ids TEXT,        -- JSON array
+    session_data TEXT,         -- full SessionSummary as JSON
+    status TEXT DEFAULT 'active'  -- 'active' | 'completed' | 'abandoned'
 );
+
+CREATE INDEX IF NOT EXISTS idx_review_sessions_status ON review_sessions(status);
+CREATE INDEX IF NOT EXISTS idx_review_sessions_started ON review_sessions(started_at);
 ```
 
 ### LanceDB
 
-New table: `flashcard_embeddings` with columns `card_id TEXT`, `side TEXT` ("front" | "back"), `vector FLOAT[dim]`.
+New table: `flashcard_embeddings`. Follows the existing LanceDB schema pattern from `crates/storage/src/vector_store/schemas.rs` — single `id TEXT` primary key, `vector FixedSizeList<Float32, 384>`.
+
+Key format: `id = "{card_id}_front"` or `id = "{card_id}_back"` (synthetic composite key). Additional metadata columns: `card_id TEXT`, `side TEXT` ("front" | "back"), `timestamp TEXT`.
+
+Uses the same `paraphrase-multilingual-MiniLM-L12-v2` embedding model (384-dim) as note embeddings.
+
+**Batch optimization:** `flashcard_save_generated` often saves multiple cards. Embed the entire batch in one `EmbeddingEngine` call rather than spawning N background tasks.
+
+### New DomainEvent variant
+
+Add to `crates/bus/src/domain_events.rs`:
+
+```rust
+FlashcardSessionCompleted {
+    session_id: String,
+    cards_reviewed: usize,
+    avg_score: f64,
+    weak_domains: Vec<String>,
+    propagation_count: usize,
+}
+```
 
 ---
 
@@ -606,3 +621,11 @@ All existing flashcard commands stay unchanged.
 - **Image occlusion input** — future mode, not in this spec
 - **FSRS-5 weight training** — the review_log data is there for future personalization, but training is not in scope
 - **Continuous FSRS-5 scoring** — discrete 1-4 ratings stay, continuous score is mapped via thresholds
+
+## Naming Clarification
+
+The existing `CardType::Typed` enum variant refers to a card type (typed-answer card). The new `AnswerMode::typed` refers to the review interaction mode (user types their answer). These are orthogonal concepts — a `basic` card type can use a `typed` answer mode. Code and documentation should use `CardType` vs `AnswerMode` to distinguish.
+
+## Auto Mode Fallback
+
+When `auto` mode has insufficient data (< 10 reviews on a deck), it falls back through: auto (no data) → card-type default → `typed`. This ensures new decks always have a sensible default without requiring user configuration.
