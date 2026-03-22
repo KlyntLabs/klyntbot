@@ -27,11 +27,11 @@ Merge both into a single **"Learn" panel** in the right-side context area with a
 ### Tab layout
 
 ```
-[ Atoms ] [ Synthesis ] [ Gaps ] [ Quiz ] [ Map ] [ Perspectives ]
+[ Atoms ] [ Synthesis ] [ Gap Analysis ] [ Self-Assessment ] [ Concept Map ] [ Perspectives ]
 ```
 
 - **Atoms** — default landing tab, loads instantly from cached `useQuery`
-- **Synthesis through Perspectives** — existing Insight Review tabs, unchanged behavior
+- **Synthesis through Perspectives** — existing Insight Review tabs, unchanged behavior (labels preserved as-is)
 - Tab status dots: filled green = content generated, empty = not yet generated, pulsing = generating
 
 ### Panel identity
@@ -135,13 +135,12 @@ This means insight-generated flashcards participate in:
 
 When `revealAll()` submits quiz results via `note_insight_submit_quiz`:
 
-1. The backend receives the quiz score and individual question results
-2. For each answered question:
-   - Match the question topic to an active atom on the same note (same keyword overlap as Section 4)
-   - If matched: emit `AtomInteracted { atom_id, interaction_type: "quiz_answer" }` domain event
-   - If the answer was correct: update the atom's `last_interaction_ts` (refreshes salience decay timer)
-   - If the answer was wrong: no retention penalty (quizzes are lower-stakes than flashcard reviews — we don't want to punish exploration)
-3. The existing coaching pipeline sees the `AtomInteracted` events and factors them into pattern detection
+1. The backend receives the quiz score (overall score + total count — per-question results are not sent)
+2. After computing progress, query all active atoms on the same note
+3. For each active atom: emit `AtomInteracted { atom_id, interaction_type: "quiz_answer" }` domain event and update `last_interaction_ts` (refreshes salience decay timer)
+4. The existing coaching pipeline sees the `AtomInteracted` events and factors them into pattern detection
+
+Note: We treat the quiz as a note-level engagement signal, not per-question atom matching, because the current `InsightQuizSubmitParams` only carries `score` and `total` — not individual question results. This is intentional: quizzes are broad assessments, and touching all atoms on the note is a reasonable approximation of engagement.
 
 ### Why not full FSRS review?
 
@@ -188,16 +187,19 @@ Delete the `KnowledgeAtomsPanel` render from `NoteEditor` component. All atom in
 ### Modified files
 | File | Changes |
 |---|---|
-| `desktop-ui/src/features/notes/components/InsightReviewPanel.tsx` | Add Atoms tab as first tab, rename header to "Learn" |
+| `desktop-ui/src/features/notes/components/InsightReviewPanel.tsx` | Add Atoms tab as first tab, rename header to "Learn", pass noteId to KnowledgeGrowthMetrics |
+| `desktop-ui/src/features/notes/hooks/useInsightReview.ts` | Add "atoms" to `TabId` union, default `activeTab` to "atoms" |
 | `desktop-ui/src/features/notes/components/ContextPanel.tsx` | Update button label from "Insight Review" to "Learn" |
 | `desktop-ui/src/features/notes/components/AISuggestionsPanel.tsx` | Rename button label |
-| `desktop-ui/src/features/notes/components/NoteEditorPanel.tsx` | Remove KnowledgeAtomsPanel render |
-| `desktop-ui/src/features/notes/components/insight/KnowledgeGrowthMetrics.tsx` | Replace SemanticFacts query with note-level atom count |
+| `desktop-ui/src/features/notes/components/NoteEditor.tsx` | Remove KnowledgeAtomsPanel import and render (line ~432) |
+| `desktop-ui/src/features/notes/components/editor/LanguageLearningPanel.tsx` | Remove KnowledgeAtomsPanel render (line ~147) |
+| `desktop-ui/src/features/notes/components/insight/KnowledgeGrowthMetrics.tsx` | Accept `noteId` prop, replace SemanticFacts query with `useKnowledgeAtoms(noteId)` atom count |
 | `desktop-ui/src/features/notes/components/AtomCard.tsx` | Add "From gaps" badge when `metadata.source === "gap_analysis"` |
-| `crates/app-core/src/handlers/notes/insight.rs` | After gap generation: parse gaps → create suggested atoms. In `insight_save_flashcards`: match flashcards to atoms. In `note_insight_submit_quiz`: emit AtomInteracted for matched questions. |
+| `crates/app-core/src/handlers/notes/insight.rs` | After gap generation: parse gaps → create suggested atoms. In `insight_save_flashcards`: match flashcards to atoms by case-insensitive substring of atom subject in question text. In `note_insight_submit_quiz`: emit AtomInteracted for active atoms on the note. |
 | `crates/app-core/src/adapters/cognitive_accessor.rs` | Add `search_atoms()` implementation |
-| `crates/feature-insights/src/traits.rs` | Add `search_atoms()` to CognitiveAccessor trait |
+| `crates/feature-insights/src/traits.rs` | Add `search_atoms()` to CognitiveAccessor trait + NoopCognitiveAccessor impl |
 | `crates/feature-insights/src/prompt_builder.rs` | Add "Already Learned" section from atoms |
+| `crates/feature-insights/src/lib.rs` | Remove `pub mod prompts;` declaration |
 
 ### Deleted files
 | File | Reason |
