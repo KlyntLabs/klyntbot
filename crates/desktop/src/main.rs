@@ -367,6 +367,12 @@ fn run_desktop_app() {
             commands::notes::flashcard_total_due,
             commands::notes::flashcard_generate,
             commands::notes::flashcard_save_generated,
+            commands::notes::flashcard_submit_answer,
+            commands::notes::flashcard_explain_answer,
+            commands::notes::flashcard_generate_distractors,
+            commands::notes::flashcard_save_mode_preference,
+            commands::notes::flashcard_get_mode_preference,
+            commands::notes::flashcard_get_prerequisites,
             // Annotations
             commands::annotations::annotation_create,
             commands::annotations::annotation_update,

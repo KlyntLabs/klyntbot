@@ -598,6 +598,15 @@ pub struct FlashcardExplainResponse {
     pub saved_as_memory: bool,
 }
 
+// ── Deck Preference ──────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeckPreferenceResponse {
+    pub deck: String,
+    pub answer_mode: String,
+}
+
 // ── Persona Chat ────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

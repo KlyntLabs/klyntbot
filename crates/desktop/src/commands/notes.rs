@@ -1,16 +1,19 @@
 use std::sync::Arc;
 
 use desktop_shared::commands::{
-    BacklinkResponse, ChangesSummaryResponse, CreatePersonaParams, DeckSummaryResponse,
-    FlashcardCreateParams, FlashcardGenerateParams, FlashcardGenerateResponse, FlashcardListParams,
-    FlashcardResponse, FlashcardReviewParams, FlashcardSaveGeneratedParams, FlashcardUpdateParams,
-    HybridSearchResponse, InboxCreateParams, InboxItemResponse, InsightEvolutionResponse,
-    InsightQuizSubmitParams, InsightReviewResponse, InsightReviewStarted,
-    InsightSaveFlashcardsParams, InsightVersionResponse, KnowledgeGrowthResponse, NoteCreateParams,
-    NoteLinkResponse, NoteResponse, NoteSuggestionsResponse, NoteUpdateParams, NoteVersionResponse,
-    NotebookCreateParams, NotebookResponse, NotebookUpdateParams, PersonaChatParams,
-    PersonaChatResponse, PersonaResponse, RatePersonaParams, ScenarioChallengeResponse,
-    SetPersonaPinsParams, TabContent, UpdatePersonaParams,
+    BacklinkResponse, ChangesSummaryResponse, CreatePersonaParams, DeckPreferenceResponse,
+    DeckSummaryResponse, FlashcardCreateParams, FlashcardDistractorParams,
+    FlashcardDistractorResponse, FlashcardExplainParams, FlashcardExplainResponse,
+    FlashcardGenerateParams, FlashcardGenerateResponse, FlashcardListParams, FlashcardResponse,
+    FlashcardReviewParams, FlashcardSaveGeneratedParams, FlashcardSubmitAnswerParams,
+    FlashcardUpdateParams, GradeResultResponse, HybridSearchResponse, InboxCreateParams,
+    InboxItemResponse, InsightEvolutionResponse, InsightQuizSubmitParams, InsightReviewResponse,
+    InsightReviewStarted, InsightSaveFlashcardsParams, InsightVersionResponse,
+    KnowledgeGrowthResponse, NoteCreateParams, NoteLinkResponse, NoteResponse,
+    NoteSuggestionsResponse, NoteUpdateParams, NoteVersionResponse, NotebookCreateParams,
+    NotebookResponse, NotebookUpdateParams, PersonaChatParams, PersonaChatResponse, PersonaResponse,
+    RatePersonaParams, ScenarioChallengeResponse, SetPersonaPinsParams, TabContent,
+    UpdatePersonaParams,
 };
 use desktop_shared::errors::ApiError;
 use tauri::State;
@@ -560,6 +563,70 @@ pub async fn flashcard_save_generated(
     state.flashcard_save_generated(params).await
 }
 
+// ── Active Recall commands ──────────────────────────────────────────
+
+#[tauri::command]
+pub async fn flashcard_submit_answer(
+    state: State<'_, Arc<AppCore>>,
+    params: FlashcardSubmitAnswerParams,
+) -> Result<GradeResultResponse, ApiError> {
+    state.flashcard_submit_answer(params).await
+}
+
+#[tauri::command]
+pub async fn flashcard_explain_answer(
+    state: State<'_, Arc<AppCore>>,
+    params: FlashcardExplainParams,
+) -> Result<FlashcardExplainResponse, ApiError> {
+    state.flashcard_explain_answer(params).await
+}
+
+#[tauri::command]
+pub async fn flashcard_generate_distractors(
+    state: State<'_, Arc<AppCore>>,
+    params: FlashcardDistractorParams,
+) -> Result<FlashcardDistractorResponse, ApiError> {
+    state.flashcard_generate_distractors(params).await
+}
+
+#[tauri::command]
+pub async fn flashcard_save_mode_preference(
+    state: State<'_, Arc<AppCore>>,
+    deck: String,
+    mode: String,
+) -> Result<(), ApiError> {
+    state
+        .deck_preference_repo()?
+        .set(&deck, &mode)
+        .await
+        .map_err(|e| ApiError::new("DB_ERROR", e.to_string()))?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn flashcard_get_mode_preference(
+    state: State<'_, Arc<AppCore>>,
+    deck: String,
+) -> Result<Option<DeckPreferenceResponse>, ApiError> {
+    let row = state
+        .deck_preference_repo()?
+        .get(&deck)
+        .await
+        .map_err(|e| ApiError::new("DB_ERROR", e.to_string()))?;
+    Ok(row.map(|r| DeckPreferenceResponse {
+        deck: r.deck,
+        answer_mode: r.answer_mode,
+    }))
+}
+
+#[tauri::command]
+pub async fn flashcard_get_prerequisites(
+    state: State<'_, Arc<AppCore>>,
+    card_id: String,
+) -> Result<Vec<FlashcardResponse>, ApiError> {
+    state.flashcard_get_prerequisites(&card_id).await
+}
+
 // ── Dev server dispatch ─────────────────────────────────────────────
 
 #[cfg(test)]
@@ -625,6 +692,12 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "flashcard_total_due",
     "flashcard_generate",
     "flashcard_save_generated",
+    "flashcard_submit_answer",
+    "flashcard_explain_answer",
+    "flashcard_generate_distractors",
+    "flashcard_save_mode_preference",
+    "flashcard_get_mode_preference",
+    "flashcard_get_prerequisites",
 ];
 
 #[cfg(debug_assertions)]
@@ -868,6 +941,54 @@ pub(crate) async fn dispatch_dev(
             core.flashcard_save_generated(try_field!(dev::parse_params(body)))
                 .await,
         ),
+        "flashcard_submit_answer" => dev::val(
+            core.flashcard_submit_answer(try_field!(dev::parse_params(body)))
+                .await,
+        ),
+        "flashcard_explain_answer" => dev::val(
+            core.flashcard_explain_answer(try_field!(dev::parse_params(body)))
+                .await,
+        ),
+        "flashcard_generate_distractors" => dev::val(
+            core.flashcard_generate_distractors(try_field!(dev::parse_params(body)))
+                .await,
+        ),
+        "flashcard_save_mode_preference" => {
+            let deck = try_field!(dev::get_str(body, "deck"));
+            let mode = try_field!(dev::get_str(body, "mode"));
+            let repo = match core.deck_preference_repo() {
+                Ok(r) => r,
+                Err(e) => return Some(Err(e)),
+            };
+            dev::val(
+                repo.set(&deck, &mode)
+                    .await
+                    .map(|_| ())
+                    .map_err(|e| ApiError::new("DB_ERROR", e.to_string())),
+            )
+        }
+        "flashcard_get_mode_preference" => {
+            let deck = try_field!(dev::get_str(body, "deck"));
+            let repo = match core.deck_preference_repo() {
+                Ok(r) => r,
+                Err(e) => return Some(Err(e)),
+            };
+            dev::val(
+                repo.get(&deck)
+                    .await
+                    .map(|row| {
+                        row.map(|r| DeckPreferenceResponse {
+                            deck: r.deck,
+                            answer_mode: r.answer_mode,
+                        })
+                    })
+                    .map_err(|e| ApiError::new("DB_ERROR", e.to_string())),
+            )
+        }
+        "flashcard_get_prerequisites" => {
+            let card_id = try_field!(dev::get_str(body, "cardId"));
+            dev::val(core.flashcard_get_prerequisites(&card_id).await)
+        }
         _ => return None,
     })
 }
