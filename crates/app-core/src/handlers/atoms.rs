@@ -127,10 +127,25 @@ impl AppCore {
     ) -> Result<KnowledgeAtomResponse, ApiError> {
         let repo = self.knowledge_atom_repo()?;
         let importance = params.personal_importance.unwrap_or(0.7);
-        let atom = repo
+        let mut atom = repo
             .accept(&params.atom_id, importance)
             .await
             .map_err(map_db)?;
+
+        // Ensure atom has a topic — auto-extracted atoms may not have one yet.
+        if atom.topic_id.is_none() {
+            let topic = repo
+                .get_or_create_topic(&atom.domain, &atom.domain)
+                .await
+                .map_err(map_db)?;
+            sqlx::query("UPDATE knowledge_atoms SET topic_id = ?1 WHERE id = ?2")
+                .bind(&topic.id)
+                .bind(&atom.id)
+                .execute(self.storage_pool.inner())
+                .await
+                .map_err(map_db)?;
+            atom.topic_id = Some(topic.id.clone());
+        }
 
         if let Some(bus) = &self.domain_event_bus {
             let _ = bus.publish(DomainEvent::KnowledgeAtomAccepted {
@@ -201,10 +216,25 @@ impl AppCore {
         let mut topic_ids_to_update = std::collections::HashSet::new();
 
         for id in &params.atom_ids {
-            let atom = repo
+            let mut atom = repo
                 .accept(id, params.personal_importance)
                 .await
                 .map_err(map_db)?;
+
+            // Ensure atom has a topic — auto-extracted atoms may not have one yet.
+            if atom.topic_id.is_none() {
+                let topic = repo
+                    .get_or_create_topic(&atom.domain, &atom.domain)
+                    .await
+                    .map_err(map_db)?;
+                sqlx::query("UPDATE knowledge_atoms SET topic_id = ?1 WHERE id = ?2")
+                    .bind(&topic.id)
+                    .bind(&atom.id)
+                    .execute(self.storage_pool.inner())
+                    .await
+                    .map_err(map_db)?;
+                atom.topic_id = Some(topic.id.clone());
+            }
 
             if let Some(bus) = &self.domain_event_bus {
                 let _ = bus.publish(DomainEvent::KnowledgeAtomAccepted {
