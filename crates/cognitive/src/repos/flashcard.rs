@@ -579,6 +579,17 @@ impl FlashcardRepo {
         Ok(())
     }
 
+    /// Set `back_embedding_updated_at` to now for a card after its back embedding is computed.
+    pub async fn update_embedding_timestamp(&self, id: &str) -> Result<(), sqlx::Error> {
+        let now = Utc::now().to_rfc3339();
+        sqlx::query("UPDATE flashcards SET back_embedding_updated_at = ?1 WHERE id = ?2")
+            .bind(&now)
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
     /// Delete all cards in a deck.
     pub async fn delete_deck(&self, deck: &str) -> Result<u64, sqlx::Error> {
         let result = sqlx::query("DELETE FROM flashcards WHERE deck = ?1")

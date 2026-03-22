@@ -30,10 +30,14 @@ use crate::state::AppCore;
 /// Each card produces two embedding records with composite IDs:
 ///   - `"{card_id}_front"` (side = "front")
 ///   - `"{card_id}_back"`  (side = "back")
+///
+/// When `pool` is provided, `back_embedding_updated_at` is stamped after a successful
+/// back embedding upsert.
 pub(crate) async fn embed_flashcard_batch(
     engine: Arc<EmbeddingEngine>,
     vector_store: &VectorStore,
     cards: &[cognitive::FlashcardRow],
+    pool: Option<&sqlx::SqlitePool>,
 ) {
     for card in cards {
         let card_id = card.id.as_str();
@@ -65,11 +69,26 @@ pub(crate) async fn embed_flashcard_batch(
                 Ok(vec) => {
                     let id = format!("{card_id}_back");
                     let extras: &[(&str, &str)] = &[("card_id", card_id), ("side", "back")];
-                    if let Err(e) = vector_store
+                    match vector_store
                         .upsert_embedding("flashcard_embeddings", &id, &vec, extras)
                         .await
                     {
-                        tracing::warn!(card_id, "flashcard back embedding upsert failed: {e}");
+                        Ok(()) => {
+                            // Stamp the timestamp now that the back embedding is stored.
+                            if let Some(p) = pool {
+                                let now_str = chrono::Utc::now().to_rfc3339();
+                                let _ = sqlx::query(
+                                    "UPDATE flashcards SET back_embedding_updated_at = ?1 WHERE id = ?2",
+                                )
+                                .bind(&now_str)
+                                .bind(card_id)
+                                .execute(p)
+                                .await;
+                            }
+                        }
+                        Err(e) => {
+                            tracing::warn!(card_id, "flashcard back embedding upsert failed: {e}");
+                        }
                     }
                 }
                 Err(e) => {
@@ -239,8 +258,9 @@ impl AppCore {
         if let (Some(engine), Some(vs)) = (self.embedding_engine.clone(), self.vector_store.clone())
         {
             let rows_for_embed = rows.clone();
+            let pool_opt = self.flashcard_repo.as_ref().map(|r| r.pool().clone());
             tokio::spawn(async move {
-                embed_flashcard_batch(engine, &vs, &rows_for_embed).await;
+                embed_flashcard_batch(engine, &vs, &rows_for_embed, pool_opt.as_ref()).await;
             });
         }
 

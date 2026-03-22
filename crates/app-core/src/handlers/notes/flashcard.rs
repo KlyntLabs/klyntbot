@@ -171,8 +171,9 @@ impl AppCore {
         if let (Some(engine), Some(vs)) = (self.embedding_engine.clone(), self.vector_store.clone())
         {
             let row_for_embed = row.clone();
+            let pool_opt = self.flashcard_repo.as_ref().map(|r| r.pool().clone());
             tokio::spawn(async move {
-                embed_flashcard_batch(engine, &vs, &[row_for_embed]).await;
+                embed_flashcard_batch(engine, &vs, &[row_for_embed], pool_opt.as_ref()).await;
             });
         }
 

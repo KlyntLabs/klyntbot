@@ -67,8 +67,8 @@ export default function KnowledgeBasePage() {
   const { items: inboxItems, deleteItem: deleteInboxItem } = useInbox();
 
   // ── Core state ────────────────────────────────────────────────────────
-  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(
-    () => localStorage.getItem("klynt:lastOpenNoteId"),
+  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(() =>
+    localStorage.getItem("klynt:lastOpenNoteId"),
   );
   const [viewMode, setViewMode] = useState<ViewMode>("editor");
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("three-panel");

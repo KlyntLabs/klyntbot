@@ -165,6 +165,19 @@ impl AppCore {
                 )
             };
 
+            // Publish knowledge atom event for low-scoring semantic answers.
+            if score < 0.6 {
+                if let Some(bus) = &self.domain_event_bus {
+                    bus.publish(bus::DomainEvent::KnowledgeAtomCreated {
+                        atom_id: uuid::Uuid::new_v4().to_string(),
+                        atom_type: "flashcard_weak_spot".to_string(),
+                        domain: card.deck.clone(),
+                        source_note_id: card.source_note_id.clone(),
+                        personal_importance: 0.7,
+                    });
+                }
+            }
+
             return Ok(GradeResultResponse {
                 score: Some(score),
                 suggested_rating: rating.to_string(),
@@ -189,7 +202,7 @@ impl AppCore {
 
         let llm_result = self.grade_via_llm(&system_prompt, &user_prompt).await;
 
-        match llm_result {
+        let response = match llm_result {
             Ok(result) => {
                 let score = result.score.clamp(0.0, 1.0);
                 let diff_highlights = build_diff_highlights(
@@ -197,7 +210,7 @@ impl AppCore {
                     &result.key_concepts_missing,
                 );
 
-                Ok(GradeResultResponse {
+                GradeResultResponse {
                     score: Some(score),
                     suggested_rating: score_to_rating(score).to_string(),
                     grading_method: "llm".to_string(),
@@ -208,14 +221,14 @@ impl AppCore {
                     socratic_suggestion: result.socratic_suggestion,
                     key_concepts_present: result.key_concepts_present,
                     key_concepts_missing: result.key_concepts_missing,
-                })
+                }
             }
             Err(_) => {
                 // 7. LLM failure — fall back to semantic score
                 let fallback_score = 0.85 * cosine_sim; // scale down slightly
                 let rating = score_to_rating(fallback_score);
 
-                Ok(GradeResultResponse {
+                GradeResultResponse {
                     score: Some(fallback_score),
                     suggested_rating: rating.to_string(),
                     grading_method: "semantic_fallback".to_string(),
@@ -229,9 +242,26 @@ impl AppCore {
                     socratic_suggestion: None,
                     key_concepts_present: vec![],
                     key_concepts_missing: vec![],
-                })
+                }
+            }
+        };
+
+        // Publish knowledge atom event for low-scoring answers (weak spots).
+        if let Some(score) = response.score {
+            if score < 0.6 {
+                if let Some(bus) = &self.domain_event_bus {
+                    bus.publish(bus::DomainEvent::KnowledgeAtomCreated {
+                        atom_id: uuid::Uuid::new_v4().to_string(),
+                        atom_type: "flashcard_weak_spot".to_string(),
+                        domain: card.deck.clone(),
+                        source_note_id: card.source_note_id.clone(),
+                        personal_importance: 0.7,
+                    });
+                }
             }
         }
+
+        Ok(response)
     }
 
     /// Call LLM for grading, returning a parsed `LlmGradeResult`.
@@ -334,9 +364,22 @@ Be concise — 2-4 sentences max."#
             .content
             .ok_or_else(|| ApiError::new("LLM_ERROR", "Empty response from LLM"))?;
 
+        let saved = if let Some(bus) = &self.domain_event_bus {
+            bus.publish(bus::DomainEvent::KnowledgeAtomCreated {
+                atom_id: uuid::Uuid::new_v4().to_string(),
+                atom_type: "socratic_exchange".to_string(),
+                domain: card.deck.clone(),
+                source_note_id: card.source_note_id.clone(),
+                personal_importance: 0.6,
+            });
+            true
+        } else {
+            false
+        };
+
         Ok(FlashcardExplainResponse {
             explanation,
-            saved_as_memory: false,
+            saved_as_memory: saved,
         })
     }
 

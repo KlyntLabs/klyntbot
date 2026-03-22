@@ -41,7 +41,6 @@ export function TranslationSection({
   );
 }
 
-
 function TranslationSkeleton() {
   return (
     <div className="space-y-3">

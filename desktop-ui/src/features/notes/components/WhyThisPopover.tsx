@@ -53,7 +53,9 @@ export function WhyThisPopover({ sourceContext, domain, children }: WhyThisPopov
           <p className="text-[10px] text-muted mb-1">Why this was suggested</p>
           <p className="text-xs text-primary">{domain}</p>
           {sourceContext && (
-            <p className="text-[10px] text-muted mt-1 line-clamp-3">&ldquo;{sourceContext}&rdquo;</p>
+            <p className="text-[10px] text-muted mt-1 line-clamp-3">
+              &ldquo;{sourceContext}&rdquo;
+            </p>
           )}
         </PopoverPrimitive.Content>
       </PopoverPrimitive.Portal>

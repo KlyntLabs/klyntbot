@@ -1,8 +1,8 @@
 import { useEvent } from "@shared/hooks/useEvent";
-import { ThinkingDots } from "@shared/ui/ThinkingDots";
 import { ipc } from "@shared/hooks/useIpc";
 import { useTransparentBackground } from "@shared/hooks/useTransparentBackground";
 import { useWindowAutoResize } from "@shared/hooks/useWindowAutoResize";
+import { ThinkingDots } from "@shared/ui/ThinkingDots";
 import * as tauriWindow from "@tauri-apps/api/window";
 import { useRef, useState } from "react";
 
