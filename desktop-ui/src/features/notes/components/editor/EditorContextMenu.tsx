@@ -26,6 +26,7 @@ interface EditorContextMenuProps {
   onAskAI: () => void;
   onLinkedView: () => void;
   onApplyPerspective: (type: string) => void;
+  onRemoveAnnotation?: (annotationId: string) => void;
   noteTargetLang?: string;
 }
 
@@ -38,9 +39,11 @@ export function EditorContextMenu({
   onAskAI,
   onLinkedView,
   onApplyPerspective,
+  onRemoveAnnotation,
   noteTargetLang,
 }: EditorContextMenuProps) {
   const [hadSelection, setHadSelection] = useState(false);
+  const [annotationId, setAnnotationId] = useState<string | null>(null);
   const selectionTextRef = useRef("");
   const selectionRectRef = useRef<{ top: number; left: number } | undefined>(undefined);
 
@@ -57,6 +60,13 @@ export function EditorContextMenu({
       } else {
         selectionRectRef.current = undefined;
       }
+      // Detect if right-click is on an annotation
+      const focusNode = sel?.focusNode;
+      const el = focusNode instanceof HTMLElement ? focusNode : focusNode?.parentElement;
+      const annEl = el?.closest(".annotation-highlight") as HTMLElement | null;
+      setAnnotationId(annEl?.getAttribute("data-annotation-id") ?? null);
+    } else {
+      setAnnotationId(null);
     }
   }, []);
 
@@ -80,7 +90,45 @@ export function EditorContextMenu({
               <MenuItem onClick={onFlashcard} shortcut="⌥F">
                 Create Flashcard
               </MenuItem>
-              <MenuItem onClick={() => onTranslate(selectionTextRef.current, selectionRectRef.current)}>Translate</MenuItem>
+              {/* Translate → language picker submenu */}
+              <ContextMenu.Sub>
+                <ContextMenu.SubTrigger className="flex items-center justify-between rounded-md px-2 py-1.5 text-xs text-primary outline-none select-none data-[highlighted]:bg-surface-hover">
+                  Translate
+                  <span className="text-muted ml-4">▸</span>
+                </ContextMenu.SubTrigger>
+                <ContextMenu.Portal>
+                  <ContextMenu.SubContent className="glass-panel min-w-[180px] max-h-[320px] overflow-y-auto rounded-lg p-1.5 shadow-xl">
+                    {TRANSLATE_LANGUAGES.map((lang) => (
+                      <ContextMenu.Item
+                        key={lang.code}
+                        onClick={() =>
+                          onTranslateTo(lang.code, selectionTextRef.current, selectionRectRef.current)
+                        }
+                        className="flex items-center justify-between rounded-md px-2 py-1.5 text-xs text-primary outline-none select-none data-[highlighted]:bg-surface-hover"
+                      >
+                        <span>
+                          {lang.native} <span className="text-muted">({lang.label})</span>
+                        </span>
+                        {noteTargetLang === lang.code && (
+                          <span className="text-brand text-[10px]">●</span>
+                        )}
+                      </ContextMenu.Item>
+                    ))}
+                  </ContextMenu.SubContent>
+                </ContextMenu.Portal>
+              </ContextMenu.Sub>
+              <ContextMenu.Separator className="my-1 h-px bg-border" />
+            </>
+          )}
+
+          {/* Remove annotation — only when right-clicking on annotated text */}
+          {annotationId && onRemoveAnnotation && (
+            <>
+              <MenuItem
+                onClick={() => onRemoveAnnotation(annotationId)}
+              >
+                <span className="text-red-400">Remove annotation</span>
+              </MenuItem>
               <ContextMenu.Separator className="my-1 h-px bg-border" />
             </>
           )}
@@ -92,34 +140,6 @@ export function EditorContextMenu({
           <MenuItem onClick={onLinkedView} shortcut="⌥L">
             Linked View
           </MenuItem>
-
-          {/* Translate to... submenu */}
-          <ContextMenu.Sub>
-            <ContextMenu.SubTrigger className="flex items-center justify-between rounded-md px-2 py-1.5 text-xs text-primary outline-none select-none data-[highlighted]:bg-surface-hover">
-              {hadSelection ? "Translate selection to…" : "Translate to…"}
-              <span className="text-muted ml-4">▸</span>
-            </ContextMenu.SubTrigger>
-            <ContextMenu.Portal>
-              <ContextMenu.SubContent className="glass-panel min-w-[180px] max-h-[320px] overflow-y-auto rounded-lg p-1.5 shadow-xl">
-                {TRANSLATE_LANGUAGES.map((lang) => (
-                  <ContextMenu.Item
-                    key={lang.code}
-                    onClick={() =>
-                      onTranslateTo(lang.code, hadSelection ? selectionTextRef.current : undefined, selectionRectRef.current)
-                    }
-                    className="flex items-center justify-between rounded-md px-2 py-1.5 text-xs text-primary outline-none select-none data-[highlighted]:bg-surface-hover"
-                  >
-                    <span>
-                      {lang.native} <span className="text-muted">({lang.label})</span>
-                    </span>
-                    {noteTargetLang === lang.code && (
-                      <span className="text-brand text-[10px]">●</span>
-                    )}
-                  </ContextMenu.Item>
-                ))}
-              </ContextMenu.SubContent>
-            </ContextMenu.Portal>
-          </ContextMenu.Sub>
 
           <ContextMenu.Separator className="my-1 h-px bg-border" />
 

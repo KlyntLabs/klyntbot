@@ -1,6 +1,7 @@
 import { ipc } from "@shared/hooks/useIpc";
 import type { Note, NoteUpdateParams } from "@shared/types";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router";
 import { type AnnotationResponse, useAnnotations } from "../hooks/useAnnotations";
 import { useEditorActions } from "../hooks/useEditorActions";
@@ -238,35 +239,75 @@ export function NoteEditor({
   const annotationsRef = useRef(annotations);
   annotationsRef.current = annotations;
 
-  // Click handler for annotation marks
+  // Click outside annotation → close popover
   useEffect(() => {
     if (!editor) return;
     const handleClick = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
-      const highlight = target.closest(".annotation-highlight") as HTMLElement | null;
-      if (!highlight) {
+      if (!target.closest(".annotation-highlight")) {
         setActivePopover(null);
-        return;
       }
-      const annotationId = highlight.getAttribute("data-annotation-id");
-      if (!annotationId) return;
-
-      const ann = annotationsRef.current.find(
-        (a) => a.markId === annotationId || a.id === annotationId,
-      );
-      if (!ann) return;
-
-      const rect = highlight.getBoundingClientRect();
-      setActivePopover({
-        annotation: ann,
-        position: { top: rect.bottom, left: rect.left },
-      });
     };
-
     const editorEl = editor.view.dom;
     editorEl.addEventListener("click", handleClick);
     return () => editorEl.removeEventListener("click", handleClick);
   }, [editor]);
+
+  // Hover on annotation → show lightweight tooltip with annotation content
+  const [annotationTooltip, setAnnotationTooltip] = useState<{
+    text: string;
+    position: { top: number; left: number };
+  } | null>(null);
+
+  useEffect(() => {
+    if (!editor) return;
+    let hideTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const handleMouseOver = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      const highlight = target.closest(".annotation-highlight") as HTMLElement | null;
+      if (!highlight) return;
+      if (hideTimer) clearTimeout(hideTimer);
+
+      const annId = highlight.getAttribute("data-annotation-id");
+      if (!annId) return;
+      const ann = annotationsRef.current.find(
+        (a) => a.markId === annId || a.id === annId,
+      );
+      const text = ann?.content || ann?.aiSuggestion || ann?.quotedText || "Annotation — double-click to view";
+
+
+      const rect = highlight.getBoundingClientRect();
+      setAnnotationTooltip({
+        text,
+        position: { top: rect.top - 4, left: rect.left + rect.width / 2 },
+      });
+    };
+
+    const handleMouseOut = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (target.closest(".annotation-highlight")) {
+        hideTimer = setTimeout(() => setAnnotationTooltip(null), 150);
+      }
+    };
+
+    const editorEl = editor.view.dom;
+    editorEl.addEventListener("mouseover", handleMouseOver);
+    editorEl.addEventListener("mouseout", handleMouseOut);
+    return () => {
+      editorEl.removeEventListener("mouseover", handleMouseOver);
+      editorEl.removeEventListener("mouseout", handleMouseOut);
+      if (hideTimer) clearTimeout(hideTimer);
+    };
+  }, [editor]);
+
+  // Remove annotation callback for context menu
+  const handleRemoveAnnotation = useCallback(
+    (annId: string) => {
+      deleteAnnotation(annId);
+    },
+    [deleteAnnotation],
+  );
 
   // Listen for editor-action events (keyboard shortcuts from AnnotationMark)
   useEffect(() => {
@@ -436,6 +477,7 @@ export function NoteEditor({
             if (focusedSectionId)
               setPerspective(focusedSectionId, type as "linked-view" | "annotated" | "study-mode");
           }}
+          onRemoveAnnotation={handleRemoveAnnotation}
           noteTargetLang={languagePair?.targetLang}
         >
           {activeSplitMode ? (
@@ -549,6 +591,24 @@ export function NoteEditor({
           }}
           onDismiss={quickTranslate.dismiss}
         />
+      )}
+
+      {/* Annotation hover tooltip */}
+      {annotationTooltip && createPortal(
+        <div
+          className="fixed z-[60] max-w-[240px] rounded-lg px-2.5 py-1.5 text-xs text-primary leading-relaxed line-clamp-3 pointer-events-none"
+          style={{
+            top: annotationTooltip.position.top,
+            left: annotationTooltip.position.left,
+            transform: "translate(-50%, -100%)",
+            background: "var(--surface-floating)",
+            border: "1px solid var(--glass-border)",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+          }}
+        >
+          {annotationTooltip.text}
+        </div>,
+        document.body,
       )}
 
       {/* Link/Image insert dialog */}
