@@ -55,9 +55,11 @@ interface SimulatorModule {
 
 interface DayContext {
     date: Date;
-    dayOfWeek: number;     // 0=Monday, 6=Sunday
-    isWeekend: boolean;
-    dayIndex: number;       // 0-6 within the simulated week
+    dayOfWeek: number;     // Simulator-internal ordinal: 0=Monday, 6=Sunday
+                           // NOT from Date.getDay() (which returns 0=Sunday)
+                           // Computed as: (dayIndex % 7) where week starts on Monday
+    isWeekend: boolean;    // dayOfWeek >= 5
+    dayIndex: number;       // 0-based index within the simulation run
 }
 ```
 
@@ -119,7 +121,9 @@ Cross-domain connections emerge naturally:
 8. chat        → conversations with tool calls
 ```
 
-Auto-resolved from `dependencies` field. Running a subset (e.g., `--modules finance`) auto-includes transitive dependencies (para).
+Auto-resolved from `dependencies` field via topological sort with deduplication — shared dependencies (e.g., `para` needed by both `tasks` and `finance`) run exactly once. Running a subset (e.g., `--modules finance`) auto-includes transitive dependencies (para).
+
+**Error handling:** each module's `simulateDay` is wrapped in try/catch. A failed module logs the error and continues to the next module — partial days are better than aborting the entire simulation. `seed()` failures are fatal (abort the run) since subsequent modules depend on structural entities.
 
 ### 5. Simulated Week
 
@@ -163,12 +167,23 @@ class ApiClient {
         private mode: "fast" | "selective" | "full" = "fast",
     ) {}
 
-    async post<T>(command: string, params?: Record<string, unknown>): Promise<T | null> {
-        // Skip LLM-heavy commands based on mode
+    // Returns T when the call executes, or undefined when skipped by mode.
+    // Modules MUST guard skippable calls: use `client.maybe("cmd", params)` which
+    // returns undefined for skipped calls, or `client.post("cmd", params)` which
+    // throws if the command would be skipped (use for required calls).
+    async maybe<T>(command: string, params?: Record<string, unknown>): Promise<T | undefined> {
         if (this.shouldSkip(command)) {
             console.log(`  skip ${command} (${this.mode} mode)`);
-            return null;
+            return undefined;
         }
+        return this.doPost<T>(command, params);
+    }
+
+    async post<T>(command: string, params?: Record<string, unknown>): Promise<T> {
+        return this.doPost<T>(command, params);
+    }
+
+    private async doPost<T>(command: string, params?: Record<string, unknown>): Promise<T> {
 
         const start = performance.now();
         const res = await fetch(`${this.baseUrl}/api/${command}`, {
@@ -212,11 +227,18 @@ Options:
 
 ### 10. Reset Flow
 
+The dev server's `AppCore` is a long-lived singleton — it holds an open `SqlitePool` that won't reconnect after the DB file is deleted. Therefore, the simulator cannot delete the DB while the server is running and expect it to reinitialize. Instead:
+
 1. Verify `--confirm` flag
-2. Check dev server reachable (`GET /api/app_info`)
-3. Delete `~/.klyntbot-dev/data.db` and `~/.klyntbot-dev/lancedb/`
-4. Wait for dev server to reinitialize (poll `/api/app_info` until 200)
-5. Run simulation
+2. Print instructions: "Stop the dev server, then press Enter to continue"
+3. Wait for user confirmation
+4. Delete `~/.klyntbot-dev/data.db` and `~/.klyntbot-dev/lancedb/`
+5. Print: "Start the dev server (`cargo tauri dev`), then press Enter"
+6. Wait for user confirmation
+7. Verify server is reachable (`POST /api/app_info` with empty body — the dev server only accepts POST, not GET)
+8. Run simulation
+
+Alternative (future improvement): add a `POST /api/dev_reset_db` endpoint to the dev server that re-runs migrations on a cleared data dir, allowing fully automated reset without server restart. This is deferred — the manual restart flow is acceptable for a dev tool.
 
 ### 11. Progress Output
 
