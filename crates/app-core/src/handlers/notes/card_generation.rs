@@ -1,5 +1,19 @@
 use std::sync::Arc;
 
+/// Map a difficulty estimate (1–5) to initial FSRS-5 `(stability, difficulty)` parameters.
+///
+/// Higher difficulty estimates produce lower initial stability and higher FSRS difficulty,
+/// which causes the scheduler to review the card more aggressively at the start.
+fn difficulty_to_fsrs(estimate: Option<i32>) -> (f64, f64) {
+    match estimate.unwrap_or(3) {
+        1 => (4.0, 3.0), // Easy recall: high stability, low difficulty
+        2 => (3.0, 4.0),
+        3 => (2.0, 5.0), // Default
+        4 => (1.2, 6.5),
+        _ => (0.8, 8.0), // Hard synthesis: low stability, high difficulty
+    }
+}
+
 use desktop_shared::commands::{
     FlashcardGenerateParams, FlashcardGenerateResponse, FlashcardResponse,
     FlashcardSaveGeneratedParams, GeneratedCardPreview,
@@ -164,6 +178,8 @@ impl AppCore {
                 source_context: g.source_context,
                 cloze_data: g.cloze_data,
                 vocab_data: g.vocab_data,
+                difficulty_estimate: g.difficulty_estimate,
+                prerequisite_concepts: g.prerequisite_concepts,
             })
             .collect();
 
@@ -190,6 +206,7 @@ impl AppCore {
             .iter()
             .map(|c| {
                 let card_type = cognitive::CardType::parse(&c.card_type);
+                let (stability, difficulty) = difficulty_to_fsrs(c.difficulty_estimate);
                 cognitive::NewFlashcard {
                     source_note_id: params.note_id.clone(),
                     source_context: c.source_context.clone(),
@@ -202,10 +219,13 @@ impl AppCore {
                     vocab_data: c.vocab_data.clone(),
                     image_data: None,
                     tags: c.tags.clone(),
-                    stability: 1.0,
-                    difficulty: 5.0,
-                    difficulty_estimate: None,
-                    prerequisite_concepts: None,
+                    stability,
+                    difficulty,
+                    difficulty_estimate: c.difficulty_estimate,
+                    prerequisite_concepts: c
+                        .prerequisite_concepts
+                        .as_ref()
+                        .map(|v| serde_json::to_string(v).unwrap_or_default()),
                 }
             })
             .collect();

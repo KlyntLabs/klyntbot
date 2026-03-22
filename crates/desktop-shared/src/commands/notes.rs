@@ -354,6 +354,8 @@ pub struct GeneratedCardPreview {
     pub source_context: Option<String>,
     pub cloze_data: Option<serde_json::Value>,
     pub vocab_data: Option<serde_json::Value>,
+    pub difficulty_estimate: Option<i32>,
+    pub prerequisite_concepts: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Serialize)]
