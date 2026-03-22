@@ -273,6 +273,7 @@ fn domain_for_event(event: &bus::DomainEvent) -> &'static str {
         | bus::DomainEvent::PracticeUnitCompleted { .. }
         | bus::DomainEvent::PracticeSessionCompleted { .. }
         | bus::DomainEvent::KnowledgeTransferDetected { .. }
-        | bus::DomainEvent::CoachingLearningDigest { .. } => "learning",
+        | bus::DomainEvent::CoachingLearningDigest { .. }
+        | bus::DomainEvent::FlashcardSessionCompleted { .. } => "learning",
     }
 }

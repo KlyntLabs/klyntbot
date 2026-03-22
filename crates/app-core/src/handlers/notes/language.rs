@@ -167,6 +167,8 @@ impl AppCore {
                 tags: vec!["vocabulary".to_string(), "language-learning".to_string()],
                 stability: 1.0,
                 difficulty: 0.3,
+                difficulty_estimate: None,
+                prerequisite_concepts: None,
             });
 
             // Also save as SemanticFact for CJK-safe vocabulary lookup

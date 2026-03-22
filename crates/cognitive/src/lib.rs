@@ -35,6 +35,8 @@ pub use repos::{BlackboardEntry, BlackboardRepo, NewBlackboardEntry};
 pub use repos::{
     CardType, DeckSummary, FlashcardRepo, FlashcardRow, NewFlashcard, ReviewLogEntry, ReviewQuality,
 };
+pub use repos::{DeckPreferenceRepo, DeckPreferenceRow};
+pub use repos::{ReviewSessionRepo, ReviewSessionRow};
 #[allow(deprecated)]
 pub use repos::{InsightCacheRepo, InsightCacheRow};
 pub use repos::AtomExtractionCache;

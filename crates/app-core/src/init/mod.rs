@@ -308,6 +308,12 @@ impl AppCore {
             )),
             persona_repo: Some(::cognitive::PersonaRepo::new(storage_pool.inner().clone())),
             squad_repo: Some(::cognitive::SquadRepo::new(storage_pool.inner().clone())),
+            review_session_repo: Some(::cognitive::ReviewSessionRepo::new(
+                storage_pool.inner().clone(),
+            )),
+            deck_preference_repo: Some(::cognitive::DeckPreferenceRepo::new(
+                storage_pool.inner().clone(),
+            )),
             autotuner,
         };
 

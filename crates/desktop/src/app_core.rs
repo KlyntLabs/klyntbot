@@ -301,7 +301,8 @@ fn wire_event_channels(core: &AppCore, channels: EventChannels, app_handle: &tau
                             | bus::DomainEvent::PracticeUnitCompleted { .. }
                             | bus::DomainEvent::PracticeSessionCompleted { .. }
                             | bus::DomainEvent::KnowledgeTransferDetected { .. }
-                            | bus::DomainEvent::CoachingLearningDigest { .. } => "learning",
+                            | bus::DomainEvent::CoachingLearningDigest { .. }
+                            | bus::DomainEvent::FlashcardSessionCompleted { .. } => "learning",
                         };
                         let salience_str = match salience {
                             cognitive::types::SalienceVerdict::Extract => "extract",

@@ -68,6 +68,8 @@ pub struct NewFlashcard {
     pub tags: Vec<String>,
     pub stability: f64,
     pub difficulty: f64,
+    pub difficulty_estimate: Option<i32>,
+    pub prerequisite_concepts: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
@@ -93,6 +95,11 @@ pub struct FlashcardRow {
     pub state: String,
     pub suspended: i64,
     pub recall_speed_ms: Option<i64>,
+    pub back_embedding_updated_at: Option<String>,
+    pub preferred_mode: Option<String>,
+    pub difficulty_estimate: Option<i32>,
+    pub prerequisite_concepts: Option<String>,
+    pub card_distractors: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -157,6 +164,8 @@ impl FlashcardRepo {
                      cloze_data, vocab_data, image_data, tags,
                      stability, difficulty, due_at, last_reviewed_at,
                      review_count, lapses, state, suspended, recall_speed_ms,
+                     back_embedding_updated_at, preferred_mode,
+                     difficulty_estimate, prerequisite_concepts, card_distractors,
                      created_at, updated_at)
                 VALUES
                     (?1, ?2, ?3, ?4,
@@ -164,7 +173,9 @@ impl FlashcardRepo {
                      ?9, ?10, ?11, ?12,
                      ?13, ?14, ?15, NULL,
                      0, 0, 'new', 0, NULL,
-                     ?16, ?16)
+                     NULL, NULL,
+                     ?16, ?17, NULL,
+                     ?18, ?18)
                 "#,
             )
             .bind(&id)
@@ -182,6 +193,8 @@ impl FlashcardRepo {
             .bind(card.stability)
             .bind(card.difficulty)
             .bind(&now)
+            .bind(card.difficulty_estimate)
+            .bind(&card.prerequisite_concepts)
             .bind(&now)
             .execute(&self.pool)
             .await?;
@@ -637,6 +650,8 @@ mod tests {
             tags: vec![],
             stability: 1.0,
             difficulty: 5.0,
+            difficulty_estimate: None,
+            prerequisite_concepts: None,
         }
     }
 
@@ -661,6 +676,8 @@ mod tests {
             tags: vec!["japanese".to_string(), "n3".to_string()],
             stability: 1.0,
             difficulty: 5.0,
+            difficulty_estimate: None,
+            prerequisite_concepts: None,
         }
     }
 

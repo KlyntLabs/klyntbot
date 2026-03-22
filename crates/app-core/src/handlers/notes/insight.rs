@@ -449,6 +449,8 @@ impl AppCore {
                     tags: vec![],
                     stability,
                     difficulty,
+                    difficulty_estimate: None,
+                    prerequisite_concepts: None,
                 }
             })
             .collect();

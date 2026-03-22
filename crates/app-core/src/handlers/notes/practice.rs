@@ -588,6 +588,8 @@ impl AppCore {
                             ],
                             stability,
                             difficulty: 0.3,
+                            difficulty_estimate: None,
+                            prerequisite_concepts: None,
                         });
                     }
 

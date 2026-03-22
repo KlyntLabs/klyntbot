@@ -344,6 +344,13 @@ pub enum DomainEvent {
         target_lang: String,
         weak_unit_count: u32,
     },
+    FlashcardSessionCompleted {
+        session_id: String,
+        cards_reviewed: usize,
+        avg_score: f64,
+        weak_domains: Vec<String>,
+        propagation_count: usize,
+    },
     KnowledgeTransferDetected {
         atom_id: String,
         from_domain: String,

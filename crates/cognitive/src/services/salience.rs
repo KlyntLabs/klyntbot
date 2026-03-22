@@ -121,6 +121,7 @@ pub fn evaluate_salience(event: &DomainEvent) -> SalienceVerdict {
         DomainEvent::NoteContentChanged { .. } => SalienceVerdict::Discard,
         DomainEvent::NoteDeleted { .. } => SalienceVerdict::Discard,
         DomainEvent::TaskHierarchyChanged { .. } => SalienceVerdict::Discard,
+        DomainEvent::FlashcardSessionCompleted { .. } => SalienceVerdict::Accumulate,
     }
 }
 

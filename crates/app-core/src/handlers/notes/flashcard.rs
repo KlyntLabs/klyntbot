@@ -145,6 +145,8 @@ impl AppCore {
             tags: params.tags.unwrap_or_default(),
             stability: 1.0,
             difficulty: 5.0,
+            difficulty_estimate: None,
+            prerequisite_concepts: None,
         };
         let row = repo
             .create_single(card)

@@ -111,6 +111,10 @@ pub struct AppCore {
     pub persona_repo: Option<cognitive::PersonaRepo>,
     /// Squad repo for Insight Review persona squads (None when cognitive feature unavailable).
     pub squad_repo: Option<cognitive::SquadRepo>,
+    /// Review session repo for active recall sessions (None when cognitive feature unavailable).
+    pub review_session_repo: Option<cognitive::ReviewSessionRepo>,
+    /// Deck preference repo for per-deck answer mode settings (None when cognitive feature unavailable).
+    pub deck_preference_repo: Option<cognitive::DeckPreferenceRepo>,
     /// AutoTuner orchestrator (None when autotuner is disabled).
     pub autotuner: Option<Arc<agent::autotuner::AutoTunerOrchestrator>>,
 }
@@ -213,6 +217,20 @@ impl AppCore {
     /// Return practice session repo.
     pub fn practice_repo(&self) -> &PracticeSessionRepo {
         &self.practice_repo
+    }
+
+    /// Return review session repo or a "not available" error.
+    pub fn review_session_repo(&self) -> Result<&cognitive::ReviewSessionRepo, ApiError> {
+        self.review_session_repo
+            .as_ref()
+            .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "Review session repo not available"))
+    }
+
+    /// Return deck preference repo or a "not available" error.
+    pub fn deck_preference_repo(&self) -> Result<&cognitive::DeckPreferenceRepo, ApiError> {
+        self.deck_preference_repo
+            .as_ref()
+            .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "Deck preference repo not available"))
     }
 
     /// Return launcher search engine or a "feature disabled" error.

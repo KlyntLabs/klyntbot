@@ -1046,6 +1046,7 @@ fn event_type_key(event: &DomainEvent) -> String {
         DomainEvent::PracticeSessionCompleted { .. } => "PracticeSessionCompleted".into(),
         DomainEvent::KnowledgeTransferDetected { .. } => "KnowledgeTransferDetected".into(),
         DomainEvent::CoachingLearningDigest { .. } => "CoachingLearningDigest".into(),
+        DomainEvent::FlashcardSessionCompleted { .. } => "FlashcardSessionCompleted".into(),
     }
 }
 

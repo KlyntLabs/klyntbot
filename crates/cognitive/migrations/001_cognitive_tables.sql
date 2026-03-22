@@ -509,6 +509,11 @@ CREATE TABLE IF NOT EXISTS flashcards (
     state TEXT NOT NULL DEFAULT 'new',
     suspended INTEGER NOT NULL DEFAULT 0,
     recall_speed_ms INTEGER,
+    back_embedding_updated_at TEXT,
+    preferred_mode TEXT,
+    difficulty_estimate INTEGER,
+    prerequisite_concepts TEXT,
+    card_distractors TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -642,3 +647,28 @@ CREATE TABLE IF NOT EXISTS atom_extraction_cache (
     content_hash  TEXT NOT NULL,
     extracted_at  TEXT NOT NULL
 );
+
+-- ── Deck Preferences ──────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS deck_preferences (
+    deck TEXT PRIMARY KEY,
+    answer_mode TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+-- ── Review Sessions ───────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS review_sessions (
+    id TEXT PRIMARY KEY,
+    started_at TEXT NOT NULL,
+    completed_at TEXT,
+    cards_reviewed INTEGER DEFAULT 0,
+    avg_score REAL,
+    duration_seconds INTEGER,
+    modes_used TEXT,
+    propagation_count INTEGER DEFAULT 0,
+    weak_card_ids TEXT,
+    session_data TEXT,
+    status TEXT DEFAULT 'active'
+);
+
+CREATE INDEX IF NOT EXISTS idx_review_sessions_status ON review_sessions(status);
+CREATE INDEX IF NOT EXISTS idx_review_sessions_started ON review_sessions(started_at);
