@@ -1,6 +1,7 @@
 mod card_generation;
 mod converters;
 mod crud;
+pub mod distractors;
 pub(crate) mod flashcard;
 pub mod grading;
 mod inbox;

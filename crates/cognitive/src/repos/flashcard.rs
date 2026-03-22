@@ -568,6 +568,20 @@ impl FlashcardRepo {
         Ok(row.0)
     }
 
+    /// Persist generated distractors for a card (caching for multiple-choice mode).
+    pub async fn update_distractors(
+        &self,
+        id: &str,
+        distractors_json: &str,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query("UPDATE flashcards SET card_distractors = ?1 WHERE id = ?2")
+            .bind(distractors_json)
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
     /// Delete all cards in a deck.
     pub async fn delete_deck(&self, deck: &str) -> Result<u64, sqlx::Error> {
         let result = sqlx::query("DELETE FROM flashcards WHERE deck = ?1")

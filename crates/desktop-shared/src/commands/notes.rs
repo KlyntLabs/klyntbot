@@ -530,6 +530,27 @@ pub struct RatePersonaParams {
     pub helpful: bool,
 }
 
+// ── Distractor Generation ────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FlashcardDistractorParams {
+    pub card_id: String,
+    #[serde(default = "default_distractor_count")]
+    pub count: usize,
+}
+
+fn default_distractor_count() -> usize {
+    3
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FlashcardDistractorResponse {
+    pub distractors: Vec<String>,
+    pub cached: bool,
+}
+
 // ── Active Recall Grading ────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
