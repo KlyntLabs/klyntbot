@@ -530,6 +530,53 @@ pub struct RatePersonaParams {
     pub helpful: bool,
 }
 
+// ── Active Recall Grading ────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FlashcardSubmitAnswerParams {
+    pub card_id: String,
+    pub user_answer: String,
+    pub mode: String, // "typed" | "voice" | "cloze_fill"
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GradeResultResponse {
+    pub score: Option<f64>,
+    pub suggested_rating: String,
+    pub grading_method: String,
+    pub explanation: Option<String>,
+    pub diff_highlights: Vec<DiffSegmentResponse>,
+    pub expected_answer: String,
+    pub coaching_nudge: Option<String>,
+    pub socratic_suggestion: Option<String>,
+    pub key_concepts_present: Vec<String>,
+    pub key_concepts_missing: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiffSegmentResponse {
+    pub text: String,
+    pub status: String, // "match" | "missing" | "extra" | "partial"
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FlashcardExplainParams {
+    pub card_id: String,
+    pub user_answer: String,
+    pub grade_explanation: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FlashcardExplainResponse {
+    pub explanation: String,
+    pub saved_as_memory: bool,
+}
+
 // ── Persona Chat ────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
