@@ -12,20 +12,21 @@ export const productivityModule: SimulatorModule = {
 
     async seed(world, client) {
         // Create productivity goals using postFlat (snake_case, flat body)
+        // Valid metrics: productive_hours, focus_sessions, productivity_score, max_distracting_mins
         await client.postFlat("productivity_goal_create", {
             goal_type: "daily",
-            metric: "focus_minutes",
-            target_value: 240, // 4 hours deep work
-        });
-        await client.postFlat("productivity_goal_create", {
-            goal_type: "weekly",
-            metric: "tasks_completed",
-            target_value: 5,
+            metric: "productive_hours",
+            target_value: 4,
         });
         await client.postFlat("productivity_goal_create", {
             goal_type: "daily",
             metric: "focus_sessions",
             target_value: 3,
+        });
+        await client.postFlat("productivity_goal_create", {
+            goal_type: "daily",
+            metric: "max_distracting_mins",
+            target_value: 60,
         });
         console.log(`  3 productivity goals created`);
     },

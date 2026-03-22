@@ -70,45 +70,46 @@ export const cognitiveModule: SimulatorModule = {
     },
 
     async simulateDay(world, client, day) {
-        // Create an episodic memory for the day's activities
+        // Inject daily activity as UserStatedFact events
+        // Valid event types: UserStatedFact, UserCorrectedAI, BudgetAlert,
+        // DistractionDetected, FocusSessionStarted, FocusSessionEnded, TaskDeferred
         const template = DAILY_EPISODIC_TEMPLATES[day.dayOfWeek];
         if (template) {
             const episodic = template(world);
             await client.postFlat("cognitive_inject_event", {
-                event_type: "episodic_memory",
+                event_type: "UserStatedFact",
                 payload: {
+                    fact: episodic.content,
                     domain: episodic.domain,
-                    content: episodic.content,
-                    importance: day.isWeekend ? 0.4 : 0.7,
-                    occurred_at: day.date.toISOString(),
                 },
             });
-            console.log(`  cognitive: injected ${episodic.domain} episodic memory`);
+            console.log(`  cognitive: injected ${episodic.domain} fact`);
         }
 
-        // On Wednesday, also update a fact about work progress
+        // On Wednesday, inject a distraction event for realism
         if (day.dayOfWeek === 2) {
             await client.postFlat("cognitive_inject_event", {
-                event_type: "fact_update",
+                event_type: "DistractionDetected",
                 payload: {
-                    domain: "work",
-                    subject: "api_redesign",
-                    content: "Auth migration progressing — estimated 70% complete after this sprint",
+                    app: "Twitter",
+                    duration_secs: 300,
+                    context: "Browsed during focus session on auth implementation",
                 },
             });
-            console.log(`  cognitive: injected work progress fact update`);
+            console.log(`  cognitive: injected distraction event`);
         }
 
-        // On Friday, inject a weekly summary event
+        // On Friday, inject a budget alert
         if (day.dayOfWeek === 4) {
             await client.postFlat("cognitive_inject_event", {
-                event_type: "weekly_summary",
+                event_type: "BudgetAlert",
                 payload: {
-                    domain: "productivity",
-                    content: "Weekly productivity: ~20h focused work, 3 tasks completed, maintained French practice streak",
+                    category: "dining",
+                    spent: 280.0,
+                    limit: 300.0,
                 },
             });
-            console.log(`  cognitive: injected weekly summary event`);
+            console.log(`  cognitive: injected budget alert event`);
         }
     },
 };

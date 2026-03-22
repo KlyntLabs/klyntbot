@@ -89,7 +89,7 @@ export const tasksModule: SimulatorModule = {
         let completed = 0;
         for (let i = 0; i < Math.min(completeCount, activeTasks.length); i++) {
             const [key, task] = activeTasks[i];
-            await client.post("task_toggle_complete", { id: task.id });
+            await client.postFlat("task_toggle_complete", { id: task.id });
             completed++;
         }
 

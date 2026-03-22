@@ -3,7 +3,7 @@ import type { SimulatorModule, DayContext } from "./types";
 import type { World, Ref } from "../world";
 import type { ApiClient } from "../client";
 import { formatDate } from "../utils/dates";
-import { pick, randomCents, randomBetween } from "../utils/random";
+import { pick, randomCents, randomBetween, shuffle } from "../utils/random";
 
 interface CreateResponse { id: string; [key: string]: unknown }
 
