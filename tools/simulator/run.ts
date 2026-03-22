@@ -19,6 +19,7 @@ interface Args {
     seedOnly: boolean;
     baseUrl: string;
     dryRun: boolean;
+    noReset: boolean;
 }
 
 function parseArgs(argv: string[]): Args {
@@ -30,6 +31,7 @@ function parseArgs(argv: string[]): Args {
         seedOnly: false,
         baseUrl: "http://localhost:3456",
         dryRun: false,
+        noReset: false,
     };
 
     for (let i = 0; i < argv.length; i++) {
@@ -41,6 +43,7 @@ function parseArgs(argv: string[]): Args {
             case "--seed-only": args.seedOnly = true; break;
             case "--base-url": args.baseUrl = argv[++i]; break;
             case "--dry-run": args.dryRun = true; break;
+            case "--no-reset": args.noReset = true; break;
         }
     }
     return args;
@@ -83,7 +86,7 @@ async function main() {
     const dbPath = join(dataDir, "data.db");
     const lancePath = join(dataDir, "lancedb");
 
-    if (existsSync(dbPath) || existsSync(lancePath)) {
+    if (!args.noReset && (existsSync(dbPath) || existsSync(lancePath))) {
         await prompt("⏸  Stop the dev server, then press Enter...");
         if (existsSync(dbPath)) unlinkSync(dbPath);
         // Also remove WAL/SHM files

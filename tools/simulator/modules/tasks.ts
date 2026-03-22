@@ -42,12 +42,22 @@ export const tasksModule: SimulatorModule = {
     dependencies: ["para"],
 
     async seed(world, client) {
+        // Map projects to their areas for areaId (required for top-level tasks)
+        const projectArea: Record<string, Ref> = {
+            apiRedesign: world.areas.work,
+            parisTrip: world.areas.personal,
+            fireGoal: world.areas.finance,
+            languageLearning: world.areas.personal,
+        };
+
         let count = 0;
         for (const def of TASK_DEFINITIONS) {
             const project = world.projects[def.project];
+            const area = projectArea[def.project];
             const res = await client.post<CreateResponse>("task_create", {
                 title: def.title,
                 projectId: project.id,
+                areaId: area.id,
                 priority: def.priority ?? null,
                 tags: def.tags ?? [],
                 estimatedMinutes: def.estimatedMinutes ?? null,
@@ -106,11 +116,21 @@ export const tasksModule: SimulatorModule = {
         const projectKey = projectKeys[day.dayIndex % projectKeys.length];
         const project = world.projects[projectKey];
 
+        // Resolve area for the selected project
+        const projectAreaMap: Record<string, Ref> = {
+            apiRedesign: world.areas.work,
+            parisTrip: world.areas.personal,
+            fireGoal: world.areas.finance,
+            languageLearning: world.areas.personal,
+        };
+        const area = projectAreaMap[projectKey];
+
         for (let i = 0; i < newTaskCount; i++) {
             const title = i === 0 ? dayTitle : `Follow-up: ${dayTitle}`;
             const res = await client.post<CreateResponse>("task_create", {
                 title,
                 projectId: project.id,
+                areaId: area.id,
                 tags: ["daily"],
             });
             const taskKey = `day${day.dayIndex}-task${i}`;
