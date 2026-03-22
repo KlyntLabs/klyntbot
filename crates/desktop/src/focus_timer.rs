@@ -361,7 +361,7 @@ async fn read_preferences(app: &AppHandle) -> (bool, bool) {
 
 pub fn open_tray_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window(WINDOW_TRAY) {
-        if let Some(tray) = app.tray_by_id("klynt-tray") {
+        let positioned = if let Some(tray) = app.tray_by_id("klynt-tray") {
             if let Ok(Some(rect)) = tray.rect() {
                 if let Ok(win_size) = window.outer_size() {
                     let scale = window.scale_factor().unwrap_or(1.0);
@@ -370,9 +370,33 @@ pub fn open_tray_window(app: &AppHandle) {
                     let x = tray_pos.x + (tray_size.width / 2.0) - (win_size.width as f64 / 2.0);
                     let y = tray_pos.y + tray_size.height;
                     let _ = window.set_position(tauri::PhysicalPosition::new(x as i32, y as i32));
+                    true
+                } else {
+                    false
                 }
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+
+        // Fallback: if tray rect unavailable (sleep/wake, first launch), position
+        // at top-center of the primary monitor near the menu bar.
+        if !positioned {
+            if let Ok(Some(monitor)) = window.primary_monitor() {
+                let screen = monitor.size();
+                let scale = monitor.scale_factor();
+                let win_width = window
+                    .outer_size()
+                    .map(|s| s.width as f64)
+                    .unwrap_or(320.0 * scale);
+                let x = (screen.width as f64 / 2.0) - (win_width / 2.0);
+                let y = 28.0 * scale; // Below the macOS menu bar (~28 logical pts)
+                let _ = window.set_position(tauri::PhysicalPosition::new(x as i32, y as i32));
             }
         }
+
         let _ = window.show();
         let _ = window.set_focus();
     }
