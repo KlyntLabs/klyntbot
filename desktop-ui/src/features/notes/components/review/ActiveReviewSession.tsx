@@ -1,0 +1,222 @@
+import { BookOpen, X } from "lucide-react";
+import { useEffect } from "react";
+import { useActiveReview } from "../../hooks/useActiveReview";
+import type { DeckSummary, ReviewQuality } from "../../hooks/useFlashcards";
+import { ReviewCard } from "./ReviewCard";
+import { SessionProgress } from "./SessionProgress";
+
+interface ActiveReviewSessionProps {
+  layout: "compact" | "fullscreen";
+  onClose: () => void;
+}
+
+export function ActiveReviewSession({ layout: _layout, onClose }: ActiveReviewSessionProps) {
+  const {
+    phase,
+    cardPhase,
+    decks,
+    current,
+    remaining,
+    gradeResult,
+    selectedMode,
+    avgScore,
+    error,
+    fetchDecks,
+    startReview,
+    submitAnswer,
+    confirmRating,
+    requestExplanation,
+    skipCard,
+  } = useActiveReview();
+
+  // Fetch decks on mount
+  useEffect(() => {
+    fetchDecks();
+  }, [fetchDecks]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    if (phase !== "reviewing") return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't fire shortcuts while typing in an input/textarea
+      const target = e.target as HTMLElement;
+      if (target.tagName === "TEXTAREA" || target.tagName === "INPUT") return;
+
+      switch (e.key) {
+        case "Enter":
+          if (cardPhase === "graded" || cardPhase === "socratic") {
+            confirmRating();
+          }
+          break;
+        case "1":
+          if (cardPhase === "graded" || cardPhase === "socratic") {
+            confirmRating("again");
+          }
+          break;
+        case "2":
+          if (cardPhase === "graded" || cardPhase === "socratic") {
+            confirmRating("hard");
+          }
+          break;
+        case "3":
+          if (cardPhase === "graded" || cardPhase === "socratic") {
+            confirmRating("good");
+          }
+          break;
+        case "4":
+          if (cardPhase === "graded" || cardPhase === "socratic") {
+            confirmRating("easy");
+          }
+          break;
+        case "e":
+          if (cardPhase === "graded") {
+            requestExplanation();
+          }
+          break;
+        case "Escape":
+          onClose();
+          break;
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [phase, cardPhase, confirmRating, requestExplanation, onClose]);
+
+  // ── Idle — initial loading state ─────────────────────────────────────────
+
+  if (phase === "idle") {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 py-8">
+        <p className="text-[11px] text-dim">Loading decks…</p>
+      </div>
+    );
+  }
+
+  // ── Deck picker ───────────────────────────────────────────────────────────
+
+  if (phase === "deck_picker") {
+    const dueDecks = decks.filter((d: DeckSummary) => d.dueCount > 0);
+
+    if (dueDecks.length === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center gap-3 py-8">
+          <BookOpen size={24} className="text-accent" />
+          <p className="text-[12px] text-foreground font-medium">No cards due for review</p>
+          <p className="text-[10px] text-dim">
+            {decks.length} {decks.length === 1 ? "deck" : "decks"} saved, all caught up!
+          </p>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-[10px] px-3 py-1 rounded-md bg-white/[0.06] text-muted-foreground hover:text-foreground"
+          >
+            Done
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex flex-col gap-3 p-3">
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] text-foreground font-medium">Choose a deck to review</span>
+          <div className="flex-1" />
+          <button type="button" onClick={onClose} className="p-1 text-dim hover:text-foreground">
+            <X size={12} />
+          </button>
+        </div>
+
+        {error && (
+          <p className="text-[10px] text-red-400 bg-red-500/10 rounded-md px-2 py-1">{error}</p>
+        )}
+
+        <div className="space-y-1.5">
+          {dueDecks.map((d: DeckSummary) => (
+            <button
+              key={d.name}
+              type="button"
+              onClick={() => startReview(d.name)}
+              className="w-full flex items-center gap-2 p-2 rounded-lg bg-white/[0.03] hover:bg-white/[0.06] text-left"
+            >
+              <BookOpen size={12} className="text-muted-foreground shrink-0" />
+              <span className="text-[11px] text-foreground truncate flex-1">{d.name}</span>
+              <span className="text-[10px] text-dim shrink-0">
+                {d.dueCount}/{d.cardCount} due
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Complete ──────────────────────────────────────────────────────────────
+
+  if (phase === "complete") {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 py-8">
+        <BookOpen size={24} className="text-accent" />
+        <p className="text-[12px] text-foreground font-medium">Review complete!</p>
+        {avgScore != null && (
+          <p className="text-[10px] text-dim">Average score: {Math.round(avgScore * 100)}%</p>
+        )}
+        <button
+          type="button"
+          onClick={onClose}
+          className="text-[10px] px-3 py-1 rounded-md bg-white/[0.06] text-muted-foreground hover:text-foreground"
+        >
+          Done
+        </button>
+      </div>
+    );
+  }
+
+  // ── Reviewing ─────────────────────────────────────────────────────────────
+
+  if (!current) return null;
+
+  const total = remaining + (cardPhase !== "answering" ? 1 : 0);
+
+  return (
+    <div className="flex flex-col gap-3 p-3">
+      {/* Progress */}
+      <SessionProgress remaining={remaining} total={total} avgScore={avgScore} onExit={onClose} />
+
+      {/* Error */}
+      {error && (
+        <p className="text-[10px] text-red-400 bg-red-500/10 rounded-md px-2 py-1">{error}</p>
+      )}
+
+      {/* Card */}
+      <ReviewCard
+        card={current}
+        cardPhase={cardPhase}
+        mode={selectedMode}
+        gradeResult={gradeResult}
+        onSubmitAnswer={submitAnswer}
+        onConfirmRating={confirmRating}
+        onExplain={requestExplanation}
+        onSaveInsight={() => {
+          // Task 11 will implement this
+        }}
+        onJumpToSource={() => {
+          // Task 11 will implement this
+        }}
+        onSelfRate={(quality: ReviewQuality) => {
+          confirmRating(quality);
+        }}
+      />
+
+      {/* Skip */}
+      <button
+        type="button"
+        onClick={skipCard}
+        className="text-[9px] text-dim hover:text-foreground text-center"
+      >
+        Skip card
+      </button>
+    </div>
+  );
+}
