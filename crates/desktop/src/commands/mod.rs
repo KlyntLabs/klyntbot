@@ -23,6 +23,7 @@ pub mod launcher;
 pub mod notes;
 pub mod objectives;
 pub mod permissions;
+pub mod practice;
 pub mod productivity;
 pub mod project_conversations;
 pub mod project_memories;

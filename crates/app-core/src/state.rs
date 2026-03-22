@@ -10,7 +10,7 @@ use common::FormResponse;
 use desktop_shared::errors::ApiError;
 use desktop_shared::types::EntityKind;
 use feature_coaching::{FeedbackTracker, InterventionRouter, PatternDetector, SignalAccumulator};
-use feature_notes::repo::NoteRepo;
+use feature_notes::repo::{NoteRepo, PracticeSessionRepo};
 use feature_productivity::repos::ProductivityRepos;
 use feature_productivity::{DailyAggregator, FocusManager, NudgeService, ProductivityEngine};
 use scheduling::CronService;
@@ -55,6 +55,8 @@ pub struct AppCore {
         Arc<dashmap::DashMap<String, (String, oneshot::Sender<FormResponse>)>>,
     /// Notes repo (always available).
     pub note_repo: NoteRepo,
+    /// Practice session repo (always available — backed by the same DB as notes).
+    pub practice_repo: PracticeSessionRepo,
     pub productivity_repos: Option<ProductivityRepos>,
     pub focus_manager: Option<Arc<FocusManager>>,
     pub productivity_engine: Option<Arc<Mutex<ProductivityEngine>>>,
@@ -206,6 +208,11 @@ impl AppCore {
         self.knowledge_atom_repo
             .as_ref()
             .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "Knowledge atom repo not available"))
+    }
+
+    /// Return practice session repo.
+    pub fn practice_repo(&self) -> &PracticeSessionRepo {
+        &self.practice_repo
     }
 
     /// Return launcher search engine or a "feature disabled" error.

@@ -21,8 +21,8 @@ interface EditorContextMenuProps {
   children: ReactNode;
   onAnnotate: () => void;
   onFlashcard: () => void;
-  onTranslate: () => void;
-  onTranslateTo: (targetLang: string, selectedText?: string) => void;
+  onTranslate: (selectedText: string, rect?: { top: number; left: number }) => void;
+  onTranslateTo: (targetLang: string, selectedText?: string, rect?: { top: number; left: number }) => void;
   onAskAI: () => void;
   onLinkedView: () => void;
   onApplyPerspective: (type: string) => void;
@@ -42,6 +42,7 @@ export function EditorContextMenu({
 }: EditorContextMenuProps) {
   const [hadSelection, setHadSelection] = useState(false);
   const selectionTextRef = useRef("");
+  const selectionRectRef = useRef<{ top: number; left: number } | undefined>(undefined);
 
   const handleOpenChange = useCallback((open: boolean) => {
     if (open) {
@@ -49,6 +50,13 @@ export function EditorContextMenu({
       const text = sel?.toString().trim() ?? "";
       setHadSelection(text.length > 0);
       selectionTextRef.current = text;
+      // Capture rect now — it will be gone after the menu closes
+      if (sel && sel.rangeCount > 0) {
+        const rect = sel.getRangeAt(0).getBoundingClientRect();
+        selectionRectRef.current = { top: rect.bottom + 8, left: rect.left };
+      } else {
+        selectionRectRef.current = undefined;
+      }
     }
   }, []);
 
@@ -72,7 +80,7 @@ export function EditorContextMenu({
               <MenuItem onClick={onFlashcard} shortcut="⌥F">
                 Create Flashcard
               </MenuItem>
-              <MenuItem onClick={onTranslate}>Translate</MenuItem>
+              <MenuItem onClick={() => onTranslate(selectionTextRef.current, selectionRectRef.current)}>Translate</MenuItem>
               <ContextMenu.Separator className="my-1 h-px bg-border" />
             </>
           )}
@@ -97,7 +105,7 @@ export function EditorContextMenu({
                   <ContextMenu.Item
                     key={lang.code}
                     onClick={() =>
-                      onTranslateTo(lang.code, hadSelection ? selectionTextRef.current : undefined)
+                      onTranslateTo(lang.code, hadSelection ? selectionTextRef.current : undefined, selectionRectRef.current)
                     }
                     className="flex items-center justify-between rounded-md px-2 py-1.5 text-xs text-primary outline-none select-none data-[highlighted]:bg-surface-hover"
                   >

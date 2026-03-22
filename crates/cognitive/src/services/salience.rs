@@ -109,6 +109,8 @@ pub fn evaluate_salience(event: &DomainEvent) -> SalienceVerdict {
         DomainEvent::TranslationCompleted { .. } => SalienceVerdict::Accumulate,
         DomainEvent::AtomReinforced { .. } => SalienceVerdict::Accumulate,
         DomainEvent::NoteStudied { .. } => SalienceVerdict::Accumulate,
+        DomainEvent::PracticeUnitCompleted { .. } => SalienceVerdict::Accumulate,
+        DomainEvent::PracticeSessionCompleted { .. } => SalienceVerdict::Accumulate,
         DomainEvent::KnowledgeTransferDetected { .. } => SalienceVerdict::Accumulate,
         DomainEvent::KnowledgeAtomCreated { .. } => SalienceVerdict::Discard,
         DomainEvent::KnowledgeAtomArchived { .. } => SalienceVerdict::Discard,

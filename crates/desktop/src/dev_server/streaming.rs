@@ -270,6 +270,8 @@ fn domain_for_event(event: &bus::DomainEvent) -> &'static str {
         | bus::DomainEvent::RetentionMilestoneReached { .. }
         | bus::DomainEvent::TranslationCompleted { .. }
         | bus::DomainEvent::NoteStudied { .. }
+        | bus::DomainEvent::PracticeUnitCompleted { .. }
+        | bus::DomainEvent::PracticeSessionCompleted { .. }
         | bus::DomainEvent::KnowledgeTransferDetected { .. }
         | bus::DomainEvent::CoachingLearningDigest { .. } => "learning",
     }

@@ -1042,6 +1042,8 @@ fn event_type_key(event: &DomainEvent) -> String {
         DomainEvent::RetentionMilestoneReached { .. } => "RetentionMilestoneReached".into(),
         DomainEvent::TranslationCompleted { .. } => "TranslationCompleted".into(),
         DomainEvent::NoteStudied { .. } => "NoteStudied".into(),
+        DomainEvent::PracticeUnitCompleted { .. } => "PracticeUnitCompleted".into(),
+        DomainEvent::PracticeSessionCompleted { .. } => "PracticeSessionCompleted".into(),
         DomainEvent::KnowledgeTransferDetected { .. } => "KnowledgeTransferDetected".into(),
         DomainEvent::CoachingLearningDigest { .. } => "CoachingLearningDigest".into(),
     }

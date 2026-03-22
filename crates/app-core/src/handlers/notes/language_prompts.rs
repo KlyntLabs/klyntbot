@@ -116,3 +116,27 @@ Respond ONLY with a JSON object:
 Keep it concise — this is for a small annotation card, not a full breakdown."#
     )
 }
+
+/// Build system prompt for quick translation with vocabulary extraction.
+pub fn quick_translate_prompt(source_lang: &str, target_lang: &str) -> String {
+    format!(
+        r#"Translate the following {source_lang} text into {target_lang}.
+Also extract key vocabulary words with their readings and meanings.
+
+Return ONLY JSON:
+{{
+  "translation": "translated text",
+  "words": [
+    {{
+      "word": "original word",
+      "reading": "pronunciation (pinyin/romaji/IPA or null)",
+      "meaning": "meaning in {target_lang}",
+      "partOfSpeech": "noun/verb/adj/etc",
+      "proficiencyLevel": "HSK 1-6 / JLPT N5-N1 / CEFR A1-C2 or null",
+      "exampleSentence": null,
+      "isNew": false
+    }}
+  ]
+}}"#
+    )
+}

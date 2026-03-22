@@ -253,6 +253,9 @@ impl AppCore {
             active_streams: Arc::new(dashmap::DashMap::new()),
             pending_interactions: Arc::new(dashmap::DashMap::new()),
             note_repo,
+            practice_repo: feature_notes::repo::PracticeSessionRepo::new(
+                storage_pool.inner().clone(),
+            ),
             productivity_repos,
             focus_manager,
             productivity_engine,

@@ -135,3 +135,20 @@ pub struct AnnotationEnrichmentResponse {
     pub translation: String,
     pub words: Vec<WordBreakdown>,
 }
+
+// ── Quick Translate (popup) ───────────────────────────────────────────
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QuickTranslateParams {
+    pub text: String,
+    pub source_lang: String,
+    pub target_lang: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct QuickTranslateResponse {
+    pub translation: String,
+    pub words: Vec<WordBreakdown>,
+}

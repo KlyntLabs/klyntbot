@@ -3,8 +3,9 @@ use cognitive::types::SemanticFact;
 use cognitive::CardType;
 use desktop_shared::commands::{
     AnnotationEnrichmentResponse, ConfusableResponse, DetectConfusablesParams,
-    EnrichAnnotationParams, EvaluateTranslationParams, TranslateBreakdownParams,
-    TranslateBreakdownResponse, TranslationEvalResponse, VocabularySaveParams,
+    EnrichAnnotationParams, EvaluateTranslationParams, QuickTranslateParams,
+    QuickTranslateResponse, TranslateBreakdownParams, TranslateBreakdownResponse,
+    TranslationEvalResponse, VocabularySaveParams,
 };
 use desktop_shared::errors::ApiError;
 
@@ -392,6 +393,59 @@ impl AppCore {
             .map_err(|e| ApiError::new("PARSE_ERROR", format!("Failed to parse: {e}")))?;
 
         // Mark words as new/known (same as translate_breakdown)
+        let sf_repo = SemanticFactRepo::new(self.storage_pool.inner().clone());
+        for word in &mut result.words {
+            let existing = sf_repo
+                .find_vocabulary_by_subject(&word.word)
+                .await
+                .unwrap_or_default();
+            word.is_new = existing.is_empty();
+        }
+
+        Ok(result)
+    }
+
+    /// Quick-translate a short text selection with vocabulary extraction.
+    pub async fn language_quick_translate(
+        &self,
+        params: QuickTranslateParams,
+    ) -> Result<QuickTranslateResponse, ApiError> {
+        let provider = self
+            .cognitive_provider
+            .as_ref()
+            .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "LLM provider not configured"))?;
+
+        let config = self.config.read().await;
+        let chat_params = providers::cognitive_chat_params(&config, 2048);
+        drop(config);
+
+        let system =
+            language_prompts::quick_translate_prompt(&params.source_lang, &params.target_lang);
+        let messages = vec![
+            providers::Message::System { content: system },
+            providers::Message::User {
+                content: providers::UserContent::Text(params.text.clone()),
+            },
+        ];
+
+        let response = provider
+            .chat(&messages, None, &chat_params)
+            .await
+            .map_err(|e| ApiError::new("LLM_ERROR", e.to_string()))?;
+
+        let text = response
+            .content
+            .ok_or_else(|| ApiError::new("LLM_ERROR", "Empty response from LLM"))?;
+
+        let cleaned = common::helpers::strip_llm_fences(&text);
+        let mut result: QuickTranslateResponse = serde_json::from_str(cleaned).map_err(|e| {
+            ApiError::new(
+                "PARSE_ERROR",
+                format!("Failed to parse quick translate response: {e}"),
+            )
+        })?;
+
+        // Mark words as new/known via SemanticFactRepo
         let sf_repo = SemanticFactRepo::new(self.storage_pool.inner().clone());
         for word in &mut result.words {
             let existing = sf_repo

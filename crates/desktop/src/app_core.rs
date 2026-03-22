@@ -301,6 +301,8 @@ fn wire_event_channels(core: &AppCore, channels: EventChannels, app_handle: &tau
                             | bus::DomainEvent::RetentionMilestoneReached { .. }
                             | bus::DomainEvent::TranslationCompleted { .. }
                             | bus::DomainEvent::NoteStudied { .. }
+                            | bus::DomainEvent::PracticeUnitCompleted { .. }
+                            | bus::DomainEvent::PracticeSessionCompleted { .. }
                             | bus::DomainEvent::KnowledgeTransferDetected { .. }
                             | bus::DomainEvent::CoachingLearningDigest { .. } => "learning",
                         };

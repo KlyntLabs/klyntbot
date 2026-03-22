@@ -1,7 +1,8 @@
 use desktop_shared::commands::{
     AnnotationEnrichmentResponse, ConfusableResponse, DetectConfusablesParams,
-    EnrichAnnotationParams, EvaluateTranslationParams, TranslateBreakdownParams,
-    TranslateBreakdownResponse, TranslationEvalResponse, VocabularySaveParams,
+    EnrichAnnotationParams, EvaluateTranslationParams, QuickTranslateParams,
+    QuickTranslateResponse, TranslateBreakdownParams, TranslateBreakdownResponse,
+    TranslationEvalResponse, VocabularySaveParams,
 };
 use desktop_shared::errors::ApiError;
 use std::sync::Arc;
@@ -49,6 +50,14 @@ pub async fn language_enrich_annotation(
     state.language_enrich_annotation(params).await
 }
 
+#[tauri::command]
+pub async fn language_quick_translate(
+    state: State<'_, Arc<AppCore>>,
+    params: QuickTranslateParams,
+) -> Result<QuickTranslateResponse, ApiError> {
+    state.language_quick_translate(params).await
+}
+
 // ── Dev server dispatch ─────────────────────────────────────────────
 
 #[cfg(test)]
@@ -58,6 +67,7 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "language_save_vocabulary",
     "language_detect_confusables",
     "language_enrich_annotation",
+    "language_quick_translate",
 ];
 
 #[cfg(debug_assertions)]
@@ -86,6 +96,10 @@ pub(crate) async fn dispatch_dev(
         ),
         "language_enrich_annotation" => dev::val(
             core.language_enrich_annotation(try_field!(dev::parse_params(body)))
+                .await,
+        ),
+        "language_quick_translate" => dev::val(
+            core.language_quick_translate(try_field!(dev::parse_params(body)))
                 .await,
         ),
         _ => return None,

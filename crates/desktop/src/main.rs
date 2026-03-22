@@ -380,6 +380,15 @@ fn run_desktop_app() {
             commands::language::language_save_vocabulary,
             commands::language::language_detect_confusables,
             commands::language::language_enrich_annotation,
+            commands::language::language_quick_translate,
+            // Practice Mode
+            commands::practice::practice_segment_note,
+            commands::practice::practice_start_session,
+            commands::practice::practice_submit_unit,
+            commands::practice::practice_confirm_unit,
+            commands::practice::practice_get_session,
+            commands::practice::practice_complete_session,
+            commands::practice::practice_list_sessions,
             // Knowledge Atoms
             commands::atoms::atoms_for_note,
             commands::atoms::atom_accept,

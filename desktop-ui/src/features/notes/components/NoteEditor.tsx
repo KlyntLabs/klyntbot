@@ -4,7 +4,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { type AnnotationResponse, useAnnotations } from "../hooks/useAnnotations";
 import { useEditorActions } from "../hooks/useEditorActions";
+import { useLanguageConfig } from "../hooks/useLanguageConfig";
 import { usePerspective } from "../hooks/usePerspective";
+import { useQuickTranslate } from "../hooks/useQuickTranslate";
+import { useVocabularySave } from "../hooks/useVocabularySave";
 import { AnnotationPopover } from "./AnnotationPopover";
 import { EditorContextMenu } from "./editor/EditorContextMenu";
 import { EditorContentWrapper, useEntityResolution, useNoteEditor } from "./editor/EditorCore";
@@ -19,6 +22,7 @@ import { getVimPlugin, VIM_SAVE_EVENT } from "./editor/vim";
 import { WikiLinkMenu } from "./editor/WikiLinkNode";
 import { LinkInsertDialog } from "./LinkInsertDialog";
 import { NoteVersionHistory } from "./NoteVersionHistory";
+import { QuickTranslatePopup } from "./QuickTranslatePopup";
 
 const VERSION_INTERVAL_MS = 5 * 60 * 1000; // Minimum interval between auto-saving version snapshots
 
@@ -189,9 +193,6 @@ export function NoteEditor({
     createAnnotation,
   );
 
-  const handleTranslate = useCallback(() => {
-    onSplitModeChange?.("translation");
-  }, [onSplitModeChange]);
   const { activePerspective, focusedSectionId, setPerspective, setLanguagePair, languagePair } =
     usePerspective(
       note.id,
@@ -201,13 +202,30 @@ export function NoteEditor({
 
   const [translateSelection, setTranslateSelection] = useState<string | undefined>();
 
-  const handleTranslateTo = useCallback(
-    (targetLang: string, selectedText?: string) => {
-      setLanguagePair({ targetLang });
-      setTranslateSelection(selectedText);
-      onSplitModeChange?.("translation");
+  // ── Quick-translate popup ──────────────────────────────────────────
+  const { sourceLang, targetLang } = useLanguageConfig(
+    (note as Record<string, unknown>).perspectiveConfig as string | null | undefined,
+    note.body ?? undefined,
+  );
+  const quickTranslate = useQuickTranslate(sourceLang, targetLang);
+  const vocabSave = useVocabularySave();
+
+  // Right-click "Translate" → show Quick Translate popup near the selected text
+  const handleTranslate = useCallback(
+    (selectedText: string, rect?: { top: number; left: number }) => {
+      quickTranslate.triggerTranslateText(selectedText, rect);
     },
-    [setLanguagePair, onSplitModeChange],
+    [quickTranslate.triggerTranslateText],
+  );
+
+  const handleTranslateTo = useCallback(
+    (targetLang: string, selectedText?: string, rect?: { top: number; left: number }) => {
+      setLanguagePair({ targetLang });
+      if (selectedText) {
+        quickTranslate.triggerTranslateText(selectedText, rect);
+      }
+    },
+    [setLanguagePair, quickTranslate.triggerTranslateText],
   );
 
   // Annotation popover state
@@ -332,6 +350,18 @@ export function NoteEditor({
     return () => flushSave();
   }, [flushSave]);
 
+  // Cmd+Option+P → enter practice mode
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.altKey && e.key === "p") {
+        e.preventDefault();
+        onSplitModeChange?.("practice");
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [onSplitModeChange]);
+
   // Command line handlers
   const handleCommandLineSubmit = useCallback(
     (value: string) => {
@@ -420,6 +450,9 @@ export function NoteEditor({
                 note={note}
                 splitMode={activeSplitMode}
                 onSave={onSave}
+                onModeChange={(mode) =>
+                  onSplitModeChange?.(mode === "single" ? null : (mode as SplitMode))
+                }
                 targetLangOverride={languagePair?.targetLang}
                 sourceTextOverride={translateSelection}
                 onClearSourceOverride={() => setTranslateSelection(undefined)}
@@ -496,6 +529,25 @@ export function NoteEditor({
             onGenerateCards?.(quotedText);
             setActivePopover(null);
           }}
+        />
+      )}
+
+      {/* Quick-translate popup */}
+      {quickTranslate.selection && quickTranslate.position && (
+        <QuickTranslatePopup
+          translation={quickTranslate.translation}
+          words={quickTranslate.words}
+          position={quickTranslate.position}
+          loading={quickTranslate.loading}
+          onSaveWords={() => {
+            vocabSave.saveWords(quickTranslate.words, note.id, "quick-translate");
+            quickTranslate.dismiss();
+          }}
+          onPractice={() => {
+            onSplitModeChange?.("practice");
+            quickTranslate.dismiss();
+          }}
+          onDismiss={quickTranslate.dismiss}
         />
       )}
 

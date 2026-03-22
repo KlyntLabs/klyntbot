@@ -40,6 +40,7 @@ import { InsightVersionList } from "./insight/InsightVersionList";
 import { KnowledgeGrowthMetrics } from "./insight/KnowledgeGrowthMetrics";
 import { ManagePersonasModal } from "./insight/ManagePersonasModal";
 import { PerspectivesTab } from "./insight/PerspectivesTab";
+import { PracticeHistoryTab } from "./insight/PracticeHistoryTab";
 import { SelfAssessmentTab } from "./insight/SelfAssessmentTab";
 import { SquadManager } from "./insight/SquadManager";
 import { SquadPicker } from "./insight/SquadPicker";
@@ -65,6 +66,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "assessment", label: "Self-Assessment" },
   { id: "concept-map", label: "Concept Map" },
   { id: "perspectives", label: "Perspectives" },
+  { id: "practice" as TabId, label: "Practice" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -99,6 +101,8 @@ function tabStatus(state: InsightReviewState, tabId: TabId): TabStatus {
       return state.tabs.conceptMap.status;
     case "perspectives":
       return state.tabs.perspectives.status;
+    case "practice":
+      return "done";
   }
 }
 
@@ -157,6 +161,8 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
         return state.tabs.conceptMap.mermaid || state.tabs.conceptMap.fallbackText;
       case "perspectives":
         return state.tabs.perspectives.content;
+      case "practice":
+        return "";
     }
   }, [state]);
 
@@ -318,7 +324,9 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
 
       {/* Content area */}
       <div className="flex-1 overflow-y-auto p-4 min-h-0">
-        {state.activeTab === "atoms" ? (
+        {state.activeTab === "practice" ? (
+          <PracticeHistoryTab noteId={state.noteId} />
+        ) : state.activeTab === "atoms" ? (
           <AtomsTab noteId={state.noteId} />
         ) : activeStatus === "idle" || activeStatus === "error" ? (
           <div className="flex flex-col items-center justify-center h-full gap-3">

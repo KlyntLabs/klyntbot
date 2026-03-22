@@ -218,6 +218,7 @@ mod tests {
             commands::squads::DEV_COMMANDS,
             commands::annotations::DEV_COMMANDS,
             commands::language::DEV_COMMANDS,
+            commands::practice::DEV_COMMANDS,
             commands::atoms::DEV_COMMANDS,
             commands::knowledge_health::DEV_COMMANDS,
             commands::morning_briefing::DEV_COMMANDS,

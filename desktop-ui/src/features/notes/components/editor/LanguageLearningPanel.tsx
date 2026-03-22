@@ -16,6 +16,7 @@ interface LanguageLearningPanelProps {
   targetLang: string;
   isSelection?: boolean;
   onClearSelection?: () => void;
+  onEnterPractice?: () => void;
 }
 
 export function LanguageLearningPanel({
@@ -26,6 +27,7 @@ export function LanguageLearningPanel({
   targetLang,
   isSelection,
   onClearSelection,
+  onEnterPractice,
 }: LanguageLearningPanelProps) {
   const { result, loading, error, translate } = useLanguageBreakdown();
   const { saving, saved, savedCount, errorMessage, saveWords, dismissSaved, dismissError } =
@@ -141,6 +143,19 @@ export function LanguageLearningPanel({
 
       {/* Section 5: Confusables (renders its own container, only visible when matches found) */}
       {result && <ConfusableSection words={result.words} sourceLang={sourceLang} />}
+
+      {/* Footer: enter practice mode */}
+      {result && (
+        <div className="border-t border-border px-3 py-2 mt-2">
+          <button
+            type="button"
+            onClick={onEnterPractice}
+            className="flex items-center justify-center gap-1.5 w-full rounded-md px-3 py-2 text-xs font-medium bg-brand/15 text-brand hover:bg-brand/25 transition-colors"
+          >
+            Turn this into active practice
+          </button>
+        </div>
+      )}
     </div>
   );
 }

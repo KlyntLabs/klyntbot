@@ -64,6 +64,9 @@ pub(super) async fn dispatch(
     if let Some(r) = commands::language::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }
+    if let Some(r) = commands::practice::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
     if let Some(r) = commands::atoms::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }

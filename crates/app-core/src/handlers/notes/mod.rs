@@ -9,6 +9,8 @@ mod insight_personas;
 mod insight_prompts;
 mod language;
 mod language_prompts;
+mod practice;
+pub mod practice_prompts;
 mod notebooks;
 mod persona_chat;
 mod suggestions;

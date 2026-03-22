@@ -6,7 +6,14 @@ import { useCallback, useRef, useState } from "react";
 // Public types
 // ---------------------------------------------------------------------------
 
-export type TabId = "atoms" | "synthesis" | "gaps" | "assessment" | "concept-map" | "perspectives";
+export type TabId =
+  | "atoms"
+  | "synthesis"
+  | "gaps"
+  | "assessment"
+  | "concept-map"
+  | "perspectives"
+  | "practice";
 export type TabStatus = "idle" | "streaming" | "loading" | "done" | "error";
 
 export interface QuizQuestion {
