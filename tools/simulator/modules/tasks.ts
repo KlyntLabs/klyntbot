@@ -89,7 +89,7 @@ export const tasksModule: SimulatorModule = {
         const complexityCol = await client.post<CreateResponse>("custom_column_create", {
             projectId: world.projects.apiRedesign.id,
             name: "Complexity",
-            columnType: "select",
+            columnType: "dropdown",
             options: ["low", "medium", "high"],
         });
         const storyPointsCol = await client.post<CreateResponse>("custom_column_create", {
@@ -99,61 +99,9 @@ export const tasksModule: SimulatorModule = {
         });
         console.log(`  2 custom columns created`);
 
-        // Set custom column values on API redesign tasks
-        const authTask = world.createdTasks.get("auth-layer");
-        const jwtTask = world.createdTasks.get("jwt-refresh");
-        const rateLimitTask = world.createdTasks.get("rate-limiting");
-        const apiDocsTask = world.createdTasks.get("api-docs");
-
-        if (authTask) {
-            await client.post("custom_column_value_set", {
-                taskId: authTask.id,
-                columnId: complexityCol.id,
-                value: "high",
-            });
-            await client.post("custom_column_value_set", {
-                taskId: authTask.id,
-                columnId: storyPointsCol.id,
-                value: 8,
-            });
-        }
-        if (jwtTask) {
-            await client.post("custom_column_value_set", {
-                taskId: jwtTask.id,
-                columnId: complexityCol.id,
-                value: "high",
-            });
-            await client.post("custom_column_value_set", {
-                taskId: jwtTask.id,
-                columnId: storyPointsCol.id,
-                value: 5,
-            });
-        }
-        if (rateLimitTask) {
-            await client.post("custom_column_value_set", {
-                taskId: rateLimitTask.id,
-                columnId: complexityCol.id,
-                value: "medium",
-            });
-            await client.post("custom_column_value_set", {
-                taskId: rateLimitTask.id,
-                columnId: storyPointsCol.id,
-                value: 3,
-            });
-        }
-        if (apiDocsTask) {
-            await client.post("custom_column_value_set", {
-                taskId: apiDocsTask.id,
-                columnId: complexityCol.id,
-                value: "low",
-            });
-            await client.post("custom_column_value_set", {
-                taskId: apiDocsTask.id,
-                columnId: storyPointsCol.id,
-                value: 2,
-            });
-        }
-        console.log(`  custom column values set on 4 tasks`);
+        // Note: custom_column_values FK references legacy `actions` table, not `tasks`.
+        // Skipping value assignment until the schema is migrated.
+        // Custom columns are created (visible in UI) but values can't be set on new tasks yet.
     },
 
     async simulateDay(world, client, day) {
