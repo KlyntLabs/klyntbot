@@ -2,6 +2,7 @@ use async_trait::async_trait;
 use context_engine::insight_forge::DomainSearcher;
 use context_engine::{MemoryEntry, MemorySource};
 use storage::Repos;
+use tracing::debug;
 
 pub struct FinanceSearcher {
     repos: Repos,
@@ -10,6 +11,23 @@ pub struct FinanceSearcher {
 impl FinanceSearcher {
     pub fn new(repos: Repos) -> Self {
         Self { repos }
+    }
+
+    /// Extract the most meaningful keyword from the query for LIKE search.
+    fn extract_search_term(query: &str) -> String {
+        let stop = [
+            "background", "context", "current", "status", "related", "people",
+            "teams", "risks", "blockers", "overview", "details", "skill",
+            "the", "and", "for", "with", "about", "what", "how", "show",
+            "tell", "give", "remind", "any", "updates", "much", "did",
+            "spend", "month", "this", "last", "year", "total",
+        ];
+        query
+            .split(|c: char| !c.is_alphanumeric())
+            .filter(|w| w.len() > 2 && !stop.contains(&w.to_lowercase().as_str()))
+            .next()
+            .unwrap_or("")
+            .to_string()
     }
 }
 
@@ -21,16 +39,36 @@ impl DomainSearcher for FinanceSearcher {
 
     async fn search(&self, query: &str, limit: usize) -> Vec<MemoryEntry> {
         use storage::rows::finance::FinanceTransactionFilter;
+
+        let search_term = Self::extract_search_term(query);
+        if search_term.is_empty() {
+            return Vec::new();
+        }
+
+        debug!(
+            original_query = query,
+            search_term = search_term.as_str(),
+            "💰 FinanceSearcher: searching"
+        );
+
         let filter = FinanceTransactionFilter {
-            query: Some(query.to_string()),
+            query: Some(search_term.clone()),
             limit: Some(limit as i64),
             ..Default::default()
         };
 
         let rows = match self.repos.finance.transactions.list(&filter).await {
             Ok(r) => r,
-            Err(_) => return Vec::new(),
+            Err(e) => {
+                debug!(error = %e, "💰 FinanceSearcher: error");
+                return Vec::new();
+            }
         };
+
+        debug!(
+            result_count = rows.len(),
+            "💰 FinanceSearcher: found"
+        );
 
         rows.into_iter()
             .enumerate()

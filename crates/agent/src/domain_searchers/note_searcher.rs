@@ -13,6 +13,28 @@ impl NoteSearcher {
         Self { repo }
     }
 
+    fn note_to_entry(note: feature_notes::models::NoteSearchResult, rank: usize) -> MemoryEntry {
+        let body = note.body.as_deref().unwrap_or("");
+        let body_preview = if body.len() > 500 {
+            let end = body
+                .char_indices()
+                .map(|(i, _)| i)
+                .take_while(|&i| i <= 500)
+                .last()
+                .unwrap_or(body.len());
+            format!("{}...", &body[..end])
+        } else {
+            body.to_string()
+        };
+        MemoryEntry {
+            id: note.id.clone(),
+            content: format!("[Note: {}] {}", note.title, body_preview),
+            score: 1.0 / (1.0 + rank as f64),
+            source: MemorySource::Domain { name: "notes".into() },
+            raw_score: note.rank,
+        }
+    }
+
     /// Sanitize the query for FTS5 MATCH: extract meaningful terms,
     /// join with OR so partial matches work, and quote special chars.
     fn sanitize_fts_query(query: &str) -> String {
@@ -48,59 +70,75 @@ impl DomainSearcher for NoteSearcher {
     }
 
     async fn search(&self, query: &str, limit: usize) -> Vec<MemoryEntry> {
+        let mut entries = Vec::new();
+
+        // 1. FTS5 content search
         let fts_query = Self::sanitize_fts_query(query);
-        if fts_query.is_empty() {
-            return Vec::new();
+        if !fts_query.is_empty() {
+            debug!(
+                original_query = query,
+                fts_query = fts_query.as_str(),
+                "📝 NoteSearcher: FTS5 search"
+            );
+
+            match self.repo.search_fts(&fts_query).await {
+                Ok(results) => {
+                    debug!(
+                        result_count = results.len(),
+                        titles = ?results.iter().take(3).map(|n| n.title.as_str()).collect::<Vec<_>>(),
+                        "📝 NoteSearcher: FTS5 found"
+                    );
+                    for (i, note) in results.into_iter().take(limit).enumerate() {
+                        entries.push(Self::note_to_entry(note, i));
+                    }
+                }
+                Err(e) => {
+                    debug!(error = %e, query = fts_query.as_str(), "📝 NoteSearcher: FTS5 error");
+                }
+            }
         }
 
-        debug!(
-            original_query = query,
-            fts_query = fts_query.as_str(),
-            "📝 NoteSearcher: searching"
-        );
-
-        let results = match self.repo.search_fts(&fts_query).await {
-            Ok(r) => r,
-            Err(e) => {
-                debug!(error = %e, query = fts_query.as_str(), "📝 NoteSearcher: FTS5 error");
-                return Vec::new();
-            }
-        };
-
-        debug!(
-            result_count = results.len(),
-            titles = ?results.iter().take(3).map(|n| n.title.as_str()).collect::<Vec<_>>(),
-            "📝 NoteSearcher: found"
-        );
-
-        results
-            .into_iter()
-            .take(limit)
-            .enumerate()
-            .map(|(i, note)| {
-                let body = note.body.as_deref().unwrap_or("");
-                let body_preview = if body.len() > 500 {
-                    // Find a safe UTF-8 boundary near byte 500
-                    let end = body
-                        .char_indices()
-                        .map(|(i, _)| i)
-                        .take_while(|&i| i <= 500)
-                        .last()
-                        .unwrap_or(body.len());
-                    format!("{}...", &body[..end])
-                } else {
-                    body.to_string()
-                };
-                MemoryEntry {
-                    id: note.id.clone(),
-                    content: format!("[Note: {}] {}", note.title, body_preview),
-                    score: 1.0 / (1.0 + i as f64),
-                    source: MemorySource::Domain {
-                        name: "notes".into(),
-                    },
-                    raw_score: note.rank,
+        // 2. Notebook-name search: if the query mentions a notebook name, also return its notes
+        let lower_query = query.to_lowercase();
+        if lower_query.contains("notebook") || lower_query.contains("notes in") {
+            if let Ok(notebooks) = self.repo.list_notebooks().await {
+                for nb in &notebooks {
+                    let nb_lower = nb.title.to_lowercase();
+                    // Check if any notebook name words appear in the query
+                    let nb_words: Vec<&str> = nb_lower.split_whitespace().collect();
+                    let matches = nb_words.iter().any(|w| w.len() > 2 && lower_query.contains(w));
+                    if matches {
+                        debug!(
+                            notebook = nb.title.as_str(),
+                            notebook_id = nb.id.as_str(),
+                            "📝 NoteSearcher: matched notebook by name"
+                        );
+                        if let Ok(notes) = self.repo.list_notes(Some(&nb.id)).await {
+                            let existing_ids: std::collections::HashSet<String> =
+                                entries.iter().map(|e| e.id.clone()).collect();
+                            for (i, note) in notes.into_iter().take(limit).enumerate() {
+                                if !existing_ids.contains(&note.id) {
+                                    entries.push(MemoryEntry {
+                                        id: note.id.clone(),
+                                        content: format!(
+                                            "[Note in {}: {}] {}",
+                                            nb.title,
+                                            note.title,
+                                            note.body.chars().take(300).collect::<String>()
+                                        ),
+                                        score: 0.8 / (1.0 + i as f64),
+                                        source: MemorySource::Domain { name: "notes".into() },
+                                        raw_score: 0.0,
+                                    });
+                                }
+                            }
+                        }
+                    }
                 }
-            })
-            .collect()
+            }
+        }
+
+        entries.truncate(limit);
+        entries
     }
 }
