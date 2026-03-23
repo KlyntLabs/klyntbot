@@ -1346,6 +1346,7 @@ impl AgentLoopBuilder {
             channel: "unknown".to_string(),
             provider_name: provider.name().to_string(),
             scenario_max_graph_depth: config.scenario.max_graph_depth,
+            pipeline_timeout_secs: config.agents.defaults.pipeline_timeout_secs,
         };
 
         // ── Interaction recorder ──────────────────────────────────────────

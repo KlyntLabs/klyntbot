@@ -5,7 +5,7 @@
 //! ResponseValidator → CostTracker → StrategyRepo
 
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use common::{helpers::tool_def_name, Result};
 use context_engine::{ContextEngine, ContextRequest, ExecutionStrategy};
@@ -531,19 +531,46 @@ impl AgentRuntime {
             params = params.with_planning_prompt(prompt);
         }
 
+        let timeout_secs = self.config.pipeline_timeout_secs;
+        if timeout_secs > 0 {
+            params = params.with_pipeline_timeout(Duration::from_secs(timeout_secs));
+        }
+
         let retrieved_memory_count = assembled.retrieved_memory_count;
 
-        let router_result = self
-            .router
-            .execute(
-                analysis.mode.clone(),
-                assembled.messages,
-                &filtered_tools,
-                &params,
-                ctx,
-                event_tx.clone(),
-            )
-            .await?;
+        let pipeline_future = self.router.execute(
+            analysis.mode.clone(),
+            assembled.messages,
+            &filtered_tools,
+            &params,
+            ctx,
+            event_tx.clone(),
+        );
+
+        let router_result = if let Some(timeout_dur) = params.pipeline_timeout {
+            match tokio::time::timeout(timeout_dur, pipeline_future).await {
+                Ok(result) => result?,
+                Err(_) => {
+                    warn!("Pipeline execution timed out after {:?}", timeout_dur);
+                    if let Some(ref tx) = event_tx {
+                        let _ = tx
+                            .send(AgentEvent::Error {
+                                message: format!(
+                                    "Execution timed out after {}s",
+                                    timeout_dur.as_secs()
+                                ),
+                            })
+                            .await;
+                    }
+                    return Err(common::KlyntbotError::Timeout(format!(
+                        "Pipeline execution exceeded {}s limit",
+                        timeout_dur.as_secs()
+                    )));
+                }
+            }
+        } else {
+            pipeline_future.await?
+        };
 
         // Clear event_tx to prevent stale state across calls
         *self.current_event_tx.write().await = None;

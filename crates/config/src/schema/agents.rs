@@ -47,6 +47,11 @@ pub struct AgentDefaults {
 
     #[serde(default = "default_max_concurrent_subagents")]
     pub max_concurrent_subagents: usize,
+
+    /// Maximum wall-clock time for a single pipeline execution (seconds).
+    /// Default: 300 (5 minutes). Set to 0 to disable.
+    #[serde(default = "default_pipeline_timeout_secs")]
+    pub pipeline_timeout_secs: u64,
 }
 
 impl Default for AgentDefaults {
@@ -59,6 +64,7 @@ impl Default for AgentDefaults {
             temperature: default_temperature(),
             max_tool_iterations: default_max_iterations(),
             max_concurrent_subagents: default_max_concurrent_subagents(),
+            pipeline_timeout_secs: default_pipeline_timeout_secs(),
         }
     }
 }
@@ -88,6 +94,10 @@ fn default_max_iterations() -> u32 {
 
 fn default_max_concurrent_subagents() -> usize {
     3
+}
+
+fn default_pipeline_timeout_secs() -> u64 {
+    300
 }
 
 /// Configuration for the skill discovery system.
