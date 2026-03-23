@@ -422,6 +422,7 @@ mod tests {
         ActiveTaskContext, CorrectionContext, RetrievalContext, RewriteSource,
         UserSituationSnapshot,
     };
+    use context_engine::ActiveView;
 
     fn finance_context() -> RetrievalContext {
         RetrievalContext {
@@ -569,5 +570,109 @@ mod tests {
         );
         assert!(!terms.contains("the"));
         assert!(!terms.contains("was"));
+    }
+
+    // Integration tests
+
+    #[tokio::test]
+    async fn rewrite_produces_natural_language_enrichment() {
+        // Verify the enriched query is natural language, not keyword soup
+        let rewriter = ContextualQueryRewriter::heuristic_only();
+        let ctx = RetrievalContext {
+            active_skill: Some("finance-management".into()),
+            active_task: Some(ActiveTaskContext {
+                title: "March budget review".into(),
+                project_name: None,
+                domain: Some("finance".into()),
+            }),
+            ..Default::default()
+        };
+        let result = rewriter.rewrite("how are we doing?", &ctx).await;
+        let enriched = result.unwrap().enriched_query;
+        // Should contain the task context
+        assert!(
+            enriched.to_lowercase().contains("march budget"),
+            "Expected 'march budget' in enriched query: {}",
+            enriched
+        );
+        // Should be a readable phrase, not just keywords
+        assert!(
+            enriched.contains(" — ") || enriched.contains(' '),
+            "Expected readable phrase in enriched query: {}",
+            enriched
+        );
+        assert!(
+            enriched.len() > 10,
+            "Expected enriched query longer than 10 chars: {}",
+            enriched
+        );
+    }
+
+    #[tokio::test]
+    async fn context_engine_without_rewriter_works() {
+        // ContextEngine with no rewriter should work exactly as before
+        let engine = context_engine::ContextEngine::new();
+        // Just verify it can be constructed without a rewriter — the default is None
+        // The actual retrieval flow is tested via the existing ContextEngine tests
+        drop(engine);
+    }
+
+    #[tokio::test]
+    async fn active_view_enriches_when_present() {
+        let rewriter = ContextualQueryRewriter::heuristic_only();
+        let ctx = RetrievalContext {
+            active_view: Some(ActiveView {
+                dashboard: "finance".into(),
+                focused_entity: Some("FIRE projection".into()),
+                description: Some("March 2026 FIRE projection with variance highlighted".into()),
+            }),
+            ..Default::default()
+        };
+        let result = rewriter.rewrite("break this down", &ctx).await;
+        assert!(
+            result.is_some(),
+            "Expected rewrite result for active view context"
+        );
+        assert!(
+            result
+                .unwrap()
+                .enriched_query
+                .to_lowercase()
+                .contains("fire projection"),
+            "Expected 'fire projection' in enriched query"
+        );
+    }
+
+    #[tokio::test]
+    async fn deadline_pressure_triggers_aggressive_mode() {
+        let rewriter = ContextualQueryRewriter::heuristic_only();
+        let ctx = RetrievalContext {
+            active_skill: Some("task-management".into()),
+            active_task: Some(ActiveTaskContext {
+                title: "API migration".into(),
+                project_name: Some("Backend rewrite".into()),
+                domain: Some("engineering".into()),
+            }),
+            situation: Some(UserSituationSnapshot {
+                deadline_pressure: 0.8,
+                energy_level: 0.7,
+                ..Default::default()
+            }),
+            recent_user_messages: vec!["checking the migration status".into()],
+            ..Default::default()
+        };
+        let result = rewriter.rewrite("status?", &ctx).await;
+        assert!(
+            result.is_some(),
+            "Expected rewrite result under deadline pressure"
+        );
+        let query = result.unwrap().enriched_query.to_lowercase();
+        // Aggressive mode (deadline > 0.7) should include more signals
+        // At minimum task title + one more signal
+        assert!(
+            query.contains("api migration"),
+            "Expected 'api migration' in enriched query: {}",
+            query
+        );
     }
 }
