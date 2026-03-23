@@ -57,6 +57,10 @@ pub struct ConstraintEvaluator {
     max_correction_rate_increase: f64,
     /// promotion_accuracy must not drop by more than this absolute amount.
     max_promotion_accuracy_drop: f64,
+
+    // Phase 3 constraint
+    /// rewrite_engagement_rate must not decrease by more than this absolute amount.
+    max_rewrite_engagement_drop: f64,
 }
 
 impl ConstraintEvaluator {
@@ -71,6 +75,7 @@ impl ConstraintEvaluator {
             max_retrieval_precision_drop: config.max_retrieval_precision_drop,
             max_correction_rate_increase: config.max_correction_rate_increase,
             max_promotion_accuracy_drop: config.max_promotion_accuracy_drop,
+            max_rewrite_engagement_drop: config.max_rewrite_engagement_drop,
         }
     }
 
@@ -222,6 +227,22 @@ impl ConstraintEvaluator {
             }
         }
 
+        // --- Phase 3: Rewrite engagement must not drop > threshold ---
+        if baseline.rewrite_engagement_rate > 0.0 {
+            let engagement_drop = baseline.rewrite_engagement_rate - trial.rewrite_engagement_rate;
+            if engagement_drop > self.max_rewrite_engagement_drop {
+                failures.push(ConstraintFailure {
+                    metric: "rewrite_engagement_rate".into(),
+                    threshold: self.max_rewrite_engagement_drop,
+                    actual: engagement_drop,
+                    description: format!(
+                        "Rewrite engagement dropped by {engagement_drop:.4} (max allowed: {:.4})",
+                        self.max_rewrite_engagement_drop
+                    ),
+                });
+            }
+        }
+
         // --- Phase 2: promotion accuracy must not drop > threshold ---
         if baseline.promotion_accuracy > 0.0 {
             let accuracy_drop = baseline.promotion_accuracy - trial.promotion_accuracy;
@@ -265,7 +286,7 @@ pub fn parameter_distance(a: &TrialParams, b: &TrialParams) -> f64 {
 /// Flatten all `Option<f64>` fields of `TrialParams` to a fixed-size array,
 /// treating `None` as `0.0`.  The ordering must be stable so that distances are
 /// comparable.
-fn trial_params_as_array(p: &TrialParams) -> [f64; 16] {
+fn trial_params_as_array(p: &TrialParams) -> [f64; 19] {
     [
         p.skill_keyword_weight.unwrap_or(0.0),
         p.skill_semantic_weight.unwrap_or(0.0),
@@ -285,6 +306,12 @@ fn trial_params_as_array(p: &TrialParams) -> [f64; 16] {
         p.relevance_weight_importance.unwrap_or(0.0),
         p.relevance_weight_frequency.unwrap_or(0.0),
         p.relevance_weight_temporal.unwrap_or(0.0),
+        // Phase 3: Query rewriting
+        p.rewrite_confidence_threshold.unwrap_or(0.0),
+        p.rewrite_max_signals.map(|v| v as f64).unwrap_or(0.0),
+        p.rewrite_min_enrichment_length
+            .map(|v| v as f64)
+            .unwrap_or(0.0),
     ]
 }
 
@@ -526,6 +553,53 @@ mod tests {
                 .any(|f| f.metric == "promotion_accuracy"),
             "Expected promotion_accuracy failure, got: {:?}",
             verdict.failures,
+        );
+    }
+
+    #[test]
+    fn fails_when_rewrite_engagement_drops() {
+        let evaluator = default_evaluator();
+        let b = TrialResult {
+            rewrite_engagement_rate: 0.80,
+            ..baseline()
+        };
+
+        // Drops from 0.80 to 0.60 = 0.20 drop, max allowed 0.10
+        let trial = TrialResult {
+            correction_rate: 0.18,
+            rewrite_engagement_rate: 0.60,
+            ..b.clone()
+        };
+
+        let verdict = evaluator.evaluate(&trial, &b);
+        assert!(
+            verdict
+                .failures
+                .iter()
+                .any(|f| f.metric == "rewrite_engagement_rate"),
+            "Expected rewrite_engagement_rate failure, got: {:?}",
+            verdict.failures,
+        );
+    }
+
+    #[test]
+    fn passes_rewrite_engagement_when_baseline_is_zero() {
+        let evaluator = default_evaluator();
+        let b = baseline(); // rewrite_engagement_rate defaults to 0.0
+
+        let trial = TrialResult {
+            correction_rate: 0.18,
+            rewrite_engagement_rate: 0.50,
+            ..b.clone()
+        };
+
+        let verdict = evaluator.evaluate(&trial, &b);
+        assert!(
+            !verdict
+                .failures
+                .iter()
+                .any(|f| f.metric == "rewrite_engagement_rate"),
+            "Should not fail rewrite engagement when baseline is 0.0",
         );
     }
 }

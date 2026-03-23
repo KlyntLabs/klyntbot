@@ -189,9 +189,12 @@ CREATE TABLE strategy_records (
     tool_duration_ms   INTEGER,
     complexity_signals TEXT NOT NULL DEFAULT '{}',
     execution_mode     TEXT,
-    retrieved_memory_count INTEGER
+    retrieved_memory_count INTEGER,
+    rewrite_triggered  INTEGER DEFAULT 0,
+    rewrite_source     TEXT
 );
 CREATE INDEX idx_strategy_records_chat_id ON strategy_records(chat_id);
+CREATE INDEX idx_strategy_records_timestamp ON strategy_records(timestamp);
 
 -- ============================================================
 -- Enrichment Feedback

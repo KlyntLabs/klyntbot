@@ -65,9 +65,8 @@ fn has_domain_keywords(query: &str) -> bool {
     const CAPITALIZED_EXCEPTIONS: &[&str] = &[
         "I", "I'm", "I'll", "I'd", "I've",
         // Common sentence-mid words that may appear capitalized after punctuation
-        "The", "A", "An", "My", "Your", "His", "Her", "Its", "Our", "Their",
-        "Is", "Are", "Was", "Were", "Be", "Am",
-        "Do", "Does", "Did", "Can", "Could", "Would", "Should", "May", "Might",
+        "The", "A", "An", "My", "Your", "His", "Her", "Its", "Our", "Their", "Is", "Are", "Was",
+        "Were", "Be", "Am", "Do", "Does", "Did", "Can", "Could", "Would", "Should", "May", "Might",
         "If", "So", "But", "And", "Or", "Not", "No", "Yes",
     ];
     let words: Vec<&str> = query.split_whitespace().collect();
@@ -83,9 +82,25 @@ fn has_domain_keywords(query: &str) -> bool {
 /// Action verbs that indicate the user knows exactly what they want.
 /// These combined with named entities signal High specificity.
 const ACTION_VERBS: &[&str] = &[
-    "show", "list", "calculate", "compare", "display", "export", "create",
-    "delete", "remove", "add", "update", "set", "run", "execute", "schedule",
-    "plot", "graph", "summarize", "generate",
+    "show",
+    "list",
+    "calculate",
+    "compare",
+    "display",
+    "export",
+    "create",
+    "delete",
+    "remove",
+    "add",
+    "update",
+    "set",
+    "run",
+    "execute",
+    "schedule",
+    "plot",
+    "graph",
+    "summarize",
+    "generate",
 ];
 
 fn has_action_verb(query: &str) -> bool {
@@ -316,12 +331,20 @@ fn build_template(original: &str, signals: &[String], ctx: &RetrievalContext) ->
 // Main rewriter
 // ---------------------------------------------------------------------------
 
+/// Resolved champion override params — snapshot read once per `rewrite()` call.
+struct ResolvedRewriteParams {
+    max_signals: usize,
+    confidence_threshold: f32,
+    min_enrichment_length: usize,
+}
+
 /// Contextual query rewriter that uses heuristic templates and optionally
 /// an LLM fallback for low-specificity queries where heuristics lack context.
 pub struct ContextualQueryRewriter {
     llm_provider: Option<providers::DynProvider>,
     rewriter_model: Option<String>,
     timeout_ms: u64,
+    champion_overrides: Option<std::sync::Arc<std::sync::RwLock<Option<common::TrialParams>>>>,
 }
 
 impl ContextualQueryRewriter {
@@ -334,6 +357,7 @@ impl ContextualQueryRewriter {
             llm_provider: provider,
             rewriter_model: model,
             timeout_ms: timeout,
+            champion_overrides: None,
         }
     }
 
@@ -343,7 +367,24 @@ impl ContextualQueryRewriter {
             llm_provider: None,
             rewriter_model: None,
             timeout_ms: 0,
+            champion_overrides: None,
         }
+    }
+
+    /// Attach autotuner champion overrides for dynamic param tuning.
+    pub fn with_champion_overrides(
+        mut self,
+        overrides: std::sync::Arc<std::sync::RwLock<Option<common::TrialParams>>>,
+    ) -> Self {
+        self.champion_overrides = Some(overrides);
+        self
+    }
+
+    fn read_champion(&self) -> Option<common::TrialParams> {
+        self.champion_overrides
+            .as_ref()
+            .and_then(|lock| lock.read().ok())
+            .and_then(|guard| guard.clone())
     }
 
     /// Whether to be aggressive with context injection (more signals).
@@ -353,19 +394,35 @@ impl ContextualQueryRewriter {
             .is_some_and(|s| s.energy_level < 0.4 || s.deadline_pressure > 0.7)
     }
 
-    /// Maximum number of context signals to inject.
-    fn max_signals(&self, ctx: &RetrievalContext) -> usize {
-        if self.is_aggressive(ctx) {
-            4
-        } else {
-            2
+    /// Resolve champion overrides into concrete rewrite params (single lock read).
+    fn resolve_params(&self, ctx: &RetrievalContext) -> ResolvedRewriteParams {
+        let champion = self.read_champion();
+        ResolvedRewriteParams {
+            max_signals: champion
+                .as_ref()
+                .and_then(|p| p.rewrite_max_signals)
+                .unwrap_or_else(|| if self.is_aggressive(ctx) { 4 } else { 2 }),
+            confidence_threshold: champion
+                .as_ref()
+                .and_then(|p| p.rewrite_confidence_threshold)
+                .map(|t| t as f32)
+                .unwrap_or(0.0),
+            min_enrichment_length: champion
+                .as_ref()
+                .and_then(|p| p.rewrite_min_enrichment_length)
+                .unwrap_or(10),
         }
     }
 
     /// Attempt heuristic rewriting by collecting context signals and
     /// assembling them into an enriched query template.
-    fn heuristic_rewrite(&self, original: &str, ctx: &RetrievalContext) -> Option<RewriteResult> {
-        let max = self.max_signals(ctx);
+    fn heuristic_rewrite(
+        &self,
+        original: &str,
+        ctx: &RetrievalContext,
+        params: &ResolvedRewriteParams,
+    ) -> Option<RewriteResult> {
+        let max = params.max_signals;
         let mut signals: Vec<String> = Vec::new();
         let mut confidence = 0.75_f32;
 
@@ -431,7 +488,7 @@ impl ContextualQueryRewriter {
 
         // If the enriched query is trivially short or just repeats the original,
         // it adds no value — return None to let the LLM fallback handle it
-        if enriched_query.len() < 10 {
+        if enriched_query.len() < params.min_enrichment_length {
             return None;
         }
 
@@ -525,10 +582,18 @@ impl ContextualQueryRewriter {
                     // Dynamic confidence based on context richness (spec: 0.6–0.85)
                     let confidence = {
                         let mut c = 0.6_f32;
-                        if context.active_skill.is_some() { c += 0.05; }
-                        if context.active_task.is_some() { c += 0.05; }
-                        if !context.recent_user_messages.is_empty() { c += 0.1; }
-                        if context.active_view.is_some() { c += 0.05; }
+                        if context.active_skill.is_some() {
+                            c += 0.05;
+                        }
+                        if context.active_task.is_some() {
+                            c += 0.05;
+                        }
+                        if !context.recent_user_messages.is_empty() {
+                            c += 0.1;
+                        }
+                        if context.active_view.is_some() {
+                            c += 0.05;
+                        }
                         c.min(0.85)
                     };
                     Some(RewriteResult {
@@ -576,16 +641,31 @@ impl QueryRewriter for ContextualQueryRewriter {
             "🔍 QueryRewriter: evaluating"
         );
 
+        let params = self.resolve_params(context);
+
         let result = match specificity {
             Specificity::High => None,
-            Specificity::Medium => self.heuristic_rewrite(original, context),
+            Specificity::Medium => self.heuristic_rewrite(original, context, &params),
             Specificity::Low => {
-                if let Some(heuristic) = self.heuristic_rewrite(original, context) {
+                if let Some(heuristic) = self.heuristic_rewrite(original, context, &params) {
                     Some(heuristic)
                 } else {
                     self.llm_rewrite(original, context).await
                 }
             }
+        };
+
+        // Apply champion confidence threshold
+        let result = match result {
+            Some(ref r) if r.confidence < params.confidence_threshold => {
+                debug!(
+                    confidence = r.confidence,
+                    threshold = params.confidence_threshold,
+                    "⏭️ QueryRewriter: below champion confidence threshold"
+                );
+                None
+            }
+            other => other,
         };
 
         match &result {
@@ -621,15 +701,17 @@ impl QueryRewriter for ContextualQueryRewriter {
             "🔍 QueryRewriter: evaluating (race mode)"
         );
 
+        let params = self.resolve_params(context);
+
         match specificity {
             Specificity::High => {
                 debug!(original = original, "⏭️ QueryRewriter: skipped (High)");
                 None
             }
-            Specificity::Medium => self.heuristic_rewrite(original, context),
+            Specificity::Medium => self.heuristic_rewrite(original, context, &params),
             Specificity::Low => {
                 // Try heuristic first (instant)
-                if let Some(heuristic) = self.heuristic_rewrite(original, context) {
+                if let Some(heuristic) = self.heuristic_rewrite(original, context, &params) {
                     debug!(
                         enriched = heuristic.enriched_query.as_str(),
                         "✅ Heuristic enriched (race mode)"
@@ -1082,8 +1164,15 @@ mod tests {
         // Bare context: no signals → base confidence 0.6
         let rewriter_bare = ContextualQueryRewriter::new(Some(provider_bare), None, 5000);
         let ctx_bare = RetrievalContext::default();
-        let r_bare = rewriter_bare.rewrite("what was that?", &ctx_bare).await.unwrap();
-        assert!((r_bare.confidence - 0.6).abs() < f32::EPSILON, "Bare context should be 0.6, got {}", r_bare.confidence);
+        let r_bare = rewriter_bare
+            .rewrite("what was that?", &ctx_bare)
+            .await
+            .unwrap();
+        assert!(
+            (r_bare.confidence - 0.6).abs() < f32::EPSILON,
+            "Bare context should be 0.6, got {}",
+            r_bare.confidence
+        );
 
         // Rich context: skill + task + recent messages → 0.6 + 0.05 + 0.05 + 0.1 = 0.8
         let rewriter_rich = ContextualQueryRewriter::new(Some(provider_rich), None, 5000);
@@ -1098,9 +1187,21 @@ mod tests {
             ..Default::default()
         };
         // This will use heuristic (has context), so force LLM path by testing llm_rewrite directly
-        let r_rich = rewriter_rich.llm_rewrite("what was that?", &ctx_rich).await.unwrap();
-        assert!(r_rich.confidence > r_bare.confidence, "Rich context ({}) should have higher confidence than bare ({})", r_rich.confidence, r_bare.confidence);
-        assert!(r_rich.confidence >= 0.6 && r_rich.confidence <= 0.85, "Should be in 0.6–0.85 range, got {}", r_rich.confidence);
+        let r_rich = rewriter_rich
+            .llm_rewrite("what was that?", &ctx_rich)
+            .await
+            .unwrap();
+        assert!(
+            r_rich.confidence > r_bare.confidence,
+            "Rich context ({}) should have higher confidence than bare ({})",
+            r_rich.confidence,
+            r_bare.confidence
+        );
+        assert!(
+            r_rich.confidence >= 0.6 && r_rich.confidence <= 0.85,
+            "Should be in 0.6–0.85 range, got {}",
+            r_rich.confidence
+        );
     }
 
     // Race pattern tests
@@ -1166,5 +1267,85 @@ mod tests {
         let r = llm_result.unwrap().unwrap();
         assert!(r.enriched_query.contains("auth middleware"));
         assert_eq!(r.source, RewriteSource::Llm);
+    }
+
+    // Champion override tests
+
+    #[tokio::test]
+    async fn champion_overrides_confidence_threshold() {
+        let overrides = std::sync::Arc::new(std::sync::RwLock::new(Some(common::TrialParams {
+            rewrite_confidence_threshold: Some(0.95),
+            ..Default::default()
+        })));
+        let rewriter = ContextualQueryRewriter::heuristic_only().with_champion_overrides(overrides);
+        let ctx = finance_context();
+        // Heuristic produces confidence ~0.75, but threshold is 0.95 → should return None
+        let result = rewriter.rewrite("how are we doing?", &ctx).await;
+        assert!(
+            result.is_none(),
+            "High confidence threshold should suppress low-confidence rewrites"
+        );
+    }
+
+    #[tokio::test]
+    async fn champion_overrides_max_signals() {
+        let overrides = std::sync::Arc::new(std::sync::RwLock::new(Some(common::TrialParams {
+            rewrite_max_signals: Some(1),
+            ..Default::default()
+        })));
+        let rewriter = ContextualQueryRewriter::heuristic_only().with_champion_overrides(overrides);
+        let ctx = RetrievalContext {
+            active_skill: Some("finance-management".into()),
+            active_task: Some(ActiveTaskContext {
+                title: "March budget".into(),
+                project_name: Some("Q1 Finance".into()),
+                domain: Some("finance".into()),
+            }),
+            situation: Some(UserSituationSnapshot {
+                energy_level: 0.2,
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let result = rewriter.rewrite("how are we doing?", &ctx).await;
+        assert!(result.is_some());
+        let enriched = result.unwrap().enriched_query;
+        // With max_signals=1, enrichment should be shorter (fewer signals)
+        assert!(
+            !enriched.contains(", "),
+            "Max 1 signal should not have comma-separated signals, got: {enriched}"
+        );
+    }
+
+    #[tokio::test]
+    async fn autotuner_champion_overrides_affect_rewrite_behavior() {
+        let overrides = std::sync::Arc::new(std::sync::RwLock::new(None));
+        let rewriter = ContextualQueryRewriter::heuristic_only()
+            .with_champion_overrides(std::sync::Arc::clone(&overrides));
+        let ctx = finance_context();
+
+        // No champion → default behavior
+        let result1 = rewriter.rewrite("how are we doing?", &ctx).await;
+        assert!(result1.is_some());
+
+        // Promote a champion with high threshold
+        *overrides.write().unwrap() = Some(common::TrialParams {
+            rewrite_confidence_threshold: Some(0.95),
+            ..Default::default()
+        });
+
+        // Same query, now suppressed by threshold
+        let result2 = rewriter.rewrite("how are we doing?", &ctx).await;
+        assert!(
+            result2.is_none(),
+            "Champion threshold should suppress low-confidence rewrite"
+        );
+
+        // Clear champion
+        *overrides.write().unwrap() = None;
+
+        // Back to default behavior
+        let result3 = rewriter.rewrite("how are we doing?", &ctx).await;
+        assert!(result3.is_some());
     }
 }

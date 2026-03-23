@@ -265,16 +265,19 @@ impl ContextEngine {
         // 3. Retrieve memories and allocate budget (Priority::RetrievedMemory)
         // Skip memory retrieval only for Clarification mode (no RAG needed).
         // DirectResponse still needs retrieval for personalized conversational answers.
-        let (memory_content, retrieved_memory_count) = match &request.strategy {
-            ExecutionStrategy::Clarification { .. } => (None, 0),
-            _ => {
-                let result = self.retrieve_memory(request).await;
-                match result {
-                    Some((text, count)) => (Some(text), count),
-                    None => (None, 0),
+        let (memory_content, retrieved_memory_count, rewrite_triggered, rewrite_source) =
+            match &request.strategy {
+                ExecutionStrategy::Clarification { .. } => (None, 0, false, None),
+                _ => {
+                    let result = self.retrieve_memory(request).await;
+                    match result {
+                        Some((text, count, rw_triggered, rw_source)) => {
+                            (Some(text), count, rw_triggered, rw_source)
+                        }
+                        None => (None, 0, false, None),
+                    }
                 }
-            }
-        };
+            };
         let memory_tokens = memory_content
             .as_deref()
             .map(|c| self.estimate_text(c))
@@ -383,12 +386,17 @@ impl ContextEngine {
             budget_remaining,
             version: 0,
             retrieved_memory_count,
+            rewrite_triggered,
+            rewrite_source,
         }
     }
 
     /// Retrieve relevant memories for the request via embedding-based retrieval.
-    /// Returns the formatted memory text and the number of entries retrieved.
-    async fn retrieve_memory(&self, request: &ContextRequest) -> Option<(String, usize)> {
+    /// Returns (formatted text, entry count, rewrite_triggered, rewrite_source).
+    async fn retrieve_memory(
+        &self,
+        request: &ContextRequest,
+    ) -> Option<(String, usize, bool, Option<String>)> {
         let retriever = self.memory_retriever.as_ref()?;
 
         // Phase 2: Background race — heuristic immediate, LLM races with InsightForge
@@ -406,6 +414,13 @@ impl ContextEngine {
             }
             _ => (None, None),
         };
+
+        // Track rewrite metadata for instrumentation (mut: updated if late LLM arrives)
+        let mut rewrite_triggered = enriched.is_some();
+        let mut rewrite_source = enriched.as_ref().map(|r| match r.source {
+            crate::rewriter::RewriteSource::Heuristic => "heuristic".to_string(),
+            crate::rewriter::RewriteSource::Llm => "llm".to_string(),
+        });
 
         if let Some(ref e) = enriched {
             tracing::debug!(
@@ -431,6 +446,9 @@ impl ContextEngine {
                 if let Some(mut late_rx) = late_rx {
                     match late_rx.try_recv() {
                         Ok(llm_result) => {
+                            // Update instrumentation to capture the late LLM rewrite
+                            rewrite_triggered = true;
+                            rewrite_source = Some("llm".to_string());
                             tracing::debug!(
                                 enriched = llm_result.enriched_query.as_str(),
                                 "🏁 LLM finished during InsightForge — supplementary search"
@@ -518,7 +536,7 @@ impl ContextEngine {
             }
         }
 
-        Some((text, entry_count))
+        Some((text, entry_count, rewrite_triggered, rewrite_source))
     }
 
     fn estimate_text(&self, text: &str) -> usize {
@@ -1171,6 +1189,8 @@ mod tests {
             budget_remaining: 5000,
             version: 0,
             retrieved_memory_count: 0,
+            rewrite_triggered: false,
+            rewrite_source: None,
         };
         initial.inventory.upsert(ContextInventoryItem {
             source_name: "deferred_test".into(),
@@ -1209,6 +1229,8 @@ mod tests {
             budget_remaining: 5000,
             version: 0,
             retrieved_memory_count: 0,
+            rewrite_triggered: false,
+            rewrite_source: None,
         };
 
         let ctx = test_source_context();
@@ -1288,6 +1310,8 @@ mod tests {
             budget_remaining: 5,
             version: 0,
             retrieved_memory_count: 0,
+            rewrite_triggered: false,
+            rewrite_source: None,
         };
 
         let ctx = test_source_context();

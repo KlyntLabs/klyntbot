@@ -39,6 +39,10 @@ pub struct AutoTunerConfig {
     pub max_correction_rate_increase: f64,
     #[serde(default = "default_max_promotion_accuracy_drop")]
     pub max_promotion_accuracy_drop: f64,
+
+    // Phase 3 constraint threshold
+    #[serde(default = "default_max_rewrite_engagement_drop")]
+    pub max_rewrite_engagement_drop: f64,
 }
 
 impl Default for AutoTunerConfig {
@@ -56,6 +60,7 @@ impl Default for AutoTunerConfig {
             max_retrieval_precision_drop: default_max_retrieval_precision_drop(),
             max_correction_rate_increase: default_max_correction_rate_increase(),
             max_promotion_accuracy_drop: default_max_promotion_accuracy_drop(),
+            max_rewrite_engagement_drop: default_max_rewrite_engagement_drop(),
         }
     }
 }
@@ -92,6 +97,9 @@ fn default_max_correction_rate_increase() -> f64 {
 }
 fn default_max_promotion_accuracy_drop() -> f64 {
     0.05
+}
+fn default_max_rewrite_engagement_drop() -> f64 {
+    0.10
 }
 
 #[cfg(test)]

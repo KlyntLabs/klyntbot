@@ -817,13 +817,20 @@ impl AgentLoopBuilder {
         // Phase 2: Wire LLM provider + config model for query rewriting fallback
         let rewriter_provider = self.cognitive_provider.clone();
         let rewriter_model = config.agents.rewriter_model.clone();
-        let query_rewriter: Arc<dyn context_engine::QueryRewriter> = Arc::new(
-            crate::adapters::query_rewriter::ContextualQueryRewriter::new(
-                rewriter_provider,
-                rewriter_model,
-                800, // 800ms hard cap per spec
-            ),
+        let mut query_rewriter = crate::adapters::query_rewriter::ContextualQueryRewriter::new(
+            rewriter_provider,
+            rewriter_model,
+            800, // 800ms hard cap per spec
         );
+
+        // Phase 3: Wire autotuner champion overrides for rewrite params
+        if let Some(ref orchestrator) = self.autotuner {
+            if let Some(sink) = orchestrator.memory_param_sink() {
+                query_rewriter = query_rewriter.with_champion_overrides(sink);
+            }
+        }
+
+        let query_rewriter: Arc<dyn context_engine::QueryRewriter> = Arc::new(query_rewriter);
         let context_engine = context_engine.with_query_rewriter(query_rewriter);
 
         let context_engine = Arc::new(context_engine);

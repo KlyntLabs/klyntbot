@@ -52,6 +52,15 @@ pub fn aggregate_to_result(trial_id: Uuid, snapshots: &[MetricSnapshot]) -> Tria
             .iter()
             .map(|s| s.knowledge_retention_score * w(s))
             .sum(),
+        // Phase 3: Query rewriting
+        rewrite_trigger_rate: snapshots
+            .iter()
+            .map(|s| w(s) * s.rewrite_trigger_rate)
+            .sum(),
+        rewrite_engagement_rate: snapshots
+            .iter()
+            .map(|s| w(s) * s.rewrite_engagement_rate)
+            .sum(),
         user_satisfaction: {
             let sats: Vec<(f64, f64)> = snapshots
                 .iter()

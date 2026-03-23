@@ -119,6 +119,14 @@ below; unsafe suggestions are silently discarded by the evaluator.\n\n",
     if let Some(sat) = ctx.champion_metrics.user_satisfaction {
         prompt.push_str(&format!("- user_satisfaction:        {sat:.4}\n"));
     }
+    prompt.push_str(&format!(
+        "- rewrite_trigger_rate:     {:.4}  (fraction of messages rewritten)\n",
+        ctx.champion_metrics.rewrite_trigger_rate
+    ));
+    prompt.push_str(&format!(
+        "- rewrite_engagement_rate:  {:.4}  (fraction of rewrites that retrieved memories)\n",
+        ctx.champion_metrics.rewrite_engagement_rate
+    ));
     prompt.push('\n');
 
     // ---- 3. Recent trial history -------------------------------------------
@@ -179,7 +187,10 @@ below; unsafe suggestions are silently discarded by the evaluator.\n\n",
 | min_similarity                 | 0.30  | 0.80  | 0.05  | Cosine similarity threshold for retrieval |\n\
 | relevance_weight_importance    | 0.05  | 0.40  | 0.05  | Weight for fact importance in ranking |\n\
 | relevance_weight_frequency     | 0.02  | 0.30  | 0.02  | Weight for access frequency in ranking |\n\
-| relevance_weight_temporal      | 0.01  | 0.20  | 0.01  | Weight for temporal recency in ranking |\n\n",
+| relevance_weight_temporal      | 0.01  | 0.20  | 0.01  | Weight for temporal recency in ranking |\n\
+| rewrite_confidence_threshold   | 0.30  | 0.95  | 0.05  | Minimum confidence to accept an enrichment |\n\
+| rewrite_max_signals            | 1     | 6     | 1     | Max context signals in heuristic enrichment |\n\
+| rewrite_min_enrichment_length  | 5     | 30    | 5     | Min chars for an enrichment to be accepted |\n\n",
     );
 
     // ---- 9. Promotion constraints ------------------------------------------
@@ -190,7 +201,8 @@ below; unsafe suggestions are silently discarded by the evaluator.\n\n",
 - `avg_tokens_per_message` must not increase by **> 8%** relative to champion\n\
 - `avg_response_time_ms` must not increase by **> 15%** relative to champion\n\
 - `routing_stability` must not decrease by **> 10%** relative to champion\n\
-- `memory_relevance` must not decrease by **> 5%** relative to champion\n\n\
+- `memory_relevance` must not decrease by **> 5%** relative to champion\n\
+- `rewrite_engagement_rate` must not decrease by **> 10%** absolute from champion\n\n\
 Design your variants to satisfy these constraints. Include your constraint reasoning \
 in the `constraint_reasoning` field of each variant.\n\n",
     );

@@ -1369,6 +1369,8 @@ mod tests {
             complexity_signals: serde_json::Value::Null,
             execution_mode: None,
             retrieved_memory_count: None,
+            rewrite_triggered: 0,
+            rewrite_source: None,
         };
         strategy_repo.create(&sr).await.unwrap();
 

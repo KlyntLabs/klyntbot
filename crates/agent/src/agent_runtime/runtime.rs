@@ -621,6 +621,8 @@ impl AgentRuntime {
         }
 
         let retrieved_memory_count = assembled.retrieved_memory_count;
+        let rewrite_triggered = assembled.rewrite_triggered;
+        let rewrite_source = assembled.rewrite_source.clone();
 
         let pipeline_future = self.router.execute(
             analysis.mode.clone(),
@@ -686,6 +688,8 @@ impl AgentRuntime {
             ctx,
             pipeline_start,
             retrieved_memory_count,
+            rewrite_triggered,
+            rewrite_source,
         );
         let interaction_fut = async {
             if let Some(ref recorder) = self.interaction_recorder {
@@ -951,6 +955,8 @@ impl AgentRuntime {
         ctx: &RoutingContext,
         start: Instant,
         retrieved_memory_count: usize,
+        rewrite_triggered: bool,
+        rewrite_source: Option<String>,
     ) {
         let Some(ref strategy_repo) = self.strategy_repo else {
             return;
@@ -977,6 +983,8 @@ impl AgentRuntime {
             complexity_signals: serde_json::to_value(&analysis.signals).unwrap_or_default(),
             execution_mode: Some(result.final_mode.clone()),
             retrieved_memory_count: Some(retrieved_memory_count as i32),
+            rewrite_triggered: rewrite_triggered as i32,
+            rewrite_source,
         };
 
         if let Err(e) = strategy_repo.create(&record).await {

@@ -13,27 +13,11 @@ impl TaskSearcher {
         Self { repos }
     }
 
-    /// Extract the single best keyword from the sub-query for LIKE search.
-    /// TaskRepo::search_by_keyword uses LIKE %term% — a full phrase won't
-    /// match partial title text. We pick the most distinctive single term.
     fn extract_search_term(query: &str) -> String {
-        let stop = [
-            "background", "context", "current", "status", "related", "people",
-            "teams", "risks", "blockers", "overview", "details", "skill",
-            "the", "and", "for", "with", "about", "what", "how", "show",
-            "tell", "give", "remind", "any", "updates", "left", "going",
-            "doing", "work", "tasks", "todo", "done",
-        ];
-        let terms: Vec<&str> = query
-            .split(|c: char| !c.is_alphanumeric())
-            .filter(|w| w.len() > 2 && !stop.contains(&w.to_lowercase().as_str()))
-            .collect();
-        // Use the first meaningful term — respects user's intent priority.
-        // "what auth tasks are blocked" → "auth" (not "blocked")
-        terms.into_iter()
-            .next()
-            .unwrap_or("")
-            .to_string()
+        super::extract_first_keyword(
+            query,
+            &["left", "going", "doing", "work", "tasks", "todo", "done"],
+        )
     }
 }
 

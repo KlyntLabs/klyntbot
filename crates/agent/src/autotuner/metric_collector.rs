@@ -57,6 +57,8 @@ impl MetricSource for AgentMetricCollector {
             phase2_metrics,
             fact_health_result,
             knowledge_retention_result,
+            rewrite_trigger_result,
+            rewrite_engagement_result,
         ) = tokio::join!(
             self.strategy_repo.get_stats_since(since),
             self.event_log_repo
@@ -110,6 +112,9 @@ impl MetricSource for AgentMetricCollector {
             self.fact_repo.fact_health_by_domain(90),
             // Phase 3: importance-weighted avg retention across active knowledge atoms
             self.review_stats.knowledge_retention_score(),
+            // Phase 3: rewrite metrics
+            self.strategy_repo.rewrite_trigger_rate_since(since),
+            self.strategy_repo.rewrite_engagement_rate_since(since),
         );
         let (retrieval_precision, memory_freshness) = phase2_metrics;
 
@@ -119,6 +124,8 @@ impl MetricSource for AgentMetricCollector {
         };
 
         let knowledge_retention_score = knowledge_retention_result.unwrap_or(1.0);
+        let rewrite_trigger_rate = rewrite_trigger_result.unwrap_or(0.0);
+        let rewrite_engagement_rate = rewrite_engagement_result.unwrap_or(0.0);
 
         let stats = stats.map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         let correction_count = correction_count.unwrap_or(0);
@@ -166,6 +173,8 @@ impl MetricSource for AgentMetricCollector {
             memory_freshness,
             promotion_accuracy,
             knowledge_retention_score,
+            rewrite_trigger_rate,
+            rewrite_engagement_rate,
         })
     }
 }
@@ -245,6 +254,8 @@ mod tests {
             complexity_signals: serde_json::Value::Null,
             execution_mode: None,
             retrieved_memory_count: Some(3),
+            rewrite_triggered: 0,
+            rewrite_source: None,
         };
         strategy_repo.create(&strategy_row).await.unwrap();
 
@@ -267,6 +278,8 @@ mod tests {
             complexity_signals: serde_json::Value::Null,
             execution_mode: None,
             retrieved_memory_count: Some(0),
+            rewrite_triggered: 0,
+            rewrite_source: None,
         };
         strategy_repo.create(&strategy_row_no_mem).await.unwrap();
 

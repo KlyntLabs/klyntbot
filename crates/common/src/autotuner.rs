@@ -39,6 +39,17 @@ pub struct TrialParams {
     pub relevance_weight_importance: Option<f64>, // default 0.15, bounds [0.05, 0.40]
     pub relevance_weight_frequency: Option<f64>,  // default 0.10, bounds [0.02, 0.30]
     pub relevance_weight_temporal: Option<f64>,   // default 0.05, bounds [0.01, 0.20]
+
+    // Phase 3: Query rewriting
+    /// Minimum enrichment confidence to inject into InsightForge (bounds [0.3, 0.95]).
+    /// Higher = more selective (fewer rewrites), lower = more aggressive.
+    pub rewrite_confidence_threshold: Option<f64>,
+    /// Max context signals to include in heuristic enrichment (bounds [1, 6]).
+    /// Higher = richer enrichment at the cost of noise.
+    pub rewrite_max_signals: Option<usize>,
+    /// Minimum enriched query length to accept (bounds [5, 30]).
+    /// Shorter enrichments are discarded as too vague.
+    pub rewrite_min_enrichment_length: Option<usize>,
 }
 
 impl TrialParams {
@@ -61,6 +72,13 @@ impl TrialParams {
         } else {
             *defaults
         }
+    }
+
+    /// Returns `true` if any Phase 3 rewrite-related field is `Some`.
+    pub fn has_rewrite_params(&self) -> bool {
+        self.rewrite_confidence_threshold.is_some()
+            || self.rewrite_max_signals.is_some()
+            || self.rewrite_min_enrichment_length.is_some()
     }
 
     /// Returns `true` if any Phase 2 memory-related field is `Some`.
@@ -127,6 +145,27 @@ mod tests {
             ..Default::default()
         };
         assert!(with_phase2.has_memory_params());
+    }
+
+    #[test]
+    fn has_rewrite_params_detects_phase3_fields() {
+        let empty = TrialParams::default();
+        assert!(!empty.has_rewrite_params());
+
+        let with_rewrite = TrialParams {
+            rewrite_confidence_threshold: Some(0.5),
+            ..Default::default()
+        };
+        assert!(with_rewrite.has_rewrite_params());
+    }
+
+    #[test]
+    fn phase2_champion_deserializes_with_phase3_fields() {
+        let json = r#"{"vector_top_k": 50, "min_similarity": 0.6}"#;
+        let params: TrialParams = serde_json::from_str(json).unwrap();
+        assert!(params.rewrite_confidence_threshold.is_none());
+        assert!(params.rewrite_max_signals.is_none());
+        assert!(params.rewrite_min_enrichment_length.is_none());
     }
 
     #[test]

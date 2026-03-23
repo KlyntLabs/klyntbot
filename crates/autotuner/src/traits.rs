@@ -80,4 +80,8 @@ pub struct MetricSnapshot {
     /// Phase 3: importance-weighted avg retention across active knowledge atoms.
     /// Long-term metric — changes over weeks, not per-trial.
     pub knowledge_retention_score: f64,
+    /// Phase 3: Fraction of messages where query rewriting was triggered.
+    pub rewrite_trigger_rate: f64,
+    /// Phase 3: Fraction of rewritten messages where retrieved memories were engaged.
+    pub rewrite_engagement_rate: f64,
 }

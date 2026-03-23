@@ -13,21 +13,13 @@ impl FinanceSearcher {
         Self { repos }
     }
 
-    /// Extract the most meaningful keyword from the query for LIKE search.
     fn extract_search_term(query: &str) -> String {
-        let stop = [
-            "background", "context", "current", "status", "related", "people",
-            "teams", "risks", "blockers", "overview", "details", "skill",
-            "the", "and", "for", "with", "about", "what", "how", "show",
-            "tell", "give", "remind", "any", "updates", "much", "did",
-            "spend", "month", "this", "last", "year", "total",
-        ];
-        query
-            .split(|c: char| !c.is_alphanumeric())
-            .filter(|w| w.len() > 2 && !stop.contains(&w.to_lowercase().as_str()))
-            .next()
-            .unwrap_or("")
-            .to_string()
+        super::extract_first_keyword(
+            query,
+            &[
+                "much", "did", "spend", "month", "this", "last", "year", "total",
+            ],
+        )
     }
 }
 
@@ -65,10 +57,7 @@ impl DomainSearcher for FinanceSearcher {
             }
         };
 
-        debug!(
-            result_count = rows.len(),
-            "💰 FinanceSearcher: found"
-        );
+        debug!(result_count = rows.len(), "💰 FinanceSearcher: found");
 
         rows.into_iter()
             .enumerate()

@@ -30,7 +30,9 @@ impl NoteSearcher {
             id: note.id.clone(),
             content: format!("[Note: {}] {}", note.title, body_preview),
             score: 1.0 / (1.0 + rank as f64),
-            source: MemorySource::Domain { name: "notes".into() },
+            source: MemorySource::Domain {
+                name: "notes".into(),
+            },
             raw_score: note.rank,
         }
     }
@@ -39,15 +41,71 @@ impl NoteSearcher {
     /// join with OR so partial matches work, and quote special chars.
     fn sanitize_fts_query(query: &str) -> String {
         let stop_words: std::collections::HashSet<&str> = [
-            "the", "a", "an", "is", "are", "was", "were", "be", "been", "do",
-            "does", "did", "will", "would", "could", "should", "can", "may",
-            "to", "of", "in", "for", "on", "with", "at", "by", "from", "and",
-            "or", "but", "not", "my", "me", "i", "we", "you", "our", "your",
-            "how", "what", "when", "where", "why", "who", "which",
-            "show", "tell", "give", "remind", "about", "current", "status",
-            "background", "context", "related", "people", "teams", "risks",
-            "blockers", "overview", "details", "skill",
-        ].into_iter().collect();
+            "the",
+            "a",
+            "an",
+            "is",
+            "are",
+            "was",
+            "were",
+            "be",
+            "been",
+            "do",
+            "does",
+            "did",
+            "will",
+            "would",
+            "could",
+            "should",
+            "can",
+            "may",
+            "to",
+            "of",
+            "in",
+            "for",
+            "on",
+            "with",
+            "at",
+            "by",
+            "from",
+            "and",
+            "or",
+            "but",
+            "not",
+            "my",
+            "me",
+            "i",
+            "we",
+            "you",
+            "our",
+            "your",
+            "how",
+            "what",
+            "when",
+            "where",
+            "why",
+            "who",
+            "which",
+            "show",
+            "tell",
+            "give",
+            "remind",
+            "about",
+            "current",
+            "status",
+            "background",
+            "context",
+            "related",
+            "people",
+            "teams",
+            "risks",
+            "blockers",
+            "overview",
+            "details",
+            "skill",
+        ]
+        .into_iter()
+        .collect();
 
         let terms: Vec<&str> = query
             .split(|c: char| !c.is_alphanumeric())
@@ -106,7 +164,9 @@ impl DomainSearcher for NoteSearcher {
                     let nb_lower = nb.title.to_lowercase();
                     // Check if any notebook name words appear in the query
                     let nb_words: Vec<&str> = nb_lower.split_whitespace().collect();
-                    let matches = nb_words.iter().any(|w| w.len() > 2 && lower_query.contains(w));
+                    let matches = nb_words
+                        .iter()
+                        .any(|w| w.len() > 2 && lower_query.contains(w));
                     if matches {
                         debug!(
                             notebook = nb.title.as_str(),
@@ -127,7 +187,9 @@ impl DomainSearcher for NoteSearcher {
                                             note.body.chars().take(300).collect::<String>()
                                         ),
                                         score: 0.8 / (1.0 + i as f64),
-                                        source: MemorySource::Domain { name: "notes".into() },
+                                        source: MemorySource::Domain {
+                                            name: "notes".into(),
+                                        },
                                         raw_score: 0.0,
                                     });
                                 }
