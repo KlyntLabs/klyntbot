@@ -794,7 +794,7 @@ CREATE TABLE IF NOT EXISTS custom_columns (
 );
 
 CREATE TABLE IF NOT EXISTS custom_column_values (
-    task_id TEXT NOT NULL REFERENCES actions(id) ON DELETE CASCADE,
+    task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
     column_id TEXT NOT NULL REFERENCES custom_columns(id) ON DELETE CASCADE,
     value_json TEXT NOT NULL,
     PRIMARY KEY (task_id, column_id)
