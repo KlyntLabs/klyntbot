@@ -3,12 +3,14 @@ import { useMutation } from "@shared/hooks/useMutation";
 import { useQuery } from "@shared/hooks/useQuery";
 import { cn } from "@shared/lib/utils";
 import type {
+  FinanceAllocationTarget,
   FinanceInvestment,
   FinanceInvestmentCreateParams,
+  FinanceInvestmentTx,
   FinancePortfolio,
   FinancePortfolioCreateParams,
 } from "@shared/types";
-import { Plus, TrendingDown, TrendingUp } from "lucide-react";
+import { ChevronDown, ChevronRight, Plus, TrendingDown, TrendingUp } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Card, CardHeader } from "../components/Card";
 import { Donut } from "../components/Donut";
@@ -36,13 +38,26 @@ export function FinanceInvestments() {
     [],
   );
 
+  const [selectedPortfolio, setSelectedPortfolio] = useState<string | null>(null);
+  const [expandedInvestment, setExpandedInvestment] = useState<string | null>(null);
+
+  const { data: allocationTargets, refetch: rA } = useQuery<FinanceAllocationTarget[]>(
+    "finance_allocation_targets",
+    selectedPortfolio ? { portfolioId: selectedPortfolio } : null,
+    [],
+  );
+  const { data: investmentTxs } = useQuery<FinanceInvestmentTx[]>(
+    "finance_investment_txs",
+    expandedInvestment ? { investmentId: expandedInvestment } : null,
+    [],
+  );
+
   const refetchAll = () => {
     rP();
     rI();
+    if (selectedPortfolio) rA();
   };
   useEvent<{ entityKind: string }>("entity:updated", refetchAll);
-
-  const [selectedPortfolio, setSelectedPortfolio] = useState<string | null>(null);
 
   const totalValue = useMemo(
     () => investments.reduce((s, i) => s + (i.baseCurrentValue ?? 0), 0),
@@ -331,64 +346,128 @@ export function FinanceInvestments() {
             </div>
             {filteredInvestments.map((inv) => {
               const r = retPct(inv.currentValue ?? 0, inv.costBasis);
+              const isExpanded = expandedInvestment === inv.id;
               return (
-                <div
-                  key={inv.id}
-                  className="grid grid-cols-[1fr_80px_80px_90px_80px_80px] gap-2 items-center px-4 py-2.5 hover:bg-accent transition-colors border-b border-border-subtle last:border-b-0"
-                >
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[12px] font-medium text-foreground">
-                        {inv.symbol ?? inv.name}
-                      </span>
-                      <span className="px-1.5 py-0.5 text-[9px] font-light rounded bg-accent text-dim">
-                        {inv.assetType}
-                      </span>
+                <div key={inv.id}>
+                  <div
+                    className="grid grid-cols-[1fr_80px_80px_90px_80px_80px] gap-2 items-center px-4 py-2.5 hover:bg-accent transition-colors border-b border-border-subtle cursor-pointer"
+                    onClick={() => setExpandedInvestment(isExpanded ? null : inv.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") setExpandedInvestment(isExpanded ? null : inv.id);
+                    }}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        {isExpanded ? (
+                          <ChevronDown
+                            className="w-3 h-3 text-dim flex-shrink-0"
+                            strokeWidth={1.5}
+                          />
+                        ) : (
+                          <ChevronRight
+                            className="w-3 h-3 text-dim flex-shrink-0"
+                            strokeWidth={1.5}
+                          />
+                        )}
+                        <span className="text-[12px] font-medium text-foreground">
+                          {inv.symbol ?? inv.name}
+                        </span>
+                        <span className="px-1.5 py-0.5 text-[9px] font-light rounded bg-accent text-dim">
+                          {inv.assetType}
+                        </span>
+                      </div>
+                      <p className="text-[9px] text-dim font-light truncate ml-5">{inv.name}</p>
                     </div>
-                    <p className="text-[9px] text-dim font-light truncate">{inv.name}</p>
-                  </div>
-                  <span className="text-right text-[11px] text-muted-foreground font-light tabular-nums">
-                    {inv.quantity}
-                  </span>
-                  <span className="text-right text-[11px] text-muted-foreground font-light tabular-nums">
-                    {inv.currentPrice != null
-                      ? fmtMoney(inv.currentPrice, inv.marketCurrency ?? inv.currency, hidden)
-                      : "—"}
-                  </span>
-                  <div className="text-right">
-                    <span className="text-[12px] text-foreground font-light tabular-nums">
-                      {inv.currentValue != null
-                        ? fmtMoney(inv.currentValue, inv.marketCurrency ?? inv.currency, hidden)
+                    <span className="text-right text-[11px] text-muted-foreground font-light tabular-nums">
+                      {inv.quantity}
+                    </span>
+                    <span className="text-right text-[11px] text-muted-foreground font-light tabular-nums">
+                      {inv.currentPrice != null
+                        ? fmtMoney(inv.currentPrice, inv.marketCurrency ?? inv.currency, hidden)
                         : "—"}
                     </span>
-                    {mode === "multi" &&
-                      (inv.marketCurrency ?? inv.currency) !== baseCurrency &&
-                      inv.baseCurrentValue != null && (
-                        <p className="text-[9px] text-dim font-light">
-                          {fmtCompact(inv.baseCurrentValue, baseCurrency, hidden)}
-                        </p>
+                    <div className="text-right">
+                      <span className="text-[12px] text-foreground font-light tabular-nums">
+                        {inv.currentValue != null
+                          ? fmtMoney(inv.currentValue, inv.marketCurrency ?? inv.currency, hidden)
+                          : "—"}
+                      </span>
+                      {mode === "multi" &&
+                        (inv.marketCurrency ?? inv.currency) !== baseCurrency &&
+                        inv.baseCurrentValue != null && (
+                          <p className="text-[9px] text-dim font-light">
+                            {fmtCompact(inv.baseCurrentValue, baseCurrency, hidden)}
+                          </p>
+                        )}
+                    </div>
+                    <span className="text-right text-[11px] text-dim font-light tabular-nums">
+                      {displayAmount({
+                        amount: inv.costBasis,
+                        currency: inv.currency,
+                        baseAmount: inv.baseCostBasis,
+                        baseCurrency,
+                        mode,
+                        rates,
+                        hidden,
+                      })}
+                    </span>
+                    <span
+                      className={cn(
+                        "text-right text-[11px] font-light tabular-nums",
+                        r >= 0 ? "text-success" : "text-destructive",
                       )}
+                    >
+                      {r >= 0 ? "+" : ""}
+                      {r}%
+                    </span>
                   </div>
-                  <span className="text-right text-[11px] text-dim font-light tabular-nums">
-                    {displayAmount({
-                      amount: inv.costBasis,
-                      currency: inv.currency,
-                      baseAmount: inv.baseCostBasis,
-                      baseCurrency,
-                      mode,
-                      rates,
-                      hidden,
-                    })}
-                  </span>
-                  <span
-                    className={cn(
-                      "text-right text-[11px] font-light tabular-nums",
-                      r >= 0 ? "text-success" : "text-destructive",
-                    )}
-                  >
-                    {r >= 0 ? "+" : ""}
-                    {r}%
-                  </span>
+                  {isExpanded && (
+                    <div className="bg-surface-raised border-b border-border-subtle px-6 py-3">
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-2">
+                        Transaction History
+                      </p>
+                      {investmentTxs.length === 0 ? (
+                        <p className="text-[11px] text-dim font-light py-2">
+                          No transactions recorded
+                        </p>
+                      ) : (
+                        <div className="space-y-1.5">
+                          {investmentTxs.map((tx) => (
+                            <div key={tx.id} className="flex items-center justify-between py-1">
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className={cn(
+                                    "text-[9px] font-medium uppercase px-1.5 py-0.5 rounded",
+                                    tx.txType === "buy"
+                                      ? "bg-success/10 text-success"
+                                      : tx.txType === "sell"
+                                        ? "bg-destructive/10 text-destructive"
+                                        : "bg-brand/10 text-brand",
+                                  )}
+                                >
+                                  {tx.txType}
+                                </span>
+                                <span className="text-[11px] text-muted-foreground font-light tabular-nums">
+                                  {tx.quantity != null && `${tx.quantity} units`}
+                                </span>
+                                {tx.notes && (
+                                  <span className="text-[9px] text-dim font-light">{tx.notes}</span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <span className="text-[11px] text-foreground font-light tabular-nums">
+                                  {fmtMoney(tx.totalAmount, tx.currency, hidden)}
+                                </span>
+                                <span className="text-[9px] text-dim font-light">{tx.txDate}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -419,6 +498,83 @@ export function FinanceInvestments() {
               />
             </div>
           </Card>
+          {selectedPortfolio && allocationTargets.length > 0 && (
+            <Card compact className="p-4">
+              <CardHeader
+                title={`Target Allocation — ${portfolios.find((p) => p.id === selectedPortfolio)?.name}`}
+              />
+              <div className="space-y-2">
+                {allocationTargets.map((t) => {
+                  const actual = (() => {
+                    const pfInvestments = investments.filter(
+                      (i) => i.portfolioId === selectedPortfolio,
+                    );
+                    const totalPfValue = pfInvestments.reduce(
+                      (s, i) => s + (i.baseCurrentValue ?? i.costBasis),
+                      0,
+                    );
+                    if (totalPfValue === 0) return 0;
+                    const classValue = pfInvestments
+                      .filter(
+                        (i) =>
+                          i.assetType.toLowerCase() === t.assetClass.toLowerCase() ||
+                          (i.assetType === "etf" && t.assetClass === "equity"),
+                      )
+                      .reduce((s, i) => s + (i.baseCurrentValue ?? i.costBasis), 0);
+                    return classValue / totalPfValue;
+                  })();
+                  const target = Number.parseFloat(t.targetWeight);
+                  const tolerance = Number.parseFloat(t.toleranceBand);
+                  const diff = actual - target;
+                  const outOfBand = Math.abs(diff) > tolerance;
+                  return (
+                    <div key={t.id}>
+                      <div className="flex justify-between mb-0.5">
+                        <span className="text-[10px] text-muted-foreground font-light capitalize">
+                          {t.assetClass}
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] text-dim font-light tabular-nums">
+                            {(actual * 100).toFixed(1)}%
+                          </span>
+                          <span className="text-[9px] text-dim">/</span>
+                          <span className="text-[10px] text-muted-foreground font-light tabular-nums">
+                            {(target * 100).toFixed(0)}%
+                          </span>
+                          {outOfBand && (
+                            <span
+                              className={cn(
+                                "text-[8px] font-medium px-1 rounded",
+                                diff > 0
+                                  ? "text-brand bg-brand/10"
+                                  : "text-destructive bg-destructive/10",
+                              )}
+                            >
+                              {diff > 0 ? "+" : ""}
+                              {(diff * 100).toFixed(1)}%
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="h-1 bg-accent rounded-full relative">
+                        <div
+                          className={cn(
+                            "h-full rounded-full",
+                            outOfBand ? "bg-brand" : "bg-success",
+                          )}
+                          style={{
+                            width: `${Math.min(actual / Math.max(target, 0.01), 1.5) * 100}%`,
+                            maxWidth: "100%",
+                            transition: "width 0.5s ease",
+                          }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          )}
         </div>
       </div>
 
