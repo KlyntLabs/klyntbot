@@ -97,6 +97,8 @@ pub struct AgentRuntime {
     autotuner_hook: Option<Arc<dyn AutoTunerHook>>,
     /// Shared user situation for building RetrievalContext.
     user_situation: Option<Arc<tokio::sync::Mutex<cognitive::situation::UserSituation>>>,
+    /// Task repo for querying the focused task (active_task in RetrievalContext).
+    task_repo: Option<storage::TaskRepo>,
 }
 
 impl AgentRuntime {
@@ -131,6 +133,7 @@ impl AgentRuntime {
             squad_deps: None,
             autotuner_hook: None,
             user_situation: None,
+            task_repo: None,
         }
     }
 
@@ -198,6 +201,12 @@ impl AgentRuntime {
         sit: Arc<tokio::sync::Mutex<cognitive::situation::UserSituation>>,
     ) -> Self {
         self.user_situation = Some(sit);
+        self
+    }
+
+    /// Set the task repo for querying the focused task during query rewriting.
+    pub fn with_task_repo(mut self, repo: storage::TaskRepo) -> Self {
+        self.task_repo = Some(repo);
         self
     }
 
@@ -446,9 +455,31 @@ impl AgentRuntime {
                 None
             };
 
+            let active_task = if let Some(ref repo) = self.task_repo {
+                match repo.list_focused().await {
+                    Ok(tasks) => tasks.into_iter().next().map(|t| {
+                        context_engine::ActiveTaskContext {
+                            title: t.title,
+                            project_name: t.project_id,
+                            domain: active_skill
+                                .as_deref()
+                                .map(|s| s.replace("-management", "").replace('-', " ")),
+                        }
+                    }),
+                    Err(e) => {
+                        warn!(
+                            "Failed to query focused task for retrieval context: {e}"
+                        );
+                        None
+                    }
+                }
+            } else {
+                None
+            };
+
             Some(context_engine::RetrievalContext {
                 active_skill,
-                active_task: None,
+                active_task,
                 recent_user_messages,
                 situation,
                 active_view: None,

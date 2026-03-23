@@ -1396,6 +1396,9 @@ impl AgentLoopBuilder {
             runtime = runtime.with_user_situation(Arc::clone(sit));
         }
 
+        // Wire task repo for active task context in query rewriting
+        runtime = runtime.with_task_repo(repos.tasks.clone());
+
         // Inject autotuner shadow hook
         if let Some(ref orchestrator) = self.autotuner {
             // Build the concrete AutoTunerHook for shadow classification
