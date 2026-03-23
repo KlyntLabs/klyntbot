@@ -20,4 +20,5 @@ pub mod llm_summary;
 pub mod note_embedding;
 pub mod productivity;
 pub mod progress;
+pub mod query_rewriter;
 pub mod task_embedding;
