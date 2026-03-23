@@ -535,13 +535,28 @@ impl AgentLoop {
             }
         }
 
+        // Build correction context for query rewriting (if a correction was detected)
+        let correction = if correction_strength.is_some() {
+            last_assistant_content.as_ref().map(|original| {
+                context_engine::CorrectionContext {
+                    rejected_topic:
+                        crate::adapters::query_rewriter::extract_key_terms_from(
+                            &original.chars().take(200).collect::<String>(),
+                        ),
+                    corrected_to: msg.content.clone(),
+                }
+            })
+        } else {
+            None
+        };
+
         // Run through pipeline
         let mut routing_ctx = RoutingContext::new(msg.channel.clone(), msg.chat_id.clone());
         if let Some(sid) = session_squad_id {
             routing_ctx.squad_id = Some(sid);
         }
         let response_content = self
-            .run_pipeline(&msg.content, history, &routing_ctx, None, None, None)
+            .run_pipeline(&msg.content, history, &routing_ctx, None, None, correction)
             .await?;
 
         // Prepend acknowledgement when a keyword correction was detected
@@ -958,6 +973,21 @@ impl AgentLoop {
         // Whether to prepend correction acknowledgement to response
         let prepend_correction_ack = correction_emitted;
 
+        // Build correction context for query rewriting (if a correction was detected)
+        let correction = if correction_emitted {
+            last_assistant_content.as_ref().map(|original| {
+                context_engine::CorrectionContext {
+                    rejected_topic:
+                        crate::adapters::query_rewriter::extract_key_terms_from(
+                            &original.chars().take(200).collect::<String>(),
+                        ),
+                    corrected_to: content.clone(),
+                }
+            })
+        } else {
+            None
+        };
+
         // Clone Arcs for the spawned task
         let agent = Arc::clone(self);
         let sk = session_key.clone();
@@ -971,7 +1001,7 @@ impl AgentLoop {
                     &routing_ctx,
                     Some(pipeline_event_tx),
                     Some(cancel_clone),
-                    None,
+                    correction,
                 )
                 .await
             {
