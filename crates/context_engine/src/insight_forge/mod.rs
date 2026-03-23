@@ -223,11 +223,26 @@ impl InsightForge {
                 }
             }
 
+            tracing::debug!(
+                sub_query = sub_query.as_str(),
+                result_count = sub_query_results.len(),
+                sources = ?sub_query_results.iter().map(|e| format!("{}:{:.2}", match &e.source {
+                    crate::MemorySource::CognitiveFact => "fact".to_string(),
+                    crate::MemorySource::ConversationRecall => "recall".to_string(),
+                    crate::MemorySource::Domain { name } => name.clone(),
+                }, e.score)).collect::<Vec<_>>(),
+                "📊 InsightForge: sub-query results"
+            );
             all_ranked_lists.push(sub_query_results);
         }
 
         // 4. RRF merge across sub-queries.
         let merged = self.rrf_merge(&all_ranked_lists, limit);
+        tracing::debug!(
+            merged_count = merged.len(),
+            top_entries = ?merged.iter().take(5).map(|e| format!("[{:?}] {}", e.source, &e.content[..e.content.len().min(60)])).collect::<Vec<_>>(),
+            "📋 InsightForge: merged results (top 5)"
+        );
 
         // Budget allocation: ensure no single source provides more than 60% of results.
         let max_per_source = (limit as f64 * 0.6).ceil() as usize;
