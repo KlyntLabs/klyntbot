@@ -40,33 +40,10 @@
     "title": "Complete migration from ActionRepo/actions to TaskRepo/tasks",
     "type": "cleanup",
     "priority": "medium",
-    "status": "backlog",
-    "description": "ActionRepo and the actions table are the legacy task system, replaced by feature-tasks/TaskRepo/tasks table. However, ActionRepo is still actively used by 26 files across 6 crates (agent, tools, activity-log, feature-tasks, app-core, storage). This is a full migration effort: port all ActionRepo callers to TaskRepo, then drop actions + action_attachments + action_dependencies + action_time_entries tables. focus_sessions already removed (replaced by productivity_sessions). custom_column_values FK already fixed to reference tasks(id).",
-    "tables_to_remove": ["actions", "action_attachments", "action_dependencies", "action_time_entries"],
-    "already_done": ["focus_sessions removed", "custom_column_values FK fixed to tasks(id)"],
-    "affected_crates": ["storage (action_repo/)", "agent (reminders, recurring_tasks, progress, context_sources/todo)", "tools (project_tool, memory_tool)", "activity-log (context_action_repo)", "feature-tasks (complexity)", "app-core (work_context)", "plugin-runtime (host)"],
-    "scope": [
-      "crates/storage/src/repos/action_repo/ (entire module — 9 files)",
-      "crates/storage/src/rows/action.rs",
-      "crates/storage/migrations/001_initial.sql",
-      "crates/agent/src/services/reminders.rs",
-      "crates/agent/src/services/recurring_tasks.rs",
-      "crates/agent/src/adapters/progress.rs",
-      "crates/agent/src/context_sources/todo.rs",
-      "crates/tools/src/domain/project_tool.rs",
-      "crates/tools/src/domain/memory_tool.rs",
-      "crates/activity-log/src/context_action_repo.rs",
-      "crates/feature-tasks/src/complexity.rs",
-      "crates/app-core/src/handlers/work_context.rs",
-      "crates/plugin-runtime/src/host/mod.rs"
-    ],
-    "considerations": [
-      "26 files across 6 crates reference ActionRepo — this is NOT a table drop, it's a full migration",
-      "Agent runtime services (reminders, recurring_tasks) depend on ActionRepo — must port to TaskRepo",
-      "activity-log context_action_repo queries actions table directly — must be rewritten",
-      "plugin-runtime host uses ActionRepo for WASM plugin actions — verify plugin API compatibility",
-      "Pre-release: no data migration needed, but code migration is substantial"
-    ],
+    "status": "done",
+    "completed": "2026-03-23",
+    "description": "Migrated all 26 ActionRepo callers across 6 crates to TaskRepo. Deleted action_repo/ (9 files), ActionRow, ActionPatch, ActionFilter. Removed actions, action_attachments, action_dependencies, action_time_entries tables from 001_initial.sql. Added count_by_kr, time_entries_in_range, tasks_for_timeline to TaskRepo. Fixed custom_column_values FK to reference tasks(id). Removed focus_sessions table.",
+    "summary": "2,588 lines deleted, all callers ported, all tests passing.",
     "created": "2026-03-23"
   },
   {
@@ -87,6 +64,42 @@
       "work_context_* tables are part of activity-log crate — may be Phase 2 planned feature",
       "Pre-release: safe to drop, but verify no future spec references these tables"
     ],
+    "created": "2026-03-23"
+  },
+  {
+    "id": "rename-context-action-repo",
+    "title": "Rename ContextActionRepo and work_context_actions.action_id to task terminology",
+    "type": "cleanup",
+    "priority": "low",
+    "status": "backlog",
+    "description": "ContextActionRepo in activity-log still uses 'action' naming (action_id column, list_actions_for_context, list_contexts_for_action). The work_context_actions schema uses action_id. desktop-shared exposes linked_action_ids in WorkContextDetailResponse. All should be renamed to task terminology for consistency after ActionRepo migration.",
+    "scope": [
+      "crates/activity-log/src/context_action_repo.rs",
+      "crates/activity-log/migrations/001_unified_activity_log.sql",
+      "crates/desktop-shared/src/commands/work_context.rs"
+    ],
+    "created": "2026-03-23"
+  },
+  {
+    "id": "update-storage-architecture-docs",
+    "title": "Update layer-2-storage.md to reflect TaskRepo (remove ActionRepo references)",
+    "type": "docs",
+    "priority": "low",
+    "status": "backlog",
+    "description": "docs/architecture/layer-2-storage.md still describes ActionRepo as the live storage abstraction with full API surface, Repos struct diagram showing pub actions: ActionRepo, and Mermaid class diagrams. Must be updated to TaskRepo after the migration.",
+    "scope": [
+      "docs/architecture/layer-2-storage.md"
+    ],
+    "created": "2026-03-23"
+  },
+  {
+    "id": "expose-missing-task-apis",
+    "title": "Expose task_dependencies, task_attachments, task_time_entries via dev server",
+    "type": "feature",
+    "priority": "low",
+    "status": "backlog",
+    "description": "TaskRepo has methods for dependencies (add_dependency), attachments (add_attachment), and time entries (add_time_entry) but no dev server dispatch commands exist for them. Adding dispatch commands would let the simulator populate these 3 tables and enable frontend UI for task dependencies, attachments, and time tracking.",
+    "tables": ["task_dependencies", "task_attachments", "task_time_entries"],
     "created": "2026-03-23"
   },
   {
