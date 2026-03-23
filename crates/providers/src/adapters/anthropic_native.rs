@@ -73,17 +73,20 @@ impl AnthropicNativeProvider {
         self
     }
 
-    /// Extract system prompt from messages (first System message, if any).
-    fn extract_system_prompt(messages: &[Message]) -> Option<String> {
-        messages.iter().find_map(|m| match m {
-            Message::System { content } => Some(content.clone()),
-            _ => None,
-        })
+    /// Extract all system prompts from messages, preserving order.
+    fn extract_system_prompts(messages: &[Message]) -> Vec<String> {
+        messages
+            .iter()
+            .filter_map(|m| match m {
+                Message::System { content } => Some(content.clone()),
+                _ => None,
+            })
+            .collect()
     }
 
     /// Convert internal Message types to Anthropic API message format.
     ///
-    /// System messages are handled separately via `extract_system_prompt`.
+    /// System messages are handled separately via `extract_system_prompts`.
     /// Tool result messages are wrapped as `tool_result` content blocks inside
     /// a `user` role message (Anthropic requires tool results in user turns).
     pub fn convert_messages(&self, messages: &[Message]) -> Vec<Value> {
@@ -367,16 +370,32 @@ impl AnthropicNativeProvider {
             body["stream"] = json!(true);
         }
 
-        // System prompt — conditionally apply cache_control for prompt caching
-        if let Some(system_prompt) = Self::extract_system_prompt(messages) {
+        // System prompt — collect all system messages into content block array.
+        // Anthropic's API accepts `system` as an array of content blocks.
+        let system_prompts = Self::extract_system_prompts(messages);
+        if !system_prompts.is_empty() {
+            let last_idx = system_prompts.len() - 1;
             if self.cache_system_prompt {
-                body["system"] = json!([{
-                    "type": "text",
-                    "text": system_prompt,
-                    "cache_control": {"type": "ephemeral"}
-                }]);
+                let blocks: Vec<Value> = system_prompts
+                    .iter()
+                    .enumerate()
+                    .map(|(i, text)| {
+                        let mut block = json!({"type": "text", "text": text});
+                        // Apply cache_control to the LAST block — Anthropic caches
+                        // everything up to and including this block.
+                        if i == last_idx {
+                            block["cache_control"] = json!({"type": "ephemeral"});
+                        }
+                        block
+                    })
+                    .collect();
+                body["system"] = json!(blocks);
             } else {
-                body["system"] = json!(system_prompt);
+                let blocks: Vec<Value> = system_prompts
+                    .iter()
+                    .map(|text| json!({"type": "text", "text": text}))
+                    .collect();
+                body["system"] = json!(blocks);
             }
         }
 
@@ -595,8 +614,13 @@ impl LlmProvider for AnthropicNativeProvider {
             "messages": self.convert_messages(messages),
         });
 
-        if let Some(system_prompt) = Self::extract_system_prompt(messages) {
-            body["system"] = json!(system_prompt);
+        let system_prompts = Self::extract_system_prompts(messages);
+        if !system_prompts.is_empty() {
+            let blocks: Vec<Value> = system_prompts
+                .iter()
+                .map(|text| json!({"type": "text", "text": text}))
+                .collect();
+            body["system"] = json!(blocks);
         }
 
         if let Some(tools) = tools {
@@ -756,17 +780,40 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_system_prompt() {
+    fn test_extract_system_prompts_single() {
         let messages = vec![Message::system("You are helpful"), Message::user("Hi")];
-        let system = AnthropicNativeProvider::extract_system_prompt(&messages);
-        assert_eq!(system, Some("You are helpful".to_string()));
+        let prompts = AnthropicNativeProvider::extract_system_prompts(&messages);
+        assert_eq!(prompts.len(), 1);
+        assert_eq!(prompts[0], "You are helpful");
     }
 
     #[test]
-    fn test_extract_system_prompt_none() {
+    fn test_extract_system_prompts_none() {
         let messages = vec![Message::user("Hi")];
-        let system = AnthropicNativeProvider::extract_system_prompt(&messages);
-        assert!(system.is_none());
+        let prompts = AnthropicNativeProvider::extract_system_prompts(&messages);
+        assert!(prompts.is_empty());
+    }
+
+    #[test]
+    fn extract_system_prompts_collects_all_system_messages() {
+        let messages = vec![
+            Message::system("You are an assistant."),
+            Message::system("Memory: User prefers concise answers."),
+            Message::user("Hello"),
+            Message::system("Summary: Previous conversation about Rust."),
+        ];
+        let prompts = AnthropicNativeProvider::extract_system_prompts(&messages);
+        assert_eq!(prompts.len(), 3);
+        assert_eq!(prompts[0], "You are an assistant.");
+        assert_eq!(prompts[1], "Memory: User prefers concise answers.");
+        assert_eq!(prompts[2], "Summary: Previous conversation about Rust.");
+    }
+
+    #[test]
+    fn extract_system_prompts_returns_empty_when_none() {
+        let messages = vec![Message::user("Hello")];
+        let prompts = AnthropicNativeProvider::extract_system_prompts(&messages);
+        assert!(prompts.is_empty());
     }
 
     #[test]
