@@ -99,23 +99,16 @@ Add to the existing test module (after line ~447):
                 tokio::time::sleep(std::time::Duration::from_millis(self.delay_ms)).await;
             }
             Ok(LlmResponse {
-                content: self.response.clone(),
+                content: Some(self.response.clone()),
                 tool_calls: vec![],
+                finish_reason: "end_turn".into(),
                 usage: providers::Usage::default(),
-                stop_reason: None,
-                raw_response: None,
+                reasoning_content: None,
             })
         }
-        async fn chat_stream(
-            &self,
-            _messages: &[Message],
-            _tools: Option<&[serde_json::Value]>,
-            _params: &ChatParams,
-        ) -> common::Result<providers::LlmStream> {
-            unimplemented!()
-        }
         fn supports_streaming(&self) -> bool { false }
-        fn model_name(&self) -> &str { "mock" }
+        fn default_model(&self) -> &str { "mock-rewriter" }
+        fn name(&self) -> &str { "mock" }
     }
 
     #[tokio::test]
@@ -250,19 +243,18 @@ Add to `ContextualQueryRewriter` impl block (after `heuristic_rewrite`):
         );
 
         let messages = vec![providers::Message::user(prompt)];
-        let params = providers::ChatParams {
-            model: self.rewriter_model.clone(),
-            max_tokens: Some(50),
-            temperature: Some(0.0),
-            ..Default::default()
-        };
+        let model_name = self.rewriter_model.clone()
+            .unwrap_or_else(|| provider.default_model().to_string());
+        let params = providers::ChatParams::new(model_name)
+            .with_max_tokens(50)
+            .with_temperature(0.0);
 
         let timeout_dur = std::time::Duration::from_millis(self.timeout_ms);
         let result = tokio::time::timeout(timeout_dur, provider.chat(&messages, None, &params)).await;
 
         match result {
             Ok(Ok(response)) => {
-                let text = response.content.trim().to_string();
+                let text = response.content.as_deref().unwrap_or("").trim().to_string();
                 if text.eq_ignore_ascii_case("SKIP") || text.is_empty() {
                     debug!(original = original, "⏭️ QueryRewriter: LLM returned SKIP");
                     None
@@ -458,15 +450,15 @@ In `crates/agent/src/adapters/query_rewriter.rs`, add to the `QueryRewriter` imp
                     let provider = provider.clone();
                     let model = self.rewriter_model.clone();
                     let timeout_ms = self.timeout_ms;
-                    let original = original.to_string();
+                    let original_owned = original.to_string();
                     let context = context.clone();
+                    debug!(query = original, "🚀 QueryRewriter: LLM spawned in background");
                     tokio::spawn(async move {
                         let rewriter = ContextualQueryRewriter::new(Some(provider), model, timeout_ms);
-                        if let Some(result) = rewriter.llm_rewrite(&original, &context).await {
+                        if let Some(result) = rewriter.llm_rewrite(&original_owned, &context).await {
                             let _ = tx.send(result); // Ignore error if receiver dropped
                         }
                     });
-                    debug!(original = original, "🚀 QueryRewriter: LLM spawned in background");
                 }
                 None // Return None immediately — InsightForge starts without enrichment
             }
