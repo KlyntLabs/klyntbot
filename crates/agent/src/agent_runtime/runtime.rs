@@ -95,6 +95,8 @@ pub struct AgentRuntime {
     squad_deps: Option<SquadDeps>,
     /// AutoTuner hook — runs shadow classification and records ground truth.
     autotuner_hook: Option<Arc<dyn AutoTunerHook>>,
+    /// Shared user situation for building RetrievalContext.
+    user_situation: Option<Arc<tokio::sync::Mutex<cognitive::situation::UserSituation>>>,
 }
 
 impl AgentRuntime {
@@ -128,6 +130,7 @@ impl AgentRuntime {
             current_event_tx: RwLock::new(None),
             squad_deps: None,
             autotuner_hook: None,
+            user_situation: None,
         }
     }
 
@@ -189,6 +192,15 @@ impl AgentRuntime {
         self
     }
 
+    /// Set the shared user situation for building RetrievalContext.
+    pub fn with_user_situation(
+        mut self,
+        sit: Arc<tokio::sync::Mutex<cognitive::situation::UserSituation>>,
+    ) -> Self {
+        self.user_situation = Some(sit);
+        self
+    }
+
     /// Set the self-reference for delegation support (called after Arc wrapping).
     pub fn set_delegation_self_ref(&self, handler: Arc<dyn tools::DelegationHandler>) {
         let _ = self.delegation_self_ref.set(handler);
@@ -232,6 +244,7 @@ impl AgentRuntime {
         system_prompt: Option<&str>,
         event_tx: Option<tokio::sync::mpsc::Sender<AgentEvent>>,
         cancel_token: Option<tokio_util::sync::CancellationToken>,
+        correction: Option<context_engine::CorrectionContext>,
     ) -> Result<RuntimeResult> {
         let pipeline_start = Instant::now();
 
@@ -404,6 +417,47 @@ impl AgentRuntime {
             }
         }
 
+        // Step 5.5: Build retrieval context for query rewriting
+        let retrieval_context = {
+            let active_skill = Some(profile.name.clone());
+
+            let recent_user_messages: Vec<String> = history
+                .iter()
+                .rev()
+                .filter(|m| m.role() == common::MessageRole::User)
+                .take(2)
+                .map(|m| {
+                    match m {
+                        Message::User {
+                            content: providers::UserContent::Text(t),
+                        } => t.chars().take(200).collect(),
+                        _ => String::new(),
+                    }
+                })
+                .collect();
+
+            let situation = if let Some(ref sit) = self.user_situation {
+                let s = sit.lock().await;
+                Some(context_engine::UserSituationSnapshot {
+                    energy_level: s.energy_level,
+                    focus_state: s.focus_state,
+                    deadline_pressure: s.deadline_pressure,
+                    distraction_risk: s.distraction_risk,
+                })
+            } else {
+                None
+            };
+
+            Some(context_engine::RetrievalContext {
+                active_skill,
+                active_task: None,
+                recent_user_messages,
+                situation,
+                active_view: None,
+                recent_correction: correction,
+            })
+        };
+
         // Step 6: Assemble context (AgentContextSource injects agent instructions + skills)
         let prompt = system_prompt.unwrap_or(&self.config.system_prompt);
         let strategy = ExecutionStrategy::from(&analysis.mode);
@@ -416,7 +470,7 @@ impl AgentRuntime {
             tool_definitions: tool_definitions.to_vec(),
             context_window: self.config.context_window,
             session_key: Some(common::SessionKey::new(&ctx.channel, &ctx.chat_id).to_string()),
-            retrieval_context: None,
+            retrieval_context,
         };
         let assemble_start = Instant::now();
         let assembled = self.context_engine.assemble(context_request).await;
@@ -1342,7 +1396,7 @@ mod tests {
         let runtime = make_runtime(provider).await;
 
         let result = runtime
-            .process_message("hello", vec![], &[], &[], &routing_ctx(), None, None, None)
+            .process_message("hello", vec![], &[], &[], &routing_ctx(), None, None, None, None)
             .await
             .unwrap();
 
@@ -1362,6 +1416,7 @@ mod tests {
                 &[],
                 &[],
                 &routing_ctx(),
+                None,
                 None,
                 None,
                 None,
@@ -1392,6 +1447,7 @@ mod tests {
                 None,
                 None,
                 None,
+                None,
             )
             .await
             .unwrap();
@@ -1410,7 +1466,7 @@ mod tests {
             .with_confidence_evaluator(Arc::new(crate::confidence::ConfidenceEvaluator::new(0.99)));
 
         let result = runtime
-            .process_message("hello", vec![], &[], &[], &routing_ctx(), None, None, None)
+            .process_message("hello", vec![], &[], &[], &routing_ctx(), None, None, None, None)
             .await
             .unwrap();
 
@@ -1463,6 +1519,7 @@ mod tests {
                 None,
                 Some(tx),
                 None,
+                None,
             )
             .await
             .unwrap();
@@ -1500,7 +1557,7 @@ mod tests {
         ctx.delegation_depth = MAX_DELEGATION_DEPTH; // At max depth
 
         let result = runtime
-            .process_message("hello", vec![], &[], &[], &ctx, None, None, None)
+            .process_message("hello", vec![], &[], &[], &ctx, None, None, None, None)
             .await
             .unwrap();
 

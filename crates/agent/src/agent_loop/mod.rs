@@ -541,7 +541,7 @@ impl AgentLoop {
             routing_ctx.squad_id = Some(sid);
         }
         let response_content = self
-            .run_pipeline(&msg.content, history, &routing_ctx, None, None)
+            .run_pipeline(&msg.content, history, &routing_ctx, None, None, None)
             .await?;
 
         // Prepend acknowledgement when a keyword correction was detected
@@ -618,7 +618,7 @@ impl AgentLoop {
         // Run through pipeline
         let routing_ctx = RoutingContext::new(origin_channel.into(), origin_chat_id.into());
         let response_content = self
-            .run_pipeline(&system_msg_content, history, &routing_ctx, None, None)
+            .run_pipeline(&system_msg_content, history, &routing_ctx, None, None, None)
             .await?;
 
         // Save assistant response to session
@@ -748,6 +748,7 @@ impl AgentLoop {
         routing_ctx: &RoutingContext,
         event_tx: Option<tokio::sync::mpsc::Sender<AgentEvent>>,
         cancel_token: Option<CancellationToken>,
+        correction: Option<context_engine::CorrectionContext>,
     ) -> Result<String> {
         let system_prompt = self
             .context_engine
@@ -773,6 +774,7 @@ impl AgentLoop {
                 Some(&system_prompt),
                 event_tx.clone(),
                 cancel_token,
+                correction,
             )
             .await?;
 
@@ -826,7 +828,7 @@ impl AgentLoop {
         // Run through pipeline
         let routing_ctx = RoutingContext::new("cli".into(), session_key.clone().into());
         let response_content = self
-            .run_pipeline(&content, history, &routing_ctx, None, None)
+            .run_pipeline(&content, history, &routing_ctx, None, None, None)
             .await?;
 
         // Save to session
@@ -969,6 +971,7 @@ impl AgentLoop {
                     &routing_ctx,
                     Some(pipeline_event_tx),
                     Some(cancel_clone),
+                    None,
                 )
                 .await
             {
