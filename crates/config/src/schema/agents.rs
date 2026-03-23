@@ -19,6 +19,11 @@ pub struct AgentsConfig {
     /// Defaults to `~/.klyntbot/.agents/skills/` if not set.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub skills_dir: Option<String>,
+
+    /// Model to use for query rewriting LLM fallback (Phase 2).
+    /// Defaults to the cheapest/fastest available model. Example: "anthropic/claude-haiku-4-5"
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rewriter_model: Option<String>,
 }
 
 /// Default agent configuration
