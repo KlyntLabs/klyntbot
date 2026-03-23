@@ -151,8 +151,8 @@ struct PartialToolCall {
 /// Consumes the stream and returns an `LlmResponse` equivalent to `provider.chat()`,
 /// but with real-time content chunks sent to the UI as they arrive.
 ///
-/// Token usage is estimated from text length using a model-specific chars-per-token
-/// ratio, since `LlmStreamChunk` does not carry token counts.
+/// Token usage is taken from real provider data when available (via `LlmStreamChunk.usage`).
+/// Falls back to `best_token_counter()` estimation when the provider sends no usage.
 async fn call_provider_streaming(
     provider: &dyn providers::LlmProvider,
     messages: &[Message],
@@ -166,6 +166,8 @@ async fn call_provider_streaming(
     let mut partials: Vec<PartialToolCall> = Vec::with_capacity(4);
     let mut finish_reason = String::new();
     let mut reasoning = String::new();
+    let mut accumulated_usage = Usage::default();
+    let mut has_real_usage = false;
 
     while let Some(result) = stream.next().await {
         let chunk = result?;
@@ -207,6 +209,22 @@ async fn call_provider_streaming(
         if let Some(reason) = chunk.finish_reason {
             finish_reason = reason;
         }
+
+        if let Some(chunk_usage) = chunk.usage {
+            has_real_usage = true;
+            if chunk_usage.prompt_tokens > 0 {
+                accumulated_usage.prompt_tokens = chunk_usage.prompt_tokens;
+            }
+            if chunk_usage.completion_tokens > 0 {
+                accumulated_usage.completion_tokens = chunk_usage.completion_tokens;
+            }
+            if chunk_usage.cache_read_tokens > 0 {
+                accumulated_usage.cache_read_tokens = chunk_usage.cache_read_tokens;
+            }
+            if chunk_usage.cache_write_tokens > 0 {
+                accumulated_usage.cache_write_tokens = chunk_usage.cache_write_tokens;
+            }
+        }
     }
 
     let tool_calls: Vec<providers::ToolCall> = partials
@@ -223,38 +241,48 @@ async fn call_provider_streaming(
         })
         .collect();
 
-    // Estimate token usage since streaming chunks don't carry counts.
-    // Reuses context_engine::CharTokenCounter (4 chars ≈ 1 token) to stay
-    // consistent with the rest of the token estimation pipeline.
-    let counter = context_engine::CharTokenCounter;
-    let estimated_input: u32 = messages
-        .iter()
-        .map(|m| match m {
-            Message::System { content } => counter.estimate_text(content),
-            Message::User { content } => match content {
-                providers::UserContent::Text(t) => counter.estimate_text(t),
-                providers::UserContent::MultiPart(parts) => parts
-                    .iter()
-                    .map(|p| match p {
-                        providers::ContentPart::Text { text } => counter.estimate_text(text),
-                        _ => 0,
-                    })
-                    .sum(),
-            },
-            Message::Assistant {
-                content,
-                reasoning_content,
-                ..
-            } => {
-                content.as_deref().map_or(0, |c| counter.estimate_text(c))
-                    + reasoning_content
-                        .as_deref()
-                        .map_or(0, |r| counter.estimate_text(r))
-            }
-            Message::Tool { content, .. } => counter.estimate_text(content),
-        })
-        .sum::<usize>() as u32;
-    let estimated_output = counter.estimate_text(&content) as u32;
+    // Use real usage from provider when available, fall back to estimation.
+    let usage = if has_real_usage {
+        accumulated_usage.total_tokens =
+            accumulated_usage.prompt_tokens + accumulated_usage.completion_tokens;
+        accumulated_usage
+    } else {
+        // Fallback when provider sends no usage
+        let counter = context_engine::best_token_counter();
+        let est_input: u32 = messages
+            .iter()
+            .map(|m| match m {
+                Message::System { content: c } => counter.estimate_text(c),
+                Message::User { content: c } => match c {
+                    providers::UserContent::Text(t) => counter.estimate_text(t),
+                    providers::UserContent::MultiPart(parts) => parts
+                        .iter()
+                        .map(|p| match p {
+                            providers::ContentPart::Text { text } => counter.estimate_text(text),
+                            _ => 0,
+                        })
+                        .sum(),
+                },
+                Message::Assistant {
+                    content: c,
+                    reasoning_content: r,
+                    ..
+                } => {
+                    c.as_deref().map_or(0, |t| counter.estimate_text(t))
+                        + r.as_deref().map_or(0, |t| counter.estimate_text(t))
+                }
+                Message::Tool { content: c, .. } => counter.estimate_text(c),
+            })
+            .sum::<usize>() as u32;
+        let est_output = counter.estimate_text(&content) as u32;
+        Usage {
+            prompt_tokens: est_input,
+            completion_tokens: est_output,
+            total_tokens: est_input + est_output,
+            cache_read_tokens: 0,
+            cache_write_tokens: 0,
+        }
+    };
 
     Ok(providers::LlmResponse {
         content: if content.is_empty() {
@@ -264,13 +292,7 @@ async fn call_provider_streaming(
         },
         tool_calls,
         finish_reason,
-        usage: Usage {
-            prompt_tokens: estimated_input,
-            completion_tokens: estimated_output,
-            total_tokens: estimated_input + estimated_output,
-            cache_read_tokens: 0,
-            cache_write_tokens: 0,
-        },
+        usage,
         reasoning_content: if reasoning.is_empty() {
             None
         } else {

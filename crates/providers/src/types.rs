@@ -72,6 +72,9 @@ pub struct LlmStreamChunk {
 
     /// Reasoning content delta (for thinking models)
     pub reasoning_content: Option<String>,
+
+    /// Token usage (provided by some events, e.g. message_start/message_delta)
+    pub usage: Option<Usage>,
 }
 
 /// Tool call delta for streaming
@@ -173,6 +176,7 @@ pub trait LlmProvider: Send + Sync {
             is_final: true,
             finish_reason: Some(response.finish_reason),
             reasoning_content: response.reasoning_content,
+            usage: Some(response.usage),
         };
 
         Ok(Box::pin(futures_util::stream::once(
@@ -490,6 +494,25 @@ mod tests {
     fn test_chat_params_default_no_response_format() {
         let params = ChatParams::new("gpt-4o");
         assert!(params.response_format.is_none());
+    }
+
+    #[test]
+    fn stream_chunk_with_usage() {
+        let chunk = LlmStreamChunk {
+            content: None,
+            tool_call_delta: None,
+            is_final: true,
+            finish_reason: Some("end_turn".into()),
+            reasoning_content: None,
+            usage: Some(Usage {
+                prompt_tokens: 100,
+                completion_tokens: 50,
+                total_tokens: 150,
+                cache_read_tokens: 20,
+                cache_write_tokens: 0,
+            }),
+        };
+        assert_eq!(chunk.usage.unwrap().cache_read_tokens, 20);
     }
 
     #[test]

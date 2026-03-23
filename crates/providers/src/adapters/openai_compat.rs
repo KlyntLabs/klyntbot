@@ -184,6 +184,7 @@ impl OpenAiCompatProvider {
 
         if stream {
             body["stream"] = json!(true);
+            body["stream_options"] = json!({"include_usage": true});
         }
 
         if let Some(temp) = params.temperature {
@@ -229,6 +230,27 @@ impl OpenAiCompatProvider {
             .ok_or_else(|| ProviderError::InvalidResponse("No choices in SSE chunk".to_string()))?;
 
         if choices.is_empty() {
+            // OpenAI sends a final chunk with empty choices and usage data
+            // when stream_options.include_usage is true.
+            let usage = value.get("usage").and_then(|u| {
+                Some(Usage {
+                    prompt_tokens: u.get("prompt_tokens")?.as_u64()? as u32,
+                    completion_tokens: u.get("completion_tokens")?.as_u64()? as u32,
+                    total_tokens: u.get("total_tokens")?.as_u64()? as u32,
+                    cache_read_tokens: 0,
+                    cache_write_tokens: 0,
+                })
+            });
+            if usage.is_some() {
+                return Ok(Some(LlmStreamChunk {
+                    content: None,
+                    tool_call_delta: None,
+                    is_final: true,
+                    finish_reason: None,
+                    reasoning_content: None,
+                    usage,
+                }));
+            }
             return Ok(None);
         }
 
@@ -268,6 +290,7 @@ impl OpenAiCompatProvider {
             is_final,
             finish_reason,
             reasoning_content,
+            usage: None,
         }))
     }
 }
@@ -629,6 +652,27 @@ mod tests {
     #[test]
     fn test_parse_sse_done_marker() {
         let result = OpenAiCompatProvider::parse_sse_chunk("[DONE]").unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_parse_sse_usage_only_chunk() {
+        let data = r#"{"id":"chatcmpl-abc","object":"chat.completion.chunk","created":1700000000,"model":"gpt-4o","choices":[],"usage":{"prompt_tokens":50,"completion_tokens":30,"total_tokens":80}}"#;
+        let chunk = OpenAiCompatProvider::parse_sse_chunk(data)
+            .unwrap()
+            .unwrap();
+        assert!(chunk.is_final);
+        assert!(chunk.content.is_none());
+        let usage = chunk.usage.unwrap();
+        assert_eq!(usage.prompt_tokens, 50);
+        assert_eq!(usage.completion_tokens, 30);
+        assert_eq!(usage.total_tokens, 80);
+    }
+
+    #[test]
+    fn test_parse_sse_empty_choices_no_usage_returns_none() {
+        let data = r#"{"id":"chatcmpl-abc","object":"chat.completion.chunk","created":1700000000,"model":"gpt-4o","choices":[]}"#;
+        let result = OpenAiCompatProvider::parse_sse_chunk(data).unwrap();
         assert!(result.is_none());
     }
 

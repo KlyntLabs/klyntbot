@@ -384,6 +384,7 @@ mod tests {
             is_final: true,
             finish_reason: Some("stop".to_string()),
             reasoning_content: None,
+            usage: None,
         };
         Box::pin(futures_util::stream::once(async move { Ok(chunk) }))
     }

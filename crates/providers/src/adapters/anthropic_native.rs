@@ -235,6 +235,7 @@ impl AnthropicNativeProvider {
                             is_final: false,
                             finish_reason: None,
                             reasoning_content: None,
+                            usage: None,
                         }))
                     }
                     // text and thinking blocks will emit content via deltas
@@ -252,6 +253,7 @@ impl AnthropicNativeProvider {
                             is_final: false,
                             finish_reason: None,
                             reasoning_content: None,
+                            usage: None,
                         }))
                     }
                     Some("input_json_delta") => {
@@ -268,6 +270,7 @@ impl AnthropicNativeProvider {
                             is_final: false,
                             finish_reason: None,
                             reasoning_content: None,
+                            usage: None,
                         }))
                     }
                     Some("thinking_delta") => {
@@ -278,9 +281,38 @@ impl AnthropicNativeProvider {
                             is_final: false,
                             finish_reason: None,
                             reasoning_content: thinking,
+                            usage: None,
                         }))
                     }
                     _ => Ok(None),
+                }
+            }
+            "message_start" => {
+                let usage_val = &value["message"]["usage"];
+                let input = usage_val.get("input_tokens").and_then(|v| v.as_u64());
+                if let Some(input_tokens) = input {
+                    Ok(Some(LlmStreamChunk {
+                        content: None,
+                        tool_call_delta: None,
+                        is_final: false,
+                        finish_reason: None,
+                        reasoning_content: None,
+                        usage: Some(Usage {
+                            prompt_tokens: input_tokens as u32,
+                            completion_tokens: 0,
+                            total_tokens: input_tokens as u32,
+                            cache_read_tokens: usage_val
+                                .get("cache_read_input_tokens")
+                                .and_then(|v| v.as_u64())
+                                .unwrap_or(0) as u32,
+                            cache_write_tokens: usage_val
+                                .get("cache_creation_input_tokens")
+                                .and_then(|v| v.as_u64())
+                                .unwrap_or(0) as u32,
+                        }),
+                    }))
+                } else {
+                    Ok(None)
                 }
             }
             "message_delta" => {
@@ -293,12 +325,22 @@ impl AnthropicNativeProvider {
                     Some(other) => Some(other.to_string()),
                     None => None,
                 };
+                let usage = value.get("usage").and_then(|u| {
+                    u.get("output_tokens").and_then(|v| v.as_u64()).map(|output| Usage {
+                        prompt_tokens: 0,
+                        completion_tokens: output as u32,
+                        total_tokens: output as u32,
+                        cache_read_tokens: 0,
+                        cache_write_tokens: 0,
+                    })
+                });
                 Ok(Some(LlmStreamChunk {
                     content: None,
                     tool_call_delta: None,
                     is_final: true,
                     finish_reason,
                     reasoning_content: None,
+                    usage,
                 }))
             }
             "error" => {
@@ -311,7 +353,7 @@ impl AnthropicNativeProvider {
                 ))
                 .into())
             }
-            // message_start, content_block_stop, message_stop, ping — no chunk needed
+            // content_block_stop, message_stop, ping — no chunk needed
             _ => Ok(None),
         }
     }
@@ -1038,6 +1080,9 @@ mod tests {
             .unwrap();
         assert!(chunk.is_final);
         assert_eq!(chunk.finish_reason, Some("stop".to_string()));
+        let usage = chunk.usage.unwrap();
+        assert_eq!(usage.completion_tokens, 15);
+        assert_eq!(usage.prompt_tokens, 0);
     }
 
     #[test]
@@ -1061,8 +1106,32 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_sse_message_start_returns_none() {
+    fn test_parse_sse_message_start_extracts_usage() {
         let data = r#"{"type":"message_start","message":{"id":"msg_01","type":"message","role":"assistant","content":[],"model":"claude-sonnet-4-20250514","stop_reason":null,"usage":{"input_tokens":25,"output_tokens":1}}}"#;
+        let result = AnthropicNativeProvider::parse_anthropic_sse("message_start", data).unwrap();
+        let chunk = result.unwrap();
+        assert!(!chunk.is_final);
+        let usage = chunk.usage.unwrap();
+        assert_eq!(usage.prompt_tokens, 25);
+        assert_eq!(usage.completion_tokens, 0);
+        assert_eq!(usage.cache_read_tokens, 0);
+        assert_eq!(usage.cache_write_tokens, 0);
+    }
+
+    #[test]
+    fn test_parse_sse_message_start_with_cache_usage() {
+        let data = r#"{"type":"message_start","message":{"id":"msg_01","type":"message","role":"assistant","content":[],"model":"claude-sonnet-4-20250514","stop_reason":null,"usage":{"input_tokens":100,"output_tokens":1,"cache_read_input_tokens":80,"cache_creation_input_tokens":15}}}"#;
+        let result = AnthropicNativeProvider::parse_anthropic_sse("message_start", data).unwrap();
+        let chunk = result.unwrap();
+        let usage = chunk.usage.unwrap();
+        assert_eq!(usage.prompt_tokens, 100);
+        assert_eq!(usage.cache_read_tokens, 80);
+        assert_eq!(usage.cache_write_tokens, 15);
+    }
+
+    #[test]
+    fn test_parse_sse_message_start_without_usage_returns_none() {
+        let data = r#"{"type":"message_start","message":{"id":"msg_01","type":"message","role":"assistant","content":[],"model":"claude-sonnet-4-20250514","stop_reason":null}}"#;
         let result = AnthropicNativeProvider::parse_anthropic_sse("message_start", data).unwrap();
         assert!(result.is_none());
     }
