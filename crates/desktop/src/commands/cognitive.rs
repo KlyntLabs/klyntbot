@@ -207,9 +207,7 @@ pub async fn coaching_intervention_log(
 }
 
 #[tauri::command]
-pub async fn coaching_seed_patterns(
-    state: State<'_, Arc<AppCore>>,
-) -> Result<bool, ApiError> {
+pub async fn coaching_seed_patterns(state: State<'_, Arc<AppCore>>) -> Result<bool, ApiError> {
     state.coaching_seed_patterns().await
 }
 
@@ -353,7 +351,8 @@ pub(crate) async fn dispatch_dev(
                 .await,
         ),
         "coaching_intervention_log" => dev::val(
-            core.coaching_intervention_log(dev::get(body, "limit")).await,
+            core.coaching_intervention_log(dev::get(body, "limit"))
+                .await,
         ),
         "memory_health" => dev::val(core.memory_health().await),
         _ => return None,

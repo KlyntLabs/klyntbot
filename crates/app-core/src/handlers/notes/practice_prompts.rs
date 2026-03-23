@@ -73,9 +73,7 @@ pub fn coaching_nudge_check(results: &[serde_json::Value]) -> Option<String> {
     let dimensions = ["meaning", "grammar", "naturalness", "wordChoice"];
 
     // Grades at B+ or worse (i.e. not A+, A, or A-)
-    let is_weak = |grade: &str| -> bool {
-        !matches!(grade, "A+" | "A" | "A-")
-    };
+    let is_weak = |grade: &str| -> bool { !matches!(grade, "A+" | "A" | "A-") };
 
     for dim in &dimensions {
         let all_weak = last_three.iter().all(|result| {

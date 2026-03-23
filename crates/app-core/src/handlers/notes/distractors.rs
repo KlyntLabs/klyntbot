@@ -30,9 +30,7 @@ impl AppCore {
         // 2. Return cached distractors if available.
         if let Some(cached_json) = &card.card_distractors {
             if !cached_json.is_empty() {
-                if let Ok(parsed) =
-                    serde_json::from_str::<LlmDistractorResult>(cached_json)
-                {
+                if let Ok(parsed) = serde_json::from_str::<LlmDistractorResult>(cached_json) {
                     if !parsed.distractors.is_empty() {
                         return Ok(FlashcardDistractorResponse {
                             distractors: parsed.distractors,
@@ -107,7 +105,8 @@ Return ONLY this exact JSON (no extra text):
         })?;
 
         // 5. Cache in DB.
-        let distractors_json = serde_json::json!({ "distractors": &result.distractors }).to_string();
+        let distractors_json =
+            serde_json::json!({ "distractors": &result.distractors }).to_string();
         repo.update_distractors(&params.card_id, &distractors_json)
             .await
             .map_err(|e| ApiError::new("STORAGE_ERROR", e.to_string()))?;

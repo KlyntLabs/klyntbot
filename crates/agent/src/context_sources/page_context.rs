@@ -101,12 +101,7 @@ impl PageContextSource {
 
     async fn task_context(&self, id: &str) -> Option<String> {
         let task = self.repos.tasks.get(id).await.ok()??;
-        let subtasks = self
-            .repos
-            .tasks
-            .get_children(id)
-            .await
-            .unwrap_or_default();
+        let subtasks = self.repos.tasks.get_children(id).await.unwrap_or_default();
 
         let mut out = format!(
             "**Task:** {} (status: {}, priority: {})\n",

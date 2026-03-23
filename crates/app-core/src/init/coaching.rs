@@ -50,7 +50,8 @@ pub(super) async fn init_coaching(
         let pattern_detector = Arc::new(Mutex::new(PatternDetector::new()));
         let intervention_router = Arc::new(Mutex::new(InterventionRouter::new(Default::default())));
         let coaching_repo = storage::CoachingStrategyRepo::new(storage_pool.inner().clone());
-        let intervention_log_repo = storage::CoachingInterventionLogRepo::new(storage_pool.inner().clone());
+        let intervention_log_repo =
+            storage::CoachingInterventionLogRepo::new(storage_pool.inner().clone());
         let mut tracker = FeedbackTracker::new().with_repo(coaching_repo);
         tracker.load_from_db().await;
         let feedback_tracker = Arc::new(Mutex::new(tracker));

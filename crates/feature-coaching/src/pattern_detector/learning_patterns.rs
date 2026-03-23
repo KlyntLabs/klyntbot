@@ -15,9 +15,7 @@ const STREAK_MILESTONES: &[i64] = &[3, 7, 14, 30, 60, 100];
 /// Counts distinct review days backwards from the most recent entry.
 /// Fires at milestones (3/7/14/30/60/100 days) and when a streak >= 3 is
 /// at risk (last review was yesterday, none today).
-pub fn detect_study_streak(
-    reviews: &VecDeque<(DateTime<Utc>, String)>,
-) -> Option<DetectedPattern> {
+pub fn detect_study_streak(reviews: &VecDeque<(DateTime<Utc>, String)>) -> Option<DetectedPattern> {
     if reviews.is_empty() {
         return None;
     }
@@ -26,10 +24,7 @@ pub fn detect_study_streak(
     let today = now.date_naive();
 
     // Collect distinct review dates.
-    let review_dates: BTreeSet<_> = reviews
-        .iter()
-        .map(|(ts, _)| ts.date_naive())
-        .collect();
+    let review_dates: BTreeSet<_> = reviews.iter().map(|(ts, _)| ts.date_naive()).collect();
 
     // Count consecutive days backwards from the most recent review date.
     let most_recent = *review_dates.iter().next_back()?;
@@ -52,9 +47,7 @@ pub fn detect_study_streak(
             name: "study_streak_at_risk".into(),
             confidence: 0.85,
             signal_count: streak as i32,
-            description: format!(
-                "{streak}-day study streak at risk — no review yet today"
-            ),
+            description: format!("{streak}-day study streak at risk — no review yet today"),
             domain: "learning".into(),
         });
     }
@@ -65,10 +58,7 @@ pub fn detect_study_streak(
     }
 
     // Find the highest milestone reached.
-    let milestone = STREAK_MILESTONES
-        .iter()
-        .rev()
-        .find(|&&m| streak >= m);
+    let milestone = STREAK_MILESTONES.iter().rev().find(|&&m| streak >= m);
 
     milestone.map(|&m| DetectedPattern {
         name: format!("study_streak_{m}_days"),
@@ -89,10 +79,7 @@ pub fn detect_retention_decay(
     }
 
     let cutoff = Utc::now() - Duration::hours(24);
-    let recent: Vec<_> = digests
-        .iter()
-        .filter(|(ts, _)| *ts > cutoff)
-        .collect();
+    let recent: Vec<_> = digests.iter().filter(|(ts, _)| *ts > cutoff).collect();
 
     if recent.is_empty() {
         return None;
@@ -118,14 +105,8 @@ pub fn detect_learning_momentum(
 ) -> Option<DetectedPattern> {
     let cutoff = Utc::now() - Duration::days(7);
 
-    let created_count = creations
-        .iter()
-        .filter(|(ts, _)| *ts > cutoff)
-        .count();
-    let reviewed_count = reviews
-        .iter()
-        .filter(|(ts, _)| *ts > cutoff)
-        .count();
+    let created_count = creations.iter().filter(|(ts, _)| *ts > cutoff).count();
+    let reviewed_count = reviews.iter().filter(|(ts, _)| *ts > cutoff).count();
 
     // Create-heavy: creating much more than reviewing.
     if created_count >= 5 && reviewed_count == 0 {
@@ -179,14 +160,9 @@ pub fn detect_learning_momentum(
 }
 
 /// Detect domain-level retention gaps via repeated digest signals.
-pub fn detect_domain_gap(
-    digests: &VecDeque<(DateTime<Utc>, String)>,
-) -> Option<DetectedPattern> {
+pub fn detect_domain_gap(digests: &VecDeque<(DateTime<Utc>, String)>) -> Option<DetectedPattern> {
     let cutoff = Utc::now() - Duration::days(7);
-    let recent_count = digests
-        .iter()
-        .filter(|(ts, _)| *ts > cutoff)
-        .count();
+    let recent_count = digests.iter().filter(|(ts, _)| *ts > cutoff).count();
 
     if recent_count >= 2 {
         Some(DetectedPattern {
@@ -208,10 +184,7 @@ pub fn detect_knowledge_transfer(
     transfers: &VecDeque<(DateTime<Utc>, String)>,
 ) -> Option<DetectedPattern> {
     let cutoff = Utc::now() - Duration::hours(24);
-    let recent: Vec<_> = transfers
-        .iter()
-        .filter(|(ts, _)| *ts > cutoff)
-        .collect();
+    let recent: Vec<_> = transfers.iter().filter(|(ts, _)| *ts > cutoff).collect();
 
     if recent.is_empty() {
         return None;
@@ -233,9 +206,7 @@ pub fn detect_knowledge_transfer(
 mod tests {
     use super::*;
 
-    fn make_history(
-        days_ago: &[i64],
-    ) -> VecDeque<(DateTime<Utc>, String)> {
+    fn make_history(days_ago: &[i64]) -> VecDeque<(DateTime<Utc>, String)> {
         let now = Utc::now();
         days_ago
             .iter()
@@ -246,12 +217,7 @@ mod tests {
     fn make_recent_history(count: usize) -> VecDeque<(DateTime<Utc>, String)> {
         let now = Utc::now();
         (0..count)
-            .map(|i| {
-                (
-                    now - Duration::hours(i as i64),
-                    "test".into(),
-                )
-            })
+            .map(|i| (now - Duration::hours(i as i64), "test".into()))
             .collect()
     }
 

@@ -27,12 +27,10 @@ impl DeckPreferenceRepo {
 
     /// Get preference for a specific deck. Returns `None` if not set.
     pub async fn get(&self, deck: &str) -> Result<Option<DeckPreferenceRow>, sqlx::Error> {
-        sqlx::query_as::<_, DeckPreferenceRow>(
-            "SELECT * FROM deck_preferences WHERE deck = ?1",
-        )
-        .bind(deck)
-        .fetch_optional(&self.pool)
-        .await
+        sqlx::query_as::<_, DeckPreferenceRow>("SELECT * FROM deck_preferences WHERE deck = ?1")
+            .bind(deck)
+            .fetch_optional(&self.pool)
+            .await
     }
 
     /// Set (upsert) the answer mode for a deck.
@@ -56,11 +54,9 @@ impl DeckPreferenceRepo {
 
     /// Get all deck preferences.
     pub async fn get_all(&self) -> Result<Vec<DeckPreferenceRow>, sqlx::Error> {
-        sqlx::query_as::<_, DeckPreferenceRow>(
-            "SELECT * FROM deck_preferences ORDER BY deck ASC",
-        )
-        .fetch_all(&self.pool)
-        .await
+        sqlx::query_as::<_, DeckPreferenceRow>("SELECT * FROM deck_preferences ORDER BY deck ASC")
+            .fetch_all(&self.pool)
+            .await
     }
 }
 

@@ -1283,8 +1283,7 @@ async fn run_insight_pipeline(args: InsightPipelineArgs) {
                 let gap_content = gap_content.clone();
                 let bus = domain_event_bus.clone();
                 tokio::spawn(async move {
-                    create_atoms_from_gaps(&pool, &note_id, &gap_content, &insight_id, &bus)
-                        .await;
+                    create_atoms_from_gaps(&pool, &note_id, &gap_content, &insight_id, &bus).await;
                 });
             }
         }
@@ -1326,7 +1325,10 @@ async fn create_atoms_from_gaps(
         let Some(topic) = gap.get("topic").and_then(|v| v.as_str()) else {
             continue;
         };
-        let description = gap.get("description").and_then(|v| v.as_str()).unwrap_or("");
+        let description = gap
+            .get("description")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
 
         // Check if atom already exists for this subject on this note
         if existing_subjects.contains(&topic.to_lowercase()) {
@@ -1351,7 +1353,10 @@ async fn create_atoms_from_gaps(
 
         match atom_repo.create(&new_atom).await {
             Ok(atom) => {
-                if let Ok(t) = atom_repo.get_or_create_topic(&atom.domain, &atom.domain).await {
+                if let Ok(t) = atom_repo
+                    .get_or_create_topic(&atom.domain, &atom.domain)
+                    .await
+                {
                     let _ = sqlx::query("UPDATE knowledge_atoms SET topic_id = ?1 WHERE id = ?2")
                         .bind(&t.id)
                         .bind(&atom.id)

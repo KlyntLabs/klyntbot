@@ -126,7 +126,10 @@ impl ContextEngine {
 
     /// Wire a query rewriter for contextual query enrichment.
     /// Returns `self` for chaining.
-    pub fn with_query_rewriter(mut self, rewriter: Arc<dyn crate::rewriter::QueryRewriter>) -> Self {
+    pub fn with_query_rewriter(
+        mut self,
+        rewriter: Arc<dyn crate::rewriter::QueryRewriter>,
+    ) -> Self {
         self.query_rewriter = Some(rewriter);
         self
     }

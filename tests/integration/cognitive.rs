@@ -701,9 +701,7 @@ fn test_signal_accumulator_cooldown_prevents_refire() {
 
     // Second eval — cooldown blocks re-fire
     let fired2 = acc.evaluate(&situation);
-    let has_budget = fired2
-        .iter()
-        .any(|t| t.condition_name == "budget_warning");
+    let has_budget = fired2.iter().any(|t| t.condition_name == "budget_warning");
     assert!(!has_budget, "Cooldown should prevent re-fire");
 }
 

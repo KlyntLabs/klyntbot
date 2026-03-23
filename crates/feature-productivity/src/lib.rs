@@ -59,7 +59,8 @@ impl ProductivityFeature {
         vec![FeatureMigration {
             feature_name: "productivity".to_string(),
             version: 2,
-            description: "Create productivity tracking tables (removed legacy focus_sessions)".to_string(),
+            description: "Create productivity tracking tables (removed legacy focus_sessions)"
+                .to_string(),
             sql: Self::migration_sql().to_string(),
         }]
     }

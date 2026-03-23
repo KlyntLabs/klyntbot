@@ -308,7 +308,8 @@ impl AnthropicNativeProvider {
                             cache_write_tokens: usage_val
                                 .get("cache_creation_input_tokens")
                                 .and_then(|v| v.as_u64())
-                                .unwrap_or(0) as u32,
+                                .unwrap_or(0)
+                                as u32,
                         }),
                     }))
                 } else {
@@ -326,13 +327,15 @@ impl AnthropicNativeProvider {
                     None => None,
                 };
                 let usage = value.get("usage").and_then(|u| {
-                    u.get("output_tokens").and_then(|v| v.as_u64()).map(|output| Usage {
-                        prompt_tokens: 0,
-                        completion_tokens: output as u32,
-                        total_tokens: output as u32,
-                        cache_read_tokens: 0,
-                        cache_write_tokens: 0,
-                    })
+                    u.get("output_tokens")
+                        .and_then(|v| v.as_u64())
+                        .map(|output| Usage {
+                            prompt_tokens: 0,
+                            completion_tokens: output as u32,
+                            total_tokens: output as u32,
+                            cache_read_tokens: 0,
+                            cache_write_tokens: 0,
+                        })
                 });
                 Ok(Some(LlmStreamChunk {
                     content: None,

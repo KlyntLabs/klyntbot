@@ -147,7 +147,7 @@ mod tests {
         let dir = tempfile::tempdir().ok()?;
         let pool = storage::StoragePool::connect(dir.path()).await.ok()?;
         let _ = dir.keep(); // prevent cleanup; acceptable in test context
-        // Run the tasks feature migration so the `tasks` table exists.
+                            // Run the tasks feature migration so the `tasks` table exists.
         storage::StoragePool::run_feature_migrations(
             pool.inner(),
             &feature_tasks::TasksFeature::new().migrations(),

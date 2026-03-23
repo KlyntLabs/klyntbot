@@ -76,10 +76,7 @@ impl KnowledgeAtomRepo {
         &self.pool
     }
 
-    pub async fn create(
-        &self,
-        atom: &NewKnowledgeAtom,
-    ) -> Result<KnowledgeAtomRow, sqlx::Error> {
+    pub async fn create(&self, atom: &NewKnowledgeAtom) -> Result<KnowledgeAtomRow, sqlx::Error> {
         let id = Uuid::new_v4().to_string();
         let now = Utc::now().to_rfc3339();
 
@@ -151,7 +148,8 @@ impl KnowledgeAtomRepo {
         if subjects.is_empty() {
             return Ok(std::collections::HashSet::new());
         }
-        let placeholders: Vec<String> = (0..subjects.len()).map(|i| format!("?{}", i + 2)).collect();
+        let placeholders: Vec<String> =
+            (0..subjects.len()).map(|i| format!("?{}", i + 2)).collect();
         let query = format!(
             "SELECT DISTINCT subject FROM knowledge_atoms WHERE subject IN ({}) AND domain = ?1 AND status != 'archived'",
             placeholders.join(", ")
@@ -172,10 +170,7 @@ impl KnowledgeAtomRepo {
     }
 
     /// Returns active + suggested atoms for a note, ordered by salience descending.
-    pub async fn list_for_note(
-        &self,
-        note_id: &str,
-    ) -> Result<Vec<KnowledgeAtomRow>, sqlx::Error> {
+    pub async fn list_for_note(&self, note_id: &str) -> Result<Vec<KnowledgeAtomRow>, sqlx::Error> {
         sqlx::query_as::<_, KnowledgeAtomRow>(
             r#"
             SELECT * FROM knowledge_atoms
@@ -244,12 +239,11 @@ impl KnowledgeAtomRepo {
     /// Atoms archived more than 7 days ago cannot be restored.
     pub async fn restore(&self, id: &str) -> Result<KnowledgeAtomRow, sqlx::Error> {
         // Enforce 7-day restore window
-        let atom = sqlx::query_as::<_, KnowledgeAtomRow>(
-            "SELECT * FROM knowledge_atoms WHERE id = ?1",
-        )
-        .bind(id)
-        .fetch_one(&self.pool)
-        .await?;
+        let atom =
+            sqlx::query_as::<_, KnowledgeAtomRow>("SELECT * FROM knowledge_atoms WHERE id = ?1")
+                .bind(id)
+                .fetch_one(&self.pool)
+                .await?;
 
         if let Some(archived_at) = &atom.archived_at {
             if let Ok(ts) = chrono::DateTime::parse_from_rfc3339(archived_at) {
@@ -387,10 +381,9 @@ impl KnowledgeAtomRepo {
 
     /// Recompute aggregates for all topics.
     pub async fn update_all_topic_aggregates(&self) -> Result<(), sqlx::Error> {
-        let topic_ids: Vec<(String,)> =
-            sqlx::query_as("SELECT id FROM knowledge_topics")
-                .fetch_all(&self.pool)
-                .await?;
+        let topic_ids: Vec<(String,)> = sqlx::query_as("SELECT id FROM knowledge_topics")
+            .fetch_all(&self.pool)
+            .await?;
         for (id,) in &topic_ids {
             self.update_topic_aggregates(id).await?;
         }
@@ -436,7 +429,10 @@ impl KnowledgeAtomRepo {
     }
 
     /// Get a single topic by id.
-    pub async fn get_topic(&self, topic_id: &str) -> Result<Option<KnowledgeTopicRow>, sqlx::Error> {
+    pub async fn get_topic(
+        &self,
+        topic_id: &str,
+    ) -> Result<Option<KnowledgeTopicRow>, sqlx::Error> {
         sqlx::query_as::<_, KnowledgeTopicRow>("SELECT * FROM knowledge_topics WHERE id = ?1")
             .bind(topic_id)
             .fetch_optional(&self.pool)
@@ -498,12 +494,11 @@ impl KnowledgeAtomRepo {
         referencing_note_id: &str,
     ) -> Result<f64, sqlx::Error> {
         let now = Utc::now().to_rfc3339();
-        let atom = sqlx::query_as::<_, KnowledgeAtomRow>(
-            "SELECT * FROM knowledge_atoms WHERE id = ?1",
-        )
-        .bind(id)
-        .fetch_one(&self.pool)
-        .await?;
+        let atom =
+            sqlx::query_as::<_, KnowledgeAtomRow>("SELECT * FROM knowledge_atoms WHERE id = ?1")
+                .bind(id)
+                .fetch_one(&self.pool)
+                .await?;
 
         let new_salience = (atom.salience + boost).min(1.0);
 
@@ -552,12 +547,11 @@ impl KnowledgeAtomRepo {
 
     /// Count atoms created since the given RFC3339 timestamp.
     pub async fn count_created_since(&self, since: &str) -> Result<i64, sqlx::Error> {
-        let row: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM knowledge_atoms WHERE created_at > ?1",
-        )
-        .bind(since)
-        .fetch_one(&self.pool)
-        .await?;
+        let row: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM knowledge_atoms WHERE created_at > ?1")
+                .bind(since)
+                .fetch_one(&self.pool)
+                .await?;
         Ok(row.0)
     }
 
@@ -581,10 +575,11 @@ impl KnowledgeAtomRepo {
 
     /// Check migration status: (migrated, atom_count).
     pub async fn migration_status(&self) -> Result<(bool, usize), sqlx::Error> {
-        let sentinel: Option<(String,)> =
-            sqlx::query_as("SELECT id FROM knowledge_atoms WHERE subject = '__atoms_migration_v1__'")
-                .fetch_optional(&self.pool)
-                .await?;
+        let sentinel: Option<(String,)> = sqlx::query_as(
+            "SELECT id FROM knowledge_atoms WHERE subject = '__atoms_migration_v1__'",
+        )
+        .fetch_optional(&self.pool)
+        .await?;
 
         let count: (i64,) = sqlx::query_as(
             "SELECT COUNT(*) FROM knowledge_atoms WHERE subject != '__atoms_migration_v1__'",
@@ -862,10 +857,7 @@ mod tests {
             .await
             .unwrap();
 
-        let new_salience = repo
-            .boost_salience(&atom.id, 0.3, "note-2")
-            .await
-            .unwrap();
+        let new_salience = repo.boost_salience(&atom.id, 0.3, "note-2").await.unwrap();
         assert!((new_salience - 0.8).abs() < 0.01);
 
         let updated = repo.get(&atom.id).await.unwrap().unwrap();

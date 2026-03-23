@@ -123,12 +123,14 @@ impl ReviewStatsRepo {
 
         Ok(rows
             .into_iter()
-            .map(|(domain, atom_count, avg_retention, reviews_last_7d)| DomainRetentionStat {
-                domain,
-                atom_count,
-                avg_retention,
-                reviews_last_7d,
-            })
+            .map(
+                |(domain, atom_count, avg_retention, reviews_last_7d)| DomainRetentionStat {
+                    domain,
+                    atom_count,
+                    avg_retention,
+                    reviews_last_7d,
+                },
+            )
             .collect())
     }
 

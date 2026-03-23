@@ -11,9 +11,9 @@ use desktop_shared::commands::{
     InsightReviewStarted, InsightSaveFlashcardsParams, InsightVersionResponse,
     KnowledgeGrowthResponse, NoteCreateParams, NoteLinkResponse, NoteResponse,
     NoteSuggestionsResponse, NoteUpdateParams, NoteVersionResponse, NotebookCreateParams,
-    NotebookResponse, NotebookUpdateParams, PersonaChatParams, PersonaChatResponse, PersonaResponse,
-    RatePersonaParams, ScenarioChallengeResponse, SetPersonaPinsParams, TabContent,
-    UpdatePersonaParams,
+    NotebookResponse, NotebookUpdateParams, PersonaChatParams, PersonaChatResponse,
+    PersonaResponse, RatePersonaParams, ScenarioChallengeResponse, SetPersonaPinsParams,
+    TabContent, UpdatePersonaParams,
 };
 use desktop_shared::errors::ApiError;
 use tauri::State;
@@ -1002,7 +1002,7 @@ pub(crate) async fn dispatch_dev(
             core.flashcard_save_session(try_field!(dev::parse_params::<
                 desktop_shared::commands::ReviewSessionSaveParams,
             >(body)))
-            .await,
+                .await,
         ),
         _ => return None,
     })

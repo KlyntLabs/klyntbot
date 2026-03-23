@@ -24,9 +24,7 @@ impl ToolRegistryBridge {
     pub fn new(registry: Arc<RwLock<ToolRegistry>>, whitelist: Vec<String>) -> Self {
         Self {
             registry,
-            whitelist: Arc::new(std::sync::RwLock::new(
-                whitelist.into_iter().collect(),
-            )),
+            whitelist: Arc::new(std::sync::RwLock::new(whitelist.into_iter().collect())),
         }
     }
 
@@ -38,7 +36,10 @@ impl ToolRegistryBridge {
 
     /// Check whether a tool name is in the whitelist.
     pub fn is_whitelisted(&self, name: &str) -> bool {
-        self.whitelist.read().expect("whitelist lock").contains(name)
+        self.whitelist
+            .read()
+            .expect("whitelist lock")
+            .contains(name)
     }
 
     /// Alias for [`is_whitelisted`] — backwards compatibility.

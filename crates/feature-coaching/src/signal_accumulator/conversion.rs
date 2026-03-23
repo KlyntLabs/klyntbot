@@ -143,9 +143,7 @@ pub(super) fn event_to_signal(event: &DomainEvent, timestamp: DateTime<Utc>) -> 
                 ..Default::default()
             },
         ),
-        DomainEvent::CoachingLearningDigest {
-            fading_count, ..
-        } => (
+        DomainEvent::CoachingLearningDigest { fading_count, .. } => (
             "CoachingLearningDigest",
             SignalMetadata {
                 amount: Some(*fading_count as f64),

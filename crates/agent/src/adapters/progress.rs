@@ -13,11 +13,7 @@ pub struct ProgressHandlerImpl {
 }
 
 impl ProgressHandlerImpl {
-    pub fn new(
-        kr_repo: KeyResultRepo,
-        objective_repo: ObjectiveRepo,
-        task_repo: TaskRepo,
-    ) -> Self {
+    pub fn new(kr_repo: KeyResultRepo, objective_repo: ObjectiveRepo, task_repo: TaskRepo) -> Self {
         Self {
             kr_repo,
             objective_repo,

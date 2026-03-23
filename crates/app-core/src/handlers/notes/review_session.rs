@@ -4,7 +4,10 @@ use desktop_shared::errors::ApiError;
 use crate::state::AppCore;
 
 impl AppCore {
-    pub async fn flashcard_save_session(&self, params: ReviewSessionSaveParams) -> Result<(), ApiError> {
+    pub async fn flashcard_save_session(
+        &self,
+        params: ReviewSessionSaveParams,
+    ) -> Result<(), ApiError> {
         let repo = self.review_session_repo()?;
 
         // Create session first (in case it doesn't exist yet)

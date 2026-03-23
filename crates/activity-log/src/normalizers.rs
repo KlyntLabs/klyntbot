@@ -323,9 +323,7 @@ pub fn normalize_domain_event(event: &bus::DomainEvent) -> ActivityLogEntry {
                 Some("note"),
                 Some(note_id.as_str()),
                 None,
-                Some(format!(
-                    "Translation to {target_lang}: {word_count} words"
-                )),
+                Some(format!("Translation to {target_lang}: {word_count} words")),
                 serde_json::to_value(event).ok(),
             ),
             bus::DomainEvent::NoteStudied {

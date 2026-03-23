@@ -22,11 +22,7 @@ impl ContextTaskRepo {
         Ok(())
     }
 
-    pub async fn unlink(
-        pool: &StoragePool,
-        context_id: &str,
-        task_id: &str,
-    ) -> common::Result<()> {
+    pub async fn unlink(pool: &StoragePool, context_id: &str, task_id: &str) -> common::Result<()> {
         sqlx::query("DELETE FROM work_context_actions WHERE context_id = ?1 AND action_id = ?2")
             .bind(context_id)
             .bind(task_id)

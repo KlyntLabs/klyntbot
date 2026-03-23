@@ -47,9 +47,7 @@ impl ReviewSessionRepo {
         .execute(&self.pool)
         .await?;
 
-        self.get_by_id(id)
-            .await?
-            .ok_or(sqlx::Error::RowNotFound)
+        self.get_by_id(id).await?.ok_or(sqlx::Error::RowNotFound)
     }
 
     /// Mark a session as completed with summary data.
@@ -92,9 +90,7 @@ impl ReviewSessionRepo {
         .execute(&self.pool)
         .await?;
 
-        self.get_by_id(id)
-            .await?
-            .ok_or(sqlx::Error::RowNotFound)
+        self.get_by_id(id).await?.ok_or(sqlx::Error::RowNotFound)
     }
 
     /// Mark a session as abandoned with the card count reviewed so far.
@@ -115,9 +111,7 @@ impl ReviewSessionRepo {
         .execute(&self.pool)
         .await?;
 
-        self.get_by_id(id)
-            .await?
-            .ok_or(sqlx::Error::RowNotFound)
+        self.get_by_id(id).await?.ok_or(sqlx::Error::RowNotFound)
     }
 
     /// Get the currently active session (if any).
@@ -131,12 +125,10 @@ impl ReviewSessionRepo {
 
     /// Get a session by ID.
     pub async fn get_by_id(&self, id: &str) -> Result<Option<ReviewSessionRow>, sqlx::Error> {
-        sqlx::query_as::<_, ReviewSessionRow>(
-            "SELECT * FROM review_sessions WHERE id = ?1",
-        )
-        .bind(id)
-        .fetch_optional(&self.pool)
-        .await
+        sqlx::query_as::<_, ReviewSessionRow>("SELECT * FROM review_sessions WHERE id = ?1")
+            .bind(id)
+            .fetch_optional(&self.pool)
+            .await
     }
 }
 

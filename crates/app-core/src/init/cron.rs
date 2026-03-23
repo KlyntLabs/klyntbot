@@ -491,9 +491,7 @@ fn register_cron_callbacks(
                         let streak = streak_res.unwrap_or(0);
 
                         if fading_count > 0 {
-                            info!(
-                                "Morning briefing: {fading_count} fading atoms, streak={streak}"
-                            );
+                            info!("Morning briefing: {fading_count} fading atoms, streak={streak}");
                         }
 
                         Ok(Some(format!(

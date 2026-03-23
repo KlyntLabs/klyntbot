@@ -132,7 +132,11 @@ async fn process_note(
 ) -> common::Result<()> {
     // 1. Content hash check
     let content_hash = hex_sha256(content);
-    if cache.is_cached(note_id, &content_hash).await.map_err(|e| common::KlyntbotError::Storage(e.to_string()))? {
+    if cache
+        .is_cached(note_id, &content_hash)
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?
+    {
         debug!(note_id, "content unchanged, skipping extraction");
         return Ok(());
     }
@@ -141,11 +145,18 @@ async fn process_note(
     let sections = split_into_sections(content);
     if sections.is_empty() {
         debug!(note_id, "no extractable sections found");
-        cache.set(note_id, &content_hash).await.map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        cache
+            .set(note_id, &content_hash)
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         return Ok(());
     }
 
-    info!(note_id, section_count = sections.len(), "extracting atoms from note");
+    info!(
+        note_id,
+        section_count = sections.len(),
+        "extracting atoms from note"
+    );
 
     let mut total_created = 0usize;
     let mut total_reinforced = 0usize;
@@ -180,8 +191,12 @@ async fn process_note(
 
         let mut existing_subjects = std::collections::HashSet::new();
         for (domain, atoms_in_domain) in &by_domain {
-            let domain_subjects: Vec<String> = atoms_in_domain.iter().map(|a| a.subject.clone()).collect();
-            match atom_repo.find_existing_subjects(domain, &domain_subjects).await {
+            let domain_subjects: Vec<String> =
+                atoms_in_domain.iter().map(|a| a.subject.clone()).collect();
+            match atom_repo
+                .find_existing_subjects(domain, &domain_subjects)
+                .await
+            {
                 Ok(found) => existing_subjects.extend(found),
                 Err(e) => warn!(note_id, error = %e, "failed to check existing subjects"),
             }
@@ -191,7 +206,10 @@ async fn process_note(
         for atom in &extracted {
             if existing_subjects.contains(&atom.subject) {
                 // Already exists in same domain — skip (same-note dedup)
-                debug!(subject = atom.subject, "atom already exists in domain, skipping");
+                debug!(
+                    subject = atom.subject,
+                    "atom already exists in domain, skipping"
+                );
                 continue;
             }
 
@@ -271,7 +289,10 @@ async fn process_note(
     }
 
     // 8. Update cache after successful processing
-    cache.set(note_id, &content_hash).await.map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+    cache
+        .set(note_id, &content_hash)
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
 
     info!(
         note_id,
@@ -413,7 +434,7 @@ mod tests {
     fn test_hex_sha256() {
         let hash = hex_sha256("hello world");
         assert_eq!(hash.len(), 64); // SHA-256 = 32 bytes = 64 hex chars
-        // Stable hash
+                                    // Stable hash
         assert_eq!(hex_sha256("hello world"), hex_sha256("hello world"));
         assert_ne!(hex_sha256("hello world"), hex_sha256("hello world!"));
     }

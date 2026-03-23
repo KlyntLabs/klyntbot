@@ -25,10 +25,9 @@ pub mod squad;
 pub use accumulated_observation::AccumulatedObservationRepo;
 pub use annotation::AnnotationRepo;
 pub use atom_extraction_cache::AtomExtractionCache;
-pub use deck_preference::{DeckPreferenceRepo, DeckPreferenceRow};
-pub use review_session::{ReviewSessionRepo, ReviewSessionRow};
 pub use blackboard::{BlackboardEntry, BlackboardRepo, NewBlackboardEntry};
 pub use book_tree::SqliteBookTreeRepo;
+pub use deck_preference::{DeckPreferenceRepo, DeckPreferenceRow};
 pub use entity::{
     EntityRepo, EntityRow, GraphNeighborhood, NewEntity, NewRelationship, RelationshipRow,
 };
@@ -39,14 +38,17 @@ pub use flashcard::{
     CardType, DeckSummary, FlashcardRepo, FlashcardRow, NewFlashcard, ReviewLogEntry, ReviewQuality,
 };
 pub use gt_link::SqliteGTLinkRepo;
-pub use knowledge_atom::{KnowledgeAtomRepo, KnowledgeAtomRow, KnowledgeTopicRow, NewKnowledgeAtom};
 #[allow(deprecated)]
 pub use insight_cache::{InsightCacheRepo, InsightCacheRow};
+pub use knowledge_atom::{
+    KnowledgeAtomRepo, KnowledgeAtomRow, KnowledgeTopicRow, NewKnowledgeAtom,
+};
 pub use markdown_parser::parse_markdown_to_tree;
 pub use persona::{NewPersona, PersonaRepo, PersonaRow, PersonaUpdate};
 pub use persona_accuracy::{PersonaAccuracy, PersonaAccuracyRepo};
 pub use procedural_rule::ProceduralRuleRepo;
 pub use retention_history::{DailyRetentionPoint, DomainRetentionHistory, RetentionHistoryRepo};
+pub use review_session::{ReviewSessionRepo, ReviewSessionRow};
 pub use review_stats::{DailyReviewStat, DomainRetentionStat, ReviewStatsRepo};
 pub use semantic_fact::SemanticFactRepo;
 pub use squad::{NewSquad, ResolvedSquad, SquadMemberRow, SquadRepo, SquadRow};

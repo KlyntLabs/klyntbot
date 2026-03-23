@@ -217,9 +217,13 @@ impl SignalAccumulator {
             }
             "retention_drop_important" => {
                 // Fires when digest signals indicate fading important atoms
-                let fading_signals: Vec<_> = self.window.iter()
-                    .filter(|s| s.event_type == "CoachingLearningDigest"
-                        && s.metadata.amount.is_some_and(|a| a > 0.0))
+                let fading_signals: Vec<_> = self
+                    .window
+                    .iter()
+                    .filter(|s| {
+                        s.event_type == "CoachingLearningDigest"
+                            && s.metadata.amount.is_some_and(|a| a > 0.0)
+                    })
                     .collect();
                 if !fading_signals.is_empty() {
                     Some(TriggerFired {

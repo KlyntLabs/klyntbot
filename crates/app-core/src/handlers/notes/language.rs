@@ -248,13 +248,11 @@ impl AppCore {
                 // Link flashcards to atoms by matching word/front
                 for card in &created {
                     if let Some(atom) = created_atoms.iter().find(|a| a.subject == card.front) {
-                        let _ = sqlx::query(
-                            "UPDATE flashcards SET atom_id = ?1 WHERE id = ?2",
-                        )
-                        .bind(&atom.id)
-                        .bind(&card.id)
-                        .execute(flashcard_repo.pool())
-                        .await;
+                        let _ = sqlx::query("UPDATE flashcards SET atom_id = ?1 WHERE id = ?2")
+                            .bind(&atom.id)
+                            .bind(&card.id)
+                            .execute(flashcard_repo.pool())
+                            .await;
                     }
                 }
 

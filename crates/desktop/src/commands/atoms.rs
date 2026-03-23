@@ -85,12 +85,21 @@ pub(crate) async fn dispatch_dev(
 ) -> Option<Result<serde_json::Value, ApiError>> {
     use super::dev_helpers::{self as dev, try_field};
     Some(match cmd {
-        "atoms_for_note" => dev::val(core.atoms_for_note(try_field!(dev::parse_params(body))).await),
+        "atoms_for_note" => dev::val(
+            core.atoms_for_note(try_field!(dev::parse_params(body)))
+                .await,
+        ),
         "atom_accept" => dev::val(core.atom_accept(try_field!(dev::parse_params(body))).await),
         "atom_dismiss" => dev::val(core.atom_dismiss(try_field!(dev::parse_params(body))).await),
         "atom_restore" => dev::val(core.atom_restore(try_field!(dev::parse_params(body))).await),
-        "atom_next_card" => dev::val(core.atom_next_card(try_field!(dev::parse_params(body))).await),
-        "atoms_bulk_accept" => dev::val(core.atoms_bulk_accept(try_field!(dev::parse_params(body))).await),
+        "atom_next_card" => dev::val(
+            core.atom_next_card(try_field!(dev::parse_params(body)))
+                .await,
+        ),
+        "atoms_bulk_accept" => dev::val(
+            core.atoms_bulk_accept(try_field!(dev::parse_params(body)))
+                .await,
+        ),
         "atoms_migration_status" => dev::val(core.atoms_migration_status().await),
         _ => return None,
     })

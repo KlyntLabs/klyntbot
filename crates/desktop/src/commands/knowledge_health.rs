@@ -23,8 +23,7 @@ pub async fn knowledge_topic_detail(
 // ── Dev server dispatch ─────────────────────────────────────────────
 
 #[cfg(test)]
-pub(crate) const DEV_COMMANDS: &[&str] =
-    &["knowledge_health_summary", "knowledge_topic_detail"];
+pub(crate) const DEV_COMMANDS: &[&str] = &["knowledge_health_summary", "knowledge_topic_detail"];
 
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(
@@ -35,9 +34,10 @@ pub(crate) async fn dispatch_dev(
     use super::dev_helpers::{self as dev, try_field};
     Some(match cmd {
         "knowledge_health_summary" => dev::val(core.knowledge_health_summary().await),
-        "knowledge_topic_detail" => {
-            dev::val(core.knowledge_topic_detail(try_field!(dev::parse_params(body))).await)
-        }
+        "knowledge_topic_detail" => dev::val(
+            core.knowledge_topic_detail(try_field!(dev::parse_params(body)))
+                .await,
+        ),
         _ => return None,
     })
 }

@@ -51,11 +51,7 @@ impl CoachingInterventionLogRepo {
         Ok(())
     }
 
-    pub async fn update_feedback(
-        &self,
-        id: &str,
-        feedback: &str,
-    ) -> Result<bool, StorageError> {
+    pub async fn update_feedback(&self, id: &str, feedback: &str) -> Result<bool, StorageError> {
         let result = sqlx::query(
             "UPDATE coaching_intervention_log
              SET feedback = ?2, feedback_at = datetime('now')
@@ -109,9 +105,16 @@ mod tests {
     #[tokio::test]
     async fn test_insert_and_list() {
         let repo = setup().await;
-        repo.insert("int-1", "ChatMessage", "Take a break", "distraction_streak", "2026-03-21T10:00:00Z", None)
-            .await
-            .unwrap();
+        repo.insert(
+            "int-1",
+            "ChatMessage",
+            "Take a break",
+            "distraction_streak",
+            "2026-03-21T10:00:00Z",
+            None,
+        )
+        .await
+        .unwrap();
 
         let rows = repo.list_recent(10).await.unwrap();
         assert_eq!(rows.len(), 1);
@@ -123,9 +126,16 @@ mod tests {
     #[tokio::test]
     async fn test_update_feedback() {
         let repo = setup().await;
-        repo.insert("int-2", "DashboardCard", "Focus now", "overdue_pressure", "2026-03-21T11:00:00Z", None)
-            .await
-            .unwrap();
+        repo.insert(
+            "int-2",
+            "DashboardCard",
+            "Focus now",
+            "overdue_pressure",
+            "2026-03-21T11:00:00Z",
+            None,
+        )
+        .await
+        .unwrap();
 
         let updated = repo.update_feedback("int-2", "helpful").await.unwrap();
         assert!(updated);
@@ -145,12 +155,26 @@ mod tests {
     #[tokio::test]
     async fn test_insert_duplicate_is_ignored() {
         let repo = setup().await;
-        repo.insert("dup-1", "ChatMessage", "msg1", "trigger1", "2026-03-21T12:00:00Z", None)
-            .await
-            .unwrap();
-        repo.insert("dup-1", "ChatMessage", "msg2", "trigger2", "2026-03-21T13:00:00Z", None)
-            .await
-            .unwrap();
+        repo.insert(
+            "dup-1",
+            "ChatMessage",
+            "msg1",
+            "trigger1",
+            "2026-03-21T12:00:00Z",
+            None,
+        )
+        .await
+        .unwrap();
+        repo.insert(
+            "dup-1",
+            "ChatMessage",
+            "msg2",
+            "trigger2",
+            "2026-03-21T13:00:00Z",
+            None,
+        )
+        .await
+        .unwrap();
 
         let rows = repo.list_recent(10).await.unwrap();
         assert_eq!(rows.len(), 1);

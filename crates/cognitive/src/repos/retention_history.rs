@@ -37,7 +37,10 @@ impl RetentionHistoryRepo {
     /// Get daily retention data for the last N days (all domains combined).
     ///
     /// Retention is approximated as the fraction of reviews with rating >= 3 (pass).
-    pub async fn daily_retention(&self, days: i64) -> Result<Vec<DailyRetentionPoint>, sqlx::Error> {
+    pub async fn daily_retention(
+        &self,
+        days: i64,
+    ) -> Result<Vec<DailyRetentionPoint>, sqlx::Error> {
         let cutoff = (chrono::Utc::now() - chrono::Duration::days(days)).to_rfc3339();
         sqlx::query_as::<_, (String, f64, i64)>(
             r#"

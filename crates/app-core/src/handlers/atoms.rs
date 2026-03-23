@@ -45,10 +45,7 @@ fn atom_row_to_response_enriched(
 
 impl AppCore {
     /// Enrich a single atom row with its topic name and linked flashcard count.
-    async fn enrich_atom(
-        &self,
-        atom: cognitive::KnowledgeAtomRow,
-    ) -> KnowledgeAtomResponse {
+    async fn enrich_atom(&self, atom: cognitive::KnowledgeAtomRow) -> KnowledgeAtomResponse {
         let topic_name = if let Some(tid) = &atom.topic_id {
             if let Ok(repo) = self.knowledge_atom_repo() {
                 repo.get_topic_names(std::slice::from_ref(tid))

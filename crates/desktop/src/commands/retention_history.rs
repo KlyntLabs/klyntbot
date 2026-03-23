@@ -26,9 +26,10 @@ pub(crate) async fn dispatch_dev(
 ) -> Option<Result<serde_json::Value, ApiError>> {
     use super::dev_helpers::{self as dev, try_field};
     Some(match cmd {
-        "retention_history" => {
-            dev::val(core.retention_history(try_field!(dev::parse_params(body))).await)
-        }
+        "retention_history" => dev::val(
+            core.retention_history(try_field!(dev::parse_params(body)))
+                .await,
+        ),
         _ => return None,
     })
 }

@@ -65,15 +65,13 @@ impl PracticeSessionRepo {
     }
 
     /// Fetch a session by its primary key.
-    pub async fn get_by_id(
-        &self,
-        id: &str,
-    ) -> Result<Option<PracticeSessionRow>, StorageError> {
-        let result =
-            sqlx::query_as::<_, PracticeSessionRow>("SELECT * FROM practice_sessions WHERE id = ?1")
-                .bind(id)
-                .fetch_optional(&self.pool)
-                .await?;
+    pub async fn get_by_id(&self, id: &str) -> Result<Option<PracticeSessionRow>, StorageError> {
+        let result = sqlx::query_as::<_, PracticeSessionRow>(
+            "SELECT * FROM practice_sessions WHERE id = ?1",
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await?;
         Ok(result)
     }
 

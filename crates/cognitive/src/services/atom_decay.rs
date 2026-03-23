@@ -65,7 +65,10 @@ pub async fn run_decay_cycle(pool: &SqlitePool, bus: &DomainEventBus) -> common:
         }
 
         // Apply decay
-        if let Err(e) = repo.apply_decay(&atom.id, new_salience, new_retention).await {
+        if let Err(e) = repo
+            .apply_decay(&atom.id, new_salience, new_retention)
+            .await
+        {
             warn!("Failed to apply decay to atom {}: {e}", atom.id);
             continue;
         }

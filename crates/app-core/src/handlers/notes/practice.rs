@@ -215,17 +215,12 @@ impl AppCore {
         );
 
         // Add full document context
-        user_prompt.push_str(&format!(
-            "\n\n--- Full document context ---\n{}",
-            note.body
-        ));
+        user_prompt.push_str(&format!("\n\n--- Full document context ---\n{}", note.body));
 
         // Add previous unit result summary if available
         if let Some(prev) = results.last() {
             if let Some(grade) = prev.get("overall_grade").and_then(|g| g.as_str()) {
-                user_prompt.push_str(&format!(
-                    "\n\n--- Previous unit result ---\nGrade: {grade}"
-                ));
+                user_prompt.push_str(&format!("\n\n--- Previous unit result ---\nGrade: {grade}"));
             }
         }
 
@@ -315,89 +310,81 @@ impl AppCore {
         // Save updated session
         let _ = self
             .practice_repo
-            .update_progress(
-                &params.session_id,
-                next_index as i64,
-                &results_json,
-                None,
-            )
+            .update_progress(&params.session_id, next_index as i64, &results_json, None)
             .await
             .map_err(map_cognitive_err)?;
 
         // Create KnowledgeAtom + SemanticFact only for weak units (grade ≤ A-)
         let is_weak = !is_strong_grade(&params.overall_grade);
         if is_weak {
-        if let Some(atom_repo) = &self.knowledge_atom_repo {
-            let domain = format!(
-                "language:{}-{}",
-                session.source_lang, session.target_lang
-            );
-            let topic = atom_repo
-                .get_or_create_topic(
-                    &format!("{}-{}", session.source_lang, session.target_lang),
-                    &domain,
-                )
-                .await
-                .ok();
+            if let Some(atom_repo) = &self.knowledge_atom_repo {
+                let domain = format!("language:{}-{}", session.source_lang, session.target_lang);
+                let topic = atom_repo
+                    .get_or_create_topic(
+                        &format!("{}-{}", session.source_lang, session.target_lang),
+                        &domain,
+                    )
+                    .await
+                    .ok();
 
-            let atom = cognitive::NewKnowledgeAtom {
-                subject: source_text.clone(),
-                atom_type: "translation_unit".to_string(),
-                domain: domain.clone(),
-                source_note_id: Some(session.note_id.clone()),
-                source_context: Some(params.final_translation.clone()),
-                personal_importance: 0.6,
-                status: "active".to_string(),
-                topic_id: topic.as_ref().map(|t| t.id.clone()),
-                ..Default::default()
-            };
-
-            if let Ok(created_atom) = atom_repo.create_batch(vec![atom]).await {
-                // Create SemanticFact: source_text translates_to final_translation
-                let sf_repo = SemanticFactRepo::new(self.storage_pool.inner().clone());
-                let now = chrono::Utc::now().to_rfc3339();
-                let fact = SemanticFact {
-                    id: uuid::Uuid::new_v4().to_string(),
+                let atom = cognitive::NewKnowledgeAtom {
+                    subject: source_text.clone(),
+                    atom_type: "translation_unit".to_string(),
                     domain: domain.clone(),
-                    subject: source_text,
-                    predicate: "translates_to".to_string(),
-                    object: params.final_translation.clone(),
-                    confidence: 1.0,
-                    source: format!("practice:{}", session.id),
-                    valid_from: now.clone(),
-                    valid_until: None,
-                    recorded_at: now,
-                    superseded_at: None,
-                    superseded_by: None,
-                    stability: 1.0,
-                    last_accessed: None,
-                    access_count: 0,
-                    project_id: None,
-                    memory_type: "translation_unit".to_string(),
-                    scope_type: "system".to_string(),
-                    scope_id: None,
+                    source_note_id: Some(session.note_id.clone()),
+                    source_context: Some(params.final_translation.clone()),
+                    personal_importance: 0.6,
+                    status: "active".to_string(),
+                    topic_id: topic.as_ref().map(|t| t.id.clone()),
+                    ..Default::default()
                 };
-                let _ = sf_repo.upsert(&fact).await;
 
-                // Emit KnowledgeAtomCreated events
-                if let Some(bus) = &self.domain_event_bus {
-                    for atom in &created_atom {
-                        bus.publish(bus::DomainEvent::KnowledgeAtomCreated {
-                            atom_id: atom.id.clone(),
-                            atom_type: atom.atom_type.clone(),
-                            domain: atom.domain.clone(),
-                            source_note_id: atom.source_note_id.clone(),
-                            personal_importance: atom.personal_importance,
-                        });
+                if let Ok(created_atom) = atom_repo.create_batch(vec![atom]).await {
+                    // Create SemanticFact: source_text translates_to final_translation
+                    let sf_repo = SemanticFactRepo::new(self.storage_pool.inner().clone());
+                    let now = chrono::Utc::now().to_rfc3339();
+                    let fact = SemanticFact {
+                        id: uuid::Uuid::new_v4().to_string(),
+                        domain: domain.clone(),
+                        subject: source_text,
+                        predicate: "translates_to".to_string(),
+                        object: params.final_translation.clone(),
+                        confidence: 1.0,
+                        source: format!("practice:{}", session.id),
+                        valid_from: now.clone(),
+                        valid_until: None,
+                        recorded_at: now,
+                        superseded_at: None,
+                        superseded_by: None,
+                        stability: 1.0,
+                        last_accessed: None,
+                        access_count: 0,
+                        project_id: None,
+                        memory_type: "translation_unit".to_string(),
+                        scope_type: "system".to_string(),
+                        scope_id: None,
+                    };
+                    let _ = sf_repo.upsert(&fact).await;
+
+                    // Emit KnowledgeAtomCreated events
+                    if let Some(bus) = &self.domain_event_bus {
+                        for atom in &created_atom {
+                            bus.publish(bus::DomainEvent::KnowledgeAtomCreated {
+                                atom_id: atom.id.clone(),
+                                atom_type: atom.atom_type.clone(),
+                                domain: atom.domain.clone(),
+                                source_note_id: atom.source_note_id.clone(),
+                                personal_importance: atom.personal_importance,
+                            });
+                        }
+                    }
+
+                    // Update topic aggregates
+                    if let Some(topic) = &topic {
+                        let _ = atom_repo.update_topic_aggregates(&topic.id).await;
                     }
                 }
-
-                // Update topic aggregates
-                if let Some(topic) = &topic {
-                    let _ = atom_repo.update_topic_aggregates(&topic.id).await;
-                }
             }
-        }
         } // end if is_weak
 
         // Emit PracticeUnitCompleted event
@@ -534,75 +521,66 @@ impl AppCore {
         // If save_to_sr: create flashcards for weak units (independent of bus)
         let mut flashcards_created = 0u32;
         if params.save_to_sr {
-                if let Some(flashcard_repo) = &self.flashcard_repo {
-                    let segments_vec: Vec<desktop_shared::commands::PracticeSegment> =
-                        serde_json::from_str(&session.segments).unwrap_or_default();
+            if let Some(flashcard_repo) = &self.flashcard_repo {
+                let segments_vec: Vec<desktop_shared::commands::PracticeSegment> =
+                    serde_json::from_str(&session.segments).unwrap_or_default();
 
-                    let mut new_cards = Vec::new();
-                    for result in &results {
-                        let grade = result
-                            .get("overall_grade")
-                            .and_then(|g| g.as_str())
-                            .unwrap_or("C");
+                let mut new_cards = Vec::new();
+                for result in &results {
+                    let grade = result
+                        .get("overall_grade")
+                        .and_then(|g| g.as_str())
+                        .unwrap_or("C");
 
-                        if is_strong_grade(grade) {
-                            continue; // Skip strong units
-                        }
-
-                        let idx = result
-                            .get("index")
-                            .and_then(|i| i.as_u64())
-                            .unwrap_or(0) as usize;
-                        let source_text = segments_vec
-                            .get(idx)
-                            .map(|s| s.text.clone())
-                            .unwrap_or_default();
-                        let model_translation = result
-                            .get("model_translation")
-                            .and_then(|t| t.as_str())
-                            .unwrap_or_default();
-
-                        let stability = grade_to_stability(grade);
-
-                        new_cards.push(cognitive::NewFlashcard {
-                            source_note_id: Some(session.note_id.clone()),
-                            source_context: Some(source_text.clone()),
-                            atom_id: None,
-                            deck: format!(
-                                "{}-{}",
-                                session.source_lang, session.target_lang
-                            ),
-                            front: source_text,
-                            back: model_translation.to_string(),
-                            card_type: CardType::Vocabulary,
-                            cloze_data: None,
-                            vocab_data: Some(serde_json::json!({
-                                "type": "translation_unit",
-                                "grade": grade,
-                                "session_id": session.id,
-                            })),
-                            image_data: None,
-                            tags: vec![
-                                "practice".to_string(),
-                                "translation".to_string(),
-                            ],
-                            stability,
-                            difficulty: 0.3,
-                            difficulty_estimate: None,
-                            prerequisite_concepts: None,
-                        });
+                    if is_strong_grade(grade) {
+                        continue; // Skip strong units
                     }
 
-                    if !new_cards.is_empty() {
-                        match flashcard_repo.create_batch(new_cards).await {
-                            Ok(created) => flashcards_created = created.len() as u32,
-                            Err(e) => {
-                                tracing::warn!("Failed to create practice flashcards: {e}");
-                            }
+                    let idx = result.get("index").and_then(|i| i.as_u64()).unwrap_or(0) as usize;
+                    let source_text = segments_vec
+                        .get(idx)
+                        .map(|s| s.text.clone())
+                        .unwrap_or_default();
+                    let model_translation = result
+                        .get("model_translation")
+                        .and_then(|t| t.as_str())
+                        .unwrap_or_default();
+
+                    let stability = grade_to_stability(grade);
+
+                    new_cards.push(cognitive::NewFlashcard {
+                        source_note_id: Some(session.note_id.clone()),
+                        source_context: Some(source_text.clone()),
+                        atom_id: None,
+                        deck: format!("{}-{}", session.source_lang, session.target_lang),
+                        front: source_text,
+                        back: model_translation.to_string(),
+                        card_type: CardType::Vocabulary,
+                        cloze_data: None,
+                        vocab_data: Some(serde_json::json!({
+                            "type": "translation_unit",
+                            "grade": grade,
+                            "session_id": session.id,
+                        })),
+                        image_data: None,
+                        tags: vec!["practice".to_string(), "translation".to_string()],
+                        stability,
+                        difficulty: 0.3,
+                        difficulty_estimate: None,
+                        prerequisite_concepts: None,
+                    });
+                }
+
+                if !new_cards.is_empty() {
+                    match flashcard_repo.create_batch(new_cards).await {
+                        Ok(created) => flashcards_created = created.len() as u32,
+                        Err(e) => {
+                            tracing::warn!("Failed to create practice flashcards: {e}");
                         }
                     }
                 }
             }
+        }
 
         Ok(PracticeCompleteResponse {
             average_score,

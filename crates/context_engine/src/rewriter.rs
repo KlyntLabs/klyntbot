@@ -56,9 +56,5 @@ pub struct CorrectionContext {
 
 #[async_trait]
 pub trait QueryRewriter: Send + Sync {
-    async fn rewrite(
-        &self,
-        original: &str,
-        context: &RetrievalContext,
-    ) -> Option<RewriteResult>;
+    async fn rewrite(&self, original: &str, context: &RetrievalContext) -> Option<RewriteResult>;
 }
