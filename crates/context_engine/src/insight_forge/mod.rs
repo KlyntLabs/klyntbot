@@ -173,6 +173,12 @@ impl InsightForge {
         }
 
         // 3. Fan-out: for each sub-query, search all sources in parallel.
+        tracing::debug!(
+            sub_query_count = sub_queries.len(),
+            sub_queries = ?sub_queries,
+            has_enrichment = enriched.is_some(),
+            "📡 InsightForge: fan-out sub-queries"
+        );
         let per_source_limit = self.config.per_source_limit;
         let per_source_timeout =
             std::time::Duration::from_millis(self.config.per_source_timeout_ms);

@@ -249,7 +249,11 @@ const STOP_WORDS: &[&str] = &[
 pub fn extract_key_terms_from(text: &str) -> String {
     text.split_whitespace()
         .map(|w| w.trim_matches(|c: char| !c.is_alphanumeric()))
-        .filter(|w| w.len() > 2 && !STOP_WORDS.contains(&w.to_lowercase().as_str()))
+        .filter(|w| {
+            w.len() > 2
+                && !STOP_WORDS.contains(&w.to_lowercase().as_str())
+                && !PRONOUNS.contains(&w.to_lowercase().as_str())
+        })
         .take(5)
         .collect::<Vec<_>>()
         .join(" ")
@@ -367,10 +371,12 @@ impl ContextualQueryRewriter {
             }
         }
 
-        // Priority 4: Active skill
+        // Priority 4: Active skill (skip "general" — adds no semantic value)
         if signals.len() < max {
             if let Some(ref skill) = ctx.active_skill {
-                signals.push(format!("skill: {skill}"));
+                if skill != "general" {
+                    signals.push(format!("skill: {skill}"));
+                }
             }
         }
 
@@ -392,6 +398,12 @@ impl ContextualQueryRewriter {
         }
 
         let enriched_query = build_template(original, &signals, ctx);
+
+        // If the enriched query is trivially short or just repeats the original,
+        // it adds no value — return None to let the LLM fallback handle it
+        if enriched_query.len() < 10 {
+            return None;
+        }
 
         Some(RewriteResult {
             enriched_query,
