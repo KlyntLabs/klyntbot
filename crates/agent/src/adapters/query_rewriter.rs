@@ -1,8 +1,9 @@
-//! Contextual query rewriter — heuristic enrichment of vague user queries.
+//! Contextual query rewriter — heuristic + LLM enrichment of vague user queries.
 //!
 //! Uses the current skill, active task, recent corrections, and user situation
 //! to inject missing context into under-specified queries before memory retrieval.
-//! Phase 1: heuristic templates only. Phase 2 will add LLM fallback.
+//! Phase 1: heuristic templates. Phase 2: LLM fallback for Low-specificity queries
+//! where heuristics have insufficient context.
 
 use async_trait::async_trait;
 use context_engine::rewriter::{QueryRewriter, RetrievalContext, RewriteResult, RewriteSource};
@@ -281,14 +282,11 @@ fn build_template(original: &str, signals: &[String], ctx: &RetrievalContext) ->
 // Main rewriter
 // ---------------------------------------------------------------------------
 
-/// Contextual query rewriter that uses heuristic templates (Phase 1) and
-/// optionally an LLM fallback (Phase 2, not yet implemented).
+/// Contextual query rewriter that uses heuristic templates and optionally
+/// an LLM fallback for low-specificity queries where heuristics lack context.
 pub struct ContextualQueryRewriter {
-    #[allow(dead_code)]
     llm_provider: Option<providers::DynProvider>,
-    #[allow(dead_code)]
     rewriter_model: Option<String>,
-    #[allow(dead_code)]
     timeout_ms: u64,
 }
 
@@ -401,6 +399,108 @@ impl ContextualQueryRewriter {
             source: RewriteSource::Heuristic,
         })
     }
+
+    /// LLM-based fallback for queries where heuristic rewriting has no signals.
+    ///
+    /// Sends a compact prompt with the user's query and available context to a
+    /// lightweight LLM, returning an enriched query. Times out after `timeout_ms`
+    /// to avoid blocking the main retrieval path.
+    pub(crate) async fn llm_rewrite(
+        &self,
+        original: &str,
+        context: &RetrievalContext,
+    ) -> Option<RewriteResult> {
+        let provider = self.llm_provider.as_ref()?;
+
+        let recent = context
+            .recent_user_messages
+            .iter()
+            .take(2)
+            .map(|m| m.chars().take(100).collect::<String>())
+            .collect::<Vec<_>>()
+            .join("; ");
+
+        let prompt = format!(
+            "You are a query rewriter for a personal AI assistant. Given the user's \
+             vague query and their current context, produce a single enriched search \
+             query that captures what they likely mean.\n\n\
+             Rules:\n\
+             - Output ONLY the rewritten query, nothing else\n\
+             - Keep it under 20 words\n\
+             - Preserve any time references from the original\n\
+             - If the query is already clear enough, output \"SKIP\"\n\n\
+             User's query: \"{original}\"\n\n\
+             Context:\n\
+             - Active skill: {skill}\n\
+             - Current task: {task}\n\
+             - Recent messages: {recent}\n\
+             - Current view: {view}\n\n\
+             Rewritten query:",
+            original = original,
+            skill = context.active_skill.as_deref().unwrap_or("none"),
+            task = context
+                .active_task
+                .as_ref()
+                .map(|t| t.title.as_str())
+                .unwrap_or("none"),
+            recent = if recent.is_empty() {
+                "none".to_string()
+            } else {
+                recent
+            },
+            view = context
+                .active_view
+                .as_ref()
+                .and_then(|v| v.description.as_deref())
+                .unwrap_or("none"),
+        );
+
+        let messages = vec![providers::Message::user(prompt)];
+        let model_name = self
+            .rewriter_model
+            .clone()
+            .unwrap_or_else(|| provider.default_model().to_string());
+        let params = providers::ChatParams::new(model_name)
+            .with_max_tokens(50)
+            .with_temperature(0.0);
+
+        let timeout_dur = std::time::Duration::from_millis(self.timeout_ms);
+        let result =
+            tokio::time::timeout(timeout_dur, provider.chat(&messages, None, &params)).await;
+
+        match result {
+            Ok(Ok(response)) => {
+                let text = response.content.as_deref().unwrap_or("").trim().to_string();
+                if text.eq_ignore_ascii_case("SKIP") || text.is_empty() {
+                    debug!(original = original, "QueryRewriter: LLM returned SKIP");
+                    None
+                } else {
+                    debug!(
+                        original = original,
+                        enriched = text.as_str(),
+                        "QueryRewriter: LLM enriched query"
+                    );
+                    Some(RewriteResult {
+                        enriched_query: text,
+                        confidence: 0.75,
+                        source: RewriteSource::Llm,
+                    })
+                }
+            }
+            Ok(Err(e)) => {
+                debug!(original = original, error = %e, "QueryRewriter: LLM call failed");
+                None
+            }
+            Err(_) => {
+                debug!(
+                    original = original,
+                    timeout_ms = self.timeout_ms,
+                    "QueryRewriter: LLM timed out"
+                );
+                None
+            }
+        }
+    }
 }
 
 #[async_trait]
@@ -411,17 +511,29 @@ impl QueryRewriter for ContextualQueryRewriter {
             query = original,
             ?specificity,
             skill = context.active_skill.as_deref().unwrap_or("none"),
-            task = context.active_task.as_ref().map(|t| t.title.as_str()).unwrap_or("none"),
-            energy = context.situation.as_ref().map(|s| s.energy_level).unwrap_or(-1.0),
+            task = context
+                .active_task
+                .as_ref()
+                .map(|t| t.title.as_str())
+                .unwrap_or("none"),
+            energy = context
+                .situation
+                .as_ref()
+                .map(|s| s.energy_level)
+                .unwrap_or(-1.0),
             has_correction = context.recent_correction.is_some(),
             "🔍 QueryRewriter: evaluating"
         );
 
         let result = match specificity {
             Specificity::High => None,
-            Specificity::Medium | Specificity::Low => {
-                self.heuristic_rewrite(original, context)
-                // TODO Phase 2: LLM fallback when heuristic returns None for Low specificity
+            Specificity::Medium => self.heuristic_rewrite(original, context),
+            Specificity::Low => {
+                if let Some(heuristic) = self.heuristic_rewrite(original, context) {
+                    Some(heuristic)
+                } else {
+                    self.llm_rewrite(original, context).await
+                }
             }
         };
 
@@ -702,6 +814,148 @@ mod tests {
             query.contains("api migration"),
             "Expected 'api migration' in enriched query: {}",
             query
+        );
+    }
+
+    // LLM fallback tests
+
+    struct MockRewriteProvider {
+        response: String,
+        delay_ms: u64,
+    }
+
+    impl MockRewriteProvider {
+        fn new(response: &str) -> Self {
+            Self {
+                response: response.into(),
+                delay_ms: 0,
+            }
+        }
+        fn slow(response: &str, delay_ms: u64) -> Self {
+            Self {
+                response: response.into(),
+                delay_ms,
+            }
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl providers::LlmProvider for MockRewriteProvider {
+        async fn chat(
+            &self,
+            _messages: &[providers::Message],
+            _tools: Option<&[serde_json::Value]>,
+            _params: &providers::ChatParams,
+        ) -> common::Result<providers::LlmResponse> {
+            if self.delay_ms > 0 {
+                tokio::time::sleep(std::time::Duration::from_millis(self.delay_ms)).await;
+            }
+            Ok(providers::LlmResponse {
+                content: Some(self.response.clone()),
+                tool_calls: vec![],
+                finish_reason: "end_turn".into(),
+                usage: providers::Usage::default(),
+                reasoning_content: None,
+            })
+        }
+        fn supports_streaming(&self) -> bool {
+            false
+        }
+        fn default_model(&self) -> &str {
+            "mock-rewriter"
+        }
+        fn name(&self) -> &str {
+            "mock"
+        }
+    }
+
+    #[tokio::test]
+    async fn llm_fallback_on_pronoun_no_heuristic_context() {
+        // Low specificity + no context signals → heuristic returns None → LLM fires
+        let provider = std::sync::Arc::new(MockRewriteProvider::new(
+            "current spending breakdown for March budget",
+        ));
+        let rewriter = ContextualQueryRewriter::new(Some(provider), None, 5000);
+        let ctx = RetrievalContext::default(); // no signals for heuristic
+
+        let result = rewriter.rewrite("what was that?", &ctx).await;
+        assert!(
+            result.is_some(),
+            "Expected LLM fallback to produce a result"
+        );
+        let r = result.unwrap();
+        assert_eq!(r.source, RewriteSource::Llm);
+        assert!(
+            r.enriched_query.contains("spending breakdown"),
+            "Expected LLM response in enriched query: {}",
+            r.enriched_query
+        );
+    }
+
+    #[tokio::test]
+    async fn llm_skip_response_returns_none() {
+        let provider = std::sync::Arc::new(MockRewriteProvider::new("SKIP"));
+        let rewriter = ContextualQueryRewriter::new(Some(provider), None, 5000);
+        let ctx = RetrievalContext::default();
+
+        let result = rewriter.rewrite("what was that?", &ctx).await;
+        assert!(result.is_none(), "Expected None when LLM returns SKIP");
+    }
+
+    #[tokio::test]
+    async fn llm_timeout_returns_none() {
+        // Provider takes 2000ms, timeout is 100ms → should time out
+        let provider = std::sync::Arc::new(MockRewriteProvider::slow("enriched query", 2000));
+        let rewriter = ContextualQueryRewriter::new(Some(provider), None, 100);
+        let ctx = RetrievalContext::default();
+
+        let result = rewriter.rewrite("what was that?", &ctx).await;
+        assert!(result.is_none(), "Expected None when LLM times out");
+    }
+
+    #[tokio::test]
+    async fn llm_not_called_when_heuristic_succeeds() {
+        // Low specificity + task context → heuristic succeeds → LLM never called
+        let provider = std::sync::Arc::new(MockRewriteProvider::new("this should not appear"));
+        let rewriter = ContextualQueryRewriter::new(Some(provider), None, 5000);
+        let ctx = finance_context();
+
+        let result = rewriter.rewrite("what about that?", &ctx).await;
+        assert!(result.is_some());
+        let r = result.unwrap();
+        assert_eq!(
+            r.source,
+            RewriteSource::Heuristic,
+            "Expected Heuristic source when heuristic has signals"
+        );
+    }
+
+    #[tokio::test]
+    async fn llm_not_called_for_medium_specificity() {
+        // Medium specificity + no context → heuristic returns None, LLM NOT invoked
+        let provider = std::sync::Arc::new(MockRewriteProvider::new("this should not appear"));
+        let rewriter = ContextualQueryRewriter::new(Some(provider), None, 5000);
+        let ctx = RetrievalContext::default();
+
+        let result = rewriter
+            .rewrite("tell me about the progress on things", &ctx)
+            .await;
+        assert!(
+            result.is_none(),
+            "Expected None for Medium specificity with no context (LLM should not be called)"
+        );
+    }
+
+    #[tokio::test]
+    async fn llm_no_provider_degrades_gracefully() {
+        // No LLM provider → llm_rewrite returns None, no panic
+        let rewriter = ContextualQueryRewriter::new(None, None, 5000);
+        let ctx = RetrievalContext::default();
+
+        let result = rewriter.rewrite("what was that?", &ctx).await;
+        assert!(
+            result.is_none(),
+            "Expected None when no LLM provider is configured"
         );
     }
 }

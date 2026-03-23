@@ -427,65 +427,65 @@ impl AgentRuntime {
         }
 
         // Step 5.5: Build retrieval context for query rewriting
-        let retrieval_context = {
-            let active_skill = Some(profile.name.clone());
+        let retrieval_context =
+            {
+                let active_skill = Some(profile.name.clone());
 
-            let recent_user_messages: Vec<String> = history
-                .iter()
-                .rev()
-                .filter(|m| m.role() == common::MessageRole::User)
-                .take(2)
-                .map(|m| match m {
-                    Message::User {
-                        content: providers::UserContent::Text(t),
-                    } => t.chars().take(200).collect(),
-                    _ => String::new(),
-                })
-                .collect();
+                let recent_user_messages: Vec<String> = history
+                    .iter()
+                    .rev()
+                    .filter(|m| m.role() == common::MessageRole::User)
+                    .take(2)
+                    .map(|m| match m {
+                        Message::User {
+                            content: providers::UserContent::Text(t),
+                        } => t.chars().take(200).collect(),
+                        _ => String::new(),
+                    })
+                    .collect();
 
-            let situation = if let Some(ref sit) = self.user_situation {
-                let s = sit.lock().await;
-                Some(context_engine::UserSituationSnapshot {
-                    energy_level: s.energy_level,
-                    focus_state: s.focus_state,
-                    deadline_pressure: s.deadline_pressure,
-                    distraction_risk: s.distraction_risk,
-                })
-            } else {
-                None
-            };
+                let situation = if let Some(ref sit) = self.user_situation {
+                    let s = sit.lock().await;
+                    Some(context_engine::UserSituationSnapshot {
+                        energy_level: s.energy_level,
+                        focus_state: s.focus_state,
+                        deadline_pressure: s.deadline_pressure,
+                        distraction_risk: s.distraction_risk,
+                    })
+                } else {
+                    None
+                };
 
-            let active_task = if let Some(ref repo) = self.task_repo {
-                match repo.list_focused().await {
-                    Ok(tasks) => tasks.into_iter().next().map(|t| {
-                        context_engine::ActiveTaskContext {
-                            title: t.title,
-                            project_name: t.project_id,
-                            domain: active_skill
-                                .as_deref()
-                                .map(|s| s.replace("-management", "").replace('-', " ")),
+                let active_task =
+                    if let Some(ref repo) = self.task_repo {
+                        match repo.list_focused().await {
+                            Ok(tasks) => tasks.into_iter().next().map(|t| {
+                                context_engine::ActiveTaskContext {
+                                    title: t.title,
+                                    project_name: t.project_id,
+                                    domain: active_skill
+                                        .as_deref()
+                                        .map(|s| s.replace("-management", "").replace('-', " ")),
+                                }
+                            }),
+                            Err(e) => {
+                                warn!("Failed to query focused task for retrieval context: {e}");
+                                None
+                            }
                         }
-                    }),
-                    Err(e) => {
-                        warn!(
-                            "Failed to query focused task for retrieval context: {e}"
-                        );
+                    } else {
                         None
-                    }
-                }
-            } else {
-                None
-            };
+                    };
 
-            Some(context_engine::RetrievalContext {
-                active_skill,
-                active_task,
-                recent_user_messages,
-                situation,
-                active_view: None,
-                recent_correction: correction,
-            })
-        };
+                Some(context_engine::RetrievalContext {
+                    active_skill,
+                    active_task,
+                    recent_user_messages,
+                    situation,
+                    active_view: None,
+                    recent_correction: correction,
+                })
+            };
 
         // Step 6: Assemble context (AgentContextSource injects agent instructions + skills)
         let prompt = system_prompt.unwrap_or(&self.config.system_prompt);
