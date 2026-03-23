@@ -554,6 +554,7 @@ mod tests {
             tool_definitions,
             context_window,
             session_key: None,
+            retrieval_context: None,
         }
     }
 
@@ -639,6 +640,7 @@ mod tests {
 
             context_window: 128_000,
             session_key: None,
+            retrieval_context: None,
         };
         let result = engine.assemble(request).await;
         // Should have at least the system message
@@ -695,6 +697,7 @@ mod tests {
 
             context_window: 128_000,
             session_key: None,
+            retrieval_context: None,
         };
         let result = engine.assemble(request).await;
         // ZeroCounter returns 0 for all text → token_count for user + system messages = 0
@@ -725,6 +728,7 @@ mod tests {
 
             context_window: 128_000,
             session_key: None,
+            retrieval_context: None,
         };
 
         let doubled = engine.assemble(make_req()).await;
@@ -780,6 +784,7 @@ mod tests {
 
             context_window: 128_000,
             session_key: None,
+            retrieval_context: None,
         };
 
         let result = engine.assemble(request).await;
@@ -829,6 +834,7 @@ mod tests {
             tool_definitions: vec![],
             context_window: 128_000,
             session_key: None,
+            retrieval_context: None,
         };
 
         let result = engine.assemble(request).await;
@@ -860,6 +866,7 @@ mod tests {
             tool_definitions: vec![],
             context_window: 128_000,
             session_key: None,
+            retrieval_context: None,
         };
 
         let result = engine.assemble(request).await;
@@ -884,6 +891,7 @@ mod tests {
             tool_definitions: vec![],
             context_window: 4096,
             session_key: None,
+            retrieval_context: None,
         };
         let key1 = ContextEngine::compute_cache_key(&req);
         let key2 = ContextEngine::compute_cache_key(&req);
@@ -906,6 +914,7 @@ mod tests {
 
             context_window: 128_000,
             session_key: None,
+            retrieval_context: None,
         };
 
         let result = engine.assemble(request).await;
@@ -941,6 +950,7 @@ mod tests {
             tool_definitions: vec![],
             context_window: 1000, // very small window — ~850 input budget
             session_key: None,
+            retrieval_context: None,
         };
         let result = engine.assemble(request).await;
 
@@ -1015,6 +1025,7 @@ mod tests {
             // all 20 messages (~70 tokens total).
             context_window: 50,
             session_key: None,
+            retrieval_context: None,
         };
 
         engine.assemble(request).await;
@@ -1143,6 +1154,7 @@ mod tests {
             tool_definitions: vec![],
             context_window: 128_000,
             session_key: None,
+            retrieval_context: None,
         };
 
         let result = engine.assemble(request).await;

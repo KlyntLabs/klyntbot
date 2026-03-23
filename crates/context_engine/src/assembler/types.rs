@@ -34,6 +34,8 @@ pub struct ContextRequest {
     pub context_window: usize,
     /// Optional session key for per-session circuit-breaker tracking in InsightForge.
     pub session_key: Option<String>,
+    /// Contextual signals for query rewriting (active skill, task, situation, etc.)
+    pub retrieval_context: Option<crate::rewriter::RetrievalContext>,
 }
 
 /// The assembled context ready to send to the LLM.
