@@ -21,7 +21,7 @@ impl AppCore {
 
         /// Check if a source should be fetched (no filter = fetch all).
         fn want(sources: Option<&[TimelineSource]>, s: TimelineSource) -> bool {
-            sources.is_none_or(|list| list.contains(&s))
+            sources.map_or(true, |list| list.contains(&s))
         }
 
         let mut entries = Vec::new();
@@ -74,7 +74,7 @@ impl AppCore {
                     return None;
                 }
                 self.repos
-                    .actions
+                    .tasks
                     .time_entries_in_range(start, end)
                     .await
                     .ok()
@@ -83,7 +83,7 @@ impl AppCore {
                 if !want(sources, TimelineSource::Todo) {
                     return None;
                 }
-                self.repos.actions.tasks_for_timeline(start, end).await.ok()
+                self.repos.tasks.tasks_for_timeline(start, end).await.ok()
             },
             async {
                 if !want(sources, TimelineSource::Finance) {
@@ -191,13 +191,13 @@ fn normalize_time_entry(te: storage::TimeEntryWithTask) -> TimelineEntry {
         id: te.id.to_string(),
         source: TimelineSource::Task,
         entry_type: TimelineEntryType::TaskTimeEntry,
-        title: te.action_title,
+        title: te.task_title,
         description: te.note,
         started_at: te.started_at.to_rfc3339(),
         ended_at: te.ended_at.map(|t| t.to_rfc3339()),
         duration_secs: te.duration_secs,
-        entity_id: Some(te.action_id.clone()),
-        entity_route: Some(format!("/task/{}", te.action_id)),
+        entity_id: Some(te.task_id.clone()),
+        entity_route: Some(format!("/task/{}", te.task_id)),
         color: "var(--timeline-task)".into(),
         metadata: None,
     }
@@ -345,7 +345,7 @@ fn normalize_domain_event(e: cognitive::DomainEventRow) -> Option<TimelineEntry>
 }
 
 /// Normalize a task row into 1+ timeline entries.
-fn normalize_task(t: storage::ActionRow, start: &str, end: &str) -> Vec<TimelineEntry> {
+fn normalize_task(t: storage::TaskRow, start: &str, end: &str) -> Vec<TimelineEntry> {
     let mut out = Vec::new();
     let start_bound = format!("{start}T00:00:00Z");
     let end_bound = format!("{end}T23:59:59Z");

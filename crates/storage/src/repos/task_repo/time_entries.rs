@@ -105,4 +105,71 @@ impl TaskRepo {
         .await?;
         Ok(rows)
     }
+
+    /// Fetch time entries within a date range (inclusive), oldest first.
+    /// Returns entries with their parent task's title for display.
+    /// Dates are YYYY-MM-DD strings; the range is [start 00:00, end+1 00:00).
+    pub async fn time_entries_in_range(
+        &self,
+        start_date: &str,
+        end_date: &str,
+    ) -> Result<Vec<super::TimeEntryWithTask>, StorageError> {
+        // Use next-day midnight as exclusive upper bound to avoid sub-second edge cases.
+        let start_bound = format!("{start_date}T00:00:00Z");
+        let end_bound = next_day_midnight(end_date);
+        let rows = sqlx::query_as::<_, super::TimeEntryWithTask>(
+            r#"
+            SELECT te.id, te.task_id, t.title AS task_title,
+                   te.started_at, te.ended_at, te.duration_secs, te.note
+            FROM task_time_entries te
+            JOIN tasks t ON t.id = te.task_id
+            WHERE te.started_at >= ?1
+              AND te.started_at < ?2
+            ORDER BY te.started_at ASC
+            "#,
+        )
+        .bind(&start_bound)
+        .bind(&end_bound)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
+    }
+
+    /// Fetch tasks relevant to a date range for the timeline:
+    /// due on the date, created during the range, or completed during the range.
+    pub async fn tasks_for_timeline(
+        &self,
+        start_date: &str,
+        end_date: &str,
+    ) -> Result<Vec<crate::rows::task::TaskRow>, StorageError> {
+        let start_bound = format!("{start_date}T00:00:00Z");
+        let end_bound = next_day_midnight(end_date);
+        let rows = sqlx::query_as::<_, crate::rows::task::TaskRow>(
+            r#"
+            SELECT * FROM tasks
+            WHERE is_template = 0 AND (
+                (due_date >= ?1 AND due_date < ?2)
+                OR (created_at >= ?1 AND created_at < ?2)
+                OR (completed_at >= ?1 AND completed_at < ?2)
+            )
+            ORDER BY COALESCE(due_date, created_at) ASC
+            "#,
+        )
+        .bind(&start_bound)
+        .bind(&end_bound)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
+    }
+}
+
+/// Compute next-day midnight for exclusive upper bounds: "2026-03-16" → "2026-03-17T00:00:00Z".
+fn next_day_midnight(date: &str) -> String {
+    if let Ok(d) = chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d") {
+        let next = d + chrono::Duration::days(1);
+        format!("{next}T00:00:00Z")
+    } else {
+        // Fallback: append end-of-day (caller's original behavior)
+        format!("{date}T23:59:59Z")
+    }
 }

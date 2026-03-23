@@ -159,6 +159,7 @@ CREATE TABLE IF NOT EXISTS task_time_entries (
 );
 
 CREATE INDEX IF NOT EXISTS idx_task_time_entries_task_id ON task_time_entries(task_id);
+CREATE INDEX IF NOT EXISTS idx_task_time_entries_started_at ON task_time_entries(started_at);
 
 -- ============================================================
 -- Task Dependencies
