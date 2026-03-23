@@ -14,14 +14,14 @@ use common::{Result, ToolError};
 /// ProjectTool for managing projects and project-task relationships
 pub struct ProjectTool {
     project_repo: storage::ProjectRepo,
-    action_repo: storage::ActionRepo,
+    task_repo: storage::TaskRepo,
 }
 
 impl ProjectTool {
-    pub fn new(project_repo: storage::ProjectRepo, action_repo: storage::ActionRepo) -> Self {
+    pub fn new(project_repo: storage::ProjectRepo, task_repo: storage::TaskRepo) -> Self {
         Self {
             project_repo,
-            action_repo,
+            task_repo,
         }
     }
 }
@@ -258,12 +258,12 @@ impl Tool for ProjectTool {
                     .await?
                     .ok_or_else(|| ToolError::InvalidParams("Project not found".to_string()))?;
 
-                let filter = storage::ActionFilter {
+                let filter = storage::TaskFilter {
                     project_id: Some(proj.id.clone()),
                     limit: p.optional_u64("limit")?.map(|v| v as i64),
                     ..Default::default()
                 };
-                let rows = self.action_repo.list(&filter).await?;
+                let rows = self.task_repo.list(&filter).await?;
 
                 if rows.is_empty() {
                     return Ok(format!("No tasks in project '{}'", proj.name));
@@ -298,7 +298,7 @@ mod tests {
         let pool = sqlx::SqlitePool::connect_lazy("sqlite::memory:").unwrap();
         let tool = ProjectTool::new(
             storage::ProjectRepo::new(pool.clone()),
-            storage::ActionRepo::new(pool),
+            storage::TaskRepo::new(pool),
         );
         assert_eq!(tool.name(), "project");
     }

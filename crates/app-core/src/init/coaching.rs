@@ -231,18 +231,18 @@ pub(super) async fn build_situation_inputs(
     }
 
     // Task pressure: overdue tasks
-    if let Ok(overdue) = repos.actions.overdue().await {
+    if let Ok(overdue) = repos.tasks.overdue().await {
         inputs.overdue_task_count = overdue.len() as i32;
     }
 
     // Tasks due within 24h
     let tomorrow = now + Duration::hours(24);
-    let filter = storage::ActionFilter {
+    let filter = storage::TaskFilter {
         due_after: Some(now),
         due_before: Some(tomorrow),
         ..Default::default()
     };
-    if let Ok(upcoming) = repos.actions.list(&filter).await {
+    if let Ok(upcoming) = repos.tasks.list(&filter).await {
         inputs.tasks_due_within_24h = upcoming.len() as i32;
     }
 

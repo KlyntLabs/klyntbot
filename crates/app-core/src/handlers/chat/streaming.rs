@@ -153,8 +153,6 @@ async fn resolve_ancestry(
         "task" => {
             if let Ok(Some(task)) = repos.tasks.get(id).await {
                 (Some(task.area_id.clone()), task.project_id.clone())
-            } else if let Ok(Some(action)) = repos.actions.get(id).await {
-                (Some(action.area_id.clone()), action.project_id.clone())
             } else {
                 (None, None)
             }

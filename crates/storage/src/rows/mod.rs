@@ -1,6 +1,5 @@
 //! Row structs for `sqlx::FromRow` deserialization.
 
-pub mod action;
 pub mod agent_task;
 pub mod area;
 pub mod cron;

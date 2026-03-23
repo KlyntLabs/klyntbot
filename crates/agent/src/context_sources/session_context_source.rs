@@ -48,7 +48,6 @@ impl ContextSource for SessionContextSource {
 
         let entity_line = match entity_kind {
             "task" => {
-                // Try the newer tasks repo first, then fall back to legacy actions.
                 if let Ok(Some(task)) = self.repos.tasks.get(entity_id).await {
                     let short_id = &task.id[..task.id.len().min(8)];
                     let mut line = format!("- **Task**: \"{}\" (ID: {}…)", task.title, short_id);
@@ -61,21 +60,6 @@ impl ContextSource for SessionContextSource {
                             }
                         }
                     } else if let Ok(Some(area)) = self.repos.areas.get(&task.area_id).await {
-                        line.push_str(&format!(", Area: {}", area.name));
-                    }
-                    line
-                } else if let Ok(Some(action)) = self.repos.actions.get(entity_id).await {
-                    let short_id = &action.id[..action.id.len().min(8)];
-                    let mut line = format!("- **Task**: \"{}\" (ID: {}…)", action.title, short_id);
-                    line.push_str(&format!(" — Status: {}", action.status));
-                    if let Some(ref pid) = action.project_id {
-                        if let Ok(Some(proj)) = self.repos.projects.get(pid).await {
-                            line.push_str(&format!(", Project: {}", proj.name));
-                            if let Ok(Some(area)) = self.repos.areas.get(&proj.area_id).await {
-                                line.push_str(&format!(", Area: {}", area.name));
-                            }
-                        }
-                    } else if let Ok(Some(area)) = self.repos.areas.get(&action.area_id).await {
                         line.push_str(&format!(", Area: {}", area.name));
                     }
                     line

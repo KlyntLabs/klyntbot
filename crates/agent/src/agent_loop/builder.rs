@@ -286,7 +286,7 @@ impl AgentLoopBuilder {
             Box::new(BootstrapSource::new(workspace.clone())),
             Box::new(SessionContextSource::new(repos.clone())),
             Box::new(AreaSource::new(repos.areas.clone())),
-            Box::new(TodoSource::new(repos.actions.clone())),
+            Box::new(TodoSource::new(repos.tasks.clone())),
             Box::new(skill_system::context::SkillContextSource::new(
                 Arc::clone(&active_profile),
                 Arc::clone(&activated_skills),
@@ -884,7 +884,7 @@ impl AgentLoopBuilder {
                 Arc::new(crate::adapters::progress::ProgressHandlerImpl::new(
                     repos.key_results.clone(),
                     repos.objectives.clone(),
-                    repos.actions.clone(),
+                    repos.tasks.clone(),
                 ));
             task_tool = task_tool.with_progress_handler(Arc::clone(&progress_handler));
 
@@ -970,7 +970,7 @@ impl AgentLoopBuilder {
         // ── Project tool ────────────────────────────────────────────────
         tool_registry.register(ProjectTool::new(
             repos.projects.clone(),
-            repos.actions.clone(),
+            repos.tasks.clone(),
         ));
         // ── Annotate tool ──────────────────────────────────────────────────
         tool_registry.register(tools::AnnotateTool::new(cognitive::AnnotationRepo::new(
@@ -992,7 +992,7 @@ impl AgentLoopBuilder {
             if let Some(ref handler) = conversation_recall_handler {
                 let mut memory_tool = tools::MemoryTool::new()
                     .with_conversation_handler(Arc::clone(handler))
-                    .with_todo_repo(repos.actions.clone())
+                    .with_todo_repo(repos.tasks.clone())
                     .with_threshold(config.conversation.search.semantic_threshold)
                     .with_rrf_k(config.todo.search.rrf_k);
 
@@ -1207,7 +1207,7 @@ impl AgentLoopBuilder {
         // ── Reminder engine ───────────────────────────────────────────────
         let reminder_engine = if let Some(ref dispatcher) = notification_dispatcher {
             let mut engine = super::super::ReminderEngine::new(
-                repos.actions.clone(),
+                repos.tasks.clone(),
                 Arc::clone(dispatcher),
                 std::time::Duration::from_secs(300),
             );
@@ -1219,7 +1219,7 @@ impl AgentLoopBuilder {
 
         // ── Recurring task spawner ────────────────────────────────────────
         let mut recurring_spawner = super::super::RecurringTaskSpawner::new(
-            repos.actions.clone(),
+            repos.tasks.clone(),
             config.timezone.clone(),
             std::time::Duration::from_secs(60),
         );

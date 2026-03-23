@@ -222,7 +222,7 @@ fn register_cron_callbacks(
 
     // ── todo_focus_check ─────────────────────────────────────────────────
     {
-        let todo_repo = repos.actions.clone();
+        let todo_repo = repos.tasks.clone();
         let dispatcher = Arc::clone(notification_dispatcher);
         let rt = rt.clone();
         cron_service.register_handler(
@@ -232,7 +232,7 @@ fn register_cron_callbacks(
                 let dispatcher = Arc::clone(&dispatcher);
                 tokio::task::block_in_place(|| {
                     rt.block_on(async move {
-                        let focused: Vec<storage::ActionRow> = todo_repo.list_focused().await?;
+                        let focused: Vec<storage::TaskRow> = todo_repo.list_focused().await?;
                         for task in &focused {
                             if let Some(deadline) = task.focus_deadline {
                                 let remaining = deadline - chrono::Utc::now();
@@ -273,7 +273,7 @@ fn register_cron_callbacks(
 
     // ── todo_daily_digest ────────────────────────────────────────────────
     {
-        let todo_repo = repos.actions.clone();
+        let todo_repo = repos.tasks.clone();
         let dispatcher = Arc::clone(notification_dispatcher);
         let rt = rt.clone();
         cron_service.register_handler(
@@ -284,7 +284,7 @@ fn register_cron_callbacks(
                 tokio::task::block_in_place(|| {
                     rt.block_on(async move {
                         let summary = todo_repo.summary().await?;
-                        let overdue: Vec<storage::ActionRow> = todo_repo.overdue().await?;
+                        let overdue: Vec<storage::TaskRow> = todo_repo.overdue().await?;
                         let body = format!(
                             "Total: {} | Todo: {} | Doing: {} | Done: {} | Overdue: {}",
                             summary.total,
@@ -303,7 +303,7 @@ fn register_cron_callbacks(
 
     // ── todo_overdue_check ───────────────────────────────────────────────
     {
-        let todo_repo = repos.actions.clone();
+        let todo_repo = repos.tasks.clone();
         let dispatcher = Arc::clone(notification_dispatcher);
         let config_focus = config.todo.focus.clone();
         let rt = rt.clone();
@@ -315,7 +315,7 @@ fn register_cron_callbacks(
                 let config_focus = config_focus.clone();
                 tokio::task::block_in_place(|| {
                     rt.block_on(async move {
-                        let focused: Vec<storage::ActionRow> = todo_repo.list_focused().await?;
+                        let focused: Vec<storage::TaskRow> = todo_repo.list_focused().await?;
                         let now = chrono::Utc::now();
                         let mut expired_count = 0u32;
                         for task in &focused {

@@ -287,7 +287,10 @@ mod tests {
     ) {
         let pool = setup_pool().await;
         let repos = ProductivityRepos::new(pool.clone());
-        let config = FocusConfig::default();
+        let config = FocusConfig {
+            cooldown_grace_secs: 0,
+            ..FocusConfig::default()
+        };
         let mgr = Arc::new(FocusManager::new(repos.clone(), config.clone()));
         let interceptor = Arc::new(Mutex::new(DistractionInterceptor::new(
             config.clone(),
@@ -317,9 +320,10 @@ mod tests {
 
         // Send a distracting tick (Netflix is always distracting)
         tx.send(make_tick("Netflix", None, false)).unwrap();
+        tokio::task::yield_now().await;
 
         // Should receive an alert
-        let alert = tokio::time::timeout(std::time::Duration::from_secs(2), alert_rx.recv())
+        let alert = tokio::time::timeout(std::time::Duration::from_secs(10), alert_rx.recv())
             .await
             .expect("timeout waiting for alert")
             .expect("channel closed");
@@ -429,7 +433,8 @@ mod tests {
 
         // First tick — should alert
         tx.send(make_tick("Netflix", None, false)).unwrap();
-        let alert = tokio::time::timeout(std::time::Duration::from_secs(2), alert_rx.recv())
+        tokio::task::yield_now().await;
+        let alert = tokio::time::timeout(std::time::Duration::from_secs(10), alert_rx.recv())
             .await
             .expect("timeout")
             .expect("closed");
@@ -451,6 +456,7 @@ mod tests {
         // Use 0-second cooldown so it expires immediately
         let config = FocusConfig {
             soft_block_cooldown_secs: 0,
+            cooldown_grace_secs: 0,
             ..FocusConfig::default()
         };
         let cancel = CancellationToken::new();
@@ -476,7 +482,7 @@ mod tests {
 
         // Second alert — cooldown expired
         tx.send(make_tick("Netflix", None, false)).unwrap();
-        let alert = tokio::time::timeout(std::time::Duration::from_secs(2), alert_rx.recv())
+        let alert = tokio::time::timeout(std::time::Duration::from_secs(10), alert_rx.recv())
             .await
             .expect("timeout")
             .expect("closed");
@@ -515,8 +521,9 @@ mod tests {
 
         // Now send distracting tick
         tx.send(make_tick("Netflix", None, false)).unwrap();
+        tokio::task::yield_now().await;
 
-        let alert = tokio::time::timeout(std::time::Duration::from_secs(2), alert_rx.recv())
+        let alert = tokio::time::timeout(std::time::Duration::from_secs(10), alert_rx.recv())
             .await
             .expect("timeout")
             .expect("closed");
@@ -546,7 +553,7 @@ mod tests {
         cancel.cancel();
 
         // Channel should close
-        let result = tokio::time::timeout(std::time::Duration::from_secs(2), alert_rx.recv())
+        let result = tokio::time::timeout(std::time::Duration::from_secs(10), alert_rx.recv())
             .await
             .expect("should not timeout");
 

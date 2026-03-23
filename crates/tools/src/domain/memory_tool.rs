@@ -21,7 +21,7 @@ pub struct MemoryTool {
     /// RRF k parameter for hybrid search (from config)
     rrf_k: u32,
     /// Todo repo for unified search (SQL-backed)
-    todo_repo: Option<storage::ActionRepo>,
+    todo_repo: Option<storage::TaskRepo>,
     /// Embedding handler for todo semantic search
     todo_embedding_handler: Option<Arc<dyn EmbeddingHandler>>,
     /// LanceDB vector store for todo semantic search
@@ -63,7 +63,7 @@ impl MemoryTool {
     }
 
     /// Inject todo repo for unified search.
-    pub fn with_todo_repo(mut self, repo: storage::ActionRepo) -> Self {
+    pub fn with_todo_repo(mut self, repo: storage::TaskRepo) -> Self {
         self.todo_repo = Some(repo);
         self
     }

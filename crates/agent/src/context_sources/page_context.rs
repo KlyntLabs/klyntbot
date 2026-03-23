@@ -58,13 +58,13 @@ impl ContextSource for PageContextSource {
 
 impl PageContextSource {
     async fn project_context(&self, id: &str) -> Option<String> {
-        let filter = storage::repos::ActionFilter {
+        let filter = storage::TaskFilter {
             project_id: Some(id.to_string()),
             ..Default::default()
         };
         let (project_res, tasks_res, objectives_res) = tokio::join!(
             self.repos.projects.get(id),
-            self.repos.actions.list(&filter),
+            self.repos.tasks.list(&filter),
             self.repos.objectives.list(Some(id), None),
         );
         let project = project_res.ok()??;
@@ -100,10 +100,10 @@ impl PageContextSource {
     }
 
     async fn task_context(&self, id: &str) -> Option<String> {
-        let task = self.repos.actions.get(id).await.ok()??;
+        let task = self.repos.tasks.get(id).await.ok()??;
         let subtasks = self
             .repos
-            .actions
+            .tasks
             .get_children(id)
             .await
             .unwrap_or_default();

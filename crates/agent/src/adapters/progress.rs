@@ -2,26 +2,26 @@
 
 use async_trait::async_trait;
 use common::Result;
-use storage::{ActionRepo, KeyResultRepo, ObjectiveRepo};
+use storage::{KeyResultRepo, ObjectiveRepo, TaskRepo};
 use tools_core::ProgressHandler;
 use tracing::debug;
 
 pub struct ProgressHandlerImpl {
     kr_repo: KeyResultRepo,
     objective_repo: ObjectiveRepo,
-    action_repo: ActionRepo,
+    task_repo: TaskRepo,
 }
 
 impl ProgressHandlerImpl {
     pub fn new(
         kr_repo: KeyResultRepo,
         objective_repo: ObjectiveRepo,
-        action_repo: ActionRepo,
+        task_repo: TaskRepo,
     ) -> Self {
         Self {
             kr_repo,
             objective_repo,
-            action_repo,
+            task_repo,
         }
     }
 }
@@ -29,10 +29,10 @@ impl ProgressHandlerImpl {
 #[async_trait]
 impl ProgressHandler for ProgressHandlerImpl {
     async fn recalculate_kr_progress(&self, key_result_id: &str) -> Result<()> {
-        // Fetch KR and action counts concurrently (both are independent reads).
+        // Fetch KR and task counts concurrently (both are independent reads).
         let (kr, counts) = tokio::try_join!(
             self.kr_repo.get(key_result_id),
-            self.action_repo.count_by_kr(key_result_id),
+            self.task_repo.count_by_kr(key_result_id),
         )?;
 
         if let Some(kr) = kr {

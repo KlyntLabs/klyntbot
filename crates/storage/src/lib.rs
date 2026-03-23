@@ -22,12 +22,10 @@ pub use repos::Repos;
 pub use vector_store::{sanitize_predicate_value, CognitiveFactParams, VectorStore};
 
 // ── Actions / Tasks / Projects ──────────────────────────────────────
-pub use repos::action_repo::TimeEntryWithTask;
-pub use repos::{ActionFilter, ActionPatch, ActionRepo, ActionSummary};
 pub use repos::{CustomColumnRepo, ItemSummary, TaskGroupRepo};
 pub use repos::{EntityLinkRepo, ProjectSourceRepo};
 pub use repos::{ProjectFilter, ProjectPatch, ProjectRepo, ProjectWithStats};
-pub use repos::{TaskFilter, TaskPatch, TaskRepo, TaskSummary};
+pub use repos::{TaskFilter, TaskPatch, TaskRepo, TaskSummary, TimeEntryWithTask};
 
 // ── OKR ─────────────────────────────────────────────────────────────
 pub use repos::{AreaRepo, KeyResultRepo, ObjectiveRepo};
@@ -57,7 +55,6 @@ pub use repos::{
 };
 
 // ── Row structs ─────────────────────────────────────────────────────
-pub use rows::action::{ActionAttachmentRow, ActionDependencyRow, ActionRow, ActionTimeEntryRow};
 pub use rows::agent_task::AgentTaskRow;
 pub use rows::area::AreaRow;
 pub use rows::cron::CronJobRow;

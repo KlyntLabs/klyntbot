@@ -647,9 +647,11 @@ fn distraction_situation() -> cognitive::situation::UserSituation {
 }
 
 #[test]
-fn test_signal_accumulator_distraction_streak() {
+fn test_signal_accumulator_distraction_streak_removed() {
     let mut acc = SignalAccumulator::new();
 
+    // distraction_streak condition was removed — events are tracked for
+    // pattern detection but no longer trigger coaching popups.
     for _ in 0..3 {
         acc.push_event(&DomainEvent::DistractionDetected {
             app: "reddit".into(),
@@ -660,10 +662,10 @@ fn test_signal_accumulator_distraction_streak() {
 
     let fired = acc.evaluate(&distraction_situation());
     assert!(
-        fired
+        !fired
             .iter()
             .any(|t| t.condition_name == "distraction_streak"),
-        "Should detect distraction streak"
+        "distraction_streak should no longer fire as a coaching trigger"
     );
 }
 

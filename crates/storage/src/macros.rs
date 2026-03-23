@@ -88,8 +88,8 @@ macro_rules! crud_repo {
 
 /// Generate `focus`, `unfocus`, and `list_focused` methods for a repo.
 ///
-/// Both `ActionRepo` and `TaskRepo` have identical focus-slot logic — only
-/// the table name and row type differ.
+/// Generate focus-slot methods (`focus`, `unfocus`, `list_focused`) for a repo.
+/// The table name and row type are parameterized.
 macro_rules! focus_impl {
     ($repo:ty, $table:expr, $row:ty) => {
         impl $repo {
@@ -163,7 +163,7 @@ macro_rules! delete_older_than_impl {
 
 /// Generate a `get_by_ids` batch-fetch method.
 ///
-/// Both `ActionRepo` and `TaskRepo` have identical implementations: early-return
+/// Generate a `get_by_ids` batch-fetch method. Early-return
 /// on empty, build an IN-clause with `QueryBuilder`, `fetch_all`.
 macro_rules! get_by_ids_impl {
     ($table:expr, $row:ty) => {
@@ -193,8 +193,7 @@ macro_rules! get_by_ids_impl {
 
 /// Escape a string for use in a SQL `LIKE` pattern (with `\` as escape char).
 ///
-/// Used by `search_by_keyword` in both `ActionRepo` and `TaskRepo`, and also
-/// in `FinanceTransactionRepo`.
+/// Used by `search_by_keyword` in `TaskRepo` and `FinanceTransactionRepo`.
 pub fn escape_like(s: &str) -> String {
     s.replace('\\', "\\\\")
         .replace('%', "\\%")

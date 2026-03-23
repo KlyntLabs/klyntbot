@@ -1,6 +1,5 @@
 //! Repository modules and aggregate struct.
 
-pub mod action_repo;
 pub mod agent_task;
 pub mod area;
 pub mod coaching_intervention_log;
@@ -38,7 +37,6 @@ pub mod tool_usage;
 pub mod trial_repo;
 pub mod usage;
 
-pub use action_repo::{ActionFilter, ActionPatch, ActionRepo};
 pub use agent_task::AgentTaskRepo;
 pub use area::AreaRepo;
 pub use coaching_intervention_log::{CoachingInterventionLogRepo, InterventionLogRow};
@@ -68,7 +66,7 @@ pub use session_context::{SessionContextParams, SessionContextRepo};
 pub use status_workflow::StatusWorkflowRepo;
 pub use strategy::{OverallStats, StrategyRepo, ToolStatsRow};
 pub use task_group::TaskGroupRepo;
-pub use task_repo::{TaskFilter, TaskPatch, TaskRepo};
+pub use task_repo::{TaskFilter, TaskPatch, TaskRepo, TimeEntryWithTask};
 pub use tool_usage::ToolUsageRepo;
 pub use trial_repo::TrialRepo;
 pub use usage::UsageRepo;
@@ -83,8 +81,6 @@ pub struct ItemSummary {
     pub total: i64,
 }
 
-/// Type alias for backwards compatibility.
-pub type ActionSummary = ItemSummary;
 /// Type alias for backwards compatibility.
 pub type TaskSummary = ItemSummary;
 
@@ -110,7 +106,6 @@ pub fn compute_summary(rows: &[(String, i64)]) -> ItemSummary {
 pub struct Repos {
     pool: sqlx::SqlitePool,
     pub agent_tasks: AgentTaskRepo,
-    pub actions: ActionRepo,
     pub areas: AreaRepo,
     pub projects: ProjectRepo,
     pub sessions: SessionRepo,
@@ -140,7 +135,6 @@ impl Repos {
         let db = pool.inner().clone();
         Self {
             agent_tasks: AgentTaskRepo::new(db.clone()),
-            actions: ActionRepo::new(db.clone()),
             areas: AreaRepo::new(db.clone()),
             projects: ProjectRepo::new(db.clone()),
             sessions: SessionRepo::new(db.clone()),

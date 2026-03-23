@@ -14,7 +14,7 @@ use super::notifications::NotificationDispatcher;
 
 /// ReminderEngine - checks for todos that need reminders
 pub struct ReminderEngine {
-    todo_repo: storage::ActionRepo,
+    todo_repo: storage::TaskRepo,
     dispatcher: Arc<NotificationDispatcher>,
     check_interval: StdDuration,
     task_handle: Option<JoinHandle<()>>,
@@ -24,7 +24,7 @@ pub struct ReminderEngine {
 impl ReminderEngine {
     /// Create a new ReminderEngine backed by a SQL TodoRepo.
     pub fn new(
-        todo_repo: storage::ActionRepo,
+        todo_repo: storage::TaskRepo,
         dispatcher: Arc<NotificationDispatcher>,
         check_interval: StdDuration,
     ) -> Self {
@@ -76,11 +76,11 @@ impl ReminderEngine {
 
     /// Check all reminder rules and send notifications via SQL TodoRepo.
     async fn check_and_send_reminders(
-        repo: &storage::ActionRepo,
+        repo: &storage::TaskRepo,
         dispatcher: &Arc<NotificationDispatcher>,
     ) -> Result<()> {
         // Get only non-template, non-done todos for reminder checking
-        let filter = storage::ActionFilter {
+        let filter = storage::TaskFilter {
             status: None, // include todo + doing (exclude done via post-filter below)
             templates_only: false,
             ..Default::default()
@@ -110,7 +110,7 @@ impl ReminderEngine {
                     .await?;
 
                 // Update last_reminded_at via SQL
-                let patch = storage::ActionPatch {
+                let patch = storage::TaskPatch {
                     id: todo.id.clone(),
                     last_reminded_at: Some(Some(Utc::now())),
                     ..Default::default()

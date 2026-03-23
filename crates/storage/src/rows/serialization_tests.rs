@@ -10,10 +10,7 @@ mod tests {
 
     use crate::repos::project_repo::ProjectWithStats;
     use crate::repos::strategy::{OverallStats, ToolStatsRow};
-    use crate::repos::ActionSummary;
-    use crate::rows::action::{
-        ActionAttachmentRow, ActionDependencyRow, ActionRow, ActionTimeEntryRow,
-    };
+    use crate::repos::TaskSummary;
     use crate::rows::area::AreaRow;
 
     use crate::rows::cron::CronJobRow;
@@ -47,39 +44,6 @@ mod tests {
                 );
                 assert_no_snake_case_keys(&map[key], context);
             }
-        }
-    }
-
-    fn sample_action_row() -> ActionRow {
-        ActionRow {
-            id: "task-1".to_string(),
-            title: "Test task".to_string(),
-            description: None,
-            area_id: "area-1".to_string(),
-            project_id: None,
-            key_result_id: None,
-            parent_id: None,
-            priority: Some(2),
-            due_date: None,
-            tags: vec![],
-            status: "todo".to_string(),
-            focused_at: None,
-            focus_deadline: None,
-            focus_expired_count: 0,
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
-            completed_at: None,
-            total_tracked_secs: 0,
-            estimated_minutes: None,
-            calendar_event_uid: None,
-            last_reminded_at: None,
-            recurrence_rule: None,
-            recurrence_parent_id: None,
-            is_template: false,
-            next_instance_date: None,
-            status_label_id: None,
-            position: 0,
-            group_id: None,
         }
     }
 
@@ -125,44 +89,6 @@ mod tests {
                     status: "active".to_string(),
                     created_at: now,
                     updated_at: now,
-                })
-                .unwrap(),
-            ),
-            (
-                "ActionRow",
-                serde_json::to_value(sample_action_row()).unwrap(),
-            ),
-            (
-                "ActionAttachmentRow",
-                serde_json::to_value(&ActionAttachmentRow {
-                    id: Uuid::new_v4(),
-                    action_id: "t".to_string(),
-                    attachment_type: "url".to_string(),
-                    value: "v".to_string(),
-                    title: None,
-                    tags: vec![],
-                    created_at: now,
-                })
-                .unwrap(),
-            ),
-            (
-                "ActionTimeEntryRow",
-                serde_json::to_value(&ActionTimeEntryRow {
-                    id: Uuid::new_v4(),
-                    action_id: "t".to_string(),
-                    source: "manual".to_string(),
-                    started_at: now,
-                    ended_at: None,
-                    duration_secs: None,
-                    note: None,
-                })
-                .unwrap(),
-            ),
-            (
-                "ActionDependencyRow",
-                serde_json::to_value(&ActionDependencyRow {
-                    action_id: "t1".to_string(),
-                    blocker_id: "t2".to_string(),
                 })
                 .unwrap(),
             ),
@@ -581,8 +507,8 @@ mod tests {
                 .unwrap(),
             ),
             (
-                "ActionSummary",
-                serde_json::to_value(&ActionSummary {
+                "TaskSummary",
+                serde_json::to_value(&TaskSummary {
                     todo: 5,
                     doing: 2,
                     done: 10,

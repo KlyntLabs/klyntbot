@@ -437,6 +437,55 @@ mod tests {
     #[tokio::test]
     async fn test_full_workflow_lifecycle() {
         let pool = crate::StoragePool::connect_in_memory().await.unwrap();
+        // The tasks table lives in the feature-tasks migration, not core migrations.
+        // Create a minimal stub so task insertion works.
+        sqlx::query(
+            "CREATE TABLE IF NOT EXISTS tasks (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                description TEXT,
+                area_id TEXT NOT NULL,
+                project_id TEXT,
+                key_result_id TEXT,
+                objective_id TEXT,
+                parent_id TEXT,
+                status_label_id TEXT,
+                group_id TEXT,
+                priority INTEGER,
+                position INTEGER NOT NULL DEFAULT 0,
+                due_date TEXT,
+                tags TEXT NOT NULL DEFAULT '[]',
+                status TEXT NOT NULL DEFAULT 'todo',
+                task_type TEXT NOT NULL DEFAULT 'manual',
+                focused_at TEXT,
+                focus_deadline TEXT,
+                focus_expired_count INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+                updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+                completed_at TEXT,
+                completed INTEGER NOT NULL DEFAULT 0,
+                total_tracked_secs INTEGER NOT NULL DEFAULT 0,
+                estimated_minutes INTEGER,
+                actual_minutes INTEGER,
+                calendar_event_uid TEXT,
+                last_reminded_at TEXT,
+                recurrence_rule TEXT,
+                recurrence_parent_id TEXT,
+                is_template INTEGER NOT NULL DEFAULT 0,
+                next_instance_date TEXT,
+                acceptance_criteria TEXT,
+                agent_config TEXT,
+                execution_state TEXT NOT NULL DEFAULT 'idle',
+                spawned_execution_id TEXT,
+                context_snapshot TEXT,
+                energy_level TEXT DEFAULT 'medium',
+                estimated_focus_blocks INTEGER,
+                complexity_score INTEGER
+            )",
+        )
+        .execute(pool.inner())
+        .await
+        .unwrap();
         let repos = crate::Repos::from_pool(&pool);
 
         // 1. Global default exists with 6 labels
@@ -536,7 +585,7 @@ mod tests {
         };
         repos.areas.create(&area_row).await.ok();
 
-        let action_row = crate::ActionRow {
+        let task_row = crate::TaskRow {
             id: "task-wf-test".into(),
             title: "Test task".into(),
             description: None,
@@ -565,12 +614,24 @@ mod tests {
             status_label_id: Some(todo_label.id.clone()),
             position: 0,
             group_id: None,
+            task_type: "standard".into(),
+            acceptance_criteria: None,
+            agent_config: None,
+            execution_state: "idle".into(),
+            spawned_execution_id: None,
+            context_snapshot: None,
+            energy_level: None,
+            estimated_focus_blocks: None,
+            actual_minutes: None,
+            complexity_score: None,
+            completed: false,
+            objective_id: None,
         };
-        let inserted = repos.actions.add(&action_row).await.unwrap();
+        let inserted = repos.tasks.add(&task_row).await.unwrap();
         assert_eq!(inserted.status_label_id, Some(todo_label.id.clone()));
 
         // 9. Summary by group should work
-        let group_summary = repos.actions.summary_by_group().await.unwrap();
+        let group_summary = repos.tasks.summary_by_group().await.unwrap();
         assert_eq!(*group_summary.get("not_started").unwrap_or(&0), 1);
 
         // 10. Effective labels with None falls back to global default
