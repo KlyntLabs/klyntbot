@@ -37,6 +37,8 @@ pub struct ContextEngine {
     sources: Vec<Box<dyn ContextSource>>,
     /// Optional InsightForge for multi-dimensional retrieval.
     insight_forge: Option<Arc<crate::insight_forge::InsightForge>>,
+    /// Optional query rewriter for contextual query enrichment.
+    query_rewriter: Option<Arc<dyn crate::rewriter::QueryRewriter>>,
 }
 
 impl Default for ContextEngine {
@@ -51,6 +53,7 @@ impl Default for ContextEngine {
             cache: Arc::new(Mutex::new(ContextCache::new(DEFAULT_CACHE_CAPACITY))),
             sources: Vec::new(),
             insight_forge: None,
+            query_rewriter: None,
         }
     }
 }
@@ -72,6 +75,7 @@ impl ContextEngine {
             cache: self.cache,
             sources: self.sources,
             insight_forge: self.insight_forge,
+            query_rewriter: self.query_rewriter,
         }
     }
 
@@ -117,6 +121,13 @@ impl ContextEngine {
     pub fn with_sources(mut self, mut sources: Vec<Box<dyn ContextSource>>) -> Self {
         sources.sort_by_key(|s| std::cmp::Reverse(s.priority()));
         self.sources = sources;
+        self
+    }
+
+    /// Wire a query rewriter for contextual query enrichment.
+    /// Returns `self` for chaining.
+    pub fn with_query_rewriter(mut self, rewriter: Arc<dyn crate::rewriter::QueryRewriter>) -> Self {
+        self.query_rewriter = Some(rewriter);
         self
     }
 
@@ -217,6 +228,18 @@ impl ContextEngine {
         }
         // Hash context window
         hasher.update(request.context_window.to_le_bytes());
+        // Hash retrieval context fields that affect cache identity
+        if let Some(ref ctx) = request.retrieval_context {
+            if let Some(ref skill) = ctx.active_skill {
+                hasher.update(skill.as_bytes());
+            }
+            if let Some(ref task) = ctx.active_task {
+                hasher.update(task.title.as_bytes());
+            }
+            if let Some(ref correction) = ctx.recent_correction {
+                hasher.update(correction.corrected_to.as_bytes());
+            }
+        }
         format!("{:x}", hasher.finalize())
     }
 
@@ -364,6 +387,12 @@ impl ContextEngine {
     /// Returns the formatted memory text and the number of entries retrieved.
     async fn retrieve_memory(&self, request: &ContextRequest) -> Option<(String, usize)> {
         let retriever = self.memory_retriever.as_ref()?;
+
+        let enriched = match (&self.query_rewriter, &request.retrieval_context) {
+            (Some(rewriter), Some(ctx)) => rewriter.rewrite(&request.message_text, ctx).await,
+            _ => None,
+        };
+        let _ = &enriched; // Consumed in Task 4 when retrieve_with_enrichment is added
 
         // Use InsightForge if available and appropriate
         let entries = if let Some(ref forge) = self.insight_forge {
@@ -1205,5 +1234,62 @@ mod tests {
         let ctx = test_source_context();
         let result = engine.expand(&initial, "deferred_test", &ctx).await;
         assert!(result.is_err());
+    }
+
+    fn test_request() -> ContextRequest {
+        ContextRequest {
+            message_text: "test query".to_string(),
+            history: vec![Message::user("hello")],
+            system_prompt: "You are helpful.".to_string(),
+            strategy: ExecutionStrategy::DirectResponse,
+            tool_definitions: vec![],
+            context_window: 128_000,
+            session_key: None,
+            retrieval_context: None,
+        }
+    }
+
+    #[test]
+    fn cache_key_varies_by_skill() {
+        let mut req1 = test_request();
+        req1.retrieval_context = Some(crate::rewriter::RetrievalContext {
+            active_skill: Some("finance-management".into()),
+            ..Default::default()
+        });
+        let mut req2 = test_request();
+        req2.retrieval_context = Some(crate::rewriter::RetrievalContext {
+            active_skill: Some("task-management".into()),
+            ..Default::default()
+        });
+        assert_ne!(
+            ContextEngine::compute_cache_key(&req1),
+            ContextEngine::compute_cache_key(&req2),
+        );
+    }
+
+    #[test]
+    fn cache_key_varies_by_task() {
+        let mut req1 = test_request();
+        req1.retrieval_context = Some(crate::rewriter::RetrievalContext {
+            active_task: Some(crate::rewriter::ActiveTaskContext {
+                title: "March budget review".into(),
+                project_name: None,
+                domain: None,
+            }),
+            ..Default::default()
+        });
+        let mut req2 = test_request();
+        req2.retrieval_context = Some(crate::rewriter::RetrievalContext {
+            active_task: Some(crate::rewriter::ActiveTaskContext {
+                title: "API migration".into(),
+                project_name: None,
+                domain: None,
+            }),
+            ..Default::default()
+        });
+        assert_ne!(
+            ContextEngine::compute_cache_key(&req1),
+            ContextEngine::compute_cache_key(&req2),
+        );
     }
 }
