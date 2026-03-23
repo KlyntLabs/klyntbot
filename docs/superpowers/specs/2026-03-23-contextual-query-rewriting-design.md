@@ -98,8 +98,10 @@ pub struct RetrievalContext {
     pub active_task: Option<ActiveTaskContext>,
     /// Last N user messages (not assistant) for pronoun/reference resolution
     pub recent_user_messages: Vec<String>,
-    /// User's current cognitive state
-    pub situation: Option<UserSituationSnapshot>,
+    /// User's current cognitive state. Reuses the existing `UserSituation` from
+    /// `cognitive::situation` (fields: energy_level, focus_state, deadline_pressure,
+    /// distraction_risk). Passed as Option since situation may not be computed yet.
+    pub situation: Option<cognitive::UserSituation>,
     /// Desktop UI state — what the user is looking at right now
     pub active_view: Option<ActiveView>,
     /// Recent correction: if the user just rejected a result, what did they correct to?
@@ -112,12 +114,9 @@ pub struct ActiveTaskContext {
     pub domain: Option<String>,
 }
 
-pub struct UserSituationSnapshot {
-    pub energy: f64,
-    pub focus: f64,
-    pub deadline_pressure: f64,
-    pub distraction_risk: f64,
-}
+// NOTE: No UserSituationSnapshot — we reuse cognitive::UserSituation directly.
+// Field names are energy_level, focus_state, deadline_pressure, distraction_risk.
+// The rewriter reads these fields directly; no translation layer needed.
 
 pub struct ActiveView {
     pub dashboard: String,
@@ -132,6 +131,9 @@ pub struct CorrectionContext {
     pub corrected_to: String,
 }
 ```
+
+**Note on `cognitive` dependency:** `context_engine` already depends on `cognitive` types
+(via `MemoryRetriever`, `MemoryEntry`). Importing `UserSituation` adds no new dependency edge.
 
 ### QueryRewriter Trait (defined in `context_engine`)
 
@@ -188,14 +190,23 @@ fn query_specificity(query: &str, context: &RetrievalContext) -> Specificity {
     let has_pronouns = contains_pronouns(query);
     let has_named_entities = has_domain_keywords(query);
 
-    match (word_count, has_pronouns, has_named_entities) {
-        (_, false, true) if word_count >= 4 => Specificity::High,
-        (1..=3, _, false) => Specificity::Low,
-        (_, true, _) => Specificity::Low,
+    // Pronouns are checked first — they always indicate ambiguity,
+    // even when named entities are present ("what did John say about that?")
+    if has_pronouns {
+        return Specificity::Low;
+    }
+
+    match (word_count, has_named_entities) {
+        (_, true) if word_count >= 4 => Specificity::High,  // "show me March FIRE projection"
+        (1..=3, false) => Specificity::Low,                   // "how are we doing?"
         _ => Specificity::Medium,
     }
 }
 ```
+
+**Precedence rule:** Pronouns always force `Low` regardless of other signals. This prevents
+a query like "what did John say about that auth thing?" from being classified as `High`
+just because it has named entities and is long enough.
 
 **Heuristic rewriter — signal priority:**
 
@@ -204,9 +215,9 @@ fn query_specificity(query: &str, context: &RetrievalContext) -> Specificity {
 3. **Active task title + project** — current work focus
 4. **Active skill domain** — domain bias
 5. **Recent user message keywords** — top 3 non-stopword terms from last 1-2 messages
-6. **Energy-adaptive aggressiveness:**
-   - `energy < 0.4 OR deadline_pressure > 0.7` → include up to 4 signals
-   - `energy > 0.7 AND deadline_pressure < 0.3` → include top 2 signals only
+6. **Energy-adaptive aggressiveness** (uses `UserSituation` field names):
+   - `energy_level < 0.4 OR deadline_pressure > 0.7` → include up to 4 signals
+   - `energy_level > 0.7 AND deadline_pressure < 0.3` → include top 2 signals only
 
 **Assembly uses semantic fusion templates** (not keyword concatenation):
 
@@ -258,21 +269,21 @@ AgentRuntime::process_message()
   ├─ Step 4: IntentAnalyzer → analysis
   │
   ├─ Step 5.5 (NEW): Build RetrievalContext
-  │    - active_skill from SkillRouter
-  │    - active_task from session/RoutingContext
-  │    - recent_user_messages: last 2 user-role msgs from history
-  │    - situation: snapshot from shared UserSituation
-  │    - active_view: from shared desktop state (None until Phase 4)
-  │    - recent_correction: from AgentLoop correction detection
+  │    - active_skill: from SkillRouter result (profile.name())
+  │    - active_task: from focused task query (see "Data path for active_task" below)
+  │    - recent_user_messages: filter history for user-role msgs, take last 2
+  │    - situation: from shared Arc<Mutex<UserSituation>> (see "Data path for situation" below)
+  │    - active_view: None (until Phase 4 frontend wiring)
+  │    - recent_correction: from new per-session field (see "Data path for corrections" below)
   │
   ├─ Step 6: ContextEngine::assemble(ContextRequest)
   │    ContextRequest now carries: retrieval_context: Option<RetrievalContext>
   │
   │    └─ retrieve_memory(request)
-  │         ├─ QueryRewriter::rewrite(message_text, &retrieval_context)
+  │         ├─ self.query_rewriter.rewrite(message_text, &retrieval_context)
   │         │    → Option<RewriteResult>
   │         │
-  │         └─ InsightForge::retrieve(
+  │         └─ InsightForge::retrieve_with_enrichment(
   │              original_query,
   │              enriched_query,      // new parameter
   │              limit, session_key
@@ -283,19 +294,124 @@ AgentRuntime::process_message()
   │            └─ fan-out all sub-queries (no changes downstream)
 ```
 
-### Files changed
+### Wiring the QueryRewriter into ContextEngine
+
+`ContextEngine` gets a new optional field and builder method:
+
+```rust
+// In ContextEngine struct:
+query_rewriter: Option<Arc<dyn QueryRewriter>>,
+
+// Builder method:
+pub fn with_query_rewriter(mut self, rewriter: Arc<dyn QueryRewriter>) -> Self {
+    self.query_rewriter = Some(rewriter);
+    self
+}
+```
+
+In `retrieve_memory()`, before calling InsightForge:
+```rust
+let enriched = match (&self.query_rewriter, &request.retrieval_context) {
+    (Some(rewriter), Some(ctx)) => rewriter.rewrite(&request.message_text, ctx).await,
+    _ => None,
+};
+```
+
+In `AgentLoopBuilder::build()`, construct `ContextualQueryRewriter` and pass it:
+```rust
+let query_rewriter = Arc::new(ContextualQueryRewriter::new(rewrite_provider, config));
+context_engine = context_engine.with_query_rewriter(query_rewriter);
+```
+
+### InsightForge API change
+
+To avoid breaking the existing `retrieve()` signature (used in tests and the fallback path),
+add a **new method** rather than modifying the existing one:
+
+```rust
+/// Retrieve with an optional enriched query injected as sub_queries[1].
+pub async fn retrieve_with_enrichment(
+    &self,
+    query: &str,
+    enriched: Option<&RewriteResult>,
+    total_limit: usize,
+    session_key: Option<&str>,
+) -> Vec<MemoryEntry> {
+    // Decompose original
+    let mut sub_queries = self.decomposer.decompose(query, None).await;
+    // Inject enriched at position 1 if present
+    if let Some(result) = enriched {
+        sub_queries.insert(1.min(sub_queries.len()), result.enriched_query.clone());
+    }
+    // Fan-out as today...
+}
+
+/// Original method — unchanged, delegates internally.
+pub async fn retrieve(&self, query: &str, total_limit: usize, session_key: Option<&str>) -> Vec<MemoryEntry> {
+    self.retrieve_with_enrichment(query, None, total_limit, session_key).await
+}
+```
+
+This preserves backward compatibility — existing tests and the fallback path continue to
+call `retrieve()` with no changes.
+
+### Data path for `situation` (new infrastructure)
+
+`UserSituation` is currently computed on-demand by the coaching engine. We need a shared
+holder so the runtime can read it:
+
+1. **Add `Arc<Mutex<UserSituation>>` to `AgentRuntime`** — populated by the coaching engine
+   and productivity context source (which already computes situation for prompt injection).
+2. **`ProductivityContextSource` already holds situation** — it writes to a shared state
+   holder. We extend this to expose the `Arc<Mutex<UserSituation>>` to the runtime builder.
+3. **Fallback:** If situation hasn't been computed yet (cold start), `RetrievalContext.situation`
+   is `None` and the rewriter skips energy/deadline signals.
+
+Estimated: ~20 lines to add the shared state field + builder wiring.
+
+### Data path for `active_task` (new lightweight query)
+
+No existing field carries "active task." We add a lightweight query:
+
+1. **In Step 5.5**, query `TaskRepo::get_focused()` (already exists — returns the task in
+   the focus slot, if any). This is the user's current "active" task.
+2. **Map to `ActiveTaskContext`**: `title = task.title`, `project_name` from task's project
+   relation, `domain` inferred from the active skill name.
+3. **Requires `TaskRepo` access in `AgentRuntime`** — the runtime already has access to
+   `Repos` via the tool registry context. We thread `TaskRepo` into the runtime builder.
+
+Estimated: ~25 lines (query + mapping + builder plumbing).
+
+### Data path for `recent_correction` (new per-session state)
+
+Correction detection in `AgentLoop` currently fires a `DomainEvent` and doesn't store the
+result. We add a lightweight forwarding mechanism:
+
+1. **Add `last_correction: Option<CorrectionContext>` to `AgentLoop`'s per-session state.**
+   Set it when correction detection fires (alongside the existing event publish).
+2. **Pass it to `AgentRuntime::process_message()`** via a new optional field on the
+   parameters (or via `RoutingContext`).
+3. **Clear after one use** — the correction signal applies to the immediately next message
+   only. After the runtime reads it, `AgentLoop` resets it to `None`.
+
+Estimated: ~15 lines (field + set/read/clear).
+
+### Files changed (revised estimates)
 
 | File | Change | Lines |
 |------|--------|-------|
-| `context_engine/src/types.rs` | Add `RetrievalContext`, `ActiveTaskContext`, `UserSituationSnapshot`, `ActiveView`, `CorrectionContext`, `RewriteResult`, `RewriteSource` | ~60 |
-| `context_engine/src/rewriter.rs` | New: `QueryRewriter` trait | ~20 |
-| `context_engine/src/assembler/mod.rs` | `ContextRequest` gains `retrieval_context`. `retrieve_memory()` calls rewriter | ~20 |
-| `context_engine/src/insight_forge/mod.rs` | `retrieve()` gains `enriched_query: Option<&str>`, inserts at sub_queries[1] | ~10 |
-| `agent/src/adapters/query_rewriter.rs` | New: `ContextualQueryRewriter` (specificity check, heuristic templates, LLM fallback) | ~250 |
-| `agent/src/agent_runtime/runtime.rs` | Step 5.5: build `RetrievalContext`, pass into `ContextRequest` | ~30 |
-| `agent/src/agent_loop/mod.rs` | Expose `recent_correction` to runtime | ~10 |
+| `context_engine/src/rewriter.rs` | New: `QueryRewriter` trait, `RewriteResult`, `RewriteSource` | ~25 |
+| `context_engine/src/types.rs` | Add `RetrievalContext`, `ActiveTaskContext`, `ActiveView`, `CorrectionContext` | ~45 |
+| `context_engine/src/assembler/types.rs` | `ContextRequest` gains `retrieval_context: Option<RetrievalContext>` | ~5 |
+| `context_engine/src/assembler/mod.rs` | Add `query_rewriter` field + `with_query_rewriter()`. `retrieve_memory()` calls rewriter. Update `compute_cache_key()` to include retrieval context | ~35 |
+| `context_engine/src/insight_forge/mod.rs` | Add `retrieve_with_enrichment()` method. Refactor existing `retrieve()` to delegate. Update fallback path | ~40 |
+| `agent/src/adapters/query_rewriter.rs` | New: `ContextualQueryRewriter` (specificity, heuristic templates, LLM fallback) | ~280 |
+| `agent/src/agent_runtime/runtime.rs` | Step 5.5: build `RetrievalContext`, pass into `ContextRequest` | ~40 |
+| `agent/src/agent_loop/mod.rs` | Add `last_correction` field, set on detection, pass to runtime, clear after use | ~15 |
+| `agent/src/agent_loop/builder.rs` | Wire `QueryRewriter` into `ContextEngine`, thread `TaskRepo` + situation state | ~20 |
 
-**Total: ~400 lines of new/changed code.**
+**Total: ~505 lines of new/changed code** (revised from ~400 after accounting for data path
+infrastructure, InsightForge backward compat, and cache key updates).
 
 ### What does NOT change
 
@@ -310,16 +426,58 @@ AgentRuntime::process_message()
 
 ### Cache behavior
 
-The rewrite happens inside `assemble_uncached()` (after cache miss). Same message + same history = same cache key = rewritten results reused. No caching changes needed.
+The `compute_cache_key()` hash is updated to include retrieval context signals:
+
+```rust
+// Add to compute_cache_key():
+if let Some(ref ctx) = request.retrieval_context {
+    if let Some(ref skill) = ctx.active_skill {
+        hasher.update(skill.as_bytes());
+    }
+    if let Some(ref task) = ctx.active_task {
+        hasher.update(task.title.as_bytes());
+    }
+    if let Some(ref correction) = ctx.recent_correction {
+        hasher.update(correction.corrected_to.as_bytes());
+    }
+    // active_view.description and situation are NOT included in cache key:
+    // view changes rarely mid-message, and situation changes are continuous
+    // (would defeat caching). The 60s cache TTL handles staleness.
+}
+```
+
+This ensures that switching skills or tasks mid-session produces different cache keys,
+preventing stale enriched results. Situation and view are excluded to avoid cache thrashing
+(they change continuously), relying on the existing cache TTL for freshness.
 
 ### Dependency inversion
 
 ```
 context_engine (L3): defines QueryRewriter trait + RetrievalContext types
-agent (L5): implements ContextualQueryRewriter (needs DynProvider for LLM fallback)
+                     holds Option<Arc<dyn QueryRewriter>> in ContextEngine
+                     calls rewriter.rewrite() in retrieve_memory()
+
+agent (L5):          implements ContextualQueryRewriter
+                     constructed with: DynProvider (for LLM fallback, configurable model),
+                     RewriterConfig (timeout, aggressiveness, template set)
+                     wired via AgentLoopBuilder → context_engine.with_query_rewriter()
 ```
 
-Follows the same pattern as `ExtractionHandler`, `ConsolidationHandler`, `ReflectionHandler`, `SemanticFactEmbedder`.
+Follows the same pattern as `ExtractionHandler`, `ConsolidationHandler`, `ReflectionHandler`,
+`SemanticFactEmbedder`. The LLM provider for the rewriter is a **separate config entry**
+(`config.agents.rewriter_model` or similar) defaulting to the cheapest/fastest available
+model — NOT the primary conversation model.
+
+### LLM fallback latency isolation
+
+The rewriter's 800ms timeout is applied via `tokio::time::timeout` wrapping the entire
+`DynProvider::chat()` call inside `ContextualQueryRewriter::llm_rewrite()`. This is
+**separate from** InsightForge's `per_source_timeout_ms` — the rewrite completes (or times
+out) before InsightForge's fan-out begins. Worst-case total latency:
+- Heuristic path: 0ms rewrite + InsightForge's normal latency
+- LLM path: ≤800ms rewrite + InsightForge's normal latency
+
+These are sequential, not compounded — the rewriter runs once, then InsightForge runs once.
 
 ---
 
@@ -354,6 +512,9 @@ Follows the same pattern as `ExtractionHandler`, `ConsolidationHandler`, `Reflec
 | `no_rewriter_degrades_gracefully` | `query_rewriter: None` → system works as today |
 | `enriched_deduplicates_via_rrf` | Same fact from both queries → single entry in results |
 | `end_to_end_moment_2` | "how are we doing?" + finance skill → finance facts in top 3 |
+| `cache_key_varies_by_skill` | Same message with different `active_skill` → different cache keys |
+| `cache_key_varies_by_task` | Same message with different `active_task` → different cache keys |
+| `retrieve_with_enrichment_backward_compat` | `InsightForge::retrieve()` still works with no enrichment arg |
 
 ---
 
@@ -374,7 +535,7 @@ Follows the same pattern as `ExtractionHandler`, `ConsolidationHandler`, `Reflec
 |--------|--------|
 | Clarification drop rate | -30% vs baseline |
 | Rewrite trigger rate | 25-35% of messages |
-| Respectfully-lazy skip rate | 40-50% (High specificity) |
+| Respectfully-lazy skip rate | 40-50% (High specificity) — **measure actual distribution in Phase 1 before setting Phase 2 targets** |
 | LLM fallback rate | <30% of rewritten queries |
 | Enriched RRF contribution | >50% when triggered |
 | Correction effectiveness (Moment 7) | >80% improvement on next query |
