@@ -61,11 +61,38 @@ fn has_domain_keywords(query: &str) -> bool {
     }
 
     // Check for capitalized proper nouns (not first word in sentence).
+    // Excludes common English words that are always/often capitalized.
+    const CAPITALIZED_EXCEPTIONS: &[&str] = &[
+        "I", "I'm", "I'll", "I'd", "I've",
+        // Common sentence-mid words that may appear capitalized after punctuation
+        "The", "A", "An", "My", "Your", "His", "Her", "Its", "Our", "Their",
+        "Is", "Are", "Was", "Were", "Be", "Am",
+        "Do", "Does", "Did", "Can", "Could", "Would", "Should", "May", "Might",
+        "If", "So", "But", "And", "Or", "Not", "No", "Yes",
+    ];
     let words: Vec<&str> = query.split_whitespace().collect();
     words.iter().skip(1).any(|w| {
-        let first = w.chars().next();
+        let trimmed = w.trim_matches(|c: char| !c.is_alphanumeric());
+        let first = trimmed.chars().next();
         first.is_some_and(|c| c.is_uppercase() && c.is_alphabetic())
+            && trimmed.len() > 1
+            && !CAPITALIZED_EXCEPTIONS.contains(&trimmed)
     })
+}
+
+/// Action verbs that indicate the user knows exactly what they want.
+/// These combined with named entities signal High specificity.
+const ACTION_VERBS: &[&str] = &[
+    "show", "list", "calculate", "compare", "display", "export", "create",
+    "delete", "remove", "add", "update", "set", "run", "execute", "schedule",
+    "plot", "graph", "summarize", "generate",
+];
+
+fn has_action_verb(query: &str) -> bool {
+    let lower = query.to_lowercase();
+    lower
+        .split_whitespace()
+        .any(|w| ACTION_VERBS.contains(&w.trim_matches(|c: char| !c.is_alphanumeric())))
 }
 
 fn query_specificity(query: &str) -> Specificity {
@@ -76,9 +103,12 @@ fn query_specificity(query: &str) -> Specificity {
 
     let word_count = query.split_whitespace().count();
     let has_entities = has_domain_keywords(query);
+    let has_action = has_action_verb(query);
 
-    // No pronouns + entities + ≥4 words → High
-    if has_entities && word_count >= 4 {
+    // High: entities + action verb + sufficient length
+    // "show me March FIRE projection" → High (action + entity)
+    // "how is my French going?" → Medium (entity but no action verb — status query benefits from enrichment)
+    if has_entities && has_action && word_count >= 4 {
         return Specificity::High;
     }
 
