@@ -671,26 +671,38 @@ fn test_signal_accumulator_distraction_streak() {
 fn test_signal_accumulator_cooldown_prevents_refire() {
     let mut acc = SignalAccumulator::new();
 
-    for _ in 0..5 {
-        acc.push_event(&DomainEvent::DistractionDetected {
-            app: "reddit".into(),
-            duration_secs: None,
-            context: "test".into(),
+    // Use budget_warning trigger (distraction_streak was removed as a coaching trigger).
+    // Push enough budget alerts to fire the condition.
+    for _ in 0..3 {
+        acc.push_event(&DomainEvent::BudgetAlert {
+            category: "dining".into(),
+            spent: 280.0,
+            limit: 300.0,
         });
     }
 
     let situation = distraction_situation();
 
-    // First eval fires
+    // First eval fires budget_warning
     let fired1 = acc.evaluate(&situation);
-    assert!(!fired1.is_empty());
+    assert!(
+        fired1.iter().any(|t| t.condition_name == "budget_warning"),
+        "First eval should fire budget_warning"
+    );
 
-    // Second eval — cooldown blocks
+    // Push another alert immediately
+    acc.push_event(&DomainEvent::BudgetAlert {
+        category: "dining".into(),
+        spent: 290.0,
+        limit: 300.0,
+    });
+
+    // Second eval — cooldown blocks re-fire
     let fired2 = acc.evaluate(&situation);
-    let has_distraction = fired2
+    let has_budget = fired2
         .iter()
-        .any(|t| t.condition_name == "distraction_streak");
-    assert!(!has_distraction, "Cooldown should prevent re-fire");
+        .any(|t| t.condition_name == "budget_warning");
+    assert!(!has_budget, "Cooldown should prevent re-fire");
 }
 
 // ── Coaching: intervention routing + rate limiting ─────────────
