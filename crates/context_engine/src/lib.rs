@@ -30,3 +30,9 @@ pub use summary_provider::SummaryProvider;
 pub use token_counter::{
     best_token_counter, default_token_counter, CharTokenCounter, TiktokenCounter, TokenCounter,
 };
+
+pub mod rewriter;
+pub use rewriter::{
+    ActiveTaskContext, ActiveView, CorrectionContext, QueryRewriter, RetrievalContext,
+    RewriteResult, RewriteSource, UserSituationSnapshot,
+};
