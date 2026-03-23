@@ -392,14 +392,13 @@ impl ContextEngine {
             (Some(rewriter), Some(ctx)) => rewriter.rewrite(&request.message_text, ctx).await,
             _ => None,
         };
-        let _ = &enriched; // Consumed in Task 4 when retrieve_with_enrichment is added
-
         // Use InsightForge if available and appropriate
         let entries = if let Some(ref forge) = self.insight_forge {
             if forge.should_activate(&request.strategy, &request.message_text) {
                 forge
-                    .retrieve(
+                    .retrieve_with_enrichment(
                         &request.message_text,
+                        enriched.as_ref(),
                         self.memory_retrieval_limit,
                         request.session_key.as_deref(),
                     )

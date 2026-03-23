@@ -107,13 +107,30 @@ impl InsightForge {
 
     /// Retrieve context entries via multi-dimensional search.
     ///
-    /// 1. Checks the circuit breaker — falls back to plain memory retrieval if open.
-    /// 2. Decomposes the query with a timeout — falls back on timeout.
-    /// 3. For each sub-query, searches all sources in parallel (each with a per-source timeout).
-    /// 4. Merges results via RRF, deduplicates, re-normalises scores to 0.0–1.0.
+    /// Delegates to [`retrieve_with_enrichment`](Self::retrieve_with_enrichment)
+    /// without any enriched query.
     pub async fn retrieve(
         &self,
         query: &str,
+        total_limit: usize,
+        session_key: Option<&str>,
+    ) -> Vec<MemoryEntry> {
+        self.retrieve_with_enrichment(query, None, total_limit, session_key)
+            .await
+    }
+
+    /// Retrieve context entries via multi-dimensional search, optionally
+    /// injecting an enriched query from the query rewriter.
+    ///
+    /// 1. Checks the circuit breaker — falls back to plain memory retrieval if open.
+    /// 2. Decomposes the query with a timeout — falls back on timeout.
+    /// 3. If an enriched query is provided, inserts it into the sub-query list.
+    /// 4. For each sub-query, searches all sources in parallel (each with a per-source timeout).
+    /// 5. Merges results via RRF, deduplicates, re-normalises scores to 0.0–1.0.
+    pub async fn retrieve_with_enrichment(
+        &self,
+        query: &str,
+        enriched: Option<&crate::rewriter::RewriteResult>,
         total_limit: usize,
         session_key: Option<&str>,
     ) -> Vec<MemoryEntry> {
@@ -128,7 +145,7 @@ impl InsightForge {
         }
 
         // 2. Decompose with timeout.
-        let sub_queries = {
+        let mut sub_queries = {
             let decompose_fut = self.decomposer.decompose(query, None);
             let timeout = tokio::time::timeout(
                 std::time::Duration::from_millis(self.config.decomposer_timeout_ms),
@@ -149,6 +166,11 @@ impl InsightForge {
                 }
             }
         };
+
+        // 2b. Inject enriched query from the rewriter (if available).
+        if let Some(result) = enriched {
+            sub_queries.insert(1.min(sub_queries.len()), result.enriched_query.clone());
+        }
 
         // 3. Fan-out: for each sub-query, search all sources in parallel.
         let per_source_limit = self.config.per_source_limit;
