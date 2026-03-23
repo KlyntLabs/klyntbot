@@ -395,6 +395,13 @@ impl ContextEngine {
             (Some(rewriter), Some(ctx)) => rewriter.rewrite(&request.message_text, ctx).await,
             _ => None,
         };
+        if let Some(ref e) = enriched {
+            tracing::debug!(
+                enriched_query = e.enriched_query.as_str(),
+                confidence = e.confidence,
+                "🧠 ContextEngine: passing enriched query to InsightForge"
+            );
+        }
         // Use InsightForge if available and appropriate
         let entries = if let Some(ref forge) = self.insight_forge {
             if forge.should_activate(&request.strategy, &request.message_text) {

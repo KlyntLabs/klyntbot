@@ -6,6 +6,7 @@
 
 use async_trait::async_trait;
 use context_engine::rewriter::{QueryRewriter, RetrievalContext, RewriteResult, RewriteSource};
+use tracing::debug;
 
 // ---------------------------------------------------------------------------
 // Specificity classification
@@ -405,13 +406,41 @@ impl ContextualQueryRewriter {
 #[async_trait]
 impl QueryRewriter for ContextualQueryRewriter {
     async fn rewrite(&self, original: &str, context: &RetrievalContext) -> Option<RewriteResult> {
-        match query_specificity(original) {
+        let specificity = query_specificity(original);
+        debug!(
+            query = original,
+            ?specificity,
+            skill = context.active_skill.as_deref().unwrap_or("none"),
+            task = context.active_task.as_ref().map(|t| t.title.as_str()).unwrap_or("none"),
+            energy = context.situation.as_ref().map(|s| s.energy_level).unwrap_or(-1.0),
+            has_correction = context.recent_correction.is_some(),
+            "🔍 QueryRewriter: evaluating"
+        );
+
+        let result = match specificity {
             Specificity::High => None,
             Specificity::Medium | Specificity::Low => {
                 self.heuristic_rewrite(original, context)
                 // TODO Phase 2: LLM fallback when heuristic returns None for Low specificity
             }
+        };
+
+        match &result {
+            Some(r) => debug!(
+                original = original,
+                enriched = r.enriched_query.as_str(),
+                confidence = r.confidence,
+                source = ?r.source,
+                "✅ QueryRewriter: enriched query produced"
+            ),
+            None => debug!(
+                original = original,
+                ?specificity,
+                "⏭️ QueryRewriter: skipped (respectfully lazy)"
+            ),
         }
+
+        result
     }
 }
 
