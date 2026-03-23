@@ -39,6 +39,11 @@
 
 ```rust
 // crates/context_engine/src/rewriter.rs
+//
+// IMPORTANT: context_engine is L3, cognitive is L5. We CANNOT import
+// cognitive::UserSituation here. Instead we define a local snapshot struct
+// with the fields the rewriter needs. The agent crate (L5) maps from
+// cognitive::UserSituation → UserSituationSnapshot when building RetrievalContext.
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
@@ -56,13 +61,24 @@ pub enum RewriteSource {
     Llm,
 }
 
+/// Snapshot of user situation signals relevant to query rewriting.
+/// Mirrors a subset of cognitive::UserSituation fields — populated
+/// by the agent crate when building RetrievalContext.
+#[derive(Debug, Clone, Default)]
+pub struct UserSituationSnapshot {
+    pub energy_level: f64,
+    pub focus_state: f64,
+    pub deadline_pressure: f64,
+    pub distraction_risk: f64,
+}
+
 /// Rich context available at retrieval time for query enrichment.
 #[derive(Debug, Clone, Default)]
 pub struct RetrievalContext {
     pub active_skill: Option<String>,
     pub active_task: Option<ActiveTaskContext>,
     pub recent_user_messages: Vec<String>,
-    pub situation: Option<cognitive::situation::UserSituation>,
+    pub situation: Option<UserSituationSnapshot>,
     pub active_view: Option<ActiveView>,
     pub recent_correction: Option<CorrectionContext>,
 }
@@ -105,7 +121,7 @@ In `crates/context_engine/src/lib.rs`, add after the existing module declaration
 pub mod rewriter;
 pub use rewriter::{
     ActiveTaskContext, ActiveView, CorrectionContext, QueryRewriter, RetrievalContext,
-    RewriteResult, RewriteSource,
+    RewriteResult, RewriteSource, UserSituationSnapshot,
 };
 ```
 
@@ -154,7 +170,7 @@ Expected: SUCCESS
 - [ ] **Step 4: Commit**
 
 ```bash
-git add crates/context_engine/src/assembler/types.rs crates/context_engine/src/assembler/mod.rs crates/agent/
+git add crates/context_engine/src/assembler/
 git commit -m "feat(context-engine): add retrieval_context field to ContextRequest"
 ```
 
@@ -279,7 +295,11 @@ In `retrieve_memory` (line ~365), before the InsightForge/retriever calls, add:
         };
 ```
 
-Then pass `enriched` to InsightForge (this compiles after Task 4).
+The `enriched` variable isn't consumed until Task 4 adds `retrieve_with_enrichment`. For now, add a temporary suppression to avoid unused-variable warnings:
+
+```rust
+        let _ = &enriched; // Used in Task 4 when retrieve_with_enrichment is added
+```
 
 - [ ] **Step 7: Verify compilation**
 
@@ -308,7 +328,12 @@ Add to the InsightForge test module:
 #[tokio::test]
 async fn retrieve_delegates_to_enrichment_with_none() {
     // Verify that retrieve() produces identical results to retrieve_with_enrichment(None)
-    let forge = build_test_forge();
+    // Construct InsightForge manually (no build_test_forge helper — construct inline
+    // following the pattern used in existing InsightForge tests in this file)
+    let retriever: Arc<dyn MemoryRetriever> = Arc::new(MockRetriever::new(/* test entries */));
+    let decomposer: Arc<dyn QueryDecomposer> = Arc::new(HeuristicDecomposer);
+    let forge = InsightForge::new(InsightForgeConfig::default(), decomposer, retriever);
+
     let result_old = forge.retrieve("test query", 10, None).await;
     let result_new = forge.retrieve_with_enrichment("test query", None, 10, None).await;
     assert_eq!(result_old.len(), result_new.len());
@@ -506,6 +531,7 @@ Add to the test module:
 ```rust
     use context_engine::rewriter::{
         ActiveTaskContext, CorrectionContext, RetrievalContext, RewriteSource,
+        UserSituationSnapshot,
     };
 
     fn finance_context() -> RetrievalContext {
@@ -568,8 +594,10 @@ Add to the test module:
     #[tokio::test]
     async fn low_energy_includes_more_signals() {
         let rewriter = ContextualQueryRewriter::heuristic_only();
-        let mut situation = cognitive::situation::UserSituation::default();
-        situation.energy_level = 0.2;
+        let situation = UserSituationSnapshot {
+            energy_level: 0.2,
+            ..Default::default()
+        };
         let ctx = RetrievalContext {
             active_skill: Some("finance-management".into()),
             active_task: Some(ActiveTaskContext {
@@ -678,7 +706,9 @@ impl ContextualQueryRewriter {
     }
 }
 
-fn extract_key_terms_from(text: &str) -> String {
+/// Extract key terms from text, filtering stop words. Public so AgentLoop
+/// can use it for correction topic extraction (Task 7).
+pub fn extract_key_terms_from(text: &str) -> String {
     let stop_words: std::collections::HashSet<&str> = [
         "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
         "have", "has", "had", "do", "does", "did", "will", "would", "could",
@@ -761,7 +791,7 @@ pub mod query_rewriter;
 
 - [ ] **Step 7: Run all tests**
 
-Run: `cargo nextest run -p agent -E 'test(query_rewriter)' -E 'test(specificity)'`
+Run: `cargo nextest run -p agent -E 'test(query_rewriter) + test(specificity)'`
 Expected: ALL PASS
 
 - [ ] **Step 8: Commit**
@@ -807,15 +837,24 @@ In `process_message()`, after the intent analysis step and before ContextRequest
         let retrieval_context = {
             let active_skill = profile.as_ref().map(|p| p.name().to_string());
 
+            // Message is an enum (User/Assistant/System/Tool) — use .role() method
             let recent_user_messages: Vec<String> = history.iter()
                 .rev()
-                .filter(|m| m.role == providers::MessageRole::User)
+                .filter(|m| m.role() == providers::MessageRole::User)
                 .take(2)
                 .map(|m| m.content_text().unwrap_or_default().chars().take(200).collect())
                 .collect();
 
+            // Map cognitive::UserSituation → context_engine::UserSituationSnapshot
+            // (context_engine cannot depend on cognitive directly — L3 vs L5)
             let situation = if let Some(ref sit) = self.user_situation {
-                Some(sit.lock().await.clone())
+                let s = sit.lock().await;
+                Some(context_engine::UserSituationSnapshot {
+                    energy_level: s.energy_level,
+                    focus_state: s.focus_state,
+                    deadline_pressure: s.deadline_pressure,
+                    distraction_risk: s.distraction_risk,
+                })
             } else {
                 None
             };
@@ -873,14 +912,14 @@ In the correction detection block (~line 851-915), after `emit_correction_signal
 
 ```rust
         self.last_correction = Some(context_engine::CorrectionContext {
-            rejected_topic: extract_key_terms_from(
+            rejected_topic: crate::adapters::query_rewriter::extract_key_terms_from(
                 &last_assistant.chars().take(200).collect::<String>()
             ),
             corrected_to: content.to_string(),
         });
 ```
 
-(Import `extract_key_terms_from` from the query_rewriter adapter, or inline a simplified version.)
+Note: `extract_key_terms_from` is `pub` in `adapters::query_rewriter` (made public in Task 5 for this purpose).
 
 - [ ] **Step 3: Thread correction through `run_pipeline` to runtime**
 
