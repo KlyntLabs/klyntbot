@@ -29,6 +29,11 @@ export interface World {
         creditCard: Ref;
         brokerage: Ref;
     };
+    portfolios: {
+        retirement: Ref;
+        brokerage: Ref;
+    };
+    investments: Map<string, Ref>;
 
     // Notes (populated by notes module)
     notebooks: {
@@ -52,6 +57,8 @@ export function createWorld(weekStart: Date): World {
         projects: { apiRedesign: empty(), parisTrip: empty(), fireGoal: empty(), languageLearning: empty() },
         objectives: new Map(),
         accounts: { checking: empty(), savings: empty(), creditCard: empty(), brokerage: empty() },
+        portfolios: { retirement: empty(), brokerage: empty() },
+        investments: new Map(),
         notebooks: { workResearch: empty(), studyNotes: empty(), dailyJournal: empty() },
         createdNotes: new Map(),
         createdTasks: new Map(),

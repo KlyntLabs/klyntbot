@@ -1,11 +1,13 @@
 use desktop_shared::commands::{
-    FinanceInvestmentCreateParams, FinanceInvestmentUpdateParams, FinancePortfolioCreateParams,
+    FinanceAllocationTargetUpsertParams, FinanceInvestmentCreateParams,
+    FinanceInvestmentTxCreateParams, FinanceInvestmentUpdateParams, FinancePortfolioCreateParams,
     FinancePortfolioResponse,
 };
 use desktop_shared::errors::ApiError;
 use futures_util::future::try_join_all;
 use storage::rows::finance::{
-    FinanceInvestmentFilter, FinanceInvestmentPatch, FinanceInvestmentRow, FinancePortfolioRow,
+    FinanceAllocationTargetRow, FinanceInvestmentFilter, FinanceInvestmentPatch,
+    FinanceInvestmentRow, FinanceInvestmentTxRow, FinancePortfolioRow,
 };
 
 use crate::errors::{map_storage_err, parse_naive_date};
@@ -160,6 +162,86 @@ impl AppCore {
             .finance
             .investments
             .list_investments(&filter)
+            .await
+            .map_err(map_storage_err)
+    }
+
+    // ── Allocation Targets ────────────────────────────────────────
+
+    pub async fn finance_allocation_target_upsert(
+        &self,
+        params: FinanceAllocationTargetUpsertParams,
+    ) -> HandlerResult<FinanceAllocationTargetRow> {
+        let row = self
+            .repos
+            .finance
+            .allocations
+            .add(
+                &params.portfolio_id,
+                &params.asset_class,
+                &params.target_weight,
+                &params.tolerance_band,
+            )
+            .await
+            .map_err(map_storage_err)?;
+        Ok((row, Self::finance_updates(params.portfolio_id)))
+    }
+
+    pub async fn finance_allocation_targets(
+        &self,
+        portfolio_id: String,
+    ) -> Result<Vec<FinanceAllocationTargetRow>, ApiError> {
+        self.repos
+            .finance
+            .allocations
+            .list_by_portfolio(&portfolio_id)
+            .await
+            .map_err(map_storage_err)
+    }
+
+    // ── Investment Transactions ────────────────────────────────────
+
+    pub async fn finance_investment_tx_create(
+        &self,
+        params: FinanceInvestmentTxCreateParams,
+    ) -> HandlerResult<FinanceInvestmentTxRow> {
+        let id = uuid::Uuid::new_v4().to_string();
+        let now = chrono::Utc::now();
+        let tx_date = parse_naive_date(&params.tx_date)
+            .ok_or_else(|| ApiError::new("VALIDATION", "invalid txDate format"))?;
+        let row = FinanceInvestmentTxRow {
+            id: id.clone(),
+            investment_id: params.investment_id,
+            tx_type: params.tx_type,
+            quantity: params.quantity,
+            price_per_unit: params.price_per_unit,
+            total_amount: params.total_amount,
+            currency: params.currency.clone(),
+            fees: params.fees.unwrap_or(0),
+            tx_date,
+            notes: params.notes,
+            created_at: now,
+            base_total_amount: params.total_amount,
+            base_currency: params.currency,
+            exchange_rate: 1.0,
+        };
+        self.repos
+            .finance
+            .investments
+            .add_investment_tx(&row)
+            .await
+            .map_err(map_storage_err)?;
+        Ok((row, Self::finance_updates(id)))
+    }
+
+    pub async fn finance_investment_txs(
+        &self,
+        investment_id: String,
+    ) -> Result<Vec<FinanceInvestmentTxRow>, ApiError> {
+        self.repos
+            .finance
+            .investments
+            .list_investment_txs(&investment_id)
             .await
             .map_err(map_storage_err)
     }

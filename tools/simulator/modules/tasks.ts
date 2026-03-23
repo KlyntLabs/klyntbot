@@ -99,20 +99,91 @@ export const tasksModule: SimulatorModule = {
         });
         console.log(`  2 custom columns created`);
 
-        // Note: custom_column_values FK references legacy `actions` table, not `tasks`.
-        // Skipping value assignment until the schema is migrated.
-        // Custom columns are created (visible in UI) but values can't be set on new tasks yet.
+        // Set custom column values on a few tasks
+        const authLayer = world.createdTasks.get("auth-layer");
+        const jwtRefresh = world.createdTasks.get("jwt-refresh");
+        const rateLimiting = world.createdTasks.get("rate-limiting");
+        const apiDocs = world.createdTasks.get("api-docs");
+        const apiTests = world.createdTasks.get("api-tests");
+        const apiMigration = world.createdTasks.get("api-migration");
+        if (authLayer && complexityCol?.id) {
+            await client.post("custom_column_value_set", {
+                taskId: authLayer.id,
+                columnId: complexityCol.id,
+                valueJson: JSON.stringify("high"),
+            });
+            await client.post("custom_column_value_set", {
+                taskId: authLayer.id,
+                columnId: storyPointsCol.id,
+                valueJson: JSON.stringify(8),
+            });
+        }
+        if (jwtRefresh && complexityCol?.id) {
+            await client.post("custom_column_value_set", {
+                taskId: jwtRefresh.id,
+                columnId: complexityCol.id,
+                valueJson: JSON.stringify("high"),
+            });
+        }
 
-        // NOTE: task_dependencies — no dev server dispatch command exists.
-        // TaskRepo::add_dependency() is only accessible at the Rust repo level. Skipped.
+        // Task dependencies: jwt-refresh blocked by auth-layer, api-tests blocked by jwt-refresh
+        if (authLayer && jwtRefresh) {
+            await client.postFlat("task_add_dependency", { taskId: jwtRefresh.id, blockerId: authLayer.id });
+        }
+        if (jwtRefresh && apiTests) {
+            await client.postFlat("task_add_dependency", { taskId: apiTests.id, blockerId: jwtRefresh.id });
+        }
+        if (rateLimiting && apiMigration) {
+            await client.postFlat("task_add_dependency", { taskId: apiMigration.id, blockerId: rateLimiting.id });
+        }
+        console.log(`  3 task dependencies created`);
 
-        // NOTE: task_attachments — no dev server dispatch command exists.
-        // TaskRepo::add_attachment() is only accessible at the Rust repo level. Skipped.
+        // Task attachments
+        if (authLayer) {
+            await client.postFlat("task_add_attachment", {
+                taskId: authLayer.id,
+                attachmentType: "link",
+                value: "https://datatracker.ietf.org/doc/html/rfc7519",
+                title: "JWT RFC 7519",
+            });
+        }
+        if (apiDocs) {
+            await client.postFlat("task_add_attachment", {
+                taskId: apiDocs.id,
+                attachmentType: "link",
+                value: "https://swagger.io/specification/",
+                title: "OpenAPI 3.1 Spec",
+            });
+        }
+        console.log(`  2 task attachments created`);
 
-        // NOTE: task_time_entries — no dev server dispatch command exists.
-        // TaskRepo::add_time_entry() is only accessible at the Rust repo level.
-        // (Separate from the productivity_time_entry_create command which writes to
-        // the productivity time_entries table, not task_time_entries.) Skipped.
+        // Task time entries
+        const weekStartIso = world.weekStart.toISOString();
+        if (authLayer) {
+            await client.postFlat("task_add_time_entry", {
+                taskId: authLayer.id,
+                startedAt: weekStartIso,
+                durationSecs: 5400,
+                note: "Initial auth layer scaffolding",
+            });
+        }
+        if (jwtRefresh) {
+            await client.postFlat("task_add_time_entry", {
+                taskId: jwtRefresh.id,
+                startedAt: weekStartIso,
+                durationSecs: 3600,
+                note: "Research JWT rotation strategies",
+            });
+        }
+        if (rateLimiting) {
+            await client.postFlat("task_add_time_entry", {
+                taskId: rateLimiting.id,
+                startedAt: weekStartIso,
+                durationSecs: 2700,
+                note: "Prototype sliding window limiter",
+            });
+        }
+        console.log(`  3 task time entries created`);
     },
 
     async simulateDay(world, client, day) {

@@ -497,6 +497,10 @@ fn run_desktop_app() {
             commands::finance::finance_portfolio_create,
             commands::finance::finance_investment_create,
             commands::finance::finance_investment_update,
+            commands::finance::finance_allocation_target_upsert,
+            commands::finance::finance_allocation_targets,
+            commands::finance::finance_investment_tx_create,
+            commands::finance::finance_investment_txs,
             // Finance — reports
             commands::finance::finance_report_spending,
             commands::finance::finance_report_income,

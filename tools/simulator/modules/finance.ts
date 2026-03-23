@@ -103,15 +103,17 @@ export const financeModule: SimulatorModule = {
             description: "Tax-advantaged retirement",
             currency: "USD",
         });
+        world.portfolios.retirement = { id: retirement.id, title: "Retirement 401k" };
         const brokeragePortfolio = await client.post<CreateResponse>("finance_portfolio_create", {
             name: "Brokerage",
             description: "General investment account",
             currency: "USD",
         });
+        world.portfolios.brokerage = { id: brokeragePortfolio.id, title: "Brokerage" };
         console.log(`  2 portfolios created`);
 
         // Create investments in each portfolio
-        await client.post<CreateResponse>("finance_investment_create", {
+        const vti = await client.post<CreateResponse>("finance_investment_create", {
             portfolioId: retirement.id,
             assetType: "etf",
             symbol: "VTI",
@@ -120,7 +122,8 @@ export const financeModule: SimulatorModule = {
             quantity: "65.5",
             currency: "USD",
         });
-        await client.post<CreateResponse>("finance_investment_create", {
+        world.investments.set("VTI", { id: vti.id, title: "VTI" });
+        const vxus = await client.post<CreateResponse>("finance_investment_create", {
             portfolioId: retirement.id,
             assetType: "etf",
             symbol: "VXUS",
@@ -129,7 +132,8 @@ export const financeModule: SimulatorModule = {
             quantity: "42.3",
             currency: "USD",
         });
-        await client.post<CreateResponse>("finance_investment_create", {
+        world.investments.set("VXUS", { id: vxus.id, title: "VXUS" });
+        const bnd = await client.post<CreateResponse>("finance_investment_create", {
             portfolioId: retirement.id,
             assetType: "bond",
             symbol: "BND",
@@ -138,7 +142,8 @@ export const financeModule: SimulatorModule = {
             quantity: "30.0",
             currency: "USD",
         });
-        await client.post<CreateResponse>("finance_investment_create", {
+        world.investments.set("BND", { id: bnd.id, title: "BND" });
+        const voo = await client.post<CreateResponse>("finance_investment_create", {
             portfolioId: brokeragePortfolio.id,
             assetType: "etf",
             symbol: "VOO",
@@ -147,7 +152,8 @@ export const financeModule: SimulatorModule = {
             quantity: "28.7",
             currency: "USD",
         });
-        await client.post<CreateResponse>("finance_investment_create", {
+        world.investments.set("VOO", { id: voo.id, title: "VOO" });
+        const qqq = await client.post<CreateResponse>("finance_investment_create", {
             portfolioId: brokeragePortfolio.id,
             assetType: "etf",
             symbol: "QQQ",
@@ -156,7 +162,8 @@ export const financeModule: SimulatorModule = {
             quantity: "15.2",
             currency: "USD",
         });
-        await client.post<CreateResponse>("finance_investment_create", {
+        world.investments.set("QQQ", { id: qqq.id, title: "QQQ" });
+        const schd = await client.post<CreateResponse>("finance_investment_create", {
             portfolioId: brokeragePortfolio.id,
             assetType: "etf",
             symbol: "SCHD",
@@ -165,6 +172,7 @@ export const financeModule: SimulatorModule = {
             quantity: "22.1",
             currency: "USD",
         });
+        world.investments.set("SCHD", { id: schd.id, title: "SCHD" });
         console.log(`  6 investments created across 2 portfolios`);
 
         // Create finance goals
@@ -208,13 +216,84 @@ export const financeModule: SimulatorModule = {
         });
         console.log(`  2 liabilities created`);
 
-        // NOTE: finance_allocation_targets — no dev server dispatch command exists.
-        // The FinanceAllocationRepo.add() is only accessible at the Rust repo level,
-        // not exposed as a Tauri/dev-server command. Skipped.
+        // Allocation targets for retirement portfolio (60/30/10 split)
+        await client.post("finance_allocation_target_upsert", {
+            portfolioId: retirement.id,
+            assetClass: "equity",
+            targetWeight: "0.60",
+            toleranceBand: "0.05",
+        });
+        await client.post("finance_allocation_target_upsert", {
+            portfolioId: retirement.id,
+            assetClass: "international",
+            targetWeight: "0.30",
+            toleranceBand: "0.05",
+        });
+        await client.post("finance_allocation_target_upsert", {
+            portfolioId: retirement.id,
+            assetClass: "bonds",
+            targetWeight: "0.10",
+            toleranceBand: "0.03",
+        });
+        // Brokerage: growth-oriented (70/20/10)
+        await client.post("finance_allocation_target_upsert", {
+            portfolioId: brokeragePortfolio.id,
+            assetClass: "equity",
+            targetWeight: "0.70",
+            toleranceBand: "0.05",
+        });
+        await client.post("finance_allocation_target_upsert", {
+            portfolioId: brokeragePortfolio.id,
+            assetClass: "growth",
+            targetWeight: "0.20",
+            toleranceBand: "0.05",
+        });
+        await client.post("finance_allocation_target_upsert", {
+            portfolioId: brokeragePortfolio.id,
+            assetClass: "dividend",
+            targetWeight: "0.10",
+            toleranceBand: "0.03",
+        });
+        console.log(`  6 allocation targets set across 2 portfolios`);
 
-        // NOTE: finance_investment_transactions — no dev server dispatch command exists.
-        // The FinanceInvestmentRepo.add_investment_tx() is only accessible at the Rust
-        // repo level, not exposed as a Tauri/dev-server command. Skipped.
+        // Investment transactions (historical buys)
+        const weekStr = formatDate(world.weekStart);
+        await client.post("finance_investment_tx_create", {
+            investmentId: vti.id,
+            txType: "buy",
+            totalAmount: 500000,
+            currency: "USD",
+            txDate: weekStr,
+            quantity: 22.0,
+            pricePerUnit: 22727,
+        });
+        await client.post("finance_investment_tx_create", {
+            investmentId: voo.id,
+            txType: "buy",
+            totalAmount: 400000,
+            currency: "USD",
+            txDate: weekStr,
+            quantity: 9.5,
+            pricePerUnit: 42105,
+        });
+        await client.post("finance_investment_tx_create", {
+            investmentId: qqq.id,
+            txType: "buy",
+            totalAmount: 300000,
+            currency: "USD",
+            txDate: weekStr,
+            quantity: 7.5,
+            pricePerUnit: 40000,
+        });
+        await client.post("finance_investment_tx_create", {
+            investmentId: schd.id,
+            txType: "dividend",
+            totalAmount: 8500,
+            currency: "USD",
+            txDate: weekStr,
+            notes: "Quarterly dividend payout",
+        });
+        console.log(`  4 investment transactions created`);
     },
 
     async simulateDay(world, client, day) {

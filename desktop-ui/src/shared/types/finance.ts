@@ -82,6 +82,37 @@ export interface FinanceInvestment {
   marketRate?: number;
 }
 
+// ── Finance Allocation Targets ─────────────────────────────
+
+export interface FinanceAllocationTarget {
+  id: string;
+  portfolioId: string;
+  assetClass: string;
+  targetWeight: string;
+  toleranceBand: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ── Finance Investment Transactions ───────────────────────
+
+export interface FinanceInvestmentTx {
+  id: string;
+  investmentId: string;
+  txType: string;
+  quantity: number | null;
+  pricePerUnit: number | null;
+  totalAmount: number;
+  currency: string;
+  fees: number;
+  txDate: string;
+  notes: string | null;
+  createdAt: string;
+  baseTotalAmount: number;
+  baseCurrency: string;
+  exchangeRate: number;
+}
+
 // ── Finance Goals & Liabilities ────────────────────────────
 
 export interface FinanceGoal {
@@ -233,4 +264,23 @@ export interface FinanceInvestmentCreateParams {
   name?: string;
   currency?: string;
   marketCurrency?: string;
+}
+
+export interface FinanceAllocationTargetUpsertParams {
+  portfolioId: string;
+  assetClass: string;
+  targetWeight: string;
+  toleranceBand: string;
+}
+
+export interface FinanceInvestmentTxCreateParams {
+  investmentId: string;
+  txType: string;
+  totalAmount: number;
+  currency: string;
+  txDate: string;
+  quantity?: number;
+  pricePerUnit?: number;
+  fees?: number;
+  notes?: string;
 }
