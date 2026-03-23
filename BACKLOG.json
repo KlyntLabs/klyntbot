@@ -36,23 +36,36 @@
     "created": "2026-03-19"
   },
   {
-    "id": "remove-legacy-tables",
-    "title": "Remove legacy action_* tables and fix custom_column_values FK",
+    "id": "migrate-actions-to-tasks",
+    "title": "Complete migration from ActionRepo/actions to TaskRepo/tasks",
     "type": "cleanup",
     "priority": "medium",
     "status": "backlog",
-    "description": "Remove deprecated tables replaced by the tasks system. The actions, action_attachments, action_dependencies, action_time_entries tables are unused. focus_sessions is replaced by productivity_sessions. custom_column_values has a broken FK referencing actions(id) instead of tasks(id). Drop all legacy tables and fix the FK constraint.",
-    "tables": ["actions", "action_attachments", "action_dependencies", "action_time_entries", "focus_sessions", "custom_column_values"],
+    "description": "ActionRepo and the actions table are the legacy task system, replaced by feature-tasks/TaskRepo/tasks table. However, ActionRepo is still actively used by 26 files across 6 crates (agent, tools, activity-log, feature-tasks, app-core, storage). This is a full migration effort: port all ActionRepo callers to TaskRepo, then drop actions + action_attachments + action_dependencies + action_time_entries tables. focus_sessions already removed (replaced by productivity_sessions). custom_column_values FK already fixed to reference tasks(id).",
+    "tables_to_remove": ["actions", "action_attachments", "action_dependencies", "action_time_entries"],
+    "already_done": ["focus_sessions removed", "custom_column_values FK fixed to tasks(id)"],
+    "affected_crates": ["storage (action_repo/)", "agent (reminders, recurring_tasks, progress, context_sources/todo)", "tools (project_tool, memory_tool)", "activity-log (context_action_repo)", "feature-tasks (complexity)", "app-core (work_context)", "plugin-runtime (host)"],
     "scope": [
-      "crates/storage/src/migrations/001_initial.sql",
-      "crates/feature-tasks/migrations/",
-      "crates/desktop-shared/src/commands/"
+      "crates/storage/src/repos/action_repo/ (entire module — 9 files)",
+      "crates/storage/src/rows/action.rs",
+      "crates/storage/migrations/001_initial.sql",
+      "crates/agent/src/services/reminders.rs",
+      "crates/agent/src/services/recurring_tasks.rs",
+      "crates/agent/src/adapters/progress.rs",
+      "crates/agent/src/context_sources/todo.rs",
+      "crates/tools/src/domain/project_tool.rs",
+      "crates/tools/src/domain/memory_tool.rs",
+      "crates/activity-log/src/context_action_repo.rs",
+      "crates/feature-tasks/src/complexity.rs",
+      "crates/app-core/src/handlers/work_context.rs",
+      "crates/plugin-runtime/src/host/mod.rs"
     ],
     "considerations": [
-      "Pre-release: can drop tables directly, no migration scripts needed",
-      "custom_column_values FK must be updated to reference tasks(id)",
-      "Search for any remaining code referencing action_repo or actions table",
-      "Ensure no desktop commands still reference legacy action endpoints"
+      "26 files across 6 crates reference ActionRepo — this is NOT a table drop, it's a full migration",
+      "Agent runtime services (reminders, recurring_tasks) depend on ActionRepo — must port to TaskRepo",
+      "activity-log context_action_repo queries actions table directly — must be rewritten",
+      "plugin-runtime host uses ActionRepo for WASM plugin actions — verify plugin API compatibility",
+      "Pre-release: no data migration needed, but code migration is substantial"
     ],
     "created": "2026-03-23"
   },
