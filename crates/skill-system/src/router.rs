@@ -24,22 +24,37 @@ impl SkillRouter {
 
     /// Keyword scores for all skills against a user message.
     pub fn keyword_scores(&self, message: &str, catalog: &SkillCatalog) -> HashMap<String, f64> {
+        let msg_lower = message.to_lowercase();
         let msg_tokens: Vec<String> = tokenize(message);
         let mut result = HashMap::new();
 
         for (name, desc_tokens) in &self.description_tokens {
-            if !catalog.skills.contains_key(name) {
-                continue;
-            }
+            let pkg = match catalog.skills.get(name) {
+                Some(p) => p,
+                None => continue,
+            };
+
+            // Description keyword matching (existing logic)
             let mut hits = 0usize;
             for token in desc_tokens {
                 if msg_tokens.contains(token) {
                     hits += 1;
                 }
             }
-            if hits > 0 {
+
+            // Trigger phrase matching — exact substring match (case-insensitive)
+            let trigger_hits = pkg
+                .triggers()
+                .iter()
+                .filter(|t| msg_lower.contains(&t.to_lowercase()))
+                .count();
+
+            if hits > 0 || trigger_hits > 0 {
                 let normalizer = (desc_tokens.len() as f64 / 3.0).max(1.0);
-                let score = (hits as f64 / normalizer).min(1.0);
+                let desc_score = (hits as f64 / normalizer).min(1.0);
+                // Each trigger match adds 0.3, capped at 1.0
+                let trigger_score = (trigger_hits as f64 * 0.3).min(1.0);
+                let score = (desc_score + trigger_score).min(1.0);
                 result.insert(name.clone(), score);
             }
         }
@@ -217,6 +232,29 @@ mod tests {
         let router = SkillRouter::new(&catalog);
         let selected = router.select_orchestrator("search the web for me", &catalog, None);
         assert_eq!(selected.skill_type, SkillType::Orchestrator);
+    }
+
+    #[test]
+    fn router_boosts_score_for_trigger_match() {
+        let skills = vec![
+            (
+                "task-management".to_string(),
+                "---\nname: task-management\ndescription: Manage tasks and todos.\nmetadata:\n  klyntbot:\n    type: orchestrator\n    triggers:\n      - \"add task\"\n      - \"create todo\"\n---\nTask management body."
+                    .to_string(),
+            ),
+            (
+                "general".to_string(),
+                "---\nname: general\ndescription: General purpose assistant.\nmetadata:\n  klyntbot:\n    type: orchestrator\n---\nGeneral body."
+                    .to_string(),
+            ),
+        ];
+        let source = SkillSource::BuiltIn(skills);
+        let catalog = SkillCatalog::discover_sync(&[source]).unwrap();
+        let router = SkillRouter::new(&catalog);
+
+        let scores = router.keyword_scores("add task to my list", &catalog);
+        let task_score = scores.get("task-management").copied().unwrap_or(0.0);
+        assert!(task_score > 0.0, "trigger phrase should produce a score");
     }
 
     #[test]

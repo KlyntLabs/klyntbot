@@ -88,6 +88,15 @@ impl SkillPackage {
             .map(|k| k.always_skills.as_slice())
             .unwrap_or(&[])
     }
+
+    /// Trigger phrases for routing boost.
+    pub fn triggers(&self) -> &[String] {
+        self.metadata
+            .klyntbot
+            .as_ref()
+            .map(|k| k.triggers.as_slice())
+            .unwrap_or(&[])
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -108,6 +117,8 @@ pub struct KlyntbotMeta {
     pub always_skills: Vec<String>,
     /// Skills this one may chain to (e.g., task-management → productivity).
     pub invokes: Vec<String>,
+    /// Trigger phrases that boost this skill during routing.
+    pub triggers: Vec<String>,
 }
 
 #[derive(Debug, Clone)]

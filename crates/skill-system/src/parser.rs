@@ -35,6 +35,8 @@ struct RawKlyntbotMeta {
     always_skills: Vec<String>,
     #[serde(default)]
     invokes: Vec<String>,
+    #[serde(default)]
+    triggers: Vec<String>,
 }
 
 pub fn parse_skill_md(
@@ -204,6 +206,7 @@ fn parse_metadata_block(
             max_iterations: raw_km.max_iterations,
             always_skills: raw_km.always_skills,
             invokes: raw_km.invokes,
+            triggers: raw_km.triggers,
         })
     });
 
@@ -382,5 +385,39 @@ Body.
         let pkg =
             parse_skill_md(content, PathBuf::from("skills/My-Skill"), SkillScope::User).unwrap();
         assert_eq!(pkg.name, "My-Skill");
+    }
+
+    #[test]
+    fn parse_skill_md_extracts_triggers() {
+        let content = r#"---
+name: test-skill
+description: A test skill for managing tasks
+metadata:
+  klyntbot:
+    type: orchestrator
+    triggers:
+      - "add task"
+      - "create todo"
+      - "show tasks"
+---
+Test body content.
+"#;
+        let pkg = parse_skill_md(content, PathBuf::from("/tmp/test"), SkillScope::BuiltIn).unwrap();
+        let meta = pkg.metadata.klyntbot.unwrap();
+        assert_eq!(meta.triggers.len(), 3);
+        assert!(meta.triggers.contains(&"add task".to_string()));
+    }
+
+    #[test]
+    fn parse_skill_md_empty_triggers_is_ok() {
+        let content = r#"---
+name: test-skill
+description: A test skill
+---
+Body.
+"#;
+        let pkg = parse_skill_md(content, PathBuf::from("/tmp/test"), SkillScope::BuiltIn).unwrap();
+        let meta = pkg.metadata.klyntbot;
+        assert!(meta.is_none() || meta.unwrap().triggers.is_empty());
     }
 }
