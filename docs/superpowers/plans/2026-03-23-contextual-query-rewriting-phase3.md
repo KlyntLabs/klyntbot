@@ -28,6 +28,8 @@
 | `crates/agent/src/autotuner/metric_collector.rs` | Modify | Collect rewrite metrics from `strategy_records` |
 | `crates/autotuner/src/generator.rs` | Modify | Add Phase 3 params to bounds table |
 | `crates/autotuner/src/evaluator.rs` | Modify | Add rewrite engagement constraint |
+| `crates/config/src/schema/autotuner.rs` | Modify | Add `max_rewrite_engagement_drop: f64` config field |
+| `crates/storage/src/rows/learning.rs` | Modify | Add `rewrite_triggered: i32` + `rewrite_source: Option<String>` to `StrategyRecordRow` |
 | `crates/agent/src/agent_loop/builder.rs` | Modify | Pass `champion_overrides` lock to `ContextualQueryRewriter` |
 
 ---
@@ -127,11 +129,22 @@ In `crates/storage/migrations/001_initial.sql`, find the `CREATE TABLE strategy_
 
 Note: Pre-release project — direct schema modification, no migration script needed.
 
-- [ ] **Step 2: Update `StrategyRepo` INSERT**
+- [ ] **Step 2: Update `StrategyRecordRow` struct**
+
+In `crates/storage/src/rows/learning.rs`, find the `StrategyRecordRow` struct and add:
+
+```rust
+    pub rewrite_triggered: i32,
+    pub rewrite_source: Option<String>,
+```
+
+This is required because the repo uses `RETURNING *` which maps all columns to the struct via `sqlx::FromRow`.
+
+- [ ] **Step 3: Update `StrategyRepo` INSERT**
 
 In `crates/storage/src/repos/strategy_repo.rs`, find the `record_strategy` method's INSERT statement. Add the two new columns to both the column list and values.
 
-Also add a new query method:
+Also add new query methods (use `DateTime<Utc>` binding directly, matching existing repo patterns like `memory_relevance_since`):
 
 ```rust
 /// Fraction of messages where rewrite_triggered = 1, since `since`.
@@ -145,7 +158,7 @@ pub async fn rewrite_trigger_rate_since(
          FROM strategy_records
          WHERE timestamp >= ?1",
     )
-    .bind(since.to_rfc3339())
+    .bind(since)
     .fetch_one(&self.pool)
     .await?;
     Ok(if row.0 == 0 { 0.0 } else { row.1 as f64 / row.0 as f64 })
@@ -162,14 +175,14 @@ pub async fn rewrite_engagement_rate_since(
          FROM strategy_records
          WHERE timestamp >= ?1 AND rewrite_triggered = 1",
     )
-    .bind(since.to_rfc3339())
+    .bind(since)
     .fetch_one(&self.pool)
     .await?;
     Ok(if row.0 == 0 { 0.0 } else { row.1 as f64 / row.0 as f64 })
 }
 ```
 
-- [ ] **Step 3: Record rewrite metadata in `AgentRuntime`**
+- [ ] **Step 4: Record rewrite metadata in `AgentRuntime`**
 
 In `crates/agent/src/agent_runtime/runtime.rs`, at Step 10 where `record_strategy` is called, pass the rewrite info. The `enriched` variable from Step 5.5/6 needs to be carried through to Step 10.
 
@@ -177,17 +190,20 @@ Add to the runtime's internal state tracking (alongside existing `mode_used`, `c
 
 ```rust
 let rewrite_triggered = enriched.is_some();
-let rewrite_source = enriched.as_ref().map(|r| format!("{:?}", r.source));
+let rewrite_source = enriched.as_ref().map(|r| match r.source {
+    context_engine::RewriteSource::Heuristic => "heuristic".to_string(),
+    context_engine::RewriteSource::Llm => "llm".to_string(),
+});
 ```
 
 Pass these to `record_strategy()`.
 
-- [ ] **Step 4: Verify compilation + existing tests**
+- [ ] **Step 5: Verify compilation + existing tests**
 
 Run: `cargo check --workspace && cargo nextest run -p storage -p agent`
 Expected: ALL PASS
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add crates/storage/ crates/agent/src/agent_runtime/
@@ -227,12 +243,15 @@ In `crates/autotuner/src/trial.rs`, add after `knowledge_retention_score`:
 
 - [ ] **Step 3: Update aggregation in `metrics.rs`**
 
-In `crates/autotuner/src/metrics.rs`, in the `aggregate_to_result` function, add the volume-weighted aggregation for the new fields (follow the pattern of existing fields like `retrieval_precision`):
+In `crates/autotuner/src/metrics.rs`, in the `aggregate_to_result` function, the `TrialResult { ... }` struct literal constructs every field explicitly (no `..Default::default()`). You MUST add the two new fields to this struct literal:
 
 ```rust
+        // Phase 3: Query rewriting
         rewrite_trigger_rate: snapshots.iter().map(|s| w(s) * s.rewrite_trigger_rate).sum(),
         rewrite_engagement_rate: snapshots.iter().map(|s| w(s) * s.rewrite_engagement_rate).sum(),
 ```
+
+Also update any test `MetricSnapshot` or `TrialResult` struct literals in `metrics.rs` tests — they also construct every field explicitly. Add `rewrite_trigger_rate: 0.0, rewrite_engagement_rate: 0.0` to each.
 
 - [ ] **Step 4: Collect metrics in `AgentMetricCollector`**
 
@@ -244,7 +263,14 @@ In `crates/agent/src/autotuner/metric_collector.rs`, add to the `tokio::join!` b
             self.strategy_repo.rewrite_engagement_rate_since(since),
 ```
 
-And in the destructuring + `MetricSnapshot` construction, add the new fields.
+In the destructuring, add the results. Use `.unwrap_or(0.0)` for error handling (matching the existing pattern — e.g., `routing_stability.unwrap_or(1.0)`):
+
+```rust
+let rewrite_trigger_rate = rewrite_trigger_result.unwrap_or(0.0);
+let rewrite_engagement_rate = rewrite_engagement_result.unwrap_or(0.0);
+```
+
+Add these to the `MetricSnapshot` construction.
 
 - [ ] **Step 5: Fix all test `MetricSnapshot` and `TrialResult` struct literals**
 
@@ -301,7 +327,7 @@ async fn champion_overrides_max_signals() {
             project_name: Some("Q1 Finance".into()),
             domain: Some("finance".into()),
         }),
-        situation: Some(UserSituationSnapshot {
+        situation: Some(context_engine::UserSituationSnapshot {
             energy_level: 0.2, // Aggressive mode would normally allow 4 signals
             ..Default::default()
         }),
@@ -453,7 +479,15 @@ In `crates/autotuner/src/evaluator.rs`, add:
     max_rewrite_engagement_drop: f64,
 ```
 
-Wire from config (add `max_rewrite_engagement_drop: f64` to `AutoTunerConfig` with default `0.10`).
+Wire from config:
+1. In `crates/config/src/schema/autotuner.rs`, add to `AutoTunerConfig`:
+```rust
+    #[serde(default = "default_max_rewrite_engagement_drop")]
+    pub max_rewrite_engagement_drop: f64,
+```
+And add the default function: `fn default_max_rewrite_engagement_drop() -> f64 { 0.10 }`
+
+2. In `ConstraintEvaluator::from_config()`, add: `max_rewrite_engagement_drop: config.max_rewrite_engagement_drop,`
 
 Add check in `evaluate()`:
 
