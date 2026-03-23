@@ -426,13 +426,11 @@ impl AgentRuntime {
                 .rev()
                 .filter(|m| m.role() == common::MessageRole::User)
                 .take(2)
-                .map(|m| {
-                    match m {
-                        Message::User {
-                            content: providers::UserContent::Text(t),
-                        } => t.chars().take(200).collect(),
-                        _ => String::new(),
-                    }
+                .map(|m| match m {
+                    Message::User {
+                        content: providers::UserContent::Text(t),
+                    } => t.chars().take(200).collect(),
+                    _ => String::new(),
                 })
                 .collect();
 
@@ -1396,7 +1394,17 @@ mod tests {
         let runtime = make_runtime(provider).await;
 
         let result = runtime
-            .process_message("hello", vec![], &[], &[], &routing_ctx(), None, None, None, None)
+            .process_message(
+                "hello",
+                vec![],
+                &[],
+                &[],
+                &routing_ctx(),
+                None,
+                None,
+                None,
+                None,
+            )
             .await
             .unwrap();
 
@@ -1466,7 +1474,17 @@ mod tests {
             .with_confidence_evaluator(Arc::new(crate::confidence::ConfidenceEvaluator::new(0.99)));
 
         let result = runtime
-            .process_message("hello", vec![], &[], &[], &routing_ctx(), None, None, None, None)
+            .process_message(
+                "hello",
+                vec![],
+                &[],
+                &[],
+                &routing_ctx(),
+                None,
+                None,
+                None,
+                None,
+            )
             .await
             .unwrap();
 

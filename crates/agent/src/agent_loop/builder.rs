@@ -813,6 +813,12 @@ impl AgentLoopBuilder {
         } else {
             context_engine
         };
+
+        // Wire heuristic query rewriter for contextual enrichment of vague queries
+        let query_rewriter: Arc<dyn context_engine::QueryRewriter> =
+            Arc::new(crate::adapters::query_rewriter::ContextualQueryRewriter::heuristic_only());
+        let context_engine = context_engine.with_query_rewriter(query_rewriter);
+
         let context_engine = Arc::new(context_engine);
 
         // Outputs for MemoryTool — populated inside the pool block if embedding is enabled
@@ -1384,6 +1390,11 @@ impl AgentLoopBuilder {
 
         // Inject tool registry for delegation support
         runtime = runtime.with_tool_registry(Arc::clone(&tool_registry));
+
+        // Inject user situation for RetrievalContext
+        if let Some(ref sit) = self.user_situation {
+            runtime = runtime.with_user_situation(Arc::clone(sit));
+        }
 
         // Inject autotuner shadow hook
         if let Some(ref orchestrator) = self.autotuner {

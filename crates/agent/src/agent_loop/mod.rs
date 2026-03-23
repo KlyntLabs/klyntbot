@@ -537,15 +537,14 @@ impl AgentLoop {
 
         // Build correction context for query rewriting (if a correction was detected)
         let correction = if correction_strength.is_some() {
-            last_assistant_content.as_ref().map(|original| {
-                context_engine::CorrectionContext {
-                    rejected_topic:
-                        crate::adapters::query_rewriter::extract_key_terms_from(
-                            &original.chars().take(200).collect::<String>(),
-                        ),
+            last_assistant_content
+                .as_ref()
+                .map(|original| context_engine::CorrectionContext {
+                    rejected_topic: crate::adapters::query_rewriter::extract_key_terms_from(
+                        &original.chars().take(200).collect::<String>(),
+                    ),
                     corrected_to: msg.content.clone(),
-                }
-            })
+                })
         } else {
             None
         };
@@ -975,15 +974,14 @@ impl AgentLoop {
 
         // Build correction context for query rewriting (if a correction was detected)
         let correction = if correction_emitted {
-            last_assistant_content.as_ref().map(|original| {
-                context_engine::CorrectionContext {
-                    rejected_topic:
-                        crate::adapters::query_rewriter::extract_key_terms_from(
-                            &original.chars().take(200).collect::<String>(),
-                        ),
+            last_assistant_content
+                .as_ref()
+                .map(|original| context_engine::CorrectionContext {
+                    rejected_topic: crate::adapters::query_rewriter::extract_key_terms_from(
+                        &original.chars().take(200).collect::<String>(),
+                    ),
                     corrected_to: content.clone(),
-                }
-            })
+                })
         } else {
             None
         };
