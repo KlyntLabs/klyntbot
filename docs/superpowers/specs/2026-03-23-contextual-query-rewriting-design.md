@@ -352,22 +352,40 @@ pub async fn retrieve(&self, query: &str, total_limit: usize, session_key: Optio
 }
 ```
 
+**Important:** `retrieve_with_enrichment` must preserve the existing timeout and circuit-breaker
+logic from `retrieve()`. The implementation should call into the existing timeout-wrapped
+decomposition path (not bypass it). The enriched query is inserted into the sub-query list
+*after* decomposition completes but *before* the fan-out loop — so the timeout covers
+decomposition only, and the enriched query participates in the same fan-out with the same
+per-source timeout as all other sub-queries.
+
+```
+```
+
 This preserves backward compatibility — existing tests and the fallback path continue to
 call `retrieve()` with no changes.
 
-### Data path for `situation` (new infrastructure)
+### Data path for `situation` (existing infrastructure, minor extension)
 
-`UserSituation` is currently computed on-demand by the coaching engine. We need a shared
-holder so the runtime can read it:
+A shared `Arc<Mutex<UserSituation>>` already exists:
 
-1. **Add `Arc<Mutex<UserSituation>>` to `AgentRuntime`** — populated by the coaching engine
-   and productivity context source (which already computes situation for prompt injection).
-2. **`ProductivityContextSource` already holds situation** — it writes to a shared state
-   holder. We extend this to expose the `Arc<Mutex<UserSituation>>` to the runtime builder.
-3. **Fallback:** If situation hasn't been computed yet (cold start), `RetrievalContext.situation`
-   is `None` and the rewriter skips energy/deadline signals.
+1. **Created in `app-core/src/init/agent.rs:64`:** `let user_situation = Arc::new(Mutex::new(UserSituation::default()));`
+2. **Passed to `AgentLoopBuilder` at `init/agent.rs:84`:** `.with_user_situation(user_situation.clone())`
+3. **Written by the coaching engine at `init/coaching.rs:66`:** `*user_situation.lock().await = real_situation;`
+4. **Already wired into `UnifiedMemoryService` at `builder.rs:649-651`** for situational boost scoring.
 
-Estimated: ~20 lines to add the shared state field + builder wiring.
+The `Arc<Mutex<UserSituation>>` is already threaded through the agent builder. To make it
+available at Step 5.5 in `AgentRuntime`, we need one extension:
+
+- **Add the `Arc<Mutex<UserSituation>>` as an optional field on `AgentRuntime`** (not just
+  on `UnifiedMemoryService`). The builder already has it — just pass it through.
+- **In Step 5.5**, read `situation.lock().await.clone()` → `RetrievalContext.situation`.
+- **Fallback:** On cold start (before coaching engine computes the first situation),
+  `UserSituation::default()` has all fields at 0.0. The rewriter treats this as "no strong
+  signal" and uses default aggressiveness (same as medium energy).
+
+Estimated: ~10 lines (field on `AgentRuntime` + builder wire + read in Step 5.5).
+The coaching engine writes periodically; no new write path needed.
 
 ### Data path for `active_task` (new lightweight query)
 
@@ -387,14 +405,24 @@ Estimated: ~25 lines (query + mapping + builder plumbing).
 Correction detection in `AgentLoop` currently fires a `DomainEvent` and doesn't store the
 result. We add a lightweight forwarding mechanism:
 
-1. **Add `last_correction: Option<CorrectionContext>` to `AgentLoop`'s per-session state.**
-   Set it when correction detection fires (alongside the existing event publish).
-2. **Pass it to `AgentRuntime::process_message()`** via a new optional field on the
-   parameters (or via `RoutingContext`).
-3. **Clear after one use** — the correction signal applies to the immediately next message
-   only. After the runtime reads it, `AgentLoop` resets it to `None`.
+1. **Add `last_correction: Option<CorrectionContext>` as a field on `AgentLoop` itself.**
+   This is session-scoped state (one `AgentLoop` per active session).
+2. **Set it in `process_message()` / `process_direct_streaming()`** where correction
+   detection already runs (alongside the existing `DomainEvent` publish). The detection
+   extracts `correction_strength` and the corrected topic — map these to `CorrectionContext`.
+3. **Thread it through `run_pipeline()`** — `run_pipeline` is the intermediary between
+   `AgentLoop::process_message()` and `AgentRuntime::process_message()`. Add
+   `correction: Option<CorrectionContext>` as a parameter to `run_pipeline()`. The runtime
+   receives it and includes it in `RetrievalContext`.
+4. **NOT via `RoutingContext`** — `RoutingContext` is defined in `tools-core` (L1) and
+   is used for routing decisions, not transient session state. Adding correction context
+   there would pollute a widely-used shared type. Instead, `run_pipeline()` carries it
+   as a separate parameter.
+5. **Clear after one use** — after building `RetrievalContext`, set `self.last_correction = None`.
+   The correction signal applies only to the immediately next message.
 
-Estimated: ~15 lines (field + set/read/clear).
+Estimated: ~20 lines (field on AgentLoop + set in correction detect + parameter on
+run_pipeline + read in runtime + clear).
 
 ### Files changed (revised estimates)
 
@@ -402,7 +430,7 @@ Estimated: ~15 lines (field + set/read/clear).
 |------|--------|-------|
 | `context_engine/src/rewriter.rs` | New: `QueryRewriter` trait, `RewriteResult`, `RewriteSource` | ~25 |
 | `context_engine/src/types.rs` | Add `RetrievalContext`, `ActiveTaskContext`, `ActiveView`, `CorrectionContext` | ~45 |
-| `context_engine/src/assembler/types.rs` | `ContextRequest` gains `retrieval_context: Option<RetrievalContext>` | ~5 |
+| `context_engine/src/assembler/types.rs` | `ContextRequest` gains `retrieval_context: Option<RetrievalContext>`. All existing struct literal instantiations (tests, call sites) need `retrieval_context: None` added — there are ~9 such sites in `assembler/mod.rs` tests alone | ~15 |
 | `context_engine/src/assembler/mod.rs` | Add `query_rewriter` field + `with_query_rewriter()`. `retrieve_memory()` calls rewriter. Update `compute_cache_key()` to include retrieval context | ~35 |
 | `context_engine/src/insight_forge/mod.rs` | Add `retrieve_with_enrichment()` method. Refactor existing `retrieve()` to delegate. Update fallback path | ~40 |
 | `agent/src/adapters/query_rewriter.rs` | New: `ContextualQueryRewriter` (specificity, heuristic templates, LLM fallback) | ~280 |
@@ -441,8 +469,14 @@ if let Some(ref ctx) = request.retrieval_context {
         hasher.update(correction.corrected_to.as_bytes());
     }
     // active_view.description and situation are NOT included in cache key:
-    // view changes rarely mid-message, and situation changes are continuous
-    // (would defeat caching). The 60s cache TTL handles staleness.
+    // - situation changes continuously (energy, focus); including it would
+    //   defeat caching entirely. Accepted tradeoff: two messages <60s apart
+    //   with different energy states get the same enrichment. This is acceptable
+    //   because rewrite confidence ranges overlap across energy levels, and the
+    //   6-factor FSRS scoring (which DOES use live situation) compensates at
+    //   ranking time.
+    // - active_view changes rarely mid-conversation. The 60s cache TTL provides
+    //   sufficient freshness.
 }
 ```
 
