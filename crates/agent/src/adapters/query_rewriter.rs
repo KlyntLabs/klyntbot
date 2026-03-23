@@ -480,9 +480,18 @@ impl ContextualQueryRewriter {
                         enriched = text.as_str(),
                         "QueryRewriter: LLM enriched query"
                     );
+                    // Dynamic confidence based on context richness (spec: 0.6–0.85)
+                    let confidence = {
+                        let mut c = 0.6_f32;
+                        if context.active_skill.is_some() { c += 0.05; }
+                        if context.active_task.is_some() { c += 0.05; }
+                        if !context.recent_user_messages.is_empty() { c += 0.1; }
+                        if context.active_view.is_some() { c += 0.05; }
+                        c.min(0.85)
+                    };
                     Some(RewriteResult {
                         enriched_query: text,
-                        confidence: 0.75,
+                        confidence,
                         source: RewriteSource::Llm,
                     })
                 }
@@ -927,7 +936,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn llm_fallback_on_pronoun_no_heuristic_context() {
+    async fn llm_fallback_on_pronoun_no_context() {
         // Low specificity + no context signals → heuristic returns None → LLM fires
         let provider = std::sync::Arc::new(MockRewriteProvider::new(
             "current spending breakdown for March budget",
@@ -942,6 +951,12 @@ mod tests {
         );
         let r = result.unwrap();
         assert_eq!(r.source, RewriteSource::Llm);
+        // Dynamic confidence: no context → base 0.6
+        assert!(
+            r.confidence >= 0.6 && r.confidence <= 0.85,
+            "Expected LLM confidence in 0.6–0.85 range, got {}",
+            r.confidence
+        );
         assert!(
             r.enriched_query.contains("spending breakdown"),
             "Expected LLM response in enriched query: {}",
@@ -1016,6 +1031,36 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn llm_confidence_scales_with_context_richness() {
+        // With more context signals, LLM confidence should be higher
+        let provider_bare = std::sync::Arc::new(MockRewriteProvider::new("enriched result"));
+        let provider_rich = std::sync::Arc::new(MockRewriteProvider::new("enriched result"));
+
+        // Bare context: no signals → base confidence 0.6
+        let rewriter_bare = ContextualQueryRewriter::new(Some(provider_bare), None, 5000);
+        let ctx_bare = RetrievalContext::default();
+        let r_bare = rewriter_bare.rewrite("what was that?", &ctx_bare).await.unwrap();
+        assert!((r_bare.confidence - 0.6).abs() < f32::EPSILON, "Bare context should be 0.6, got {}", r_bare.confidence);
+
+        // Rich context: skill + task + recent messages → 0.6 + 0.05 + 0.05 + 0.1 = 0.8
+        let rewriter_rich = ContextualQueryRewriter::new(Some(provider_rich), None, 5000);
+        let ctx_rich = RetrievalContext {
+            active_skill: Some("finance-management".into()),
+            active_task: Some(ActiveTaskContext {
+                title: "Budget review".into(),
+                project_name: None,
+                domain: Some("finance".into()),
+            }),
+            recent_user_messages: vec!["checking the spending".into()],
+            ..Default::default()
+        };
+        // This will use heuristic (has context), so force LLM path by testing llm_rewrite directly
+        let r_rich = rewriter_rich.llm_rewrite("what was that?", &ctx_rich).await.unwrap();
+        assert!(r_rich.confidence > r_bare.confidence, "Rich context ({}) should have higher confidence than bare ({})", r_rich.confidence, r_bare.confidence);
+        assert!(r_rich.confidence >= 0.6 && r_rich.confidence <= 0.85, "Should be in 0.6–0.85 range, got {}", r_rich.confidence);
+    }
+
     // Race pattern tests
 
     #[tokio::test]
@@ -1038,6 +1083,28 @@ mod tests {
             .await;
         assert!(result.is_some());
         assert_eq!(result.unwrap().source, RewriteSource::Heuristic);
+    }
+
+    #[tokio::test]
+    async fn llm_background_race_discards_late() {
+        // LLM is very slow (5s) — simulates InsightForge finishing first.
+        // The oneshot channel should be droppable without error.
+        let provider: providers::DynProvider =
+            std::sync::Arc::new(MockRewriteProvider::slow("late result", 5000));
+        let rewriter = ContextualQueryRewriter::new(Some(provider), None, 5000);
+        let ctx = RetrievalContext::default(); // no heuristic signals → LLM spawned
+        let (tx, mut rx) = tokio::sync::oneshot::channel();
+        let result = rewriter
+            .rewrite_or_spawn("what was that?", &ctx, Some(tx))
+            .await;
+        assert!(result.is_none()); // Heuristic failed, LLM spawned in background
+
+        // Simulate InsightForge finishing first — try_recv immediately (LLM still running)
+        assert!(
+            rx.try_recv().is_err(),
+            "LLM should not have finished yet (5s delay)"
+        );
+        // Dropping rx here is safe — the spawned task's tx.send() will get Err but not panic
     }
 
     #[tokio::test]
