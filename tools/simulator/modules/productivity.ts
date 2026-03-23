@@ -29,6 +29,9 @@ export const productivityModule: SimulatorModule = {
             target_value: 60,
         });
         console.log(`  3 productivity goals created`);
+
+        // NOTE: focus_sessions — legacy table, no longer written to by any command.
+        // productivity_focus_start writes to `productivity_sessions` instead. Skipped.
     },
 
     async simulateDay(world, client, day) {

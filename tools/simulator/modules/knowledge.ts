@@ -195,6 +195,45 @@ export const knowledgeModule: SimulatorModule = {
             // May not be available if no data exists
         }
 
+        // ── Persona pins (insight_persona_pins table) ─────────────────
+        // On Thursday (dayOfWeek === 3), pin a relevant persona to the study note.
+        if (day.dayOfWeek === 3) {
+            const studyNote = world.createdNotes.get("oauth-patterns");
+            if (studyNote) {
+                try {
+                    await client.post("note_insight_set_pins", {
+                        noteId: studyNote.id,
+                        personaIds: ["builtin-practitioner", "builtin-skeptic"],
+                    });
+                    console.log(`  knowledge: pinned 2 personas to study note`);
+                } catch {
+                    // Persona pins may fail if personas not seeded
+                }
+            }
+        }
+
+        // ── Review sessions (review_sessions table) ───────────────────
+        // After reviewing cards, save a review session summary.
+        if (cardsReviewed > 0) {
+            const sessionId = `sim-review-day${day.dayIndex}`;
+            try {
+                await client.post("flashcard_save_session", {
+                    sessionId,
+                    cardsReviewed,
+                    avgScore: 0.75,
+                    durationSeconds: cardsReviewed * randomBetween(15, 30),
+                    modesUsed: ["standard"],
+                    propagationCount: 0,
+                    weakCardIds: [],
+                    sessionData: JSON.stringify({ source: "simulator", day: day.dayIndex }),
+                    status: "completed",
+                });
+                console.log(`  knowledge: saved review session (${cardsReviewed} cards)`);
+            } catch {
+                // Review session save may fail
+            }
+        }
+
         if (atomsAccepted > 0 || cardsReviewed > 0) {
             console.log(`  knowledge: accepted ${atomsAccepted} atoms, reviewed ${cardsReviewed} cards`);
         } else {

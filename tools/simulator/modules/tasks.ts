@@ -102,6 +102,17 @@ export const tasksModule: SimulatorModule = {
         // Note: custom_column_values FK references legacy `actions` table, not `tasks`.
         // Skipping value assignment until the schema is migrated.
         // Custom columns are created (visible in UI) but values can't be set on new tasks yet.
+
+        // NOTE: task_dependencies — no dev server dispatch command exists.
+        // TaskRepo::add_dependency() is only accessible at the Rust repo level. Skipped.
+
+        // NOTE: task_attachments — no dev server dispatch command exists.
+        // TaskRepo::add_attachment() is only accessible at the Rust repo level. Skipped.
+
+        // NOTE: task_time_entries — no dev server dispatch command exists.
+        // TaskRepo::add_time_entry() is only accessible at the Rust repo level.
+        // (Separate from the productivity_time_entry_create command which writes to
+        // the productivity time_entries table, not task_time_entries.) Skipped.
     },
 
     async simulateDay(world, client, day) {
@@ -184,6 +195,32 @@ export const tasksModule: SimulatorModule = {
 
         // Check today view
         await client.post("today_tasks");
+
+        // ── Task decomposition (task_decompositions table) ──────────
+        // On Wednesday, attempt AI decomposition for a complex task.
+        // Skipped in fast mode (already in SKIP_IN_MODE).
+        if (day.dayOfWeek === 2 && activeTasks.length > 3) {
+            const [, complexTask] = activeTasks[3];
+            try {
+                const decomp = await client.maybeFlat<{ id: string; subtasks: unknown[] }>(
+                    "task_decompose",
+                    { taskId: complexTask.id },
+                );
+                if (decomp?.id) {
+                    // Apply the decomposition to create subtasks
+                    try {
+                        await client.postFlat("task_apply_decomposition", {
+                            decompositionId: decomp.id,
+                        });
+                        console.log(`  tasks: decomposed "${complexTask.title}" into subtasks`);
+                    } catch {
+                        // Decomposition may fail if task doesn't have enough context
+                    }
+                }
+            } catch {
+                // Decomposition requires LLM — may fail in environments without API keys
+            }
+        }
 
         console.log(`  tasks: completed ${completed}, created ${newTaskCount}, updated 1`);
     },

@@ -42,6 +42,37 @@ export const paraModule: SimulatorModule = {
         await createKeyResult(client, obj3.id, "Learn 500 new vocabulary words", 500, "words");
         await createKeyResult(client, obj3.id, "Complete 30 practice sessions", 30, "sessions");
         console.log(`  6 key results created`);
+
+        // ── Project sources (project_sources table) ─────────────────
+        await client.post("project_source_create", {
+            projectId: world.projects.apiRedesign.id,
+            sourceType: "document",
+            title: "Auth Migration RFC",
+            content: "RFC-2024-AUTH: Migration plan from legacy session-based auth to JWT + refresh token rotation.",
+            tags: ["rfc", "auth", "architecture"],
+        });
+        await client.post("project_source_create", {
+            projectId: world.projects.apiRedesign.id,
+            sourceType: "url",
+            title: "OAuth 2.0 Best Practices (IETF)",
+            url: "https://datatracker.ietf.org/doc/html/draft-ietf-oauth-security-topics",
+            tags: ["oauth", "reference", "security"],
+        });
+        await client.post("project_source_create", {
+            projectId: world.projects.parisTrip.id,
+            sourceType: "url",
+            title: "Paris Museum Pass Guide",
+            url: "https://www.parismuseumpass.com",
+            tags: ["travel", "paris", "museums"],
+        });
+        await client.post("project_source_create", {
+            projectId: world.projects.fireGoal.id,
+            sourceType: "document",
+            title: "FIRE Calculator Assumptions",
+            content: "25x annual expenses rule. Assumes 4% safe withdrawal rate, 7% real returns, 2% inflation.",
+            tags: ["fire", "finance", "planning"],
+        });
+        console.log(`  4 project sources created`);
     },
 
     async simulateDay(world, client, day) {

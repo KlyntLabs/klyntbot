@@ -34,5 +34,57 @@
       "project_source_list"
     ],
     "created": "2026-03-19"
+  },
+  {
+    "id": "remove-legacy-tables",
+    "title": "Remove legacy action_* tables and fix custom_column_values FK",
+    "type": "cleanup",
+    "priority": "medium",
+    "status": "backlog",
+    "description": "Remove deprecated tables replaced by the tasks system. The actions, action_attachments, action_dependencies, action_time_entries tables are unused. focus_sessions is replaced by productivity_sessions. custom_column_values has a broken FK referencing actions(id) instead of tasks(id). Drop all legacy tables and fix the FK constraint.",
+    "tables": ["actions", "action_attachments", "action_dependencies", "action_time_entries", "focus_sessions", "custom_column_values"],
+    "scope": [
+      "crates/storage/src/migrations/001_initial.sql",
+      "crates/feature-tasks/migrations/",
+      "crates/desktop-shared/src/commands/"
+    ],
+    "considerations": [
+      "Pre-release: can drop tables directly, no migration scripts needed",
+      "custom_column_values FK must be updated to reference tasks(id)",
+      "Search for any remaining code referencing action_repo or actions table",
+      "Ensure no desktop commands still reference legacy action endpoints"
+    ],
+    "created": "2026-03-23"
+  },
+  {
+    "id": "remove-dead-tables",
+    "title": "Remove dead/unimplemented tables from migrations",
+    "type": "cleanup",
+    "priority": "low",
+    "status": "backlog",
+    "description": "Remove tables that exist in migrations but have zero code writing to them. These are placeholder schemas for features that were never implemented.",
+    "tables": [
+      "calendar_event_cache", "calendar_sync_state", "calendar_events",
+      "context_merges", "resource_edges",
+      "work_context_actions", "work_context_resources", "work_contexts", "work_resources",
+      "productivity_voice_journals", "productivity_privacy_rules"
+    ],
+    "considerations": [
+      "calendar_* may be needed if CalDAV integration is planned — check roadmap before removing",
+      "work_context_* tables are part of activity-log crate — may be Phase 2 planned feature",
+      "Pre-release: safe to drop, but verify no future spec references these tables"
+    ],
+    "created": "2026-03-23"
+  },
+  {
+    "id": "adaptive-note-intents",
+    "title": "Implement adaptive note intents (study/research/capture)",
+    "type": "feature",
+    "priority": "high",
+    "status": "planned",
+    "description": "Make notes purpose-aware via notebook-level intent default + per-note override. Study notes get full learning pipeline (atoms, flashcards, FSRS). Research notes get evidence maps, source trails, cross-domain links. Capture notes get clean editor with lightweight enrichment only.",
+    "spec": "docs/superpowers/specs/2026-03-22-adaptive-note-intents-design.md",
+    "plan": "docs/superpowers/plans/2026-03-22-adaptive-note-intents.md",
+    "created": "2026-03-22"
   }
 ]

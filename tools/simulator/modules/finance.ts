@@ -207,6 +207,14 @@ export const financeModule: SimulatorModule = {
             currency: "USD",
         });
         console.log(`  2 liabilities created`);
+
+        // NOTE: finance_allocation_targets — no dev server dispatch command exists.
+        // The FinanceAllocationRepo.add() is only accessible at the Rust repo level,
+        // not exposed as a Tauri/dev-server command. Skipped.
+
+        // NOTE: finance_investment_transactions — no dev server dispatch command exists.
+        // The FinanceInvestmentRepo.add_investment_tx() is only accessible at the Rust
+        // repo level, not exposed as a Tauri/dev-server command. Skipped.
     },
 
     async simulateDay(world, client, day) {

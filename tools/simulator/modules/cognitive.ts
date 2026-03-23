@@ -111,5 +111,68 @@ export const cognitiveModule: SimulatorModule = {
             });
             console.log(`  cognitive: injected budget alert event`);
         }
+
+        // ── Entity links (entity_links table) ─────────────────────────
+        // On Tuesday, link tasks to related notes and projects to notes.
+        if (day.dayOfWeek === 1) {
+            let linkCount = 0;
+
+            // Link auth task → auth meeting notes
+            const authTask = world.createdTasks.get("auth-layer");
+            const authNote = world.createdNotes.get("auth-meeting-notes");
+            if (authTask && authNote) {
+                try {
+                    await client.post("entity_link_create", {
+                        sourceKind: "task",
+                        sourceId: authTask.id,
+                        targetKind: "note",
+                        targetId: authNote.id,
+                        linkType: "reference",
+                    });
+                    linkCount++;
+                } catch {
+                    // Link may already exist
+                }
+            }
+
+            // Link API redesign project → retro note
+            const retroNote = world.createdNotes.get("api-retro");
+            if (retroNote) {
+                try {
+                    await client.post("entity_link_create", {
+                        sourceKind: "project",
+                        sourceId: world.projects.apiRedesign.id,
+                        targetKind: "note",
+                        targetId: retroNote.id,
+                        linkType: "reference",
+                    });
+                    linkCount++;
+                } catch {
+                    // Link may already exist
+                }
+            }
+
+            // Link OAuth study note → jwt task
+            const oauthNote = world.createdNotes.get("oauth-patterns");
+            const jwtTask = world.createdTasks.get("jwt-refresh");
+            if (oauthNote && jwtTask) {
+                try {
+                    await client.post("entity_link_create", {
+                        sourceKind: "note",
+                        sourceId: oauthNote.id,
+                        targetKind: "task",
+                        targetId: jwtTask.id,
+                        linkType: "informs",
+                    });
+                    linkCount++;
+                } catch {
+                    // Link may already exist
+                }
+            }
+
+            if (linkCount > 0) {
+                console.log(`  cognitive: created ${linkCount} entity links`);
+            }
+        }
     },
 };
