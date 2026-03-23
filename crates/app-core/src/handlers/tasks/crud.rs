@@ -1,7 +1,8 @@
+use chrono::{DateTime, Utc};
 use desktop_shared::commands::{TaskCreateParams, TaskResponse, TaskUpdateParams};
 use desktop_shared::errors::ApiError;
 use desktop_shared::types::EntityKind;
-use storage::{TaskFilter, TaskPatch, TaskRow};
+use storage::{TaskAttachmentRow, TaskFilter, TaskPatch, TaskRow, TaskTimeEntryRow};
 use tracing::warn;
 
 use crate::errors::{map_storage_err, parse_date};
@@ -353,5 +354,101 @@ impl AppCore {
             .map_err(map_storage_err)?;
 
         rows_to_tasks(&self.repos, &rows).await
+    }
+
+    // ── Dependencies ────────────────────────────────────────────────────
+
+    pub async fn task_add_dependency(
+        &self,
+        task_id: String,
+        blocker_id: String,
+    ) -> Result<(), ApiError> {
+        self.repos
+            .tasks
+            .add_dependency(&task_id, &blocker_id, "blocks")
+            .await
+            .map_err(map_storage_err)
+    }
+
+    pub async fn task_list_dependencies(
+        &self,
+        task_id: String,
+    ) -> Result<Vec<TaskResponse>, ApiError> {
+        let rows = self
+            .repos
+            .tasks
+            .get_blockers(&task_id)
+            .await
+            .map_err(map_storage_err)?;
+
+        rows_to_tasks(&self.repos, &rows).await
+    }
+
+    // ── Attachments ─────────────────────────────────────────────────────
+
+    pub async fn task_add_attachment(
+        &self,
+        task_id: String,
+        attachment_type: String,
+        value: String,
+        title: Option<String>,
+    ) -> Result<TaskAttachmentRow, ApiError> {
+        self.repos
+            .tasks
+            .add_attachment(
+                &task_id,
+                &attachment_type,
+                &value,
+                title.as_deref(),
+                &[],
+                "user",
+            )
+            .await
+            .map_err(map_storage_err)
+    }
+
+    pub async fn task_list_attachments(
+        &self,
+        task_id: String,
+    ) -> Result<Vec<TaskAttachmentRow>, ApiError> {
+        self.repos
+            .tasks
+            .list_attachments(&task_id)
+            .await
+            .map_err(map_storage_err)
+    }
+
+    // ── Time entries ────────────────────────────────────────────────────
+
+    pub async fn task_add_time_entry(
+        &self,
+        task_id: String,
+        started_at: DateTime<Utc>,
+        duration_secs: Option<i64>,
+        note: Option<String>,
+    ) -> Result<TaskTimeEntryRow, ApiError> {
+        self.repos
+            .tasks
+            .add_time_entry(
+                &task_id,
+                "user",
+                started_at,
+                duration_secs,
+                note.as_deref(),
+                None,
+            )
+            .await
+            .map_err(map_storage_err)
+    }
+
+    pub async fn task_list_time_entries(
+        &self,
+        task_id: String,
+    ) -> Result<Vec<TaskTimeEntryRow>, ApiError> {
+        self.repos
+            .tasks
+            .list_time_entries(&task_id)
+            .await
+            .map_err(map_storage_err)
     }
 }

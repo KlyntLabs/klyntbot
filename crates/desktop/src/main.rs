@@ -303,6 +303,12 @@ fn run_desktop_app() {
             commands::tasks::task_apply_decomposition,
             commands::tasks::task_reject_decomposition,
             commands::tasks::task_forecast,
+            commands::tasks::task_add_dependency,
+            commands::tasks::task_list_dependencies,
+            commands::tasks::task_add_attachment,
+            commands::tasks::task_list_attachments,
+            commands::tasks::task_add_time_entry,
+            commands::tasks::task_list_time_entries,
             commands::tasks::project_list,
             commands::tasks::objective_list,
             // Notes

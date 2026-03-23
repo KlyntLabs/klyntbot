@@ -4,6 +4,7 @@ use desktop_shared::commands::{
 };
 use desktop_shared::errors::ApiError;
 use std::sync::Arc;
+use storage::{TaskAttachmentRow, TaskTimeEntryRow};
 use tauri::State;
 
 use crate::app_core::AppCore;
@@ -166,6 +167,74 @@ pub async fn task_forecast(
     state.task_forecast(task_id).await
 }
 
+// ── Dependencies ────────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn task_add_dependency(
+    state: State<'_, Arc<AppCore>>,
+    task_id: String,
+    blocker_id: String,
+) -> Result<(), ApiError> {
+    state.task_add_dependency(task_id, blocker_id).await
+}
+
+#[tauri::command]
+pub async fn task_list_dependencies(
+    state: State<'_, Arc<AppCore>>,
+    task_id: String,
+) -> Result<Vec<TaskResponse>, ApiError> {
+    state.task_list_dependencies(task_id).await
+}
+
+// ── Attachments ─────────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn task_add_attachment(
+    state: State<'_, Arc<AppCore>>,
+    task_id: String,
+    attachment_type: String,
+    value: String,
+    title: Option<String>,
+) -> Result<TaskAttachmentRow, ApiError> {
+    state
+        .task_add_attachment(task_id, attachment_type, value, title)
+        .await
+}
+
+#[tauri::command]
+pub async fn task_list_attachments(
+    state: State<'_, Arc<AppCore>>,
+    task_id: String,
+) -> Result<Vec<TaskAttachmentRow>, ApiError> {
+    state.task_list_attachments(task_id).await
+}
+
+// ── Time entries ────────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn task_add_time_entry(
+    state: State<'_, Arc<AppCore>>,
+    task_id: String,
+    started_at: String,
+    duration_secs: Option<i64>,
+    note: Option<String>,
+) -> Result<TaskTimeEntryRow, ApiError> {
+    let started_at = chrono::DateTime::parse_from_rfc3339(&started_at)
+        .map(|dt| dt.with_timezone(&chrono::Utc))
+        .map_err(|e| ApiError::new("VALIDATION", format!("invalid started_at: {e}")))?;
+    state
+        .task_add_time_entry(task_id, started_at, duration_secs, note)
+        .await
+}
+
+#[tauri::command]
+pub async fn task_list_time_entries(
+    state: State<'_, Arc<AppCore>>,
+    task_id: String,
+) -> Result<Vec<TaskTimeEntryRow>, ApiError> {
+    state.task_list_time_entries(task_id).await
+}
+
 // ── Dev server dispatch ─────────────────────────────────────────────
 
 #[cfg(test)]
@@ -187,6 +256,12 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "task_apply_decomposition",
     "task_reject_decomposition",
     "task_forecast",
+    "task_add_dependency",
+    "task_list_dependencies",
+    "task_add_attachment",
+    "task_list_attachments",
+    "task_add_time_entry",
+    "task_list_time_entries",
 ];
 
 #[cfg(debug_assertions)]
@@ -260,6 +335,52 @@ pub(crate) async fn dispatch_dev(
             core.task_forecast(try_field!(dev::get_str(body, "taskId")))
                 .await,
         ),
+        "task_add_dependency" => {
+            let task_id = try_field!(dev::get_str(body, "taskId"));
+            let blocker_id = try_field!(dev::get_str(body, "blockerId"));
+            dev::val(core.task_add_dependency(task_id, blocker_id).await)
+        }
+        "task_list_dependencies" => {
+            let task_id = try_field!(dev::get_str(body, "taskId"));
+            dev::val(core.task_list_dependencies(task_id).await)
+        }
+        "task_add_attachment" => {
+            let task_id = try_field!(dev::get_str(body, "taskId"));
+            let attachment_type = try_field!(dev::get_str(body, "attachmentType"));
+            let value = try_field!(dev::get_str(body, "value"));
+            let title: Option<String> = dev::get(body, "title");
+            dev::val(
+                core.task_add_attachment(task_id, attachment_type, value, title)
+                    .await,
+            )
+        }
+        "task_list_attachments" => {
+            let task_id = try_field!(dev::get_str(body, "taskId"));
+            dev::val(core.task_list_attachments(task_id).await)
+        }
+        "task_add_time_entry" => {
+            let task_id = try_field!(dev::get_str(body, "taskId"));
+            let started_at_str = try_field!(dev::get_str(body, "startedAt"));
+            let started_at = chrono::DateTime::parse_from_rfc3339(&started_at_str)
+                .map(|dt| dt.with_timezone(&chrono::Utc))
+                .map_err(|e| {
+                    desktop_shared::errors::ApiError::new(
+                        "VALIDATION",
+                        format!("invalid startedAt: {e}"),
+                    )
+                });
+            let started_at = try_field!(started_at);
+            let duration_secs: Option<i64> = dev::get(body, "durationSecs");
+            let note: Option<String> = dev::get(body, "note");
+            dev::val(
+                core.task_add_time_entry(task_id, started_at, duration_secs, note)
+                    .await,
+            )
+        }
+        "task_list_time_entries" => {
+            let task_id = try_field!(dev::get_str(body, "taskId"));
+            dev::val(core.task_list_time_entries(task_id).await)
+        }
         _ => return None,
     })
 }
