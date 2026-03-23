@@ -8,7 +8,7 @@ The storage crate is the single persistence boundary for the entire application.
 
 - **StoragePool** -- a newtype around `sqlx::SqlitePool` with automatic WAL mode, foreign keys, busy timeout, and migration execution on connect.
 - **23 repository structs** -- each wrapping `SqlitePool` with domain-specific CRUD, filtering, aggregation, and retention methods.
-- **Repos** -- an aggregate struct that constructs all repositories from a single pool, providing convenient `repos.actions`, `repos.sessions`, etc. access.
+- **Repos** -- an aggregate struct that constructs all repositories from a single pool, providing convenient `repos.tasks`, `repos.sessions`, etc. access.
 - **VectorStore** -- a LanceDB-backed embedding store for semantic similarity search across 9 tables.
 - **FinanceStorage** -- a sub-aggregate of 9 finance-specific repositories.
 - **FeatureMigration system** -- allowing feature crates to register and run their own schema migrations independently of the core migration.
@@ -59,7 +59,7 @@ On every `connect()`:
 pub struct Repos {
     pool: SqlitePool,
     pub agent_tasks: AgentTaskRepo,
-    pub actions: ActionRepo,
+    pub actions: TaskRepo,
     pub areas: AreaRepo,
     pub projects: ProjectRepo,
     pub sessions: SessionRepo,
@@ -129,44 +129,44 @@ The storage crate uses 5 macros to eliminate CRUD boilerplate:
 
 ## Repository Structs and Methods
 
-### ActionRepo
+### TaskRepo
 
-**Files:** `src/repos/action_repo/` (mod, core, filter, aggregation, hierarchy, attachments, dependencies, time_entries)
+**Files:** `src/repos/task_repo/` (mod, core, filter, aggregation, hierarchy, attachments, dependencies, time_entries)
 
 **Table:** `actions`
 
 **Core CRUD:**
-- `add(row) -> ActionRow`
-- `get(id) -> Option<ActionRow>`
-- `get_or_err(id) -> ActionRow`
-- `get_by_ids(ids) -> Vec<ActionRow>`
-- `update(patch: ActionPatch) -> ActionRow`
+- `add(row) -> TaskRow`
+- `get(id) -> Option<TaskRow>`
+- `get_or_err(id) -> TaskRow`
+- `get_by_ids(ids) -> Vec<TaskRow>`
+- `update(patch: TaskPatch) -> TaskRow`
 - `delete(id) -> bool`
 
 **Filter/Search:**
-- `list(filter: ActionFilter) -> Vec<ActionRow>` -- filter by status, tags, area, project, key_result, priority, due date range, status_group, group_id, templates
-- `list_templates() -> Vec<ActionRow>`
-- `search_by_keyword(query, limit) -> Vec<ActionRow>`
+- `list(filter: TaskFilter) -> Vec<TaskRow>` -- filter by status, tags, area, project, key_result, priority, due date range, status_group, group_id, templates
+- `list_templates() -> Vec<TaskRow>`
+- `search_by_keyword(query, limit) -> Vec<TaskRow>`
 
 **Aggregation:**
 - `summary() -> ActionSummary`
 - `summary_by_group() -> HashMap<String, i64>`
-- `overdue() -> Vec<ActionRow>`
+- `overdue() -> Vec<TaskRow>`
 - `to_context_string() -> String` (LLM context injection)
 - `count_by_kr(kr_id) -> (total, completed)`
 
 **Hierarchy:**
-- `get_children(parent_id) -> Vec<ActionRow>`
+- `get_children(parent_id) -> Vec<TaskRow>`
 - `count_children(parent_id) -> (total, completed)`
 - `count_children_bulk(parent_ids) -> HashMap<String, (i64, i64)>`
-- `get_subtree(root_id) -> Vec<ActionRow>` (recursive CTE)
-- `move_action(id, new_parent, new_project) -> ActionRow` (cycle detection)
+- `get_subtree(root_id) -> Vec<TaskRow>` (recursive CTE)
+- `move_task(id, new_parent, new_project) -> TaskRow` (cycle detection)
 - `cascade_complete(root_id) -> u64`
 
 **Focus (macro-generated):**
 - `focus(id, max_slots, deadline) -> bool`
 - `unfocus(id) -> bool`
-- `list_focused() -> Vec<ActionRow>`
+- `list_focused() -> Vec<TaskRow>`
 
 **Attachments:**
 - `add_attachment(action_id, type, value, title, tags) -> ActionAttachmentRow`
@@ -176,9 +176,9 @@ The storage crate uses 5 macros to eliminate CRUD boilerplate:
 **Dependencies:**
 - `add_dependency(action_id, blocker_id)` (cycle detection via recursive CTE)
 - `remove_dependency(action_id, blocker_id) -> bool`
-- `get_blockers(action_id) -> Vec<ActionRow>`
-- `incomplete_blockers(action_id) -> Vec<ActionRow>`
-- `get_blocking(blocker_id) -> Vec<ActionRow>`
+- `get_blockers(action_id) -> Vec<TaskRow>`
+- `incomplete_blockers(action_id) -> Vec<TaskRow>`
+- `get_blocking(blocker_id) -> Vec<TaskRow>`
 - `get_dependencies(action_id) -> Vec<ActionDependencyRow>`
 
 **Time Entries:**
@@ -186,10 +186,10 @@ The storage crate uses 5 macros to eliminate CRUD boilerplate:
 - `close_time_entry(action_id, entry_id) -> ActionTimeEntryRow`
 - `list_time_entries(action_id) -> Vec<ActionTimeEntryRow>`
 - `time_entries_in_range(start, end) -> Vec<TimeEntryWithTask>`
-- `tasks_for_timeline(start, end) -> Vec<ActionRow>`
+- `tasks_for_timeline(start, end) -> Vec<TaskRow>`
 
 **Templates:**
-- `add_template(row) -> ActionRow`
+- `add_template(row) -> TaskRow`
 - `delete_template(id) -> bool`
 
 ### TaskRepo
@@ -198,7 +198,7 @@ The storage crate uses 5 macros to eliminate CRUD boilerplate:
 
 **Table:** `tasks` (feature migration from `feature-tasks`)
 
-Mirrors `ActionRepo` structure with additional task-specific fields:
+Mirrors `TaskRepo` structure with additional task-specific fields:
 
 **Core CRUD:**
 - `add(row) -> TaskRow`
@@ -564,7 +564,7 @@ Each has `crud_repo!`-generated `get`, `get_or_err`, `delete` plus custom create
 
 All row types derive `Debug, Clone, FromRow, Serialize` with `#[serde(rename_all = "camelCase")]`.
 
-### ActionRow (`actions`)
+### TaskRow (`actions`)
 `id, title, description?, area_id, project_id?, key_result_id?, parent_id?, priority?, due_date?, tags: Vec<String>, status, focused_at?, focus_deadline?, focus_expired_count, created_at, updated_at, completed_at?, total_tracked_secs, estimated_minutes?, calendar_event_uid?, last_reminded_at?, recurrence_rule?, recurrence_parent_id?, is_template, next_instance_date?, status_label_id?, position, group_id?`
 
 ### ActionAttachmentRow (`action_attachments`)
@@ -577,7 +577,7 @@ All row types derive `Debug, Clone, FromRow, Serialize` with `#[serde(rename_all
 `action_id, blocker_id`
 
 ### TaskRow (`tasks`)
-Same as ActionRow plus: `task_type, acceptance_criteria?, agent_config?, execution_state, spawned_execution_id?, context_snapshot?, energy_level?, estimated_focus_blocks?, actual_minutes?, complexity_score?, completed, objective_id?`
+Same as TaskRow plus: `task_type, acceptance_criteria?, agent_config?, execution_state, spawned_execution_id?, context_snapshot?, energy_level?, estimated_focus_blocks?, actual_minutes?, complexity_score?, completed, objective_id?`
 
 ### TaskActivityRow (`task_activity`)
 `id, task_id, activity_type, field_changed?, old_value?, new_value?, actor_type, actor_id?, summary?, created_at`
@@ -850,7 +850,7 @@ classDiagram
     class Repos {
         -SqlitePool pool
         +agent_tasks: AgentTaskRepo
-        +actions: ActionRepo
+        +actions: TaskRepo
         +areas: AreaRepo
         +projects: ProjectRepo
         +sessions: SessionRepo
@@ -900,7 +900,7 @@ classDiagram
         +dedup_table(table, ts_column) usize
     }
 
-    class ActionRepo {
+    class TaskRepo {
         -SqlitePool pool
         +add/get/update/delete
         +list/search_by_keyword
@@ -932,7 +932,7 @@ classDiagram
     }
 
     Repos --> StoragePool : from_pool
-    Repos --> ActionRepo
+    Repos --> TaskRepo
     Repos --> TaskRepo
     Repos --> ProjectRepo
     Repos --> SessionRepo
@@ -1495,7 +1495,7 @@ erDiagram
 | `src/error.rs` | StorageError enum + OptionExt |
 | `src/macros.rs` | crud_repo!, focus_impl!, delete_older_than_impl!, get_by_ids_impl!, escape_like |
 | `src/repos/mod.rs` | Repos aggregate + ItemSummary |
-| `src/repos/action_repo/` | ActionRepo (8 submodules) |
+| `src/repos/task_repo/` | TaskRepo (8 submodules) |
 | `src/repos/task_repo/` | TaskRepo (11 submodules) |
 | `src/repos/project_repo.rs` | ProjectRepo |
 | `src/repos/area.rs` | AreaRepo |

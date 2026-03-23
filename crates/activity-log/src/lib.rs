@@ -14,7 +14,7 @@ pub mod work_context_repo;
 pub mod work_context_tool;
 pub mod work_resource_repo;
 
-pub use context_action_repo::ContextActionRepo;
+pub use context_action_repo::ContextTaskRepo;
 pub use context_resource_repo::ContextResourceRepo;
 pub use context_source::WorkContextSource;
 pub use normalizers::{

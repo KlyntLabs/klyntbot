@@ -133,6 +133,7 @@ impl From<KlyntbotError> for ApiError {
             KlyntbotError::Cron(msg) => ApiError::new("CRON_ERROR", msg),
             KlyntbotError::Io(e) => ApiError::new("IO_ERROR", e.to_string()),
             KlyntbotError::Json(e) => ApiError::new("JSON_ERROR", e.to_string()),
+            KlyntbotError::Timeout(msg) => ApiError::new("TIMEOUT", msg),
         }
     }
 }
