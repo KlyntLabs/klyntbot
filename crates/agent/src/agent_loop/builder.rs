@@ -814,9 +814,16 @@ impl AgentLoopBuilder {
             context_engine
         };
 
-        // Wire heuristic query rewriter for contextual enrichment of vague queries
-        let query_rewriter: Arc<dyn context_engine::QueryRewriter> =
-            Arc::new(crate::adapters::query_rewriter::ContextualQueryRewriter::heuristic_only());
+        // Phase 2: Wire LLM provider + config model for query rewriting fallback
+        let rewriter_provider = self.cognitive_provider.clone();
+        let rewriter_model = config.agents.rewriter_model.clone();
+        let query_rewriter: Arc<dyn context_engine::QueryRewriter> = Arc::new(
+            crate::adapters::query_rewriter::ContextualQueryRewriter::new(
+                rewriter_provider,
+                rewriter_model,
+                800, // 800ms hard cap per spec
+            ),
+        );
         let context_engine = context_engine.with_query_rewriter(query_rewriter);
 
         let context_engine = Arc::new(context_engine);
