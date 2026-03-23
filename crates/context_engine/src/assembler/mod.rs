@@ -391,10 +391,22 @@ impl ContextEngine {
     async fn retrieve_memory(&self, request: &ContextRequest) -> Option<(String, usize)> {
         let retriever = self.memory_retriever.as_ref()?;
 
-        let enriched = match (&self.query_rewriter, &request.retrieval_context) {
-            (Some(rewriter), Some(ctx)) => rewriter.rewrite(&request.message_text, ctx).await,
-            _ => None,
+        // Phase 2: Background race — heuristic immediate, LLM races with InsightForge
+        let (enriched, late_rx) = match (&self.query_rewriter, &request.retrieval_context) {
+            (Some(rewriter), Some(ctx)) => {
+                let (tx, rx) = tokio::sync::oneshot::channel();
+                let result = rewriter
+                    .rewrite_or_spawn(&request.message_text, ctx, Some(tx))
+                    .await;
+                if result.is_some() {
+                    (result, None) // Heuristic hit — no need for background channel
+                } else {
+                    (None, Some(rx)) // LLM may be running in background
+                }
+            }
+            _ => (None, None),
         };
+
         if let Some(ref e) = enriched {
             tracing::debug!(
                 enriched_query = e.enriched_query.as_str(),
@@ -402,17 +414,55 @@ impl ContextEngine {
                 "🧠 ContextEngine: passing enriched query to InsightForge"
             );
         }
+
         // Use InsightForge if available and appropriate
         let entries = if let Some(ref forge) = self.insight_forge {
             if forge.should_activate(&request.strategy, &request.message_text) {
-                forge
+                let forge_result = forge
                     .retrieve_with_enrichment(
                         &request.message_text,
                         enriched.as_ref(),
                         self.memory_retrieval_limit,
                         request.session_key.as_deref(),
                     )
-                    .await
+                    .await;
+
+                // Check if background LLM finished during InsightForge execution
+                if let Some(mut late_rx) = late_rx {
+                    match late_rx.try_recv() {
+                        Ok(llm_result) => {
+                            tracing::debug!(
+                                enriched = llm_result.enriched_query.as_str(),
+                                "🏁 LLM finished during InsightForge — supplementary search"
+                            );
+                            // Quick supplementary retrieval with the LLM-enriched query
+                            let supplement = retriever
+                                .retrieve(
+                                    &llm_result.enriched_query,
+                                    self.memory_retrieval_limit / 2,
+                                )
+                                .await;
+                            let existing_ids: std::collections::HashSet<String> =
+                                forge_result.iter().map(|e| e.id.clone()).collect();
+                            let mut merged = forge_result;
+                            for entry in supplement {
+                                if !existing_ids.contains(&entry.id) {
+                                    merged.push(entry);
+                                }
+                            }
+                            merged.truncate(self.memory_retrieval_limit);
+                            merged
+                        }
+                        Err(_) => {
+                            tracing::debug!(
+                                "⏱️ LLM didn't finish during InsightForge — using original results"
+                            );
+                            forge_result
+                        }
+                    }
+                } else {
+                    forge_result
+                }
             } else {
                 retriever
                     .retrieve(&request.message_text, self.memory_retrieval_limit)

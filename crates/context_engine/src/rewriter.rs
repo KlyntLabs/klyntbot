@@ -57,4 +57,19 @@ pub struct CorrectionContext {
 #[async_trait]
 pub trait QueryRewriter: Send + Sync {
     async fn rewrite(&self, original: &str, context: &RetrievalContext) -> Option<RewriteResult>;
+
+    /// Attempt heuristic rewrite immediately. If heuristic returns None and LLM is available,
+    /// spawn the LLM call in background and send the result on `late_tx` when ready.
+    /// Returns the heuristic result (or None). The caller races the channel against InsightForge.
+    async fn rewrite_or_spawn(
+        &self,
+        original: &str,
+        context: &RetrievalContext,
+        late_tx: Option<tokio::sync::oneshot::Sender<RewriteResult>>,
+    ) -> Option<RewriteResult> {
+        // Default: just call rewrite(), no background work
+        let result = self.rewrite(original, context).await;
+        drop(late_tx); // Close channel — no background LLM
+        result
+    }
 }
