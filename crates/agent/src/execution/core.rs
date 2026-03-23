@@ -25,6 +25,33 @@ const INTERACTIVE_TOOL_TIMEOUT: std::time::Duration = std::time::Duration::from_
 /// Maximum number of tool calls that can execute concurrently within a single cycle.
 const MAX_CONCURRENT_TOOLS: usize = 10;
 
+/// Maximum length for a single tool result (100KB).
+const MAX_TOOL_RESULT_LENGTH: usize = 100_000;
+
+/// Sanitize tool result string before injecting into conversation messages.
+///
+/// - Strips control characters (except `\n`, `\t`, `\r`)
+/// - Truncates to [`MAX_TOOL_RESULT_LENGTH`] with a notice (UTF-8 safe)
+fn sanitize_tool_result(input: &str) -> String {
+    let cleaned: String = input
+        .chars()
+        .filter(|c| !c.is_control() || *c == '\n' || *c == '\t' || *c == '\r')
+        .collect();
+
+    if cleaned.len() > MAX_TOOL_RESULT_LENGTH {
+        // Find a valid UTF-8 char boundary at or before MAX_TOOL_RESULT_LENGTH
+        let mut truncate_at = MAX_TOOL_RESULT_LENGTH;
+        while truncate_at > 0 && !cleaned.is_char_boundary(truncate_at) {
+            truncate_at -= 1;
+        }
+        let mut truncated = cleaned[..truncate_at].to_string();
+        truncated.push_str("\n[truncated - result exceeded 100KB]");
+        truncated
+    } else {
+        cleaned
+    }
+}
+
 /// Hash a `serde_json::Value` without serializing to a string.
 ///
 /// `Value` doesn't implement `Hash` (because of `f64`), so we walk the tree
@@ -651,12 +678,12 @@ impl ExecutionCore {
                 }
             }
 
-            // Append tool result messages
+            // Append tool result messages (sanitized to strip control chars / cap length)
             for r in &results {
                 messages.push(Message::tool(
                     r.tool_call_id.clone(),
                     r.tool_name.clone(),
-                    r.result.clone(),
+                    sanitize_tool_result(&r.result),
                 ));
             }
 
@@ -1134,5 +1161,30 @@ mod tests {
             }
             _ => panic!("Expected Assistant message"),
         }
+    }
+
+    // ── sanitize_tool_result tests ───────────────────────────────
+
+    #[test]
+    fn sanitize_tool_result_strips_control_chars() {
+        let input = "Normal text\x00\x01\x02with control chars\nand newlines";
+        let result = sanitize_tool_result(input);
+        assert!(!result.contains('\x00'));
+        assert!(!result.contains('\x01'));
+        assert!(result.contains('\n'));
+        assert!(result.contains("Normal text"));
+    }
+
+    #[test]
+    fn sanitize_tool_result_caps_length() {
+        let long = "x".repeat(200_000);
+        let result = sanitize_tool_result(&long);
+        assert!(result.len() <= MAX_TOOL_RESULT_LENGTH + 50);
+    }
+
+    #[test]
+    fn sanitize_tool_result_preserves_normal_content() {
+        let input = "Task created: 'Buy groceries' with priority High";
+        assert_eq!(sanitize_tool_result(input), input);
     }
 }
