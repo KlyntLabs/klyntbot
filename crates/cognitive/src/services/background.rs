@@ -260,6 +260,7 @@ impl BackgroundConsolidationService {
             let mut promotion_queue: Vec<Observation> = Vec::new();
 
             let session_start = chrono::Utc::now().to_rfc3339();
+            let mut batch_count: u64 = 0;
 
             loop {
                 // Collect batch (3s window, max 10 events)
@@ -573,6 +574,19 @@ impl BackgroundConsolidationService {
                         accumulator.remove(&key);
                         if let Some(ref ar) = accum_repo {
                             ar.delete_by_key(&key).await;
+                        }
+                    }
+                }
+
+                batch_count += 1;
+                if batch_count % 100 == 0 {
+                    if let Some(ref dlq) = failed_obs_repo {
+                        let removed = dlq.cleanup_permanently_failed().await;
+                        if removed > 0 {
+                            info!(
+                                "DLQ cleanup: removed {} permanently failed observations",
+                                removed
+                            );
                         }
                     }
                 }

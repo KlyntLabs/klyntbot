@@ -140,58 +140,73 @@ impl ChannelManager {
             tasks.push(task);
         }
 
-        // Start outbound dispatcher
+        // Start outbound dispatcher with per-channel isolation
         let mut outbound_rx = self.outbound_rx.take().ok_or_else(|| {
             ChannelError::InvalidConfig(
                 "Outbound receiver already taken - start_all() may have been called twice"
                     .to_string(),
             )
         })?;
-        let channels_clone = self.channels.clone();
-        let dispatcher_task = tokio::spawn(async move {
-            debug!("Starting outbound message dispatcher");
 
-            loop {
-                match outbound_rx.recv().await {
-                    Some(msg) => {
-                        let channels = channels_clone.read().await;
-                        if let Some(channel) = channels.get(msg.channel.as_str()) {
-                            if let Err(e) = channel.send(&msg).await {
-                                error!("Failed to send message to {}: {}", msg.channel, e);
+        // Create per-channel queues for isolated delivery
+        let mut per_channel_senders: HashMap<String, mpsc::Sender<OutboundMessage>> =
+            HashMap::new();
 
-                                // Send user-facing error feedback (avoid infinite loop
-                                // by not retrying if the error message itself fails)
-                                let error_text = format!(
-                                    "Sorry, I encountered an error sending that message. Please try again.\n({})",
-                                    user_facing_error(&e)
-                                );
-                                let error_msg = OutboundMessage {
-                                    channel: msg.channel.clone(),
-                                    chat_id: msg.chat_id.clone(),
-                                    content: error_text,
-                                    reply_to: None,
-                                    media: vec![],
-                                    metadata: Default::default(),
-                                };
-                                if let Err(e2) = channel.send(&error_msg).await {
-                                    error!(
-                                        "Failed to send error feedback to {}: {} (giving up)",
-                                        msg.channel, e2
-                                    );
-                                }
-                            }
-                        } else {
-                            warn!("No channel found for: {}", msg.channel);
+        for (name, channel) in channels.iter() {
+            let (tx, mut rx) = mpsc::channel::<OutboundMessage>(32);
+            per_channel_senders.insert(name.clone(), tx);
+
+            let channel = channel.clone();
+            let channel_name = name.clone();
+            let task = tokio::spawn(async move {
+                while let Some(msg) = rx.recv().await {
+                    if let Err(e) = channel.send(&msg).await {
+                        error!("Failed to send message to {}: {}", channel_name, e);
+
+                        let error_text = format!(
+                            "Sorry, I encountered an error sending that message. Please try again.\n({})",
+                            user_facing_error(&e)
+                        );
+                        let error_msg = OutboundMessage {
+                            channel: msg.channel.clone(),
+                            chat_id: msg.chat_id.clone(),
+                            content: error_text,
+                            reply_to: None,
+                            media: vec![],
+                            metadata: Default::default(),
+                        };
+                        if let Err(e2) = channel.send(&error_msg).await {
+                            error!(
+                                "Failed to send error feedback to {}: {} (giving up)",
+                                channel_name, e2
+                            );
                         }
                     }
-                    None => {
-                        warn!("Outbound queue closed");
-                        break;
+                }
+                debug!("Per-channel queue closed for: {}", channel_name);
+            });
+            tasks.push(task);
+        }
+
+        // Dispatcher: route messages to per-channel queues
+        let dispatcher_task = tokio::spawn(async move {
+            debug!("Starting outbound message dispatcher (per-channel fan-out)");
+
+            while let Some(msg) = outbound_rx.recv().await {
+                if let Some(tx) = per_channel_senders.get(msg.channel.as_str()) {
+                    if let Err(e) = tx.send(msg).await {
+                        error!("Per-channel queue full or closed: {}", e);
                     }
+                } else {
+                    warn!("No channel found for: {}", msg.channel);
                 }
             }
+            warn!("Outbound queue closed");
         });
         tasks.push(dispatcher_task);
+
+        // Release the read lock before awaiting long-running tasks
+        drop(channels);
 
         // Wait for all tasks (they should run forever)
         for task in tasks {

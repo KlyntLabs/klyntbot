@@ -111,6 +111,32 @@ impl FailedObservationRepo {
         .unwrap_or((0,));
         row.0
     }
+
+    /// Count observations that have exhausted all retries.
+    pub async fn count_permanently_failed(&self) -> i64 {
+        let row: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM failed_observations WHERE retry_count >= max_retries",
+        )
+        .fetch_one(&self.pool)
+        .await
+        .unwrap_or((0,));
+        row.0
+    }
+
+    /// Delete observations that have exhausted all retries.
+    /// Returns the number of rows removed.
+    pub async fn cleanup_permanently_failed(&self) -> u64 {
+        match sqlx::query("DELETE FROM failed_observations WHERE retry_count >= max_retries")
+            .execute(&self.pool)
+            .await
+        {
+            Ok(result) => result.rows_affected(),
+            Err(e) => {
+                warn!("Failed to cleanup permanently failed observations: {e}");
+                0
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -210,6 +236,50 @@ mod tests {
         repo.insert(&obs, "consolidation", "parse_error").await;
 
         assert_eq!(repo.count_pending().await, 2);
+    }
+
+    #[tokio::test]
+    async fn test_cleanup_permanently_failed() {
+        let (_pool, repo) = setup().await;
+        let obs = test_observation();
+
+        repo.insert(&obs, "extraction", "llm_error").await;
+        let eligible = repo.list_eligible(10).await;
+        let id = eligible[0].id.clone();
+
+        sqlx::query("UPDATE failed_observations SET retry_count = max_retries WHERE id = ?1")
+            .bind(&id)
+            .execute(&repo.pool)
+            .await
+            .unwrap();
+
+        assert!(repo.list_eligible(10).await.is_empty());
+        assert_eq!(repo.count_permanently_failed().await, 1);
+
+        let removed = repo.cleanup_permanently_failed().await;
+        assert_eq!(removed, 1);
+        assert_eq!(repo.count_permanently_failed().await, 0);
+    }
+
+    #[tokio::test]
+    async fn test_count_permanently_failed() {
+        let (_pool, repo) = setup().await;
+        let obs = test_observation();
+
+        assert_eq!(repo.count_permanently_failed().await, 0);
+
+        repo.insert(&obs, "extraction", "error1").await;
+        repo.insert(&obs, "extraction", "error2").await;
+        let eligible = repo.list_eligible(10).await;
+
+        sqlx::query("UPDATE failed_observations SET retry_count = max_retries WHERE id = ?1")
+            .bind(&eligible[0].id)
+            .execute(&repo.pool)
+            .await
+            .unwrap();
+
+        assert_eq!(repo.count_permanently_failed().await, 1);
+        assert_eq!(repo.count_pending().await, 1);
     }
 
     #[tokio::test]

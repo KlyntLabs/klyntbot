@@ -84,6 +84,7 @@ pub struct AgentLoopBuilder {
     user_situation: Option<Arc<tokio::sync::Mutex<cognitive::situation::UserSituation>>>,
     activity_svc: Option<Arc<activity_log::ActivityIngestionService>>,
     autotuner: Option<Arc<crate::autotuner::AutoTunerOrchestrator>>,
+    active_view: Option<Arc<tokio::sync::RwLock<Option<context_engine::ActiveView>>>>,
 }
 
 impl AgentLoopBuilder {
@@ -103,6 +104,7 @@ impl AgentLoopBuilder {
             user_situation: None,
             activity_svc: None,
             autotuner: None,
+            active_view: None,
         }
     }
 
@@ -170,6 +172,14 @@ impl AgentLoopBuilder {
         orchestrator: Arc<crate::autotuner::AutoTunerOrchestrator>,
     ) -> Self {
         self.autotuner = Some(orchestrator);
+        self
+    }
+
+    pub fn with_active_view(
+        mut self,
+        view: Arc<tokio::sync::RwLock<Option<context_engine::ActiveView>>>,
+    ) -> Self {
+        self.active_view = Some(view);
         self
     }
 
@@ -503,7 +513,9 @@ impl AgentLoopBuilder {
         ));
         let context_engine = context_engine::ContextEngine::new()
             .with_sources(sources)
-            .with_token_counter(context_engine::best_token_counter())
+            .with_token_counter(context_engine::token_counter_for_model(
+                &config.agents.defaults.model,
+            ))
             .with_summary_provider(summary_provider);
 
         // ── Session manager (SQL-backed) ──────────────────────────────────
@@ -1412,6 +1424,11 @@ impl AgentLoopBuilder {
 
         // Wire task repo for active task context in query rewriting
         runtime = runtime.with_task_repo(repos.tasks.clone());
+
+        // Inject active view for RetrievalContext
+        if let Some(ref view) = self.active_view {
+            runtime = runtime.with_active_view(Arc::clone(view));
+        }
 
         // Inject autotuner shadow hook
         if let Some(ref orchestrator) = self.autotuner {

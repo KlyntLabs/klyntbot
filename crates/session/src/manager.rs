@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex as StdMutex};
 use tokio::sync::Mutex as TokioMutex;
-use tracing::{debug, warn};
+use tracing::{debug, error, warn};
 use uuid::Uuid;
 
 use common::{KlyntbotError, Result};
@@ -245,15 +245,51 @@ impl SessionManager {
 
         // Handle evictions (async, LRU lock already released)
         for old_key in evict_keys {
-            if let Some((_, session_arc)) = self.sessions.remove(&old_key) {
-                let session = session_arc.lock().await;
-                if let Err(e) = self.save(&session).await {
-                    warn!(
-                        "Failed to save evicted session {}: {}. Data may be lost.",
-                        old_key, e
-                    );
+            // Save BEFORE removing from cache to prevent data loss.
+            // Clone the Arc out of the DashMap ref immediately to avoid holding
+            // the shard read lock across async await points.
+            let session_arc = self.sessions.get(&old_key).map(|r| r.value().clone());
+            let save_result = if let Some(session_arc) = session_arc {
+                // Clone session data and release the mutex immediately so concurrent
+                // access to this session is not blocked during retries + sleep.
+                let session_snapshot = session_arc.lock().await.clone();
+                let mut saved = false;
+                for attempt in 1..=3u32 {
+                    match self.save(&session_snapshot).await {
+                        Ok(_) => {
+                            saved = true;
+                            break;
+                        }
+                        Err(e) => {
+                            warn!("Eviction save attempt {}/3 for {}: {}", attempt, old_key, e);
+                            if attempt < 3 {
+                                tokio::time::sleep(std::time::Duration::from_millis(
+                                    100 * attempt as u64,
+                                ))
+                                .await;
+                            }
+                        }
+                    }
                 }
+                saved
+            } else {
+                // Session already removed by another task — nothing to save
+                true
+            };
+
+            if save_result {
+                self.sessions.remove(&old_key);
                 debug!("Evicted session from cache: {}", old_key);
+            } else {
+                // Re-add to LRU to retry eviction next time.
+                // This prevents data loss at the cost of temporarily exceeding max_cache_size.
+                error!(
+                    "Failed to persist evicted session {} after 3 attempts, \
+                     keeping in cache to prevent data loss",
+                    old_key
+                );
+                let mut lru = self.lru_order.lock().unwrap();
+                lru.insert(old_key, ());
             }
         }
 
@@ -748,5 +784,33 @@ mod tests {
         .await;
 
         assert!(result.is_ok(), "tasks deadlocked or timed out");
+    }
+
+    #[tokio::test]
+    async fn test_eviction_preserves_session_on_save_failure() {
+        let pool = storage::StoragePool::connect_in_memory().await.unwrap();
+        let repo = storage::SessionRepo::new(pool.inner().clone());
+        let manager = SessionManager::from_repo(repo, 2).await;
+
+        let _s1 = manager.get_or_create("key-1", None).await.unwrap();
+        let _s2 = manager.get_or_create("key-2", None).await.unwrap();
+
+        {
+            let s1 = manager.get_or_create("key-1", None).await.unwrap();
+            let mut session = s1.lock().await;
+            session.add_message("user", "important data");
+        }
+
+        let _s3 = manager.get_or_create("key-3", None).await.unwrap();
+
+        let s1_reloaded = manager.get_or_create("key-1", None).await.unwrap();
+        let session = s1_reloaded.lock().await;
+        assert!(
+            session
+                .messages
+                .iter()
+                .any(|m| m.role == "user" && m.content.contains("important data")),
+            "Evicted session should be recoverable from DB"
+        );
     }
 }

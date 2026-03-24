@@ -28,7 +28,8 @@ pub use memory_retriever::{MemoryEntry, MemoryRetriever, MemorySource};
 pub use source::{ContextSource, SourceContext};
 pub use summary_provider::SummaryProvider;
 pub use token_counter::{
-    best_token_counter, default_token_counter, CharTokenCounter, TiktokenCounter, TokenCounter,
+    best_token_counter, default_token_counter, token_counter_for_model, AnthropicTokenCounter,
+    CharTokenCounter, TiktokenCounter, TokenCounter,
 };
 
 pub mod rewriter;
