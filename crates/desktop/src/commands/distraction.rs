@@ -7,6 +7,7 @@ use desktop_shared::errors::ApiError;
 use tauri::State;
 
 use crate::app_core::AppCore;
+use crate::focus_timer::FocusTimer;
 
 #[tauri::command(rename_all = "snake_case")]
 pub async fn distraction_dismiss(
@@ -19,8 +20,11 @@ pub async fn distraction_dismiss(
 #[tauri::command]
 pub async fn distraction_allow_temp(
     state: State<'_, Arc<AppCore>>,
+    timer: State<'_, Arc<FocusTimer>>,
     pattern: String,
 ) -> Result<(), ApiError> {
+    // Pause the focus timer so the user doesn't lose focus time during their break
+    timer.pause().await;
     state.distraction_allow_temp(pattern).await
 }
 

@@ -11,6 +11,17 @@ export function ResultsList({ onExecute }: ResultsListProps) {
   const selectedIndex = useLauncherStore((s) => s.selectedIndex);
   const isSearching = useLauncherStore((s) => s.isSearching);
   const listRef = useRef<HTMLDivElement>(null);
+  // Prevent hover selection when results render under a stationary cursor.
+  // Only allow mouse-based selection after the mouse physically moves.
+  const mouseMovedRef = useRef(false);
+
+  // Reset mouse-moved flag when results change — use first item ID as a
+  // stable identity signal (length alone can't distinguish different result sets).
+  const resultsKey = results.length > 0 ? results[0].id : "";
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally reacting to result identity change
+  useEffect(() => {
+    mouseMovedRef.current = false;
+  }, [resultsKey]);
 
   // Scroll selected item into view
   useEffect(() => {
@@ -47,7 +58,14 @@ export function ResultsList({ onExecute }: ResultsListProps) {
   }
 
   return (
-    <div ref={listRef} className="max-h-[500px] overflow-y-auto py-1">
+    <div
+      ref={listRef}
+      role="listbox"
+      className="max-h-[500px] overflow-y-auto py-1"
+      onMouseMove={() => {
+        mouseMovedRef.current = true;
+      }}
+    >
       {results.map((item, index) => (
         <ResultRow
           key={item.id}
@@ -55,7 +73,11 @@ export function ResultsList({ onExecute }: ResultsListProps) {
           index={index}
           isSelected={index === selectedIndex}
           onClick={() => onExecute(index)}
-          onMouseEnter={() => useLauncherStore.getState().setSelectedIndex(index)}
+          onMouseEnter={() => {
+            if (mouseMovedRef.current) {
+              useLauncherStore.getState().setSelectedIndex(index);
+            }
+          }}
         />
       ))}
     </div>

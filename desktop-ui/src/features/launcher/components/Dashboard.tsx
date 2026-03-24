@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { useLauncherStore } from "../stores/launcherStore";
 import type { DashboardData } from "../types";
 
@@ -16,7 +15,6 @@ export function Dashboard({ onOpenTask }: DashboardProps) {
   }
 
   const hasContent =
-    dashboard.focus ||
     dashboard.calendar.length > 0 ||
     dashboard.tasks.length > 0 ||
     dashboard.productivity.totalMinutes > 0;
@@ -32,58 +30,12 @@ export function Dashboard({ onOpenTask }: DashboardProps) {
 
   return (
     <div className="px-3 pt-2 pb-3 space-y-2 max-h-[460px] overflow-y-auto">
-      {dashboard.focus && <FocusWidget focus={dashboard.focus} />}
       {dashboard.calendar.length > 0 && <CalendarWidget events={dashboard.calendar} />}
       {dashboard.tasks.length > 0 && (
         <TasksWidget tasks={dashboard.tasks} onOpenTask={onOpenTask} />
       )}
       {dashboard.productivity.totalMinutes > 0 && (
         <ProductivityWidget productivity={dashboard.productivity} />
-      )}
-    </div>
-  );
-}
-
-/* ── Focus Session ────────────────────────────────────────────── */
-
-function FocusWidget({ focus }: { focus: NonNullable<DashboardData["focus"]> }) {
-  const [elapsed, setElapsed] = useState(focus.elapsedSecs);
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: sessionId resets the timer when a new session starts
-  useEffect(() => {
-    setElapsed(focus.elapsedSecs);
-    const interval = setInterval(() => setElapsed((e) => e + 1), 1000);
-    return () => clearInterval(interval);
-  }, [focus.elapsedSecs, focus.sessionId]);
-
-  const mins = Math.floor(elapsed / 60);
-  const secs = elapsed % 60;
-  const progress = focus.targetSecs ? Math.min(100, (elapsed / focus.targetSecs) * 100) : null;
-
-  return (
-    <div className="rounded-lg bg-brand/[0.06] border border-brand/15 p-3">
-      <div className="flex items-center gap-2 mb-1.5">
-        <div className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse" />
-        <span className="text-[11px] font-medium uppercase tracking-wider text-brand/80">
-          Focusing
-        </span>
-        <span className="ml-auto text-sm font-medium tabular-nums text-foreground">
-          {mins}:{String(secs).padStart(2, "0")}
-        </span>
-      </div>
-      {focus.taskName && (
-        <p className="text-[13px] text-foreground/90 truncate pl-3.5">{focus.taskName}</p>
-      )}
-      {progress !== null && (
-        <div className="mt-2 h-[3px] bg-accent rounded-full overflow-hidden">
-          <div
-            className="h-full rounded-full transition-all duration-1000 ease-out"
-            style={{
-              width: `${progress}%`,
-              background: "linear-gradient(90deg, var(--brand) 0%, var(--brand-hover) 100%)",
-            }}
-          />
-        </div>
       )}
     </div>
   );

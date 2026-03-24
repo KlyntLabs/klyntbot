@@ -53,9 +53,9 @@ impl super::SearchSource for FileSearchSource {
         #[cfg(target_os = "macos")]
         {
             let output = tokio::time::timeout(
-                std::time::Duration::from_secs(1),
+                std::time::Duration::from_secs(2),
                 tokio::process::Command::new("mdfind")
-                    .args(["-name", query, "-limit", &limit.to_string()])
+                    .args(["-name", query])
                     .output(),
             )
             .await;
@@ -68,6 +68,7 @@ impl super::SearchSource for FileSearchSource {
             String::from_utf8_lossy(&output.stdout)
                 .lines()
                 .filter(|line| !line.trim().is_empty())
+                .take(limit)
                 .map(|line| {
                     let path = PathBuf::from(line.trim());
                     let name = path
