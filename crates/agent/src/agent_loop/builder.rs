@@ -588,9 +588,9 @@ impl AgentLoopBuilder {
 
         // Cron tool (optional)
         let cron_handler: Option<Arc<dyn tools::cron_tool::CronHandler>> =
-            if let Some(cron_svc) = self.cron_service {
+            if let Some(ref cron_svc) = self.cron_service {
                 let adapter: Arc<dyn tools::cron_tool::CronHandler> =
-                    Arc::new(CronHandlerAdapter::new(cron_svc));
+                    Arc::new(CronHandlerAdapter::new(Arc::clone(cron_svc)));
                 tool_registry.register(CronTool::with_handler(Arc::clone(&adapter)));
                 Some(adapter)
             } else {
@@ -1312,7 +1312,26 @@ impl AgentLoopBuilder {
                 ));
             }
             service.start();
-            Some(Arc::new(RwLock::new(service)))
+            let svc_arc = Arc::new(RwLock::new(service));
+
+            // Register cron handler so the learning analysis shows in the Automations page.
+            // The handler triggers the existing background loop rather than running inline.
+            if let Some(ref cron_svc) = self.cron_service {
+                let svc_for_cron = Arc::clone(&svc_arc);
+                cron_svc.register_handler(
+                    "__klyntbot_learning_analysis",
+                    Arc::new(move |_job: &scheduling::CronJob| {
+                        let svc = Arc::clone(&svc_for_cron);
+                        // Trigger the analysis via the existing Notify mechanism
+                        if let Ok(guard) = svc.try_read() {
+                            guard.trigger_analysis();
+                        }
+                        Ok(Some("Learning analysis triggered".to_string()))
+                    }),
+                );
+            }
+
+            Some(svc_arc)
         } else {
             None
         };
@@ -1329,8 +1348,30 @@ impl AgentLoopBuilder {
             )))
         });
 
+        // ── MCP health check (auto-reconnect downed servers) ─────────────
+        let mcp_manager_arc = Arc::new(tokio::sync::Mutex::new(mcp_manager));
+        let mcp_health_check_token = {
+            let mgr_guard = mcp_manager_arc.lock().await;
+            if mgr_guard.is_some() {
+                drop(mgr_guard);
+                Some(CancellationToken::new())
+            } else {
+                None
+            }
+        };
+
         // ── Agent Runtime ─────────────────────────────────────────────────
         let tool_registry = Arc::new(RwLock::new(tool_registry));
+
+        // Start health check now that tool_registry is wrapped in Arc<RwLock<>>
+        if let Some(ref token) = mcp_health_check_token {
+            let _health_handle = mcp::McpManager::start_health_check(
+                Arc::clone(&mcp_manager_arc),
+                Arc::clone(&tool_registry),
+                token.clone(),
+            );
+        }
+
         let mut execution_core =
             crate::execution::ExecutionCore::new(provider.clone(), Arc::clone(&tool_registry));
         if let Some(ref recorder) = outcome_recorder {
@@ -1489,37 +1530,9 @@ impl AgentLoopBuilder {
 
         info!("Agent runtime initialized");
 
-        // ── Session cleanup service ───────────────────────────────────────
-        let session_cleanup_token = if self.pool.is_some() {
-            let token = CancellationToken::new();
-            let cleanup_service = crate::services::session_cleanup::SessionCleanupService::new(
-                storage::SessionRepo::new(storage_pool.inner().clone()),
-                config.conversation.session.ttl_days,
-                config.conversation.session.cleanup_interval_hours,
-                token.clone(),
-            );
-            cleanup_service.spawn();
-            Some(token)
-        } else {
-            None
-        };
-
-        // ── Memory maintenance service ────────────────────────────────────
-        let memory_maintenance_token =
-            if let (Some(_), Some(vs)) = (&self.pool, self.vector_store.clone()) {
-                let token = CancellationToken::new();
-                let maintenance_service =
-                    crate::services::memory_maintenance::MemoryMaintenanceService::new(
-                        vs,
-                        config.conversation.memory.max_age_days,
-                        config.conversation.memory.maintenance_interval_hours,
-                        token.clone(),
-                    );
-                maintenance_service.spawn();
-                Some(token)
-            } else {
-                None
-            };
+        // Session cleanup and memory maintenance are handled by CronService
+        // (registered in app-core/init/cron.rs as __klyntbot_session_cleanup
+        // and __klyntbot_memory_maintenance).
 
         // ── Assemble AgentLoop ────────────────────────────────────────────
         let history_limit = config.conversation.session.history_limit;
@@ -1540,9 +1553,10 @@ impl AgentLoopBuilder {
             runtime,
             strategy_repo: Some(repos.strategies.clone()),
             history_limit,
-            _session_cleanup_token: session_cleanup_token,
-            _memory_maintenance_token: memory_maintenance_token,
-            mcp_manager: tokio::sync::Mutex::new(mcp_manager),
+            _session_cleanup_token: None,
+            _memory_maintenance_token: None,
+            mcp_manager: Arc::clone(&mcp_manager_arc),
+            _mcp_health_check_token: mcp_health_check_token,
             domain_event_bus: self.domain_event_bus,
             trial_repo: if self.autotuner.is_some() {
                 self.pool

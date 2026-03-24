@@ -257,10 +257,10 @@ impl AutoTunerOrchestrator {
     /// 5. Generates new trial variants via the LLM.
     /// 6. Logs the results.
     ///
-    /// Must be called before wrapping the `CronService` in `Arc` (takes `&mut`).
+    /// Can be called before or after wrapping the `CronService` in `Arc`.
     pub fn register_nightly_cycle(
         orchestrator: Arc<Self>,
-        cron_service: &mut CronService,
+        cron_service: &CronService,
         autotuner_config: AutoTunerConfig,
         trial_repo: TrialRepo,
         metric_source: Arc<dyn MetricSource>,

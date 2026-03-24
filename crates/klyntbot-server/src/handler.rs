@@ -206,14 +206,12 @@ impl ServerHandler for KlyntbotServerHandler {
         let uri = request.uri.as_str();
 
         let text = match uri {
-            "klyntbot://status" => {
-                serde_json::json!({
-                    "status": "running",
-                    "version": env!("CARGO_PKG_VERSION"),
-                    "mode": format!("{:?}", self.app.mode),
-                })
-                .to_string()
-            }
+            "klyntbot://status" => serde_json::json!({
+                "status": "running",
+                "version": env!("CARGO_PKG_VERSION"),
+                "mode": format!("{:?}", self.app.mode),
+            })
+            .to_string(),
             "klyntbot://memory/recent" => {
                 self.call_tool_for_resource(
                     "memory",
@@ -229,7 +227,20 @@ impl ServerHandler for KlyntbotServerHandler {
                 .await
             }
             "klyntbot://config/skills" => {
-                r#"{"status": "not_available", "message": "Skill listing via resources is not yet implemented. Use the agent tool to query active skills."}"#.to_string()
+                let catalog = self.app.agent.skill_catalog();
+                let catalog = catalog.read().await;
+                let skills: Vec<serde_json::Value> = catalog
+                    .all_skills()
+                    .map(|pkg| {
+                        serde_json::json!({
+                            "name": pkg.name,
+                            "type": format!("{:?}", pkg.skill_type),
+                            "description": pkg.description,
+                            "scope": format!("{:?}", pkg.scope),
+                        })
+                    })
+                    .collect();
+                serde_json::json!({ "skills": skills }).to_string()
             }
             _ => {
                 return Err(McpError::new(

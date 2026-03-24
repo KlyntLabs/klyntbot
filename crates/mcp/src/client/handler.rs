@@ -15,13 +15,25 @@ use tracing::{debug, info, warn};
 pub struct KlyntbotClientHandler {
     /// Server name for logging context
     server_name: String,
+    /// Optional channel to notify when the server signals a tool list change.
+    tool_list_changed_tx: Option<tokio::sync::mpsc::UnboundedSender<String>>,
 }
 
 impl KlyntbotClientHandler {
     pub fn new(server_name: &str) -> Self {
         Self {
             server_name: server_name.to_string(),
+            tool_list_changed_tx: None,
         }
+    }
+
+    /// Create a handler with a tool-list-changed notification channel.
+    pub fn with_tool_list_changed_tx(
+        mut self,
+        tx: tokio::sync::mpsc::UnboundedSender<String>,
+    ) -> Self {
+        self.tool_list_changed_tx = Some(tx);
+        self
     }
 }
 
@@ -70,8 +82,11 @@ impl ClientHandler for KlyntbotClientHandler {
     async fn on_tool_list_changed(&self, _context: NotificationContext<RoleClient>) {
         info!(
             server = %self.server_name,
-            "MCP server tool list changed (dynamic refresh not yet implemented)"
+            "MCP server tool list changed, triggering re-discovery"
         );
+        if let Some(ref tx) = self.tool_list_changed_tx {
+            let _ = tx.send(self.server_name.clone());
+        }
     }
 
     async fn on_resource_list_changed(&self, _context: NotificationContext<RoleClient>) {

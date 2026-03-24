@@ -70,8 +70,10 @@ pub struct AgentLoop {
     /// Cancellation token for the memory maintenance background service.
     pub(crate) _memory_maintenance_token: Option<CancellationToken>,
     /// MCP manager for external server connections (kept alive for the agent's lifetime).
-    /// Wrapped in Mutex so `shutdown(&self)` can take ownership for graceful disconnect.
-    pub(crate) mcp_manager: tokio::sync::Mutex<Option<mcp::McpManager>>,
+    /// Wrapped in Arc<Mutex> so the health check background task can share access.
+    pub(crate) mcp_manager: Arc<tokio::sync::Mutex<Option<mcp::McpManager>>>,
+    /// Cancellation token for the MCP health check background service.
+    pub(crate) _mcp_health_check_token: Option<CancellationToken>,
     /// Shared DomainEventBus for cross-feature communication (cognitive + coaching + autotuner).
     pub(crate) domain_event_bus: Option<Arc<bus::DomainEventBus>>,
     /// Trial repo for marking shadow log entries as corrected (autotuner).
@@ -95,6 +97,12 @@ impl AgentLoop {
     /// Used by `klyntbot-server` to bridge internal tools to MCP.
     pub fn tool_registry(&self) -> Arc<RwLock<tools::registry::ToolRegistry>> {
         Arc::clone(&self.tool_registry)
+    }
+
+    /// Public accessor for the skill catalog.
+    /// Used by `klyntbot-server` to expose active skills via MCP resources.
+    pub fn skill_catalog(&self) -> Arc<RwLock<skill_system::types::SkillCatalog>> {
+        Arc::clone(&self.skill_catalog)
     }
 
     /// Reload skill packages from workspace (hot-reload after UI edits).
@@ -316,6 +324,11 @@ impl AgentLoop {
 
         // Stop the work context inference loop
         if let Some(token) = &self._inference_loop_token {
+            token.cancel();
+        }
+
+        // Stop the MCP health check background service
+        if let Some(token) = &self._mcp_health_check_token {
             token.cancel();
         }
 

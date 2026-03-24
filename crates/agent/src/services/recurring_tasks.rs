@@ -76,6 +76,14 @@ impl RecurringTaskSpawner {
         }
     }
 
+    /// Check all templates and spawn instances that are due (public for cron handler).
+    pub async fn check_and_spawn_static(
+        repo: &storage::TaskRepo,
+        timezone: &str,
+    ) -> common::Result<()> {
+        Self::check_and_spawn(repo, timezone).await
+    }
+
     /// Check all templates and spawn instances that are due via SQL.
     async fn check_and_spawn(repo: &storage::TaskRepo, _timezone: &str) -> common::Result<()> {
         let template_rows = repo.list_templates().await?;

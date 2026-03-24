@@ -75,6 +75,16 @@ impl ReminderEngine {
     }
 
     /// Check all reminder rules and send notifications via SQL TodoRepo.
+    ///
+    /// Public static variant for use by the cron handler.
+    pub async fn check_and_send_reminders_static(
+        repo: &storage::TaskRepo,
+        dispatcher: &Arc<NotificationDispatcher>,
+    ) -> Result<()> {
+        Self::check_and_send_reminders(repo, dispatcher).await
+    }
+
+    /// Check all reminder rules and send notifications via SQL TodoRepo.
     async fn check_and_send_reminders(
         repo: &storage::TaskRepo,
         dispatcher: &Arc<NotificationDispatcher>,

@@ -38,6 +38,10 @@ pub struct McpManager {
     circuit_breaker: Arc<McpCircuitBreaker>,
     #[allow(dead_code)]
     config: McpConfig,
+    /// Sender for tool-list-changed notifications from MCP servers.
+    tool_list_changed_tx: tokio::sync::mpsc::UnboundedSender<String>,
+    /// Receiver for tool-list-changed notifications (taken by `start_health_check`).
+    tool_list_changed_rx: Option<tokio::sync::mpsc::UnboundedReceiver<String>>,
 }
 
 impl McpManager {
@@ -53,6 +57,8 @@ impl McpManager {
         event_tx: Option<tokio::sync::mpsc::Sender<McpStartupEvent>>,
     ) -> Self {
         let circuit_breaker = Arc::new(McpCircuitBreaker::new(3, 60));
+        let (tool_list_changed_tx, tool_list_changed_rx) =
+            tokio::sync::mpsc::unbounded_channel::<String>();
         let mut connections = HashMap::new();
         let mut ready_count = 0usize;
         let mut failed_count = 0usize;
@@ -76,6 +82,7 @@ impl McpManager {
             let def = server_def.clone();
             let tx = event_tx.clone();
             let cb = Arc::clone(&circuit_breaker);
+            let tlc_tx = tool_list_changed_tx.clone();
             join_set.spawn(async move {
                 let name = def.name.clone();
                 if let Some(ref tx) = tx {
@@ -85,7 +92,7 @@ impl McpManager {
                         })
                         .await;
                 }
-                let result = Self::connect_one(&def, &cb).await;
+                let result = Self::connect_one(&def, &cb, Some(&tlc_tx)).await;
                 (name, result, tx)
             });
         }
@@ -139,6 +146,8 @@ impl McpManager {
             connections,
             circuit_breaker,
             config: config.clone(),
+            tool_list_changed_tx,
+            tool_list_changed_rx: Some(tool_list_changed_rx),
         }
     }
 
@@ -149,13 +158,19 @@ impl McpManager {
     async fn connect_one(
         server_def: &config::McpServerDef,
         circuit_breaker: &Arc<McpCircuitBreaker>,
+        tool_list_changed_tx: Option<&tokio::sync::mpsc::UnboundedSender<String>>,
     ) -> anyhow::Result<McpConnection> {
         let startup_timeout = Duration::from_secs(server_def.startup_timeout_sec);
         let tool_timeout = Duration::from_secs(server_def.tool_timeout_sec);
 
         tokio::time::timeout(
             startup_timeout,
-            Self::connect_one_inner(server_def, tool_timeout, circuit_breaker),
+            Self::connect_one_inner(
+                server_def,
+                tool_timeout,
+                circuit_breaker,
+                tool_list_changed_tx,
+            ),
         )
         .await
         .map_err(|_| {
@@ -176,9 +191,17 @@ impl McpManager {
         server_def: &config::McpServerDef,
         tool_timeout: Duration,
         circuit_breaker: &Arc<McpCircuitBreaker>,
+        tool_list_changed_tx: Option<&tokio::sync::mpsc::UnboundedSender<String>>,
     ) -> anyhow::Result<McpConnection> {
         let name = &server_def.name;
-        let handler = KlyntbotClientHandler::new(name);
+        let handler = {
+            let h = KlyntbotClientHandler::new(name);
+            if let Some(tx) = tool_list_changed_tx {
+                h.with_tool_list_changed_tx(tx.clone())
+            } else {
+                h
+            }
+        };
 
         let service: McpService = match &server_def.transport {
             McpTransport::Stdio { command, args, env } => {
@@ -305,7 +328,13 @@ impl McpManager {
         }
 
         // Connect fresh
-        match Self::connect_one(server_def, &self.circuit_breaker).await {
+        match Self::connect_one(
+            server_def,
+            &self.circuit_breaker,
+            Some(&self.tool_list_changed_tx),
+        )
+        .await
+        {
             Ok(conn) => {
                 let tools = conn.tools.clone();
                 let tool_count = tools.len();
@@ -328,75 +357,133 @@ impl McpManager {
             .unwrap_or_default()
     }
 
-    /// Spawn a background task that periodically reconnects downed MCP servers.
+    /// Take the tool-list-changed receiver out of this manager.
+    ///
+    /// Called once before `start_health_check` to pass the receiver to the
+    /// background task. Returns `None` on second call.
+    pub fn take_tool_list_changed_rx(
+        &mut self,
+    ) -> Option<tokio::sync::mpsc::UnboundedReceiver<String>> {
+        self.tool_list_changed_rx.take()
+    }
+
+    /// Spawn a background task that periodically reconnects downed MCP servers
+    /// and reacts to tool-list-changed notifications from connected servers.
     ///
     /// Checks every 30 seconds for servers whose circuit breaker cooldown has expired,
     /// attempts reconnection, and re-registers tools in the `ToolRegistry` on success.
+    /// Also listens for `notifications/tools/list_changed` signals from MCP servers
+    /// and triggers immediate re-discovery for the affected server.
     ///
     /// The task runs until the `cancel` token is cancelled.
     pub fn start_health_check(
-        manager: Arc<tokio::sync::Mutex<McpManager>>,
+        manager: Arc<tokio::sync::Mutex<Option<McpManager>>>,
         registry: Arc<tokio::sync::RwLock<tools_core::ToolRegistry>>,
         cancel: tokio_util::sync::CancellationToken,
     ) -> tokio::task::JoinHandle<()> {
         tokio::spawn(async move {
+            // Take the tool-list-changed receiver out of the manager (one-shot).
+            let mut tool_list_rx = {
+                let mut guard = manager.lock().await;
+                guard
+                    .as_mut()
+                    .and_then(|mgr| mgr.take_tool_list_changed_rx())
+            };
+
             let mut interval = tokio::time::interval(Duration::from_secs(30));
             interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
             loop {
-                tokio::select! {
+                // Collect servers to reconnect from either timer tick or tool-list-changed notification
+                let servers_to_reconnect: Vec<config::McpServerDef> = tokio::select! {
                     _ = cancel.cancelled() => {
                         tracing::debug!("MCP health check task cancelled");
                         break;
                     }
                     _ = interval.tick() => {
                         // Collect servers that need reconnection (brief lock)
-                        let servers_to_reconnect = {
-                            let mgr = manager.lock().await;
-                            mgr.config
+                        let guard = manager.lock().await;
+                        match guard.as_ref() {
+                            Some(mgr) => mgr.config
                                 .servers
                                 .iter()
                                 .filter(|s| {
                                     s.enabled && mgr.circuit_breaker.cooldown_expired(&s.name)
                                 })
                                 .cloned()
-                                .collect::<Vec<_>>()
-                        };
-
-                        for server_def in servers_to_reconnect {
-                            info!(
-                                name = %server_def.name,
-                                "Attempting auto-reconnect for MCP server"
-                            );
-                            // Reconnect under manager lock, then drop it before
-                            // acquiring registry lock to avoid AB/BA deadlock.
-                            let (new_tools, server_name) = {
-                                let mut mgr = manager.lock().await;
-                                let tools = mgr.reconnect_server(&server_def).await;
-                                (tools, server_def.name.clone())
-                            };
-                            // Manager lock dropped here — safe to acquire registry lock
-                            if !new_tools.is_empty() {
-                                let mut reg = registry.write().await;
-                                for tool in new_tools {
-                                    reg.register_dyn(tool as Arc<dyn tools_core::Tool>);
-                                }
-                                drop(reg);
-                                let mgr = manager.lock().await;
-                                mgr.circuit_breaker.record_success(&server_name);
-                                info!(name = %server_name, "Auto-reconnected MCP server");
-                            } else {
-                                warn!(
-                                    name = %server_name,
-                                    "Auto-reconnect failed for MCP server (no tools returned)"
-                                );
-                            }
+                                .collect(),
+                            None => continue,
                         }
-
-                        // Cleanup stale circuit breaker entries
-                        let mgr = manager.lock().await;
-                        mgr.circuit_breaker.cleanup();
                     }
+                    Some(server_name) = async {
+                        match tool_list_rx.as_mut() {
+                            Some(rx) => rx.recv().await,
+                            None => std::future::pending().await,
+                        }
+                    } => {
+                        info!(
+                            name = %server_name,
+                            "Tool list changed notification received, triggering re-discovery"
+                        );
+                        // Find the server def for this server
+                        let guard = manager.lock().await;
+                        match guard.as_ref() {
+                            Some(mgr) => mgr.config
+                                .servers
+                                .iter()
+                                .filter(|s| s.enabled && s.name == server_name)
+                                .cloned()
+                                .collect(),
+                            None => continue,
+                        }
+                    }
+                };
+
+                for server_def in servers_to_reconnect {
+                    info!(
+                        name = %server_def.name,
+                        "Attempting auto-reconnect for MCP server"
+                    );
+                    // Reconnect under manager lock, then drop it before
+                    // acquiring registry lock to avoid AB/BA deadlock.
+                    let (new_tools, server_name) = {
+                        let mut guard = manager.lock().await;
+                        let mgr = match guard.as_mut() {
+                            Some(m) => m,
+                            None => continue,
+                        };
+                        let tools = mgr.reconnect_server(&server_def).await;
+                        (tools, server_def.name.clone())
+                    };
+                    // Manager lock dropped here — safe to acquire registry lock
+                    if !new_tools.is_empty() {
+                        let mut reg = registry.write().await;
+                        for tool in new_tools {
+                            reg.register_dyn(tool as Arc<dyn tools_core::Tool>);
+                        }
+                        drop(reg);
+                        let guard = manager.lock().await;
+                        if let Some(mgr) = guard.as_ref() {
+                            mgr.circuit_breaker.record_success(&server_name);
+                        }
+                        info!(name = %server_name, "Auto-reconnected MCP server");
+                    } else {
+                        // Re-record failure so cleanup() doesn't remove the entry
+                        let guard = manager.lock().await;
+                        if let Some(mgr) = guard.as_ref() {
+                            mgr.circuit_breaker.record_failure(&server_name);
+                        }
+                        warn!(
+                            name = %server_name,
+                            "Auto-reconnect failed for MCP server (no tools returned)"
+                        );
+                    }
+                }
+
+                // Cleanup stale circuit breaker entries
+                let guard = manager.lock().await;
+                if let Some(mgr) = guard.as_ref() {
+                    mgr.circuit_breaker.cleanup();
                 }
             }
         })

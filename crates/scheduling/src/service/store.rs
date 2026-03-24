@@ -73,7 +73,7 @@ impl CronService {
     pub(crate) async fn process_due_jobs(
         store: &Arc<RwLock<CronStore>>,
         repo: &Option<CronRepo>,
-        handlers: &std::collections::HashMap<String, super::JobCallback>,
+        handlers: &super::HandlerMap,
         on_job: &Option<super::JobCallback>,
     ) {
         let now = super::now_ms();
@@ -93,9 +93,15 @@ impl CronService {
                 .collect::<Vec<_>>()
         };
 
+        // Snapshot handlers once (clone the Arc values, release the lock before await)
+        let handlers_snapshot: std::collections::HashMap<String, super::JobCallback> = {
+            let guard = handlers.read().expect("handler lock poisoned");
+            guard.clone()
+        };
+
         // Execute due jobs
         for job in due_jobs {
-            super::executor::execute_job_static(store, handlers, on_job, &job).await;
+            super::executor::execute_job_static(store, &handlers_snapshot, on_job, &job).await;
         }
 
         // Save store via SQL (skip if no repo, e.g. in tests)

@@ -109,6 +109,7 @@ impl AppCore {
             provider.clone(),
             &domain_event_bus,
             feature_tasks::TasksConfig::default(),
+            vector_store.clone(),
         )
         .await?;
 
@@ -339,30 +340,27 @@ impl AppCore {
             });
         }
 
-        // ── Background insight progress refresh (daily) ──────────────────
+        // ── Insight progress refresh (registered post-init — deps available now) ──
         if let Some(ref insight_svc) = core.insight_service {
             let svc = Arc::clone(insight_svc);
             let note_repo_clone = core.note_repo.clone();
-            let token = shutdown_token.clone();
-            tokio::spawn(async move {
-                // Initial delay so the app finishes starting
-                tokio::time::sleep(std::time::Duration::from_secs(60)).await;
-                loop {
-                    if token.is_cancelled() {
-                        break;
-                    }
-                    match cron::refresh_insight_progress(&svc, &note_repo_clone).await {
-                        Ok(Some(msg)) => info!("{msg}"),
-                        Ok(None) => {}
-                        Err(e) => tracing::debug!("insight progress refresh error: {e}"),
-                    }
-                    // Sleep ~24 hours (86400 seconds)
-                    tokio::select! {
-                        _ = tokio::time::sleep(std::time::Duration::from_secs(86400)) => {}
-                        _ = token.cancelled() => break,
-                    }
-                }
-            });
+            let rt = tokio::runtime::Handle::current();
+            cron_service.register_handler(
+                cron::JOB_INSIGHT_REFRESH,
+                Arc::new(move |_job: &scheduling::CronJob| {
+                    let svc = Arc::clone(&svc);
+                    let note_repo_clone = note_repo_clone.clone();
+                    tokio::task::block_in_place(|| {
+                        rt.block_on(async move {
+                            match cron::refresh_insight_progress(&svc, &note_repo_clone).await {
+                                Ok(Some(msg)) => Ok(Some(msg)),
+                                Ok(None) => Ok(Some("No insights to refresh".to_string())),
+                                Err(e) => Ok(Some(format!("Insight refresh failed: {e}"))),
+                            }
+                        })
+                    })
+                }),
+            );
         }
 
         // ── Background note embedding catch-up ────────────────────────────

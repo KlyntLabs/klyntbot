@@ -85,6 +85,10 @@ pub(crate) async fn execute_job_static(
 impl super::CronService {
     /// Execute a single job
     pub(crate) async fn execute_job(&self, job: &CronJob) {
-        execute_job_static(&self.store, &self.handlers, &self.on_job, job).await;
+        let handlers = {
+            let guard = self.handlers.read().expect("handler lock poisoned");
+            guard.clone()
+        };
+        execute_job_static(&self.store, &handlers, &self.on_job, job).await;
     }
 }

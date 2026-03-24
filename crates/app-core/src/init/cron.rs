@@ -31,6 +31,7 @@ pub(super) async fn init_cron(
     provider: providers::DynProvider,
     domain_event_bus: &Arc<DomainEventBus>,
     tasks_config: TasksConfig,
+    vector_store: Option<storage::VectorStore>,
 ) -> Result<CronResult, String> {
     // 6. Cron service — set callbacks BEFORE wrapping in Arc
     let mut cron_service = CronService::new(repos.cron.clone());
@@ -105,6 +106,7 @@ pub(super) async fn init_cron(
         tasks_config.clone(),
         proactive_handler,
         suggestion_applier,
+        vector_store,
     );
 
     // ── AutoTuner nightly cycle (conditional) ────────────────────────────
@@ -158,7 +160,7 @@ pub(super) async fn init_cron(
         }
         agent::autotuner::AutoTunerOrchestrator::register_nightly_cycle(
             Arc::clone(&orchestrator),
-            &mut cron_service,
+            &cron_service,
             config.autotuner.clone(),
             trial_repo,
             metric_source,
@@ -204,7 +206,16 @@ const JOB_FINANCE_HEALTH_CHECK: &str = "__klyntbot_finance_health_check";
 const JOB_MORNING_BRIEFING: &str = "__klyntbot_morning_briefing";
 const JOB_WEEKLY_KNOWLEDGE_DIGEST: &str = "__klyntbot_weekly_knowledge_digest";
 
-/// Register individual cron handlers (must be called before wrapping CronService in Arc).
+// ── Background service cron job constants ────────────────────────────────────
+const JOB_SESSION_CLEANUP: &str = "__klyntbot_session_cleanup";
+const JOB_MEMORY_MAINTENANCE: &str = "__klyntbot_memory_maintenance";
+const JOB_ANALYTICS_CLEANUP: &str = "__klyntbot_analytics_cleanup";
+const JOB_REMINDER_CHECK: &str = "__klyntbot_reminder_check";
+const JOB_RECURRING_TASKS: &str = "__klyntbot_recurring_tasks";
+pub(super) const JOB_INSIGHT_REFRESH: &str = "__klyntbot_insight_refresh";
+pub(super) const JOB_LEARNING_ANALYSIS: &str = "__klyntbot_learning_analysis";
+
+/// Register individual cron handlers.
 #[allow(clippy::too_many_arguments)]
 fn register_cron_callbacks(
     cron_service: &mut CronService,
@@ -217,6 +228,7 @@ fn register_cron_callbacks(
     tasks_config: TasksConfig,
     proactive_handler: Arc<dyn ProactiveHandler>,
     suggestion_applier: Option<Arc<dyn SuggestionApplier>>,
+    vector_store: Option<storage::VectorStore>,
 ) {
     let rt = tokio::runtime::Handle::current();
 
@@ -582,6 +594,191 @@ fn register_cron_callbacks(
             }),
         );
     }
+
+    // ── session_cleanup ───────────────────────────────────────────────────
+    {
+        let session_repo = storage::SessionRepo::new(repos.pool().clone());
+        let ttl_days = config.conversation.session.ttl_days;
+        let rt = rt.clone();
+        cron_service.register_handler(
+            JOB_SESSION_CLEANUP,
+            Arc::new(move |_job: &scheduling::CronJob| {
+                let session_repo = session_repo.clone();
+                tokio::task::block_in_place(|| {
+                    rt.block_on(async move {
+                        match session_repo.delete_stale_sessions(ttl_days).await {
+                            Ok(0) => Ok(Some("No stale sessions".to_string())),
+                            Ok(n) => {
+                                info!(
+                                    deleted = n,
+                                    ttl_days, "Session cleanup: deleted stale sessions"
+                                );
+                                Ok(Some(format!("Deleted {n} stale sessions")))
+                            }
+                            Err(e) => {
+                                warn!(error = %e, "Session cleanup failed");
+                                Ok(Some(format!("Session cleanup failed: {e}")))
+                            }
+                        }
+                    })
+                })
+            }),
+        );
+    }
+
+    // ── memory_maintenance ────────────────────────────────────────────────
+    if let Some(vs) = vector_store {
+        let max_age_days = config.conversation.memory.max_age_days;
+        let rt = rt.clone();
+        cron_service.register_handler(
+            JOB_MEMORY_MAINTENANCE,
+            Arc::new(move |_job: &scheduling::CronJob| {
+                let vs = vs.clone();
+                tokio::task::block_in_place(|| {
+                    rt.block_on(async move {
+                        let cutoff =
+                            chrono::Utc::now() - chrono::Duration::days(max_age_days as i64);
+                        let cutoff_str =
+                            match storage::sanitize_predicate_value(&cutoff.to_rfc3339()) {
+                                Ok(s) => s,
+                                Err(e) => {
+                                    return Ok(Some(format!(
+                                        "Memory maintenance: invalid cutoff: {e}"
+                                    )))
+                                }
+                            };
+                        let predicate = format!("created_at < '{cutoff_str}'");
+
+                        let before = vs.count("conv_embeddings").await.unwrap_or(0);
+                        if let Err(e) = vs.delete_where("conv_embeddings", &predicate).await {
+                            warn!(error = %e, "Memory maintenance: failed to prune");
+                            return Ok(Some(format!("Memory maintenance failed: {e}")));
+                        }
+                        let after = vs.count("conv_embeddings").await.unwrap_or(before);
+                        let deleted = before.saturating_sub(after);
+
+                        // Dedup pass
+                        for (table, ts_col) in [
+                            ("conv_embeddings", "created_at"),
+                            ("todo_embeddings", "updated_at"),
+                            ("cognitive_fact_embeddings", "updated_at"),
+                        ] {
+                            if let Err(e) = vs.dedup_table(table, ts_col).await {
+                                warn!(error = %e, table, "Memory maintenance: dedup failed");
+                            }
+                        }
+
+                        if deleted > 0 {
+                            info!(
+                                deleted,
+                                max_age_days, "Memory maintenance: pruned old embeddings"
+                            );
+                        }
+                        Ok(Some(format!("Pruned {deleted} old embeddings")))
+                    })
+                })
+            }),
+        );
+    }
+
+    // ── analytics_cleanup ─────────────────────────────────────────────────
+    {
+        let repos_bg = repos.clone();
+        let cog_pool = repos.pool().clone();
+        let rt = rt.clone();
+        cron_service.register_handler(
+            JOB_ANALYTICS_CLEANUP,
+            Arc::new(move |_job: &scheduling::CronJob| {
+                let repos_bg = repos_bg.clone();
+                let cog_pool = cog_pool.clone();
+                tokio::task::block_in_place(|| {
+                    rt.block_on(async move {
+                        let cleaned = match repos_bg.cleanup_analytics().await {
+                            Ok(n) => n,
+                            Err(e) => {
+                                warn!(error = %e, "Analytics cleanup failed");
+                                0
+                            }
+                        };
+
+                        // Prune low-salience semantic facts
+                        let fact_repo = cognitive::SemanticFactRepo::new(cog_pool);
+                        let pruned = match fact_repo.prune_low_salience(0.05, 180).await {
+                            Ok(n) => n,
+                            Err(e) => {
+                                warn!(error = %e, "Fact pruning failed");
+                                0
+                            }
+                        };
+
+                        Ok(Some(format!(
+                            "Analytics: {cleaned} records cleaned, {pruned} facts pruned"
+                        )))
+                    })
+                })
+            }),
+        );
+    }
+
+    // ── reminder_check ────────────────────────────────────────────────────
+    {
+        let todo_repo = repos.tasks.clone();
+        let dispatcher = Arc::clone(notification_dispatcher);
+        let rt = rt.clone();
+        cron_service.register_handler(
+            JOB_REMINDER_CHECK,
+            Arc::new(move |_job: &scheduling::CronJob| {
+                let todo_repo = todo_repo.clone();
+                let dispatcher = Arc::clone(&dispatcher);
+                tokio::task::block_in_place(|| {
+                    rt.block_on(async move {
+                        match agent::services::reminders::ReminderEngine::check_and_send_reminders_static(
+                            &todo_repo,
+                            &dispatcher,
+                        )
+                        .await
+                        {
+                            Ok(()) => Ok(Some("Reminder check complete".to_string())),
+                            Err(e) => {
+                                warn!("Reminder check failed: {e}");
+                                Ok(Some(format!("Reminder check failed: {e}")))
+                            }
+                        }
+                    })
+                })
+            }),
+        );
+    }
+
+    // ── recurring_tasks ───────────────────────────────────────────────────
+    {
+        let todo_repo = repos.tasks.clone();
+        let timezone = config.timezone.clone();
+        let rt = rt.clone();
+        cron_service.register_handler(
+            JOB_RECURRING_TASKS,
+            Arc::new(move |_job: &scheduling::CronJob| {
+                let todo_repo = todo_repo.clone();
+                let timezone = timezone.clone();
+                tokio::task::block_in_place(|| {
+                    rt.block_on(async move {
+                        match agent::services::recurring_tasks::RecurringTaskSpawner::check_and_spawn_static(
+                            &todo_repo,
+                            &timezone,
+                        )
+                        .await
+                        {
+                            Ok(()) => Ok(Some("Recurring task check complete".to_string())),
+                            Err(e) => {
+                                warn!("Recurring task check failed: {e}");
+                                Ok(Some(format!("Recurring task check failed: {e}")))
+                            }
+                        }
+                    })
+                })
+            }),
+        );
+    }
 }
 
 /// Register default cron jobs (idempotent — skips existing).
@@ -766,6 +963,71 @@ async fn ensure_cron_jobs(
         )
         .await?;
     }
+
+    // ── Background service cron jobs ──────────────────────────────────────
+
+    // Session cleanup (default: every 6 hours)
+    ensure_job!(
+        JOB_SESSION_CLEANUP,
+        scheduling::CronSchedule::Every {
+            every_ms: config.conversation.session.cleanup_interval_hours as u64 * 60 * 60 * 1000,
+        },
+        "Delete stale sessions"
+    );
+
+    // Memory maintenance (default: every 12 hours)
+    ensure_job!(
+        JOB_MEMORY_MAINTENANCE,
+        scheduling::CronSchedule::Every {
+            every_ms: config.conversation.memory.maintenance_interval_hours as u64 * 60 * 60 * 1000,
+        },
+        "Prune old conversation embeddings"
+    );
+
+    // Analytics retention cleanup (daily)
+    ensure_job!(
+        JOB_ANALYTICS_CLEANUP,
+        scheduling::CronSchedule::Every {
+            every_ms: 24 * 60 * 60 * 1000,
+        },
+        "Clean old analytics records and prune low-salience facts"
+    );
+
+    // Reminder check (every 5 minutes)
+    ensure_job!(
+        JOB_REMINDER_CHECK,
+        scheduling::CronSchedule::Every {
+            every_ms: 5 * 60 * 1000,
+        },
+        "Check task due dates and send reminders"
+    );
+
+    // Recurring task spawner (every 60 seconds)
+    ensure_job!(
+        JOB_RECURRING_TASKS,
+        scheduling::CronSchedule::Every {
+            every_ms: 60 * 1000,
+        },
+        "Spawn recurring task instances from templates"
+    );
+
+    // Insight progress refresh (daily)
+    ensure_job!(
+        JOB_INSIGHT_REFRESH,
+        scheduling::CronSchedule::Every {
+            every_ms: 24 * 60 * 60 * 1000,
+        },
+        "Refresh insight progress snapshots"
+    );
+
+    // Learning analysis (configurable interval)
+    ensure_job!(
+        JOB_LEARNING_ANALYSIS,
+        scheduling::CronSchedule::Every {
+            every_ms: config.learning.analysis_interval_secs * 1000,
+        },
+        "Analyze tool outcomes and adapt confidence threshold"
+    );
 
     Ok(())
 }
