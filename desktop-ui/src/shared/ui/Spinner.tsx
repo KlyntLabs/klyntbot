@@ -1,4 +1,4 @@
-import { cn } from "@shared/lib/cn";
+import { cn } from "@shared/lib/utils";
 
 export interface SpinnerProps {
   size?: "sm" | "md" | "lg";

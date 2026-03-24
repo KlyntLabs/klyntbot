@@ -2,7 +2,7 @@ import { MiniCalendar } from "@shared/components/MiniCalendar";
 import { DataTable, type DataTableColumn } from "@shared/composites/DataTable";
 import { useMutation } from "@shared/hooks/useMutation";
 import { invalidateQueries, useQuery } from "@shared/hooks/useQuery";
-import { cn } from "@shared/lib/cn";
+import { cn } from "@shared/lib/utils";
 import { humanizeJobName, humanizeSchedule, ORIGIN_STYLES, relativeTime } from "@shared/lib/cron";
 import { toLocalDateTime, toLocalISO } from "@shared/lib/dates";
 import type {

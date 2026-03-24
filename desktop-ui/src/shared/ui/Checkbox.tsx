@@ -1,5 +1,5 @@
 import * as CheckboxPrimitive from "@radix-ui/react-checkbox";
-import { cn } from "@shared/lib/cn";
+import { cn } from "@shared/lib/utils";
 import { Check } from "lucide-react";
 
 export interface CheckboxProps {

@@ -1,5 +1,5 @@
 import * as PopoverPrimitive from "@radix-ui/react-popover";
-import { cn } from "@shared/lib/cn";
+import { cn } from "@shared/lib/utils";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
 interface WhyThisPopoverProps {

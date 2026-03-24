@@ -1,7 +1,7 @@
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { useCopyToClipboard } from "@shared/hooks/useCopyToClipboard";
 import { ipc } from "@shared/hooks/useIpc";
-import { cn } from "@shared/lib/cn";
+import { cn } from "@shared/lib/utils";
 import {
   BookOpen,
   Brain,

@@ -1,5 +1,5 @@
 import * as ProgressPrimitive from "@radix-ui/react-progress";
-import { cn } from "@shared/lib/cn";
+import { cn } from "@shared/lib/utils";
 
 export interface ProgressProps {
   value: number;

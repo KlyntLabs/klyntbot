@@ -1,4 +1,4 @@
-export { cn } from "@shared/lib/cn";
+export { cn } from "@shared/lib/utils";
 
 /**
  * LexoRank — minimal implementation for ordering issues.
