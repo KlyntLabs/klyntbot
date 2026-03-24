@@ -13,7 +13,8 @@ pub struct ContactEntry {
 #[derive(Clone)]
 pub struct ContactsSource {
     contacts: Arc<RwLock<Vec<ContactEntry>>>,
-    permission_warned: Arc<AtomicBool>,
+    /// Once set, we never attempt to load contacts again (denied or failed).
+    gave_up: Arc<AtomicBool>,
 }
 
 impl Default for ContactsSource {
@@ -26,35 +27,63 @@ impl ContactsSource {
     pub fn new() -> Self {
         Self {
             contacts: Arc::new(RwLock::new(Vec::new())),
-            permission_warned: Arc::new(AtomicBool::new(false)),
+            gave_up: Arc::new(AtomicBool::new(false)),
         }
     }
 
+    /// Swift script that checks CNContactStore authorization and fetches contacts
+    /// via the Contacts framework — never opens the Contacts.app GUI.
+    ///
+    /// Authorization status values:
+    ///   0 = notDetermined, 1 = restricted, 2 = denied, 3 = authorized
+    ///
+    /// If not authorized, prints "DENIED" to stderr and exits 1.
+    /// If authorized, prints JSON array to stdout.
     #[cfg(target_os = "macos")]
-    const JXA_FETCH_ALL: &'static str = r#"
-        var app = Application("Contacts");
-        var people = app.people();
-        var results = [];
-        var limit = Math.min(people.length, 500);
-        for (var i = 0; i < limit; i++) {
-            var p = people[i];
-            var emails = p.emails();
-            var phones = p.phones();
-            results.push({
-                name: p.name(),
-                email: emails.length > 0 ? emails[0].value() : null,
-                phone: phones.length > 0 ? phones[0].value() : null,
-            });
-        }
-        JSON.stringify(results);
-    "#;
+    const SWIFT_FETCH: &'static str = r#"
+import Contacts
+import Foundation
+
+let status = CNContactStore.authorizationStatus(for: .contacts)
+guard status == .authorized else {
+    fputs("DENIED:\(status.rawValue)", stderr)
+    exit(1)
+}
+let store = CNContactStore()
+let keys: [CNKeyDescriptor] = [
+    CNContactGivenNameKey as CNKeyDescriptor,
+    CNContactFamilyNameKey as CNKeyDescriptor,
+    CNContactEmailAddressesKey as CNKeyDescriptor,
+    CNContactPhoneNumbersKey as CNKeyDescriptor,
+]
+let req = CNContactFetchRequest(keysToFetch: keys)
+req.sortOrder = .givenName
+var results: [[String: Any]] = []
+var count = 0
+try? store.enumerateContacts(with: req) { contact, stop in
+    let name = [contact.givenName, contact.familyName]
+        .filter { !$0.isEmpty }.joined(separator: " ")
+    guard !name.isEmpty else { return }
+    let email: Any = (contact.emailAddresses.first?.value as String?) ?? NSNull()
+    let phone: Any = contact.phoneNumbers.first?.value.stringValue ?? NSNull()
+    results.append(["name": name, "email": email, "phone": phone])
+    count += 1
+    if count >= 500 { stop.pointee = true }
+}
+let data = try! JSONSerialization.data(withJSONObject: results)
+print(String(data: data, encoding: .utf8)!)
+"#;
 
     #[cfg(target_os = "macos")]
     async fn load_contacts(&self) -> Vec<ContactEntry> {
+        if self.gave_up.load(Ordering::Relaxed) {
+            return vec![];
+        }
+
         let output = tokio::time::timeout(
-            std::time::Duration::from_secs(5),
-            tokio::process::Command::new("osascript")
-                .args(["-l", "JavaScript", "-e", Self::JXA_FETCH_ALL])
+            std::time::Duration::from_secs(10),
+            tokio::process::Command::new("swift")
+                .args(["-e", Self::SWIFT_FETCH])
                 .output(),
         )
         .await;
@@ -62,17 +91,30 @@ impl ContactsSource {
         let output = match output {
             Ok(Ok(o)) if o.status.success() => o,
             Ok(Ok(o)) => {
-                if !self.permission_warned.swap(true, Ordering::Relaxed) {
-                    let stderr = String::from_utf8_lossy(&o.stderr);
-                    if stderr.contains("not allowed") || stderr.contains("denied") {
-                        tracing::warn!(
-                            "Contacts access denied. Grant access in System Settings > Privacy > Contacts."
-                        );
-                    }
+                let stderr = String::from_utf8_lossy(&o.stderr);
+                if stderr.contains("DENIED") {
+                    tracing::warn!(
+                        "Contacts access not authorized ({}). \
+                         Grant in System Settings > Privacy > Contacts. \
+                         Disabling contacts source for this session.",
+                        stderr.trim()
+                    );
+                } else {
+                    tracing::warn!("Contacts fetch failed: {}", stderr.trim());
                 }
+                self.gave_up.store(true, Ordering::Relaxed);
                 return vec![];
             }
-            _ => return vec![],
+            Ok(Err(e)) => {
+                tracing::warn!("Failed to run swift for contacts: {e}");
+                self.gave_up.store(true, Ordering::Relaxed);
+                return vec![];
+            }
+            Err(_) => {
+                tracing::warn!("Contacts fetch timed out");
+                self.gave_up.store(true, Ordering::Relaxed);
+                return vec![];
+            }
         };
 
         let stdout = String::from_utf8_lossy(&output.stdout);
