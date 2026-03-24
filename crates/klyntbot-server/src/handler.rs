@@ -213,11 +213,8 @@ impl ServerHandler for KlyntbotServerHandler {
             })
             .to_string(),
             "klyntbot://memory/recent" => {
-                self.call_tool_for_resource(
-                    "memory",
-                    serde_json::json!({"action": "list", "limit": 20}),
-                )
-                .await
+                self.call_tool_for_resource("memory", serde_json::json!({"action": "status"}))
+                    .await
             }
             "klyntbot://tasks/today" => {
                 self.call_tool_for_resource(
