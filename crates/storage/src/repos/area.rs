@@ -142,10 +142,10 @@ impl AreaRepo {
         Ok(row.0)
     }
 
-    /// Count actions in an area.
+    /// Count tasks (non-template) in an area.
     pub async fn count_actions(&self, area_id: &str) -> Result<i64, StorageError> {
         let row: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM actions WHERE area_id = ?1 AND is_template = FALSE",
+            "SELECT COUNT(*) FROM tasks WHERE area_id = ?1 AND is_template = FALSE",
         )
         .bind(area_id)
         .fetch_one(&self.pool)

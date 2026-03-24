@@ -216,6 +216,8 @@ impl AppCore {
             is_system: false,
         };
         repos.categories.upsert(&cat).await.map_err(map_prod_err)?;
+        // Refresh the in-memory categorizer so the background tracker uses updated rules
+        self.refresh_categorizer(&repos.categories).await;
         Ok(ActivityCategoryResponse {
             id: cat.id,
             name: cat.name,
@@ -229,7 +231,10 @@ impl AppCore {
 
     pub async fn productivity_category_delete(&self, id: String) -> Result<bool, ApiError> {
         let repos = self.productivity_repos()?;
-        repos.categories.delete(&id).await.map_err(map_prod_err)
+        let result = repos.categories.delete(&id).await.map_err(map_prod_err)?;
+        // Refresh the in-memory categorizer so deleted category stops being applied
+        self.refresh_categorizer(&repos.categories).await;
+        Ok(result)
     }
 
     /// Re-assign all historical events for a given app/site to a new category.
@@ -317,5 +322,20 @@ impl AppCore {
         let repos = self.productivity_repos()?;
         repos.projects.delete(&id).await.map_err(map_prod_err)?;
         Ok(())
+    }
+
+    /// Refresh the in-memory categorizer from DB so the background tracker
+    /// picks up category changes immediately.
+    async fn refresh_categorizer(
+        &self,
+        repo: &feature_productivity::repos::ActivityCategoryRepo,
+    ) {
+        if let Some(ref engine) = self.productivity_engine {
+            let engine = engine.lock().await;
+            let mut categorizer = engine.categorizer().write().await;
+            if let Err(e) = categorizer.refresh(repo).await {
+                tracing::warn!("Failed to refresh categorizer: {e}");
+            }
+        }
     }
 }

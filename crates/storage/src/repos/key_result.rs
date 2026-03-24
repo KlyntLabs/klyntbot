@@ -173,7 +173,7 @@ impl KeyResultRepo {
     pub async fn count_actions(&self, kr_id: &str) -> Result<(i64, i64), StorageError> {
         let row: (i64, i64) = sqlx::query_as(
             "SELECT COUNT(*), SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END) \
-             FROM actions WHERE key_result_id = ?1 AND is_template = FALSE",
+             FROM tasks WHERE key_result_id = ?1 AND is_template = FALSE",
         )
         .bind(kr_id)
         .fetch_one(&self.pool)

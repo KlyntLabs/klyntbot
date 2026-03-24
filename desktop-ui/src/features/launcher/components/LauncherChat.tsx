@@ -1,9 +1,7 @@
-import { InteractionCard } from "@features/chat/components/InteractionCard";
-import { MarkdownContent } from "@features/chat/components/MarkdownContent";
-import { ActiveToolIndicator } from "@features/chat/components/SegmentedMessage";
+import { MessageList } from "@features/chat/components/MessageList";
+import { useAutoResizeTextarea } from "@shared/hooks/useAutoResizeTextarea";
 import { useChatSession } from "@shared/hooks/useChatSession";
 import { isTauri } from "@shared/lib/utils";
-import { ThinkingDots } from "@shared/ui/ThinkingDots";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ArrowLeft, ArrowUpRight, Send, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";
@@ -17,8 +15,7 @@ interface LauncherChatProps {
 
 export function LauncherChat({ sessionKey, initialQuery, onBack, onExpand }: LauncherChatProps) {
   const chat = useChatSession(sessionKey);
-  const endRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const { ref: inputRef, handleInput } = useAutoResizeTextarea(chat.input);
   const sentInitial = useRef(false);
   const needsInitialSend = useRef(false);
 
@@ -39,12 +36,8 @@ export function LauncherChat({ sessionKey, initialQuery, onBack, onExpand }: Lau
     }
   }, [chat.input, chat.send]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-scroll on new content
-  useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, []);
-
   // Focus input after streaming completes
+  // biome-ignore lint/correctness/useExhaustiveDependencies: inputRef is a stable ref object
   useEffect(() => {
     if (!chat.isStreaming && !chat.activeInteraction) {
       inputRef.current?.focus();
@@ -52,6 +45,7 @@ export function LauncherChat({ sessionKey, initialQuery, onBack, onExpand }: Lau
   }, [chat.isStreaming, chat.activeInteraction]);
 
   // Re-focus input when launcher window regains focus (after hide/show)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: inputRef is a stable ref object
   useEffect(() => {
     if (!isTauri) return;
     let unlisten: (() => void) | undefined;
@@ -115,78 +109,21 @@ export function LauncherChat({ sessionKey, initialQuery, onBack, onExpand }: Lau
         </button>
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
-        {chat.messages.map((msg) => {
-          if (msg.role === "interaction") return null;
-          return (
-            <div key={msg.id}>
-              {msg.role === "user" ? (
-                <div className="flex justify-end">
-                  <div className="max-w-[85%] glass-bubble-user">
-                    <p className="text-[13px] font-light whitespace-pre-wrap leading-relaxed text-foreground">
-                      {msg.content}
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="max-w-full">
-                  <MarkdownContent content={msg.content} />
-                </div>
-              )}
-            </div>
-          );
-        })}
-
-        {/* Streaming content */}
-        {chat.segments.length > 0 && (
-          <div className="max-w-full">
-            {chat.segments.map((seg, idx) =>
-              seg.type === "text" ? (
-                <div
-                  key={`text-${seg.content.slice(0, 32)}`}
-                  className={
-                    chat.isStreaming && idx === chat.segments.length - 1 ? "streaming-cursor" : ""
-                  }
-                >
-                  <MarkdownContent content={seg.content} />
-                </div>
-              ) : null,
-            )}
-          </div>
-        )}
-
-        {/* Active tool spinners */}
-        {chat.activeTools.map((name) => (
-          <ActiveToolIndicator key={name} name={name} />
-        ))}
-
-        {/* Thinking indicator */}
-        {chat.isStreaming && chat.segments.length === 0 && chat.activeTools.length === 0 && (
-          <div className="flex items-center gap-2">
-            <ThinkingDots size="sm" className="text-muted" />
-            {chat.statusPhase && <span className="text-xs text-muted">{chat.statusPhase}</span>}
-          </div>
-        )}
-
-        {/* Error */}
-        {chat.error && (
-          <div className="rounded-xl px-4 py-3 bg-destructive/10 border border-destructive/20">
-            <p className="text-xs font-light text-destructive">{chat.error}</p>
-          </div>
-        )}
-
-        {/* Interaction card */}
-        {chat.activeInteraction && (
-          <InteractionCard
-            sessionKey={sessionKey}
-            requestId={chat.activeInteraction.requestId}
-            request={chat.activeInteraction.request}
-            onSubmitted={chat.clearInteraction}
-          />
-        )}
-
-        <div ref={endRef} />
+      <div className="flex-1 overflow-y-auto px-4 py-3">
+        <MessageList
+          messages={chat.messages}
+          segments={chat.segments}
+          isStreaming={chat.isStreaming}
+          activeTools={chat.activeTools}
+          error={chat.error}
+          activeInteraction={chat.activeInteraction}
+          sessionKey={sessionKey}
+          onInteractionSubmitted={chat.clearInteraction}
+          showTransparency={false}
+          liveTransparency={null}
+          activeDelegateAgent={chat.activeDelegateAgent}
+          statusPhase={chat.statusPhase}
+        />
       </div>
 
       {/* Input */}
@@ -196,11 +133,8 @@ export function LauncherChat({ sessionKey, initialQuery, onBack, onExpand }: Lau
           <textarea
             ref={inputRef}
             value={chat.input}
-            onChange={(e) => {
-              chat.setInput(e.target.value);
-              e.target.style.height = "auto";
-              e.target.style.height = `${Math.min(e.target.scrollHeight, 80)}px`;
-            }}
+            onChange={(e) => chat.setInput(e.target.value)}
+            onInput={handleInput}
             onKeyDown={handleKeyDown}
             placeholder="Follow up\u2026"
             aria-label="Message Klynt"
