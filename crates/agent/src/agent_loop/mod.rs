@@ -90,6 +90,8 @@ pub struct AgentLoop {
     pub(crate) skill_catalog: Arc<RwLock<skill_system::types::SkillCatalog>>,
     /// Shared skill router — rebuilt after reload.
     pub(crate) skill_router: Arc<RwLock<skill_system::router::SkillRouter>>,
+    /// Shared embedding engine — reused for hot-reload embedding recomputation.
+    pub(crate) embedding_engine: Arc<tools::EmbeddingEngine>,
 }
 
 impl AgentLoop {
@@ -122,7 +124,13 @@ impl AgentLoop {
                 skill_system::types::SkillScope::User,
             ));
         }
-        let new_catalog = skill_system::types::SkillCatalog::discover(&sources).await?;
+        let mut new_catalog = skill_system::types::SkillCatalog::discover(&sources).await?;
+
+        // Recompute embeddings for the new catalog using the shared engine
+        let engine = Arc::clone(&self.embedding_engine);
+        let embed_fn: skill_system::types::EmbedFn = Arc::new(move |text: &str| engine.embed(text));
+        new_catalog.precompute_embeddings(&embed_fn).await;
+
         let new_router = skill_system::router::SkillRouter::new(&new_catalog);
 
         let mut catalog = self.skill_catalog.write().await;

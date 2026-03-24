@@ -1058,6 +1058,7 @@ impl AppCore {
                 &session_key,
                 "insight",
                 Some(&event_tx),
+                None,
             )
             .await;
 

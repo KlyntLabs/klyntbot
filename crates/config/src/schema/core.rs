@@ -219,6 +219,14 @@ pub struct Config {
     /// Autotuner self-optimization system configuration.
     #[serde(default)]
     pub autotuner: AutoTunerConfig,
+
+    /// Schema version for forward-compatible config migration.
+    #[serde(default = "default_schema_version")]
+    pub schema_version: u32,
+}
+
+fn default_schema_version() -> u32 {
+    1
 }
 
 impl Config {

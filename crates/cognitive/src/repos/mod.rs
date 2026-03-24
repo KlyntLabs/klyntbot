@@ -13,6 +13,7 @@ pub mod gt_link;
 pub mod insight_cache;
 pub mod knowledge_atom;
 pub mod markdown_parser;
+pub mod pending_memory;
 pub mod persona;
 pub mod persona_accuracy;
 pub mod procedural_rule;
@@ -44,6 +45,7 @@ pub use knowledge_atom::{
     KnowledgeAtomRepo, KnowledgeAtomRow, KnowledgeTopicRow, NewKnowledgeAtom,
 };
 pub use markdown_parser::parse_markdown_to_tree;
+pub use pending_memory::{PendingMemoryRepo, PendingMemoryRow};
 pub use persona::{NewPersona, PersonaRepo, PersonaRow, PersonaUpdate};
 pub use persona_accuracy::{PersonaAccuracy, PersonaAccuracyRepo};
 pub use procedural_rule::ProceduralRuleRepo;

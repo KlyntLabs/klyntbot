@@ -25,6 +25,46 @@ pub struct CycleResult {
     pub failed_constraints: Vec<(Uuid, Vec<String>)>,
     /// All evaluated trials with their aggregated results (for observability logging).
     pub evaluated_trials: Vec<(Uuid, TrialResult)>,
+    /// Diagnostic health report for the autotuner subsystem.
+    pub health: Option<AutotunerHealth>,
+}
+
+/// Diagnostic health report for the autotuner subsystem.
+#[derive(Debug, Clone)]
+pub struct AutotunerHealth {
+    pub evaluated_count: usize,
+    pub ground_truth_match_rate: f64,
+    pub had_promotion: bool,
+    pub warnings: Vec<HealthWarning>,
+}
+
+/// Specific health warnings that may indicate autotuner issues.
+#[derive(Debug, Clone)]
+pub enum HealthWarning {
+    LowGroundTruthMatch,
+    InsufficientData,
+}
+
+impl AutotunerHealth {
+    pub fn diagnose(
+        evaluated_count: usize,
+        ground_truth_match_rate: f64,
+        had_promotion: bool,
+    ) -> Self {
+        let mut warnings = vec![];
+        if ground_truth_match_rate < 0.8 {
+            warnings.push(HealthWarning::LowGroundTruthMatch);
+        }
+        if evaluated_count < 10 {
+            warnings.push(HealthWarning::InsufficientData);
+        }
+        Self {
+            evaluated_count,
+            ground_truth_match_rate,
+            had_promotion,
+            warnings,
+        }
+    }
 }
 
 /// Orchestrates the nightly evaluation-and-promotion cycle.
@@ -163,12 +203,24 @@ impl NightlyCycle {
         // Check for champion regression.
         let regression = self.check_regression(champion).await?;
 
+        // Collect diagnostic health report
+        let match_rate = self
+            .repo
+            .shadow_log_agreement_rate(None, Utc::now() - chrono::Duration::hours(24))
+            .await
+            .unwrap_or(1.0);
+        let health = AutotunerHealth::diagnose(completed_count, match_rate, promotion.is_some());
+        for warning in &health.warnings {
+            warn!(?warning, "Autotuner health issue detected");
+        }
+
         Ok(CycleResult {
             promotion,
             regression,
             completed_count,
             failed_constraints,
             evaluated_trials,
+            health: Some(health),
         })
     }
 
@@ -255,12 +307,13 @@ pub fn affected_param_names(old: &TrialParams, new: &TrialParams) -> Vec<String>
     names
 }
 
-/// Small bonus for parameter-space diversity, scaled to [0, 0.1].
+/// Bonus for parameter-space diversity, scaled to [0, 0.3].
+/// Higher weight encourages broader exploration of the parameter space.
 fn diversity_bonus(distance: f64, max_distance: f64) -> f64 {
     if max_distance <= 0.0 {
         return 0.0;
     }
-    0.1 * (distance / max_distance)
+    0.3 * (distance / max_distance)
 }
 
 #[cfg(test)]
@@ -610,8 +663,8 @@ mod tests {
 
     #[test]
     fn diversity_bonus_scales_correctly() {
-        assert!((super::diversity_bonus(5.0, 10.0) - 0.05).abs() < 1e-9);
-        assert!((super::diversity_bonus(10.0, 10.0) - 0.1).abs() < 1e-9);
+        assert!((super::diversity_bonus(5.0, 10.0) - 0.15).abs() < 1e-9);
+        assert!((super::diversity_bonus(10.0, 10.0) - 0.3).abs() < 1e-9);
         assert!((super::diversity_bonus(0.0, 10.0) - 0.0).abs() < 1e-9);
         assert!((super::diversity_bonus(5.0, 0.0) - 0.0).abs() < 1e-9);
     }

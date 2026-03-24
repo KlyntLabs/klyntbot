@@ -438,29 +438,63 @@ impl BackgroundConsolidationService {
                         // ── Contradiction detection ──────────────────────────
                         if let Some(ref bus) = domain_bus {
                             for (candidate, op) in candidates.iter().zip(ops.iter()) {
-                                if let crate::types::MemoryOp::Update { id: _, old_id } = op {
-                                    let new = &candidate.candidate;
-                                    if let Ok(Some(old_fact)) = repo.get(old_id).await {
-                                        if old_fact.confidence < 0.7
-                                            || old_fact.source != "user_stated"
-                                        {
-                                            continue;
-                                        }
-                                        if old_fact.object != new.object
-                                            && !is_same_session(
-                                                &old_fact.recorded_at,
-                                                &session_start,
-                                            )
-                                        {
-                                            bus.publish(DomainEvent::ContradictionDetected {
-                                                existing_subject: old_fact.subject.clone(),
-                                                existing_predicate: old_fact.predicate.clone(),
-                                                existing_object: old_fact.object.clone(),
-                                                new_object: new.object.clone(),
-                                                confidence: new.confidence,
-                                            });
+                                match op {
+                                    crate::types::MemoryOp::Update { id: _, old_id } => {
+                                        let new = &candidate.candidate;
+                                        if let Ok(Some(old_fact)) = repo.get(old_id).await {
+                                            if old_fact.confidence < 0.7
+                                                || old_fact.source != "user_stated"
+                                            {
+                                                continue;
+                                            }
+                                            if old_fact.object != new.object
+                                                && !is_same_session(
+                                                    &old_fact.recorded_at,
+                                                    &session_start,
+                                                )
+                                            {
+                                                bus.publish(DomainEvent::ContradictionDetected {
+                                                    existing_subject: old_fact.subject.clone(),
+                                                    existing_predicate: old_fact.predicate.clone(),
+                                                    existing_object: old_fact.object.clone(),
+                                                    new_object: new.object.clone(),
+                                                    confidence: new.confidence,
+                                                });
+                                            }
                                         }
                                     }
+                                    crate::types::MemoryOp::Add { .. } => {
+                                        let new = &candidate.candidate;
+                                        for existing in &candidate.existing {
+                                            if existing.superseded_at.is_some() {
+                                                continue;
+                                            }
+                                            // Same guards as Update path: skip low-confidence
+                                            // or non-user-stated facts, and same-session writes
+                                            if existing.confidence < 0.7
+                                                || existing.source != "user_stated"
+                                            {
+                                                continue;
+                                            }
+                                            if existing.object != new.object
+                                                && existing.subject == new.subject
+                                                && existing.predicate == new.predicate
+                                                && !is_same_session(
+                                                    &existing.recorded_at,
+                                                    &session_start,
+                                                )
+                                            {
+                                                bus.publish(DomainEvent::ContradictionDetected {
+                                                    existing_subject: existing.subject.clone(),
+                                                    existing_predicate: existing.predicate.clone(),
+                                                    existing_object: existing.object.clone(),
+                                                    new_object: new.object.clone(),
+                                                    confidence: new.confidence,
+                                                });
+                                            }
+                                        }
+                                    }
+                                    _ => {}
                                 }
                             }
                         }
@@ -1061,6 +1095,7 @@ fn event_type_key(event: &DomainEvent) -> String {
         DomainEvent::KnowledgeTransferDetected { .. } => "KnowledgeTransferDetected".into(),
         DomainEvent::CoachingLearningDigest { .. } => "CoachingLearningDigest".into(),
         DomainEvent::FlashcardSessionCompleted { .. } => "FlashcardSessionCompleted".into(),
+        DomainEvent::MemoryPendingConfirmation { .. } => "MemoryPendingConfirmation".into(),
     }
 }
 

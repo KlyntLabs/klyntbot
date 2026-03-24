@@ -303,6 +303,7 @@ fn wire_event_channels(core: &AppCore, channels: EventChannels, app_handle: &tau
                             | bus::DomainEvent::KnowledgeTransferDetected { .. }
                             | bus::DomainEvent::CoachingLearningDigest { .. }
                             | bus::DomainEvent::FlashcardSessionCompleted { .. } => "learning",
+                            bus::DomainEvent::MemoryPendingConfirmation { .. } => "memory",
                         };
                         let salience_str = match salience {
                             cognitive::types::SalienceVerdict::Extract => "extract",

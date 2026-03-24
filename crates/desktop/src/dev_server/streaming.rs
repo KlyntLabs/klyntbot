@@ -275,5 +275,6 @@ fn domain_for_event(event: &bus::DomainEvent) -> &'static str {
         | bus::DomainEvent::KnowledgeTransferDetected { .. }
         | bus::DomainEvent::CoachingLearningDigest { .. }
         | bus::DomainEvent::FlashcardSessionCompleted { .. } => "learning",
+        bus::DomainEvent::MemoryPendingConfirmation { .. } => "memory",
     }
 }

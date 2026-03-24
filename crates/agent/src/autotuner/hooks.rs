@@ -160,6 +160,7 @@ impl AutoTunerHook for AutoTunerHookImpl {
                         &trial_id,
                         &ts,
                         &cid,
+                        "",
                         &prediction.predicted_orchestrator,
                         &prediction.predicted_mode,
                         prediction.confidence as f64,
@@ -265,7 +266,7 @@ impl AutoTunerHook for AutoTunerHookImpl {
         }
         if let Err(e) = self
             .trial_repo
-            .update_shadow_log_ground_truth(chat_id, orchestrator_name, execution_mode)
+            .update_shadow_log_ground_truth(chat_id, "", orchestrator_name, execution_mode)
             .await
         {
             tracing::warn!(error = %e, "Failed to update shadow log ground truth");
@@ -378,6 +379,7 @@ mod tests {
                 "trial-gt",
                 &chrono::Utc::now().to_rfc3339(),
                 "chat-gt",
+                "",
                 "general",
                 "direct",
                 0.9,

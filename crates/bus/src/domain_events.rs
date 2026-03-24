@@ -373,6 +373,14 @@ pub enum DomainEvent {
         new_object: String,
         confidence: f64,
     },
+
+    /// A memory write is below the confidence threshold and needs user confirmation.
+    MemoryPendingConfirmation {
+        fact_id: String,
+        subject: String,
+        predicate: String,
+        object: String,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

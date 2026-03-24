@@ -112,6 +112,11 @@ pub struct CognitiveConfig {
     /// Auto-extraction of knowledge atoms from notes.
     #[serde(default)]
     pub atom_extraction: AtomExtractionConfig,
+
+    /// Require user confirmation for memory writes below this confidence threshold.
+    /// Set to 0.0 to auto-approve all (default). Set to 1.0 to require confirmation for everything.
+    #[serde(default)]
+    pub confirm_threshold: f64,
 }
 
 impl Default for CognitiveConfig {
@@ -144,6 +149,7 @@ impl Default for CognitiveConfig {
             insight_forge_per_source_timeout_ms: default_insight_forge_per_source_timeout_ms(),
             book_index: BookIndexConfig::default(),
             atom_extraction: AtomExtractionConfig::default(),
+            confirm_threshold: 0.0,
         }
     }
 }

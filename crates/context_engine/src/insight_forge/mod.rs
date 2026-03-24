@@ -1,3 +1,4 @@
+pub mod audit;
 pub mod bookrag_searcher;
 pub mod circuit_breaker;
 pub mod decomposer;
@@ -134,6 +135,7 @@ impl InsightForge {
         total_limit: usize,
         session_key: Option<&str>,
     ) -> Vec<MemoryEntry> {
+        let start = std::time::Instant::now();
         let limit = total_limit.min(self.config.total_limit);
 
         // 1. Circuit breaker check.
@@ -269,6 +271,23 @@ impl InsightForge {
         let remaining = limit.saturating_sub(budgeted.len());
         budgeted.extend(overflow.into_iter().take(remaining));
         budgeted.truncate(limit);
+
+        // Audit trail logging (guarded to avoid allocations when debug is off)
+        if tracing::enabled!(tracing::Level::DEBUG) {
+            let elapsed_ms = start.elapsed().as_millis() as u64;
+            let source_names: Vec<String> = source_counts.keys().cloned().collect();
+            let audit = audit::RetrievalAuditEntry {
+                query: query.to_string(),
+                enriched_query: enriched.map(|r| r.enriched_query.clone()),
+                sub_queries,
+                sources_queried: source_names,
+                results_per_source: source_counts,
+                final_results: budgeted.len(),
+                circuit_breaker_fallback: false,
+                total_latency_ms: elapsed_ms,
+            };
+            tracing::debug!(?audit, "Retrieval audit trail");
+        }
 
         budgeted
     }

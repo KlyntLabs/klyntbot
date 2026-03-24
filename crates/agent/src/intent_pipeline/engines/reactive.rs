@@ -234,20 +234,26 @@ impl ExecutionEngine for ReactiveEngine {
                         try_store_plan(plan_text, &mut scratchpad, &event_tx).await;
                     }
 
-                    // Track plan step completion
+                    // Track plan step completion (semantic matching for same-tool disambiguation)
                     let mut completed_step_index = None;
-                    for tool_name in &tool_names {
-                        if let Some((idx, desc, name)) = scratchpad.mark_step_completed(tool_name) {
-                            completed_step_index = Some(idx);
-                            if let Some(ref tx) = event_tx {
-                                let _ = tx
-                                    .send(crate::events::AgentEvent::PlanStepCompleted {
-                                        step_index: idx,
-                                        description: desc,
-                                        tool_name: name,
-                                    })
-                                    .await;
-                            }
+                    for r in &results {
+                        let (idx, desc, name) = match scratchpad.mark_step_completed_semantic(
+                            &r.tool_name,
+                            &r.arguments,
+                            &r.result,
+                        ) {
+                            Some(v) => v,
+                            None => continue,
+                        };
+                        completed_step_index = Some(idx);
+                        if let Some(ref tx) = event_tx {
+                            let _ = tx
+                                .send(crate::events::AgentEvent::PlanStepCompleted {
+                                    step_index: idx,
+                                    description: desc,
+                                    tool_name: name,
+                                })
+                                .await;
                         }
                     }
 
@@ -318,6 +324,15 @@ impl ExecutionEngine for ReactiveEngine {
                         plan_step_index: None,
                     });
                 }
+            }
+
+            // Oscillation detection: if the agent repeats the same action pattern, break early
+            if scratchpad.detect_oscillation(3) {
+                tracing::warn!(
+                    "ReactiveEngine: oscillation detected at iteration {} — breaking loop",
+                    iteration
+                );
+                break;
             }
         }
 

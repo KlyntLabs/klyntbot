@@ -29,6 +29,18 @@ pub fn config_dir() -> Result<PathBuf> {
         })
 }
 
+/// Current config schema version. Increment when config format changes.
+const CURRENT_SCHEMA_VERSION: u32 = 1;
+
+/// Migrate a raw config JSON from `from` version to `to` version.
+/// Future migrations will be added as match arms on `from`.
+fn migrate_config(mut raw: Value, _from: u32, to: u32) -> Result<Value> {
+    // No migrations needed yet (version 1 is the initial version).
+    // When adding v2, match on `_from < 2` and apply changes.
+    raw["schemaVersion"] = serde_json::json!(to);
+    Ok(raw)
+}
+
 /// Load configuration from file or return default
 pub async fn load() -> Result<Config> {
     let klyntbot_path = config_path()?;
@@ -38,7 +50,20 @@ pub async fn load() -> Result<Config> {
             .await
             .map_err(ConfigError::Io)?;
 
-        let config: Config = serde_json::from_str(&content)
+        let mut raw: Value = serde_json::from_str(&content)
+            .map_err(|e| ConfigError::Invalid(format!("Failed to parse config: {}", e)))?;
+
+        let file_version = raw["schemaVersion"].as_u64().unwrap_or(1) as u32;
+        if file_version < CURRENT_SCHEMA_VERSION {
+            raw = migrate_config(raw, file_version, CURRENT_SCHEMA_VERSION)?;
+            let config: Config = serde_json::from_value(raw).map_err(|e| {
+                ConfigError::Invalid(format!("Migration produced invalid config: {}", e))
+            })?;
+            save(&config).await?;
+            return Ok(config);
+        }
+
+        let config: Config = serde_json::from_value(raw)
             .map_err(|e| ConfigError::Invalid(format!("Failed to parse config: {}", e)))?;
 
         return Ok(config);

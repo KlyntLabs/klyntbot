@@ -1571,6 +1571,7 @@ impl AgentLoopBuilder {
             activity_svc: self.activity_svc,
             skill_catalog,
             skill_router,
+            embedding_engine,
         })
     }
 }

@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS autotuner_shadow_log (
     trial_id                   TEXT    NOT NULL REFERENCES autotuner_trials(id),
     message_timestamp          TEXT    NOT NULL,
     chat_id                    TEXT    NOT NULL,
+    message_id                 TEXT    NOT NULL DEFAULT '',
     predicted_orchestrator     TEXT    NOT NULL,
     predicted_mode             TEXT    NOT NULL,
     confidence                 REAL    NOT NULL,
@@ -184,6 +185,7 @@ impl TrialRepo {
         trial_id: &str,
         message_timestamp: &str,
         chat_id: &str,
+        message_id: &str,
         predicted_orchestrator: &str,
         predicted_mode: &str,
         confidence: f64,
@@ -193,14 +195,15 @@ impl TrialRepo {
     ) -> Result<(), StorageError> {
         sqlx::query(
             "INSERT INTO autotuner_shadow_log
-                (trial_id, message_timestamp, chat_id, predicted_orchestrator,
+                (trial_id, message_timestamp, chat_id, message_id, predicted_orchestrator,
                  predicted_mode, confidence, predicted_iteration_budget,
                  control_orchestrator, control_mode)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
         )
         .bind(trial_id)
         .bind(message_timestamp)
         .bind(chat_id)
+        .bind(message_id)
         .bind(predicted_orchestrator)
         .bind(predicted_mode)
         .bind(confidence)
@@ -233,19 +236,21 @@ impl TrialRepo {
     pub async fn update_shadow_log_ground_truth(
         &self,
         chat_id: &str,
+        message_id: &str,
         control_orchestrator: &str,
         control_mode: &str,
     ) -> Result<(), StorageError> {
         sqlx::query(
             "UPDATE autotuner_shadow_log
              SET control_orchestrator = ?1, control_mode = ?2
-             WHERE chat_id = ?3
+             WHERE chat_id = ?3 AND message_id = ?4
                AND control_orchestrator = 'pending'
                AND created_at >= datetime('now', '-60 seconds')",
         )
         .bind(control_orchestrator)
         .bind(control_mode)
         .bind(chat_id)
+        .bind(message_id)
         .execute(&self.pool)
         .await?;
         Ok(())
@@ -540,6 +545,7 @@ mod tests {
             trial_id,
             "2026-03-19T12:00:00Z",
             chat_id,
+            "",
             "general",
             predicted_mode,
             0.85,
@@ -563,7 +569,7 @@ mod tests {
         insert_test_shadow_log(&repo, "trial-gt", "chat-1", "direct", "pending", "pending").await;
 
         // Update the ground truth
-        repo.update_shadow_log_ground_truth("chat-1", "general", "reactive")
+        repo.update_shadow_log_ground_truth("chat-1", "", "general", "reactive")
             .await
             .unwrap();
 
@@ -672,13 +678,13 @@ mod tests {
         .await;
 
         // Back-fill ground truth so control_mode != 'pending'
-        repo.update_shadow_log_ground_truth("chat-cr-1", "general", "direct")
+        repo.update_shadow_log_ground_truth("chat-cr-1", "", "general", "direct")
             .await
             .unwrap();
-        repo.update_shadow_log_ground_truth("chat-cr-2", "general", "direct")
+        repo.update_shadow_log_ground_truth("chat-cr-2", "", "general", "direct")
             .await
             .unwrap();
-        repo.update_shadow_log_ground_truth("chat-cr-3", "general", "direct")
+        repo.update_shadow_log_ground_truth("chat-cr-3", "", "general", "direct")
             .await
             .unwrap();
 

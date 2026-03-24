@@ -354,6 +354,7 @@ impl AgentRuntime {
                     &deps.provider,
                     &deps.chat_params,
                     ctx.squad_mode.as_deref(),
+                    cancel_token.as_ref(),
                 )
                 .await;
 
@@ -822,6 +823,7 @@ impl AgentRuntime {
         provider: &providers::DynProvider,
         params: &providers::ChatParams,
         _squad_mode_str: Option<&str>,
+        cancel_token: Option<&tokio_util::sync::CancellationToken>,
     ) -> Result<RuntimeResult> {
         use crate::intent_pipeline::engines;
         use crate::intent_pipeline::engines::squad;
@@ -866,7 +868,7 @@ impl AgentRuntime {
         let persona_responses = if use_debate {
             let blackboard_repo = blackboard_repo.unwrap();
             let debate_session_key = format!("debate:{}:{}", squad_id, uuid::Uuid::new_v4());
-            let debate_results = engines::debate::run_room_debate(
+            let debate_fut = engines::debate::run_room_debate(
                 provider,
                 &orchestrator_context,
                 message,
@@ -876,8 +878,16 @@ impl AgentRuntime {
                 &debate_session_key,
                 squad_id,
                 event_tx.as_ref(),
-            )
-            .await;
+                cancel_token,
+            );
+            let debate_results =
+                match tokio::time::timeout(std::time::Duration::from_secs(120), debate_fut).await {
+                    Ok(results) => results,
+                    Err(_) => {
+                        tracing::warn!("Squad debate timed out after 120s");
+                        Vec::new()
+                    }
+                };
 
             // Collect responses from the final round for synthesis
             debate_results

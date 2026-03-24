@@ -128,6 +128,92 @@ impl Scratchpad {
         Some((step.index, step.description.clone(), tool_name.to_string()))
     }
 
+    /// Enhanced plan step matching using tool name + argument/result word overlap.
+    /// When multiple uncompleted steps share the same expected tool, picks the one
+    /// whose description best matches the tool arguments and result text.
+    /// Falls back to name-only matching if no semantic match is found.
+    pub fn mark_step_completed_semantic(
+        &mut self,
+        tool_name: &str,
+        tool_args: &serde_json::Value,
+        tool_result: &str,
+    ) -> Option<(usize, String, String)> {
+        let plan = self.plan.as_mut()?;
+
+        // Check if any uncompleted step uses this tool before serializing args
+        let has_matching_steps = plan
+            .steps
+            .iter()
+            .any(|s| !s.completed && s.expected_tool.as_deref() == Some(tool_name));
+        if !has_matching_steps {
+            return self.mark_step_completed(tool_name);
+        }
+
+        let arg_text = tool_args.to_string().to_lowercase();
+        let result_lower = tool_result.to_lowercase();
+
+        let mut best_match: Option<(usize, usize)> = None;
+        for (idx, step) in plan.steps.iter().enumerate() {
+            if step.completed {
+                continue;
+            }
+            if step.expected_tool.as_deref() != Some(tool_name) {
+                continue;
+            }
+
+            let desc_words: Vec<String> = step
+                .description
+                .to_lowercase()
+                .split_whitespace()
+                .filter(|w| w.len() > 2)
+                .map(|w| w.trim_matches(|c: char| !c.is_alphanumeric()).to_string())
+                .filter(|w| !w.is_empty())
+                .collect();
+
+            let overlap = desc_words
+                .iter()
+                .filter(|w| arg_text.contains(w.as_str()) || result_lower.contains(w.as_str()))
+                .count();
+
+            if overlap > 0 && overlap > desc_words.len() / 3 {
+                match best_match {
+                    Some((_, best_overlap)) if overlap > best_overlap => {
+                        best_match = Some((idx, overlap));
+                    }
+                    None => best_match = Some((idx, overlap)),
+                    _ => {}
+                }
+            }
+        }
+
+        if let Some((idx, _)) = best_match {
+            let step = &mut plan.steps[idx];
+            step.completed = true;
+            return Some((step.index, step.description.clone(), tool_name.to_string()));
+        }
+
+        // Fallback to name-only matching
+        self.mark_step_completed(tool_name)
+    }
+
+    /// Detect if the agent is oscillating between tool calls without progress.
+    /// Returns true if the last `window*2` traces show a repeating pattern.
+    pub fn detect_oscillation(&self, window: usize) -> bool {
+        if self.traces.len() < window * 2 {
+            return false;
+        }
+        let recent = &self.traces[self.traces.len() - window * 2..];
+        let first_half: Vec<&str> = recent[..window]
+            .iter()
+            .map(|t| t.actual_action.as_str())
+            .collect();
+        let second_half: Vec<&str> = recent[window..]
+            .iter()
+            .map(|t| t.actual_action.as_str())
+            .collect();
+        first_half == second_half
+    }
+
     /// (completed, total) plan progress. None if no plan.
     pub fn plan_progress(&self) -> Option<(usize, usize)> {
         self.plan.as_ref().map(|p| {
@@ -383,5 +469,95 @@ mod tests {
     fn step_descriptions_collects_all() {
         let plan = ExecutionPlan::parse("1. Do A [tool: a]\n2. Do B\n3. Do C [tool: c]");
         assert_eq!(plan.step_descriptions(), vec!["Do A", "Do B", "Do C"]);
+    }
+
+    #[test]
+    fn mark_step_completed_semantic_with_args() {
+        let mut pad = Scratchpad::new();
+        pad.set_plan(ExecutionPlan {
+            steps: vec![
+                PlanStep {
+                    index: 0,
+                    description: "Search for rust tutorials".into(),
+                    expected_tool: Some("notes".into()),
+                    completed: false,
+                },
+                PlanStep {
+                    index: 1,
+                    description: "Search for python guides".into(),
+                    expected_tool: Some("notes".into()),
+                    completed: false,
+                },
+            ],
+            raw_text: String::new(),
+        });
+
+        // Should match step 0 because args contain "rust tutorials"
+        let result = pad.mark_step_completed_semantic(
+            "notes",
+            &serde_json::json!({"query": "rust tutorials"}),
+            "",
+        );
+        assert_eq!(result.map(|r| r.0), Some(0));
+
+        // Should match step 1 because args contain "python guides"
+        let result = pad.mark_step_completed_semantic(
+            "notes",
+            &serde_json::json!({"query": "python guides"}),
+            "",
+        );
+        assert_eq!(result.map(|r| r.0), Some(1));
+    }
+
+    #[test]
+    fn mark_step_completed_semantic_fallback() {
+        let mut pad = Scratchpad::new();
+        pad.set_plan(ExecutionPlan {
+            steps: vec![PlanStep {
+                index: 0,
+                description: "Do something".into(),
+                expected_tool: Some("tasks".into()),
+                completed: false,
+            }],
+            raw_text: String::new(),
+        });
+
+        // No word overlap — falls back to name-only matching
+        let result =
+            pad.mark_step_completed_semantic("tasks", &serde_json::json!({"action": "list"}), "");
+        assert_eq!(result.map(|r| r.0), Some(0));
+    }
+
+    #[test]
+    fn detect_oscillation_finds_repeating_pattern() {
+        let mut pad = Scratchpad::new();
+        // Create pattern: A, B, A, B
+        pad.add(make_trace(1, "think", "action_a"));
+        pad.add(make_trace(2, "think", "action_b"));
+        pad.add(make_trace(3, "think", "action_a"));
+        pad.add(make_trace(4, "think", "action_b"));
+
+        assert!(pad.detect_oscillation(2));
+    }
+
+    #[test]
+    fn detect_oscillation_no_repeat() {
+        let mut pad = Scratchpad::new();
+        pad.add(make_trace(1, "think", "action_a"));
+        pad.add(make_trace(2, "think", "action_b"));
+        pad.add(make_trace(3, "think", "action_c"));
+        pad.add(make_trace(4, "think", "action_d"));
+
+        assert!(!pad.detect_oscillation(2));
+    }
+
+    #[test]
+    fn detect_oscillation_too_few_traces() {
+        let mut pad = Scratchpad::new();
+        pad.add(make_trace(1, "think", "action_a"));
+        pad.add(make_trace(2, "think", "action_a"));
+
+        // window=2 needs 4 traces, we only have 2
+        assert!(!pad.detect_oscillation(2));
     }
 }

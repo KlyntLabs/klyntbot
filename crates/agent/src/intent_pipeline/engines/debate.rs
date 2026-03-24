@@ -396,6 +396,7 @@ pub async fn run_room_debate(
     session_key: &str,
     squad_id: &str,
     event_tx: Option<&tokio::sync::mpsc::Sender<crate::AgentEvent>>,
+    cancel_token: Option<&tokio_util::sync::CancellationToken>,
 ) -> DebateRounds {
     let persona_ids: Vec<String> = personas.iter().map(|p| p.id.clone()).collect();
     let mut all_rounds: DebateRounds = Vec::new();
@@ -404,6 +405,14 @@ pub async fn run_room_debate(
 
     loop {
         round += 1;
+
+        // Check cancellation before each round
+        if let Some(token) = cancel_token {
+            if token.is_cancelled() {
+                tracing::warn!("Squad debate cancelled at round {round}");
+                break;
+            }
+        }
 
         // Determine phase
         let phase = if round == 1 {

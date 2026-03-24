@@ -79,6 +79,9 @@ impl SkillRouter {
     ///
     /// `keyword_weight` and `semantic_weight` override the default 0.7 / 0.3
     /// blend weights when supplied. Pass `None` to use the defaults.
+    ///
+    /// When the top two candidates are within `AMBIGUITY_THRESHOLD`, picks the
+    /// more specific skill (fewer trigger phrases) as a tiebreaker.
     pub fn select_orchestrator_blended<'a>(
         &self,
         message: &str,
@@ -87,11 +90,14 @@ impl SkillRouter {
         keyword_weight: Option<f64>,
         semantic_weight: Option<f64>,
     ) -> &'a Arc<SkillPackage> {
+        const AMBIGUITY_THRESHOLD: f64 = 0.05;
+
         let kw_w = keyword_weight.unwrap_or(0.7);
         let sem_w = semantic_weight.unwrap_or(0.3);
         let kw_scores = self.keyword_scores(message, catalog);
-        let mut best: Option<(&str, f64)> = None;
 
+        // Collect all candidates that pass the candidacy gate
+        let mut candidates: Vec<(&str, f64)> = Vec::new();
         for pkg in catalog.orchestrators() {
             let kw_score = kw_scores.get(pkg.name.as_str()).copied().unwrap_or(0.0);
             let sem_score = if !query_embedding.is_empty() {
@@ -110,12 +116,30 @@ impl SkillRouter {
             }
 
             let blended = kw_score * kw_w + sem_score * sem_w;
-            if best.as_ref().map_or(true, |(_, s)| blended > *s) {
-                best = Some((pkg.name.as_str(), blended));
+            candidates.push((pkg.name.as_str(), blended));
+        }
+
+        // Sort descending by score
+        candidates.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+        // Disambiguation: if top two are within threshold, prefer the more specific skill
+        if candidates.len() >= 2 {
+            let gap = candidates[0].1 - candidates[1].1;
+            if gap < AMBIGUITY_THRESHOLD {
+                let a_triggers = catalog
+                    .get(candidates[0].0)
+                    .map_or(0, |s| s.triggers().len());
+                let b_triggers = catalog
+                    .get(candidates[1].0)
+                    .map_or(0, |s| s.triggers().len());
+                // More specific = fewer triggers (more targeted)
+                if b_triggers < a_triggers && b_triggers > 0 {
+                    candidates.swap(0, 1);
+                }
             }
         }
 
-        if let Some((name, _)) = best {
+        if let Some((name, _)) = candidates.first() {
             catalog.get(name).unwrap()
         } else {
             catalog
@@ -255,6 +279,45 @@ mod tests {
         let scores = router.keyword_scores("add task to my list", &catalog);
         let task_score = scores.get("task-management").copied().unwrap_or(0.0);
         assert!(task_score > 0.0, "trigger phrase should produce a score");
+    }
+
+    #[test]
+    fn disambiguation_picks_more_specific_on_tie() {
+        // Create two orchestrators with very similar descriptions to trigger ambiguity
+        let skills = vec![
+            (
+                "broad-skill".to_string(),
+                "---\nname: broad-skill\ndescription: Manage tasks, schedule, budget, planning and reviews.\nmetadata:\n  klyntbot:\n    type: orchestrator\n    triggers:\n      - \"task\"\n      - \"plan\"\n      - \"budget\"\n      - \"schedule\"\n      - \"review\"\n---\nBroad body."
+                    .to_string(),
+            ),
+            (
+                "narrow-skill".to_string(),
+                "---\nname: narrow-skill\ndescription: Manage tasks and planning.\nmetadata:\n  klyntbot:\n    type: orchestrator\n    triggers:\n      - \"plan my tasks\"\n---\nNarrow body."
+                    .to_string(),
+            ),
+            (
+                "general".to_string(),
+                "---\nname: general\ndescription: General purpose.\nmetadata:\n  klyntbot:\n    type: orchestrator\n---\nGeneral body."
+                    .to_string(),
+            ),
+        ];
+        let source = SkillSource::BuiltIn(skills);
+        let catalog = SkillCatalog::discover_sync(&[source]).unwrap();
+        let router = SkillRouter::new(&catalog);
+
+        // "plan my tasks" triggers both skills — narrow should win due to fewer triggers
+        let selected = router.select_orchestrator_blended(
+            "plan my tasks for the week",
+            &[],
+            &catalog,
+            None,
+            None,
+        );
+        // The narrow skill has only 1 trigger (more specific) vs broad's 5
+        assert_eq!(
+            selected.name, "narrow-skill",
+            "Disambiguation should prefer the more specific (fewer triggers) skill"
+        );
     }
 
     #[test]

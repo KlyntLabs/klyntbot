@@ -122,6 +122,9 @@ pub fn evaluate_salience(event: &DomainEvent) -> SalienceVerdict {
         DomainEvent::NoteDeleted { .. } => SalienceVerdict::Discard,
         DomainEvent::TaskHierarchyChanged { .. } => SalienceVerdict::Discard,
         DomainEvent::FlashcardSessionCompleted { .. } => SalienceVerdict::Accumulate,
+
+        // Memory confirmation events — discard from cognitive (handled by UI/pending queue)
+        DomainEvent::MemoryPendingConfirmation { .. } => SalienceVerdict::Discard,
     }
 }
 
