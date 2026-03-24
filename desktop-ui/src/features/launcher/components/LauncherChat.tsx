@@ -3,6 +3,7 @@ import { MarkdownContent } from "@features/chat/components/MarkdownContent";
 import { ActiveToolIndicator } from "@features/chat/components/SegmentedMessage";
 import { useChatSession } from "@shared/hooks/useChatSession";
 import { isTauri } from "@shared/lib/utils";
+import { ThinkingDots } from "@shared/ui/ThinkingDots";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ArrowLeft, ArrowUpRight, Send, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";
@@ -162,19 +163,9 @@ export function LauncherChat({ sessionKey, initialQuery, onBack, onExpand }: Lau
 
         {/* Thinking indicator */}
         {chat.isStreaming && chat.segments.length === 0 && chat.activeTools.length === 0 && (
-          <div className="flex gap-1">
-            <div
-              className="w-1.5 h-1.5 bg-muted rounded-full animate-bounce"
-              style={{ animationDelay: "0ms" }}
-            />
-            <div
-              className="w-1.5 h-1.5 bg-muted rounded-full animate-bounce"
-              style={{ animationDelay: "150ms" }}
-            />
-            <div
-              className="w-1.5 h-1.5 bg-muted rounded-full animate-bounce"
-              style={{ animationDelay: "300ms" }}
-            />
+          <div className="flex items-center gap-2">
+            <ThinkingDots size="sm" className="text-muted" />
+            {chat.statusPhase && <span className="text-xs text-muted">{chat.statusPhase}</span>}
           </div>
         )}
 

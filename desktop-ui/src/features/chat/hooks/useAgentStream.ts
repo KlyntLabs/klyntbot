@@ -39,6 +39,8 @@ interface AgentStream {
   clearPersonaMessages: () => void;
   /** The agent currently being delegated to (between delegation_started and delegation_completed). */
   activeDelegateAgent: string | null;
+  /** Dynamic status phase (e.g. "Thinking", "Using tasks:search"). */
+  statusPhase: string | null;
 }
 
 /**
@@ -118,6 +120,7 @@ export function useAgentStream(sessionKey: string, onDone?: () => void): AgentSt
     judgeDecisions: state.judgeDecisions,
     consensusReached: state.consensusReached,
     consensusSummary: state.consensusSummary,
+    statusPhase: state.statusPhase,
     startStreaming,
     failStreaming,
     clearInteraction,

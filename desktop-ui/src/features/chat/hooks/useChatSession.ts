@@ -22,6 +22,7 @@ interface ChatSession {
   error: string | null;
   activeInteraction: ActiveInteraction | null;
   activeDelegateAgent: string | null;
+  statusPhase: string | null;
   personaMessages: PersonaSegment[];
   debateRounds: DebateRound[];
   totalDebateRounds: number | null;
@@ -130,6 +131,7 @@ export function useChatSession(
     error: stream.error,
     activeInteraction: stream.activeInteraction,
     activeDelegateAgent: stream.activeDelegateAgent,
+    statusPhase: stream.statusPhase,
     personaMessages: stream.personaMessages,
     debateRounds: stream.debateRounds,
     totalDebateRounds: stream.totalDebateRounds,

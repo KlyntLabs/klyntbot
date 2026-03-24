@@ -368,6 +368,7 @@ export function ChatPage() {
                   showTransparency={showTransparency}
                   liveTransparency={chat.transparency}
                   activeDelegateAgent={chat.activeDelegateAgent}
+                  statusPhase={chat.statusPhase}
                   personaMessages={showPersonaMessages ? chat.personaMessages : undefined}
                 />
               </>

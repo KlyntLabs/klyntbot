@@ -5,6 +5,7 @@ import type {
   PersonaSegment,
   TransparencyData,
 } from "@shared/types";
+import { ThinkingDots } from "@shared/ui/ThinkingDots";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { CollapsedInteraction } from "./CollapsedInteraction";
 import { InteractionCard } from "./InteractionCard";
@@ -25,6 +26,7 @@ interface MessageListProps {
   liveTransparency: TransparencyData | null;
   activeDelegateAgent?: string | null;
   personaMessages?: PersonaSegment[];
+  statusPhase?: string | null;
 }
 
 export function MessageList({
@@ -40,6 +42,7 @@ export function MessageList({
   liveTransparency,
   activeDelegateAgent,
   personaMessages,
+  statusPhase,
 }: MessageListProps) {
   const endRef = useRef<HTMLDivElement>(null);
   const [userScrolledUp, setUserScrolledUp] = useState(false);
@@ -180,19 +183,9 @@ export function MessageList({
       {/* Thinking indicator (streaming but no segments yet and no tools running) */}
       {isStreaming && segments.length === 0 && activeTools.length === 0 && (
         <div className="flex justify-start">
-          <div className="glass-bubble px-4 py-3 flex gap-1.5">
-            <div
-              className="w-1.5 h-1.5 bg-brand/60 rounded-full animate-bounce"
-              style={{ animationDelay: "0ms" }}
-            />
-            <div
-              className="w-1.5 h-1.5 bg-brand/60 rounded-full animate-bounce"
-              style={{ animationDelay: "150ms" }}
-            />
-            <div
-              className="w-1.5 h-1.5 bg-brand/60 rounded-full animate-bounce"
-              style={{ animationDelay: "300ms" }}
-            />
+          <div className="glass-bubble px-4 py-3 flex items-center gap-2">
+            <ThinkingDots size="sm" />
+            {statusPhase && <span className="text-xs text-muted">{statusPhase}</span>}
           </div>
         </div>
       )}

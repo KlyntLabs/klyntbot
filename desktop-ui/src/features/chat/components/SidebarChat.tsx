@@ -196,6 +196,7 @@ export function SidebarChat({
               showTransparency={false}
               liveTransparency={null}
               activeDelegateAgent={chat.activeDelegateAgent}
+              statusPhase={chat.statusPhase}
             />
           </>
         )}

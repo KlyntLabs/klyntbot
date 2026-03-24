@@ -87,6 +87,8 @@ export interface StreamSnapshot {
   consensusReached: boolean;
   consensusSummary: string | null;
   judgeDecisions: JudgeDecisionEntry[];
+  /** Dynamic status phase shown alongside the loading indicator (e.g. "Thinking", "Using tasks:search"). */
+  statusPhase: string | null;
   /** True when a stream finished while no component was subscribed to consume onDone. */
   needsRefetch: boolean;
 }
@@ -107,6 +109,7 @@ const DEFAULT_SNAPSHOT: StreamSnapshot = Object.freeze({
   consensusReached: false,
   consensusSummary: null,
   judgeDecisions: [],
+  statusPhase: null,
   needsRefetch: false,
 });
 
@@ -147,6 +150,7 @@ class ChatStreamStore {
     this.states.set(sessionKey, {
       ...DEFAULT_SNAPSHOT,
       isStreaming: true,
+      statusPhase: "Thinking",
       needsRefetch: false,
     });
     this.notify();
@@ -401,6 +405,11 @@ class ChatStreamStore {
     if (!this.isActive(payload.sessionKey)) return;
     const buf = (this.textBuffers.get(payload.sessionKey) || "") + payload.data;
     this.textBuffers.set(payload.sessionKey, buf);
+    // Set "Composing" on first content chunk (when no segments or tools yet)
+    const state = this.states.get(payload.sessionKey);
+    if (state && state.segments.length === 0 && state.activeTools.length === 0) {
+      this.updateState(payload.sessionKey, (s) => ({ ...s, statusPhase: "Composing" }));
+    }
     this.scheduleFlush(payload.sessionKey);
   }
 
@@ -408,9 +417,11 @@ class ChatStreamStore {
     if (!this.isActive(payload.sessionKey)) return;
     this.flushText(payload.sessionKey);
     this.textBuffers.set(payload.sessionKey, "");
+    const toolDisplay = qualifiedToolName(payload.name, payload.action);
     this.updateState(payload.sessionKey, (s) => ({
       ...s,
-      activeTools: [...s.activeTools, qualifiedToolName(payload.name, payload.action)],
+      statusPhase: `Using ${toolDisplay}`,
+      activeTools: [...s.activeTools, toolDisplay],
     }));
   }
 
@@ -469,6 +480,7 @@ class ChatStreamStore {
     this.updateState(payload.sessionKey, (s) => ({
       ...s,
       isStreaming: false,
+      statusPhase: null,
       activeInteraction: null,
       // If no component is listening, mark for deferred refetch
       needsRefetch: !hasCallbacks,
@@ -505,6 +517,7 @@ class ChatStreamStore {
     if (!this.isActive(payload.sessionKey)) return;
     this.updateState(payload.sessionKey, (s) => ({
       ...s,
+      statusPhase: "Analyzing",
       transparency: {
         ...s.transparency,
         classification: {
@@ -520,6 +533,7 @@ class ChatStreamStore {
     if (!this.isActive(payload.sessionKey)) return;
     this.updateState(payload.sessionKey, (s) => ({
       ...s,
+      statusPhase: "Preparing",
       transparency: {
         ...s.transparency,
         execution: {
@@ -588,8 +602,10 @@ class ChatStreamStore {
 
   private onSkillLoaded(payload: SkillLoadedPayload): void {
     if (!this.isActive(payload.sessionKey)) return;
+    const skillLabel = payload.name.replace(/-management$/, "").replace(/-/g, " ");
     this.updateState(payload.sessionKey, (s) => ({
       ...s,
+      statusPhase: `Loading ${skillLabel}`,
       transparency: {
         ...s.transparency,
         skills: [
@@ -618,6 +634,7 @@ class ChatStreamStore {
     if (!this.isActive(payload.sessionKey)) return;
     this.updateState(payload.sessionKey, (s) => ({
       ...s,
+      statusPhase: `Consulting ${payload.name}`,
       transparency: {
         ...s.transparency,
         agentSelected: { name: payload.name, description: payload.description },
