@@ -1,5 +1,17 @@
 import * as ContextMenu from "@radix-ui/react-context-menu";
-import { type ReactNode, useCallback, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+
+// Inject ::highlight() CSS at runtime to avoid Lightning CSS build warning.
+// The CSS Highlight API is valid in Chromium but not yet recognized by the minifier.
+let highlightStyleInjected = false;
+function ensureHighlightStyle() {
+  if (highlightStyleInjected) return;
+  highlightStyleInjected = true;
+  const style = document.createElement("style");
+  style.textContent =
+    "::highlight(editor-context-selection){background-color:rgba(255,255,255,.35)}";
+  document.head.appendChild(style);
+}
 
 interface EditorContextMenuProps {
   children: ReactNode;
@@ -23,6 +35,8 @@ export function EditorContextMenu({
   const selectionTextRef = useRef("");
   const savedRangeRef = useRef<Range | null>(null);
   const selectionRectRef = useRef<{ top: number; left: number } | undefined>(undefined);
+
+  useEffect(() => ensureHighlightStyle(), []);
 
   const handleOpenChange = useCallback((open: boolean) => {
     if (open) {
