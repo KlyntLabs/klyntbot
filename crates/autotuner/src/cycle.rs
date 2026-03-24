@@ -248,6 +248,10 @@ pub fn affected_param_names(old: &TrialParams, new: &TrialParams) -> Vec<String>
     check_field!(relevance_weight_importance);
     check_field!(relevance_weight_frequency);
     check_field!(relevance_weight_temporal);
+    // Phase 3: Query rewriting
+    check_field!(rewrite_confidence_threshold);
+    check_field!(rewrite_max_signals);
+    check_field!(rewrite_min_enrichment_length);
     names
 }
 
