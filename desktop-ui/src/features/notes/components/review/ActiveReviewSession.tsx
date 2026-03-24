@@ -172,14 +172,14 @@ export function ActiveReviewSession({ layout: _layout, onClose }: ActiveReviewSe
       return (
         <div className="flex flex-col items-center justify-center gap-3 py-8">
           <BookOpen size={24} className="text-accent" />
-          <p className="text-[12px] text-foreground font-medium">No cards due for review</p>
-          <p className="text-[10px] text-dim">
+          <p className="text-xs text-foreground font-medium">No cards due for review</p>
+          <p className="text-2xs text-dim">
             {decks.length} {decks.length === 1 ? "deck" : "decks"} saved, all caught up!
           </p>
           <button
             type="button"
             onClick={onClose}
-            className="text-[10px] px-3 py-1 rounded-md bg-white/[0.06] text-muted-foreground hover:text-foreground"
+            className="text-2xs px-3 py-1 rounded-md bg-white/[0.06] text-muted-foreground hover:text-foreground"
           >
             Done
           </button>
@@ -198,7 +198,7 @@ export function ActiveReviewSession({ layout: _layout, onClose }: ActiveReviewSe
         </div>
 
         {error && (
-          <p className="text-[10px] text-red-400 bg-red-500/10 rounded-md px-2 py-1">{error}</p>
+          <p className="text-2xs text-red-400 bg-red-500/10 rounded-md px-2 py-1">{error}</p>
         )}
 
         <div className="space-y-1.5">
@@ -211,7 +211,7 @@ export function ActiveReviewSession({ layout: _layout, onClose }: ActiveReviewSe
             >
               <BookOpen size={12} className="text-muted-foreground shrink-0" />
               <span className="text-[11px] text-foreground truncate flex-1">{d.name}</span>
-              <span className="text-[10px] text-dim shrink-0">
+              <span className="text-2xs text-dim shrink-0">
                 {d.dueCount}/{d.cardCount} due
               </span>
             </button>
@@ -261,9 +261,7 @@ export function ActiveReviewSession({ layout: _layout, onClose }: ActiveReviewSe
       />
 
       {/* Error */}
-      {error && (
-        <p className="text-[10px] text-red-400 bg-red-500/10 rounded-md px-2 py-1">{error}</p>
-      )}
+      {error && <p className="text-2xs text-red-400 bg-red-500/10 rounded-md px-2 py-1">{error}</p>}
 
       {/* Card */}
       <ReviewCard

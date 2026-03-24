@@ -53,7 +53,7 @@ export function AtomCard({ atom, onAccept, onDismiss, onReviewDone }: AtomCardPr
           </span>
         )}
         {atom.sourceContext && (
-          <span className="text-[10px] text-muted truncate">{atom.sourceContext}</span>
+          <span className="text-2xs text-muted truncate">{atom.sourceContext}</span>
         )}
       </div>
 

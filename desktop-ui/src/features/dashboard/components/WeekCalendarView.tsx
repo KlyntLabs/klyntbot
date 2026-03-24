@@ -248,7 +248,7 @@ export function WeekCalendarView() {
                 )}
               >
                 <div>{DAY_LABELS[i]}</div>
-                <div className="text-[10px]">{new Date(`${day}T00:00:00`).getDate()}</div>
+                <div className="text-2xs">{new Date(`${day}T00:00:00`).getDate()}</div>
                 {activeSecs > 0 && (
                   <div className="text-[9px] text-muted-foreground/60 mt-0.5">
                     {formatHumanDuration(activeSecs)}

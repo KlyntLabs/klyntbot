@@ -65,7 +65,7 @@ export function ActivityTimeline() {
   if (grouped.size === 0) {
     return (
       <div className="glass-card rounded-xl p-5">
-        <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-3">
+        <p className="text-2xs text-muted-foreground uppercase tracking-wider mb-3">
           Recent Activity
         </p>
         <p className="text-[11px] text-muted-foreground">No recent activity</p>
@@ -75,26 +75,26 @@ export function ActivityTimeline() {
 
   return (
     <div className="glass-card rounded-xl p-5">
-      <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-4">
+      <p className="text-2xs text-muted-foreground uppercase tracking-wider mb-4">
         Recent Activity
       </p>
 
       <div className="flex flex-col gap-4">
         {Array.from(grouped.entries()).map(([group, groupItems]) => (
           <div key={group}>
-            <p className="text-[10px] text-muted-foreground font-medium mb-2">{group}</p>
+            <p className="text-2xs text-muted-foreground font-medium mb-2">{group}</p>
             <div className="flex flex-col gap-2">
               {groupItems.map((item) => (
                 <div key={item.id} className="flex items-start gap-3">
                   <div className="flex flex-col items-center mt-1.5">
                     <div
-                      className="w-2 h-2 rounded-full flex-shrink-0"
+                      className="size-2 rounded-full flex-shrink-0"
                       style={{ backgroundColor: DOT_COLORS[item.type] }}
                     />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs text-foreground truncate">{item.label}</p>
-                    <p className="text-[10px] text-muted-foreground">
+                    <p className="text-2xs text-muted-foreground">
                       {formatRelativeTime(item.timestamp)}
                     </p>
                   </div>

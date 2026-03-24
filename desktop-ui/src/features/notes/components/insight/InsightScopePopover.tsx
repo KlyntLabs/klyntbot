@@ -64,7 +64,7 @@ export function InsightScopePopover({ value, onChange }: Props) {
           <div className="flex flex-col gap-3">
             {/* Scope type */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+              <label className="text-2xs font-medium text-muted-foreground uppercase tracking-wider">
                 Scope
               </label>
               <div className="grid grid-cols-2 gap-1">
@@ -74,7 +74,7 @@ export function InsightScopePopover({ value, onChange }: Props) {
                     type="button"
                     onClick={() => onChange({ ...value, scopeType: st.id })}
                     className={cn(
-                      "px-2 py-1.5 rounded-md text-[10px] text-left transition-colors border",
+                      "px-2 py-1.5 rounded-md text-2xs text-left transition-colors border",
                       value.scopeType === st.id
                         ? "bg-accent text-foreground border-border"
                         : "bg-transparent text-muted-foreground hover:bg-accent/50 border-transparent",
@@ -91,10 +91,10 @@ export function InsightScopePopover({ value, onChange }: Props) {
             {value.scopeType === "semantic" && (
               <div className="flex flex-col gap-1">
                 <div className="flex items-center justify-between">
-                  <label className="text-[10px] font-medium text-muted-foreground">
+                  <label className="text-2xs font-medium text-muted-foreground">
                     Similarity Radius
                   </label>
-                  <span className="text-[10px] text-muted">{value.radius.toFixed(2)}</span>
+                  <span className="text-2xs text-muted">{value.radius.toFixed(2)}</span>
                 </div>
                 <input
                   type="range"
@@ -162,13 +162,13 @@ function Toggle({
       >
         <div
           className={cn(
-            "w-3 h-3 rounded-full bg-white transition-transform",
+            "size-3 rounded-full bg-white transition-transform",
             checked ? "translate-x-3" : "translate-x-0",
           )}
         />
       </div>
       <div className="flex flex-col">
-        <span className="text-[10px] font-medium text-foreground">{label}</span>
+        <span className="text-2xs font-medium text-foreground">{label}</span>
         <span className="text-[9px] text-muted">{description}</span>
       </div>
     </button>

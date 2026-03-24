@@ -47,18 +47,18 @@ export function PersonaCard({
       {/* Header */}
       <div className="flex items-center gap-2">
         <span
-          className={`w-7 h-7 rounded-full ${colors.bg} flex items-center justify-center text-sm shrink-0`}
+          className={`size-7 rounded-full ${colors.bg} flex items-center justify-center text-sm shrink-0`}
         >
           {icon}
         </span>
         <div className="min-w-0">
-          <div className="text-[12px] font-medium text-foreground truncate">{name}</div>
-          <div className="text-[10px] text-dim">{role}</div>
+          <div className="text-xs font-medium text-foreground truncate">{name}</div>
+          <div className="text-2xs text-dim">{role}</div>
         </div>
       </div>
 
       {/* Analysis content */}
-      <div className="text-[12px] text-muted-foreground leading-relaxed">
+      <div className="text-xs text-muted-foreground leading-relaxed">
         <MarkdownContent content={content} />
       </div>
 
@@ -68,7 +68,7 @@ export function PersonaCard({
           <button
             type="button"
             onClick={() => setShowChat((p) => !p)}
-            className="flex items-center gap-1 text-[10px] text-purple hover:text-purple/80 transition-colors"
+            className="flex items-center gap-1 text-2xs text-purple hover:text-purple/80 transition-colors"
           >
             <MessageCircle size={10} />
             {showChat ? "Hide chat" : "Ask this persona"}

@@ -66,7 +66,7 @@ function SortableTab({
       )}
       {tab.label}
       {tab.badge != null && (
-        <span className="glass-badge px-1.5 py-0.5 text-[10px] text-muted-foreground font-light">
+        <span className="glass-badge px-1.5 py-0.5 text-2xs text-muted-foreground font-light">
           {tab.badge}
         </span>
       )}

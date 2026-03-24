@@ -8,8 +8,8 @@ export function CollapsedInteraction({ content }: CollapsedInteractionProps) {
   return (
     <div className="flex justify-start">
       <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-accent border border-border">
-        <MessageSquareMore className="w-3.5 h-3.5 text-brand shrink-0" strokeWidth={1.5} />
-        <span className="text-[12px] font-light text-muted-foreground">{content}</span>
+        <MessageSquareMore className="size-3.5 text-brand shrink-0" strokeWidth={1.5} />
+        <span className="text-xs font-light text-muted-foreground">{content}</span>
       </div>
     </div>
   );

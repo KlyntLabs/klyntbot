@@ -64,8 +64,8 @@ export function ReviewCard({
         if (distractors.length === 0) {
           return (
             <div className="flex items-center gap-2 py-3 justify-center">
-              <span className="text-[10px] text-dim">Generating options...</span>
-              <span className="w-3 h-3 rounded-full border border-accent/40 border-t-accent animate-spin" />
+              <span className="text-2xs text-dim">Generating options...</span>
+              <span className="size-3 rounded-full border border-accent/40 border-t-accent animate-spin" />
             </div>
           );
         }
@@ -100,8 +100,8 @@ export function ReviewCard({
       {/* Grading spinner */}
       {cardPhase === "grading" && (
         <div className="flex items-center justify-center gap-2 py-3">
-          <span className="text-[10px] text-dim">Grading…</span>
-          <span className="w-3 h-3 rounded-full border border-accent/40 border-t-accent animate-spin" />
+          <span className="text-2xs text-dim">Grading…</span>
+          <span className="size-3 rounded-full border border-accent/40 border-t-accent animate-spin" />
         </div>
       )}
 

@@ -42,7 +42,7 @@ const NOTIFICATION_TARGET_OPTIONS = [
 const DEFAULT_TARGETS: string[] = ["os_native"];
 
 const INPUT_CLASS =
-  "w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim";
+  "w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim";
 
 // ── Component ────────────────────────────────────────────────────────
 
@@ -188,7 +188,7 @@ export function TasksSettings() {
 
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-[12px] text-muted-foreground">Focus reminders</span>
+                <span className="text-xs text-muted-foreground">Focus reminders</span>
                 <p className="text-[11px] text-dim">Remind you when a focused task is overdue</p>
               </div>
               <Toggle
@@ -199,7 +199,7 @@ export function TasksSettings() {
 
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-[12px] text-muted-foreground">Daily digest</span>
+                <span className="text-xs text-muted-foreground">Daily digest</span>
                 <p className="text-[11px] text-dim">
                   Receive a summary of upcoming tasks each morning
                 </p>
@@ -236,7 +236,7 @@ export function TasksSettings() {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-[12px] text-muted-foreground">Auto-enrich tasks</span>
+                <span className="text-xs text-muted-foreground">Auto-enrich tasks</span>
                 <p className="text-[11px] text-dim">
                   Automatically infer priority, project, and tags on creation
                 </p>
@@ -273,7 +273,7 @@ export function TasksSettings() {
 
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-[12px] text-muted-foreground">Use LLM for enrichment</span>
+                <span className="text-xs text-muted-foreground">Use LLM for enrichment</span>
                 <p className="text-[11px] text-dim">
                   Use an AI model instead of keyword matching (uses tokens)
                 </p>
@@ -295,7 +295,7 @@ export function TasksSettings() {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-[12px] text-muted-foreground">Semantic search</span>
+                <span className="text-xs text-muted-foreground">Semantic search</span>
                 <p className="text-[11px] text-dim">
                   Enable meaning-based search in addition to keyword matching
                 </p>
@@ -368,7 +368,7 @@ export function TasksSettings() {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-[12px] text-muted-foreground">Enable daily planning</span>
+                <span className="text-xs text-muted-foreground">Enable daily planning</span>
                 <p className="text-[11px] text-dim">
                   Automatically generate a daily plan each morning
                 </p>

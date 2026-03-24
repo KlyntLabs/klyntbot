@@ -11,16 +11,14 @@ export function CardFront({ card }: CardFrontProps) {
       {/* Header: deck name + card type badge */}
       <div className="flex items-center gap-2">
         <BookOpen size={11} className="text-muted-foreground shrink-0" />
-        <span className="text-[10px] text-dim truncate flex-1">{card.deck}</span>
+        <span className="text-2xs text-dim truncate flex-1">{card.deck}</span>
         <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-white/[0.06] text-muted-foreground capitalize shrink-0">
           {card.cardType}
         </span>
       </div>
 
       {/* Question */}
-      <p className="text-[12px] text-foreground whitespace-pre-wrap leading-relaxed">
-        {card.front}
-      </p>
+      <p className="text-xs text-foreground whitespace-pre-wrap leading-relaxed">{card.front}</p>
     </div>
   );
 }

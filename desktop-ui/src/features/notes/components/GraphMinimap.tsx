@@ -165,7 +165,7 @@ export function GraphMinimap({ noteId, notes, onSelectNote, onExpandGraph }: Gra
         <button
           type="button"
           onClick={() => setCollapsed(!collapsed)}
-          className="flex-1 flex items-center gap-1.5 px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
+          className="flex-1 flex items-center gap-1.5 px-3 py-2 text-2xs font-medium uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
         >
           {collapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
           <span>Local Graph</span>
@@ -173,7 +173,7 @@ export function GraphMinimap({ noteId, notes, onSelectNote, onExpandGraph }: Gra
         <button
           type="button"
           onClick={onExpandGraph}
-          className="text-[10px] text-dim hover:text-foreground px-2 py-1 transition-colors"
+          className="text-2xs text-dim hover:text-foreground px-2 py-1 transition-colors"
         >
           Expand
         </button>
@@ -182,7 +182,7 @@ export function GraphMinimap({ noteId, notes, onSelectNote, onExpandGraph }: Gra
       {!collapsed && (
         <div className="px-1 pb-2">
           {nodes.length === 0 ? (
-            <div className="text-[10px] text-dim px-2 py-3 text-center">No linked notes</div>
+            <div className="text-2xs text-dim px-2 py-3 text-center">No linked notes</div>
           ) : (
             <svg
               ref={svgRef}

@@ -22,7 +22,7 @@ export function SelfGradeInput({ card, onRate }: SelfGradeInputProps) {
       <button
         type="button"
         onClick={() => setRevealed(true)}
-        className="flex items-center justify-center gap-1 text-[10px] px-3 py-2 rounded-md bg-white/[0.06] text-muted-foreground hover:text-foreground hover:bg-white/[0.08] w-full"
+        className="flex items-center justify-center gap-1 text-2xs px-3 py-2 rounded-md bg-white/[0.06] text-muted-foreground hover:text-foreground hover:bg-white/[0.08] w-full"
       >
         <ChevronRight size={10} />
         Show Answer
@@ -44,7 +44,7 @@ export function SelfGradeInput({ card, onRate }: SelfGradeInputProps) {
             key={quality}
             type="button"
             onClick={() => onRate(quality)}
-            className="text-[10px] px-3 py-1.5 rounded-md bg-white/[0.04] text-muted-foreground hover:text-foreground hover:bg-white/[0.08]"
+            className="text-2xs px-3 py-1.5 rounded-md bg-white/[0.04] text-muted-foreground hover:text-foreground hover:bg-white/[0.08]"
           >
             {label}
           </button>

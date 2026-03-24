@@ -14,7 +14,7 @@ export function CoachingCard() {
       role="button"
       tabIndex={0}
     >
-      <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-3">Coaching</p>
+      <p className="text-2xs text-muted-foreground uppercase tracking-wider mb-3">Coaching</p>
 
       {nudge ? (
         <div className="flex flex-col gap-2">
@@ -26,9 +26,9 @@ export function CoachingCard() {
                 e.stopPropagation();
                 handleFeedback(nudge.id, "helpful");
               }}
-              className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-success transition-colors"
+              className="flex items-center gap-1 text-2xs text-muted-foreground hover:text-success transition-colors"
             >
-              <ThumbsUp className="w-3 h-3" />
+              <ThumbsUp className="size-3" />
               Helpful
             </button>
             <button
@@ -37,16 +37,16 @@ export function CoachingCard() {
                 e.stopPropagation();
                 handleFeedback(nudge.id, "dismissed");
               }}
-              className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-destructive transition-colors"
+              className="flex items-center gap-1 text-2xs text-muted-foreground hover:text-destructive transition-colors"
             >
-              <X className="w-3 h-3" />
+              <X className="size-3" />
               Dismiss
             </button>
           </div>
         </div>
       ) : (
         <div className="flex items-center gap-2">
-          <Brain className="w-4 h-4 text-muted-foreground/50" />
+          <Brain className="size-4 text-muted-foreground/50" />
           <p className="text-[11px] text-muted-foreground">
             No active coaching — Deep work mode detected
           </p>

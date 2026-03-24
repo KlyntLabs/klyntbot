@@ -18,19 +18,19 @@ export function ExperimentTimeline({ experiments, loading }: ExperimentTimelineP
   return (
     <div className="glass-card p-4 flex flex-col gap-3">
       <h2 className="text-[13px] font-medium text-muted-foreground flex items-center gap-2">
-        <FlaskConical className="w-3.5 h-3.5 text-muted-foreground" />
+        <FlaskConical className="size-3.5 text-muted-foreground" />
         Experiment History
         {experiments.length > 0 && (
-          <span className="text-[10px] text-dim font-light ml-auto">
+          <span className="text-2xs text-dim font-light ml-auto">
             {experiments.length} {experiments.length === 1 ? "experiment" : "experiments"}
           </span>
         )}
       </h2>
 
-      {loading && <p className="text-[12px] font-light text-dim">Loading&hellip;</p>}
+      {loading && <p className="text-xs font-light text-dim">Loading&hellip;</p>}
 
       {!loading && experiments.length === 0 && (
-        <p className="text-[12px] font-light text-dim">No experiments yet</p>
+        <p className="text-xs font-light text-dim">No experiments yet</p>
       )}
 
       {!loading && experiments.length > 0 && (
@@ -45,10 +45,10 @@ export function ExperimentTimeline({ experiments, loading }: ExperimentTimelineP
 
               {/* Content */}
               <div className="flex flex-col gap-0.5 pb-2 min-w-0">
-                <p className="text-[12px] font-light text-foreground leading-snug truncate">
+                <p className="text-xs font-light text-foreground leading-snug truncate">
                   {exp.hypothesis}
                 </p>
-                <p className="text-[10px] font-light text-dim tabular-nums">
+                <p className="text-2xs font-light text-dim tabular-nums">
                   {exp.variant_count}v &middot; {exp.messages_scored} scored &middot;{" "}
                   {formatDate(exp.started_at)}
                 </p>

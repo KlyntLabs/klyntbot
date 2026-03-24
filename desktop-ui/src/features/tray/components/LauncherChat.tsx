@@ -98,9 +98,9 @@ export function LauncherChat({ sessionKey, initialQuery, onBack, onExpand }: Lau
         <button
           type="button"
           onClick={onBack}
-          className="flex items-center gap-1.5 text-[12px] font-light text-muted-foreground hover:text-foreground transition-colors"
+          className="flex items-center gap-1.5 text-xs font-light text-muted-foreground hover:text-foreground transition-colors"
         >
-          <ArrowLeft className="w-3.5 h-3.5" strokeWidth={1.5} />
+          <ArrowLeft className="size-3.5" strokeWidth={1.5} />
           Back
         </button>
         <span className="text-[13px] font-light text-foreground">Klynt AI</span>
@@ -109,7 +109,7 @@ export function LauncherChat({ sessionKey, initialQuery, onBack, onExpand }: Lau
           onClick={onExpand}
           className="flex items-center gap-1.5 text-[11px] font-light text-muted-foreground hover:text-foreground transition-colors"
         >
-          <ArrowUpRight className="w-3.5 h-3.5" strokeWidth={1.5} />
+          <ArrowUpRight className="size-3.5" strokeWidth={1.5} />
           Expand
         </button>
       </div>
@@ -181,7 +181,7 @@ export function LauncherChat({ sessionKey, initialQuery, onBack, onExpand }: Lau
         {/* Error */}
         {chat.error && (
           <div className="rounded-xl px-4 py-3 bg-destructive/10 border border-destructive/20">
-            <p className="text-[12px] font-light text-destructive">{chat.error}</p>
+            <p className="text-xs font-light text-destructive">{chat.error}</p>
           </div>
         )}
 
@@ -222,7 +222,7 @@ export function LauncherChat({ sessionKey, initialQuery, onBack, onExpand }: Lau
             disabled={!chat.input.trim() || chat.isStreaming}
             className="text-brand hover:text-brand/80 disabled:text-muted-foreground transition-colors shrink-0"
           >
-            <Send className="w-4 h-4" strokeWidth={1.5} />
+            <Send className="size-4" strokeWidth={1.5} />
           </button>
         </div>
       </div>

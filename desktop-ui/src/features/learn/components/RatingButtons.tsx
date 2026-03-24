@@ -52,7 +52,7 @@ export function RatingButtons({ onRate }: RatingButtonsProps) {
           className={`glass-button px-4 py-2.5 flex flex-col items-center gap-0.5 min-w-[72px] transition-all duration-200 ${r.hoverBg}`}
         >
           <span className={`text-sm font-medium ${r.color}`}>{r.label}</span>
-          <span className="text-[10px] text-muted-foreground">{r.key}</span>
+          <span className="text-2xs text-muted-foreground">{r.key}</span>
         </button>
       ))}
     </div>

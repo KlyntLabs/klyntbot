@@ -31,7 +31,7 @@ function StepDots({
           <div
             key={i}
             className={`rounded-full transition-all duration-300 ${
-              isActive ? "w-6 h-2 bg-brand" : isDone ? "w-2 h-2 bg-brand/60" : "w-2 h-2 bg-muted"
+              isActive ? "w-6 h-2 bg-brand" : isDone ? "size-2 bg-brand/60" : "size-2 bg-muted"
             }`}
           />
         );
@@ -323,9 +323,9 @@ export function ConversationRunner() {
           {/* Complete state */}
           {isComplete && (
             <div className="text-center py-6" style={{ animation: "fade-in-up 0.4s ease-out" }}>
-              <div className="w-16 h-16 mx-auto mb-5 rounded-full bg-success/10 border border-success/20 flex items-center justify-center">
+              <div className="size-16 mx-auto mb-5 rounded-full bg-success/10 border border-success/20 flex items-center justify-center">
                 <svg
-                  className="w-8 h-8 text-success"
+                  className="size-8 text-success"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"

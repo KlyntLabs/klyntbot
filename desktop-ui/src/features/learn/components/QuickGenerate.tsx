@@ -31,7 +31,7 @@ export function QuickGenerate({
   if (mode === "note") {
     return (
       <div className="glass-card p-4">
-        <p className="text-[12px] text-muted-foreground mb-2">Select a note to generate from:</p>
+        <p className="text-xs text-muted-foreground mb-2">Select a note to generate from:</p>
         <NotePicker
           onSelect={(note) => {
             setMode(null);
@@ -46,7 +46,7 @@ export function QuickGenerate({
   if (mode === "clipboard") {
     return (
       <div className="glass-card p-4 space-y-2">
-        <p className="text-[12px] text-muted-foreground">Paste text to generate flashcards:</p>
+        <p className="text-xs text-muted-foreground">Paste text to generate flashcards:</p>
         <textarea
           value={clipboardText}
           onChange={(e) => setClipboardText(e.target.value)}
@@ -59,7 +59,7 @@ export function QuickGenerate({
           <button
             type="button"
             onClick={() => setMode(null)}
-            className="text-[12px] text-muted-foreground hover:text-foreground"
+            className="text-xs text-muted-foreground hover:text-foreground"
           >
             Cancel
           </button>
@@ -72,7 +72,7 @@ export function QuickGenerate({
               }
             }}
             disabled={!clipboardText.trim()}
-            className="glass-button px-3 py-1.5 text-[12px] text-foreground disabled:opacity-40"
+            className="glass-button px-3 py-1.5 text-xs text-foreground disabled:opacity-40"
           >
             Generate
           </button>
@@ -108,7 +108,7 @@ export function QuickGenerate({
         >
           <MessageSquare size={14} strokeWidth={1.5} />
           From last chat...
-          <span className="ml-auto text-[10px]">Soon</span>
+          <span className="ml-auto text-2xs">Soon</span>
         </button>
       </div>
     </div>

@@ -88,7 +88,7 @@ export function ActivityFeed() {
     return (
       <div className="glass-card p-4">
         <h2 className="text-[13px] font-medium text-muted-foreground mb-3">Activity</h2>
-        <p className="text-[12px] font-light text-dim">No recent activity</p>
+        <p className="text-xs font-light text-dim">No recent activity</p>
       </div>
     );
   }
@@ -99,7 +99,7 @@ export function ActivityFeed() {
         <h2 className="text-[13px] font-medium text-muted-foreground">Activity</h2>
         <div className="flex items-center gap-1.5">
           <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
-          <span className="text-[10px] font-light text-dim">Live</span>
+          <span className="text-2xs font-light text-dim">Live</span>
         </div>
       </div>
       <div ref={scrollRef} className="flex flex-col gap-0 max-h-64 overflow-y-auto">
@@ -122,14 +122,14 @@ export function ActivityFeed() {
               {/* App icon */}
               <div className="flex-shrink-0">
                 {e.isIdle ? (
-                  <span className="w-3.5 h-3.5 rounded-full bg-muted block" />
+                  <span className="size-3.5 rounded-full bg-muted block" />
                 ) : (
                   <AppIcon appName={name} color={color} />
                 )}
               </div>
 
               {/* Time */}
-              <span className="text-[10px] tabular-nums w-10 flex-shrink-0 font-light text-dim">
+              <span className="text-2xs tabular-nums w-10 flex-shrink-0 font-light text-dim">
                 {formatTime(e.startedAt)}
               </span>
               {tag && (

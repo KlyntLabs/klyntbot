@@ -19,7 +19,7 @@ export function DeckList({ decks, onReviewDeck }: DeckListProps) {
 
   return (
     <div className="space-y-1">
-      <h3 className="text-[12px] font-medium text-muted-foreground uppercase tracking-wider px-1 mb-2">
+      <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-1 mb-2">
         Decks
       </h3>
       {decks.map((deck) => (
@@ -43,7 +43,7 @@ export function DeckList({ decks, onReviewDeck }: DeckListProps) {
             <button
               type="button"
               onClick={() => onReviewDeck(deck.name)}
-              className="glass-button px-2.5 py-1 text-[12px] text-foreground flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+              className="glass-button px-2.5 py-1 text-xs text-foreground flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
             >
               <Play size={12} strokeWidth={1.5} />
               Review

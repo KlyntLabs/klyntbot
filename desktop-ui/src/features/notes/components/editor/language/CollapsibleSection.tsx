@@ -23,13 +23,13 @@ export function CollapsibleSection({
         type="button"
         onClick={toggle}
         aria-expanded={expanded}
-        className="flex w-full items-center justify-between px-3 py-2 text-[10px] text-muted-foreground uppercase tracking-wider hover:bg-surface-hover transition-colors"
+        className="flex w-full items-center justify-between px-3 py-2 text-2xs text-muted-foreground uppercase tracking-wider hover:bg-surface-hover transition-colors"
       >
         <span className="flex items-center gap-2">
           {title}
           {badge}
         </span>
-        <span className="text-[10px]">{expanded ? "▾" : "▸"}</span>
+        <span className="text-2xs">{expanded ? "▾" : "▸"}</span>
       </button>
       {expanded && <div className="px-3 pb-3">{children}</div>}
     </div>

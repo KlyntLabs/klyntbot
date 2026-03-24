@@ -45,8 +45,8 @@ export function AutoFocusToast() {
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <span className="text-[12px] font-medium text-foreground">Focus session detected</span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-success/15 text-success font-medium">
+            <span className="text-xs font-medium text-foreground">Focus session detected</span>
+            <span className="text-2xs px-1.5 py-0.5 rounded-full bg-success/15 text-success font-medium">
               {ratio}% productive
             </span>
           </div>

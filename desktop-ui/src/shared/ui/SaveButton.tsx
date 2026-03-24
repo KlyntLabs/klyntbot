@@ -8,7 +8,7 @@ export interface SaveButtonProps extends Omit<ButtonProps, "children"> {
 export function SaveButton({ saving, disabled, ...props }: SaveButtonProps) {
   return (
     <Button variant="primary" size="sm" disabled={saving || disabled} {...props}>
-      <Save className="w-3 h-3" />
+      <Save className="size-3" />
       {saving ? "Saving..." : "Save"}
     </Button>
   );

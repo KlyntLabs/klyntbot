@@ -32,9 +32,9 @@ export function PatternCard({
               style={{ width: `${pct}%` }}
             />
           </div>
-          <span className="text-[10px] tabular-nums text-dim">{pct}%</span>
+          <span className="text-2xs tabular-nums text-dim">{pct}%</span>
         </div>
-        <span className="text-[10px] text-dim tabular-nums">{signalCount} signals</span>
+        <span className="text-2xs text-dim tabular-nums">{signalCount} signals</span>
       </div>
     </div>
   );

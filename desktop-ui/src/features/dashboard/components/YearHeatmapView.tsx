@@ -138,13 +138,13 @@ export function YearHeatmapView() {
 
         {/* Legend */}
         <div className="flex items-center gap-2 mt-4 justify-center">
-          <span className="text-[10px] text-muted-foreground">Less focus</span>
-          <div className="w-3 h-3 rounded-[2px] bg-card" />
-          <div className="w-3 h-3 rounded-[2px] bg-timeline-focus/10" />
-          <div className="w-3 h-3 rounded-[2px] bg-timeline-focus/25" />
-          <div className="w-3 h-3 rounded-[2px] bg-timeline-focus/40" />
-          <div className="w-3 h-3 rounded-[2px] bg-timeline-focus/60" />
-          <span className="text-[10px] text-muted-foreground">More focus</span>
+          <span className="text-2xs text-muted-foreground">Less focus</span>
+          <div className="size-3 rounded-[2px] bg-card" />
+          <div className="size-3 rounded-[2px] bg-timeline-focus/10" />
+          <div className="size-3 rounded-[2px] bg-timeline-focus/25" />
+          <div className="size-3 rounded-[2px] bg-timeline-focus/40" />
+          <div className="size-3 rounded-[2px] bg-timeline-focus/60" />
+          <span className="text-2xs text-muted-foreground">More focus</span>
         </div>
       </div>
 

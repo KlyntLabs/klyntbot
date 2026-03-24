@@ -20,7 +20,7 @@ export function AutoTunerPanel() {
   if (!status) {
     return (
       <div className="glass-card p-4">
-        <p className="text-[12px] font-light text-dim">AutoTuner unavailable</p>
+        <p className="text-xs font-light text-dim">AutoTuner unavailable</p>
       </div>
     );
   }
@@ -28,7 +28,7 @@ export function AutoTunerPanel() {
   if (!status.enabled) {
     return (
       <div className="glass-card p-4">
-        <p className="text-[12px] font-light text-dim">
+        <p className="text-xs font-light text-dim">
           AutoTuner is disabled. Enable it in settings to let Klyntbot learn your preferences.
         </p>
       </div>

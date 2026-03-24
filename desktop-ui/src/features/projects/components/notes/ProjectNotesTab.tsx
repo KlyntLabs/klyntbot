@@ -57,7 +57,7 @@ export function ProjectNotesTab() {
               <h2 className="text-sm font-semibold text-foreground truncate">
                 {selectedNote.title || "Untitled"}
               </h2>
-              <span className="text-[10px] text-muted-foreground">
+              <span className="text-2xs text-muted-foreground">
                 Updated {new Date(selectedNote.updatedAt).toLocaleDateString()}
               </span>
               {selectedNote.tags.length > 0 && (
@@ -65,7 +65,7 @@ export function ProjectNotesTab() {
                   {selectedNote.tags.slice(0, 3).map((tag) => (
                     <span
                       key={tag}
-                      className="text-[10px] px-1.5 py-0.5 rounded bg-accent text-muted-foreground"
+                      className="text-2xs px-1.5 py-0.5 rounded bg-accent text-muted-foreground"
                     >
                       {tag}
                     </span>
@@ -77,7 +77,7 @@ export function ProjectNotesTab() {
                 onClick={handleOpenInNotes}
                 className="ml-auto flex items-center gap-1 text-xs text-brand hover:text-brand/80 transition-colors"
               >
-                <ExternalLink className="w-3.5 h-3.5" />
+                <ExternalLink className="size-3.5" />
                 Open in Notes
               </button>
             </div>

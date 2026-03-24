@@ -56,7 +56,7 @@ export function MultipleChoiceInput({
           >
             <span
               className={[
-                "shrink-0 w-4 h-4 rounded text-[9px] font-semibold flex items-center justify-center",
+                "shrink-0 size-4 rounded text-[9px] font-semibold flex items-center justify-center",
                 isSelected ? "bg-accent text-white" : "bg-white/[0.08] text-dim",
               ].join(" ")}
             >

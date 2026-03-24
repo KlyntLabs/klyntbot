@@ -96,7 +96,7 @@ function CalendarWidget({ events }: { events: DashboardData["calendar"] }) {
     <div className="rounded-lg border border-border-subtle bg-card/50 p-3">
       <div className="flex items-center gap-1.5 mb-2">
         <svg
-          className="w-3.5 h-3.5 text-info/70"
+          className="size-3.5 text-info/70"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -163,7 +163,7 @@ function TasksWidget({
     <div className="rounded-lg border border-border-subtle bg-card/50 p-3">
       <div className="flex items-center gap-1.5 mb-2">
         <svg
-          className="w-3.5 h-3.5 text-success/70"
+          className="size-3.5 text-success/70"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -198,12 +198,12 @@ function TasksWidget({
               {task.title}
             </span>
             {task.status === "doing" && (
-              <span className="text-[10px] text-brand/70 font-medium uppercase tracking-wide shrink-0">
+              <span className="text-2xs text-brand/70 font-medium uppercase tracking-wide shrink-0">
                 Active
               </span>
             )}
             <svg
-              className="w-3.5 h-3.5 text-muted-foreground/0 group-hover:text-muted-foreground/60 transition-colors shrink-0"
+              className="size-3.5 text-muted-foreground/0 group-hover:text-muted-foreground/60 transition-colors shrink-0"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"

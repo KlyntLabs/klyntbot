@@ -540,15 +540,15 @@ export default function KnowledgeBasePage() {
               <ViewModeToggle viewMode={viewMode} onChange={setViewMode} />
             </div>
             <div className="flex-1 flex flex-col items-center justify-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-card flex items-center justify-center">
-                <FileText className="w-6 h-6 text-dim" strokeWidth={1.5} />
+              <div className="size-12 rounded-2xl bg-card flex items-center justify-center">
+                <FileText className="size-6 text-dim" strokeWidth={1.5} />
               </div>
               <div className="text-center">
                 <div className="text-muted-foreground text-sm">Select a note to view</div>
                 <div className="text-dim text-xs mt-1">
                   or press{" "}
-                  <kbd className="px-1.5 py-0.5 rounded bg-accent text-[10px] font-mono">Cmd+N</kbd>{" "}
-                  to create one
+                  <kbd className="px-1.5 py-0.5 rounded bg-accent text-2xs font-mono">Cmd+N</kbd> to
+                  create one
                 </div>
               </div>
             </div>

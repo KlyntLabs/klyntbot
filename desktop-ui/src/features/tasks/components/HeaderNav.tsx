@@ -1,9 +1,9 @@
+import { Button } from "@shared/ui/Button";
 import { Search, X } from "lucide-react";
 import { useCallback } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useSearchStore } from "../store/search-store";
 import { useTabStore } from "../store/tab-store";
-import { Button } from "./ui/button";
 
 export default function HeaderNav() {
   const { isSearchOpen, searchQuery, toggleSearch, closeSearch, setSearchQuery } = useSearchStore();

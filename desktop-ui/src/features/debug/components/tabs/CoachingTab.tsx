@@ -60,8 +60,8 @@ function Gauge({
   const pct = Math.round(value * 100);
   return (
     <div className="flex flex-col items-center gap-1">
-      <div className="relative w-16 h-16">
-        <svg className="w-16 h-16 -rotate-90" viewBox="0 0 36 36" aria-hidden="true">
+      <div className="relative size-16">
+        <svg className="size-16 -rotate-90" viewBox="0 0 36 36" aria-hidden="true">
           <circle
             className="text-white/[0.08]"
             strokeWidth="3"
@@ -87,7 +87,7 @@ function Gauge({
           {pct}%
         </span>
       </div>
-      <span className="text-[10px] text-muted-foreground text-center leading-tight">{label}</span>
+      <span className="text-2xs text-muted-foreground text-center leading-tight">{label}</span>
     </div>
   );
 }
@@ -229,14 +229,12 @@ export function CoachingTab() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-[10px] px-1.5 py-0.5 bg-brand/20 text-brand rounded font-medium">
+                      <span className="text-2xs px-1.5 py-0.5 bg-brand/20 text-brand rounded font-medium">
                         {iv.interventionType}
                       </span>
-                      <span className="text-[10px] text-muted-foreground">{iv.triggerName}</span>
+                      <span className="text-2xs text-muted-foreground">{iv.triggerName}</span>
                     </div>
-                    <p className="text-[12px] text-muted-foreground leading-relaxed">
-                      {iv.message}
-                    </p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">{iv.message}</p>
                   </div>
                   <div className="flex gap-1 shrink-0">
                     <button
@@ -245,7 +243,7 @@ export function CoachingTab() {
                       className="p-1.5 rounded hover:bg-success/20 text-muted-foreground hover:text-success transition-colors"
                       title="Helpful"
                     >
-                      <Check className="w-3.5 h-3.5" />
+                      <Check className="size-3.5" />
                     </button>
                     <button
                       type="button"
@@ -253,7 +251,7 @@ export function CoachingTab() {
                       className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                       title="Dismiss"
                     >
-                      <X className="w-3.5 h-3.5" />
+                      <X className="size-3.5" />
                     </button>
                     <button
                       type="button"
@@ -261,7 +259,7 @@ export function CoachingTab() {
                       className="p-1.5 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
                       title="Stop suggesting"
                     >
-                      <XCircle className="w-3.5 h-3.5" />
+                      <XCircle className="size-3.5" />
                     </button>
                   </div>
                 </div>
@@ -280,13 +278,13 @@ export function CoachingTab() {
               <button
                 type="button"
                 onClick={handleClearSignals}
-                className="text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-1"
+                className="text-2xs text-muted-foreground hover:text-foreground flex items-center gap-1"
               >
-                <Trash2 className="w-3 h-3" /> Clear
+                <Trash2 className="size-3" /> Clear
               </button>
             </div>
             <div className="p-3 bg-card rounded-lg border border-border">
-              <p className="text-[12px] text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 {signals.windowSize} signals in 30min window
               </p>
               {signals.triggers.length > 0 && (
@@ -314,10 +312,8 @@ export function CoachingTab() {
               {patterns.map((p) => (
                 <div key={p.name} className="p-3 bg-card rounded-lg border border-border">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-[12px] text-muted-foreground font-medium">{p.name}</span>
-                    <span className="text-[10px] text-muted-foreground">
-                      {p.signalCount} signals
-                    </span>
+                    <span className="text-xs text-muted-foreground font-medium">{p.name}</span>
+                    <span className="text-2xs text-muted-foreground">{p.signalCount} signals</span>
                   </div>
                   <div className="w-full bg-muted rounded-full h-1 mb-1">
                     <div
@@ -329,7 +325,7 @@ export function CoachingTab() {
                 </div>
               ))}
               {patterns.length === 0 && (
-                <p className="text-[12px] text-muted-foreground">No patterns detected</p>
+                <p className="text-xs text-muted-foreground">No patterns detected</p>
               )}
             </div>
           </div>
@@ -342,7 +338,7 @@ export function CoachingTab() {
               Intervention Router
             </h3>
             <div className="p-3 bg-card rounded-lg border border-border">
-              <div className="flex gap-4 text-[12px]">
+              <div className="flex gap-4 text-xs">
                 <span className="text-muted-foreground">
                   Hourly:{" "}
                   <span className="text-muted-foreground">
@@ -365,13 +361,13 @@ export function CoachingTab() {
               <button
                 type="button"
                 onClick={handleResetDismissals}
-                className="text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-1"
+                className="text-2xs text-muted-foreground hover:text-foreground flex items-center gap-1"
               >
-                <RefreshCw className="w-3 h-3" /> Reset All
+                <RefreshCw className="size-3" /> Reset All
               </button>
             </div>
             <div className="bg-card rounded-lg border border-border overflow-hidden">
-              <table className="w-full text-[12px]">
+              <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b border-border-subtle">
                     <th className="text-left p-2 text-muted-foreground font-normal">Trigger</th>

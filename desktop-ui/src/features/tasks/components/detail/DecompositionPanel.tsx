@@ -122,7 +122,7 @@ export function DecompositionPanel({
           <span className="text-sm font-medium text-[hsl(var(--foreground))]">Task Breakdown</span>
           {result && (
             <span
-              className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${confidenceBadgeClass(result.confidence)}`}
+              className={`text-2xs font-medium px-1.5 py-0.5 rounded-full ${confidenceBadgeClass(result.confidence)}`}
             >
               {Math.round(result.confidence)}%
             </span>
@@ -224,7 +224,7 @@ function ResultView({
 
         {/* Subtask tree */}
         <div>
-          <div className="text-[10px] font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wider mb-2">
+          <div className="text-2xs font-medium text-[hsl(var(--muted-foreground))] uppercase tracking-wider mb-2">
             Proposed Subtasks
           </div>
           <div className="border border-[hsl(var(--border))] rounded-md px-3 py-1">

@@ -44,13 +44,9 @@ export function CalendarSync() {
             : "Sync calendar events"
       }
     >
-      {loading ? (
-        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-      ) : (
-        <Calendar className="w-3.5 h-3.5" />
-      )}
+      {loading ? <Loader2 className="size-3.5 animate-spin" /> : <Calendar className="size-3.5" />}
       <span className="hidden sm:inline">Sync</span>
-      {lastSynced && !loading && <RefreshCw className="w-3 h-3 text-success" />}
+      {lastSynced && !loading && <RefreshCw className="size-3 text-success" />}
     </button>
   );
 }

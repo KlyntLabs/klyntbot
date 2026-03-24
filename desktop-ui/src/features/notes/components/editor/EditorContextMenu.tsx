@@ -135,7 +135,7 @@ function MenuItem({
       className="flex items-center justify-between rounded-md px-2 py-1.5 text-xs text-primary outline-none select-none data-[highlighted]:bg-surface-hover"
     >
       <span>{children}</span>
-      {shortcut && <span className="ml-4 text-muted text-[10px]">{shortcut}</span>}
+      {shortcut && <span className="ml-4 text-muted text-2xs">{shortcut}</span>}
     </ContextMenu.Item>
   );
 }

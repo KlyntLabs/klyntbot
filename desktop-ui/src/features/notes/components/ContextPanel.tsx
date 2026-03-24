@@ -62,7 +62,7 @@ function scrollToHeading(text: string, index: number) {
 const TOC_STYLES: Record<number, { size: string; weight: string; opacity: string }> = {
   1: { size: "text-[11px]", weight: "font-medium", opacity: "opacity-90" },
   2: { size: "text-[10.5px]", weight: "font-normal", opacity: "opacity-70" },
-  3: { size: "text-[10px]", weight: "font-normal", opacity: "opacity-55" },
+  3: { size: "text-2xs", weight: "font-normal", opacity: "opacity-55" },
 };
 
 function TableOfContents({ bodyHtml }: { bodyHtml?: string | null }) {
@@ -76,7 +76,7 @@ function TableOfContents({ bodyHtml }: { bodyHtml?: string | null }) {
 
   return (
     <div>
-      <div className="text-[10px] font-medium text-dim uppercase tracking-wider mb-2">
+      <div className="text-2xs font-medium text-dim uppercase tracking-wider mb-2">
         Table of Contents
       </div>
       <nav className="relative border-l border-border-subtle ml-1">
@@ -123,7 +123,7 @@ function MoreSection({ note }: { note: Note }) {
       <button
         type="button"
         onClick={() => setCollapsed(!collapsed)}
-        className="w-full flex items-center gap-1.5 px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
+        className="w-full flex items-center gap-1.5 px-3 py-2 text-2xs font-medium uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
       >
         {collapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
         <span>More</span>
@@ -136,19 +136,19 @@ function MoreSection({ note }: { note: Note }) {
 
           {/* Note Metadata */}
           <div className="border-t border-border-subtle pt-2">
-            <div className="text-[10px] font-medium text-dim uppercase tracking-wider mb-1.5">
+            <div className="text-2xs font-medium text-dim uppercase tracking-wider mb-1.5">
               Metadata
             </div>
             <div className="space-y-1">
-              <div className="flex justify-between text-[10px]">
+              <div className="flex justify-between text-2xs">
                 <span className="text-dim">Created</span>
                 <span className="text-muted-foreground">{formatRelativeTime(note.createdAt)}</span>
               </div>
-              <div className="flex justify-between text-[10px]">
+              <div className="flex justify-between text-2xs">
                 <span className="text-dim">Updated</span>
                 <span className="text-muted-foreground">{formatRelativeTime(note.updatedAt)}</span>
               </div>
-              <div className="flex justify-between text-[10px]">
+              <div className="flex justify-between text-2xs">
                 <span className="text-dim">Words</span>
                 <span className="text-muted-foreground">{wordCount.toLocaleString()}</span>
               </div>
@@ -181,7 +181,7 @@ function NotePreview({ note, onSelectNote }: { note: Note; onSelectNote: (id: st
           {note.tags.map((tag) => (
             <span
               key={tag}
-              className="text-[10px] px-1.5 py-0.5 rounded"
+              className="text-2xs px-1.5 py-0.5 rounded"
               style={{
                 color: tagColor(tag),
                 backgroundColor: tagBgColor(tag),
@@ -194,7 +194,7 @@ function NotePreview({ note, onSelectNote }: { note: Note; onSelectNote: (id: st
       )}
 
       {note.body && (
-        <div className="text-[12px] text-muted-foreground leading-relaxed whitespace-pre-wrap line-clamp-[20]">
+        <div className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap line-clamp-[20]">
           {note.body}
         </div>
       )}

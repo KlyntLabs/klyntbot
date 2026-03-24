@@ -258,7 +258,7 @@ export function EditorToolbar({
               : "text-dim hover:text-muted-foreground hover:bg-card"
           }`}
         >
-          <Languages className="w-3.5 h-3.5" strokeWidth={1.5} />
+          <Languages className="size-3.5" strokeWidth={1.5} />
         </button>
       )}
       {onToggleAnnotationPane && (
@@ -272,7 +272,7 @@ export function EditorToolbar({
               : "text-dim hover:text-muted-foreground hover:bg-card"
           }`}
         >
-          <StickyNote className="w-3.5 h-3.5" strokeWidth={1.5} />
+          <StickyNote className="size-3.5" strokeWidth={1.5} />
         </button>
       )}
       {onGenerateCards && (
@@ -287,7 +287,7 @@ export function EditorToolbar({
           title="Generate flashcards from note (or selection)"
           className="p-1.5 rounded-lg transition-all text-dim hover:text-muted-foreground hover:bg-card"
         >
-          <Sparkles className="w-3.5 h-3.5" strokeWidth={1.5} />
+          <Sparkles className="size-3.5" strokeWidth={1.5} />
         </button>
       )}
       {onToggleFocusMode && (
@@ -301,7 +301,7 @@ export function EditorToolbar({
               : "text-dim hover:text-muted-foreground hover:bg-card"
           }`}
         >
-          <Expand className="w-3.5 h-3.5" strokeWidth={1.5} />
+          <Expand className="size-3.5" strokeWidth={1.5} />
         </button>
       )}
       {onToggleGraphMode && (
@@ -315,7 +315,7 @@ export function EditorToolbar({
               : "text-dim hover:text-muted-foreground hover:bg-card"
           }`}
         >
-          <GitGraph className="w-3.5 h-3.5" strokeWidth={1.5} />
+          <GitGraph className="size-3.5" strokeWidth={1.5} />
         </button>
       )}
       {onToggleVersionHistory && (
@@ -329,7 +329,7 @@ export function EditorToolbar({
               : "text-dim hover:text-muted-foreground hover:bg-card"
           }`}
         >
-          <History className="w-3.5 h-3.5" strokeWidth={1.5} />
+          <History className="size-3.5" strokeWidth={1.5} />
         </button>
       )}
     </div>
@@ -363,13 +363,13 @@ export function EditorToolbar({
                 type="button"
                 onClick={() => btn.action(editor)}
                 title={btn.label}
-                className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
+                className={`size-7 rounded-lg flex items-center justify-center transition-all ${
                   active
                     ? "bg-brand/15 text-brand shadow-[0_0_8px_rgba(249,115,22,0.12)]"
                     : "text-muted-foreground hover:text-foreground hover:bg-muted"
                 }`}
               >
-                <Icon className="w-3.5 h-3.5" strokeWidth={1.5} />
+                <Icon className="size-3.5" strokeWidth={1.5} />
               </button>
             );
           })}

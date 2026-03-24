@@ -15,7 +15,7 @@ export function PromotionToast({ impact, onDismiss }: PromotionToastProps) {
         style={{ borderLeftColor: "var(--success)" }}
       >
         <div className="flex-1 min-w-0">
-          <span className="text-[12px] font-medium text-foreground">
+          <span className="text-xs font-medium text-foreground">
             I just improved how I understand you
           </span>
           <p className="text-[11px] font-light text-muted-foreground mt-0.5">{impact}</p>

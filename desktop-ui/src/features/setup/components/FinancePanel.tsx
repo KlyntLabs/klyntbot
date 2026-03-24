@@ -78,7 +78,7 @@ export function FinancePanel({ onComplete }: FinancePanelProps) {
             key={step}
             type="button"
             onClick={() => setSubStep(i)}
-            className={`text-[10px] px-2 py-0.5 rounded-full transition-colors ${
+            className={`text-2xs px-2 py-0.5 rounded-full transition-colors ${
               i === subStep
                 ? "bg-brand text-white"
                 : i < subStep
@@ -121,7 +121,7 @@ export function FinancePanel({ onComplete }: FinancePanelProps) {
             <button
               type="button"
               onClick={handleBack}
-              className="px-3 py-1.5 text-[12px] text-muted-foreground hover:text-foreground transition-colors"
+              className="px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
               Back
             </button>
@@ -129,7 +129,7 @@ export function FinancePanel({ onComplete }: FinancePanelProps) {
           <button
             type="button"
             onClick={onComplete}
-            className="px-3 py-1.5 text-[12px] text-muted-foreground hover:text-foreground transition-colors"
+            className="px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
             Skip
           </button>
@@ -138,7 +138,7 @@ export function FinancePanel({ onComplete }: FinancePanelProps) {
           type="button"
           onClick={handleNext}
           disabled={saving}
-          className="px-4 py-1.5 text-[12px] font-medium text-white bg-brand hover:bg-brand-hover rounded-lg transition-colors disabled:opacity-50"
+          className="px-4 py-1.5 text-xs font-medium text-white bg-brand hover:bg-brand-hover rounded-lg transition-colors disabled:opacity-50"
         >
           {saving ? "Saving..." : subStep === SUB_STEPS.length - 1 ? "Done" : "Next"}
         </button>

@@ -64,11 +64,11 @@ export function GradeDisplay({ result, propagationCount = 0 }: GradeDisplayProps
       </div>
 
       {/* Explanation */}
-      {explanation && <p className="text-[10px] text-muted-foreground">{explanation}</p>}
+      {explanation && <p className="text-2xs text-muted-foreground">{explanation}</p>}
 
       {/* Socratic suggestion (collapsible) */}
       {socraticSuggestion && (
-        <details className="text-[10px]">
+        <details className="text-2xs">
           <summary className="cursor-pointer text-accent hover:text-accent/80 select-none">
             Explore deeper…
           </summary>

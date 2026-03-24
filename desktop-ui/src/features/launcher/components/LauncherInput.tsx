@@ -35,12 +35,12 @@ export function LauncherInput() {
   return (
     <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
       {isSearching ? (
-        <div className="w-5 h-5 shrink-0 flex items-center justify-center">
+        <div className="size-5 shrink-0 flex items-center justify-center">
           <ThinkingDots size="sm" />
         </div>
       ) : (
         <svg
-          className="w-5 h-5 text-muted-foreground shrink-0"
+          className="size-5 text-muted-foreground shrink-0"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"

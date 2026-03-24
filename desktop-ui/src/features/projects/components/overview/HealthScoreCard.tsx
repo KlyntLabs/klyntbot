@@ -22,9 +22,7 @@ export function HealthScoreCard() {
       onClick={() => navigate(`/project/${project?.id ?? ""}/okr`)}
       className="glass-card rounded-xl p-5 text-left transition-colors hover:border-brand/30"
     >
-      <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-3">
-        Health Score
-      </p>
+      <p className="text-2xs text-muted-foreground uppercase tracking-wider mb-3">Health Score</p>
       <div className="flex items-center gap-4">
         <ProgressRing progress={health.score} size="lg" gradient />
         <div className="flex flex-col gap-1">

@@ -49,14 +49,14 @@ export function KnowledgeAtomsPanel({ noteId, variant = "inline" }: KnowledgeAto
     <div className={wrapperClass}>
       {/* Header */}
       <div className="flex items-center justify-between mb-1">
-        <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+        <span className="text-2xs text-muted-foreground uppercase tracking-wider">
           Knowledge Atoms ({totalCount})
         </span>
         {suggestedAtoms.length > 0 && (
           <button
             type="button"
             onClick={() => setBulkModalOpen(true)}
-            className="text-[10px] text-brand hover:text-brand/80 transition-colors"
+            className="text-2xs text-brand hover:text-brand/80 transition-colors"
           >
             Accept all ({suggestedAtoms.length})
           </button>

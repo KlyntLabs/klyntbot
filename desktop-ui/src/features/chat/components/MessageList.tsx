@@ -138,7 +138,7 @@ export function MessageList({
                   className="flex justify-start gap-2.5"
                   style={{ animation: "fade-in 0.3s ease-out" }}
                 >
-                  <div className="shrink-0 w-7 h-7 rounded-full bg-purple-500/15 flex items-center justify-center text-sm mt-1">
+                  <div className="shrink-0 size-7 rounded-full bg-purple-500/15 flex items-center justify-center text-sm mt-1">
                     {pm.personaIcon || "🤖"}
                   </div>
                   <div className="max-w-[80%]">
@@ -200,7 +200,7 @@ export function MessageList({
               border: "1px solid rgba(244, 63, 94, 0.15)",
             }}
           >
-            <p className="text-[12px] font-light text-destructive">{error}</p>
+            <p className="text-xs font-light text-destructive">{error}</p>
           </div>
         </div>
       )}

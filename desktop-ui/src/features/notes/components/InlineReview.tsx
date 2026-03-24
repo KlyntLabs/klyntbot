@@ -51,7 +51,7 @@ export function InlineReview({ atomId, onDone }: InlineReviewProps) {
   if (loading) {
     return (
       <div className="rounded-lg border border-border px-3 py-4 text-center">
-        <span className="text-[10px] text-muted animate-pulse">Loading card...</span>
+        <span className="text-2xs text-muted animate-pulse">Loading card...</span>
       </div>
     );
   }
@@ -59,11 +59,11 @@ export function InlineReview({ atomId, onDone }: InlineReviewProps) {
   if (!card) {
     return (
       <div className="rounded-lg border border-border px-3 py-3">
-        <p className="text-[10px] text-muted text-center">No cards available</p>
+        <p className="text-2xs text-muted text-center">No cards available</p>
         <button
           type="button"
           onClick={onDone}
-          className="mt-1 text-[10px] text-brand hover:text-brand/80 block mx-auto"
+          className="mt-1 text-2xs text-brand hover:text-brand/80 block mx-auto"
         >
           Close
         </button>
@@ -101,7 +101,7 @@ export function InlineReview({ atomId, onDone }: InlineReviewProps) {
                 type="button"
                 onClick={() => handleRate(q)}
                 disabled={isSubmitting}
-                className={`rounded-md px-2 py-1 text-[10px] font-medium transition-colors disabled:opacity-50 ${isSubmittingStyle(q)}`}
+                className={`rounded-md px-2 py-1 text-2xs font-medium transition-colors disabled:opacity-50 ${isSubmittingStyle(q)}`}
               >
                 {q.charAt(0).toUpperCase() + q.slice(1)}
               </button>

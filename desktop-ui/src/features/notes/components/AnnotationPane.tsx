@@ -126,7 +126,7 @@ export function AnnotationPane({
         <button
           type="button"
           onClick={() => setAnnotationsExpanded((prev) => !prev)}
-          className="w-full flex items-center gap-1.5 px-3 py-1.5 text-[10px] text-muted-foreground uppercase tracking-wider hover:bg-surface-hover transition-colors shrink-0"
+          className="w-full flex items-center gap-1.5 px-3 py-1.5 text-2xs text-muted-foreground uppercase tracking-wider hover:bg-surface-hover transition-colors shrink-0"
         >
           {annotationsExpanded ? (
             <ChevronDown size={10} strokeWidth={1.5} />

@@ -84,7 +84,7 @@ export function NoteActionBar({ noteId, noteTitle, onInsightGenerated }: NoteAct
         disabled={generatingInsight}
         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand text-white text-xs font-medium hover:bg-brand/90 transition-colors disabled:opacity-50"
       >
-        <Sparkles className="w-3.5 h-3.5" />
+        <Sparkles className="size-3.5" />
         {generatingInsight ? "Generating..." : "Generate Insight"}
       </button>
 
@@ -94,7 +94,7 @@ export function NoteActionBar({ noteId, noteTitle, onInsightGenerated }: NoteAct
           onClick={() => setShowKrPicker((prev) => !prev)}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
         >
-          <Target className="w-3.5 h-3.5" />
+          <Target className="size-3.5" />
           Link to KR
         </button>
 
@@ -110,7 +110,7 @@ export function NoteActionBar({ noteId, noteTitle, onInsightGenerated }: NoteAct
                   .filter((o) => (o.keyResults ?? []).length > 0)
                   .map((o) => (
                     <div key={o.id}>
-                      <p className="px-3 pt-2 pb-1 text-[10px] text-muted-foreground uppercase tracking-wider truncate">
+                      <p className="px-3 pt-2 pb-1 text-2xs text-muted-foreground uppercase tracking-wider truncate">
                         {o.title}
                       </p>
                       {(o.keyResults ?? []).map((kr) => (
@@ -136,7 +136,7 @@ export function NoteActionBar({ noteId, noteTitle, onInsightGenerated }: NoteAct
         onClick={handleCreateTask}
         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
       >
-        <ListTodo className="w-3.5 h-3.5" />
+        <ListTodo className="size-3.5" />
         Create Task
       </button>
 
@@ -145,7 +145,7 @@ export function NoteActionBar({ noteId, noteTitle, onInsightGenerated }: NoteAct
         onClick={handleFlashcards}
         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
       >
-        <BookMarked className="w-3.5 h-3.5" />
+        <BookMarked className="size-3.5" />
         Flashcards
       </button>
     </div>

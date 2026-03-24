@@ -14,7 +14,7 @@ export function ArchivedSettings() {
       </div>
 
       <div className="bg-card rounded-lg border border-border p-8 flex flex-col items-center text-center">
-        <Archive className="w-8 h-8 text-dim mb-3" strokeWidth={1.5} />
+        <Archive className="size-8 text-dim mb-3" strokeWidth={1.5} />
         <p className="text-[13px] text-muted-foreground mb-1">No archived threads</p>
         <p className="text-[11px] text-dim">
           Archived conversations will appear here. Thread archiving is coming soon.

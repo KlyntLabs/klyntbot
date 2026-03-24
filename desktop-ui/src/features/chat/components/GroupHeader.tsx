@@ -20,12 +20,12 @@ export function GroupHeader({
       type="button"
       onClick={() => onToggle(groupKey)}
       aria-expanded={isExpanded}
-      className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-accent transition-colors text-[12px] font-light text-muted-foreground hover:text-foreground"
+      className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-accent transition-colors text-xs font-light text-muted-foreground hover:text-foreground"
     >
-      <Icon className="w-3.5 h-3.5" strokeWidth={1.5} />
+      <Icon className="size-3.5" strokeWidth={1.5} />
       <span className="flex-1 text-left">{label}</span>
       <ChevronDown
-        className={`w-3.5 h-3.5 transition-transform ${isExpanded ? "rotate-0" : "-rotate-90"}`}
+        className={`size-3.5 transition-transform ${isExpanded ? "rotate-0" : "-rotate-90"}`}
         strokeWidth={1.5}
       />
     </button>

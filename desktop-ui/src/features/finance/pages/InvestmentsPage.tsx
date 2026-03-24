@@ -173,7 +173,7 @@ export function FinanceInvestments() {
         onSelectCurrency={setMode}
       >
         <Card className="p-6 text-center">
-          <p className="text-[12px] text-destructive mb-2">{error.message}</p>
+          <p className="text-xs text-destructive mb-2">{error.message}</p>
           <button
             type="button"
             onClick={refetchAll}
@@ -197,7 +197,7 @@ export function FinanceInvestments() {
       {/* ── Stats row ─────────────────────────────────── */}
       <div className="grid grid-cols-4 gap-4 mb-4">
         <Card compact className="p-4">
-          <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">
+          <p className="text-2xs text-muted-foreground uppercase tracking-widest mb-1">
             Total Value
           </p>
           <p className="text-[24px] font-light text-foreground tabular-nums">
@@ -205,7 +205,7 @@ export function FinanceInvestments() {
           </p>
         </Card>
         <Card compact className="p-4">
-          <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">
+          <p className="text-2xs text-muted-foreground uppercase tracking-widest mb-1">
             Cost Basis
           </p>
           <p className="text-[24px] font-light text-muted-foreground tabular-nums">
@@ -213,7 +213,7 @@ export function FinanceInvestments() {
           </p>
         </Card>
         <Card compact className="p-4">
-          <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">
+          <p className="text-2xs text-muted-foreground uppercase tracking-widest mb-1">
             Total Return
           </p>
           <p
@@ -227,9 +227,7 @@ export function FinanceInvestments() {
           </p>
         </Card>
         <Card compact className="p-4">
-          <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">
-            Holdings
-          </p>
+          <p className="text-2xs text-muted-foreground uppercase tracking-widest mb-1">Holdings</p>
           <p className="text-[24px] font-light text-foreground">{investments.length}</p>
         </Card>
       </div>
@@ -245,9 +243,9 @@ export function FinanceInvestments() {
                 <button
                   type="button"
                   onClick={() => setPortfolioModalOpen(true)}
-                  className="flex items-center gap-1 text-[10px] text-brand font-light hover:text-brand-hover transition-colors"
+                  className="flex items-center gap-1 text-2xs text-brand font-light hover:text-brand-hover transition-colors"
                 >
-                  <Plus className="w-3 h-3" strokeWidth={1.5} /> Add Portfolio
+                  <Plus className="size-3" strokeWidth={1.5} /> Add Portfolio
                 </button>
               }
             />
@@ -272,7 +270,7 @@ export function FinanceInvestments() {
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
                         <div
-                          className="w-2.5 h-2.5 rounded-full"
+                          className="size-2.5 rounded-full"
                           style={{ backgroundColor: COLORS[i % COLORS.length] }}
                         />
                         <span className="text-[13px] font-medium text-muted-foreground">
@@ -281,9 +279,9 @@ export function FinanceInvestments() {
                       </div>
                       <div className="flex items-center gap-1">
                         {r >= 0 ? (
-                          <TrendingUp className="w-3 h-3 text-success" strokeWidth={1.5} />
+                          <TrendingUp className="size-3 text-success" strokeWidth={1.5} />
                         ) : (
-                          <TrendingDown className="w-3 h-3 text-destructive" strokeWidth={1.5} />
+                          <TrendingDown className="size-3 text-destructive" strokeWidth={1.5} />
                         )}
                         <span
                           className={cn(
@@ -329,14 +327,14 @@ export function FinanceInvestments() {
                         setInvPortfolioId(selectedPortfolio ?? portfolios[0].id);
                       setInvestModalOpen(true);
                     }}
-                    className="flex items-center gap-1 text-[10px] text-brand font-light hover:text-brand-hover transition-colors"
+                    className="flex items-center gap-1 text-2xs text-brand font-light hover:text-brand-hover transition-colors"
                   >
-                    <Plus className="w-3 h-3" strokeWidth={1.5} /> Add Investment
+                    <Plus className="size-3" strokeWidth={1.5} /> Add Investment
                   </button>
                 }
               />
             </div>
-            <div className="grid grid-cols-[1fr_80px_80px_90px_80px_80px] gap-2 border-b border-border text-[10px] text-muted-foreground uppercase tracking-widest font-light px-4 py-2">
+            <div className="grid grid-cols-[1fr_80px_80px_90px_80px_80px] gap-2 border-b border-border text-2xs text-muted-foreground uppercase tracking-widest font-light px-4 py-2">
               <div>Asset</div>
               <div className="text-right">Qty</div>
               <div className="text-right">Price</div>
@@ -362,16 +360,16 @@ export function FinanceInvestments() {
                       <div className="flex items-center gap-2">
                         {isExpanded ? (
                           <ChevronDown
-                            className="w-3 h-3 text-dim flex-shrink-0"
+                            className="size-3 text-dim flex-shrink-0"
                             strokeWidth={1.5}
                           />
                         ) : (
                           <ChevronRight
-                            className="w-3 h-3 text-dim flex-shrink-0"
+                            className="size-3 text-dim flex-shrink-0"
                             strokeWidth={1.5}
                           />
                         )}
-                        <span className="text-[12px] font-medium text-foreground">
+                        <span className="text-xs font-medium text-foreground">
                           {inv.symbol ?? inv.name}
                         </span>
                         <span className="px-1.5 py-0.5 text-[9px] font-light rounded bg-accent text-dim">
@@ -389,7 +387,7 @@ export function FinanceInvestments() {
                         : "—"}
                     </span>
                     <div className="text-right">
-                      <span className="text-[12px] text-foreground font-light tabular-nums">
+                      <span className="text-xs text-foreground font-light tabular-nums">
                         {inv.currentValue != null
                           ? fmtMoney(inv.currentValue, inv.marketCurrency ?? inv.currency, hidden)
                           : "—"}
@@ -425,7 +423,7 @@ export function FinanceInvestments() {
                   </div>
                   {isExpanded && (
                     <div className="bg-surface-raised border-b border-border-subtle px-6 py-3">
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-2">
+                      <p className="text-2xs text-muted-foreground uppercase tracking-widest mb-2">
                         Transaction History
                       </p>
                       {investmentTxs.length === 0 ? (
@@ -530,15 +528,15 @@ export function FinanceInvestments() {
                   return (
                     <div key={t.id}>
                       <div className="flex justify-between mb-0.5">
-                        <span className="text-[10px] text-muted-foreground font-light capitalize">
+                        <span className="text-2xs text-muted-foreground font-light capitalize">
                           {t.assetClass}
                         </span>
                         <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] text-dim font-light tabular-nums">
+                          <span className="text-2xs text-dim font-light tabular-nums">
                             {(actual * 100).toFixed(1)}%
                           </span>
                           <span className="text-[9px] text-dim">/</span>
-                          <span className="text-[10px] text-muted-foreground font-light tabular-nums">
+                          <span className="text-2xs text-muted-foreground font-light tabular-nums">
                             {(target * 100).toFixed(0)}%
                           </span>
                           {outOfBand && (

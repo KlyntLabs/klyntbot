@@ -50,12 +50,10 @@ export function WhyThisPopover({ sourceContext, domain, children }: WhyThisPopov
             "data-[side=top]:slide-in-from-bottom-2 data-[side=bottom]:slide-in-from-top-2",
           )}
         >
-          <p className="text-[10px] text-muted mb-1">Why this was suggested</p>
+          <p className="text-2xs text-muted mb-1">Why this was suggested</p>
           <p className="text-xs text-primary">{domain}</p>
           {sourceContext && (
-            <p className="text-[10px] text-muted mt-1 line-clamp-3">
-              &ldquo;{sourceContext}&rdquo;
-            </p>
+            <p className="text-2xs text-muted mt-1 line-clamp-3">&ldquo;{sourceContext}&rdquo;</p>
           )}
         </PopoverPrimitive.Content>
       </PopoverPrimitive.Portal>

@@ -23,14 +23,14 @@ export function QuickAddFAB({ onAddTask, onAddNote, onAddObjective }: QuickAddFA
         onClick={onAddTask}
         className="flex items-center gap-1.5 px-4 py-2.5 rounded-l-lg bg-brand text-white text-xs font-medium hover:bg-brand/90 transition-colors"
       >
-        <Plus className="w-3.5 h-3.5" /> Add Task
+        <Plus className="size-3.5" /> Add Task
       </button>
       <button
         type="button"
         onClick={() => setOpen(!open)}
         className="px-2 py-2.5 rounded-r-lg bg-brand text-white hover:bg-brand/90 transition-colors border-l border-white/20"
       >
-        <ChevronDown className="w-3.5 h-3.5" />
+        <ChevronDown className="size-3.5" />
       </button>
       {open && (
         <div className="absolute bottom-full right-0 mb-2 glass-dropdown rounded-lg py-1 min-w-[160px]">

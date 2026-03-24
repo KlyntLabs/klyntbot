@@ -72,9 +72,9 @@ export function ChatInput({
           <button
             type="button"
             aria-label="Add attachment"
-            className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors shrink-0 rounded-lg hover:bg-accent"
+            className="size-8 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors shrink-0 rounded-lg hover:bg-accent"
           >
-            <Plus className="w-4 h-4" strokeWidth={1.5} />
+            <Plus className="size-4" strokeWidth={1.5} />
           </button>
           <textarea
             ref={textareaRef}
@@ -96,18 +96,18 @@ export function ChatInput({
           <button
             type="button"
             aria-label="Voice input"
-            className="w-8 h-8 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors shrink-0 rounded-lg hover:bg-accent"
+            className="size-8 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors shrink-0 rounded-lg hover:bg-accent"
           >
-            <Mic className="w-4 h-4" strokeWidth={1.5} />
+            <Mic className="size-4" strokeWidth={1.5} />
           </button>
           <button
             type="button"
             onClick={onSend}
             disabled={!input.trim() || isStreaming}
             aria-label="Send message"
-            className="w-9 h-9 rounded-full bg-brand hover:bg-brand-hover disabled:bg-accent disabled:text-muted-foreground flex items-center justify-center transition-all shrink-0"
+            className="size-9 rounded-full bg-brand hover:bg-brand-hover disabled:bg-accent disabled:text-muted-foreground flex items-center justify-center transition-all shrink-0"
           >
-            <Send className="w-4 h-4" strokeWidth={2} />
+            <Send className="size-4" strokeWidth={2} />
           </button>
         </div>
         <div className="flex items-center gap-2 mt-2">
@@ -126,12 +126,12 @@ export function ChatInput({
               </>
             ) : (
               <>
-                <Users className="w-3.5 h-3.5" strokeWidth={1.5} />
+                <Users className="size-3.5" strokeWidth={1.5} />
                 <span>KlyntBot</span>
               </>
             )}
             <ChevronDown
-              className={`w-3 h-3 transition-transform ${popup ? "rotate-180" : ""}`}
+              className={`size-3 transition-transform ${popup ? "rotate-180" : ""}`}
               strokeWidth={1.5}
             />
           </button>
@@ -141,7 +141,7 @@ export function ChatInput({
               <button
                 type="button"
                 onClick={() => onVoiceModeChange("multi")}
-                className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded-md transition-colors ${
+                className={`flex items-center gap-1 text-2xs px-2 py-1 rounded-md transition-colors ${
                   voiceMode === "multi"
                     ? "bg-purple-500/20 text-purple-300"
                     : "text-muted-foreground hover:text-foreground"
@@ -153,7 +153,7 @@ export function ChatInput({
               <button
                 type="button"
                 onClick={() => onVoiceModeChange("synthesized")}
-                className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded-md transition-colors ${
+                className={`flex items-center gap-1 text-2xs px-2 py-1 rounded-md transition-colors ${
                   voiceMode === "synthesized"
                     ? "bg-purple-500/20 text-purple-300"
                     : "text-muted-foreground hover:text-foreground"
@@ -200,7 +200,7 @@ export function ChatInput({
                   {squad.members.slice(0, 3).map((m) => (
                     <span
                       key={m.personaId}
-                      className="w-3.5 h-3.5 rounded-full bg-white/[0.08] flex items-center justify-center text-[7px] ring-1 ring-black/30"
+                      className="size-3.5 rounded-full bg-white/[0.08] flex items-center justify-center text-[7px] ring-1 ring-black/30"
                       title={m.personaName}
                     >
                       {m.personaIcon}
@@ -226,7 +226,7 @@ export function ChatInput({
                   : "text-muted-foreground hover:bg-white/[0.06] hover:text-foreground"
               }`}
             >
-              <Users className="w-3 h-3 shrink-0" strokeWidth={1.5} />
+              <Users className="size-3 shrink-0" strokeWidth={1.5} />
               <span className="text-[11px] font-medium">KlyntBot</span>
             </button>
           </div>,

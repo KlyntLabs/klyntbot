@@ -41,7 +41,7 @@ function TopicBar({ topic }: { topic: TopicStat }) {
   const pct = Math.round(topic.avgRetention * 100);
   return (
     <div className="flex items-center gap-2">
-      <span className="text-[10px] text-muted-foreground w-24 truncate shrink-0">{topic.name}</span>
+      <span className="text-2xs text-muted-foreground w-24 truncate shrink-0">{topic.name}</span>
       <div className="flex-1 h-1.5 rounded-full bg-white/5 overflow-hidden">
         <div
           className={`h-full rounded-full transition-all duration-500 ${retentionBarColor(topic.avgRetention)}`}
@@ -49,7 +49,7 @@ function TopicBar({ topic }: { topic: TopicStat }) {
         />
       </div>
       <span
-        className={`text-[10px] font-medium tabular-nums w-8 text-right shrink-0 ${retentionTextColor(topic.avgRetention)}`}
+        className={`text-2xs font-medium tabular-nums w-8 text-right shrink-0 ${retentionTextColor(topic.avgRetention)}`}
       >
         {pct}%
       </span>
@@ -93,7 +93,7 @@ export function MorningBriefing() {
         {summary.streakDays > 0 && (
           <div className="flex items-center gap-1">
             <Flame size={14} className="text-amber-400" strokeWidth={1.5} />
-            <span className="text-[12px] font-medium text-amber-400 tabular-nums">
+            <span className="text-xs font-medium text-amber-400 tabular-nums">
               {summary.streakDays}-day streak
             </span>
           </div>
@@ -127,7 +127,7 @@ export function MorningBriefing() {
         {/* Fading atoms */}
         {summary.fadingAtoms.length > 0 && (
           <div>
-            <h3 className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-2">
+            <h3 className="text-2xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
               Fading Atoms
             </h3>
             <div className="flex flex-col gap-1">
@@ -148,7 +148,7 @@ export function MorningBriefing() {
                       {atom.subject}
                     </span>
                     <span
-                      className={`text-[10px] font-medium tabular-nums shrink-0 ${retentionTextColor(atom.retentionPct)}`}
+                      className={`text-2xs font-medium tabular-nums shrink-0 ${retentionTextColor(atom.retentionPct)}`}
                     >
                       {pct}%
                     </span>
@@ -163,7 +163,7 @@ export function MorningBriefing() {
         <div className="flex flex-col gap-3">
           {summary.strongestTopic && (
             <div>
-              <h3 className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1.5">
+              <h3 className="text-2xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">
                 Strongest
               </h3>
               <TopicBar topic={summary.strongestTopic} />
@@ -171,7 +171,7 @@ export function MorningBriefing() {
           )}
           {summary.weakestTopic && (
             <div>
-              <h3 className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1.5">
+              <h3 className="text-2xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">
                 Weakest
               </h3>
               <TopicBar topic={summary.weakestTopic} />

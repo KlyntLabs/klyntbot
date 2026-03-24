@@ -82,7 +82,7 @@ export function NoteSidebar({
       {/* Search */}
       <div className="p-3">
         <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
           <input
             type="text"
             value={searchQuery}
@@ -95,7 +95,7 @@ export function NoteSidebar({
 
       {/* Notebook tree */}
       <div className="px-3 pb-2">
-        <h3 className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1.5">
+        <h3 className="text-2xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">
           Notebooks
         </h3>
         {projectNotebooks.length === 0 ? (
@@ -107,9 +107,9 @@ export function NoteSidebar({
                 key={nb.id}
                 className="flex items-center gap-2 px-2 py-1 rounded text-xs text-muted-foreground"
               >
-                <BookOpen className="w-3.5 h-3.5 flex-shrink-0" />
+                <BookOpen className="size-3.5 flex-shrink-0" />
                 <span className="truncate">{nb.title}</span>
-                <span className="ml-auto text-[10px] opacity-60">{nb.noteCount}</span>
+                <span className="ml-auto text-2xs opacity-60">{nb.noteCount}</span>
               </div>
             ))}
           </div>
@@ -121,7 +121,7 @@ export function NoteSidebar({
 
       {/* Notes list */}
       <div className="flex-1 overflow-y-auto px-3 py-2">
-        <h3 className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1.5">
+        <h3 className="text-2xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">
           {searchResults ? "Search Results" : "Recent Notes"}
         </h3>
         {loading || searching ? (
@@ -144,7 +144,7 @@ export function NoteSidebar({
                 }`}
               >
                 <div className="truncate font-medium">{note.title || "Untitled"}</div>
-                <div className="text-[10px] opacity-60 mt-0.5">
+                <div className="text-2xs opacity-60 mt-0.5">
                   {new Date(note.updatedAt).toLocaleDateString()}
                 </div>
               </button>

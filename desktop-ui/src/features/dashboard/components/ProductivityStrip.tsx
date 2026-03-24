@@ -47,7 +47,7 @@ function MiniScore({ score }: { score: number | null }) {
 
   return (
     <div
-      className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-semibold tabular-nums shrink-0"
+      className="size-6 rounded-full flex items-center justify-center text-[9px] font-semibold tabular-nums shrink-0"
       style={{
         background: `conic-gradient(${color} ${clamped * 3.6}deg, rgba(255,255,255,0.06) 0deg)`,
       }}
@@ -110,7 +110,7 @@ export function ProductivityStrip({ summary }: ProductivityStripProps) {
         </div>
 
         {/* Quick stats */}
-        <div className="flex items-center gap-3 text-[10px] tabular-nums shrink-0">
+        <div className="flex items-center gap-3 text-2xs tabular-nums shrink-0">
           <span className="text-muted-foreground">
             {formatHumanDuration(summary.totalActiveSecs)}
             <span className="text-dim"> active</span>
@@ -128,7 +128,7 @@ export function ProductivityStrip({ summary }: ProductivityStripProps) {
 
         <svg
           aria-hidden="true"
-          className="w-3 h-3 text-dim transition-transform"
+          className="size-3 text-dim transition-transform"
           style={{ transform: expanded ? "rotate(180deg)" : undefined }}
           viewBox="0 0 12 12"
           fill="none"

@@ -71,7 +71,7 @@ export function ContextDayView({ date, isToday }: ContextDayViewProps) {
                 style={{ top: h * hourHeight }}
               >
                 <div
-                  className="text-[10px] text-muted-foreground text-right pr-2 select-none"
+                  className="text-2xs text-muted-foreground text-right pr-2 select-none"
                   style={{ width: HOUR_GUTTER }}
                 >
                   {h === 0 ? "" : formatHour(h)}

@@ -251,7 +251,7 @@ const TreeRow = memo(function TreeRow({
       onDragLeave={onDragLeave}
       onDrop={(e) => onDrop(e, item)}
       onDragEnd={onDragEnd}
-      className={`relative flex items-center gap-2 py-1.5 pr-2 rounded-lg text-[12px] font-light cursor-default select-none outline-none transition-all ${
+      className={`relative flex items-center gap-2 py-1.5 pr-2 rounded-lg text-xs font-light cursor-default select-none outline-none transition-all ${
         isDragging ? "opacity-40" : ""
       } ${
         isDropTarget
@@ -299,7 +299,7 @@ const TreeRow = memo(function TreeRow({
       {/* Chevron for folders */}
       {isFolder && (
         <ChevronRight
-          className={`w-3 h-3 shrink-0 text-dim transition-transform duration-150 ${
+          className={`size-3 shrink-0 text-dim transition-transform duration-150 ${
             item.isExpanded ? "rotate-90" : ""
           }`}
         />
@@ -309,36 +309,36 @@ const TreeRow = memo(function TreeRow({
       {item.icon && ICON_MAP[item.icon] ? (
         <ItemIcon
           name={item.icon}
-          className={`w-3.5 h-3.5 shrink-0 ${item.color ? "" : "text-muted-foreground"}`}
+          className={`size-3.5 shrink-0 ${item.color ? "" : "text-muted-foreground"}`}
           style={item.color ? { color: item.color } : undefined}
         />
       ) : item.icon?.startsWith("#") ? (
         isFolder ? (
           item.isExpanded ? (
-            <FolderOpen className="w-3.5 h-3.5 shrink-0" style={{ color: item.icon }} />
+            <FolderOpen className="size-3.5 shrink-0" style={{ color: item.icon }} />
           ) : (
-            <FolderClosed className="w-3.5 h-3.5 shrink-0" style={{ color: item.icon }} />
+            <FolderClosed className="size-3.5 shrink-0" style={{ color: item.icon }} />
           )
         ) : (
-          <FileText className="w-3.5 h-3.5 shrink-0" style={{ color: item.icon }} />
+          <FileText className="size-3.5 shrink-0" style={{ color: item.icon }} />
         )
       ) : isFolder ? (
         item.isExpanded ? (
           <FolderOpen
-            className={`w-3.5 h-3.5 shrink-0 ${item.color ? "" : "text-muted-foreground"}`}
+            className={`size-3.5 shrink-0 ${item.color ? "" : "text-muted-foreground"}`}
             style={item.color ? { color: item.color } : undefined}
           />
         ) : (
           <FolderClosed
-            className={`w-3.5 h-3.5 shrink-0 ${item.color ? "" : "text-muted-foreground"}`}
+            className={`size-3.5 shrink-0 ${item.color ? "" : "text-muted-foreground"}`}
             style={item.color ? { color: item.color } : undefined}
           />
         )
       ) : isNote && item.pinned ? (
-        <Pin className="w-3 h-3 shrink-0 text-brand" />
+        <Pin className="size-3 shrink-0 text-brand" />
       ) : (
         <FileText
-          className={`w-3.5 h-3.5 shrink-0 ${item.color ? "" : "text-muted-foreground"}`}
+          className={`size-3.5 shrink-0 ${item.color ? "" : "text-muted-foreground"}`}
           style={item.color ? { color: item.color } : undefined}
         />
       )}
@@ -353,7 +353,7 @@ const TreeRow = memo(function TreeRow({
             }
           }}
           defaultValue={item.title}
-          className="flex-1 min-w-0 text-[12px] bg-accent border border-brand/40 rounded-md px-1.5 py-0.5 text-foreground focus:outline-none"
+          className="flex-1 min-w-0 text-xs bg-accent border border-brand/40 rounded-md px-1.5 py-0.5 text-foreground focus:outline-none"
           onBlur={(e) => onCommitRename(item, e.currentTarget.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") e.currentTarget.blur();
@@ -375,12 +375,12 @@ const TreeRow = memo(function TreeRow({
 
       {/* Note count for folders */}
       {isFolder && !isRenaming && item.noteCount != null && item.noteCount > 0 && (
-        <span className="text-[10px] text-muted-foreground shrink-0">{item.noteCount}</span>
+        <span className="text-2xs text-muted-foreground shrink-0">{item.noteCount}</span>
       )}
 
       {/* Date badge for notes */}
       {isNote && item.updatedAt && !isRenaming && (
-        <span className="text-[10px] text-muted-foreground shrink-0">
+        <span className="text-2xs text-muted-foreground shrink-0">
           {formatDate(item.updatedAt.slice(0, 10))}
         </span>
       )}
@@ -824,25 +824,25 @@ export function NotebookTree({
     <div className="flex flex-col min-h-0 flex-1" onContextMenu={handleBlankContextMenu}>
       {/* Header */}
       <div className="flex items-center justify-between px-4 pb-1 pt-3">
-        <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+        <span className="text-2xs uppercase tracking-wider text-muted-foreground font-medium">
           Notebooks
         </span>
         <div className="flex items-center gap-0.5">
           <button
             type="button"
             onClick={() => onCreateNote()}
-            className="w-5 h-5 rounded-md flex items-center justify-center text-dim hover:text-foreground hover:bg-accent transition-all"
+            className="size-5 rounded-md flex items-center justify-center text-dim hover:text-foreground hover:bg-accent transition-all"
             aria-label="New note"
           >
-            <Plus className="w-3.5 h-3.5" />
+            <Plus className="size-3.5" />
           </button>
           <button
             type="button"
             onClick={() => onCreateNotebook()}
-            className="w-5 h-5 rounded-md flex items-center justify-center text-dim hover:text-foreground hover:bg-accent transition-all"
+            className="size-5 rounded-md flex items-center justify-center text-dim hover:text-foreground hover:bg-accent transition-all"
             aria-label="New notebook"
           >
-            <FolderPlus className="w-3.5 h-3.5" />
+            <FolderPlus className="size-3.5" />
           </button>
         </div>
       </div>
@@ -981,7 +981,7 @@ function TreeContextMenu({
     return (
       <ContextMenu ref={ref} x={target.x} y={target.y} onClose={onClose}>
         <ContextMenuItem
-          icon={<Plus className="w-4 h-4" />}
+          icon={<Plus className="size-4" />}
           onClick={() => {
             onCreateNote();
             onClose();
@@ -990,7 +990,7 @@ function TreeContextMenu({
           New note
         </ContextMenuItem>
         <ContextMenuItem
-          icon={<FolderPlus className="w-4 h-4" />}
+          icon={<FolderPlus className="size-4" />}
           onClick={() => {
             onCreateNotebook();
             onClose();
@@ -1000,7 +1000,7 @@ function TreeContextMenu({
         </ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem
-          icon={<ChevronsUpDown className="w-4 h-4" />}
+          icon={<ChevronsUpDown className="size-4" />}
           onClick={() => {
             onExpandAll();
             onClose();
@@ -1009,7 +1009,7 @@ function TreeContextMenu({
           Expand all
         </ContextMenuItem>
         <ContextMenuItem
-          icon={<ChevronsDownUp className="w-4 h-4" />}
+          icon={<ChevronsDownUp className="size-4" />}
           onClick={() => {
             onCollapseAll();
             onClose();
@@ -1032,7 +1032,7 @@ function TreeContextMenu({
 
     return (
       <ContextMenuSubmenu
-        icon={<Palette className="w-4 h-4" />}
+        icon={<Palette className="size-4" />}
         label="Appearance"
         open={openSubmenu === "appearance"}
         onToggle={() => toggleSubmenu("appearance")}
@@ -1056,15 +1056,12 @@ function TreeContextMenu({
                     onUpdate(entityId, { icon: name });
                   }
                 }}
-                className={`w-8 h-8 rounded-md flex items-center justify-center hover:bg-muted transition-colors ${
+                className={`size-8 rounded-md flex items-center justify-center hover:bg-muted transition-colors ${
                   isActive ? "bg-muted ring-1 ring-brand/40" : ""
                 }`}
                 title={isActive ? `Remove ${name} icon` : name}
               >
-                <Icon
-                  className="w-4 h-4"
-                  style={activeColor ? { color: activeColor } : undefined}
-                />
+                <Icon className="size-4" style={activeColor ? { color: activeColor } : undefined} />
               </button>
             );
           })}
@@ -1086,7 +1083,7 @@ function TreeContextMenu({
                   onUpdate(entityId, { color });
                 }
               }}
-              className={`w-5 h-5 rounded-full border transition-transform hover:scale-125 ${
+              className={`size-5 rounded-full border transition-transform hover:scale-125 ${
                 activeColor === color && color !== null
                   ? "ring-2 ring-primary/60 ring-offset-1 ring-offset-surface-lowest"
                   : ""
@@ -1094,7 +1091,7 @@ function TreeContextMenu({
               style={color ? { backgroundColor: color } : undefined}
               title={color ?? "Reset color"}
             >
-              {!color && <X className="w-2.5 h-2.5 text-dim mx-auto" />}
+              {!color && <X className="size-2.5 text-dim mx-auto" />}
             </button>
           ))}
         </div>
@@ -1124,7 +1121,7 @@ function TreeContextMenu({
     return (
       <ContextMenu ref={ref} x={target.x} y={target.y} onClose={onClose}>
         <ContextMenuItem
-          icon={<Plus className="w-4 h-4" />}
+          icon={<Plus className="size-4" />}
           onClick={() => {
             onCreateNote(target.notebook.id);
             onClose();
@@ -1133,7 +1130,7 @@ function TreeContextMenu({
           New note here
         </ContextMenuItem>
         <ContextMenuItem
-          icon={<FolderPlus className="w-4 h-4" />}
+          icon={<FolderPlus className="size-4" />}
           onClick={() => {
             onCreateNotebook(target.notebook.id);
             onClose();
@@ -1143,7 +1140,7 @@ function TreeContextMenu({
         </ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem
-          icon={<Pencil className="w-4 h-4" />}
+          icon={<Pencil className="size-4" />}
           onClick={() => {
             onStartRename(target.notebook.id);
             onClose();
@@ -1156,7 +1153,7 @@ function TreeContextMenu({
 
         <ContextMenuSeparator />
         <ContextMenuItem
-          icon={<Trash2 className="w-4 h-4" />}
+          icon={<Trash2 className="size-4" />}
           onClick={() => {
             onDeleteNotebook(target.notebook.id);
             onClose();
@@ -1174,7 +1171,7 @@ function TreeContextMenu({
   return (
     <ContextMenu ref={ref} x={target.x} y={target.y} onClose={onClose}>
       <ContextMenuItem
-        icon={<Pencil className="w-4 h-4" />}
+        icon={<Pencil className="size-4" />}
         onClick={() => {
           onStartRename(note.id);
           onClose();
@@ -1183,7 +1180,7 @@ function TreeContextMenu({
         Rename
       </ContextMenuItem>
       <ContextMenuItem
-        icon={note.pinned ? <PinOff className="w-4 h-4" /> : <Pin className="w-4 h-4" />}
+        icon={note.pinned ? <PinOff className="size-4" /> : <Pin className="size-4" />}
         onClick={() => {
           onPinNote(note.id, !note.pinned);
           onClose();
@@ -1196,7 +1193,7 @@ function TreeContextMenu({
 
       {folders.length > 0 && (
         <ContextMenuSubmenu
-          icon={<FolderInput className="w-4 h-4" />}
+          icon={<FolderInput className="size-4" />}
           label="Move to..."
           open={openSubmenu === "move"}
           onToggle={() => toggleSubmenu("move")}
@@ -1214,7 +1211,7 @@ function TreeContextMenu({
             .map((folder) => (
               <ContextMenuItem
                 key={folder.id}
-                icon={<FolderClosed className="w-3.5 h-3.5 text-dim" />}
+                icon={<FolderClosed className="size-3.5 text-dim" />}
                 onClick={() => {
                   onMoveNote(note.id, folder.id);
                   onClose();
@@ -1228,7 +1225,7 @@ function TreeContextMenu({
 
       <ContextMenuSeparator />
       <ContextMenuItem
-        icon={<Trash2 className="w-4 h-4" />}
+        icon={<Trash2 className="size-4" />}
         onClick={() => {
           onDeleteNote(note.id);
           onClose();

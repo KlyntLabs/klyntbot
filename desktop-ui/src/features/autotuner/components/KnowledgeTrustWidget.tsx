@@ -64,7 +64,7 @@ export function KnowledgeTrustWidget() {
         ))}
       </div>
 
-      <p className="text-[10px] text-dim">
+      <p className="text-2xs text-dim">
         {data.totalFacts90d} facts tracked
         {data.computedAt && ` · updated ${formatRelativeTime(data.computedAt)}`}
       </p>

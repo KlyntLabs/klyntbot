@@ -308,8 +308,8 @@ export function SlashMenu({ editor }: SlashMenuProps) {
               isSelected ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-card"
             }`}
           >
-            <span className="w-7 h-7 rounded-md flex items-center justify-center bg-brand/10 text-brand shrink-0">
-              <Icon className="w-4 h-4" />
+            <span className="size-7 rounded-md flex items-center justify-center bg-brand/10 text-brand shrink-0">
+              <Icon className="size-4" />
             </span>
             <span>{cmd.label}</span>
           </button>

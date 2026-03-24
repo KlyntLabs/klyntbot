@@ -37,7 +37,7 @@ export function InterventionRow({
 
   return (
     <div className="flex items-start gap-3 py-3 border-b border-border last:border-0">
-      <span className="text-[10px] text-dim tabular-nums w-14 pt-0.5 shrink-0">
+      <span className="text-2xs text-dim tabular-nums w-14 pt-0.5 shrink-0">
         {formatTime(deliveredAt)}
       </span>
 
@@ -55,7 +55,7 @@ export function InterventionRow({
         <button
           type="button"
           onClick={() => navigate(actionUrl)}
-          className="text-[10px] text-brand hover:underline shrink-0"
+          className="text-2xs text-brand hover:underline shrink-0"
         >
           Open →
         </button>
@@ -68,18 +68,18 @@ export function InterventionRow({
             <button
               type="button"
               onClick={() => handleFeedback("helpful")}
-              className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-success transition-colors"
+              className="flex items-center gap-1 text-2xs text-muted-foreground hover:text-success transition-colors"
               title="Mark as helpful"
             >
-              <ThumbsUp className="w-3 h-3" />
+              <ThumbsUp className="size-3" />
             </button>
             <button
               type="button"
               onClick={() => handleFeedback("dismissed")}
-              className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-destructive transition-colors"
+              className="flex items-center gap-1 text-2xs text-muted-foreground hover:text-destructive transition-colors"
               title="Dismiss"
             >
-              <X className="w-3 h-3" />
+              <X className="size-3" />
             </button>
           </>
         )}

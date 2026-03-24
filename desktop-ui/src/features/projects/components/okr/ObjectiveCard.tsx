@@ -80,7 +80,7 @@ export function ObjectiveCard({ objective, onEdit }: ObjectiveCardProps) {
           onClick={() => toggleObjective(objective.id)}
           className="text-muted-foreground hover:text-foreground transition-colors"
         >
-          {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+          {expanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
         </button>
 
         {/* Progress ring */}
@@ -90,20 +90,20 @@ export function ObjectiveCard({ objective, onEdit }: ObjectiveCardProps) {
         <div className="flex-1 min-w-0">
           <h3 className="text-sm font-medium text-foreground truncate">{objective.title}</h3>
           <div className="flex items-center gap-2 mt-0.5">
-            <span className="text-[10px] text-muted-foreground">
+            <span className="text-2xs text-muted-foreground">
               {krs.length} Key Result{krs.length !== 1 ? "s" : ""}
             </span>
           </div>
         </div>
 
         {/* Status badge */}
-        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${status.color}`}>
+        <span className={`text-2xs px-2 py-0.5 rounded-full font-medium ${status.color}`}>
           {status.label}
         </span>
 
         {/* AI Confidence badge */}
         <span
-          className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-400 font-medium cursor-help"
+          className="text-2xs px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-400 font-medium cursor-help"
           title={`AI Confidence: ${confidence}% — based on KR velocity and progress`}
         >
           AI {confidence}%
@@ -112,10 +112,10 @@ export function ObjectiveCard({ objective, onEdit }: ObjectiveCardProps) {
         {/* "Suggest next KR" placeholder */}
         <button
           type="button"
-          className="text-[10px] px-2 py-1 rounded bg-accent text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+          className="text-2xs px-2 py-1 rounded bg-accent text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
           title="Ask AI to suggest next Key Result (coming soon)"
         >
-          <Sparkles className="w-3 h-3" />
+          <Sparkles className="size-3" />
           Suggest KR
         </button>
 
@@ -126,7 +126,7 @@ export function ObjectiveCard({ objective, onEdit }: ObjectiveCardProps) {
             onClick={() => setMenuOpen(!menuOpen)}
             className="text-muted-foreground hover:text-foreground transition-colors"
           >
-            <MoreHorizontal className="w-4 h-4" />
+            <MoreHorizontal className="size-4" />
           </button>
           {menuOpen && (
             <div className="absolute right-0 top-full mt-1 z-20 glass-panel rounded-lg py-1 min-w-[140px] bg-card border border-border shadow-lg">
@@ -138,14 +138,14 @@ export function ObjectiveCard({ objective, onEdit }: ObjectiveCardProps) {
                 }}
                 className="w-full px-3 py-1.5 text-left text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors flex items-center gap-2"
               >
-                <Pencil className="w-3 h-3" /> Edit
+                <Pencil className="size-3" /> Edit
               </button>
               <button
                 type="button"
                 onClick={handleDelete}
                 className="w-full px-3 py-1.5 text-left text-xs text-red-400 hover:text-red-300 hover:bg-accent transition-colors flex items-center gap-2"
               >
-                <Trash2 className="w-3 h-3" /> Delete
+                <Trash2 className="size-3" /> Delete
               </button>
             </div>
           )}
@@ -181,7 +181,7 @@ export function ObjectiveCard({ objective, onEdit }: ObjectiveCardProps) {
               onClick={() => setShowKrForm(true)}
               className="flex items-center gap-1.5 ml-4 px-3 py-1.5 text-[11px] text-muted-foreground hover:text-foreground hover:bg-accent rounded transition-colors"
             >
-              <Plus className="w-3 h-3" /> Add Key Result
+              <Plus className="size-3" /> Add Key Result
             </button>
           )}
         </div>

@@ -17,8 +17,8 @@ export function TokenBadge({ transparency, isStreaming }: TokenBadgeProps) {
     if (!isStreaming) return null;
     return (
       <div className="flex justify-end mt-1">
-        <div className="flex items-center gap-1 text-[10px] font-light text-dim">
-          <Loader2 className="w-2.5 h-2.5 animate-spin" strokeWidth={1.5} />
+        <div className="flex items-center gap-1 text-2xs font-light text-dim">
+          <Loader2 className="size-2.5 animate-spin" strokeWidth={1.5} />
         </div>
       </div>
     );
@@ -29,7 +29,7 @@ export function TokenBadge({ transparency, isStreaming }: TokenBadgeProps) {
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
-        className="ml-auto flex items-center gap-1.5 text-[10px] font-light text-dim hover:text-muted-foreground transition-colors"
+        className="ml-auto flex items-center gap-1.5 text-2xs font-light text-dim hover:text-muted-foreground transition-colors"
       >
         <span>
           {"\u2191"}
@@ -45,13 +45,13 @@ export function TokenBadge({ transparency, isStreaming }: TokenBadgeProps) {
           </span>
         )}
         <ChevronDown
-          className={`w-2.5 h-2.5 transition-transform ${expanded ? "rotate-180" : ""}`}
+          className={`size-2.5 transition-transform ${expanded ? "rotate-180" : ""}`}
           strokeWidth={1.5}
         />
       </button>
 
       {expanded && (
-        <div className="mt-1.5 p-2.5 rounded-lg bg-accent border border-border text-[10px] font-light space-y-1">
+        <div className="mt-1.5 p-2.5 rounded-lg bg-accent border border-border text-2xs font-light space-y-1">
           <div className="flex justify-between text-muted-foreground">
             <span>Input tokens</span>
             <span className="text-muted-foreground">{usage.promptTokens.toLocaleString()}</span>

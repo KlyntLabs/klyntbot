@@ -50,7 +50,7 @@ function CardPreviewRow({
         <button
           type="button"
           onClick={onToggle}
-          className={`mt-0.5 w-5 h-5 rounded flex items-center justify-center flex-shrink-0 transition-colors ${
+          className={`mt-0.5 size-5 rounded flex items-center justify-center flex-shrink-0 transition-colors ${
             isApproved ? "bg-brand text-white" : "bg-muted text-muted-foreground hover:bg-accent"
           }`}
         >
@@ -59,9 +59,9 @@ function CardPreviewRow({
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-md ${typeBg}`}>{typeLabel}</span>
+            <span className={`text-2xs px-1.5 py-0.5 rounded-md ${typeBg}`}>{typeLabel}</span>
             {card.tags.length > 0 && (
-              <span className="text-[10px] text-muted-foreground">{card.tags.join(", ")}</span>
+              <span className="text-2xs text-muted-foreground">{card.tags.join(", ")}</span>
             )}
             <button
               type="button"
@@ -77,7 +77,7 @@ function CardPreviewRow({
           {expanded && (
             <div className="mt-2 space-y-2">
               <div>
-                <label className="text-[10px] text-muted-foreground block mb-0.5">Front</label>
+                <label className="text-2xs text-muted-foreground block mb-0.5">Front</label>
                 <textarea
                   value={card.front}
                   onChange={(e) => onEdit("front", e.target.value)}
@@ -86,7 +86,7 @@ function CardPreviewRow({
                 />
               </div>
               <div>
-                <label className="text-[10px] text-muted-foreground block mb-0.5">Back</label>
+                <label className="text-2xs text-muted-foreground block mb-0.5">Back</label>
                 <textarea
                   value={card.back}
                   onChange={(e) => onEdit("back", e.target.value)}
@@ -103,7 +103,7 @@ function CardPreviewRow({
           )}
 
           {!expanded && (
-            <p className="text-[12px] text-muted-foreground mt-0.5 truncate">{card.back}</p>
+            <p className="text-xs text-muted-foreground mt-0.5 truncate">{card.back}</p>
           )}
         </div>
       </div>
@@ -201,7 +201,7 @@ export function CardGenerationModal({
         {!generating && previews.length > 0 && (
           <div className="px-5 py-4 border-t border-border space-y-3">
             <div className="flex items-center gap-2">
-              <label className="text-[12px] text-muted-foreground whitespace-nowrap">Deck:</label>
+              <label className="text-xs text-muted-foreground whitespace-nowrap">Deck:</label>
               <input
                 type="text"
                 value={deck}
@@ -212,7 +212,7 @@ export function CardGenerationModal({
             </div>
 
             <div className="flex items-center justify-between">
-              <span className="text-[12px] text-muted-foreground">
+              <span className="text-xs text-muted-foreground">
                 {approvedCount} of {previews.length} cards selected
               </span>
               <button

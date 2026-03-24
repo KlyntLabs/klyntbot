@@ -139,12 +139,12 @@ export function FocusedReview() {
           className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft size={16} strokeWidth={1.5} />
-          <span className="text-[12px]">Back</span>
+          <span className="text-xs">Back</span>
         </Link>
 
         <span className="text-[13px] font-medium text-foreground">{heading}</span>
 
-        <span className="text-[12px] text-muted-foreground tabular-nums">
+        <span className="text-xs text-muted-foreground tabular-nums">
           Card {currentIndex + 1} of {cards.length}
         </span>
       </div>
@@ -170,7 +170,7 @@ export function FocusedReview() {
               className="glass-button px-8 py-2.5 text-sm text-foreground"
             >
               Show Answer
-              <span className="text-[10px] text-muted-foreground ml-2">Space</span>
+              <span className="text-2xs text-muted-foreground ml-2">Space</span>
             </button>
           </div>
         ) : (

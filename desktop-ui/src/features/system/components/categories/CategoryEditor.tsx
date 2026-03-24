@@ -85,7 +85,7 @@ export function CategoryEditor({ category, onSaved, onDeleted }: CategoryEditorP
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: color }} />
+          <span className="size-3 rounded-sm" style={{ backgroundColor: color }} />
           <h3 className="text-[13px] font-medium text-muted-foreground">Edit Category</h3>
           {category.isSystem && (
             <span className="text-[9px] font-light text-dim bg-accent px-1.5 py-0.5 rounded">
@@ -116,20 +116,20 @@ export function CategoryEditor({ category, onSaved, onDeleted }: CategoryEditorP
 
       {/* Name */}
       <div className="flex flex-col gap-1">
-        <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+        <span className="text-2xs font-medium text-muted-foreground uppercase tracking-wider">
           Name
         </span>
         <input
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="glass-input px-3 py-1.5 text-[12px] rounded-lg"
+          className="glass-input px-3 py-1.5 text-xs rounded-lg"
         />
       </div>
 
       {/* Type */}
       <div className="flex flex-col gap-1">
-        <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+        <span className="text-2xs font-medium text-muted-foreground uppercase tracking-wider">
           Type
         </span>
         <div className="flex gap-1.5">
@@ -156,7 +156,7 @@ export function CategoryEditor({ category, onSaved, onDeleted }: CategoryEditorP
 
       {/* Color */}
       <div className="flex flex-col gap-1.5">
-        <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+        <span className="text-2xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
           <Palette size={10} />
           Color
         </span>
@@ -166,7 +166,7 @@ export function CategoryEditor({ category, onSaved, onDeleted }: CategoryEditorP
               key={swatch}
               type="button"
               onClick={() => setColor(swatch)}
-              className={`w-5 h-5 rounded-md transition-all ${
+              className={`size-5 rounded-md transition-all ${
                 color === swatch ? "ring-2 ring-white/40 scale-110" : "hover:scale-105"
               }`}
               style={{ backgroundColor: swatch }}
@@ -218,7 +218,7 @@ function TagListField({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+      <span className="text-2xs font-medium text-muted-foreground uppercase tracking-wider">
         {label}
       </span>
       <div className="flex flex-wrap gap-1">

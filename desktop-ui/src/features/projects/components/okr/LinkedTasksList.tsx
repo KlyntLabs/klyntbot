@@ -43,9 +43,9 @@ export function LinkedTasksList({ keyResultId }: LinkedTasksListProps) {
         >
           <button type="button" onClick={() => handleToggle(task)} className="flex-shrink-0">
             {task.completed ? (
-              <CheckCircle2 className="w-3.5 h-3.5 text-brand" />
+              <CheckCircle2 className="size-3.5 text-brand" />
             ) : (
-              <Circle className="w-3.5 h-3.5 text-muted-foreground" />
+              <Circle className="size-3.5 text-muted-foreground" />
             )}
           </button>
           <span
@@ -53,7 +53,7 @@ export function LinkedTasksList({ keyResultId }: LinkedTasksListProps) {
           >
             {task.title}
           </span>
-          <span className="ml-auto text-[10px] text-muted-foreground">{task.status}</span>
+          <span className="ml-auto text-2xs text-muted-foreground">{task.status}</span>
         </div>
       ))}
     </div>

@@ -77,7 +77,7 @@ export function ClozeInput({ clozeText, onSubmit }: ClozeInputProps) {
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="rounded-lg bg-white/[0.04] border border-border px-3 py-2 text-[12px] text-foreground leading-relaxed">
+      <div className="rounded-lg bg-white/[0.04] border border-border px-3 py-2 text-xs text-foreground leading-relaxed">
         {segments.map((seg) => {
           if (seg.type === "text") {
             return <span key={`text-${seg.content.slice(0, 20)}`}>{seg.content}</span>;
@@ -91,7 +91,7 @@ export function ClozeInput({ clozeText, onSubmit }: ClozeInputProps) {
               onChange={(e) => handleChange(seg.index, e.target.value)}
               onKeyDown={(e) => handleKeyDown(e, seg.index)}
               placeholder="…"
-              className="inline-block mx-0.5 px-1.5 py-0 min-w-[80px] max-w-[200px] bg-white/[0.06] border-b border-accent/60 text-[12px] text-foreground focus:outline-none focus:border-accent rounded-sm placeholder:text-dim"
+              className="inline-block mx-0.5 px-1.5 py-0 min-w-[80px] max-w-[200px] bg-white/[0.06] border-b border-accent/60 text-xs text-foreground focus:outline-none focus:border-accent rounded-sm placeholder:text-dim"
               style={{
                 width: `${Math.max(80, (answersRef.current[seg.index]?.length ?? 0) * 8 + 32)}px`,
               }}
@@ -105,7 +105,7 @@ export function ClozeInput({ clozeText, onSubmit }: ClozeInputProps) {
           type="button"
           onClick={handleSubmit}
           disabled={answersRef.current.every((a) => !a.trim())}
-          className="text-[10px] px-3 py-1 rounded-md bg-accent/20 text-accent hover:bg-accent/30 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="text-2xs px-3 py-1 rounded-md bg-accent/20 text-accent hover:bg-accent/30 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           Submit
         </button>

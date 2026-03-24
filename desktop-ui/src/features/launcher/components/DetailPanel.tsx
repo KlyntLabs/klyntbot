@@ -66,7 +66,7 @@ function DetailField({ label, value }: { label: string; value: string | null | u
   if (!value) return null;
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="text-[10px] text-muted-foreground uppercase tracking-wider">{label}</span>
+      <span className="text-2xs text-muted-foreground uppercase tracking-wider">{label}</span>
       <span className="text-sm text-foreground break-all">{value}</span>
     </div>
   );
@@ -74,7 +74,7 @@ function DetailField({ label, value }: { label: string; value: string | null | u
 
 function KindTag({ label }: { label: string }) {
   return (
-    <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 rounded bg-accent inline-block">
+    <span className="text-2xs text-muted-foreground px-1.5 py-0.5 rounded bg-accent inline-block">
       {label}
     </span>
   );
@@ -98,7 +98,7 @@ function ApplicationDetail({ item, kind }: { item: LauncherItem; kind: KindOf<"a
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-3">
         {item.icon?.startsWith("data:") && (
-          <img src={item.icon} alt="" className="w-12 h-12 rounded-lg" />
+          <img src={item.icon} alt="" className="size-12 rounded-lg" />
         )}
         <div>
           <div className="text-base text-foreground font-medium">{item.title}</div>
@@ -119,7 +119,7 @@ function FileDetail({ item, kind }: { item: LauncherItem; kind: KindOf<"file"> }
       <div className="flex items-center gap-2">
         <KindTag label={kind.kind.charAt(0).toUpperCase() + kind.kind.slice(1)} />
         {kind.kind === "code" && (
-          <span className="text-[10px] text-muted-foreground">Open in Editor &mdash; Enter</span>
+          <span className="text-2xs text-muted-foreground">Open in Editor &mdash; Enter</span>
         )}
       </div>
       {item.subtitle && <DetailField label="Info" value={item.subtitle} />}
@@ -174,7 +174,7 @@ function CalculatorDetail({ kind }: { item: LauncherItem; kind: KindOf<"calculat
     <div className="flex flex-col gap-4">
       <div className="text-sm text-muted-foreground font-mono">{kind.expression}</div>
       <div className="text-3xl text-foreground font-mono font-medium">{kind.result}</div>
-      <span className="text-[10px] text-muted-foreground">Copied to clipboard on Enter</span>
+      <span className="text-2xs text-muted-foreground">Copied to clipboard on Enter</span>
       <KindTag label="Calculator" />
     </div>
   );

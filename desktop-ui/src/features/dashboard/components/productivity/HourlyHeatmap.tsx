@@ -55,7 +55,7 @@ export function HourlyHeatmap({ startDate, endDate }: Props) {
           const width = (h.productiveRatio / maxRatio) * 100;
           return (
             <div key={h.hour} className="flex items-center gap-1.5">
-              <span className="text-[10px] text-muted-foreground w-6 text-right tabular-nums">
+              <span className="text-2xs text-muted-foreground w-6 text-right tabular-nums">
                 {h.hour}
               </span>
               <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">

@@ -127,7 +127,7 @@ function FirstVisitView({
       {/* Header */}
       <div className="px-6 pt-5 pb-3 flex items-start justify-between">
         <div>
-          <p className="text-purple text-[10px] uppercase tracking-[0.12em] font-medium">
+          <p className="text-purple text-2xs uppercase tracking-[0.12em] font-medium">
             Practice Session
           </p>
           <div className="flex items-baseline gap-2 mt-1.5">
@@ -156,7 +156,7 @@ function FirstVisitView({
               key={seg.index}
               className="flex items-center gap-2.5 py-1.5 px-3.5 hover:bg-white/[0.03] transition-colors"
             >
-              <span className="text-muted-foreground/50 text-[10px] w-5 text-right shrink-0 tabular-nums">
+              <span className="text-muted-foreground/50 text-2xs w-5 text-right shrink-0 tabular-nums">
                 {seg.index + 1}
               </span>
               <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${typeDot(seg.type)}`} />
@@ -220,7 +220,7 @@ function ResumeView({
       {/* Header */}
       <div className="px-6 pt-5 pb-3 flex items-start justify-between">
         <div>
-          <p className="text-purple text-[10px] uppercase tracking-[0.12em] font-medium">
+          <p className="text-purple text-2xs uppercase tracking-[0.12em] font-medium">
             Resume Session
           </p>
           <div className="flex items-baseline gap-2 mt-1.5">
@@ -250,7 +250,7 @@ function ResumeView({
             style={{ width: `${pct}%` }}
           />
         </div>
-        <p className="text-[10px] text-muted mt-1.5">Pick up where you left off</p>
+        <p className="text-2xs text-muted mt-1.5">Pick up where you left off</p>
       </div>
 
       {/* Actions */}

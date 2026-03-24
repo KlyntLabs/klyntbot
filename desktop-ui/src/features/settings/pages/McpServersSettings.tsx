@@ -169,16 +169,16 @@ export function McpServersSettings() {
           <button
             type="button"
             onClick={handleOpenAdd}
-            className="flex items-center gap-1.5 text-[12px] text-brand hover:text-brand-hover transition-colors"
+            className="flex items-center gap-1.5 text-xs text-brand hover:text-brand-hover transition-colors"
           >
-            <Plus className="w-3.5 h-3.5" />
+            <Plus className="size-3.5" />
             Add server
           </button>
         </div>
 
         {customServers.length === 0 ? (
           <div className="bg-card rounded-lg border border-border p-8 flex flex-col items-center text-center">
-            <Plug className="w-8 h-8 text-dim mb-3" strokeWidth={1.5} />
+            <Plug className="size-8 text-dim mb-3" strokeWidth={1.5} />
             <p className="text-[13px] text-muted-foreground">No custom MCP servers connected</p>
             <p className="text-[11px] text-dim mt-1">
               Add a server manually or install one from the recommended list below

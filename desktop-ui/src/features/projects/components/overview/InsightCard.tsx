@@ -52,7 +52,7 @@ export function InsightCard() {
   if (loading) {
     return (
       <div className="glass-card rounded-xl p-5">
-        <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-3">
+        <div className="text-2xs text-muted-foreground uppercase tracking-wider mb-3">
           Latest Insight
         </div>
         <div className="h-12 bg-accent/20 rounded animate-pulse" />
@@ -63,7 +63,7 @@ export function InsightCard() {
   if (!insight) {
     return (
       <div className="glass-card rounded-xl p-5">
-        <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-3">
+        <div className="text-2xs text-muted-foreground uppercase tracking-wider mb-3">
           Latest Insight
         </div>
         <p className="text-[11px] text-muted-foreground">
@@ -72,7 +72,7 @@ export function InsightCard() {
         <button
           type="button"
           onClick={() => navigate(`/project/${project?.id}/notes`)}
-          className="mt-3 text-[10px] px-3 py-1 rounded bg-brand/10 text-brand hover:bg-brand/20 transition-colors"
+          className="mt-3 text-2xs px-3 py-1 rounded bg-brand/10 text-brand hover:bg-brand/20 transition-colors"
         >
           Go to Notes
         </button>
@@ -82,7 +82,7 @@ export function InsightCard() {
 
   return (
     <div className="glass-card rounded-xl p-5 border border-brand/15">
-      <div className="text-[10px] text-brand uppercase tracking-wider mb-3">Latest Insight</div>
+      <div className="text-2xs text-brand uppercase tracking-wider mb-3">Latest Insight</div>
       <p className="text-[11px] text-muted-foreground line-clamp-3 leading-relaxed">
         {insight.synthesis}
       </p>
@@ -90,7 +90,7 @@ export function InsightCard() {
         <button
           type="button"
           onClick={() => navigate(`/project/${project?.id}/notes`)}
-          className="text-[10px] px-3 py-1 rounded bg-brand/10 text-brand hover:bg-brand/20 transition-colors"
+          className="text-2xs px-3 py-1 rounded bg-brand/10 text-brand hover:bg-brand/20 transition-colors"
         >
           View Insight
         </button>

@@ -106,7 +106,7 @@ export function DistractionOverlay() {
                 </span>
               </div>
               {(loading || verdict) && (
-                <div className="text-[10px] text-muted-foreground flex items-center gap-1.5">
+                <div className="text-2xs text-muted-foreground flex items-center gap-1.5">
                   {loading && (
                     <>
                       <ThinkingDots size="sm" />

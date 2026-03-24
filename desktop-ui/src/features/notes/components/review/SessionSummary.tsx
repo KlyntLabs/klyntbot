@@ -161,13 +161,13 @@ export function SessionSummary({
       {beat3 && (
         <div className="animate-in fade-in duration-500 flex flex-col items-center gap-1.5">
           {stats.propagationCount > 0 && (
-            <p className="text-[10px] text-muted-foreground">
+            <p className="text-2xs text-muted-foreground">
               <span className="text-foreground font-medium">{stats.propagationCount}</span>
               {" knowledge connections strengthened"}
             </p>
           )}
           {stats.weakCards.length > 0 && (
-            <p className="text-[10px] text-muted-foreground">
+            <p className="text-2xs text-muted-foreground">
               <span className="text-yellow-400 font-medium">{stats.weakCards.length}</span>
               {" weak spot"}
               {stats.weakCards.length !== 1 ? "s" : ""}
@@ -175,7 +175,7 @@ export function SessionSummary({
             </p>
           )}
           {stats.propagationCount === 0 && stats.weakCards.length === 0 && (
-            <p className="text-[10px] text-dim">All cards held strong.</p>
+            <p className="text-2xs text-dim">All cards held strong.</p>
           )}
         </div>
       )}
@@ -183,7 +183,7 @@ export function SessionSummary({
       {/* Reflection pulse */}
       {showPulse && !pulseDismissed && (
         <div className="animate-in fade-in duration-500 w-full rounded-lg bg-white/[0.04] border border-white/[0.07] p-3 flex flex-col gap-2 text-left">
-          <p className="text-[10px] text-muted-foreground leading-snug">
+          <p className="text-2xs text-muted-foreground leading-snug">
             What felt different about today's answers?
           </p>
           <textarea
@@ -191,7 +191,7 @@ export function SessionSummary({
             onChange={(e) => setReflectionText(e.target.value)}
             placeholder="Optional reflection…"
             rows={2}
-            className="w-full bg-transparent resize-none text-[10px] text-foreground placeholder:text-dim outline-none border-none"
+            className="w-full bg-transparent resize-none text-2xs text-foreground placeholder:text-dim outline-none border-none"
           />
           <div className="flex justify-end">
             <button
@@ -217,7 +217,7 @@ export function SessionSummary({
             <button
               type="button"
               onClick={onReviewWeak}
-              className="w-full text-[10px] py-1.5 rounded-md bg-yellow-400/10 text-yellow-300 hover:bg-yellow-400/20 transition-colors"
+              className="w-full text-2xs py-1.5 rounded-md bg-yellow-400/10 text-yellow-300 hover:bg-yellow-400/20 transition-colors"
             >
               Review {stats.weakCards.length} weak spot
               {stats.weakCards.length !== 1 ? "s" : ""}
@@ -226,14 +226,14 @@ export function SessionSummary({
           <button
             type="button"
             onClick={onSaveInsight}
-            className="w-full text-[10px] py-1.5 rounded-md bg-white/[0.06] text-muted-foreground hover:text-foreground transition-colors"
+            className="w-full text-2xs py-1.5 rounded-md bg-white/[0.06] text-muted-foreground hover:text-foreground transition-colors"
           >
             Save as insight
           </button>
           <button
             type="button"
             onClick={onClose}
-            className="w-full text-[10px] py-1.5 rounded-md bg-white/[0.03] text-dim hover:text-muted-foreground transition-colors"
+            className="w-full text-2xs py-1.5 rounded-md bg-white/[0.03] text-dim hover:text-muted-foreground transition-colors"
           >
             Done
           </button>

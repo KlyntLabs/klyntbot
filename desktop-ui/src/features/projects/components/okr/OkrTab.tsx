@@ -45,9 +45,9 @@ export function OkrTab() {
     <div className="p-6 space-y-4">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Target className="w-4 h-4 text-muted-foreground" />
+        <Target className="size-4 text-muted-foreground" />
         <h2 className="text-sm font-semibold text-foreground">Objectives</h2>
-        <span className="text-[10px] px-2 py-0.5 rounded-full bg-brand/10 text-brand font-medium">
+        <span className="text-2xs px-2 py-0.5 rounded-full bg-brand/10 text-brand font-medium">
           {overallProgress}%
         </span>
 
@@ -58,7 +58,7 @@ export function OkrTab() {
               key={opt.value}
               type="button"
               onClick={() => setFilter(opt.value)}
-              className={`px-2.5 py-1 text-[10px] font-medium rounded transition-colors ${
+              className={`px-2.5 py-1 text-2xs font-medium rounded transition-colors ${
                 filter === opt.value
                   ? "bg-brand/20 text-brand"
                   : "text-muted-foreground hover:text-foreground"
@@ -78,7 +78,7 @@ export function OkrTab() {
           onClick={() => setModalOpen(true)}
           className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-brand text-white hover:bg-brand/90 transition-colors"
         >
-          <Plus className="w-3.5 h-3.5" /> New Objective
+          <Plus className="size-3.5" /> New Objective
         </button>
       </div>
 
@@ -92,7 +92,7 @@ export function OkrTab() {
       ) : (
         /* Empty state */
         <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
-          <Target className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
+          <Target className="size-8 text-muted-foreground mx-auto mb-3" />
           <p className="text-sm text-muted-foreground mb-1">
             {filter === "all"
               ? "No objectives defined."
@@ -108,7 +108,7 @@ export function OkrTab() {
                 onClick={() => setModalOpen(true)}
                 className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-md bg-brand text-white hover:bg-brand/90 transition-colors"
               >
-                <Plus className="w-3.5 h-3.5" /> New Objective
+                <Plus className="size-3.5" /> New Objective
               </button>
             </>
           )}

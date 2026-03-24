@@ -26,10 +26,7 @@ export function DashboardHome({
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
-          <GraduationCap
-            className="w-12 h-12 text-muted-foreground mx-auto mb-3"
-            strokeWidth={1.5}
-          />
+          <GraduationCap className="size-12 text-muted-foreground mx-auto mb-3" strokeWidth={1.5} />
           <h1 className="text-xl font-semibold text-foreground">Learning Hub</h1>
           <p className="text-muted-foreground mt-1 text-sm">Loading dashboard...</p>
         </div>
@@ -58,7 +55,7 @@ export function DashboardHome({
           >
             <Plus size={16} strokeWidth={1.5} />
             Create Card
-            <span className="text-[10px] text-muted-foreground ml-1">{"\u2318"}N</span>
+            <span className="text-2xs text-muted-foreground ml-1">{"\u2318"}N</span>
           </button>
         </div>
       </div>
@@ -76,11 +73,11 @@ export function DashboardHome({
         <button
           type="button"
           onClick={onQuickAdd}
-          className="glass-button px-3 py-1.5 text-[12px] text-foreground inline-flex items-center gap-1.5"
+          className="glass-button px-3 py-1.5 text-xs text-foreground inline-flex items-center gap-1.5"
         >
           <Plus size={14} strokeWidth={1.5} />
           Quick Add
-          <span className="text-[10px] text-muted-foreground">{"\u2318"}N</span>
+          <span className="text-2xs text-muted-foreground">{"\u2318"}N</span>
         </button>
       </div>
 
@@ -101,7 +98,7 @@ export function DashboardHome({
             </div>
             <span className="text-sm font-medium text-foreground">Start Review</span>
           </div>
-          <p className="text-[12px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             {totalDue > 0
               ? `${totalDue} card${totalDue !== 1 ? "s" : ""} due for review`
               : "No cards due right now"}
@@ -125,7 +122,7 @@ export function DashboardHome({
         </div>
         <div className="flex-1 min-w-0">
           <span className="text-sm font-medium text-foreground">Focused Review</span>
-          <p className="text-[12px] text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             Review all due cards in a distraction-free session
           </p>
         </div>
@@ -141,7 +138,7 @@ export function DashboardHome({
         </div>
         <div className="flex-1 min-w-0">
           <span className="text-sm font-medium text-foreground">Knowledge Health</span>
-          <p className="text-[12px] text-muted-foreground">Track retention across topics</p>
+          <p className="text-xs text-muted-foreground">Track retention across topics</p>
         </div>
       </Link>
 

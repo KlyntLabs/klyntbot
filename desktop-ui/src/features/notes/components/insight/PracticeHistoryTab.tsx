@@ -114,9 +114,7 @@ export function PracticeHistoryTab({ noteId }: PracticeHistoryTabProps) {
               <span className="text-[11px] text-muted-foreground">
                 {formatSessionDate(session.startedAt)}
               </span>
-              <span
-                className={`text-[10px] font-medium rounded-full px-2 py-0.5 ${badge.className}`}
-              >
+              <span className={`text-2xs font-medium rounded-full px-2 py-0.5 ${badge.className}`}>
                 {badge.label}
               </span>
             </div>
@@ -128,7 +126,7 @@ export function PracticeHistoryTab({ noteId }: PracticeHistoryTabProps) {
               {session.status === "in_progress" && (
                 <button
                   type="button"
-                  className="text-[10px] font-medium text-brand hover:text-brand/80 transition-colors"
+                  className="text-2xs font-medium text-brand hover:text-brand/80 transition-colors"
                 >
                   Resume
                 </button>
@@ -136,7 +134,7 @@ export function PracticeHistoryTab({ noteId }: PracticeHistoryTabProps) {
               {session.status === "completed" && (
                 <button
                   type="button"
-                  className="text-[10px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+                  className="text-2xs font-medium text-muted-foreground hover:text-foreground transition-colors"
                 >
                   Review
                 </button>

@@ -75,7 +75,7 @@ export function AISuggestionsPanel({
   return (
     <>
       <div className="border-b border-border px-3 py-2">
-        <div className="text-[10px] font-medium text-dim uppercase tracking-wider mb-1.5">
+        <div className="text-2xs font-medium text-dim uppercase tracking-wider mb-1.5">
           Language
         </div>
         <div className="flex gap-2">
@@ -102,7 +102,7 @@ export function AISuggestionsPanel({
         <button
           type="button"
           onClick={() => setCollapsed(!collapsed)}
-          className="w-full flex items-center gap-1.5 px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
+          className="w-full flex items-center gap-1.5 px-3 py-2 text-2xs font-medium uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
         >
           {collapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
           <span style={{ color: ACCENT }}>AI Suggestions</span>
@@ -117,7 +117,7 @@ export function AISuggestionsPanel({
           <div className="px-3 pb-3" style={{ backgroundColor: ACCENT_BG }}>
             {/* Related Notes */}
             <div className="py-1.5">
-              <div className="text-[10px] font-medium text-dim uppercase tracking-wider mb-1">
+              <div className="text-2xs font-medium text-dim uppercase tracking-wider mb-1">
                 Related Notes
               </div>
               {suggestions.relatedNotes.length > 0 ? (
@@ -137,7 +137,7 @@ export function AISuggestionsPanel({
                   ))}
                 </div>
               ) : (
-                <div className="text-[10px] text-dim italic">
+                <div className="text-2xs text-dim italic">
                   {noteId ? "No suggestions yet" : "Select a note"}
                 </div>
               )}
@@ -145,7 +145,7 @@ export function AISuggestionsPanel({
 
             {/* Link Suggestions */}
             <div className="py-1.5 border-t border-border-subtle">
-              <div className="text-[10px] font-medium text-dim uppercase tracking-wider mb-1">
+              <div className="text-2xs font-medium text-dim uppercase tracking-wider mb-1">
                 Link Suggestions
               </div>
               {suggestions.linkSuggestions.length > 0 ? (
@@ -165,13 +165,13 @@ export function AISuggestionsPanel({
                   ))}
                 </div>
               ) : (
-                <div className="text-[10px] text-dim italic">No link suggestions</div>
+                <div className="text-2xs text-dim italic">No link suggestions</div>
               )}
             </div>
 
             {/* Suggested Tags */}
             <div className="py-1.5 border-t border-border-subtle">
-              <div className="text-[10px] font-medium text-dim uppercase tracking-wider mb-1">
+              <div className="text-2xs font-medium text-dim uppercase tracking-wider mb-1">
                 Suggested Tags
               </div>
               {suggestions.suggestedTags.length > 0 ? (
@@ -179,7 +179,7 @@ export function AISuggestionsPanel({
                   {suggestions.suggestedTags.map((tag) => (
                     <span
                       key={tag}
-                      className="text-[10px] px-1.5 py-0.5 rounded-full"
+                      className="text-2xs px-1.5 py-0.5 rounded-full"
                       style={{
                         color: tagColor(tag),
                         backgroundColor: tagBgColor(tag),
@@ -190,7 +190,7 @@ export function AISuggestionsPanel({
                   ))}
                 </div>
               ) : (
-                <div className="text-[10px] text-dim italic">No tag suggestions</div>
+                <div className="text-2xs text-dim italic">No tag suggestions</div>
               )}
             </div>
 
@@ -200,7 +200,7 @@ export function AISuggestionsPanel({
                 type="button"
                 onClick={() => onOpenInsight?.()}
                 disabled={!noteId}
-                className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-accent text-muted-foreground hover:bg-accent/80 hover:text-foreground transition-colors disabled:text-dim disabled:cursor-not-allowed"
+                className="flex items-center gap-1 text-2xs px-2 py-1 rounded-md bg-accent text-muted-foreground hover:bg-accent/80 hover:text-foreground transition-colors disabled:text-dim disabled:cursor-not-allowed"
               >
                 <Brain size={10} />
                 Learn
@@ -208,7 +208,7 @@ export function AISuggestionsPanel({
               <button
                 type="button"
                 disabled
-                className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-accent text-dim cursor-not-allowed"
+                className="flex items-center gap-1 text-2xs px-2 py-1 rounded-md bg-accent text-dim cursor-not-allowed"
               >
                 <MessageSquare size={10} />
                 Ask AI
@@ -224,7 +224,7 @@ export function AISuggestionsPanel({
                   }
                 }}
                 disabled={!noteId || suggestions.linkSuggestions.length === 0}
-                className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded-md transition-colors ${
+                className={`flex items-center gap-1 text-2xs px-2 py-1 rounded-md transition-colors ${
                   noteId && suggestions.linkSuggestions.length > 0
                     ? "bg-accent text-muted-foreground hover:bg-accent/80 hover:text-foreground"
                     : "bg-accent text-dim cursor-not-allowed"

@@ -57,7 +57,7 @@ export function NoteVersionHistory({ noteId, onRestore }: NoteVersionHistoryProp
         {versions.length === 0 && (
           <div className="px-3 py-8 text-center">
             <div className="text-dim text-xs">No versions yet</div>
-            <div className="text-dim/60 text-[10px] mt-1">
+            <div className="text-dim/60 text-2xs mt-1">
               Versions are created automatically as you edit
             </div>
           </div>
@@ -83,7 +83,7 @@ export function NoteVersionHistory({ noteId, onRestore }: NoteVersionHistoryProp
               >
                 {formatTime(v.createdAt)}
               </div>
-              <div className="text-[10px] text-dim mt-0.5 truncate">
+              <div className="text-2xs text-dim mt-0.5 truncate">
                 {v.body.slice(0, 80)}
                 {v.body.length > 80 ? "..." : ""}
               </div>
@@ -95,7 +95,7 @@ export function NoteVersionHistory({ noteId, onRestore }: NoteVersionHistoryProp
       {/* Preview + Restore */}
       {previewVersion && (
         <div className="border-t border-border px-3 py-2">
-          <div className="text-[10px] text-dim mb-1.5 max-h-20 overflow-y-auto whitespace-pre-wrap">
+          <div className="text-2xs text-dim mb-1.5 max-h-20 overflow-y-auto whitespace-pre-wrap">
             {previewVersion.body.slice(0, 500)}
           </div>
           <button
@@ -104,7 +104,7 @@ export function NoteVersionHistory({ noteId, onRestore }: NoteVersionHistoryProp
             disabled={restoring}
             className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-light text-brand hover:bg-brand/10 transition-colors disabled:opacity-50"
           >
-            <RotateCcw className="w-3 h-3" strokeWidth={1.5} />
+            <RotateCcw className="size-3" strokeWidth={1.5} />
             {restoring ? "Restoring..." : "Restore this version"}
           </button>
         </div>

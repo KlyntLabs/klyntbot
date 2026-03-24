@@ -51,7 +51,7 @@ export function SettingsLayout({ children }: SettingsLayoutProps) {
           onClick={() => navigate("/")}
           className="flex items-center gap-2 px-4 py-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors mb-3"
         >
-          <ArrowLeft className="w-3.5 h-3.5" />
+          <ArrowLeft className="size-3.5" />
           Back to app
         </button>
 
@@ -76,7 +76,7 @@ export function SettingsLayout({ children }: SettingsLayoutProps) {
                     : "text-muted-foreground hover:bg-accent hover:text-foreground"
                 }`}
               >
-                <Icon className="w-4 h-4 flex-shrink-0" strokeWidth={1.5} />
+                <Icon className="size-4 flex-shrink-0" strokeWidth={1.5} />
                 {section.label}
               </button>
             );

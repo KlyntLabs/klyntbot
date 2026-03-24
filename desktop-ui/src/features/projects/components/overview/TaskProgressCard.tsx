@@ -32,9 +32,7 @@ export function TaskProgressCard() {
       onClick={() => navigate(`/project/${project?.id ?? ""}/tasks`)}
       className="glass-card rounded-xl p-5 text-left transition-colors hover:border-brand/30"
     >
-      <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-3">
-        Task Progress
-      </p>
+      <p className="text-2xs text-muted-foreground uppercase tracking-wider mb-3">Task Progress</p>
       <span className="text-2xl font-bold text-foreground">{activeCount}</span>
       <span className="text-[11px] text-muted-foreground ml-1.5">
         active task{activeCount !== 1 ? "s" : ""}

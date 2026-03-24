@@ -125,7 +125,7 @@ export function TrackedAppsList({ apps, categories, onReassigned }: TrackedAppsL
 
   return (
     <div className="glass-card p-3 flex flex-col gap-2">
-      <h3 className="text-[12px] font-medium text-muted-foreground">Tracked Apps & Sites</h3>
+      <h3 className="text-xs font-medium text-muted-foreground">Tracked Apps & Sites</h3>
 
       {/* Search */}
       <div className="relative">
@@ -147,7 +147,7 @@ export function TrackedAppsList({ apps, categories, onReassigned }: TrackedAppsL
         <button
           type="button"
           onClick={() => setShowUncategorized(!showUncategorized)}
-          className={`text-[10px] font-light px-2 py-1 rounded-lg transition-colors ${
+          className={`text-2xs font-light px-2 py-1 rounded-lg transition-colors ${
             showUncategorized ? "bg-brand/20 text-brand" : "text-muted-foreground hover:bg-card"
           }`}
         >
@@ -200,9 +200,9 @@ function TrackedAppRow({
   return (
     <div className="flex items-center gap-2 px-1.5 py-1 rounded-md hover:bg-card group">
       {color ? (
-        <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ backgroundColor: color }} />
+        <span className="size-2 rounded-sm flex-shrink-0" style={{ backgroundColor: color }} />
       ) : (
-        <span className="w-2 h-2 rounded-sm flex-shrink-0 border border-dashed border-muted" />
+        <span className="size-2 rounded-sm flex-shrink-0 border border-dashed border-muted" />
       )}
       <div className="flex-1 min-w-0">
         <div className="text-[11px] font-light text-foreground truncate">{app.displayName}</div>
@@ -212,7 +212,7 @@ function TrackedAppRow({
       </div>
       {isEditing ? (
         <select
-          className="glass-input text-[10px] px-1.5 py-0.5 rounded-md w-24"
+          className="glass-input text-2xs px-1.5 py-0.5 rounded-md w-24"
           defaultValue={app.categoryId ?? ""}
           onChange={(e) => onReassign(e.target.value)}
           onBlur={onCancel}

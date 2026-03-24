@@ -16,9 +16,7 @@ export function TranslationSection({
   return (
     <div className="border-b border-border px-3 py-3">
       <div className="flex items-center gap-2 mb-2">
-        <div className="text-[10px] text-muted-foreground uppercase tracking-wider">
-          Translation
-        </div>
+        <div className="text-2xs text-muted-foreground uppercase tracking-wider">Translation</div>
         {loading && <ThinkingDots size="sm" />}
       </div>
       {loading && !translation && <TranslationSkeleton />}

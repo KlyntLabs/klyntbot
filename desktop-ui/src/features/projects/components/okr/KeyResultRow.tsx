@@ -83,11 +83,7 @@ export function KeyResultRow({
           onClick={() => toggleKr(keyResult.id)}
           className="text-muted-foreground hover:text-foreground"
         >
-          {expanded ? (
-            <ChevronDown className="w-3.5 h-3.5" />
-          ) : (
-            <ChevronRight className="w-3.5 h-3.5" />
-          )}
+          {expanded ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
         </button>
 
         {/* Mini progress ring */}
@@ -128,7 +124,7 @@ export function KeyResultRow({
         <button
           type="button"
           onClick={() => toggleKr(keyResult.id)}
-          className="text-[10px] px-1.5 py-0.5 rounded-full bg-brand/10 text-brand opacity-0 group-hover:opacity-100 transition-opacity"
+          className="text-2xs px-1.5 py-0.5 rounded-full bg-brand/10 text-brand opacity-0 group-hover:opacity-100 transition-opacity"
         >
           {linkedTaskCount > 0
             ? `${linkedTaskCount} task${linkedTaskCount !== 1 ? "s" : ""}`
@@ -142,7 +138,7 @@ export function KeyResultRow({
             onClick={() => setMenuOpen(!menuOpen)}
             className="text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity"
           >
-            <MoreHorizontal className="w-3.5 h-3.5" />
+            <MoreHorizontal className="size-3.5" />
           </button>
           {menuOpen && (
             <div className="absolute right-0 top-full mt-1 z-20 glass-panel rounded-lg py-1 min-w-[120px] bg-card border border-border shadow-lg">
@@ -154,7 +150,7 @@ export function KeyResultRow({
                 }}
                 className="w-full px-3 py-1.5 text-left text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors flex items-center gap-2"
               >
-                <Pencil className="w-3 h-3" /> Edit
+                <Pencil className="size-3" /> Edit
               </button>
               <button
                 type="button"
@@ -164,7 +160,7 @@ export function KeyResultRow({
                 }}
                 className="w-full px-3 py-1.5 text-left text-xs text-red-400 hover:text-red-300 hover:bg-accent transition-colors flex items-center gap-2"
               >
-                <Trash2 className="w-3 h-3" /> Delete
+                <Trash2 className="size-3" /> Delete
               </button>
             </div>
           )}

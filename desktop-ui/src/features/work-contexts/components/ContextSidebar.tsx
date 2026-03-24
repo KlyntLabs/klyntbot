@@ -27,7 +27,7 @@ export function ContextSidebar({
         className="flex items-center justify-between px-1 py-1.5 text-[11px] font-medium text-dim uppercase tracking-wider hover:text-muted-foreground transition-colors"
       >
         <span>Work Contexts</span>
-        <span className="text-[10px] text-muted-foreground">{collapsed ? "▸" : "▾"}</span>
+        <span className="text-2xs text-muted-foreground">{collapsed ? "▸" : "▾"}</span>
       </button>
 
       {!collapsed && (
@@ -53,16 +53,16 @@ export function ContextSidebar({
                 }`}
               >
                 <div
-                  className={`w-2 h-2 rounded-full shrink-0 ${isRecent ? "animate-pulse" : ""}`}
+                  className={`size-2 rounded-full shrink-0 ${isRecent ? "animate-pulse" : ""}`}
                   style={{ backgroundColor: color }}
                 />
                 <div className="flex-1 min-w-0">
-                  <p className="text-[12px] font-medium truncate">{ctx.title}</p>
-                  <p className="text-[10px] text-muted-foreground">
+                  <p className="text-xs font-medium truncate">{ctx.title}</p>
+                  <p className="text-2xs text-muted-foreground">
                     {isRecent ? "Active now" : `${ago} ago`}
                   </p>
                 </div>
-                <span className="text-[10px] text-muted-foreground bg-accent rounded-full px-1.5 py-0.5 shrink-0">
+                <span className="text-2xs text-muted-foreground bg-accent rounded-full px-1.5 py-0.5 shrink-0">
                   {ctx.eventCount}
                 </span>
               </button>
@@ -74,7 +74,7 @@ export function ContextSidebar({
             onClick={onSearchClick}
             className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[11px] text-muted-foreground hover:text-foreground hover:bg-card transition-colors mt-1"
           >
-            <Search className="w-3 h-3" />
+            <Search className="size-3" />
             Search contexts…
           </button>
         </div>

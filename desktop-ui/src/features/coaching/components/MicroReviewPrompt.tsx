@@ -16,10 +16,10 @@ export function MicroReviewPrompt({ dueCount, onAccept, onSkip }: MicroReviewPro
           <BookOpen size={14} className="text-brand" strokeWidth={1.5} />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-[12px] text-foreground leading-relaxed">
+          <p className="text-xs text-foreground leading-relaxed">
             Before you dive in — 45s review to keep your streak alive?
           </p>
-          <p className="text-[10px] text-muted-foreground mt-0.5">
+          <p className="text-2xs text-muted-foreground mt-0.5">
             {dueCount} card{dueCount !== 1 ? "s" : ""} due for review
           </p>
         </div>

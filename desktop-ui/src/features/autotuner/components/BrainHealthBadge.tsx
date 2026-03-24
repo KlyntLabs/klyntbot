@@ -37,7 +37,7 @@ export function BrainHealthBadge({ compact = false }: BrainHealthBadgeProps) {
         )}
         <span className={`relative inline-flex h-2 w-2 rounded-full ${color}`} />
       </span>
-      {!compact && <span className="text-[10px] font-light text-muted-foreground">{label}</span>}
+      {!compact && <span className="text-2xs font-light text-muted-foreground">{label}</span>}
     </span>
   );
 }

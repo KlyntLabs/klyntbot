@@ -31,7 +31,7 @@ export function FocusStateIndicator() {
         className={`w-1.5 h-1.5 rounded-full ${config.pulse ? "animate-pulse" : ""}`}
         style={{ backgroundColor: config.color }}
       />
-      <span className="text-[10px] font-medium" style={{ color: config.color }}>
+      <span className="text-2xs font-medium" style={{ color: config.color }}>
         {config.label}
       </span>
     </div>

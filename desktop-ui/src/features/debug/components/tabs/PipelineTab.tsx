@@ -108,7 +108,7 @@ export function PipelineTab() {
         {/* Extraction Log */}
         <div>
           <h2 className="text-[13px] font-medium text-muted-foreground mb-3 flex items-center gap-1.5">
-            <GitBranch className="w-3.5 h-3.5" /> Extraction Log
+            <GitBranch className="size-3.5" /> Extraction Log
           </h2>
           <div className="space-y-2">
             {extractions.map((e) => (
@@ -117,7 +117,7 @@ export function PipelineTab() {
                 className="p-3 bg-card rounded-lg border border-border"
               >
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-[10px] text-muted-foreground font-mono">
+                  <span className="text-2xs text-muted-foreground font-mono">
                     {new Date(e.ts).toLocaleTimeString(undefined, {
                       hour: "2-digit",
                       minute: "2-digit",
@@ -125,7 +125,7 @@ export function PipelineTab() {
                       hour12: false,
                     })}
                   </span>
-                  <span className="text-[10px] bg-brand/20 text-brand px-1 py-0.5 rounded">
+                  <span className="text-2xs bg-brand/20 text-brand px-1 py-0.5 rounded">
                     {e.factsExtracted} facts
                   </span>
                 </div>
@@ -133,7 +133,7 @@ export function PipelineTab() {
               </div>
             ))}
             {extractions.length === 0 && (
-              <p className="text-[12px] text-muted-foreground text-center py-4">
+              <p className="text-xs text-muted-foreground text-center py-4">
                 No extraction events yet
               </p>
             )}
@@ -150,7 +150,7 @@ export function PipelineTab() {
                 className="p-3 bg-card rounded-lg border border-border"
               >
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-[10px] text-muted-foreground font-mono">
+                  <span className="text-2xs text-muted-foreground font-mono">
                     {new Date(c.ts).toLocaleTimeString(undefined, {
                       hour: "2-digit",
                       minute: "2-digit",
@@ -159,7 +159,7 @@ export function PipelineTab() {
                     })}
                   </span>
                   <span
-                    className={`text-[10px] px-1 py-0.5 rounded ${opColors[c.operation] ?? opColors.NOOP}`}
+                    className={`text-2xs px-1 py-0.5 rounded ${opColors[c.operation] ?? opColors.NOOP}`}
                   >
                     {c.operation}
                   </span>
@@ -168,7 +168,7 @@ export function PipelineTab() {
               </div>
             ))}
             {consolidations.length === 0 && (
-              <p className="text-[12px] text-muted-foreground text-center py-4">
+              <p className="text-xs text-muted-foreground text-center py-4">
                 No consolidation events yet
               </p>
             )}

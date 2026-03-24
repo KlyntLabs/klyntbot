@@ -33,7 +33,7 @@ export function SplitToolbar({ currentMode, onModeChange }: SplitToolbarProps) {
                 : "text-muted-foreground hover:text-foreground hover:bg-muted"
             }`}
           >
-            <Icon className="w-3.5 h-3.5" strokeWidth={1.5} />
+            <Icon className="size-3.5" strokeWidth={1.5} />
             {mode.shortLabel}
           </button>
         );

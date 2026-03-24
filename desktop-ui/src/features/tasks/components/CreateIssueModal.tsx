@@ -1,5 +1,6 @@
 import type { useMutation } from "@shared/hooks/useMutation";
 import type { Area, Task, TaskCreateParams } from "@shared/types/tasks";
+import { Button } from "@shared/ui/Button";
 import { useState } from "react";
 import { useStatusWorkflow } from "../contexts/StatusWorkflowContext";
 import type { Priority, Status } from "../lib/mappers";
@@ -7,7 +8,6 @@ import { priorityToNumber } from "../lib/mappers";
 import { priorities } from "../lib/priority-icons";
 import { renderStatusIcon } from "../lib/status-utils";
 import { useCreateIssueStore } from "../store/create-issue-store";
-import { Button } from "./ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "./ui/dialog";
 
 interface CreateIssueModalProps {
@@ -124,6 +124,7 @@ export function CreateIssueModal({ onCreateTask, areas }: CreateIssueModalProps)
             Cancel
           </Button>
           <Button
+            variant="primary"
             size="sm"
             onClick={handleSubmit}
             disabled={!title.trim() || !selectedStatus || !selectedPriority}

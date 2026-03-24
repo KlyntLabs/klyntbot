@@ -44,7 +44,7 @@ export function AnnotationSidebar({
   return (
     <div className="flex h-full flex-col">
       {!hideHeader && (
-        <div className="px-3 py-1.5 text-[10px] text-muted-foreground uppercase tracking-wider border-b border-border shrink-0 flex items-center justify-between">
+        <div className="px-3 py-1.5 text-2xs text-muted-foreground uppercase tracking-wider border-b border-border shrink-0 flex items-center justify-between">
           <span>Annotations ({annotations.length})</span>
         </div>
       )}
@@ -134,7 +134,7 @@ function AnnotationCard({
       {/* Quoted text */}
       {annotation.quotedText && (
         <div className="mb-1 border-l-2 border-brand/40 pl-1.5">
-          <p className="text-[10px] text-muted-foreground italic leading-snug">
+          <p className="text-2xs text-muted-foreground italic leading-snug">
             &ldquo;{annotation.quotedText}&rdquo;
           </p>
         </div>
@@ -150,7 +150,7 @@ function AnnotationCard({
             {enrichment.words.map((w) => (
               <span
                 key={w.word}
-                className="inline-flex items-center gap-1 rounded bg-surface-hover px-1.5 py-0.5 text-[10px] text-primary"
+                className="inline-flex items-center gap-1 rounded bg-surface-hover px-1.5 py-0.5 text-2xs text-primary"
               >
                 {w.word}
                 {w.reading && <span className="text-[9px] text-muted-foreground">{w.reading}</span>}

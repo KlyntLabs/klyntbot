@@ -130,7 +130,7 @@ export function NoteCreationDialog({
           <div className="border-t border-border-subtle px-5 py-3">
             <div className="flex items-center gap-1.5 mb-2">
               <Sparkles size={12} className="text-brand" />
-              <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+              <span className="text-2xs uppercase tracking-wider text-muted-foreground">
                 Similar notes
               </span>
             </div>

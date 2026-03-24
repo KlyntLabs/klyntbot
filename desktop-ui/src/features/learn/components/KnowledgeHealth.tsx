@@ -16,11 +16,11 @@ function TopicRow({ topic }: { topic: TopicHealth }) {
       {/* Name + domain */}
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium text-primary truncate">{topic.name}</p>
-        <p className="text-[10px] text-muted truncate">{topic.domain}</p>
+        <p className="text-2xs text-muted truncate">{topic.domain}</p>
       </div>
 
       {/* Atom count */}
-      <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">
+      <span className="text-2xs text-muted-foreground tabular-nums shrink-0">
         {topic.atomCount} atom{topic.atomCount !== 1 ? "s" : ""}
       </span>
 
@@ -44,7 +44,7 @@ function TopicRow({ topic }: { topic: TopicHealth }) {
       {/* Review button */}
       <Link
         to={`/learn/review/${topic.id}`}
-        className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium text-purple-400 hover:bg-purple-500/15 transition-colors shrink-0"
+        className="flex items-center gap-1 px-2 py-1 rounded-md text-2xs font-medium text-purple-400 hover:bg-purple-500/15 transition-colors shrink-0"
       >
         <Play size={10} strokeWidth={1.5} />
         Review
@@ -70,7 +70,7 @@ function TrendsTab() {
               type="button"
               key={d}
               onClick={() => setDays(d)}
-              className={`px-2 py-0.5 text-[10px] rounded-md transition-colors ${
+              className={`px-2 py-0.5 text-2xs rounded-md transition-colors ${
                 days === d
                   ? "bg-brand/20 text-brand font-medium"
                   : "text-muted-foreground hover:text-foreground"

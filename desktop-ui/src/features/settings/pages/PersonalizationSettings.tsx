@@ -302,7 +302,7 @@ export function PersonalizationSettings() {
               <select
                 value={editedProvider}
                 onChange={(e) => handleProviderChange(e.target.value)}
-                className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
               >
                 <option value="" className="bg-popover">
                   Auto-detect
@@ -339,7 +339,7 @@ export function PersonalizationSettings() {
                       setProviderEdits((prev) => ({ ...prev, apiBase: e.target.value }))
                     }
                     placeholder="Leave blank for default"
-                    className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                    className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
                   />
                 </label>
               </>
@@ -352,7 +352,7 @@ export function PersonalizationSettings() {
                 value={editedModel}
                 onChange={(e) => setProviderEdits((prev) => ({ ...prev, model: e.target.value }))}
                 placeholder="e.g. anthropic/claude-opus-4-5"
-                className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
               />
             </label>
 
@@ -382,7 +382,7 @@ export function PersonalizationSettings() {
                     model: "",
                   }))
                 }
-                className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
               >
                 <option value="" className="bg-popover">
                   Same as main ({PROVIDERS.find((p) => p.value === editedProvider)?.label || "auto"}
@@ -404,7 +404,7 @@ export function PersonalizationSettings() {
                   onChange={(e) =>
                     setCognitiveEdits((prev) => ({ ...prev, model: e.target.value }))
                   }
-                  className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                  className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
                 >
                   <option value="" className="bg-popover">
                     Same as main agent model
@@ -424,16 +424,14 @@ export function PersonalizationSettings() {
                     setCognitiveEdits((prev) => ({ ...prev, model: e.target.value }))
                   }
                   placeholder="Leave blank to use main agent model"
-                  className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                  className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
                 />
               )}
             </div>
 
             <div className="flex items-center justify-between pt-1 border-t border-border">
               <div>
-                <span className="text-[12px] text-muted-foreground">
-                  Auto-extract knowledge atoms
-                </span>
+                <span className="text-xs text-muted-foreground">Auto-extract knowledge atoms</span>
                 <p className="text-[11px] text-dim">
                   Automatically extract concepts and facts from notes
                 </p>
@@ -452,7 +450,7 @@ export function PersonalizationSettings() {
 
             {hasCognitiveChanges && (
               <>
-                <p className="text-[10px] text-warning/80">Changes take effect after restart</p>
+                <p className="text-2xs text-warning/80">Changes take effect after restart</p>
                 <SaveButton onClick={saveCognitive} saving={savingCognitive} />
               </>
             )}
@@ -464,7 +462,7 @@ export function PersonalizationSettings() {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-[12px] text-muted-foreground">Enable learning</span>
+                <span className="text-xs text-muted-foreground">Enable learning</span>
                 <p className="text-[11px] text-dim">
                   Adaptive confidence thresholds based on outcomes
                 </p>
@@ -490,7 +488,7 @@ export function PersonalizationSettings() {
                 }
                 step="60"
                 min="60"
-                className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
               />
             </label>
 
@@ -509,7 +507,7 @@ export function PersonalizationSettings() {
                   step="0.05"
                   min="0"
                   max="1"
-                  className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                  className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
                 />
               </label>
               <label className="flex-1">
@@ -526,7 +524,7 @@ export function PersonalizationSettings() {
                   step="0.05"
                   min="0"
                   max="1"
-                  className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                  className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
                 />
               </label>
             </div>
@@ -545,7 +543,7 @@ export function PersonalizationSettings() {
                   }))
                 }
                 min="1"
-                className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
               />
             </label>
 
@@ -565,7 +563,7 @@ export function PersonalizationSettings() {
               <select
                 value={pmVal("primary")}
                 onChange={(e) => setPmEdits((prev) => ({ ...prev, primary: e.target.value }))}
-                className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
               >
                 <option value="" className="bg-popover">
                   Auto (use agent default)
@@ -585,7 +583,7 @@ export function PersonalizationSettings() {
               <select
                 value={pmVal("fallback")}
                 onChange={(e) => setPmEdits((prev) => ({ ...prev, fallback: e.target.value }))}
-                className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
               >
                 <option value="" className="bg-popover">
                   None
@@ -610,7 +608,7 @@ export function PersonalizationSettings() {
                   setPmEdits((prev) => ({ ...prev, classifierModel: e.target.value }))
                 }
                 placeholder="e.g. claude-haiku"
-                className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
               />
             </label>
 

@@ -17,11 +17,11 @@ export function RelevantAtoms({ domain, limit = 5 }: RelevantAtomsProps) {
 
   return (
     <div className="glass-card rounded-lg p-3 space-y-1">
-      <span className="text-[10px] text-muted uppercase tracking-wider">Related Knowledge</span>
+      <span className="text-2xs text-muted uppercase tracking-wider">Related Knowledge</span>
       {matchingTopics.map((topic) => (
         <div key={topic.id} className="flex items-center justify-between text-xs">
           <span className="text-primary truncate">{topic.name}</span>
-          <span className={`text-[10px] tabular-nums ${retentionTextColor(topic.avgRetention)}`}>
+          <span className={`text-2xs tabular-nums ${retentionTextColor(topic.avgRetention)}`}>
             {Math.round(topic.avgRetention * 100)}%
           </span>
         </div>

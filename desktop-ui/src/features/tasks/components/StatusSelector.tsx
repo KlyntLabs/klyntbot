@@ -1,4 +1,5 @@
 import { useMutation } from "@shared/hooks/useMutation";
+import { cn } from "@shared/lib/utils";
 import type { Task, TaskUpdateParams } from "@shared/types/tasks";
 import { Check } from "lucide-react";
 import { useState } from "react";
@@ -7,7 +8,6 @@ import { useRefetchTasks } from "../hooks/useTasksContext";
 import { statusToMutationParams } from "../lib/mappers";
 import type { Status } from "../lib/status-icons";
 import { renderStatusIcon } from "../lib/status-utils";
-import { cn } from "../lib/utils";
 import {
   Command,
   CommandEmpty,

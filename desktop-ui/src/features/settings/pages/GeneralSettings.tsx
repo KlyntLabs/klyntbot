@@ -163,7 +163,7 @@ export function GeneralSettings() {
               ] as const
             ).map(([key, label]) => (
               <div key={key} className="flex items-center justify-between gap-4">
-                <span className="text-[12px] text-muted-foreground w-28 shrink-0">{label}</span>
+                <span className="text-xs text-muted-foreground w-28 shrink-0">{label}</span>
                 <ShortcutRecorder
                   value={currentShortcuts[key]}
                   defaultValue={SHORTCUT_DEFAULTS[key]}
@@ -177,7 +177,7 @@ export function GeneralSettings() {
               </div>
             ))}
 
-            {shortcutError && <p className="text-[12px] text-red-400">{shortcutError}</p>}
+            {shortcutError && <p className="text-xs text-red-400">{shortcutError}</p>}
 
             {hasShortcutChanges && (
               <div className="flex justify-end">
@@ -194,7 +194,7 @@ export function GeneralSettings() {
         <SettingsCard title="Agent defaults">
           <div className="space-y-3">
             <label className="block">
-              <span className="block text-[12px] text-muted-foreground mb-1">Default model</span>
+              <span className="block text-xs text-muted-foreground mb-1">Default model</span>
               <input
                 type="text"
                 value={currentModel}
@@ -206,7 +206,7 @@ export function GeneralSettings() {
 
             <div className="flex gap-3">
               <label className="flex-1">
-                <span className="block text-[12px] text-muted-foreground mb-1">Temperature</span>
+                <span className="block text-xs text-muted-foreground mb-1">Temperature</span>
                 <input
                   type="number"
                   value={currentTemp}
@@ -218,7 +218,7 @@ export function GeneralSettings() {
                 />
               </label>
               <label className="flex-1">
-                <span className="block text-[12px] text-muted-foreground mb-1">Max tokens</span>
+                <span className="block text-xs text-muted-foreground mb-1">Max tokens</span>
                 <input
                   type="number"
                   value={currentMaxTokens}
@@ -241,7 +241,7 @@ export function GeneralSettings() {
         <PermissionsCard />
 
         <SettingsCard title="AI Self-Improvement">
-          <p className="text-[12px] text-muted-foreground mb-3">
+          <p className="text-xs text-muted-foreground mb-3">
             AutoTuner continuously learns your preferences and optimizes response quality.
           </p>
           <AutoTunerPanel />

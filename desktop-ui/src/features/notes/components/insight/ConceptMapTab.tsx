@@ -48,7 +48,7 @@ function CopyButton({
     <button
       type="button"
       onClick={onCopy}
-      className="flex items-center gap-1.5 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+      className="flex items-center gap-1.5 text-2xs text-muted-foreground hover:text-foreground transition-colors"
     >
       <ClipboardCopy size={10} />
       {copied ? "Copied!" : "Copy Mermaid code"}

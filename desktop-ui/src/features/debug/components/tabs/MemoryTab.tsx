@@ -207,11 +207,11 @@ export function MemoryTab() {
             type="button"
             className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
           >
-            <Plus className="w-3 h-3" /> Add Fact
+            <Plus className="size-3" /> Add Fact
           </button>
         </div>
         <div className="bg-card rounded-lg border border-border overflow-hidden">
-          <table className="w-full text-[12px]">
+          <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-border-subtle">
                 <th className="text-left p-2 text-muted-foreground font-normal">Domain</th>
@@ -235,7 +235,7 @@ export function MemoryTab() {
                 >
                   <td className="p-2">
                     <span
-                      className={`text-[10px] px-1 py-0.5 rounded ${domainColors[f.domain] ?? "text-muted-foreground"}`}
+                      className={`text-2xs px-1 py-0.5 rounded ${domainColors[f.domain] ?? "text-muted-foreground"}`}
                     >
                       {f.domain}
                     </span>
@@ -262,7 +262,7 @@ export function MemoryTab() {
                       onClick={() => handleDeleteFact(f.id)}
                       className="text-muted-foreground hover:text-destructive"
                     >
-                      <Trash2 className="w-3 h-3" />
+                      <Trash2 className="size-3" />
                     </button>
                   </td>
                 </tr>
@@ -287,21 +287,21 @@ export function MemoryTab() {
             <div key={m.id} className="p-3 bg-card rounded-lg border border-border">
               <div className="flex items-center gap-2 mb-1">
                 <span
-                  className={`text-[10px] px-1 py-0.5 rounded ${domainColors[m.domain] ?? "text-muted-foreground"}`}
+                  className={`text-2xs px-1 py-0.5 rounded ${domainColors[m.domain] ?? "text-muted-foreground"}`}
                 >
                   {m.domain}
                 </span>
-                <span className="text-[10px] text-muted-foreground">{m.occurredAt}</span>
-                <span className="text-[10px] text-muted-foreground">
+                <span className="text-2xs text-muted-foreground">{m.occurredAt}</span>
+                <span className="text-2xs text-muted-foreground">
                   imp: {m.importance.toFixed(2)}
                 </span>
               </div>
-              <p className="text-[12px] text-muted-foreground">{m.content}</p>
+              <p className="text-xs text-muted-foreground">{m.content}</p>
               {m.summary && <p className="text-[11px] text-muted-foreground mt-1">{m.summary}</p>}
             </div>
           ))}
           {episodic.length === 0 && (
-            <p className="text-[12px] text-muted-foreground">No episodic memories</p>
+            <p className="text-xs text-muted-foreground">No episodic memories</p>
           )}
         </div>
       </div>
@@ -310,7 +310,7 @@ export function MemoryTab() {
       <div>
         <h2 className="text-[13px] font-medium text-muted-foreground mb-3">Procedural Rules</h2>
         <div className="bg-card rounded-lg border border-border overflow-hidden">
-          <table className="w-full text-[12px]">
+          <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-border-subtle">
                 <th className="text-left p-2 text-muted-foreground font-normal">Domain</th>
@@ -325,7 +325,7 @@ export function MemoryTab() {
                 <tr key={r.id} className="border-b border-border-subtle">
                   <td className="p-2">
                     <span
-                      className={`text-[10px] px-1 py-0.5 rounded ${domainColors[r.domain] ?? "text-muted-foreground"}`}
+                      className={`text-2xs px-1 py-0.5 rounded ${domainColors[r.domain] ?? "text-muted-foreground"}`}
                     >
                       {r.domain}
                     </span>
@@ -334,9 +334,7 @@ export function MemoryTab() {
                   <td className="p-2 text-muted-foreground">{r.confidence.toFixed(2)}</td>
                   <td className="p-2 text-muted-foreground">{r.signalCount}</td>
                   <td className="p-2">
-                    <span
-                      className={`text-[10px] ${r.active ? "text-success" : "text-destructive"}`}
-                    >
+                    <span className={`text-2xs ${r.active ? "text-success" : "text-destructive"}`}>
                       {r.active ? "ON" : "OFF"}
                     </span>
                   </td>
@@ -375,7 +373,7 @@ export function MemoryTab() {
           disabled={reflecting}
           className="flex items-center gap-1 text-[11px] text-brand hover:text-brand/80 disabled:opacity-50"
         >
-          <Play className="w-3 h-3" />
+          <Play className="size-3" />
           {reflecting ? "Reflecting..." : "Run Reflection"}
         </button>
         <button
@@ -384,7 +382,7 @@ export function MemoryTab() {
           disabled={compacting}
           className="flex items-center gap-1 text-[11px] text-brand hover:text-brand/80 disabled:opacity-50"
         >
-          <Play className="w-3 h-3" />
+          <Play className="size-3" />
           {compacting ? "Running..." : "Run Compaction"}
         </button>
       </div>

@@ -1,6 +1,6 @@
+import { cn } from "@shared/lib/utils";
 import { useState } from "react";
 import type { useIssueDetail } from "../../hooks/useIssueDetail";
-import { cn } from "../../lib/utils";
 import { IssueActivityTab } from "./IssueActivityTab";
 import { IssueContentTab } from "./IssueContentTab";
 

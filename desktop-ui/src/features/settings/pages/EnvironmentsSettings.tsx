@@ -9,7 +9,7 @@ export function EnvironmentsSettings() {
       </div>
 
       <div className="bg-card rounded-lg border border-border p-8 flex flex-col items-center text-center">
-        <Container className="w-8 h-8 text-dim mb-3" strokeWidth={1.5} />
+        <Container className="size-8 text-dim mb-3" strokeWidth={1.5} />
         <p className="text-[13px] text-muted-foreground">Environment management coming soon</p>
       </div>
     </div>

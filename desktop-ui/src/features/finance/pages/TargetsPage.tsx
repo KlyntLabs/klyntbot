@@ -208,29 +208,25 @@ export function FinanceTargets() {
       {/* ── Stats row ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-4 gap-3 mb-4">
         <Card compact className="p-4">
-          <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">
+          <p className="text-2xs text-dim font-medium uppercase tracking-wider mb-1">
             Active Goals
           </p>
           <p className="text-[24px] font-light text-foreground">{activeGoals.length}</p>
         </Card>
         <Card compact className="p-4">
-          <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">
+          <p className="text-2xs text-dim font-medium uppercase tracking-wider mb-1">
             Goal Progress
           </p>
           <p className="text-[24px] font-light text-brand tabular-nums">{overallGoalPct}%</p>
         </Card>
         <Card compact className="p-4">
-          <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">
-            Total Debt
-          </p>
+          <p className="text-2xs text-dim font-medium uppercase tracking-wider mb-1">Total Debt</p>
           <p className="text-[24px] font-light text-destructive tabular-nums">
             {fmtCompact(convertTotal(totalRemaining), displayCur, hidden)}
           </p>
         </Card>
         <Card compact className="p-4">
-          <p className="text-[10px] text-dim font-medium uppercase tracking-wider mb-1">
-            Debt Paid
-          </p>
+          <p className="text-2xs text-dim font-medium uppercase tracking-wider mb-1">Debt Paid</p>
           <p className="text-[24px] font-light text-success tabular-nums">{debtPaidPct}%</p>
         </Card>
       </div>
@@ -246,9 +242,9 @@ export function FinanceTargets() {
                 <button
                   type="button"
                   onClick={() => setGoalModalOpen(true)}
-                  className="flex items-center gap-1 text-[10px] text-brand font-light hover:text-brand-hover transition-colors"
+                  className="flex items-center gap-1 text-2xs text-brand font-light hover:text-brand-hover transition-colors"
                 >
-                  <Plus className="w-3 h-3" strokeWidth={1.5} /> Add Goal
+                  <Plus className="size-3" strokeWidth={1.5} /> Add Goal
                 </button>
               }
             />
@@ -285,11 +281,11 @@ export function FinanceTargets() {
                       <div className="flex items-center justify-between mb-1.5">
                         <div className="flex items-center gap-2 min-w-0">
                           <Icon
-                            className="w-3.5 h-3.5 flex-shrink-0"
+                            className="size-3.5 flex-shrink-0"
                             style={{ color: COLORS[i % COLORS.length] }}
                             strokeWidth={1.5}
                           />
-                          <span className="text-[12px] font-medium text-muted-foreground truncate">
+                          <span className="text-xs font-medium text-muted-foreground truncate">
                             {g.name}
                           </span>
                           <span
@@ -325,7 +321,7 @@ export function FinanceTargets() {
                               compact: true,
                             })}
                           </span>
-                          <span className="text-[10px] text-brand tabular-nums w-8 text-right">
+                          <span className="text-2xs text-brand tabular-nums w-8 text-right">
                             {p}%
                           </span>
                         </div>
@@ -380,9 +376,9 @@ export function FinanceTargets() {
                 <button
                   type="button"
                   onClick={() => setLiabModalOpen(true)}
-                  className="flex items-center gap-1 text-[10px] text-brand font-light hover:text-brand-hover transition-colors"
+                  className="flex items-center gap-1 text-2xs text-brand font-light hover:text-brand-hover transition-colors"
                 >
-                  <Plus className="w-3 h-3" strokeWidth={1.5} /> Add Debt
+                  <Plus className="size-3" strokeWidth={1.5} /> Add Debt
                 </button>
               }
             />
@@ -401,10 +397,10 @@ export function FinanceTargets() {
                         <div className="flex items-center justify-between mb-1.5">
                           <div className="flex items-center gap-2 min-w-0">
                             <Icon
-                              className="w-3.5 h-3.5 flex-shrink-0 text-destructive/60"
+                              className="size-3.5 flex-shrink-0 text-destructive/60"
                               strokeWidth={1.5}
                             />
-                            <span className="text-[12px] font-medium text-muted-foreground truncate">
+                            <span className="text-xs font-medium text-muted-foreground truncate">
                               {l.name}
                             </span>
                             <span className="text-[8px] font-light px-1.5 py-0.5 rounded-full bg-accent text-dim flex-shrink-0">
@@ -424,7 +420,7 @@ export function FinanceTargets() {
                                 compact: true,
                               })}
                             </span>
-                            <span className="text-[10px] text-success tabular-nums w-8 text-right">
+                            <span className="text-2xs text-success tabular-nums w-8 text-right">
                               {paid}%
                             </span>
                           </div>
@@ -467,7 +463,7 @@ export function FinanceTargets() {
                 </div>
                 {liabilities.length > 0 && (
                   <div className="mt-3 pt-2.5 border-t border-border flex justify-between">
-                    <span className="text-[10px] text-muted-foreground">Total Debt</span>
+                    <span className="text-2xs text-muted-foreground">Total Debt</span>
                     <span className="text-[11px] text-destructive tabular-nums">
                       {fmtCompact(convertTotal(totalRemaining), displayCur, hidden)}
                     </span>
@@ -482,7 +478,7 @@ export function FinanceTargets() {
         <div className="w-72 flex-shrink-0 sticky top-0 self-start space-y-4">
           {/* Goal Progress overview */}
           <Card compact className="p-4">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-3">
+            <p className="text-2xs text-muted-foreground uppercase tracking-widest mb-3">
               Goal Progress
             </p>
             <div className="flex items-center justify-center mb-3">
@@ -495,8 +491,8 @@ export function FinanceTargets() {
             </div>
             <div className="mb-2">
               <div className="flex justify-between mb-1">
-                <span className="text-[10px] text-muted-foreground font-light">Overall</span>
-                <span className="text-[10px] text-brand font-light">{overallGoalPct}%</span>
+                <span className="text-2xs text-muted-foreground font-light">Overall</span>
+                <span className="text-2xs text-brand font-light">{overallGoalPct}%</span>
               </div>
               <Progress value={overallGoalPct} />
             </div>
@@ -512,11 +508,11 @@ export function FinanceTargets() {
                             className="w-1.5 h-1.5 rounded-full flex-shrink-0"
                             style={{ backgroundColor: COLORS[i % COLORS.length] }}
                           />
-                          <span className="text-[10px] text-muted-foreground font-light truncate max-w-[120px]">
+                          <span className="text-2xs text-muted-foreground font-light truncate max-w-[120px]">
                             {g.name}
                           </span>
                         </div>
-                        <span className="text-[10px] text-muted-foreground font-light">{p}%</span>
+                        <span className="text-2xs text-muted-foreground font-light">{p}%</span>
                       </div>
                       <Progress value={p} />
                     </div>
@@ -528,7 +524,7 @@ export function FinanceTargets() {
 
           {/* Debt Breakdown */}
           <Card compact className="p-4">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-3">
+            <p className="text-2xs text-muted-foreground uppercase tracking-widest mb-3">
               Debt Breakdown
             </p>
             <div className="flex items-center justify-center mb-3">
@@ -551,23 +547,21 @@ export function FinanceTargets() {
                             className="w-1.5 h-1.5 rounded-full flex-shrink-0"
                             style={{ backgroundColor: COLORS[i % COLORS.length] }}
                           />
-                          <span className="text-[10px] text-muted-foreground font-light truncate max-w-[120px]">
+                          <span className="text-2xs text-muted-foreground font-light truncate max-w-[120px]">
                             {l.name}
                           </span>
                         </div>
-                        <span className="text-[10px] text-muted-foreground font-light">
-                          {paid}%
-                        </span>
+                        <span className="text-2xs text-muted-foreground font-light">{paid}%</span>
                       </div>
                       <Progress value={paid} />
                     </div>
                   );
                 })}
                 <div className="pt-2 border-t border-border-subtle flex justify-between">
-                  <span className="text-[10px] text-muted-foreground font-light">
+                  <span className="text-2xs text-muted-foreground font-light">
                     Monthly Payments
                   </span>
-                  <span className="text-[10px] text-brand font-light tabular-nums">
+                  <span className="text-2xs text-brand font-light tabular-nums">
                     {fmtCompact(convertTotal(liabMonthlyTotal), displayCur, hidden)}/mo
                   </span>
                 </div>

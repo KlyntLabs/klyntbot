@@ -137,7 +137,7 @@ export function VersionHistoryOverlay({
                     {/* Timeline dot + line */}
                     <div className="flex flex-col items-center pt-1.5">
                       <div
-                        className={`w-2.5 h-2.5 rounded-full border-2 transition-colors ${
+                        className={`size-2.5 rounded-full border-2 transition-colors ${
                           v.id === selectedId
                             ? "border-brand bg-brand"
                             : "border-dim bg-transparent"

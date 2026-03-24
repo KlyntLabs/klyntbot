@@ -117,7 +117,7 @@ export function ProductivityScoreRing({ score, size = 110, summary }: Productivi
         {/* Hover tooltip */}
         {hovered && summary && summary.totalActiveSecs > 0 && (
           <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 z-50 glass-panel rounded-lg px-3 py-2 shadow-lg min-w-[160px]">
-            <div className="flex flex-col gap-1.5 text-[10px]">
+            <div className="flex flex-col gap-1.5 text-2xs">
               {focusRatio != null && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Focus time</span>
@@ -148,7 +148,7 @@ export function ProductivityScoreRing({ score, size = 110, summary }: Productivi
       </div>
 
       {/* Label below */}
-      <span className="text-[10px] font-medium tracking-wide uppercase" style={{ color }}>
+      <span className="text-2xs font-medium tracking-wide uppercase" style={{ color }}>
         {scoreLabel(score)}
       </span>
 

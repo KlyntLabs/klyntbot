@@ -20,10 +20,10 @@ export function ProjectHeader() {
         onClick={() => navigate(-1)}
         className="text-muted-foreground hover:text-foreground"
       >
-        <ArrowLeft className="w-4 h-4" />
+        <ArrowLeft className="size-4" />
       </button>
       <div
-        className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+        className="size-2.5 rounded-full flex-shrink-0"
         style={{ backgroundColor: project.color }}
       />
       <h1 className="text-base font-semibold text-foreground truncate">{project.name}</h1>
@@ -42,7 +42,7 @@ export function ProjectHeader() {
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent text-muted-foreground hover:text-foreground text-[11px] transition-colors"
           title="Ask AI about this project"
         >
-          <MessageSquare className="w-3.5 h-3.5" />
+          <MessageSquare className="size-3.5" />
           Ask AI
         </button>
       </div>

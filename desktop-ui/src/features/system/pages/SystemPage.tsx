@@ -104,7 +104,7 @@ export function SystemPage() {
                     : "text-muted-foreground hover:text-foreground hover:bg-card"
                 }`}
               >
-                <Icon className="w-3.5 h-3.5 shrink-0" strokeWidth={1.5} />
+                <Icon className="size-3.5 shrink-0" strokeWidth={1.5} />
                 <span className="truncate">{tab.label}</span>
               </button>
             );

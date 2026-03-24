@@ -46,7 +46,7 @@ export function CategoryList({ categories, selectedId, onSelect, onCreated }: Ca
   return (
     <div className="glass-card p-3 flex flex-col gap-2">
       <div className="flex items-center justify-between">
-        <h3 className="text-[12px] font-medium text-muted-foreground">Categories</h3>
+        <h3 className="text-xs font-medium text-muted-foreground">Categories</h3>
         <button
           type="button"
           onClick={handleCreate}
@@ -61,7 +61,7 @@ export function CategoryList({ categories, selectedId, onSelect, onCreated }: Ca
         <div key={group.type} className="flex flex-col gap-0.5">
           <div className="flex items-center gap-1.5 py-1">
             <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: group.color }} />
-            <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+            <span className="text-2xs font-medium text-muted-foreground uppercase tracking-wider">
               {group.label}
             </span>
           </div>
@@ -79,7 +79,7 @@ export function CategoryList({ categories, selectedId, onSelect, onCreated }: Ca
                 }`}
               >
                 <span
-                  className="w-2.5 h-2.5 rounded-sm flex-shrink-0"
+                  className="size-2.5 rounded-sm flex-shrink-0"
                   style={{ backgroundColor: cat.color ?? getCategoryColor(cat.id) }}
                 />
                 <span className="text-[11px] font-light truncate">{cat.name}</span>

@@ -47,16 +47,16 @@ export function WordsSection({ words, onSaveWords, saving, saved }: WordsSection
       : `Save ${selected.size} word${selected.size !== 1 ? "s" : ""}`;
 
   const buttonClass = saving
-    ? "rounded-md bg-brand/50 px-2.5 py-1 text-[10px] font-semibold text-black cursor-wait"
+    ? "rounded-md bg-brand/50 px-2.5 py-1 text-2xs font-semibold text-black cursor-wait"
     : saved
-      ? "rounded-md bg-green-500 px-2.5 py-1 text-[10px] font-semibold text-black"
-      : "rounded-md bg-brand px-2.5 py-1 text-[10px] font-semibold text-black hover:bg-brand/90 active:scale-95 transition-all";
+      ? "rounded-md bg-green-500 px-2.5 py-1 text-2xs font-semibold text-black"
+      : "rounded-md bg-brand px-2.5 py-1 text-2xs font-semibold text-black hover:bg-brand/90 active:scale-95 transition-all";
 
   return (
     <div className="border-b border-border px-3 py-3">
       {/* Header */}
       <div className="flex items-center justify-between mb-1.5">
-        <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+        <span className="text-2xs text-muted-foreground uppercase tracking-wider">
           Words ({words.length})
         </span>
         <div className="flex items-center gap-1.5">
@@ -64,7 +64,7 @@ export function WordsSection({ words, onSaveWords, saving, saved }: WordsSection
             <button
               type="button"
               onClick={selected.size === words.length ? deselectAll : selectAll}
-              className="text-[10px] text-muted-foreground hover:text-primary transition-colors"
+              className="text-2xs text-muted-foreground hover:text-primary transition-colors"
             >
               {selected.size === words.length ? "Deselect all" : "Select all"}
             </button>
@@ -138,7 +138,7 @@ function WordRow({
           )}
         </div>
         <span className="text-xs text-primary font-medium truncate">{word.word}</span>
-        {word.reading && <span className="text-[10px] text-muted shrink-0">{word.reading}</span>}
+        {word.reading && <span className="text-2xs text-muted shrink-0">{word.reading}</span>}
         {word.isNew && <span className="text-[9px] text-brand font-medium shrink-0">new</span>}
       </div>
       <div className="flex items-center gap-2 shrink-0 ml-2">

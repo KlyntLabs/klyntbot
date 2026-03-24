@@ -253,7 +253,7 @@ export function DayColumnsView({
 
         {/* Zoom indicator — shown when zoomed away from default */}
         {hourHeight !== DEFAULT_HOUR_HEIGHT && (
-          <div className="px-3 py-1 flex items-center justify-between border-b border-border text-[10px] text-muted-foreground">
+          <div className="px-3 py-1 flex items-center justify-between border-b border-border text-2xs text-muted-foreground">
             <span className="tabular-nums">
               Zoom: {Math.round((hourHeight / DEFAULT_HOUR_HEIGHT) * 100)}%
             </span>
@@ -305,7 +305,7 @@ export function DayColumnsView({
                   aria-valuemax={h === 0 ? MAX_HOUR_HEIGHT : undefined}
                   aria-valuenow={h === 0 ? hourHeight : undefined}
                   tabIndex={h === 0 ? 0 : undefined}
-                  className="text-[10px] text-muted-foreground text-right pr-2 select-none cursor-ns-resize"
+                  className="text-2xs text-muted-foreground text-right pr-2 select-none cursor-ns-resize"
                   style={{ width: HOUR_GUTTER }}
                   onMouseDown={handleGutterMouseDown}
                   onKeyDown={
@@ -428,9 +428,9 @@ export function DayColumnsView({
               className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors w-full"
             >
               {feedExpanded ? (
-                <ChevronDown className="w-3.5 h-3.5" />
+                <ChevronDown className="size-3.5" />
               ) : (
-                <ChevronUp className="w-3.5 h-3.5" />
+                <ChevronUp className="size-3.5" />
               )}
               Live Activity Feed
             </button>
@@ -499,7 +499,7 @@ function ColumnEntry({
       >
         <span className="text-muted-foreground truncate block">{entry.title}</span>
         {height > 28 && (
-          <span className="text-muted-foreground text-[10px] truncate block">
+          <span className="text-muted-foreground text-2xs truncate block">
             {dur > 0 && `${formatHumanDuration(dur)} · `}
             {timeStr}
           </span>
@@ -530,9 +530,7 @@ function ColumnEntry({
       >
         <span className="text-muted-foreground truncate block">{entry.title}</span>
         {isDue && status && height > 28 && (
-          <span className="text-muted-foreground text-[10px] truncate block capitalize">
-            {status}
-          </span>
+          <span className="text-muted-foreground text-2xs truncate block capitalize">{status}</span>
         )}
       </button>
     );
@@ -546,7 +544,7 @@ function ColumnEntry({
         type="button"
         onClick={onClick}
         className={cn(
-          "absolute left-0.5 right-0.5 rounded-md px-1.5 py-0.5 text-[10px] leading-tight overflow-hidden cursor-pointer transition-colors",
+          "absolute left-0.5 right-0.5 rounded-md px-1.5 py-0.5 text-2xs leading-tight overflow-hidden cursor-pointer transition-colors",
           isExpense
             ? "border-l-2 border-l-[var(--timeline-finance-expense)] bg-[var(--timeline-finance-expense)]/15 hover:bg-[var(--timeline-finance-expense)]/25"
             : "border-l-2 border-l-[var(--timeline-finance-income)] bg-[var(--timeline-finance-income)]/15 hover:bg-[var(--timeline-finance-income)]/25",
@@ -576,7 +574,7 @@ function ColumnEntry({
         type="button"
         onClick={onClick}
         className={cn(
-          "absolute left-1 right-1 flex items-center gap-1 text-[10px] cursor-pointer transition-colors",
+          "absolute left-1 right-1 flex items-center gap-1 text-2xs cursor-pointer transition-colors",
           "text-muted-foreground hover:text-muted-foreground",
           selected && "text-brand",
         )}
@@ -584,7 +582,7 @@ function ColumnEntry({
         title={entry.title}
       >
         <span
-          className="w-2 h-2 rounded-full shrink-0"
+          className="size-2 rounded-full shrink-0"
           style={{ backgroundColor: "var(--timeline-note)" }}
         />
         <span className="truncate">{entry.title}</span>
@@ -598,13 +596,13 @@ function ColumnEntry({
       type="button"
       onClick={onClick}
       className={cn(
-        "absolute left-1 right-1 flex items-center gap-1 text-[10px] text-muted-foreground hover:text-muted-foreground cursor-pointer transition-colors",
+        "absolute left-1 right-1 flex items-center gap-1 text-2xs text-muted-foreground hover:text-muted-foreground cursor-pointer transition-colors",
         selected && "text-brand",
       )}
       style={{ top }}
       title={entry.title}
     >
-      <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: column.color }} />
+      <span className="size-2 rounded-full shrink-0" style={{ backgroundColor: column.color }} />
       <span className="truncate">{entry.title}</span>
     </button>
   );
@@ -621,7 +619,7 @@ function NowLine({ pxPerMin }: { pxPerMin: number }) {
   return (
     <div className="absolute w-full pointer-events-none z-10" style={{ top, left: HOUR_GUTTER }}>
       <div className="flex items-center">
-        <div className="w-2 h-2 rounded-full bg-destructive -ml-1" />
+        <div className="size-2 rounded-full bg-destructive -ml-1" />
         <div className="flex-1 border-t border-destructive" />
       </div>
     </div>

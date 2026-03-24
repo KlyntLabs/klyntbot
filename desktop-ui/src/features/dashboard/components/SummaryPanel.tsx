@@ -213,7 +213,7 @@ function DaySummary({
 
       {/* ── 3. LLM suggestion ── */}
       {intel?.focusRecommendation && (
-        <p className="text-[10px] text-muted-foreground italic leading-relaxed">
+        <p className="text-2xs text-muted-foreground italic leading-relaxed">
           {intel.focusRecommendation}
         </p>
       )}
@@ -230,9 +230,7 @@ function DaySummary({
       {/* ── 5. Top Apps — visual bar chart ── */}
       {hasProductivity && ps.topApps.length > 0 && (
         <section>
-          <h4 className="text-[10px] font-medium text-dim uppercase tracking-wider mb-2">
-            Top Apps
-          </h4>
+          <h4 className="text-2xs font-medium text-dim uppercase tracking-wider mb-2">Top Apps</h4>
           <TopAppsChart apps={ps.topApps} maxSecs={ps.topApps[0]?.durationSecs ?? 1} />
         </section>
       )}
@@ -240,19 +238,17 @@ function DaySummary({
       {/* ── 6. Insights & Nudges ── */}
       {intel && (intel.patterns.length > 0 || intel.nudges.length > 0) && (
         <section>
-          <h4 className="text-[10px] font-medium text-dim uppercase tracking-wider mb-2">
-            Insights
-          </h4>
+          <h4 className="text-2xs font-medium text-dim uppercase tracking-wider mb-2">Insights</h4>
           <div className="flex flex-col gap-2">
             {intel.patterns.map((p, i) => (
               <div key={`p-${i}`} className="flex items-start gap-2 text-[11px]">
-                <Brain className="w-3 h-3 text-muted-foreground mt-0.5 shrink-0" />
+                <Brain className="size-3 text-muted-foreground mt-0.5 shrink-0" />
                 <span className="text-muted-foreground">{p}</span>
               </div>
             ))}
             {intel.nudges.map((n, i) => (
               <div key={`n-${i}`} className="flex items-start gap-2 text-[11px]">
-                <Lightbulb className="w-3 h-3 text-warning mt-0.5 shrink-0" />
+                <Lightbulb className="size-3 text-warning mt-0.5 shrink-0" />
                 <span className="text-muted-foreground">{n.message}</span>
               </div>
             ))}
@@ -304,7 +300,7 @@ function TopAppsChart({
                 }}
               />
             </div>
-            <span className="text-[10px] text-dim tabular-nums w-10 text-right shrink-0">
+            <span className="text-2xs text-dim tabular-nums w-10 text-right shrink-0">
               {formatHumanDuration(app.durationSecs)}
             </span>
           </div>
@@ -360,7 +356,7 @@ function WeeklySparkline({ data }: { data: ProductivitySummary[] }) {
       </svg>
       {changePct !== 0 && (
         <span
-          className={`text-[10px] font-medium shrink-0 ${changePct > 0 ? "text-success" : "text-destructive"}`}
+          className={`text-2xs font-medium shrink-0 ${changePct > 0 ? "text-success" : "text-destructive"}`}
         >
           {changePct > 0 ? "↑" : "↓"}
           {Math.abs(changePct)}%
@@ -397,13 +393,13 @@ function SessionDetail({ session, onClose }: { session: SessionBlock; onClose: (
           onClick={onClose}
           className="text-muted-foreground hover:text-foreground"
         >
-          <X className="w-4 h-4" />
+          <X className="size-4" />
         </button>
       </div>
 
       {/* Session header */}
       <div className="flex items-center gap-2">
-        <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: session.color }} />
+        <div className="size-3 rounded-sm" style={{ backgroundColor: session.color }} />
         <span className="text-sm font-medium text-foreground">{session.label}</span>
       </div>
 
@@ -416,7 +412,7 @@ function SessionDetail({ session, onClose }: { session: SessionBlock; onClose: (
       <div className="flex items-center gap-2 flex-wrap">
         {matched?.qualityScore != null && (
           <div
-            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold w-fit"
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-semibold w-fit"
             style={{
               backgroundColor: `color-mix(in oklch, ${session.color} 20%, transparent)`,
               color: session.color,
@@ -427,7 +423,7 @@ function SessionDetail({ session, onClose }: { session: SessionBlock; onClose: (
           </div>
         )}
         <div
-          className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium w-fit"
+          className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-2xs font-medium w-fit"
           style={{
             backgroundColor: `color-mix(in oklch, ${categoryColor} 15%, transparent)`,
             color: categoryColor,
@@ -441,7 +437,7 @@ function SessionDetail({ session, onClose }: { session: SessionBlock; onClose: (
 
       {/* Intelligence stats */}
       {matched && (
-        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px]">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-2xs">
           {matched.categoryPurity != null && (
             <>
               <span className="text-dim">Focus purity</span>
@@ -483,7 +479,7 @@ function SessionDetail({ session, onClose }: { session: SessionBlock; onClose: (
                     style={{ backgroundColor: appCatColor }}
                   />
                   <span className="text-xs text-muted-foreground truncate flex-1">{app.app}</span>
-                  <span className="text-[10px] text-dim tabular-nums">
+                  <span className="text-2xs text-dim tabular-nums">
                     {formatHumanDuration(app.dur)}
                   </span>
                 </div>
@@ -520,12 +516,12 @@ function EntryDetail({
           onClick={onClose}
           className="text-muted-foreground hover:text-foreground"
         >
-          <X className="w-4 h-4" />
+          <X className="size-4" />
         </button>
       </div>
 
       <div className="flex items-center gap-2">
-        <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: entry.color }} />
+        <div className="size-3 rounded-sm" style={{ backgroundColor: entry.color }} />
         <span className="text-sm font-medium text-foreground">{entry.title}</span>
       </div>
 
@@ -546,7 +542,7 @@ function EntryDetail({
           onClick={() => onNavigate(entry.entityRoute as string)}
           className="flex items-center gap-1.5 text-xs text-brand hover:underline mt-1"
         >
-          <ExternalLink className="w-3.5 h-3.5" />
+          <ExternalLink className="size-3.5" />
           Open {entry.source}
         </button>
       )}
@@ -562,7 +558,7 @@ function TrendArrow({ value, label }: { value?: number | null; label?: string })
   const pct = Math.round(Math.abs(value));
   return (
     <span
-      className={`inline-flex items-center gap-0.5 text-[10px] font-medium ${isUp ? "text-success" : "text-destructive"}`}
+      className={`inline-flex items-center gap-0.5 text-2xs font-medium ${isUp ? "text-success" : "text-destructive"}`}
       title={label ? `${isUp ? "+" : "-"}${pct}% ${label}` : undefined}
     >
       {isUp ? "↑" : "↓"}

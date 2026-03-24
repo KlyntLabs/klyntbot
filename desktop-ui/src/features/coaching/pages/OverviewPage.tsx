@@ -69,8 +69,8 @@ function Gauge({
   const pct = Math.round(value * 100);
   return (
     <div className="flex flex-col items-center gap-1">
-      <div className="relative w-16 h-16">
-        <svg className="w-16 h-16 -rotate-90" viewBox="0 0 36 36" aria-hidden="true">
+      <div className="relative size-16">
+        <svg className="size-16 -rotate-90" viewBox="0 0 36 36" aria-hidden="true">
           <circle
             className="text-white/[0.08]"
             strokeWidth="3"
@@ -96,7 +96,7 @@ function Gauge({
           {pct}%
         </span>
       </div>
-      <span className="text-[10px] text-muted-foreground text-center leading-tight">{label}</span>
+      <span className="text-2xs text-muted-foreground text-center leading-tight">{label}</span>
     </div>
   );
 }
@@ -261,14 +261,12 @@ export function CoachingOverviewPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-[10px] px-1.5 py-0.5 bg-brand/20 text-brand rounded font-medium">
+                      <span className="text-2xs px-1.5 py-0.5 bg-brand/20 text-brand rounded font-medium">
                         {iv.interventionType}
                       </span>
-                      <span className="text-[10px] text-muted-foreground">{iv.triggerName}</span>
+                      <span className="text-2xs text-muted-foreground">{iv.triggerName}</span>
                     </div>
-                    <p className="text-[12px] text-muted-foreground leading-relaxed">
-                      {iv.message}
-                    </p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">{iv.message}</p>
                   </div>
                   <div className="flex gap-1 shrink-0">
                     <button
@@ -277,7 +275,7 @@ export function CoachingOverviewPage() {
                       className="p-1.5 rounded hover:bg-success/20 text-muted-foreground hover:text-success transition-colors"
                       title="Helpful"
                     >
-                      <Check className="w-3.5 h-3.5" />
+                      <Check className="size-3.5" />
                     </button>
                     <button
                       type="button"
@@ -285,7 +283,7 @@ export function CoachingOverviewPage() {
                       className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                       title="Dismiss"
                     >
-                      <X className="w-3.5 h-3.5" />
+                      <X className="size-3.5" />
                     </button>
                     <button
                       type="button"
@@ -293,7 +291,7 @@ export function CoachingOverviewPage() {
                       className="p-1.5 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
                       title="Stop suggesting"
                     >
-                      <XCircle className="w-3.5 h-3.5" />
+                      <XCircle className="size-3.5" />
                     </button>
                   </div>
                 </div>
@@ -314,12 +312,12 @@ export function CoachingOverviewPage() {
               <button
                 type="button"
                 onClick={handleClearSignals}
-                className="text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-1"
+                className="text-2xs text-muted-foreground hover:text-foreground flex items-center gap-1"
               >
-                <Trash2 className="w-3 h-3" /> Clear
+                <Trash2 className="size-3" /> Clear
               </button>
             </div>
-            <p className="text-[12px] text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               {signals.windowSize} signals in 30min window
             </p>
             {signals.triggers.length > 0 && (
@@ -346,7 +344,7 @@ export function CoachingOverviewPage() {
                 <button
                   type="button"
                   onClick={() => navigate("/coaching/patterns")}
-                  className="text-[10px] text-primary hover:underline"
+                  className="text-2xs text-primary hover:underline"
                 >
                   View all
                 </button>
@@ -362,10 +360,10 @@ export function CoachingOverviewPage() {
                     <span className="text-[11px] font-medium text-foreground w-44 shrink-0 truncate">
                       {p.name}
                     </span>
-                    <span className="text-[10px] text-muted-foreground flex-1 truncate">
+                    <span className="text-2xs text-muted-foreground flex-1 truncate">
                       {p.description}
                     </span>
-                    <span className="text-[10px] text-dim tabular-nums shrink-0">
+                    <span className="text-2xs text-dim tabular-nums shrink-0">
                       {Math.round(p.confidence * 100)}%
                     </span>
                   </div>
@@ -387,7 +385,7 @@ export function CoachingOverviewPage() {
             <h2 className="text-[13px] font-medium text-muted-foreground mb-3">
               Intervention Router
             </h2>
-            <div className="flex gap-4 text-[12px]">
+            <div className="flex gap-4 text-xs">
               <span className="text-muted-foreground">
                 Hourly:{" "}
                 <span className="tabular-nums">
@@ -410,13 +408,13 @@ export function CoachingOverviewPage() {
               <button
                 type="button"
                 onClick={handleResetDismissals}
-                className="text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-1"
+                className="text-2xs text-muted-foreground hover:text-foreground flex items-center gap-1"
               >
-                <RefreshCw className="w-3 h-3" /> Reset All
+                <RefreshCw className="size-3" /> Reset All
               </button>
             </div>
             <div className="rounded-lg overflow-hidden">
-              <table className="w-full text-[12px]">
+              <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b border-border-subtle">
                     <th className="text-left p-2 text-muted-foreground font-normal">Trigger</th>
@@ -462,7 +460,7 @@ export function CoachingOverviewPage() {
                 <button
                   type="button"
                   onClick={() => navigate("/coaching/history")}
-                  className="text-[10px] text-primary hover:underline"
+                  className="text-2xs text-primary hover:underline"
                 >
                   View all
                 </button>
@@ -472,7 +470,7 @@ export function CoachingOverviewPage() {
               <div className="flex flex-col gap-2">
                 {history.map((h) => (
                   <div key={h.id} className="flex items-center gap-3 py-1.5">
-                    <span className="text-[10px] text-dim tabular-nums w-14 shrink-0">
+                    <span className="text-2xs text-dim tabular-nums w-14 shrink-0">
                       {formatTime(h.deliveredAt)}
                     </span>
                     <p className="text-[11px] text-foreground truncate flex-1">{h.message}</p>

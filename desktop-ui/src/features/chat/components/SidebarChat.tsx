@@ -119,9 +119,9 @@ export function SidebarChat({
             onClick={() => setShowSquadPicker((prev) => !prev)}
             aria-label="New squad chat"
             title="New squad chat"
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-purple-400 hover:bg-accent transition-all"
+            className="size-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-purple-400 hover:bg-accent transition-all"
           >
-            <Users className="w-3.5 h-3.5" strokeWidth={1.5} />
+            <Users className="size-3.5" strokeWidth={1.5} />
           </button>
           {pageContext && (
             <button
@@ -129,18 +129,18 @@ export function SidebarChat({
               onClick={handlePin}
               aria-label="Pin to Chat threads"
               title="Pin to Chat threads"
-              className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-all"
+              className="size-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-all"
             >
-              <Pin className="w-3.5 h-3.5" strokeWidth={1.5} />
+              <Pin className="size-3.5" strokeWidth={1.5} />
             </button>
           )}
           <button
             type="button"
             onClick={onClose}
             aria-label="Close chat"
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-all"
+            className="size-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-all"
           >
-            <X className="w-4 h-4" strokeWidth={1.5} />
+            <X className="size-4" strokeWidth={1.5} />
           </button>
         </div>
       </div>
@@ -168,7 +168,7 @@ export function SidebarChat({
       <div className="flex-1 overflow-y-auto p-5">
         {chat.messages.length === 0 && !chat.isStreaming ? (
           <div className="flex flex-col items-center justify-center py-12">
-            <p className="text-muted-foreground text-[12px] font-light text-center">
+            <p className="text-muted-foreground text-xs font-light text-center">
               {activeSquadId
                 ? "Start a squad conversation"
                 : pageContext
@@ -251,9 +251,9 @@ function SidebarChatInput({
           onClick={onSend}
           disabled={!input.trim() || isStreaming}
           aria-label="Send message"
-          className="w-10 h-10 rounded-xl bg-brand hover:bg-brand-hover disabled:bg-accent disabled:text-muted-foreground flex items-center justify-center transition-all shrink-0"
+          className="size-10 rounded-xl bg-brand hover:bg-brand-hover disabled:bg-accent disabled:text-muted-foreground flex items-center justify-center transition-all shrink-0"
         >
-          <Send className="w-4 h-4" strokeWidth={2} />
+          <Send className="size-4" strokeWidth={2} />
         </button>
       </div>
     </div>

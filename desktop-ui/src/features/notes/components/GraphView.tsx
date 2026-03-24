@@ -277,7 +277,7 @@ export function GraphView({
             <button
               type="button"
               onClick={() => setSettingsOpen(!settingsOpen)}
-              className={`w-7 h-7 glass-button flex items-center justify-center transition-colors ${
+              className={`size-7 glass-button flex items-center justify-center transition-colors ${
                 settingsOpen ? "text-brand" : "text-muted-foreground hover:text-foreground"
               }`}
               aria-label="Graph settings"
@@ -299,7 +299,7 @@ export function GraphView({
           <button
             type="button"
             onClick={() => setSettings({ livePhysics: !settings.livePhysics })}
-            className={`w-7 h-7 glass-button flex items-center justify-center transition-colors ${
+            className={`size-7 glass-button flex items-center justify-center transition-colors ${
               settings.livePhysics ? "text-brand" : "text-muted-foreground hover:text-foreground"
             }`}
             aria-label="Live physics"
@@ -311,7 +311,7 @@ export function GraphView({
           <button
             type="button"
             onClick={zoomIn}
-            className="w-7 h-7 glass-button flex items-center justify-center text-muted-foreground hover:text-foreground"
+            className="size-7 glass-button flex items-center justify-center text-muted-foreground hover:text-foreground"
             aria-label="Zoom in"
           >
             <Plus size={14} />
@@ -319,7 +319,7 @@ export function GraphView({
           <button
             type="button"
             onClick={zoomOut}
-            className="w-7 h-7 glass-button flex items-center justify-center text-muted-foreground hover:text-foreground"
+            className="size-7 glass-button flex items-center justify-center text-muted-foreground hover:text-foreground"
             aria-label="Zoom out"
           >
             <Minus size={14} />
@@ -327,7 +327,7 @@ export function GraphView({
           <button
             type="button"
             onClick={fitScreen}
-            className="w-7 h-7 glass-button flex items-center justify-center text-muted-foreground hover:text-foreground"
+            className="size-7 glass-button flex items-center justify-center text-muted-foreground hover:text-foreground"
             aria-label="Fit to screen"
           >
             <Maximize2 size={14} />
@@ -335,7 +335,7 @@ export function GraphView({
           <button
             type="button"
             onClick={runLayout}
-            className="w-7 h-7 glass-button flex items-center justify-center text-muted-foreground hover:text-foreground"
+            className="size-7 glass-button flex items-center justify-center text-muted-foreground hover:text-foreground"
             aria-label="Re-layout"
           >
             <RotateCcw size={14} />

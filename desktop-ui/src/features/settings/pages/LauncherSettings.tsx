@@ -92,7 +92,7 @@ const SOURCE_DEFS: SourceDef[] = [
 ];
 
 const INPUT_CLASS =
-  "w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim";
+  "w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim";
 
 // ── Component ────────────────────────────────────────────────────────
 
@@ -174,7 +174,7 @@ export function LauncherSettings() {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-[12px] text-muted-foreground">Enable launcher</span>
+                <span className="text-xs text-muted-foreground">Enable launcher</span>
                 <p className="text-[11px] text-dim">Global toggle for the command launcher</p>
               </div>
               <Toggle
@@ -205,9 +205,9 @@ export function LauncherSettings() {
                         className="text-muted-foreground hover:text-foreground transition-colors"
                       >
                         {isExpanded ? (
-                          <ChevronDown className="w-3.5 h-3.5" />
+                          <ChevronDown className="size-3.5" />
                         ) : (
-                          <ChevronRight className="w-3.5 h-3.5" />
+                          <ChevronRight className="size-3.5" />
                         )}
                       </button>
                     ) : (

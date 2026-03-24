@@ -45,7 +45,7 @@ export function SquadPicker({ selectedSquadId, onSelect, onManage, inline }: Squ
             <button
               type="button"
               onClick={onManage}
-              className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-[10px] text-muted hover:text-foreground hover:bg-accent transition-colors"
+              className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-2xs text-muted hover:text-foreground hover:bg-accent transition-colors"
             >
               <Settings size={10} />
               Manage Squads
@@ -64,14 +64,14 @@ export function SquadPicker({ selectedSquadId, onSelect, onManage, inline }: Squ
           className="flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-accent border border-transparent hover:border-border transition-colors text-[11px]"
         >
           {loading && selectedSquadId ? (
-            <span className="text-[10px] text-muted-foreground">Loading...</span>
+            <span className="text-2xs text-muted-foreground">Loading...</span>
           ) : selected ? (
             <>
               <span>{selected.icon}</span>
               <span className="text-muted-foreground truncate max-w-[120px]">{selected.name}</span>
             </>
           ) : (
-            <span className="text-[10px] text-muted-foreground">Select squad</span>
+            <span className="text-2xs text-muted-foreground">Select squad</span>
           )}
           <ChevronDown
             size={10}
@@ -122,7 +122,7 @@ export function SquadPicker({ selectedSquadId, onSelect, onManage, inline }: Squ
                   onManage();
                   setOpen(false);
                 }}
-                className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-[10px] text-muted hover:text-foreground hover:bg-accent transition-colors w-full"
+                className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-2xs text-muted hover:text-foreground hover:bg-accent transition-colors w-full"
               >
                 <Settings size={10} />
                 Manage Squads
@@ -164,7 +164,7 @@ function SquadOption({
             {squad.members.slice(0, 5).map((m) => (
               <span
                 key={m.personaId}
-                className="w-4 h-4 rounded-full bg-accent flex items-center justify-center text-[8px]"
+                className="size-4 rounded-full bg-accent flex items-center justify-center text-[8px]"
                 title={m.personaName}
               >
                 {m.personaIcon}

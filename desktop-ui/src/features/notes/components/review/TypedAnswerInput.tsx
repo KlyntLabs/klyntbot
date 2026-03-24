@@ -42,7 +42,7 @@ export function TypedAnswerInput({ onSubmit, disabled, initialValue }: TypedAnsw
         disabled={disabled}
         placeholder="Type your answer… (Enter to submit, Shift+Enter for newline)"
         rows={3}
-        className="bg-white/[0.04] border border-border rounded-lg p-3 text-[12px] text-foreground placeholder:text-dim resize-none focus:outline-none focus:ring-1 focus:ring-accent/40 disabled:opacity-50"
+        className="bg-white/[0.04] border border-border rounded-lg p-3 text-xs text-foreground placeholder:text-dim resize-none focus:outline-none focus:ring-1 focus:ring-accent/40 disabled:opacity-50"
       />
       <span className="text-[9px] text-dim text-right">{charCount} chars</span>
     </div>

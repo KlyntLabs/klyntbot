@@ -79,7 +79,7 @@ export function ConfusableSection({ words, sourceLang }: ConfusableSectionProps)
               <span className="text-xs text-primary font-medium">
                 {a.word} vs {a.confusableWord}
               </span>
-              <span className="text-[10px] text-muted">({a.confusableMeaning})</span>
+              <span className="text-2xs text-muted">({a.confusableMeaning})</span>
             </div>
             {a.explanation && <p className="text-[11px] text-muted ml-5">{a.explanation}</p>}
           </div>

@@ -22,7 +22,7 @@ function ProjectCard({ project }: { project: Project }) {
     >
       <div className="flex items-center gap-3 mb-3">
         <div
-          className="w-3 h-3 rounded-full flex-shrink-0"
+          className="size-3 rounded-full flex-shrink-0"
           style={{ backgroundColor: project.color }}
         />
         <h3 className="text-sm font-medium text-foreground truncate flex-1">{project.name}</h3>
@@ -69,7 +69,7 @@ export function ProjectsListPage() {
           onClick={() => setCreating(true)}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand text-white text-xs font-medium hover:bg-brand/90 transition-colors"
         >
-          <Plus className="w-3.5 h-3.5" /> New Project
+          <Plus className="size-3.5" /> New Project
         </button>
       </div>
 

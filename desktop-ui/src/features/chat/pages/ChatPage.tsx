@@ -307,7 +307,7 @@ export function ChatPage() {
         {/* Toolbar: resume banner, squad header, voice toggle, transparency */}
         <div className="flex items-center justify-between px-4 py-2 border-b border-border-subtle">
           {resumeBanner ? (
-            <div className="flex items-center gap-2 text-[12px]">
+            <div className="flex items-center gap-2 text-xs">
               <span className="text-brand font-medium">Resuming: {resumeBanner}</span>
               <button
                 type="button"

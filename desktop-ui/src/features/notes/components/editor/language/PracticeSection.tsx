@@ -39,7 +39,7 @@ export function PracticeSection({ sourceText, sourceLang, targetLang }: Practice
     <div className="space-y-3">
       {/* Input area */}
       <div>
-        <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">
+        <div className="text-2xs text-muted-foreground uppercase tracking-wider mb-1">
           Your Translation
         </div>
         <textarea
@@ -115,7 +115,7 @@ function EvaluationResults({ evaluation }: { evaluation: TranslationEvalResponse
                       return next;
                     })
                   }
-                  className="text-[10px] text-muted-foreground hover:text-primary"
+                  className="text-2xs text-muted-foreground hover:text-primary"
                 >
                   {expandedSet.has(i) ? "▾ Hide" : "▸ Why?"}
                 </button>
@@ -132,7 +132,7 @@ function EvaluationResults({ evaluation }: { evaluation: TranslationEvalResponse
 
       {/* Model translation */}
       <div className="rounded-md bg-surface-hover/50 border border-border/50 p-2">
-        <div className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">
+        <div className="text-2xs text-muted-foreground uppercase tracking-wider mb-1">
           Model Translation
         </div>
         <p className="text-xs text-primary">{modelTranslation}</p>

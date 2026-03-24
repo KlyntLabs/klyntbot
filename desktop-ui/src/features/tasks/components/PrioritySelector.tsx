@@ -1,4 +1,5 @@
 import { useMutation } from "@shared/hooks/useMutation";
+import { cn } from "@shared/lib/utils";
 import type { Task, TaskUpdateParams } from "@shared/types/tasks";
 import { Check } from "lucide-react";
 import { useState } from "react";
@@ -6,7 +7,6 @@ import { useRefetchTasks } from "../hooks/useTasksContext";
 import type { Priority } from "../lib/mappers";
 import { priorityToNumber } from "../lib/mappers";
 import { priorities } from "../lib/priority-icons";
-import { cn } from "../lib/utils";
 import {
   Command,
   CommandEmpty,

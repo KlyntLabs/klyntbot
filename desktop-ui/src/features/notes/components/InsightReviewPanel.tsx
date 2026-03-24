@@ -203,7 +203,7 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
       {/* Header */}
       <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border shrink-0">
         <Brain size={14} className="text-purple shrink-0" />
-        <span className="text-[12px] font-medium text-foreground flex-1">Learn</span>
+        <span className="text-xs font-medium text-foreground flex-1">Learn</span>
         <InsightScopePopover value={scopeConfig} onChange={setScopeConfig} />
         <button
           type="button"
@@ -234,7 +234,7 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
 
       {/* Scope coverage hint */}
       {state.isOpen && (
-        <div className="px-3 py-1.5 border-b border-border text-[10px] text-dim flex items-center gap-1">
+        <div className="px-3 py-1.5 border-b border-border text-2xs text-dim flex items-center gap-1">
           <span>Scope:</span>
           <span className="text-muted-foreground capitalize">{scopeConfig.scopeType}</span>
           {scopeConfig.deepDive && <span className="text-purple text-[9px] ml-1">(deep dive)</span>}
@@ -383,7 +383,7 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
           type="button"
           onClick={handleInsertIntoNote}
           disabled={!hasActiveContent}
-          className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-accent text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors disabled:text-dim disabled:cursor-not-allowed"
+          className="flex items-center gap-1 text-2xs px-2 py-1 rounded-md bg-accent text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors disabled:text-dim disabled:cursor-not-allowed"
           title="Insert into note"
         >
           <FileInput size={10} />
@@ -393,7 +393,7 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
           type="button"
           onClick={handleCreateInsightNote}
           disabled={!hasActiveContent}
-          className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-accent text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors disabled:text-dim disabled:cursor-not-allowed"
+          className="flex items-center gap-1 text-2xs px-2 py-1 rounded-md bg-accent text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors disabled:text-dim disabled:cursor-not-allowed"
           title="Create note from insight"
         >
           <FilePlus size={10} />
@@ -406,7 +406,7 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
             <button
               type="button"
               onClick={() => actions.saveFlashcards(`insight-${Date.now()}`)}
-              className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-brand/20 text-brand hover:bg-brand/30 transition-colors"
+              className="flex items-center gap-1 text-2xs px-2 py-1 rounded-md bg-brand/20 text-brand hover:bg-brand/30 transition-colors"
               title="Save as flashcard deck"
             >
               <BookOpen size={10} />
@@ -417,7 +417,7 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
           <PopoverPrimitive.Trigger asChild>
             <button
               type="button"
-              className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-white/[0.04] text-muted-foreground hover:text-foreground hover:bg-white/[0.06]"
+              className="flex items-center gap-1 text-2xs px-2 py-1 rounded-md bg-white/[0.04] text-muted-foreground hover:text-foreground hover:bg-white/[0.06]"
               title="Review due flashcards"
             >
               <RotateCcw size={10} />
@@ -446,7 +446,7 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
           <button
             type="button"
             onClick={() => actions.regenerateTab(state.activeTab)}
-            className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-accent text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors"
+            className="flex items-center gap-1 text-2xs px-2 py-1 rounded-md bg-accent text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors"
             title="Regenerate this tab"
           >
             <RefreshCw size={10} />
@@ -456,7 +456,7 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
           type="button"
           onClick={handleCopy}
           disabled={!hasActiveContent}
-          className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-accent text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors disabled:text-dim disabled:cursor-not-allowed ml-auto"
+          className="flex items-center gap-1 text-2xs px-2 py-1 rounded-md bg-accent text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors disabled:text-dim disabled:cursor-not-allowed ml-auto"
           title="Copy to clipboard"
         >
           <Copy size={10} />

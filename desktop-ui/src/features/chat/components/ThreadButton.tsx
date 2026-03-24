@@ -38,7 +38,7 @@ export function ThreadButton({
             if (e.key === "Enter") onRenameConfirm();
             if (e.key === "Escape") onRenameCancel();
           }}
-          className="flex-1 min-w-0 bg-muted text-foreground text-[12px] font-light px-2 py-1 rounded border border-border"
+          className="flex-1 min-w-0 bg-muted text-foreground text-xs font-light px-2 py-1 rounded border border-border"
         />
         <button
           type="button"
@@ -46,7 +46,7 @@ export function ThreadButton({
           aria-label="Confirm rename"
           className="text-success hover:text-success/80 shrink-0"
         >
-          <Check className="w-3.5 h-3.5" strokeWidth={2} />
+          <Check className="size-3.5" strokeWidth={2} />
         </button>
         <button
           type="button"
@@ -54,7 +54,7 @@ export function ThreadButton({
           aria-label="Cancel rename"
           className="text-muted-foreground hover:text-foreground shrink-0"
         >
-          <X className="w-3.5 h-3.5" strokeWidth={2} />
+          <X className="size-3.5" strokeWidth={2} />
         </button>
       </div>
     );
@@ -65,16 +65,16 @@ export function ThreadButton({
       type="button"
       onClick={() => onSelect(thread.sessionKey)}
       onContextMenu={(e) => onContextMenu(e, thread)}
-      className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-[12px] font-light ${
+      className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-xs font-light ${
         isActive
           ? "bg-muted text-foreground"
           : "text-muted-foreground hover:bg-accent hover:text-foreground"
       }`}
     >
       {thread.squadId ? (
-        <Users className="w-3 h-3 shrink-0 text-purple-400" strokeWidth={1.5} />
+        <Users className="size-3 shrink-0 text-purple-400" strokeWidth={1.5} />
       ) : (
-        <MessageSquare className="w-3 h-3 shrink-0" strokeWidth={1.5} />
+        <MessageSquare className="size-3 shrink-0" strokeWidth={1.5} />
       )}
       <span className="flex-1 text-left truncate">{thread.title}</span>
       <span className="text-[11px] shrink-0">{formatRelativeTime(thread.updatedAt)}</span>

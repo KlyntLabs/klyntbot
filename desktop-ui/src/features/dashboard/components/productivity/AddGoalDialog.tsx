@@ -40,26 +40,26 @@ export function AddGoalDialog({ open, onClose, onAdd }: AddGoalDialogProps) {
       <div className="glass-panel w-[400px]">
         <div className="bg-card rounded-[var(--glass-radius-inner)]">
           <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-            <h3 className="text-[14px] font-medium text-foreground">Add Goal</h3>
+            <h3 className="text-sm font-medium text-foreground">Add Goal</h3>
             <button
               type="button"
               onClick={onClose}
-              className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              className="size-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
             >
-              <X className="w-4 h-4" />
+              <X className="size-4" />
             </button>
           </div>
 
           <div className="px-5 py-4 space-y-4">
             <div>
-              <span className="block text-[12px] text-muted-foreground mb-1.5">Period</span>
+              <span className="block text-xs text-muted-foreground mb-1.5">Period</span>
               <div className="flex gap-2">
                 {(["daily", "weekly"] as const).map((t) => (
                   <button
                     key={t}
                     type="button"
                     onClick={() => setGoalType(t)}
-                    className={`flex-1 py-1.5 text-[12px] rounded-md border transition-colors capitalize ${
+                    className={`flex-1 py-1.5 text-xs rounded-md border transition-colors capitalize ${
                       goalType === t
                         ? "border-brand/50 text-brand bg-brand/5"
                         : "border-border text-muted-foreground bg-accent hover:bg-muted"
@@ -72,14 +72,14 @@ export function AddGoalDialog({ open, onClose, onAdd }: AddGoalDialogProps) {
             </div>
 
             <div>
-              <span className="block text-[12px] text-muted-foreground mb-1.5">Metric</span>
+              <span className="block text-xs text-muted-foreground mb-1.5">Metric</span>
               <div className="flex flex-col gap-1.5">
                 {METRICS.map((m) => (
                   <button
                     key={m.value}
                     type="button"
                     onClick={() => setMetric(m.value)}
-                    className={`px-3 py-2 text-[12px] text-left rounded-md border transition-colors ${
+                    className={`px-3 py-2 text-xs text-left rounded-md border transition-colors ${
                       metric === m.value
                         ? "border-brand/50 text-brand bg-brand/5"
                         : "border-border text-muted-foreground bg-accent hover:bg-muted"
@@ -92,10 +92,7 @@ export function AddGoalDialog({ open, onClose, onAdd }: AddGoalDialogProps) {
             </div>
 
             <div>
-              <label
-                htmlFor="goal-target"
-                className="block text-[12px] text-muted-foreground mb-1.5"
-              >
+              <label htmlFor="goal-target" className="block text-xs text-muted-foreground mb-1.5">
                 Target <span className="text-dim">({selectedMetric.unit})</span>
               </label>
               <input
@@ -115,7 +112,7 @@ export function AddGoalDialog({ open, onClose, onAdd }: AddGoalDialogProps) {
             <button
               type="button"
               onClick={onClose}
-              className="px-3 py-1.5 text-[12px] text-muted-foreground hover:text-foreground rounded-md hover:bg-accent transition-colors"
+              className="px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground rounded-md hover:bg-accent transition-colors"
             >
               Cancel
             </button>
@@ -123,7 +120,7 @@ export function AddGoalDialog({ open, onClose, onAdd }: AddGoalDialogProps) {
               type="button"
               onClick={handleSubmit}
               disabled={!canSubmit}
-              className="px-4 py-1.5 text-[12px] rounded-md bg-brand text-white hover:bg-brand-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="px-4 py-1.5 text-xs rounded-md bg-brand text-white hover:bg-brand-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Add goal
             </button>

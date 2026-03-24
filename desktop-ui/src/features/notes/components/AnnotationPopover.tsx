@@ -60,12 +60,12 @@ export function AnnotationPopover({
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           {tags.map((tag) => (
-            <span key={tag} className="rounded-full bg-brand/15 px-2 py-0.5 text-[10px] text-brand">
+            <span key={tag} className="rounded-full bg-brand/15 px-2 py-0.5 text-2xs text-brand">
               {tag}
             </span>
           ))}
         </div>
-        <span className="text-[10px] text-muted">
+        <span className="text-2xs text-muted">
           {new Date(annotation.createdAt).toLocaleDateString()}
         </span>
       </div>
@@ -80,7 +80,7 @@ export function AnnotationPopover({
       {/* AI Suggestion */}
       {annotation.aiSuggestion && (
         <div className="mb-3 rounded-md bg-blue-500/10 px-3 py-2">
-          <p className="text-[10px] font-medium text-blue-400 uppercase">AI Insight</p>
+          <p className="text-2xs font-medium text-blue-400 uppercase">AI Insight</p>
           <p className="mt-1 text-xs text-primary">{annotation.aiSuggestion}</p>
         </div>
       )}
@@ -99,14 +99,14 @@ export function AnnotationPopover({
             <button
               type="button"
               onClick={() => setEditing(false)}
-              className="rounded px-2 py-1 text-[10px] text-muted hover:bg-surface-hover"
+              className="rounded px-2 py-1 text-2xs text-muted hover:bg-surface-hover"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={handleSave}
-              className="rounded bg-brand/20 px-2 py-1 text-[10px] text-brand hover:bg-brand/30"
+              className="rounded bg-brand/20 px-2 py-1 text-2xs text-brand hover:bg-brand/30"
             >
               Save
             </button>
@@ -151,7 +151,7 @@ function ActionButton({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-md px-2 py-1 text-[10px] text-muted hover:bg-surface-hover ${className}`}
+      className={`rounded-md px-2 py-1 text-2xs text-muted hover:bg-surface-hover ${className}`}
     >
       {children}
     </button>

@@ -265,7 +265,7 @@ export function CashFlowPage() {
                 placeholder="Search transactions…"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="glass-input w-full px-3 py-2 text-[12px] font-light"
+                className="glass-input w-full px-3 py-2 text-xs font-light"
                 spellCheck={false}
               />
             </div>
@@ -277,7 +277,7 @@ export function CashFlowPage() {
                   role="tab"
                   aria-selected={t === txFilter}
                   onClick={() => setTxFilter(t)}
-                  className={`px-2.5 py-1 rounded-lg text-[10px] font-light capitalize transition-colors ${
+                  className={`px-2.5 py-1 rounded-lg text-2xs font-light capitalize transition-colors ${
                     t === txFilter
                       ? "glass-button-active text-foreground"
                       : "text-muted-foreground hover:text-foreground"
@@ -298,9 +298,9 @@ export function CashFlowPage() {
                   <button
                     type="button"
                     onClick={handleOpenPanel}
-                    className="flex items-center gap-1 text-[10px] text-brand font-light hover:text-brand-hover transition-colors"
+                    className="flex items-center gap-1 text-2xs text-brand font-light hover:text-brand-hover transition-colors"
                   >
-                    <Plus className="w-3 h-3" strokeWidth={1.5} /> Add
+                    <Plus className="size-3" strokeWidth={1.5} /> Add
                   </button>
                 }
               />
@@ -329,11 +329,11 @@ export function CashFlowPage() {
                     key={tx.id}
                     className="flex items-center gap-3 px-4 py-2 hover:bg-accent transition-colors border-b border-border-subtle last:border-b-0"
                   >
-                    <span className="text-[10px] text-dim font-light w-10 flex-shrink-0 tabular-nums">
+                    <span className="text-2xs text-dim font-light w-10 flex-shrink-0 tabular-nums">
                       {tx.txDate.slice(5)}
                     </span>
-                    <TxIcon className={cn("w-3 h-3 flex-shrink-0", col)} strokeWidth={1.5} />
-                    <span className="text-[12px] font-light text-muted-foreground truncate flex-1">
+                    <TxIcon className={cn("size-3 flex-shrink-0", col)} strokeWidth={1.5} />
+                    <span className="text-xs font-light text-muted-foreground truncate flex-1">
                       {tx.counterparty ?? tx.notes ?? tx.txType}
                     </span>
                     {tx.category && (
@@ -343,7 +343,7 @@ export function CashFlowPage() {
                     )}
                     <span
                       className={cn(
-                        "text-[12px] font-light w-24 text-right flex-shrink-0 tabular-nums",
+                        "text-xs font-light w-24 text-right flex-shrink-0 tabular-nums",
                         col,
                       )}
                     >
@@ -382,7 +382,7 @@ export function CashFlowPage() {
 
           {/* Accounts sidebar */}
           <Card compact className="p-3">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-2">
+            <p className="text-2xs text-muted-foreground uppercase tracking-widest mb-2">
               Accounts
             </p>
             {activeAccounts.map((acct) => {
@@ -405,11 +405,11 @@ export function CashFlowPage() {
                     isSelected ? "bg-muted" : "hover:bg-accent",
                   )}
                 >
-                  <Icon className="w-3.5 h-3.5 text-muted-foreground" strokeWidth={1.5} />
+                  <Icon className="size-3.5 text-muted-foreground" strokeWidth={1.5} />
                   <span className="text-[11px] text-muted-foreground flex-1 truncate">
                     {acct.name}
                   </span>
-                  <span className="text-[10px] text-muted-foreground tabular-nums">
+                  <span className="text-2xs text-muted-foreground tabular-nums">
                     {displayAmount({
                       amount: acct.balance,
                       currency: acct.currency,
@@ -428,7 +428,7 @@ export function CashFlowPage() {
           {/* Spending & Budgets (merged) */}
           <Card compact className="overflow-hidden">
             <div className="px-3 pt-3 pb-1">
-              <p className="text-[10px] text-muted-foreground uppercase tracking-widest">
+              <p className="text-2xs text-muted-foreground uppercase tracking-widest">
                 Spending & Budgets
               </p>
             </div>
@@ -457,12 +457,12 @@ export function CashFlowPage() {
                         className="w-1.5 h-1.5 rounded-full flex-shrink-0"
                         style={{ backgroundColor: COLORS[i % COLORS.length] }}
                       />
-                      <span className="text-[10px] text-muted-foreground capitalize">
+                      <span className="text-2xs text-muted-foreground capitalize">
                         {item.category}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] text-foreground tabular-nums">
+                      <span className="text-2xs text-foreground tabular-nums">
                         {fmtCompact(convertTotal(item.spent), displayCur, hidden)}
                       </span>
                       {hasBudget && (
@@ -493,7 +493,7 @@ export function CashFlowPage() {
               );
             })}
             {spendingWithBudgets.length === 0 && (
-              <p className="px-3 py-4 text-[10px] text-dim text-center">No spending this period</p>
+              <p className="px-3 py-4 text-2xs text-dim text-center">No spending this period</p>
             )}
           </Card>
         </div>
@@ -526,7 +526,7 @@ export function CashFlowPage() {
                   type="button"
                   onClick={() => setTxType(t)}
                   className={cn(
-                    "flex-1 py-1.5 text-[12px] rounded-md border transition-colors capitalize",
+                    "flex-1 py-1.5 text-xs rounded-md border transition-colors capitalize",
                     txType === t
                       ? "border-brand/50 text-brand bg-brand/5"
                       : "border-border text-muted-foreground bg-accent hover:bg-muted",
@@ -584,7 +584,7 @@ export function CashFlowPage() {
               type="button"
               onClick={handleCreateTx}
               disabled={!txAccountId || !txAmount}
-              className="w-full py-2 text-[12px] rounded-lg bg-brand text-white hover:bg-brand-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-full py-2 text-xs rounded-lg bg-brand text-white hover:bg-brand-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Add Transaction
             </button>

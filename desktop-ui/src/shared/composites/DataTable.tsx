@@ -51,7 +51,7 @@ function SkeletonRows<T>({
         <tr key={`skel-${i}`} className="border-b border-border-subtle">
           {expandable && (
             <td className="px-3 py-2.5 w-8">
-              <div className="w-3 h-3 rounded animate-pulse bg-muted" />
+              <div className="size-3 rounded animate-pulse bg-muted" />
             </td>
           )}
           {hasPrefix && (

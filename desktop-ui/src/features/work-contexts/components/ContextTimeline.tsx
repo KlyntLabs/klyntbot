@@ -55,7 +55,7 @@ export function ContextTimeline({
           onMouseLeave={() => setHoveredIdx(null)}
         >
           {height > 18 && !block.isIdle && (
-            <span className="block px-1.5 py-0.5 text-[10px] text-white truncate font-medium">
+            <span className="block px-1.5 py-0.5 text-2xs text-white truncate font-medium">
               {block.contextTitle ?? "Unknown"}
             </span>
           )}
@@ -63,7 +63,7 @@ export function ContextTimeline({
           {/* Tooltip */}
           {hoveredIdx === idx && (
             <div className="absolute left-full ml-2 top-0 z-50 glass-dropdown px-3 py-2 min-w-[180px] pointer-events-none">
-              <p className="text-[12px] font-medium text-foreground">
+              <p className="text-xs font-medium text-foreground">
                 {block.isIdle ? "Idle" : (block.contextTitle ?? "Unassigned")}
               </p>
               <p className="text-[11px] text-muted-foreground mt-0.5">

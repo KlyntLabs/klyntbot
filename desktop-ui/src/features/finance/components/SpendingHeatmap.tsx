@@ -50,7 +50,7 @@ export function SpendingHeatmap({
       <div className="grid grid-cols-7 mb-1">
         {DAY_HEADERS.map((h, i) => (
           // biome-ignore lint/suspicious/noArrayIndexKey: static headers
-          <div key={i} className="text-center text-[10px] font-light text-dim py-1">
+          <div key={i} className="text-center text-2xs font-light text-dim py-1">
             {h}
           </div>
         ))}
@@ -102,12 +102,12 @@ export function SpendingHeatmap({
 
       {/* Legend */}
       <div className="flex items-center justify-end gap-1.5 mt-3">
-        <span className="text-[10px] text-dim font-light">Less</span>
+        <span className="text-2xs text-dim font-light">Less</span>
         {HEATMAP_COLORS.map((color, i) => (
           // biome-ignore lint/suspicious/noArrayIndexKey: static legend
-          <div key={i} className="w-3 h-3 rounded-sm" style={{ backgroundColor: color }} />
+          <div key={i} className="size-3 rounded-sm" style={{ backgroundColor: color }} />
         ))}
-        <span className="text-[10px] text-dim font-light">More</span>
+        <span className="text-2xs text-dim font-light">More</span>
       </div>
     </div>
   );

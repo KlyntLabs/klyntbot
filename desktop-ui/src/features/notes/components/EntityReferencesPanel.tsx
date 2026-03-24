@@ -63,7 +63,7 @@ export function EntityReferencesPanel({
       <button
         type="button"
         onClick={() => setCollapsed(!collapsed)}
-        className="w-full flex items-center gap-1.5 px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
+        className="w-full flex items-center gap-1.5 px-3 py-2 text-2xs font-medium uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
       >
         {collapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
         <span>Entity References</span>
@@ -78,7 +78,7 @@ export function EntityReferencesPanel({
               {entities.map((ent) => (
                 <span
                   key={`${ent.type}:${ent.id}`}
-                  className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md cursor-default"
+                  className="inline-flex items-center gap-1 text-2xs px-1.5 py-0.5 rounded-md cursor-default"
                   style={{
                     color: TYPE_COLORS[ent.type] ?? "rgba(255,255,255,0.6)",
                     backgroundColor: TYPE_BG[ent.type] ?? "rgba(255,255,255,0.06)",

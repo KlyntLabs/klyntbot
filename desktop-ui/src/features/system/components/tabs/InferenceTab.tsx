@@ -40,10 +40,10 @@ function StatCard({
   return (
     <div className="glass-card rounded-xl p-4 flex items-center gap-3">
       <div
-        className="w-9 h-9 rounded-lg flex items-center justify-center"
+        className="size-9 rounded-lg flex items-center justify-center"
         style={{ backgroundColor: `${accent ?? "#6B7280"}20` }}
       >
-        <Icon className="w-4.5 h-4.5" strokeWidth={1.5} style={{ color: accent ?? "#6B7280" }} />
+        <Icon className="size-4.5" strokeWidth={1.5} style={{ color: accent ?? "#6B7280" }} />
       </div>
       <div>
         <p className="text-lg font-semibold text-foreground leading-tight">{value}</p>
@@ -73,7 +73,7 @@ function Slider({
   const display = format ? format(value) : value.toFixed(2);
   return (
     <div className="flex items-center gap-3">
-      <span className="text-[12px] text-muted-foreground w-40 shrink-0">{label}</span>
+      <span className="text-xs text-muted-foreground w-40 shrink-0">{label}</span>
       <input
         type="range"
         min={min}
@@ -83,9 +83,7 @@ function Slider({
         onChange={(e) => onChange(Number(e.target.value))}
         className="flex-1 accent-accent"
       />
-      <span className="text-[12px] text-muted-foreground w-12 text-right tabular-nums">
-        {display}
-      </span>
+      <span className="text-xs text-muted-foreground w-12 text-right tabular-nums">{display}</span>
     </div>
   );
 }

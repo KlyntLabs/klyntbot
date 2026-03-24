@@ -50,12 +50,12 @@ export function LanguageLearningPanel({
       {/* Selection indicator */}
       {isSelection && (
         <div className="flex items-center justify-between border-b border-brand/20 bg-brand/5 px-3 py-1.5">
-          <span className="text-[10px] text-brand">Translating selection</span>
+          <span className="text-2xs text-brand">Translating selection</span>
           {onClearSelection && (
             <button
               type="button"
               onClick={onClearSelection}
-              className="text-[10px] text-muted-foreground hover:text-primary"
+              className="text-2xs text-muted-foreground hover:text-primary"
             >
               Translate full document
             </button>

@@ -130,10 +130,10 @@ const ICON_MAP: Record<string, string> = {
 
 function ItemIcon({ kind, icon }: { kind: string; icon?: string | null }) {
   if (icon?.startsWith("data:")) {
-    return <img src={icon} alt="" className="w-6 h-6 shrink-0 rounded" />;
+    return <img src={icon} alt="" className="size-6 shrink-0 rounded" />;
   }
   return (
-    <span className="w-6 h-6 flex items-center justify-center text-sm shrink-0">
+    <span className="size-6 flex items-center justify-center text-sm shrink-0">
       {ICON_MAP[kind] || "\u2022"}
     </span>
   );
@@ -164,7 +164,7 @@ const KIND_LABELS: Record<string, string> = {
 
 function KindBadge({ type }: { type: string }) {
   return (
-    <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 rounded bg-accent shrink-0">
+    <span className="text-2xs text-muted-foreground px-1.5 py-0.5 rounded bg-accent shrink-0">
       {KIND_LABELS[type] || type}
     </span>
   );

@@ -65,10 +65,10 @@ export function BulkAcceptModal({ atoms, onClose }: BulkAcceptModalProps) {
         <button
           type="button"
           onClick={toggleAll}
-          className="flex items-center gap-2 w-full py-1.5 text-[10px] text-muted-foreground hover:text-primary transition-colors"
+          className="flex items-center gap-2 w-full py-1.5 text-2xs text-muted-foreground hover:text-primary transition-colors"
         >
           <div
-            className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-colors ${
+            className={`size-3.5 rounded border flex items-center justify-center transition-colors ${
               selected.size === atoms.length
                 ? "bg-brand border-brand"
                 : "border-border hover:border-muted-foreground"
@@ -87,7 +87,7 @@ export function BulkAcceptModal({ atoms, onClose }: BulkAcceptModalProps) {
             className="flex items-center gap-2 w-full rounded-md px-1.5 py-1.5 hover:bg-surface-hover transition-colors text-left"
           >
             <div
-              className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 transition-colors ${
+              className={`size-3.5 rounded border flex items-center justify-center shrink-0 transition-colors ${
                 selected.has(atom.id)
                   ? "bg-brand border-brand"
                   : "border-border hover:border-muted-foreground"
@@ -97,7 +97,7 @@ export function BulkAcceptModal({ atoms, onClose }: BulkAcceptModalProps) {
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-xs font-medium text-primary truncate">{atom.subject}</p>
-              <p className="text-[10px] text-muted truncate">{atom.domain}</p>
+              <p className="text-2xs text-muted truncate">{atom.domain}</p>
             </div>
           </button>
         ))}
@@ -106,7 +106,7 @@ export function BulkAcceptModal({ atoms, onClose }: BulkAcceptModalProps) {
       {/* Importance picker + action */}
       <div className="pt-3 mt-3 border-t border-border/30 space-y-3">
         <div>
-          <p className="text-[10px] text-muted-foreground mb-1.5">Importance</p>
+          <p className="text-2xs text-muted-foreground mb-1.5">Importance</p>
           <div className="flex gap-1.5">
             {IMPORTANCE_OPTIONS.map((opt) => (
               <button

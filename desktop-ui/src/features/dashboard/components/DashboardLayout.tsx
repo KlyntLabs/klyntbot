@@ -201,7 +201,7 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
             )}
             title="Toggle layers"
           >
-            <Layers className="w-4 h-4" />
+            <Layers className="size-4" />
           </button>
 
           <CalendarSync />
@@ -213,7 +213,7 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
               onClick={() => navigateBy(-1)}
               className="p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
             >
-              <ChevronLeft className="w-4 h-4" />
+              <ChevronLeft className="size-4" />
             </button>
             <button
               ref={calTriggerRef}
@@ -227,14 +227,14 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
               )}
               title="Pick date"
             >
-              <Calendar className="w-4 h-4" />
+              <Calendar className="size-4" />
             </button>
             <button
               type="button"
               onClick={() => navigateBy(1)}
               className="p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
             >
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight className="size-4" />
             </button>
           </div>
 
@@ -248,7 +248,7 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
             )}
             title={sidebarOpen ? "Hide summary" : "Show summary"}
           >
-            <PanelRight className="w-4 h-4" />
+            <PanelRight className="size-4" />
           </button>
         </>
       </div>
@@ -270,9 +270,9 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
                   type="checkbox"
                   checked={enabled.has(layer.key)}
                   onChange={() => toggle(layer.key)}
-                  className="accent-brand w-3 h-3"
+                  className="accent-brand size-3"
                 />
-                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: layer.color }} />
+                <span className="size-2 rounded-full" style={{ backgroundColor: layer.color }} />
                 {layer.label}
               </label>
             ))}

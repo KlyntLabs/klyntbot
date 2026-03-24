@@ -111,7 +111,7 @@ function SuggestionCard({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-foreground">{suggestion.title}</span>
-            <span className="text-[10px] px-1 py-0.5 rounded bg-purple/20 text-purple shrink-0">
+            <span className="text-2xs px-1 py-0.5 rounded bg-purple/20 text-purple shrink-0">
               {Math.round(suggestion.confidence * 100)}%
             </span>
           </div>

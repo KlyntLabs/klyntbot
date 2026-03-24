@@ -49,7 +49,7 @@ export function LinkedViewPanel({ noteId, sectionText }: LinkedViewPanelProps) {
               </p>
               <div className="mt-1 flex items-center gap-2">
                 <ConfidenceBar confidence={fact.confidence} />
-                <span className="text-[10px] text-muted">{Math.round(fact.confidence * 100)}%</span>
+                <span className="text-2xs text-muted">{Math.round(fact.confidence * 100)}%</span>
               </div>
             </div>
           ))}
@@ -63,8 +63,8 @@ export function LinkedViewPanel({ noteId, sectionText }: LinkedViewPanelProps) {
             <div key={mem.id} className="rounded-md border border-brand/20 bg-brand/5 p-2">
               <p className="text-xs text-primary">{mem.content}</p>
               <div className="mt-1 flex items-center justify-between">
-                <span className="text-[10px] text-muted">{mem.domain}</span>
-                <span className="text-[10px] text-muted">
+                <span className="text-2xs text-muted">{mem.domain}</span>
+                <span className="text-2xs text-muted">
                   {new Date(mem.createdAt).toLocaleDateString()}
                 </span>
               </div>
@@ -80,7 +80,7 @@ export function LinkedViewPanel({ noteId, sectionText }: LinkedViewPanelProps) {
             <div key={ann.id} className="rounded-md border border-green-500/20 bg-green-500/5 p-2">
               <p className="text-xs text-primary">{ann.content}</p>
               {ann.quotedText && (
-                <p className="mt-1 text-[10px] text-muted italic">"{ann.quotedText}"</p>
+                <p className="mt-1 text-2xs text-muted italic">"{ann.quotedText}"</p>
               )}
             </div>
           ))}
@@ -94,8 +94,8 @@ export function LinkedViewPanel({ noteId, sectionText }: LinkedViewPanelProps) {
             <div key={rule.id} className="rounded-md border border-blue-500/20 bg-blue-500/5 p-2">
               <p className="text-xs text-primary">{rule.ruleText}</p>
               <div className="mt-1 flex items-center justify-between">
-                <span className="text-[10px] text-muted">{rule.domain}</span>
-                <span className="text-[10px] text-muted">
+                <span className="text-2xs text-muted">{rule.domain}</span>
+                <span className="text-2xs text-muted">
                   {rule.signalCount} signal{rule.signalCount !== 1 ? "s" : ""}
                 </span>
               </div>

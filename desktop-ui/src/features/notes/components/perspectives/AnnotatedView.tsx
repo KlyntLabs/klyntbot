@@ -50,7 +50,7 @@ export function AnnotatedView({ noteId, sectionId: _ }: AnnotatedViewProps) {
                     </span>
                   ))}
             </div>
-            <span className="text-[10px] text-muted">
+            <span className="text-2xs text-muted">
               {new Date(ann.createdAt).toLocaleDateString()}
             </span>
           </div>

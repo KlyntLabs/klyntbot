@@ -59,13 +59,13 @@ export function FormModal({
       >
         <div className="bg-card rounded-[var(--glass-radius-inner)]">
           <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-            <h3 className="text-[14px] font-medium text-foreground">{title}</h3>
+            <h3 className="text-sm font-medium text-foreground">{title}</h3>
             <button
               type="button"
               onClick={onClose}
-              className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              className="size-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
             >
-              <X className="w-4 h-4" />
+              <X className="size-4" />
             </button>
           </div>
 
@@ -75,14 +75,14 @@ export function FormModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-3 py-1.5 text-[12px] text-muted-foreground hover:text-foreground rounded-md hover:bg-accent transition-colors"
+              className="px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground rounded-md hover:bg-accent transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={!canSubmit}
-              className="px-4 py-1.5 text-[12px] rounded-md bg-brand text-white hover:bg-brand-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="px-4 py-1.5 text-xs rounded-md bg-brand text-white hover:bg-brand-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {submitLabel}
             </button>
@@ -103,4 +103,4 @@ export function FormField({ label, children }: { label: string; children: ReactN
 }
 
 export const fieldClass =
-  "glass-input w-full px-3 py-2 text-[12px] font-light text-foreground placeholder:text-dim rounded-lg";
+  "glass-input w-full px-3 py-2 text-xs font-light text-foreground placeholder:text-dim rounded-lg";
