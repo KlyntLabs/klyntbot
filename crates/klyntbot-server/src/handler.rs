@@ -23,6 +23,8 @@ pub struct KlyntbotServerHandler {
     /// Pre-built static tool definitions (computed once at construction).
     status_tool: Tool,
     agent_tool: Option<Tool>,
+    /// Per-connection session identifier for routing context isolation.
+    session_id: String,
 }
 
 impl KlyntbotServerHandler {
@@ -45,6 +47,78 @@ impl KlyntbotServerHandler {
             agent_bridge,
             status_tool,
             agent_tool,
+            session_id: uuid::Uuid::new_v4().to_string(),
+        }
+    }
+
+    /// Build the list of MCP resources exposed by this server.
+    fn build_resources() -> Vec<Resource> {
+        vec![
+            Resource {
+                raw: RawResource {
+                    uri: "klyntbot://status".into(),
+                    name: "status".into(),
+                    title: Some("Agent Status".into()),
+                    description: Some("Agent status, version, and current mode".into()),
+                    mime_type: Some("application/json".into()),
+                    size: None,
+                    icons: None,
+                    meta: None,
+                },
+                annotations: None,
+            },
+            Resource {
+                raw: RawResource {
+                    uri: "klyntbot://memory/recent".into(),
+                    name: "memory_recent".into(),
+                    title: Some("Recent Memories".into()),
+                    description: Some("Recent semantic facts from the agent's memory".into()),
+                    mime_type: Some("application/json".into()),
+                    size: None,
+                    icons: None,
+                    meta: None,
+                },
+                annotations: None,
+            },
+            Resource {
+                raw: RawResource {
+                    uri: "klyntbot://tasks/today".into(),
+                    name: "tasks_today".into(),
+                    title: Some("Today's Tasks".into()),
+                    description: Some("Tasks and deadlines due today".into()),
+                    mime_type: Some("application/json".into()),
+                    size: None,
+                    icons: None,
+                    meta: None,
+                },
+                annotations: None,
+            },
+            Resource {
+                raw: RawResource {
+                    uri: "klyntbot://config/skills".into(),
+                    name: "config_skills".into(),
+                    title: Some("Active Skills".into()),
+                    description: Some("List of currently active orchestrator skills".into()),
+                    mime_type: Some("application/json".into()),
+                    size: None,
+                    icons: None,
+                    meta: None,
+                },
+                annotations: None,
+            },
+        ]
+    }
+
+    /// Execute a tool via the bridge and collect its text output into a single string.
+    async fn call_tool_for_resource(&self, tool_name: &str, args: serde_json::Value) -> String {
+        match self.bridge.execute(tool_name, args, &self.session_id).await {
+            Ok(result) => result
+                .content
+                .iter()
+                .filter_map(|c| c.as_text().map(|t| t.text.clone()))
+                .collect::<Vec<_>>()
+                .join("\n"),
+            Err(e) => format!("Error fetching {}: {}", tool_name, e.message),
         }
     }
 
@@ -95,6 +169,10 @@ impl ServerHandler for KlyntbotServerHandler {
             protocol_version: ProtocolVersion::default(),
             capabilities: ServerCapabilities {
                 tools: Some(ToolsCapability::default()),
+                resources: Some(ResourcesCapability {
+                    subscribe: Some(false),
+                    list_changed: Some(false),
+                }),
                 ..Default::default()
             },
             server_info: Implementation {
@@ -106,6 +184,65 @@ impl ServerHandler for KlyntbotServerHandler {
                 "Klyntbot MCP server — personal AI agent with task management, memory, and productivity tools.".to_string(),
             ),
         }
+    }
+
+    async fn list_resources(
+        &self,
+        _request: Option<PaginatedRequestParams>,
+        _context: RequestContext<RoleServer>,
+    ) -> Result<ListResourcesResult, McpError> {
+        Ok(ListResourcesResult {
+            meta: None,
+            next_cursor: None,
+            resources: Self::build_resources(),
+        })
+    }
+
+    async fn read_resource(
+        &self,
+        request: ReadResourceRequestParams,
+        _context: RequestContext<RoleServer>,
+    ) -> Result<ReadResourceResult, McpError> {
+        let uri = request.uri.as_str();
+
+        let text = match uri {
+            "klyntbot://status" => {
+                serde_json::json!({
+                    "status": "running",
+                    "version": env!("CARGO_PKG_VERSION"),
+                    "mode": format!("{:?}", self.app.mode),
+                })
+                .to_string()
+            }
+            "klyntbot://memory/recent" => {
+                self.call_tool_for_resource(
+                    "memory",
+                    serde_json::json!({"action": "list", "limit": 20}),
+                )
+                .await
+            }
+            "klyntbot://tasks/today" => {
+                self.call_tool_for_resource(
+                    "tasks",
+                    serde_json::json!({"action": "list", "filter": "today"}),
+                )
+                .await
+            }
+            "klyntbot://config/skills" => {
+                r#"{"status": "not_available", "message": "Skill listing via resources is not yet implemented. Use the agent tool to query active skills."}"#.to_string()
+            }
+            _ => {
+                return Err(McpError::new(
+                    ErrorCode::INVALID_PARAMS,
+                    format!("Unknown resource URI: {}", uri),
+                    None,
+                ));
+            }
+        };
+
+        Ok(ReadResourceResult {
+            contents: vec![ResourceContents::text(text, uri)],
+        })
     }
 
     async fn list_tools(
@@ -129,7 +266,7 @@ impl ServerHandler for KlyntbotServerHandler {
     async fn call_tool(
         &self,
         request: CallToolRequestParams,
-        _context: RequestContext<RoleServer>,
+        context: RequestContext<RoleServer>,
     ) -> Result<CallToolResult, McpError> {
         let name = request.name.as_ref();
         let params = serde_json::Value::Object(request.arguments.unwrap_or_default());
@@ -137,7 +274,15 @@ impl ServerHandler for KlyntbotServerHandler {
         match name {
             "get_status" => self.handle_get_status().await,
             "agent" if self.agent_tool.is_some() => {
-                let result = self.agent_bridge.execute(params).await?;
+                // Build a progress emitter if the client provided a progress token.
+                let progress = context.meta.get_progress_token().map(|token| {
+                    crate::bridge::agent::ProgressEmitter {
+                        peer: context.peer.clone(),
+                        token,
+                    }
+                });
+
+                let result = self.agent_bridge.execute(params, progress).await?;
                 // Agent calls may mutate any entity — broadcast a broad invalidation.
                 // The FE listeners filter by entityKind so this is safe.
                 for kind in [EntityKind::Task, EntityKind::Project, EntityKind::Note] {
@@ -146,7 +291,10 @@ impl ServerHandler for KlyntbotServerHandler {
                 Ok(result)
             }
             _ => {
-                let result = self.bridge.execute(name, params.clone()).await?;
+                let result = self
+                    .bridge
+                    .execute(name, params.clone(), &self.session_id)
+                    .await?;
                 emit_entity_update_for_tool(&self.app.event_emitter, name, &params);
                 Ok(result)
             }

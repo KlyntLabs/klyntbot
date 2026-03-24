@@ -6,9 +6,16 @@ use std::sync::Arc;
 use agent::AgentEvent;
 use app_core::AppCore;
 use common::FormResponse;
-use rmcp::model::{CallToolResult, Content};
-use rmcp::ErrorData as McpError;
+use rmcp::model::{CallToolResult, Content, ProgressNotificationParam, ProgressToken};
+use rmcp::service::RoleServer;
+use rmcp::{ErrorData as McpError, Peer};
 use tokio::sync::mpsc;
+
+/// Optional progress emitter for streaming MCP notifications during agent execution.
+pub struct ProgressEmitter {
+    pub peer: Peer<RoleServer>,
+    pub token: ProgressToken,
+}
 
 /// Bridges MCP `agent` tool calls to AppCore's chat pipeline.
 pub struct AgentBridge {
@@ -21,14 +28,21 @@ impl AgentBridge {
     }
 
     /// Execute an agent chat request and collect the streamed response.
-    pub async fn execute(&self, params: serde_json::Value) -> Result<CallToolResult, McpError> {
+    ///
+    /// When `progress` is provided, emits `notifications/progress` for each
+    /// `ContentChunk` event so external MCP clients get real-time feedback.
+    pub async fn execute(
+        &self,
+        params: serde_json::Value,
+        progress: Option<ProgressEmitter>,
+    ) -> Result<CallToolResult, McpError> {
         let action = params
             .get("action")
             .and_then(|v| v.as_str())
             .unwrap_or("chat");
 
         match action {
-            "chat" => self.handle_chat(params).await,
+            "chat" => self.handle_chat(params, progress).await,
             "status" => self.handle_status().await,
             _ => Err(McpError::invalid_params(
                 format!("Unknown agent action: {action}"),
@@ -37,7 +51,11 @@ impl AgentBridge {
         }
     }
 
-    async fn handle_chat(&self, params: serde_json::Value) -> Result<CallToolResult, McpError> {
+    async fn handle_chat(
+        &self,
+        params: serde_json::Value,
+        progress: Option<ProgressEmitter>,
+    ) -> Result<CallToolResult, McpError> {
         let message = params
             .get("message")
             .and_then(|v| v.as_str())
@@ -59,7 +77,7 @@ impl AgentBridge {
 
         // Collect streamed events into a single response
         let (response, tool_log) =
-            collect_agent_stream(stream_info.event_rx, stream_info.interaction_rx).await;
+            collect_agent_stream(stream_info.event_rx, stream_info.interaction_rx, progress).await;
 
         // Build result
         let mut content = vec![Content::text(response)];
@@ -88,12 +106,18 @@ impl AgentBridge {
 ///
 /// Uses `select! biased` to prioritize event_rx over interaction_rx.
 /// Auto-declines any ask_user interactions with `FormResponse::Cancelled`.
+///
+/// When a `ProgressEmitter` is provided, emits MCP `notifications/progress`
+/// for each `ContentChunk` and `ToolStart` event so external clients get
+/// real-time feedback during long-running agent calls.
 async fn collect_agent_stream(
     mut event_rx: mpsc::Receiver<AgentEvent>,
     mut interaction_rx: mpsc::Receiver<tools_core::InteractionBundle>,
+    progress: Option<ProgressEmitter>,
 ) -> (String, Vec<String>) {
     let mut response = String::new();
     let mut tool_log = Vec::new();
+    let mut chunks_sent: u64 = 0;
 
     loop {
         tokio::select! {
@@ -103,8 +127,28 @@ async fn collect_agent_stream(
                 match event {
                     Some(AgentEvent::ContentChunk { data }) => {
                         response.push_str(&data);
+                        // Emit progress notification (best-effort)
+                        if let Some(ref emitter) = progress {
+                            chunks_sent += 1;
+                            let _ = emitter.peer.notify_progress(ProgressNotificationParam {
+                                progress_token: emitter.token.clone(),
+                                progress: chunks_sent as f64,
+                                total: None,
+                                message: Some(data),
+                            }).await;
+                        }
                     }
                     Some(AgentEvent::ToolStart { name, .. }) => {
+                        // Emit tool-start as progress notification
+                        if let Some(ref emitter) = progress {
+                            chunks_sent += 1;
+                            let _ = emitter.peer.notify_progress(ProgressNotificationParam {
+                                progress_token: emitter.token.clone(),
+                                progress: chunks_sent as f64,
+                                total: None,
+                                message: Some(format!("[calling tool: {name}]")),
+                            }).await;
+                        }
                         tool_log.push(name);
                     }
                     Some(AgentEvent::ToolEnd { .. }) => {
@@ -183,7 +227,7 @@ mod tests {
             .await
             .unwrap();
 
-        let (response, tools) = collect_agent_stream(event_rx, interaction_rx).await;
+        let (response, tools) = collect_agent_stream(event_rx, interaction_rx, None).await;
         assert_eq!(response, "Hello world");
         assert_eq!(tools, vec!["task"]);
     }
@@ -200,7 +244,7 @@ mod tests {
             .await
             .unwrap();
 
-        let (response, tools) = collect_agent_stream(event_rx, interaction_rx).await;
+        let (response, tools) = collect_agent_stream(event_rx, interaction_rx, None).await;
         assert_eq!(response, "Agent error: something broke");
         assert!(tools.is_empty());
     }
@@ -213,7 +257,7 @@ mod tests {
         let (response_tx, response_rx) = tokio::sync::oneshot::channel();
 
         // Spawn collector so we can interleave sends with yields
-        let handle = tokio::spawn(collect_agent_stream(event_rx, interaction_rx));
+        let handle = tokio::spawn(collect_agent_stream(event_rx, interaction_rx, None));
 
         // Send interaction — yield so the collector can poll it
         interaction_tx
@@ -262,7 +306,7 @@ mod tests {
             .unwrap();
         drop(event_tx); // Close channel without Done event
 
-        let (response, tools) = collect_agent_stream(event_rx, interaction_rx).await;
+        let (response, tools) = collect_agent_stream(event_rx, interaction_rx, None).await;
         assert_eq!(response, "partial");
         assert!(tools.is_empty());
     }

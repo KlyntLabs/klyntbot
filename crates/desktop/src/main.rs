@@ -190,15 +190,92 @@ fn run_desktop_app() {
                         let host = config.mcp.server.host.clone();
                         let port = config.mcp.server.port;
                         let whitelist = config.mcp.server.exposed_tools.clone();
+                        let auth_config = config.mcp.server.auth.clone();
                         drop(config);
+
                         tracing::info!("Starting embedded MCP HTTP server on {host}:{port}");
-                        let handler =
-                            klyntbot_server::KlyntbotServerHandler::new(mcp_core, whitelist);
-                        // TODO: Wire rmcp streamable HTTP server transport
-                        tracing::warn!(
-                            "HTTP transport not yet implemented — MCP server not started"
+
+                        use rmcp::transport::streamable_http_server::{
+                            session::local::LocalSessionManager, StreamableHttpServerConfig,
+                            StreamableHttpService,
+                        };
+                        use tokio_util::sync::CancellationToken;
+
+                        let ct = CancellationToken::new();
+                        let mcp_config = StreamableHttpServerConfig {
+                            cancellation_token: ct.clone(),
+                            ..Default::default()
+                        };
+
+                        let factory_app = mcp_core;
+                        let mcp_service: StreamableHttpService<
+                            klyntbot_server::KlyntbotServerHandler,
+                            LocalSessionManager,
+                        > = StreamableHttpService::new(
+                            move || {
+                                Ok(klyntbot_server::KlyntbotServerHandler::new(
+                                    factory_app.clone(),
+                                    whitelist.clone(),
+                                ))
+                            },
+                            std::sync::Arc::new(LocalSessionManager::default()),
+                            mcp_config,
                         );
-                        let _ = handler;
+
+                        let mut router = axum::Router::new().nest_service("/mcp", mcp_service);
+
+                        // Wire bearer-token auth middleware if configured.
+                        if auth_config.enabled {
+                            if let Some(ref token) = auth_config.token {
+                                let expected = token.expose().clone();
+                                router = router.layer(axum::middleware::from_fn(
+                                    move |req: axum::extract::Request,
+                                          next: axum::middleware::Next| {
+                                        use axum::response::IntoResponse;
+                                        let expected = expected.clone();
+                                        async move {
+                                            let auth_header = req
+                                                .headers()
+                                                .get(axum::http::header::AUTHORIZATION)
+                                                .and_then(|v| v.to_str().ok());
+                                            match auth_header {
+                                                Some(value)
+                                                    if value.strip_prefix("Bearer ")
+                                                        == Some(expected.as_str()) =>
+                                                {
+                                                    Ok(next.run(req).await)
+                                                }
+                                                _ => Err((
+                                                    axum::http::StatusCode::UNAUTHORIZED,
+                                                    "Unauthorized: invalid or missing Bearer token",
+                                                )
+                                                    .into_response()),
+                                            }
+                                        }
+                                    },
+                                ));
+                            }
+                        }
+
+                        let bind_addr = format!("{host}:{port}");
+                        match tokio::net::TcpListener::bind(&bind_addr).await {
+                            Ok(listener) => {
+                                tracing::info!("MCP HTTP server listening on {bind_addr}");
+                                if let Err(e) = axum::serve(listener, router)
+                                    .with_graceful_shutdown(
+                                        async move { ct.cancelled_owned().await },
+                                    )
+                                    .await
+                                {
+                                    tracing::error!("MCP HTTP server error: {e}");
+                                }
+                            }
+                            Err(e) => {
+                                tracing::error!(
+                                    "Failed to bind MCP HTTP server to {bind_addr}: {e}"
+                                );
+                            }
+                        }
                     });
                 }
             }

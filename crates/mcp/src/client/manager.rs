@@ -14,6 +14,7 @@ use tracing::{info, warn};
 
 use rmcp::transport::streamable_http_client::StreamableHttpClientTransportConfig;
 
+use crate::client::circuit_breaker::McpCircuitBreaker;
 use crate::client::events::McpStartupEvent;
 use crate::client::handler::KlyntbotClientHandler;
 use crate::client::tool_adapter::McpTool;
@@ -34,6 +35,9 @@ struct McpConnection {
 /// Manages all MCP server connections and their tools.
 pub struct McpManager {
     connections: HashMap<String, McpConnection>,
+    circuit_breaker: Arc<McpCircuitBreaker>,
+    #[allow(dead_code)]
+    config: McpConfig,
 }
 
 impl McpManager {
@@ -48,6 +52,7 @@ impl McpManager {
         config: &McpConfig,
         event_tx: Option<tokio::sync::mpsc::Sender<McpStartupEvent>>,
     ) -> Self {
+        let circuit_breaker = Arc::new(McpCircuitBreaker::new(3, 60));
         let mut connections = HashMap::new();
         let mut ready_count = 0usize;
         let mut failed_count = 0usize;
@@ -70,6 +75,7 @@ impl McpManager {
             }
             let def = server_def.clone();
             let tx = event_tx.clone();
+            let cb = Arc::clone(&circuit_breaker);
             join_set.spawn(async move {
                 let name = def.name.clone();
                 if let Some(ref tx) = tx {
@@ -79,7 +85,7 @@ impl McpManager {
                         })
                         .await;
                 }
-                let result = Self::connect_one(&def).await;
+                let result = Self::connect_one(&def, &cb).await;
                 (name, result, tx)
             });
         }
@@ -129,20 +135,27 @@ impl McpManager {
                 .await;
         }
 
-        Self { connections }
+        Self {
+            connections,
+            circuit_breaker,
+            config: config.clone(),
+        }
     }
 
     /// Connect to a single MCP server with a startup timeout.
     ///
     /// Wraps `connect_one_inner` in `tokio::time::timeout` using the
     /// server's configured `startup_timeout_sec`.
-    async fn connect_one(server_def: &config::McpServerDef) -> anyhow::Result<McpConnection> {
+    async fn connect_one(
+        server_def: &config::McpServerDef,
+        circuit_breaker: &Arc<McpCircuitBreaker>,
+    ) -> anyhow::Result<McpConnection> {
         let startup_timeout = Duration::from_secs(server_def.startup_timeout_sec);
         let tool_timeout = Duration::from_secs(server_def.tool_timeout_sec);
 
         tokio::time::timeout(
             startup_timeout,
-            Self::connect_one_inner(server_def, tool_timeout),
+            Self::connect_one_inner(server_def, tool_timeout, circuit_breaker),
         )
         .await
         .map_err(|_| {
@@ -162,6 +175,7 @@ impl McpManager {
     async fn connect_one_inner(
         server_def: &config::McpServerDef,
         tool_timeout: Duration,
+        circuit_breaker: &Arc<McpCircuitBreaker>,
     ) -> anyhow::Result<McpConnection> {
         let name = &server_def.name;
         let handler = KlyntbotClientHandler::new(name);
@@ -221,6 +235,7 @@ impl McpManager {
                     tool_def,
                     Arc::clone(&peer),
                     tool_timeout,
+                    Arc::clone(circuit_breaker),
                 ))
             })
             .collect();
@@ -249,6 +264,11 @@ impl McpManager {
     /// Get the number of connected servers.
     pub fn connected_count(&self) -> usize {
         self.connections.len()
+    }
+
+    /// Get the circuit breaker shared across all MCP connections.
+    pub fn circuit_breaker(&self) -> &Arc<McpCircuitBreaker> {
+        &self.circuit_breaker
     }
 
     /// Disconnect a single server without reconnecting.
@@ -285,7 +305,7 @@ impl McpManager {
         }
 
         // Connect fresh
-        match Self::connect_one(server_def).await {
+        match Self::connect_one(server_def, &self.circuit_breaker).await {
             Ok(conn) => {
                 let tools = conn.tools.clone();
                 let tool_count = tools.len();
@@ -298,6 +318,88 @@ impl McpManager {
                 Vec::new()
             }
         }
+    }
+
+    /// Get all tools for a specific server (for re-registration after reconnect).
+    pub fn tools_for_server(&self, server_name: &str) -> Vec<Arc<McpTool>> {
+        self.connections
+            .get(server_name)
+            .map(|conn| conn.tools.clone())
+            .unwrap_or_default()
+    }
+
+    /// Spawn a background task that periodically reconnects downed MCP servers.
+    ///
+    /// Checks every 30 seconds for servers whose circuit breaker cooldown has expired,
+    /// attempts reconnection, and re-registers tools in the `ToolRegistry` on success.
+    ///
+    /// The task runs until the `cancel` token is cancelled.
+    pub fn start_health_check(
+        manager: Arc<tokio::sync::Mutex<McpManager>>,
+        registry: Arc<tokio::sync::RwLock<tools_core::ToolRegistry>>,
+        cancel: tokio_util::sync::CancellationToken,
+    ) -> tokio::task::JoinHandle<()> {
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(Duration::from_secs(30));
+            interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+
+            loop {
+                tokio::select! {
+                    _ = cancel.cancelled() => {
+                        tracing::debug!("MCP health check task cancelled");
+                        break;
+                    }
+                    _ = interval.tick() => {
+                        // Collect servers that need reconnection (brief lock)
+                        let servers_to_reconnect = {
+                            let mgr = manager.lock().await;
+                            mgr.config
+                                .servers
+                                .iter()
+                                .filter(|s| {
+                                    s.enabled && mgr.circuit_breaker.cooldown_expired(&s.name)
+                                })
+                                .cloned()
+                                .collect::<Vec<_>>()
+                        };
+
+                        for server_def in servers_to_reconnect {
+                            info!(
+                                name = %server_def.name,
+                                "Attempting auto-reconnect for MCP server"
+                            );
+                            // Reconnect under manager lock, then drop it before
+                            // acquiring registry lock to avoid AB/BA deadlock.
+                            let (new_tools, server_name) = {
+                                let mut mgr = manager.lock().await;
+                                let tools = mgr.reconnect_server(&server_def).await;
+                                (tools, server_def.name.clone())
+                            };
+                            // Manager lock dropped here — safe to acquire registry lock
+                            if !new_tools.is_empty() {
+                                let mut reg = registry.write().await;
+                                for tool in new_tools {
+                                    reg.register_dyn(tool as Arc<dyn tools_core::Tool>);
+                                }
+                                drop(reg);
+                                let mgr = manager.lock().await;
+                                mgr.circuit_breaker.record_success(&server_name);
+                                info!(name = %server_name, "Auto-reconnected MCP server");
+                            } else {
+                                warn!(
+                                    name = %server_name,
+                                    "Auto-reconnect failed for MCP server (no tools returned)"
+                                );
+                            }
+                        }
+
+                        // Cleanup stale circuit breaker entries
+                        let mgr = manager.lock().await;
+                        mgr.circuit_breaker.cleanup();
+                    }
+                }
+            }
+        })
     }
 
     /// Gracefully disconnect all MCP servers concurrently.

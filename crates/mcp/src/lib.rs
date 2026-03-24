@@ -3,7 +3,6 @@
 //! Provides:
 //! - `McpManager`: connects to external MCP servers, discovers tools
 //! - `McpTool`: adapts MCP server tools to `tools_core::Tool`
-//! - `McpServerRunner`: exposes klyntbot tools to external AI agents
 
 pub mod client;
 pub mod server;
@@ -15,4 +14,3 @@ pub use client::events::McpStartupEvent;
 pub use client::manager::McpManager;
 pub use client::sanitize;
 pub use server::security;
-pub use server::McpServerRunner;

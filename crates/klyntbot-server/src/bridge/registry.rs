@@ -76,6 +76,7 @@ impl ToolRegistryBridge {
         &self,
         tool_name: &str,
         arguments: serde_json::Value,
+        session_id: &str,
     ) -> Result<CallToolResult, McpError> {
         // Whitelist check
         if !self.is_whitelisted(tool_name) {
@@ -85,10 +86,10 @@ impl ToolRegistryBridge {
             ));
         }
 
-        // Build MCP routing context
+        // Build MCP routing context with per-connection session isolation
         let ctx = RoutingContext {
             channel: ChannelName::new(MCP_CHANNEL),
-            chat_id: ChatId::new("mcp-session"),
+            chat_id: ChatId::new(format!("mcp:{}", session_id)),
             interaction_tx: None,
             is_direct_mode: true,
             delegation_depth: 0,
@@ -131,7 +132,9 @@ mod tests {
             let registry = Arc::new(RwLock::new(ToolRegistry::new()));
             let bridge = ToolRegistryBridge::new(registry, vec!["task".into()]);
 
-            let result = bridge.execute("read_file", serde_json::json!({})).await;
+            let result = bridge
+                .execute("read_file", serde_json::json!({}), "test-session")
+                .await;
             assert!(result.is_err());
         });
     }
@@ -146,7 +149,11 @@ mod tests {
             // Tool passes whitelist but is not registered -> NotFound maps to
             // Err(McpError) since prepare() fails before execute().
             let result = bridge
-                .execute("task", serde_json::json!({"action": "list"}))
+                .execute(
+                    "task",
+                    serde_json::json!({"action": "list"}),
+                    "test-session",
+                )
                 .await;
             assert!(result.is_err());
         });
@@ -159,7 +166,9 @@ mod tests {
             let registry = Arc::new(RwLock::new(ToolRegistry::new()));
             let bridge = ToolRegistryBridge::new(registry, vec![]);
 
-            let result = bridge.execute("task", serde_json::json!({})).await;
+            let result = bridge
+                .execute("task", serde_json::json!({}), "test-session")
+                .await;
             assert!(result.is_err());
         });
     }
