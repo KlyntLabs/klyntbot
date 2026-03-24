@@ -101,6 +101,8 @@ pub struct AgentRuntime {
     task_repo: Option<storage::TaskRepo>,
     /// Shared active desktop view for query rewriting context.
     active_view: Option<Arc<tokio::sync::RwLock<Option<context_engine::ActiveView>>>>,
+    /// Shared activated skills — written per-message, read by SkillContextSource.
+    activated_skills: Option<Arc<tokio::sync::RwLock<Vec<Arc<SkillPackage>>>>>,
 }
 
 impl AgentRuntime {
@@ -137,6 +139,7 @@ impl AgentRuntime {
             user_situation: None,
             task_repo: None,
             active_view: None,
+            activated_skills: None,
         }
     }
 
@@ -219,6 +222,15 @@ impl AgentRuntime {
         view: Arc<tokio::sync::RwLock<Option<context_engine::ActiveView>>>,
     ) -> Self {
         self.active_view = Some(view);
+        self
+    }
+
+    /// Set the shared activated skills for per-message skill activation.
+    pub fn with_activated_skills(
+        mut self,
+        skills: Arc<tokio::sync::RwLock<Vec<Arc<SkillPackage>>>>,
+    ) -> Self {
+        self.activated_skills = Some(skills);
         self
     }
 
@@ -313,6 +325,20 @@ impl AgentRuntime {
         {
             let mut guard = self.active_profile.write().await;
             *guard = Some(Arc::clone(&profile));
+        }
+
+        // Step 2a: Activate per-message skills (keyword-only for now)
+        if let Some(ref activated_skills) = self.activated_skills {
+            let catalog = self.skill_catalog.read().await;
+            let router = self.skill_router.read().await;
+            let activated = router.activate_skills(message, &[], &catalog, None);
+            if !activated.is_empty() {
+                let mut lock = activated_skills.write().await;
+                lock.clear();
+                for skill in activated {
+                    lock.push(Arc::clone(skill));
+                }
+            }
         }
 
         // Step 2b: Squad detection — if a squad_id is set, fan out to personas

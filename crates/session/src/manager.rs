@@ -116,6 +116,52 @@ impl Session {
         self.messages.clear();
         self.updated_at = Utc::now();
     }
+
+    /// Validate session integrity and auto-repair issues.
+    /// Returns the number of repairs made.
+    pub fn validate_and_repair(&mut self) -> usize {
+        let mut repairs = 0;
+
+        // Remove orphaned tool messages (tool message without preceding assistant tool_calls)
+        let mut i = 0;
+        while i < self.messages.len() {
+            if self.messages[i].role == "tool" {
+                let has_nearby_tool_call = self.messages[..i]
+                    .iter()
+                    .rev()
+                    .take(10)
+                    .any(|m| m.role == "assistant" && m.tool_calls.is_some());
+
+                if !has_nearby_tool_call {
+                    tracing::debug!(
+                        "Removing orphaned tool message at index {} in session {}",
+                        i,
+                        self.key
+                    );
+                    self.messages.remove(i);
+                    repairs += 1;
+                    continue;
+                }
+            }
+            i += 1;
+        }
+
+        // Ensure timestamps are monotonically increasing
+        let mut last_ts = chrono::DateTime::<chrono::Utc>::MIN_UTC;
+        for msg in &mut self.messages {
+            if msg.timestamp < last_ts {
+                msg.timestamp = last_ts + chrono::Duration::milliseconds(1);
+                repairs += 1;
+            }
+            last_ts = msg.timestamp;
+        }
+
+        if repairs > 0 {
+            tracing::info!("Session '{}' repaired: {} fixes applied", self.key, repairs);
+        }
+
+        repairs
+    }
 }
 
 /// A single message in a session
@@ -302,7 +348,9 @@ impl SessionManager {
         let session = match self.sql_repo.get_session(&key).await {
             Ok(row) => {
                 let msgs = self.sql_repo.get_messages(&key).await?;
-                Self::row_to_session(row, msgs)
+                let mut session = Self::row_to_session(row, msgs);
+                session.validate_and_repair();
+                session
             }
             Err(storage::StorageError::NotFound(_)) => {
                 let metadata = serde_json::Value::Object(serde_json::Map::new());
@@ -784,6 +832,83 @@ mod tests {
         .await;
 
         assert!(result.is_ok(), "tasks deadlocked or timed out");
+    }
+
+    #[test]
+    fn test_validate_removes_orphaned_tool_messages() {
+        let mut session = Session::new("test-validate".to_string());
+        session.add_message("user", "hello");
+        session.add_message("assistant", "hi there");
+        // Add orphaned tool result (no preceding assistant with tool_calls)
+        session.add_structured_message("tool", "result data", None, None, None);
+
+        assert_eq!(session.messages.len(), 3);
+        let repairs = session.validate_and_repair();
+        assert!(repairs > 0);
+        assert_eq!(session.messages.len(), 2);
+    }
+
+    #[test]
+    fn test_validate_preserves_valid_session() {
+        let mut session = Session::new("test-valid".to_string());
+        session.add_message("user", "hello");
+        session.add_message("assistant", "hi");
+        session.add_message("user", "thanks");
+
+        let repairs = session.validate_and_repair();
+        assert_eq!(repairs, 0);
+        assert_eq!(session.messages.len(), 3);
+    }
+
+    #[test]
+    fn test_validate_empty_session() {
+        let mut session = Session::new("test-empty".to_string());
+        let repairs = session.validate_and_repair();
+        assert_eq!(repairs, 0);
+    }
+
+    #[test]
+    fn test_validate_preserves_tool_message_with_tool_calls() {
+        let mut session = Session::new("test-valid-tool".to_string());
+        session.add_message("user", "search for rust");
+        // Assistant with tool_calls
+        session.add_structured_message(
+            "assistant",
+            "",
+            None,
+            Some(serde_json::json!([{"name": "search", "arguments": {"q": "rust"}}])),
+            None,
+        );
+        // Tool response (not orphaned — preceded by assistant with tool_calls)
+        session.add_structured_message("tool", "search results", None, None, None);
+
+        assert_eq!(session.messages.len(), 3);
+        let repairs = session.validate_and_repair();
+        assert_eq!(repairs, 0);
+        assert_eq!(session.messages.len(), 3);
+    }
+
+    #[test]
+    fn test_validate_fixes_out_of_order_timestamps() {
+        let mut session = Session::new("test-timestamps".to_string());
+        session.add_message("user", "first");
+        session.add_message("user", "second");
+        session.add_message("user", "third");
+
+        // Manually set timestamps out of order
+        let base = Utc::now();
+        session.messages[0].timestamp = base;
+        session.messages[1].timestamp = base - chrono::Duration::seconds(10); // out of order
+        session.messages[2].timestamp = base + chrono::Duration::seconds(10);
+
+        let repairs = session.validate_and_repair();
+        assert_eq!(repairs, 1);
+        // The second message should now be after the first
+        assert!(session.messages[1].timestamp >= session.messages[0].timestamp);
+        // All timestamps should be monotonically increasing
+        for i in 1..session.messages.len() {
+            assert!(session.messages[i].timestamp >= session.messages[i - 1].timestamp);
+        }
     }
 
     #[tokio::test]

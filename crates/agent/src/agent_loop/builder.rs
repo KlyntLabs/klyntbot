@@ -1441,7 +1441,8 @@ impl AgentLoopBuilder {
             runtime_config,
             Arc::clone(&active_profile),
         )
-        .with_strategy_repo(repos.strategies.clone());
+        .with_strategy_repo(repos.strategies.clone())
+        .with_activated_skills(Arc::clone(&activated_skills));
 
         if let Some(evaluator) = confidence_evaluator {
             runtime = runtime.with_confidence_evaluator(Arc::new(evaluator));

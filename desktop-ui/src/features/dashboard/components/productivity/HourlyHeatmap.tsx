@@ -44,21 +44,17 @@ export function HourlyHeatmap({ startDate, endDate }: Props) {
 
   return (
     <div className="space-y-1 px-1 py-2">
-      <div className="text-xs font-medium text-foreground">
+      <div className="text-2xs font-medium text-foreground">
         Hourly Productivity
-        {peakHour && (
-          <span className="text-muted-foreground font-normal ml-1">Peak: {peakHour.hour}:00</span>
-        )}
+        {peakHour && <span className="text-dim font-normal ml-1">Peak: {peakHour.hour}:00</span>}
       </div>
       <div className="space-y-px">
         {working.map((h) => {
           const width = (h.productiveRatio / maxRatio) * 100;
           return (
-            <div key={h.hour} className="flex items-center gap-1.5">
-              <span className="text-2xs text-muted-foreground w-6 text-right tabular-nums">
-                {h.hour}
-              </span>
-              <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+            <div key={h.hour} className="flex items-center gap-1">
+              <span className="text-2xs text-dim w-4 text-right tabular-nums">{h.hour}</span>
+              <div className="flex-1 h-1 rounded-full bg-muted overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all"
                   style={{

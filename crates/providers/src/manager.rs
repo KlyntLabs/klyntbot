@@ -149,11 +149,31 @@ impl ProviderManager {
             std::time::Duration::from_secs(1),
             std::time::Duration::from_secs(2),
         ];
+        self.retry_with_backoff_inner(&delays, true, call).await
+    }
+
+    /// Retry with custom delay schedule, optionally updating the primary circuit breaker.
+    ///
+    /// When `update_circuit_breaker` is false, failures and successes do not
+    /// affect the primary provider's circuit breaker state — used for fallback
+    /// retries that should not influence primary health tracking.
+    async fn retry_with_backoff_inner<F, Fut, T>(
+        &self,
+        delays: &[std::time::Duration],
+        update_circuit_breaker: bool,
+        call: F,
+    ) -> Result<T>
+    where
+        F: Fn() -> Fut,
+        Fut: Future<Output = Result<T>>,
+    {
         let mut last_err = None;
         for (attempt, delay) in delays.iter().enumerate() {
             match call().await {
                 Ok(val) => {
-                    self.reset_failures();
+                    if update_circuit_breaker {
+                        self.reset_failures();
+                    }
                     return Ok(val);
                 }
                 Err(e @ KlyntbotError::Provider(ProviderError::RateLimited { .. })) => {
@@ -163,12 +183,16 @@ impl ProviderManager {
                     }
                 }
                 Err(e) => {
-                    self.record_failure().await;
+                    if update_circuit_breaker {
+                        self.record_failure().await;
+                    }
                     return Err(e);
                 }
             }
         }
-        self.record_failure().await;
+        if update_circuit_breaker {
+            self.record_failure().await;
+        }
         Err(last_err.unwrap())
     }
 
@@ -213,6 +237,8 @@ impl ProviderManager {
     }
 
     /// Route to fallback if available, otherwise return the original error.
+    /// Retries the fallback up to 2 times on rate-limit errors without
+    /// affecting the primary provider's circuit breaker state.
     async fn try_fallback(
         &self,
         messages: &[Message],
@@ -220,8 +246,15 @@ impl ProviderManager {
         params: &ChatParams,
         primary_err: KlyntbotError,
     ) -> Result<LlmResponse> {
+        let delays = [
+            std::time::Duration::from_millis(500),
+            std::time::Duration::from_secs(1),
+        ];
         match &self.fallback {
-            Some(fb) => fb.chat(messages, tools, params).await,
+            Some(fb) => {
+                self.retry_with_backoff_inner(&delays, false, || fb.chat(messages, tools, params))
+                    .await
+            }
             None => Err(primary_err),
         }
     }
@@ -493,6 +526,139 @@ mod tests {
         assert_eq!(primary_count.load(AtomicOrdering::SeqCst), 3);
         // Fallback should have been called once after retries exhausted
         assert_eq!(fallback_count.load(AtomicOrdering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn test_fallback_retries_on_rate_limit() {
+        tokio::time::pause();
+
+        let primary_count = Arc::new(AtomicUsize::new(0));
+        let fallback_count = Arc::new(AtomicUsize::new(0));
+
+        let manager = ProviderManager::new(
+            Arc::new(CountingProvider::failing(
+                "primary",
+                primary_count.clone(),
+                auth_error, // non-retryable → fails fast to reach fallback
+            )),
+            Some(Arc::new(CountingProvider::failing(
+                "fallback",
+                fallback_count.clone(),
+                rate_limited_error, // fallback is rate-limited
+            ))),
+            None,
+        );
+
+        let result = manager
+            .chat(&[], None, &ChatParams::new("test-model"))
+            .await;
+        // Should fail — fallback exhausted its retries
+        assert!(result.is_err());
+        // Primary tried once (non-retryable)
+        assert_eq!(primary_count.load(AtomicOrdering::SeqCst), 1);
+        // Fallback retried 2 times (delays [500ms, 1s])
+        assert_eq!(fallback_count.load(AtomicOrdering::SeqCst), 2);
+    }
+
+    #[tokio::test]
+    async fn test_fallback_retry_succeeds_on_second_attempt() {
+        tokio::time::pause();
+
+        let primary_count = Arc::new(AtomicUsize::new(0));
+        let fallback_call_count = Arc::new(AtomicUsize::new(0));
+        let fallback_call_count_clone = fallback_call_count.clone();
+
+        /// Fallback provider that fails with rate-limit on first call, then succeeds.
+        struct FirstFailFallback {
+            call_count: Arc<AtomicUsize>,
+        }
+
+        #[async_trait]
+        impl LlmProvider for FirstFailFallback {
+            async fn chat(
+                &self,
+                _messages: &[Message],
+                _tools: Option<&[Value]>,
+                _params: &ChatParams,
+            ) -> Result<LlmResponse> {
+                let n = self.call_count.fetch_add(1, AtomicOrdering::SeqCst);
+                if n == 0 {
+                    Err(KlyntbotError::Provider(ProviderError::RateLimited {
+                        provider: "fallback".into(),
+                        retry_after: None,
+                    }))
+                } else {
+                    Ok(dummy_response())
+                }
+            }
+            fn default_model(&self) -> &str {
+                "test"
+            }
+            fn name(&self) -> &str {
+                "first-fail-fallback"
+            }
+        }
+
+        let manager = ProviderManager::new(
+            Arc::new(CountingProvider::failing(
+                "primary",
+                primary_count.clone(),
+                auth_error,
+            )),
+            Some(Arc::new(FirstFailFallback {
+                call_count: fallback_call_count_clone,
+            })),
+            None,
+        );
+
+        let result = manager
+            .chat(&[], None, &ChatParams::new("test-model"))
+            .await;
+        assert!(result.is_ok());
+        assert_eq!(primary_count.load(AtomicOrdering::SeqCst), 1);
+        // Fallback: first call rate-limited, second succeeds
+        assert_eq!(fallback_call_count.load(AtomicOrdering::SeqCst), 2);
+    }
+
+    #[tokio::test]
+    async fn test_fallback_retry_does_not_affect_circuit_breaker() {
+        tokio::time::pause();
+
+        let primary_count = Arc::new(AtomicUsize::new(0));
+        let fallback_count = Arc::new(AtomicUsize::new(0));
+
+        let manager = ProviderManager::with_config(
+            Arc::new(CountingProvider::failing(
+                "primary",
+                primary_count.clone(),
+                auth_error,
+            )),
+            Some(Arc::new(CountingProvider::failing(
+                "fallback",
+                fallback_count.clone(),
+                rate_limited_error,
+            ))),
+            None,
+            CircuitBreakerConfig {
+                failure_threshold: 3,
+                reset_timeout_secs: 60,
+            },
+        );
+
+        // Each call: primary fails (records 1 failure), fallback rate-limited (no circuit effect)
+        for _ in 0..2 {
+            let _ = manager
+                .chat(&[], None, &ChatParams::new("test-model"))
+                .await;
+        }
+
+        // Primary failed twice → circuit should NOT be open (threshold is 3)
+        // If fallback retries were incorrectly touching the circuit breaker,
+        // the extra failures would have tripped it.
+        assert!(!manager.is_circuit_open().await);
+        assert_eq!(primary_count.load(AtomicOrdering::SeqCst), 2);
+        // Each fallback call retried 2 times
+        assert_eq!(fallback_count.load(AtomicOrdering::SeqCst), 4);
     }
 
     #[tokio::test]

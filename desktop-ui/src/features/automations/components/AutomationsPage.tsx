@@ -27,7 +27,7 @@ function OriginBadge({ origin }: { origin: CronOrigin }) {
   return (
     <span
       className={cn(
-        "px-1.5 py-0.5 rounded text-2xs font-medium uppercase tracking-wide",
+        "px-1 py-px rounded text-2xs leading-tight font-medium uppercase tracking-wide",
         style.className,
       )}
     >
@@ -41,7 +41,9 @@ function OriginBadge({ origin }: { origin: CronOrigin }) {
 function ScheduleTypeBadge({ schedule }: { schedule: CronSchedule }) {
   const label = schedule.kind === "every" ? "Interval" : schedule.kind === "cron" ? "Cron" : "Once";
   return (
-    <span className="px-1.5 py-0.5 rounded text-2xs font-light text-dim bg-accent">{label}</span>
+    <span className="px-1 py-px rounded text-2xs leading-tight font-light text-dim bg-accent">
+      {label}
+    </span>
   );
 }
 

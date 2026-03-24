@@ -122,7 +122,7 @@ function DaySummary({
             {/* Active time + ratio bar */}
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="text-sm font-semibold text-foreground tabular-nums">
+                <span className="text-xs font-semibold text-foreground tabular-nums">
                   {formatHumanDuration(ps.totalActiveSecs)}
                 </span>
                 <TrendArrow
@@ -134,7 +134,7 @@ function DaySummary({
                       : null
                   }
                 />
-                <span className="text-[9px] text-dim">active</span>
+                <span className="text-2xs text-dim">active</span>
               </div>
               <div className="flex h-1 rounded-full overflow-hidden bg-accent mt-1">
                 {ps.productiveSecs > 0 && (
@@ -165,7 +165,7 @@ function DaySummary({
                   />
                 )}
               </div>
-              <span className="text-[9px] text-success mt-0.5 block">
+              <span className="text-2xs text-success mt-0.5 block">
                 {productivePct}% productive
               </span>
             </div>
@@ -186,7 +186,7 @@ function DaySummary({
             )}
             {/* Deep Work */}
             {ps.deepWorkBlocks > 0 && (
-              <div className="flex items-center justify-between text-xs text-muted-foreground px-1 mt-2">
+              <div className="flex items-center justify-between text-2xs text-dim px-1 mt-1.5">
                 <span>
                   {ps.deepWorkBlocks} deep work block{ps.deepWorkBlocks !== 1 ? "s" : ""}
                 </span>
@@ -196,7 +196,7 @@ function DaySummary({
 
             {/* Recovery Time */}
             {ps.avgRecoverySecs != null && (
-              <div className="text-xs text-muted-foreground px-1 mt-1">
+              <div className="text-2xs text-dim px-1 mt-0.5">
                 Avg recovery: {Math.round(ps.avgRecoverySecs)}s
               </div>
             )}
@@ -230,7 +230,9 @@ function DaySummary({
       {/* ── 5. Top Apps — visual bar chart ── */}
       {hasProductivity && ps.topApps.length > 0 && (
         <section>
-          <h4 className="text-2xs font-medium text-dim uppercase tracking-wider mb-2">Top Apps</h4>
+          <h4 className="text-2xs font-medium text-dim uppercase tracking-wider mb-1.5">
+            Top Apps
+          </h4>
           <TopAppsChart apps={ps.topApps} maxSecs={ps.topApps[0]?.durationSecs ?? 1} />
         </section>
       )}
@@ -238,7 +240,9 @@ function DaySummary({
       {/* ── 6. Insights & Nudges ── */}
       {intel && (intel.patterns.length > 0 || intel.nudges.length > 0) && (
         <section>
-          <h4 className="text-2xs font-medium text-dim uppercase tracking-wider mb-2">Insights</h4>
+          <h4 className="text-2xs font-medium text-dim uppercase tracking-wider mb-1.5">
+            Insights
+          </h4>
           <div className="flex flex-col gap-2">
             {intel.patterns.map((p) => (
               <div key={`pattern-${p}`} className="flex items-start gap-2 text-[11px]">
@@ -284,16 +288,16 @@ function TopAppsChart({
   maxSecs: number;
 }) {
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-1">
       {apps.slice(0, 5).map((app) => {
         const pct = maxSecs > 0 ? (app.durationSecs / maxSecs) * 100 : 0;
         const color = getAppColor(app.appName, app.category ?? null);
         return (
-          <div key={app.appName} className="flex items-center gap-2">
-            <span className="text-[11px] text-muted-foreground truncate w-20 shrink-0">
+          <div key={app.appName} className="flex items-center gap-1.5">
+            <span className="text-2xs text-muted-foreground truncate w-16 shrink-0">
               {app.appName}
             </span>
-            <div className="flex-1 h-[6px] rounded-full bg-accent overflow-hidden">
+            <div className="flex-1 h-1 rounded-full bg-accent overflow-hidden">
               <div
                 className="h-full rounded-full"
                 style={{
@@ -303,7 +307,7 @@ function TopAppsChart({
                 }}
               />
             </div>
-            <span className="text-2xs text-dim tabular-nums w-10 text-right shrink-0">
+            <span className="text-2xs text-dim tabular-nums text-right shrink-0 whitespace-nowrap">
               {formatHumanDuration(app.durationSecs)}
             </span>
           </div>

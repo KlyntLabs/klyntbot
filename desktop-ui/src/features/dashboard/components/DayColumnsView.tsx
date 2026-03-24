@@ -12,6 +12,7 @@ import type {
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type LayerKey, useEnabledLayers, useSidebarOpen } from "../lib/layers";
+import { computeOverlapLayout } from "../lib/timeline-utils";
 import { ActivityTrack, type SessionBlock } from "./ActivityTrack";
 import { CalendarTrack } from "./CalendarTrack";
 import { ContextRibbon } from "./ContextRibbon";
@@ -203,19 +204,24 @@ export function DayColumnsView({
     setHourHeight(DEFAULT_HOUR_HEIGHT);
   }, []);
 
-  // Group entries by column (skip activity — it has its own track)
-  const columnEntries = useMemo(() => {
-    const map = new Map<LayerKey, TimelineEntry[]>();
-    for (const col of COLUMNS) map.set(col.key, []);
+  // Group entries by column (skip activity — it has its own track) and compute overlap layouts
+  const { columnEntries, columnLayouts } = useMemo(() => {
+    const entryMap = new Map<LayerKey, TimelineEntry[]>();
+    for (const col of COLUMNS) entryMap.set(col.key, []);
     for (const entry of entries) {
       for (const col of COLUMNS) {
         if (col.filter(entry)) {
-          map.get(col.key)?.push(entry);
+          entryMap.get(col.key)?.push(entry);
           break;
         }
       }
     }
-    return map;
+    // Compute overlap layout for each column
+    const layoutMap = new Map<LayerKey, Map<string, { colIndex: number; totalCols: number }>>();
+    for (const [key, colEntries] of entryMap) {
+      layoutMap.set(key, computeOverlapLayout(colEntries));
+    }
+    return { columnEntries: entryMap, columnLayouts: layoutMap };
   }, [entries]);
 
   // Only show columns whose layer is enabled
@@ -395,6 +401,7 @@ export function DayColumnsView({
                 }
 
                 const colEntries = columnEntries.get(col.key) ?? [];
+                const layouts = columnLayouts.get(col.key);
                 return (
                   <div
                     key={col.key}
@@ -408,6 +415,7 @@ export function DayColumnsView({
                         pxPerMin={pxPerMin}
                         selected={selectedEntry?.id === entry.id}
                         onClick={() => handleSelectEntry(entry)}
+                        layout={layouts?.get(entry.id)}
                       />
                     ))}
                   </div>
@@ -468,17 +476,30 @@ function ColumnEntry({
   pxPerMin,
   selected,
   onClick,
+  layout,
 }: {
   entry: TimelineEntry;
   column: ColumnDef;
   pxPerMin: number;
   selected: boolean;
   onClick: () => void;
+  layout?: { colIndex: number; totalCols: number };
 }) {
   const startMin = minutesSinceMidnight(entry.startedAt);
   const top = startMin * pxPerMin;
   const dur = entry.durationSecs ?? 0;
   const height = Math.max(dur > 0 ? (dur / 60) * pxPerMin : MIN_BLOCK_HEIGHT, MIN_BLOCK_HEIGHT);
+
+  // Overlap layout: compute left/width percentages
+  const colIndex = layout?.colIndex ?? 0;
+  const totalCols = layout?.totalCols ?? 1;
+  const leftPct = totalCols > 1 ? `${(colIndex / totalCols) * 100}%` : undefined;
+  const widthPct = totalCols > 1 ? `${(1 / totalCols) * 100}%` : undefined;
+
+  // Shared positioning style for overlap layout
+  const posStyle: React.CSSProperties = leftPct
+    ? { top, left: leftPct, width: widthPct, paddingLeft: 4, paddingRight: 2 }
+    : { top, left: 4, right: 4 };
 
   // Time entries — rich blocks with title + time
   if (column.key === "timeEntries") {
@@ -491,11 +512,11 @@ function ColumnEntry({
         type="button"
         onClick={onClick}
         className={cn(
-          "absolute left-1 right-1 rounded-md px-1.5 py-0.5 text-[11px] leading-tight overflow-hidden cursor-pointer",
+          "absolute rounded-md px-1.5 py-0.5 text-[11px] leading-tight overflow-hidden cursor-pointer",
           "border-l-2 border-l-timeline-task bg-timeline-task/15 hover:bg-timeline-task/25 transition-colors",
           selected && "ring-1 ring-brand",
         )}
-        style={{ top, height }}
+        style={{ ...posStyle, height }}
         title={entry.title}
       >
         <span className="text-muted-foreground truncate block">{entry.title}</span>
@@ -519,14 +540,14 @@ function ColumnEntry({
         type="button"
         onClick={onClick}
         className={cn(
-          "absolute left-1 right-1 rounded-md px-1.5 py-0.5 text-[11px] leading-tight overflow-hidden cursor-pointer transition-colors",
+          "absolute rounded-md px-1.5 py-0.5 text-[11px] leading-tight overflow-hidden cursor-pointer transition-colors",
           isDue
             ? "border-l-2 border-l-[var(--timeline-todo)] bg-[var(--timeline-todo)]/15 hover:bg-[var(--timeline-todo)]/25"
-            : "border-l border-border bg-card hover:bg-muted",
+            : "border-l-2 border-l-[var(--timeline-todo)]/50 bg-[var(--timeline-todo)]/8 hover:bg-[var(--timeline-todo)]/15",
           isCompleted && "opacity-60 line-through",
           selected && "ring-1 ring-brand",
         )}
-        style={{ top, height: Math.max(height, 20) }}
+        style={{ ...posStyle, height: Math.max(height, 20) }}
         title={entry.title}
       >
         <span className="text-muted-foreground truncate block">{entry.title}</span>
@@ -545,13 +566,13 @@ function ColumnEntry({
         type="button"
         onClick={onClick}
         className={cn(
-          "absolute left-0.5 right-0.5 rounded-md px-1.5 py-0.5 text-2xs leading-tight overflow-hidden cursor-pointer transition-colors",
+          "absolute rounded-md px-1.5 py-0.5 text-2xs leading-tight overflow-hidden cursor-pointer transition-colors",
           isExpense
             ? "border-l-2 border-l-[var(--timeline-finance-expense)] bg-[var(--timeline-finance-expense)]/15 hover:bg-[var(--timeline-finance-expense)]/25"
             : "border-l-2 border-l-[var(--timeline-finance-income)] bg-[var(--timeline-finance-income)]/15 hover:bg-[var(--timeline-finance-income)]/25",
           selected && "ring-1 ring-brand",
         )}
-        style={{ top, height: Math.max(height, 18) }}
+        style={{ ...posStyle, height: Math.max(height, 18) }}
         title={entry.title}
       >
         <span
@@ -568,25 +589,21 @@ function ColumnEntry({
     );
   }
 
-  // Notes — dot + label
+  // Notes — colored box like tasks
   if (column.key === "notes") {
     return (
       <button
         type="button"
         onClick={onClick}
         className={cn(
-          "absolute left-1 right-1 flex items-center gap-1 text-2xs cursor-pointer transition-colors",
-          "text-muted-foreground hover:text-muted-foreground",
-          selected && "text-brand",
+          "absolute rounded-md px-1.5 py-0.5 text-2xs leading-tight overflow-hidden cursor-pointer transition-colors",
+          "border-l-2 border-l-[var(--timeline-note)]/60 bg-[var(--timeline-note)]/8 hover:bg-[var(--timeline-note)]/15",
+          selected && "ring-1 ring-brand",
         )}
-        style={{ top }}
+        style={{ ...posStyle, height: Math.max(height, 18) }}
         title={entry.title}
       >
-        <span
-          className="size-2 rounded-full shrink-0"
-          style={{ backgroundColor: "var(--timeline-note)" }}
-        />
-        <span className="truncate">{entry.title}</span>
+        <span className="text-muted-foreground truncate block">{entry.title}</span>
       </button>
     );
   }
@@ -597,10 +614,10 @@ function ColumnEntry({
       type="button"
       onClick={onClick}
       className={cn(
-        "absolute left-1 right-1 flex items-center gap-1 text-2xs text-muted-foreground hover:text-muted-foreground cursor-pointer transition-colors",
+        "absolute flex items-center gap-1 text-2xs text-muted-foreground hover:text-muted-foreground cursor-pointer transition-colors",
         selected && "text-brand",
       )}
-      style={{ top }}
+      style={posStyle}
       title={entry.title}
     >
       <span className="size-2 rounded-full shrink-0" style={{ backgroundColor: column.color }} />

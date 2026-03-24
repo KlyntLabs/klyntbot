@@ -210,6 +210,7 @@ const JOB_WEEKLY_KNOWLEDGE_DIGEST: &str = "__klyntbot_weekly_knowledge_digest";
 const JOB_SESSION_CLEANUP: &str = "__klyntbot_session_cleanup";
 const JOB_MEMORY_MAINTENANCE: &str = "__klyntbot_memory_maintenance";
 const JOB_ANALYTICS_CLEANUP: &str = "__klyntbot_analytics_cleanup";
+const JOB_BLACKBOARD_CLEANUP: &str = "__klyntbot_blackboard_cleanup";
 const JOB_REMINDER_CHECK: &str = "__klyntbot_reminder_check";
 const JOB_RECURRING_TASKS: &str = "__klyntbot_recurring_tasks";
 pub(super) const JOB_INSIGHT_REFRESH: &str = "__klyntbot_insight_refresh";
@@ -445,8 +446,11 @@ fn register_cron_callbacks(
                         }
                         _ => return Ok(None),
                     };
+                    // chat_id must be "channel:id" format for process_system_message routing.
+                    // Cron jobs route to the "system" channel with the job channel as the id.
+                    let chat_id = format!("system:{channel}");
                     let msg =
-                        bus::InboundMessage::new("system", "cron", channel, msg_text.to_string());
+                        bus::InboundMessage::new("system", "cron", chat_id, msg_text.to_string());
                     bus.publish_inbound(msg).await.map_err(|e| {
                         common::KlyntbotError::Bus(format!(
                             "Failed to publish {job_name} message: {e}"
@@ -618,6 +622,34 @@ fn register_cron_callbacks(
                             Err(e) => {
                                 warn!(error = %e, "Session cleanup failed");
                                 Ok(Some(format!("Session cleanup failed: {e}")))
+                            }
+                        }
+                    })
+                })
+            }),
+        );
+    }
+
+    // ── blackboard_cleanup ─────────────────────────────────────────────────
+    {
+        let pool = repos.pool().clone();
+        let rt = rt.clone();
+        cron_service.register_handler(
+            JOB_BLACKBOARD_CLEANUP,
+            Arc::new(move |_job: &scheduling::CronJob| {
+                let pool = pool.clone();
+                tokio::task::block_in_place(|| {
+                    rt.block_on(async move {
+                        let repo = cognitive::BlackboardRepo::new(pool);
+                        match repo.cleanup_stale(chrono::Duration::hours(24)).await {
+                            Ok(0) => Ok(Some("No stale blackboard entries".to_string())),
+                            Ok(n) => {
+                                info!(deleted = n, "Blackboard cleanup: removed stale entries");
+                                Ok(Some(format!("Deleted {n} stale blackboard entries")))
+                            }
+                            Err(e) => {
+                                warn!(error = %e, "Blackboard cleanup failed");
+                                Ok(Some(format!("Blackboard cleanup failed: {e}")))
                             }
                         }
                     })
@@ -814,25 +846,35 @@ async fn ensure_cron_jobs(
 
     ensure_job!(
         JOB_FOCUS_CHECK,
-        scheduling::CronSchedule::Every { every_ms: 30 * 60 * 1000 },
+        scheduling::CronSchedule::Every {
+            every_ms: 30 * 60 * 1000
+        },
         "Check focus task deadlines",
         user.clone()
     );
     ensure_job!(
         JOB_DAILY_DIGEST,
-        scheduling::CronSchedule::Cron { expr: "0 9 * * *".to_string(), tz: None },
+        scheduling::CronSchedule::Cron {
+            expr: "0 9 * * *".to_string(),
+            tz: None
+        },
         "Daily task summary",
         user.clone()
     );
     ensure_job!(
         JOB_OVERDUE_CHECK,
-        scheduling::CronSchedule::Every { every_ms: 60 * 60 * 1000 },
+        scheduling::CronSchedule::Every {
+            every_ms: 60 * 60 * 1000
+        },
         "Check for overdue focus tasks",
         user.clone()
     );
     ensure_job!(
         JOB_WEEKLY_REPORT,
-        scheduling::CronSchedule::Cron { expr: "0 18 * * 0".to_string(), tz: None },
+        scheduling::CronSchedule::Cron {
+            expr: "0 18 * * 0".to_string(),
+            tz: None
+        },
         "Generate weekly progress report",
         user.clone()
     );
@@ -841,7 +883,10 @@ async fn ensure_cron_jobs(
         if let Some(cron_expr) = parse_time_to_cron(&config.todo.daily_planning.planning_time) {
             ensure_job!(
                 JOB_DAILY_PLANNING,
-                scheduling::CronSchedule::Cron { expr: cron_expr, tz: None },
+                scheduling::CronSchedule::Cron {
+                    expr: cron_expr,
+                    tz: None
+                },
                 "Generate daily planning notification",
                 user.clone()
             );
@@ -852,14 +897,19 @@ async fn ensure_cron_jobs(
         if let Some(cron_expr) = parse_time_to_cron(&config.finance.scheduling.daily_review_time) {
             ensure_job!(
                 JOB_FINANCE_DAILY_REVIEW,
-                scheduling::CronSchedule::Cron { expr: cron_expr, tz: None },
+                scheduling::CronSchedule::Cron {
+                    expr: cron_expr,
+                    tz: None
+                },
                 "Daily financial review",
                 user.clone()
             );
         }
         ensure_job!(
             JOB_FINANCE_BUDGET_CHECK,
-            scheduling::CronSchedule::Every { every_ms: 6 * 60 * 60 * 1000 },
+            scheduling::CronSchedule::Every {
+                every_ms: 6 * 60 * 60 * 1000
+            },
             "Check budget thresholds",
             user.clone()
         );
@@ -875,7 +925,10 @@ async fn ensure_cron_jobs(
         }
         ensure_job!(
             JOB_FINANCE_HEALTH_CHECK,
-            scheduling::CronSchedule::Cron { expr: "0 0 * * *".to_string(), tz: None },
+            scheduling::CronSchedule::Cron {
+                expr: "0 0 * * *".to_string(),
+                tz: None
+            },
             "Finance data health check",
             user.clone()
         );
@@ -903,7 +956,10 @@ async fn ensure_cron_jobs(
     if tasks_config.proactive_suggestions {
         ensure_job!(
             JOB_PROACTIVE_SCAN,
-            scheduling::CronSchedule::Cron { expr: "0 */4 * * *".to_string(), tz: None },
+            scheduling::CronSchedule::Cron {
+                expr: "0 */4 * * *".to_string(),
+                tz: None
+            },
             "Proactive task suggestion scan",
             user.clone()
         );
@@ -911,19 +967,25 @@ async fn ensure_cron_jobs(
 
     ensure_job!(
         JOB_REMINDER_CHECK,
-        scheduling::CronSchedule::Every { every_ms: 5 * 60 * 1000 },
+        scheduling::CronSchedule::Every {
+            every_ms: 5 * 60 * 1000
+        },
         "Check task due dates and send reminders",
         user.clone()
     );
     ensure_job!(
         JOB_RECURRING_TASKS,
-        scheduling::CronSchedule::Every { every_ms: 60 * 1000 },
+        scheduling::CronSchedule::Every {
+            every_ms: 60 * 1000
+        },
         "Spawn recurring task instances from templates",
         user.clone()
     );
     ensure_job!(
         JOB_INSIGHT_REFRESH,
-        scheduling::CronSchedule::Every { every_ms: 24 * 60 * 60 * 1000 },
+        scheduling::CronSchedule::Every {
+            every_ms: 24 * 60 * 60 * 1000
+        },
         "Refresh insight progress snapshots",
         user.clone()
     );
@@ -974,6 +1036,15 @@ async fn ensure_cron_jobs(
         system.clone()
     );
     ensure_job!(
+        JOB_BLACKBOARD_CLEANUP,
+        scheduling::CronSchedule::Cron {
+            expr: "30 3 * * *".to_string(),
+            tz: Some(config.timezone.clone()),
+        },
+        "Clean stale blackboard entries",
+        system.clone()
+    );
+    ensure_job!(
         JOB_MEMORY_MAINTENANCE,
         scheduling::CronSchedule::Every {
             every_ms: config.conversation.memory.maintenance_interval_hours as u64 * 60 * 60 * 1000,
@@ -984,13 +1055,17 @@ async fn ensure_cron_jobs(
 
     ensure_job!(
         JOB_ANALYTICS_CLEANUP,
-        scheduling::CronSchedule::Every { every_ms: 24 * 60 * 60 * 1000 },
+        scheduling::CronSchedule::Every {
+            every_ms: 24 * 60 * 60 * 1000
+        },
         "Clean old analytics records and prune low-salience facts",
         system.clone()
     );
     ensure_job!(
         JOB_LEARNING_ANALYSIS,
-        scheduling::CronSchedule::Every { every_ms: config.learning.analysis_interval_secs * 1000 },
+        scheduling::CronSchedule::Every {
+            every_ms: config.learning.analysis_interval_secs * 1000
+        },
         "Analyze tool outcomes and adapt confidence threshold",
         system
     );

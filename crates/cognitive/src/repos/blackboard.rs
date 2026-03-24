@@ -117,6 +117,17 @@ impl BlackboardRepo {
         out
     }
 
+    /// Delete all blackboard entries older than `max_age`.
+    /// Returns the number of rows removed.
+    pub async fn cleanup_stale(&self, max_age: chrono::Duration) -> Result<u64, sqlx::Error> {
+        let cutoff = (chrono::Utc::now() - max_age).to_rfc3339();
+        let result = sqlx::query("DELETE FROM blackboard_entries WHERE created_at < ?1")
+            .bind(&cutoff)
+            .execute(&self.pool)
+            .await?;
+        Ok(result.rows_affected())
+    }
+
     pub async fn clear_session(&self, session_key: &str) -> Result<(), sqlx::Error> {
         sqlx::query("DELETE FROM blackboard_entries WHERE session_key = ?1")
             .bind(session_key)
@@ -296,5 +307,57 @@ mod tests {
         assert!(prompt.contains("Analyst"));
         assert!(!prompt.contains("Judge"));
         assert!(!prompt.contains("judge_decision"));
+    }
+
+    #[tokio::test]
+    async fn test_cleanup_stale_removes_old_entries() {
+        let pool = crate::repos::cognitive_test_pool().await;
+        let repo = BlackboardRepo::new(pool);
+
+        let entry = NewBlackboardEntry {
+            session_key: "test-session",
+            squad_id: "squad-1",
+            round: 1,
+            persona_id: "persona-1",
+            persona_name: "Tester",
+            entry_type: "observation",
+            content: "test content",
+            confidence: 0.9,
+            references_entry_id: None,
+        };
+        repo.insert(&entry).await.unwrap();
+
+        // Wait a tiny bit, then cleanup with zero max_age
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        let removed = repo.cleanup_stale(chrono::Duration::zero()).await.unwrap();
+        assert!(removed > 0);
+
+        let remaining = repo.list_for_session("test-session").await.unwrap();
+        assert!(remaining.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_cleanup_stale_preserves_recent() {
+        let pool = crate::repos::cognitive_test_pool().await;
+        let repo = BlackboardRepo::new(pool);
+
+        let entry = NewBlackboardEntry {
+            session_key: "test-session",
+            squad_id: "squad-1",
+            round: 1,
+            persona_id: "persona-1",
+            persona_name: "Tester",
+            entry_type: "observation",
+            content: "recent content",
+            confidence: 0.9,
+            references_entry_id: None,
+        };
+        repo.insert(&entry).await.unwrap();
+
+        let removed = repo
+            .cleanup_stale(chrono::Duration::hours(24))
+            .await
+            .unwrap();
+        assert_eq!(removed, 0);
     }
 }
