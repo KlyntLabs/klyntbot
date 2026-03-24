@@ -74,11 +74,11 @@ export function useActiveReview() {
 
   // ── Helpers ─────────────────────────────────────────────────────────────
 
-  function patchState(patch: Partial<ActiveReviewState>) {
+  const patchState = useCallback((patch: Partial<ActiveReviewState>) => {
     setState((prev) => ({ ...prev, ...patch }));
-  }
+  }, []);
 
-  function recordModeScore(mode: string, score: number | null) {
+  const recordModeScore = useCallback((mode: string, score: number | null) => {
     const stats = statsRef.current;
     stats.cardsReviewed += 1;
     const numScore = score ?? 0;
@@ -88,7 +88,7 @@ export function useActiveReview() {
     bucket.count += 1;
     bucket.totalScore += numScore;
     stats.modeUsage[mode] = bucket;
-  }
+  }, []);
 
   const saveSession = useCallback(
     async (status: "completed" | "abandoned") => {
@@ -112,7 +112,7 @@ export function useActiveReview() {
     [state.sessionId],
   );
 
-  function advanceQueue() {
+  const advanceQueue = useCallback(() => {
     setState((prev) => {
       const nextIndex = prev.currentIndex + 1;
       if (nextIndex >= prev.queue.length) {
@@ -134,7 +134,7 @@ export function useActiveReview() {
         lastAnswer: "",
       };
     });
-  }
+  }, [saveSession]);
 
   // ── Actions ──────────────────────────────────────────────────────────────
 
@@ -145,48 +145,51 @@ export function useActiveReview() {
     } catch (e: unknown) {
       patchState({ error: e instanceof Error ? e.message : "Failed to load decks" });
     }
-  }, []);
+  }, [patchState]);
 
-  const startReview = useCallback(async (deck: string) => {
-    try {
-      // Load saved mode preference for this deck
-      let savedMode: AnswerMode = "auto";
+  const startReview = useCallback(
+    async (deck: string) => {
       try {
-        const pref = await ipc<{ mode: AnswerMode } | null>("flashcard_get_mode_preference", {
-          deck,
+        // Load saved mode preference for this deck
+        let savedMode: AnswerMode = "auto";
+        try {
+          const pref = await ipc<{ mode: AnswerMode } | null>("flashcard_get_mode_preference", {
+            deck,
+          });
+          if (pref?.mode) savedMode = pref.mode;
+        } catch {
+          // preference is optional — ignore errors
+        }
+
+        const due = await ipc<Flashcard[]>("flashcard_get_due", { deck, limit: 20 });
+
+        // Reset stats for new session
+        statsRef.current = {
+          cardsReviewed: 0,
+          totalScore: 0,
+          modeUsage: {},
+          weakCards: [],
+          propagationCount: 0,
+          startTime: Date.now(),
+        };
+
+        patchState({
+          queue: due,
+          currentIndex: 0,
+          gradeResult: null,
+          cardPhase: "answering",
+          selectedMode: savedMode,
+          selectedDeck: deck,
+          sessionId: makeSessionId(),
+          phase: due.length > 0 ? "reviewing" : "complete",
+          error: null,
         });
-        if (pref?.mode) savedMode = pref.mode;
-      } catch {
-        // preference is optional — ignore errors
+      } catch (e: unknown) {
+        patchState({ error: e instanceof Error ? e.message : "Failed to start review" });
       }
-
-      const due = await ipc<Flashcard[]>("flashcard_get_due", { deck, limit: 20 });
-
-      // Reset stats for new session
-      statsRef.current = {
-        cardsReviewed: 0,
-        totalScore: 0,
-        modeUsage: {},
-        weakCards: [],
-        propagationCount: 0,
-        startTime: Date.now(),
-      };
-
-      patchState({
-        queue: due,
-        currentIndex: 0,
-        gradeResult: null,
-        cardPhase: "answering",
-        selectedMode: savedMode,
-        selectedDeck: deck,
-        sessionId: makeSessionId(),
-        phase: due.length > 0 ? "reviewing" : "complete",
-        error: null,
-      });
-    } catch (e: unknown) {
-      patchState({ error: e instanceof Error ? e.message : "Failed to start review" });
-    }
-  }, []);
+    },
+    [patchState],
+  );
 
   const submitAnswer = useCallback(
     async (text: string) => {
@@ -218,7 +221,7 @@ export function useActiveReview() {
         });
       }
     },
-    [current, state.selectedMode],
+    [current, state.selectedMode, patchState, recordModeScore],
   );
 
   const confirmRating = useCallback(
@@ -244,12 +247,12 @@ export function useActiveReview() {
         });
       }
     },
-    [current, state.gradeResult],
+    [current, state.gradeResult, advanceQueue, patchState],
   );
 
   const requestExplanation = useCallback(() => {
     patchState({ cardPhase: "socratic" });
-  }, []);
+  }, [patchState]);
 
   const switchMode = useCallback(
     (mode: AnswerMode) => {
@@ -259,7 +262,7 @@ export function useActiveReview() {
         ipc("flashcard_save_mode_preference", { deck: state.selectedDeck, mode }).catch(() => {});
       }
     },
-    [state.selectedDeck],
+    [state.selectedDeck, patchState],
   );
 
   const skipCard = useCallback(async () => {
@@ -274,7 +277,7 @@ export function useActiveReview() {
       // best-effort — advance regardless
     }
     advanceQueue();
-  }, [current]);
+  }, [current, advanceQueue]);
 
   return {
     // State

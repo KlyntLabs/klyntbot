@@ -350,14 +350,14 @@
 
 /* Unresolved wiki link — note doesn't exist */
 .wiki-link--unresolved {
-  color: var(--color-muted) !important;
-  text-decoration-color: rgba(255, 255, 255, 0.12) !important;
-  text-decoration-style: dotted !important;
+  color: var(--color-muted);
+  text-decoration-color: rgba(255, 255, 255, 0.12);
+  text-decoration-style: dotted;
   opacity: 0.6;
 }
 
 .wiki-link--unresolved:hover {
-  color: var(--color-dim) !important;
+  color: var(--color-dim);
   opacity: 0.8;
 }
 
@@ -392,9 +392,9 @@
 
 /* Unresolved entity mentions — entity doesn't exist */
 .entity-mention--unresolved {
-  background: rgba(255, 255, 255, 0.06) !important;
-  border-color: rgba(255, 255, 255, 0.08) !important;
-  color: var(--color-muted) !important;
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: var(--color-muted);
   text-decoration: line-through;
   text-decoration-color: rgba(255, 255, 255, 0.15);
   opacity: 0.7;

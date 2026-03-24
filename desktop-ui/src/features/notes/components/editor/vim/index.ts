@@ -136,16 +136,23 @@ function createVimPlugins(opts: Required<VimModeOptions>) {
         editorView.dispatch(editorView.state.tr);
       });
 
-      adapter.on("dialog", (data: { template: unknown; callback: Function; options?: unknown }) => {
-        // Determine prefix from template
-        let prefix = ":";
-        if (data.template instanceof HTMLElement) {
-          const text = data.template.textContent || "";
-          if (text.includes("/")) prefix = "/";
-          else if (text.includes("?")) prefix = "?";
-        }
-        opts.onOpenCommandLine(prefix);
-      });
+      adapter.on(
+        "dialog",
+        (data: {
+          template: unknown;
+          callback: (...args: unknown[]) => void;
+          options?: unknown;
+        }) => {
+          // Determine prefix from template
+          let prefix = ":";
+          if (data.template instanceof HTMLElement) {
+            const text = data.template.textContent || "";
+            if (text.includes("/")) prefix = "/";
+            else if (text.includes("?")) prefix = "?";
+          }
+          opts.onOpenCommandLine(prefix);
+        },
+      );
 
       adapter.on("save", () => {
         document.dispatchEvent(new CustomEvent(VIM_SAVE_EVENT));

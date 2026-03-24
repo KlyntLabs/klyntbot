@@ -59,8 +59,8 @@ function DebateRoundView({ round }: { round: DebateState["rounds"][number] }) {
         <span className="text-[9px] text-dim capitalize">({round.phase})</span>
       </div>
       <div className="space-y-2">
-        {round.personas.map((p, i) => (
-          <div key={`${p.personaId}-${round.round}-${i}`} className="glass-card rounded-lg p-3">
+        {round.personas.map((p) => (
+          <div key={`${p.personaId}-${round.round}`} className="glass-card rounded-lg p-3">
             <div className="flex items-center gap-2 mb-1.5">
               <span className="text-sm">{p.personaIcon}</span>
               <div>

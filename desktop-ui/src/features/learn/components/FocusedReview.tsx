@@ -1,6 +1,6 @@
 import { invalidateQueries } from "@shared/hooks/useQuery";
 import { ThinkingDots } from "@shared/ui/ThinkingDots";
-import { ArrowLeft, CheckCircle, Loader2 } from "lucide-react";
+import { ArrowLeft, CheckCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
 import { useReviewSession } from "../hooks/useReviewSession";

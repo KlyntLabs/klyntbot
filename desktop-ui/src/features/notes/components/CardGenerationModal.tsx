@@ -21,13 +21,11 @@ interface CardGenerationModalProps {
 
 function CardPreviewRow({
   card,
-  index,
   isApproved,
   onToggle,
   onEdit,
 }: {
   card: GeneratedCardPreview;
-  index: number;
   isApproved: boolean;
   onToggle: () => void;
   onEdit: (field: "front" | "back", value: string) => void;
@@ -76,24 +74,24 @@ function CardPreviewRow({
 
           {expanded && (
             <div className="mt-2 space-y-2">
-              <div>
-                <label className="text-2xs text-muted-foreground block mb-0.5">Front</label>
+              <label className="block">
+                <span className="text-2xs text-muted-foreground block mb-0.5">Front</span>
                 <textarea
                   value={card.front}
                   onChange={(e) => onEdit("front", e.target.value)}
                   className="w-full bg-muted/50 rounded-md px-2 py-1.5 text-sm text-foreground resize-none"
                   rows={2}
                 />
-              </div>
-              <div>
-                <label className="text-2xs text-muted-foreground block mb-0.5">Back</label>
+              </label>
+              <label className="block">
+                <span className="text-2xs text-muted-foreground block mb-0.5">Back</span>
                 <textarea
                   value={card.back}
                   onChange={(e) => onEdit("back", e.target.value)}
                   className="w-full bg-muted/50 rounded-md px-2 py-1.5 text-sm text-foreground resize-none"
                   rows={2}
                 />
-              </div>
+              </label>
               {card.sourceContext && (
                 <p className="text-[11px] text-muted-foreground italic">
                   Source: {card.sourceContext}
@@ -149,6 +147,7 @@ export function CardGenerationModal({
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: backdrop overlay with role=presentation */}
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={onClose}
@@ -186,22 +185,21 @@ export function CardGenerationModal({
           )}
 
           {!generating &&
-            previews.map((card, i) => (
+            previews.map((card, cardIndex) => (
               <CardPreviewRow
-                key={i}
+                key={`${card.cardType}-${card.front.slice(0, 40)}-${card.back.slice(0, 20)}`}
                 card={card}
-                index={i}
-                isApproved={approved.has(i)}
-                onToggle={() => onToggleCard(i)}
-                onEdit={(field, value) => onEditCard(i, field, value)}
+                isApproved={approved.has(cardIndex)}
+                onToggle={() => onToggleCard(cardIndex)}
+                onEdit={(field, value) => onEditCard(cardIndex, field, value)}
               />
             ))}
         </div>
 
         {!generating && previews.length > 0 && (
           <div className="px-5 py-4 border-t border-border space-y-3">
-            <div className="flex items-center gap-2">
-              <label className="text-xs text-muted-foreground whitespace-nowrap">Deck:</label>
+            <label className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground whitespace-nowrap">Deck:</span>
               <input
                 type="text"
                 value={deck}
@@ -209,7 +207,7 @@ export function CardGenerationModal({
                 placeholder="Enter deck name..."
                 className="flex-1 bg-muted/50 rounded-lg px-3 py-1.5 text-sm text-foreground placeholder:text-dim"
               />
-            </div>
+            </label>
 
             <div className="flex items-center justify-between">
               <span className="text-xs text-muted-foreground">

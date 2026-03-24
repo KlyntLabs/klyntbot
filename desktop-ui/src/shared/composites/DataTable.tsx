@@ -48,7 +48,8 @@ function SkeletonRows<T>({
   return (
     <>
       {Array.from({ length: count }, (_, i) => (
-        <tr key={`skel-${i}`} className="border-b border-border-subtle">
+        // biome-ignore lint/suspicious/noArrayIndexKey: skeleton rows are static placeholders that never reorder
+        <tr key={`skeleton-${i}`} className="border-b border-border-subtle">
           {expandable && (
             <td className="px-3 py-2.5 w-8">
               <div className="size-3 rounded animate-pulse bg-muted" />

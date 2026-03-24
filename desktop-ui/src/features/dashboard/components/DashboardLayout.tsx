@@ -187,70 +187,68 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
         </div>
 
         {/* Date-specific controls */}
-        <>
-          {/* Layers toggle */}
+        {/* Layers toggle */}
+        <button
+          ref={layersTriggerRef}
+          type="button"
+          onClick={() => setLayersOpen(!layersOpen)}
+          aria-haspopup="dialog"
+          aria-expanded={layersOpen}
+          className={cn(
+            "p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors",
+            layersOpen && "bg-muted text-foreground",
+          )}
+          title="Toggle layers"
+        >
+          <Layers className="size-4" />
+        </button>
+
+        <CalendarSync />
+
+        {/* Nav pill group */}
+        <div className="flex items-center rounded-full bg-accent p-0.5 ml-auto">
           <button
-            ref={layersTriggerRef}
             type="button"
-            onClick={() => setLayersOpen(!layersOpen)}
+            onClick={() => navigateBy(-1)}
+            className="p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          >
+            <ChevronLeft className="size-4" />
+          </button>
+          <button
+            ref={calTriggerRef}
+            type="button"
+            onClick={() => setCalOpen(!calOpen)}
             aria-haspopup="dialog"
-            aria-expanded={layersOpen}
+            aria-expanded={calOpen}
             className={cn(
               "p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors",
-              layersOpen && "bg-muted text-foreground",
+              calOpen && "bg-muted text-foreground",
             )}
-            title="Toggle layers"
+            title="Pick date"
           >
-            <Layers className="size-4" />
+            <Calendar className="size-4" />
           </button>
-
-          <CalendarSync />
-
-          {/* Nav pill group */}
-          <div className="flex items-center rounded-full bg-accent p-0.5 ml-auto">
-            <button
-              type="button"
-              onClick={() => navigateBy(-1)}
-              className="p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            >
-              <ChevronLeft className="size-4" />
-            </button>
-            <button
-              ref={calTriggerRef}
-              type="button"
-              onClick={() => setCalOpen(!calOpen)}
-              aria-haspopup="dialog"
-              aria-expanded={calOpen}
-              className={cn(
-                "p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors",
-                calOpen && "bg-muted text-foreground",
-              )}
-              title="Pick date"
-            >
-              <Calendar className="size-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => navigateBy(1)}
-              className="p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            >
-              <ChevronRight className="size-4" />
-            </button>
-          </div>
-
-          {/* Sidebar toggle */}
           <button
             type="button"
-            onClick={toggleSidebar}
-            className={cn(
-              "p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors",
-              sidebarOpen && "bg-muted text-foreground",
-            )}
-            title={sidebarOpen ? "Hide summary" : "Show summary"}
+            onClick={() => navigateBy(1)}
+            className="p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           >
-            <PanelRight className="size-4" />
+            <ChevronRight className="size-4" />
           </button>
-        </>
+        </div>
+
+        {/* Sidebar toggle */}
+        <button
+          type="button"
+          onClick={toggleSidebar}
+          className={cn(
+            "p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors",
+            sidebarOpen && "bg-muted text-foreground",
+          )}
+          title={sidebarOpen ? "Hide summary" : "Show summary"}
+        >
+          <PanelRight className="size-4" />
+        </button>
       </div>
 
       {/* Layers dropdown popover */}

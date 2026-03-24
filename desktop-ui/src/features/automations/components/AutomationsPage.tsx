@@ -437,6 +437,7 @@ function InlineScheduleCell({
       {open &&
         createPortal(
           <>
+            {/* biome-ignore lint/a11y/noStaticElementInteractions: backdrop overlay */}
             <div
               className="fixed inset-0 z-[9998]"
               onClick={() => setOpen(false)}
@@ -444,6 +445,7 @@ function InlineScheduleCell({
                 if (e.key === "Escape") setOpen(false);
               }}
             />
+            {/* biome-ignore lint/a11y/noStaticElementInteractions: stop-propagation container */}
             <div
               className="fixed z-[9999] glass-dropdown p-5 w-[310px] max-h-[calc(100vh-32px)] overflow-y-auto rounded-xl"
               style={{ top: pos.top, left: pos.left }}
@@ -779,6 +781,7 @@ export function AutomationsPage() {
         width: "w-20",
         align: "right",
         renderCell: (job) => (
+          // biome-ignore lint/a11y/noStaticElementInteractions: stop-propagation wrapper for action buttons
           <div
             className="flex items-center justify-end gap-1"
             onClick={(e) => e.stopPropagation()}

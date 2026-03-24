@@ -121,9 +121,11 @@ function AnnotationCard({
     })
       .then(setEnrichment)
       .catch(() => {});
-  }, [annotation.id, annotation.quotedText]);
+  }, [annotation.id, annotation.quotedText, sourceLang, targetLang]);
 
   return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: annotation card click navigates to mark
+    // biome-ignore lint/a11y/noStaticElementInteractions: clickable annotation card
     <div
       ref={cardRef}
       onClick={onClick}
@@ -223,6 +225,7 @@ function AnnotationInlineEditor({
   });
 
   // Flush only if dirty on unmount
+  // biome-ignore lint/correctness/useExhaustiveDependencies: onUpdateRef is a stable ref — .current is accessed at cleanup time, not render time
   useEffect(() => {
     return () => {
       clearTimeout(saveTimerRef.current);

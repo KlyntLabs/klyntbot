@@ -150,9 +150,11 @@ export function SquadManager({ open, onClose }: SquadManagerProps) {
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: backdrop overlay with role=presentation */}
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={onClose}
+        onKeyDown={() => {}}
         role="presentation"
       />
 

@@ -70,19 +70,12 @@ export function SpendingHeatmap({
           const isSelected = date === selectedDay;
 
           return (
-            <div
+            <button
+              type="button"
               key={date}
-              role="button"
-              tabIndex={0}
               aria-label={formatAriaLabel(date, txCount)}
               aria-pressed={isSelected}
               onClick={() => onSelectDay(isSelected ? null : date)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  onSelectDay(isSelected ? null : date);
-                }
-              }}
               className="aspect-square flex items-center justify-center rounded-md text-[11px] font-light text-muted-foreground cursor-pointer transition-colors hover:brightness-125 select-none"
               style={{
                 backgroundColor: HEATMAP_COLORS[level],
@@ -95,7 +88,7 @@ export function SpendingHeatmap({
               }}
             >
               {day}
-            </div>
+            </button>
           );
         })}
       </div>

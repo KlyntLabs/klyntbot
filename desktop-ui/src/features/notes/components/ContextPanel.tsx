@@ -42,13 +42,13 @@ function parseHeadings(html: string | null | undefined): TocHeading[] {
   els.forEach((el, i) => {
     const text = (el.textContent || "").trim();
     if (text) {
-      headings.push({ level: Number.parseInt(el.tagName[1]), text, index: i });
+      headings.push({ level: Number.parseInt(el.tagName[1], 10), text, index: i });
     }
   });
   return headings;
 }
 
-function scrollToHeading(text: string, index: number) {
+function scrollToHeading(_text: string, index: number) {
   const editorEl = document.querySelector(".editor-content");
   if (!editorEl) return;
   const headings = editorEl.querySelectorAll("h1, h2, h3");

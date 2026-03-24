@@ -32,11 +32,7 @@ export function DaySummary({
   const spendingDisplay = fmtCompact(convertTotal(totalSpending), displayCur, hidden);
 
   return (
-    <div
-      role="status"
-      aria-live="polite"
-      className="glass-card flex items-start justify-between gap-3"
-    >
+    <output aria-live="polite" className="glass-card flex items-start justify-between gap-3">
       <div className="flex-1 min-w-0">
         <p className="text-[13px] font-medium text-foreground mb-1.5">
           {dateLabel} &mdash;{" "}
@@ -67,6 +63,6 @@ export function DaySummary({
       >
         &times;
       </button>
-    </div>
+    </output>
   );
 }

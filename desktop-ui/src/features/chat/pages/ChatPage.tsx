@@ -87,7 +87,7 @@ export function ChatPage() {
       setResumeBanner(resumeContext.contextTitle);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chat ref is unstable; didApplyResume guards double-apply
-  }, [resumeContext]);
+  }, [resumeContext, chat.setInput]);
 
   const [showTransparency, setShowTransparency] = useState(() => {
     try {

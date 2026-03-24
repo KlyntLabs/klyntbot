@@ -112,9 +112,9 @@ export function LanguageLearningPanel({
       {result && result.grammarPatterns.length > 0 && (
         <CollapsibleSection title="Grammar Patterns">
           <div className="space-y-2">
-            {result.grammarPatterns.map((gp, i) => (
+            {result.grammarPatterns.map((gp) => (
               <div
-                key={`${gp.pattern}-${i}`}
+                key={`${gp.pattern}-${gp.patternType ?? "generic"}`}
                 className="rounded-md border border-blue-500/20 bg-blue-500/5 p-2"
               >
                 <p className="text-xs font-mono text-blue-300">{gp.pattern}</p>

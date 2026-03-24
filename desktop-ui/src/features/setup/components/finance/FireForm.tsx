@@ -48,7 +48,7 @@ export function FireForm({ registerSave, onDirty }: FireFormProps) {
         console.error("Failed to save FIRE config:", e);
       }
     });
-  }, [enabled, currentAge, retirementAge, expenses, rate, fireType, registerSave]);
+  }, [enabled, currentAge, retirementAge, expenses, rate, fireType, registerSave, fireNumber]);
 
   return (
     <div>

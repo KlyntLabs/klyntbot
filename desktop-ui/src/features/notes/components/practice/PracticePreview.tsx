@@ -1,5 +1,5 @@
 import { ThinkingDots } from "@shared/ui/ThinkingDots";
-import { Loader2, Play, RotateCcw, X } from "lucide-react";
+import { Play, RotateCcw, X } from "lucide-react";
 import { createPortal } from "react-dom";
 
 // ── Types ────────────────────────────────────────────────

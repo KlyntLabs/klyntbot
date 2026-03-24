@@ -133,8 +133,16 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
     if (!state.isOpen) {
       evolution.clear();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showHistory, state.isOpen, state.noteId]);
+  }, [
+    showHistory,
+    state.isOpen,
+    state.noteId,
+    evolution.clear,
+    evolution.fetch,
+    versions.fetch,
+    evolution,
+    versions,
+  ]);
 
   const handleCreateDeepDiveNote = useCallback(async (title: string, body: string) => {
     try {

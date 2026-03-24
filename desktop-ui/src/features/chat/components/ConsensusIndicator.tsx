@@ -23,6 +23,7 @@ export function ConsensusIndicator({
         <div className="flex gap-0.5">
           {Array.from({ length: totalRounds }, (_, i) => (
             <div
+              // biome-ignore lint/suspicious/noArrayIndexKey: static indicator dots from Array.from
               key={`round-dot-${i}`}
               className={`w-1.5 h-1.5 rounded-full transition-all ${
                 i < (round ?? 0)

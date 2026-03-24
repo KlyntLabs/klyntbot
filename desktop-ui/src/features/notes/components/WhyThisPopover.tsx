@@ -27,6 +27,7 @@ export function WhyThisPopover({ sourceContext, domain, children }: WhyThisPopov
   return (
     <PopoverPrimitive.Root open={open} onOpenChange={setOpen}>
       <PopoverPrimitive.Trigger asChild>
+        {/* biome-ignore lint/a11y/noStaticElementInteractions: hover trigger for popover tooltip */}
         <div onMouseEnter={handleEnter} onMouseLeave={handleLeave}>
           {children}
         </div>

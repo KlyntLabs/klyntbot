@@ -63,6 +63,7 @@ export function ProductivityScoreRing({ score, size = 110, summary }: Productivi
 
   return (
     <div className="flex flex-col items-center gap-2">
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: hover tooltip container for score details */}
       <div
         className="relative"
         style={{ width: size, height: size }}

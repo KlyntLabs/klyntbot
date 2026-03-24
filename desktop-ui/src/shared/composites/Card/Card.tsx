@@ -31,14 +31,29 @@ export function Card({
   onClick,
   children,
 }: CardProps) {
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={cn(
+          cardVariants[variant],
+          cardPadding[padding],
+          "cursor-pointer transition-colors hover:border-border",
+          className,
+        )}
+      >
+        {children}
+      </button>
+    );
+  }
+
   return (
     <div
-      onClick={onClick}
       className={cn(
         cardVariants[variant],
         cardPadding[padding],
         interactive && "cursor-pointer transition-colors hover:border-border",
-        onClick && "cursor-pointer",
         className,
       )}
     >

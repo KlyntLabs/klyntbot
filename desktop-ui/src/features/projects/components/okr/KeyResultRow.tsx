@@ -18,7 +18,7 @@ interface KeyResultRowProps {
 
 export function KeyResultRow({
   keyResult,
-  projectId,
+  projectId: _projectId,
   tasks = [],
   onEdit,
   onDelete,

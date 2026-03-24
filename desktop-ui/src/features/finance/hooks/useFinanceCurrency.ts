@@ -1,7 +1,7 @@
 import { useQuery } from "@shared/hooks/useQuery";
 import type { FinanceAccount } from "@shared/types";
 import { useCallback, useMemo } from "react";
-import { buildRateMap, type RateMap } from "../lib/displayAmount";
+import { buildRateMap } from "../lib/displayAmount";
 import { useCurrencyDisplayMode } from "./useCurrencyDisplayMode";
 
 export function useFinanceCurrency() {

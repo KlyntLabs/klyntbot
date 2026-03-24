@@ -254,18 +254,14 @@ export function FinanceInvestments() {
                 const r = retPct(p.totalValue, p.totalCostBasis);
                 const isSelected = p.id === selectedPortfolio;
                 return (
-                  <div
+                  <button
+                    type="button"
                     key={p.id}
                     className={cn(
-                      "glass-card p-4 cursor-pointer transition-colors",
+                      "glass-card p-4 cursor-pointer transition-colors text-left",
                       isSelected ? "ring-1 ring-brand bg-accent" : "hover:bg-accent",
                     )}
                     onClick={() => setSelectedPortfolio(isSelected ? null : p.id)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") setSelectedPortfolio(isSelected ? null : p.id);
-                    }}
-                    role="button"
-                    tabIndex={0}
                   >
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
@@ -308,7 +304,7 @@ export function FinanceInvestments() {
                     {p.description && (
                       <p className="text-[9px] text-dim font-light mt-2">{p.description}</p>
                     )}
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -347,14 +343,10 @@ export function FinanceInvestments() {
               const isExpanded = expandedInvestment === inv.id;
               return (
                 <div key={inv.id}>
-                  <div
-                    className="grid grid-cols-[1fr_80px_80px_90px_80px_80px] gap-2 items-center px-4 py-2.5 hover:bg-accent transition-colors border-b border-border-subtle cursor-pointer"
+                  <button
+                    type="button"
+                    className="grid grid-cols-[1fr_80px_80px_90px_80px_80px] gap-2 items-center px-4 py-2.5 hover:bg-accent transition-colors border-b border-border-subtle cursor-pointer w-full text-left"
                     onClick={() => setExpandedInvestment(isExpanded ? null : inv.id)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") setExpandedInvestment(isExpanded ? null : inv.id);
-                    }}
-                    role="button"
-                    tabIndex={0}
                   >
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
@@ -420,7 +412,7 @@ export function FinanceInvestments() {
                       {r >= 0 ? "+" : ""}
                       {r}%
                     </span>
-                  </div>
+                  </button>
                   {isExpanded && (
                     <div className="bg-surface-raised border-b border-border-subtle px-6 py-3">
                       <p className="text-2xs text-muted-foreground uppercase tracking-widest mb-2">
@@ -590,7 +582,6 @@ export function FinanceInvestments() {
             value={pfName}
             onChange={(e) => setPfName(e.target.value)}
             placeholder="e.g. Long-term Growth"
-            autoFocus
           />
         </FormField>
         <FormField label="Description (optional)">

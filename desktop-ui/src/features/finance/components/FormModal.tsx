@@ -47,6 +47,8 @@ export function FormModal({
   };
 
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: modal backdrop dismissal
+    // biome-ignore lint/a11y/useKeyWithClickEvents: Escape key handled via document keydown listener
     <div
       ref={backdropRef}
       onClick={handleBackdropClick}
@@ -96,6 +98,7 @@ export function FormModal({
 export function FormField({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex flex-col gap-1.5">
+      {/* biome-ignore lint/a11y/noLabelWithoutControl: children contain the associated input/select element */}
       <label className="text-[11px] font-medium text-muted-foreground">{label}</label>
       {children}
     </div>

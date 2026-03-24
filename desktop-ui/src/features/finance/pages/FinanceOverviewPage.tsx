@@ -28,15 +28,7 @@ import { SensitiveDivider } from "../components/SensitiveDivider";
 import { useFinanceCurrency } from "../hooks/useFinanceCurrency";
 import { usePrivacyMode } from "../hooks/usePrivacyMode";
 import { displayAmount, displayHint } from "../lib/displayAmount";
-import {
-  ACCT_ICONS,
-  COLORS,
-  fmtCompact,
-  GOAL_ICONS,
-  LIAB_ICONS,
-  pct,
-  retPct,
-} from "../lib/finance";
+import { ACCT_ICONS, fmtCompact, GOAL_ICONS, LIAB_ICONS, pct, retPct } from "../lib/finance";
 import { computeHealthScore } from "../lib/healthScore";
 import { computeMonthlyPulse } from "../lib/monthlyPulse";
 
@@ -143,7 +135,7 @@ export function Finance() {
           .map((b) => ({ spent: b.spent, amount: b.amount })),
         goals: goals.map((g) => ({ currentAmount: g.currentAmount, targetAmount: g.targetAmount })),
       }),
-    [monthlySummary, accounts, investments, liabilities, budgets, goals],
+    [monthlySummary, budgets, goals, totalAssets, totalDebt],
   );
 
   const pulseRows = useMemo(() => computeMonthlyPulse(monthlySummary), [monthlySummary]);

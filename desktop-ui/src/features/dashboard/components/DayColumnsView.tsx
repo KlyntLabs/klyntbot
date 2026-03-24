@@ -133,7 +133,6 @@ export function DayColumnsView({
   const totalHeight = 24 * hourHeight;
 
   // Scroll to current hour on mount (intentionally excludes hourHeight — don't re-scroll on zoom)
-  // biome-ignore lint/correctness/useExhaustiveDependencies: only scroll on mount/date change
   useEffect(() => {
     if (scrollRef.current) {
       const targetHour = isToday ? new Date().getHours() - 1 : 8;
@@ -298,8 +297,10 @@ export function DayColumnsView({
                 className="absolute w-full flex items-start"
                 style={{ top: h * hourHeight }}
               >
+                {/* biome-ignore lint/a11y/noStaticElementInteractions: drag-to-zoom gutter; first cell is an accessible slider, rest are presentation */}
+                {/* biome-ignore lint/a11y/useAriaPropsSupportedByRole: aria attrs are only rendered for h===0 (slider role) */}
                 <div
-                  role={h === 0 ? "slider" : undefined}
+                  role={h === 0 ? "slider" : "presentation"}
                   aria-label={h === 0 ? "Timeline zoom level" : undefined}
                   aria-valuemin={h === 0 ? MIN_HOUR_HEIGHT : undefined}
                   aria-valuemax={h === 0 ? MAX_HOUR_HEIGHT : undefined}

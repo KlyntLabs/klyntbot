@@ -1,5 +1,5 @@
 import { ThinkingDots } from "@shared/ui/ThinkingDots";
-import { Clipboard, FileText, Loader2, MessageSquare } from "lucide-react";
+import { Clipboard, FileText, MessageSquare } from "lucide-react";
 import { useState } from "react";
 import { NotePicker } from "./NotePicker";
 
@@ -53,7 +53,6 @@ export function QuickGenerate({
           placeholder="Paste content here..."
           className="w-full bg-muted/50 rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-dim resize-none"
           rows={4}
-          autoFocus
         />
         <div className="flex items-center justify-between">
           <button

@@ -1,4 +1,3 @@
-import { formatTime } from "@shared/lib/dates";
 import type { ContextTimelineBlock } from "@shared/types";
 import { useMemo, useState } from "react";
 import { contextColor } from "../lib/context-colors";
@@ -41,6 +40,8 @@ export function ContextTimeline({
   return (
     <div className="relative w-full" style={{ height: 24 * hourHeight }}>
       {rendered.map(({ block, idx, top, height, color, opacity }) => (
+        // biome-ignore lint/a11y/useKeyWithClickEvents: timeline blocks are supplementary click targets
+        // biome-ignore lint/a11y/noStaticElementInteractions: timeline blocks
         <div
           key={`${block.startTime}-${block.contextId ?? "idle"}`}
           className="absolute left-0 right-0 rounded-md border border-border-subtle cursor-pointer transition-all hover:brightness-125"

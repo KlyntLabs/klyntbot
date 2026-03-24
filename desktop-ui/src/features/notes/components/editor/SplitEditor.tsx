@@ -244,7 +244,7 @@ export function SplitEditor({
         rightEditor.commands.setContent(pane.html || pane.markdown || "");
       }
     }
-  }, [note.id, splitMode, leftEditor, rightEditor, flushSave]);
+  }, [note.id, splitMode, leftEditor, rightEditor, flushSave, note]);
 
   // Cmd+S + flush on unmount
   useEffect(() => {

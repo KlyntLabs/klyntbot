@@ -67,6 +67,7 @@ export function InlineSelect({
         createPortal(
           <>
             {/* Backdrop */}
+            {/* biome-ignore lint/a11y/noStaticElementInteractions: dropdown backdrop dismissal */}
             <div
               className="fixed inset-0 z-50"
               onClick={() => setOpen(false)}

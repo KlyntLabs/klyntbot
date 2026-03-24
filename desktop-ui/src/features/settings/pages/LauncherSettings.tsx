@@ -225,13 +225,18 @@ export function LauncherSettings() {
 
                   {isExpanded && hasExtra && (
                     <div className="px-3 pb-3 space-y-2 border-t border-border-subtle pt-2">
-                      {src.extraFields!.map((field) => (
-                        <label key={field.key} className="block">
+                      {src.extraFields?.map((field) => (
+                        <label
+                          key={field.key}
+                          className="block"
+                          htmlFor={`launcher-${src.key}-${field.key}`}
+                        >
                           <span className="block text-[11px] text-muted-foreground mb-1">
                             {field.label}
                           </span>
                           {field.type === "dirs" ? (
                             <input
+                              id={`launcher-${src.key}-${field.key}`}
                               type="text"
                               value={(sourceVal(src.key, field.key, []) as string[]).join(", ")}
                               onChange={(e) =>

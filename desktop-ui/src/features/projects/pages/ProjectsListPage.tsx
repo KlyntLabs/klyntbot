@@ -85,7 +85,6 @@ export function ProjectsListPage() {
             }}
             placeholder="Project name..."
             className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
-            autoFocus
           />
           <button
             type="button"

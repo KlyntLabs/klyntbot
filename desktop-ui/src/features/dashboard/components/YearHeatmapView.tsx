@@ -91,8 +91,9 @@ export function YearHeatmapView() {
         <div className="grid grid-cols-3 gap-4">
           {Array.from({ length: 12 }, (_, monthIdx) => {
             const weeks = buildMonthGrid(year, monthIdx);
+            const monthName = MONTH_NAMES[monthIdx];
             return (
-              <div key={monthIdx}>
+              <div key={monthName}>
                 <div className="text-xs font-medium text-muted-foreground mb-1.5">
                   {MONTH_NAMES[monthIdx]}
                 </div>
@@ -101,7 +102,8 @@ export function YearHeatmapView() {
                 <div className="grid grid-cols-7 gap-px mb-0.5">
                   {DAY_LABELS.map((label, i) => (
                     <div
-                      key={`${monthIdx}-label-${i}`}
+                      // biome-ignore lint/suspicious/noArrayIndexKey: static 7 day-of-week labels with duplicates
+                      key={`${monthName}-label-${i}`}
                       className="text-[8px] text-muted-foreground/50 text-center"
                     >
                       {label}
@@ -111,7 +113,11 @@ export function YearHeatmapView() {
 
                 {/* Weeks */}
                 {weeks.map((week, wi) => (
-                  <div key={`${monthIdx}-w${wi}`} className="grid grid-cols-7 gap-px">
+                  <div
+                    // biome-ignore lint/suspicious/noArrayIndexKey: week rows within month have no unique ID
+                    key={`${monthName}-w${wi}`}
+                    className="grid grid-cols-7 gap-px"
+                  >
                     {week.map((day, di) =>
                       day ? (
                         <button
@@ -126,7 +132,11 @@ export function YearHeatmapView() {
                           title={`${day}: ${formatHumanDuration(dayMap.get(day) || 0)}`}
                         />
                       ) : (
-                        <div key={`empty-${monthIdx}-${wi}-${di}`} className="aspect-square" />
+                        <div
+                          // biome-ignore lint/suspicious/noArrayIndexKey: empty calendar padding cells
+                          key={`empty-${monthName}-${wi}-${di}`}
+                          className="aspect-square"
+                        />
                       ),
                     )}
                   </div>

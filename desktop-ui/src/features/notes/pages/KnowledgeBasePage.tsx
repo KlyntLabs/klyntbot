@@ -103,7 +103,7 @@ export default function KnowledgeBasePage() {
     if (insightState.isOpen && selectedNoteId && selectedNoteId !== insightState.noteId) {
       void insightActions.open(selectedNoteId);
     }
-  }, [selectedNoteId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedNoteId, insightActions.open, insightState.isOpen, insightState.noteId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Sidebar widths (imperatively managed for perf) ────────────────────
   const [leftWidth, setLeftWidth] = useState(220);
@@ -145,7 +145,7 @@ export default function KnowledgeBasePage() {
     // Leave at least 300px for the editor + left sidebar space
     const available = container.clientWidth - leftWidth - 20;
     return Math.max(360, Math.min(640, available * 0.65));
-  }, [leftWidth, insightOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [leftWidth]); // eslint-disable-line react-hooks/exhaustive-deps
   const effectiveRightWidth = insightOpen ? insightPanelWidth : rightWidth;
 
   // ── Mutations ─────────────────────────────────────────────────────────

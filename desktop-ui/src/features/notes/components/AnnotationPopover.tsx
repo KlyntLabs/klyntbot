@@ -93,7 +93,6 @@ export function AnnotationPopover({
             onChange={(e) => setContent(e.target.value)}
             className="w-full rounded-md bg-surface-base p-2 text-xs text-primary outline-none ring-1 ring-border focus:ring-brand"
             rows={3}
-            autoFocus
           />
           <div className="mt-1 flex justify-end gap-1">
             <button

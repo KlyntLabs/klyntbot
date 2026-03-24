@@ -68,7 +68,6 @@ export function ContextDetailPanel({ open, onClose, detail }: ContextDetailPanel
             <div className="flex-1 min-w-0">
               {editingTitle ? (
                 <input
-                  autoFocus
                   value={titleDraft}
                   onChange={(e) => setTitleDraft(e.target.value)}
                   onBlur={handleRename}

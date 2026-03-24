@@ -36,6 +36,13 @@
       "tailwindDirectives": true
     }
   },
+  "overrides": [
+    {
+      "includes": ["src/features/notes/components/editor/vim/vim-engine.js"],
+      "linter": { "enabled": false },
+      "formatter": { "enabled": false }
+    }
+  ],
   "files": {
     "includes": ["src/**"],
     "experimentalScannerIgnores": ["dist/**", "node_modules/**"]

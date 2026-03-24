@@ -65,7 +65,6 @@ export function LinkInsertDialog({ type, isOpen, onClose, onInsert }: LinkInsert
 
       {/* Dialog */}
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: stopPropagation on dialog panel */}
-      {/* biome-ignore lint/a11y/noStaticElementInteractions: dialog content panel */}
       <div
         className="relative glass-panel rounded-2xl p-5 w-[380px] shadow-2xl"
         role="dialog"

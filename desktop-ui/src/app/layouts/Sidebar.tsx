@@ -11,7 +11,6 @@ import {
   MessageSquare,
   Settings,
   Sparkles,
-  Target,
   Timer,
   Wallet,
 } from "lucide-react";

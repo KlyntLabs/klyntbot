@@ -333,6 +333,7 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
           <div className="flex gap-1.5 mt-2.5">
             {Array.from({ length: dotsCount }, (_, i) => (
               <div
+                // biome-ignore lint/suspicious/noArrayIndexKey: static session dots from Array.from
                 key={`dot-${i}`}
                 className={`w-[6px] h-[6px] rounded-full transition-colors duration-300 ${
                   i < filledDots ? "bg-brand" : "bg-muted"

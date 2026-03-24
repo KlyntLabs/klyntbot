@@ -41,15 +41,14 @@ export function GradeDisplay({ result, propagationCount = 0 }: GradeDisplayProps
       {/* Diff highlights */}
       {diffHighlights.length > 0 && (
         <div className="rounded-lg bg-white/[0.03] p-2.5 flex flex-wrap gap-1">
-          {diffHighlights.map((chunk, i) => {
+          {diffHighlights.map((chunk) => {
             let cls = "text-[11px]";
             if (chunk.status === "match") cls += " text-green-400";
             else if (chunk.status === "missing") cls += " text-red-400 line-through";
             else if (chunk.status === "partial") cls += " text-yellow-400";
             else cls += " text-dim";
-            // biome-ignore lint/suspicious/noArrayIndexKey: diff highlights are positional, no stable id
             return (
-              <span key={`diff-${i}`} className={cls}>
+              <span key={`diff-${chunk.status}-${chunk.text}`} className={cls}>
                 {chunk.text}
               </span>
             );

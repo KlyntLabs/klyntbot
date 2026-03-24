@@ -221,6 +221,7 @@ export function GraphMinimap({ noteId, notes, onSelectNote, onExpandGraph }: Gra
                     : "rgba(255,255,255,0.4)";
 
                 return (
+                  // biome-ignore lint/a11y/noStaticElementInteractions: SVG node click handler
                   <g
                     key={node.id}
                     transform={`translate(${node.x},${node.y})`}

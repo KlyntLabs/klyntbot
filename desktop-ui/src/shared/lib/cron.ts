@@ -35,8 +35,8 @@ function humanizeCronExpr(expr: string, tz?: string): string {
   const tzSuffix = tz && tz !== "UTC" ? ` (${tz})` : "";
 
   if (min !== undefined && hour !== undefined && dom === "*" && dow === "*") {
-    const h = Number.parseInt(hour);
-    const m = Number.parseInt(min);
+    const h = Number.parseInt(hour, 10);
+    const m = Number.parseInt(min, 10);
     if (!Number.isNaN(h) && !Number.isNaN(m)) {
       const time = formatTime(h, m);
       return `Daily at ${time}${tzSuffix}`;
@@ -44,8 +44,8 @@ function humanizeCronExpr(expr: string, tz?: string): string {
   }
 
   if (min !== undefined && hour !== undefined && dom === "*" && dow !== undefined && dow !== "*") {
-    const h = Number.parseInt(hour);
-    const m = Number.parseInt(min);
+    const h = Number.parseInt(hour, 10);
+    const m = Number.parseInt(min, 10);
     if (!Number.isNaN(h) && !Number.isNaN(m)) {
       const time = formatTime(h, m);
       const dayName = dayOfWeek(dow);

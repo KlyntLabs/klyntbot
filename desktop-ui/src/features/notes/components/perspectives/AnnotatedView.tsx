@@ -37,18 +37,17 @@ export function AnnotatedView({ noteId, sectionId: _ }: AnnotatedViewProps) {
 
           <div className="mt-2 flex items-center justify-between">
             <div className="flex gap-1">
-              {ann.tags &&
-                ann.tags
-                  .split(",")
-                  .filter(Boolean)
-                  .map((tag) => (
-                    <span
-                      key={tag}
-                      className="rounded-full bg-surface-hover px-1.5 py-0.5 text-[9px] text-muted"
-                    >
-                      {tag}
-                    </span>
-                  ))}
+              {ann.tags
+                ?.split(",")
+                .filter(Boolean)
+                .map((tag) => (
+                  <span
+                    key={tag}
+                    className="rounded-full bg-surface-hover px-1.5 py-0.5 text-[9px] text-muted"
+                  >
+                    {tag}
+                  </span>
+                ))}
             </div>
             <span className="text-2xs text-muted">
               {new Date(ann.createdAt).toLocaleDateString()}

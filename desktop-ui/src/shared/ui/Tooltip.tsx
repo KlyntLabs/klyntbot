@@ -20,6 +20,7 @@ export function Tooltip({ content, side = "top", children, className }: TooltipP
   };
 
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: tooltip wrapper uses mouse/focus events for show/hide, not for interactive actions
     <div
       className="relative inline-block"
       onMouseEnter={() => setIsVisible(true)}

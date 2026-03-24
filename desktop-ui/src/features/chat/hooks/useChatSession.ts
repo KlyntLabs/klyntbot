@@ -119,7 +119,7 @@ export function useChatSession(
         stream.failStreaming(parseApiError(e).message);
       }
     },
-    [input, sessionKey, stream, squadId],
+    [input, sessionKey, stream, squadId, options?.squadMode],
   );
 
   return {

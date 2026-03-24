@@ -46,7 +46,7 @@ export function useAtomRestore() {
   return useMutation<KnowledgeAtomResponse>("atom_restore", "params");
 }
 
-export function useAtomActions(noteId: string | null) {
+export function useAtomActions(_noteId: string | null) {
   const { mutate: acceptMutate } = useAtomAccept();
   const { mutate: dismissMutate } = useAtomDismiss();
   const { mutate: restoreMutate } = useAtomRestore();

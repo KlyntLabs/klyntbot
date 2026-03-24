@@ -240,14 +240,17 @@ function DaySummary({
         <section>
           <h4 className="text-2xs font-medium text-dim uppercase tracking-wider mb-2">Insights</h4>
           <div className="flex flex-col gap-2">
-            {intel.patterns.map((p, i) => (
-              <div key={`p-${i}`} className="flex items-start gap-2 text-[11px]">
+            {intel.patterns.map((p) => (
+              <div key={`pattern-${p}`} className="flex items-start gap-2 text-[11px]">
                 <Brain className="size-3 text-muted-foreground mt-0.5 shrink-0" />
                 <span className="text-muted-foreground">{p}</span>
               </div>
             ))}
-            {intel.nudges.map((n, i) => (
-              <div key={`n-${i}`} className="flex items-start gap-2 text-[11px]">
+            {intel.nudges.map((n) => (
+              <div
+                key={`nudge-${n.nudgeType}-${n.message}`}
+                className="flex items-start gap-2 text-[11px]"
+              >
                 <Lightbulb className="size-3 text-warning mt-0.5 shrink-0" />
                 <span className="text-muted-foreground">{n.message}</span>
               </div>
@@ -343,7 +346,13 @@ function WeeklySparkline({ data }: { data: ProductivitySummary[] }) {
 
   return (
     <div className="flex items-center gap-3">
-      <svg width={w} height={h} className="flex-1">
+      <svg
+        width={w}
+        height={h}
+        className="flex-1"
+        role="img"
+        aria-label="Weekly productivity trend"
+      >
         <polyline
           points={points}
           fill="none"

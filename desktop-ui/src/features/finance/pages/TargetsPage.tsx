@@ -389,7 +389,7 @@ export function FinanceTargets() {
             ) : (
               <>
                 <div className="divide-y divide-border-subtle">
-                  {liabilities.map((l, i) => {
+                  {liabilities.map((l, _i) => {
                     const Icon = LIAB_ICONS[l.liabilityType] ?? Wallet;
                     const paid = pct(l.principal - l.remaining, l.principal);
                     return (
@@ -585,7 +585,6 @@ export function FinanceTargets() {
             value={gName}
             onChange={(e) => setGName(e.target.value)}
             placeholder="e.g. Emergency Fund"
-            autoFocus
           />
         </FormField>
         <FormField label="Goal Type">
@@ -653,7 +652,6 @@ export function FinanceTargets() {
             value={lName}
             onChange={(e) => setLName(e.target.value)}
             placeholder="e.g. Home Mortgage"
-            autoFocus
           />
         </FormField>
         <FormField label="Debt Type">

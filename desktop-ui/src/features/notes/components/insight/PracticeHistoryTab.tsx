@@ -58,6 +58,20 @@ export function PracticeHistoryTab({ noteId }: PracticeHistoryTabProps) {
     [],
   );
 
+  const segmentCounts = useMemo(
+    () =>
+      new Map(
+        (sessions ?? []).map((s) => {
+          try {
+            return [s.id, (JSON.parse(s.segments) as unknown[]).length] as const;
+          } catch {
+            return [s.id, 0] as const;
+          }
+        }),
+      ),
+    [sessions],
+  );
+
   if (!noteId) {
     return (
       <p className="text-muted text-sm text-center py-8">Select a note to see practice history</p>
@@ -79,20 +93,6 @@ export function PracticeHistoryTab({ noteId }: PracticeHistoryTabProps) {
       </p>
     );
   }
-
-  const segmentCounts = useMemo(
-    () =>
-      new Map(
-        (sessions ?? []).map((s) => {
-          try {
-            return [s.id, (JSON.parse(s.segments) as unknown[]).length] as const;
-          } catch {
-            return [s.id, 0] as const;
-          }
-        }),
-      ),
-    [sessions],
-  );
 
   return (
     <div className="space-y-2">

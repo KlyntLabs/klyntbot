@@ -19,7 +19,7 @@ export function IssueDetailTitle({ title, onUpdate }: IssueDetailTitleProps) {
     if (!el) return;
     el.style.height = "auto";
     el.style.height = `${el.scrollHeight}px`;
-  }, [value]);
+  }, []);
 
   const handleBlur = useCallback(() => {
     const trimmed = value.trim();

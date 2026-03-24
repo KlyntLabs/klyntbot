@@ -21,7 +21,14 @@ export function ProgressRing({ progress, size, color, gradient, className }: Pro
   const strokeColor = gradient ? `url(#${gradientId})` : (color ?? "var(--brand)");
 
   return (
-    <svg width={px} height={px} viewBox="0 0 36 36" className={className}>
+    <svg
+      width={px}
+      height={px}
+      viewBox="0 0 36 36"
+      className={className}
+      role="img"
+      aria-label={`${Math.round(clamped)}% progress`}
+    >
       {gradient && (
         <defs>
           <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">

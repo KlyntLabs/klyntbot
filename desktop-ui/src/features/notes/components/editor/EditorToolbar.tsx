@@ -351,9 +351,12 @@ export function EditorToolbar({
 
   return (
     <div className="glass-toolbar rounded-lg px-2 py-1 flex items-center gap-0.5 flex-wrap">
-      {groups.map((group, gi) => (
-        <div key={gi} className="flex items-center gap-0.5">
-          {gi > 0 && <div className="w-px h-4 bg-muted mx-1.5" />}
+      {groups.map((group, groupIdx) => (
+        <div
+          key={`toolbar-group-${group[0]?.label ?? groupIdx}`}
+          className="flex items-center gap-0.5"
+        >
+          {groupIdx > 0 && <div className="w-px h-4 bg-muted mx-1.5" />}
           {group.map((btn) => {
             const Icon = btn.icon;
             const active = btn.isActive?.(editor) ?? false;

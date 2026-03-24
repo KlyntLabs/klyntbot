@@ -64,7 +64,7 @@ export function SystemPage() {
     if (isValidTab(urlTab) && urlTab !== activeTab) {
       setActiveTab(urlTab);
     }
-  }, [urlTab]);
+  }, [urlTab, activeTab]);
 
   // Bridge cognitive SSE events in browser dev mode (same as DebugDashboardPage)
   useEffect(() => {

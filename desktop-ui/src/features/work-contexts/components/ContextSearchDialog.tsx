@@ -52,6 +52,8 @@ export function ContextSearchDialog({ open, onClose, onSelect }: ContextSearchDi
 
   return createPortal(
     <>
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: backdrop overlay, Escape handled via document listener */}
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: backdrop overlay */}
       <div className="fixed inset-0 z-50 bg-overlay" onClick={onClose} />
       <div className="fixed inset-0 z-50 flex items-start justify-center pt-[20vh] pointer-events-none">
         <div className="glass-panel w-full max-w-lg pointer-events-auto rounded-2xl overflow-hidden">

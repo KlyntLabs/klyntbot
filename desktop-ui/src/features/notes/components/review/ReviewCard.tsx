@@ -82,8 +82,6 @@ export function ReviewCard({
       }
       case "voice":
         return <VoiceInput onSubmit={onSubmitAnswer} />;
-      case "typed":
-      case "auto":
       default:
         return <TypedAnswerInput onSubmit={onSubmitAnswer} />;
     }

@@ -200,7 +200,7 @@ export function NoteEditor({
     note.body ?? undefined,
   );
   const quickTranslate = useQuickTranslate(sourceLang, targetLang);
-  const vocabSave = useVocabularySave();
+  const _vocabSave = useVocabularySave();
 
   // ── Annotation side pane ─────────────────────────────────────────
   const sideNotesContent = useMemo(() => parseSideNotes(note.splitContent), [note.splitContent]);

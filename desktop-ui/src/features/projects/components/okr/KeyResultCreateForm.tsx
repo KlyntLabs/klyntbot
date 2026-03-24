@@ -55,7 +55,6 @@ export function KeyResultCreateForm({
         placeholder="Key Result title..."
         value={title}
         onChange={(e) => setTitle(e.target.value)}
-        autoFocus
         className="w-full px-2.5 py-1.5 text-xs bg-transparent border border-border rounded text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-brand"
       />
 

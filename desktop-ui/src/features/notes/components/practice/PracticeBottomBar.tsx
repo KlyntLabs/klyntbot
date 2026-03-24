@@ -37,7 +37,7 @@ export interface PracticeBottomBarProps {
 // ── Input state ───────────────────────────────────────────
 
 function InputBar({
-  currentSegmentText,
+  currentSegmentText: _currentSegmentText,
   loading,
   error,
   initialText,
@@ -167,8 +167,8 @@ function EvalBar({
       {/* Row 2: Corrections */}
       {corrections.length > 0 && (
         <div className="flex flex-col gap-1">
-          {corrections.map((c, i) => (
-            <div key={`correction-${i}`} className="text-xs">
+          {corrections.map((c) => (
+            <div key={`correction-${c.original}-${c.suggested}`} className="text-xs">
               <span className="text-red-400 line-through">{c.original}</span>
               <span className="text-muted mx-1">&rarr;</span>
               <span className="text-green-400">{c.suggested}</span>

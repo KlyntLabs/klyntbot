@@ -129,7 +129,9 @@ export function CashFlowPage() {
     if (!period.selectedDay) return null;
     const day = dailySpendingResp.days.find((d) => d.date === period.selectedDay);
     const dayTxs = transactions.filter((t) => t.txDate === period.selectedDay);
-    const categories = [...new Set(dayTxs.filter((t) => t.category).map((t) => t.category!))];
+    const categories = [
+      ...new Set(dayTxs.filter((t) => t.category).map((t) => t.category as string)),
+    ];
     return {
       txCount: day?.txCount ?? dayTxs.length,
       totalSpending: day?.totalSpending ?? 0,
@@ -141,7 +143,7 @@ export function CashFlowPage() {
   const spendingWithBudgets = useMemo(() => {
     const activeBudgets = budgets.filter((b) => b.isActive);
     const budgetByCategory = new Map(
-      activeBudgets.filter((b) => b.category).map((b) => [b.category!, b]),
+      activeBudgets.filter((b) => b.category).map((b) => [b.category as string, b]),
     );
 
     // Start with spending categories
@@ -389,19 +391,12 @@ export function CashFlowPage() {
               const Icon = ACCT_ICONS[acct.accountType] ?? Wallet;
               const isSelected = accountFilter === acct.id;
               return (
-                <div
+                <button
+                  type="button"
                   key={acct.id}
-                  role="button"
-                  tabIndex={0}
                   onClick={() => setAccountFilter(isSelected ? null : acct.id)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      setAccountFilter(isSelected ? null : acct.id);
-                    }
-                  }}
                   className={cn(
-                    "flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-colors",
+                    "flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-colors w-full text-left",
                     isSelected ? "bg-muted" : "hover:bg-accent",
                   )}
                 >
@@ -420,7 +415,7 @@ export function CashFlowPage() {
                       hidden,
                     })}
                   </span>
-                </div>
+                </button>
               );
             })}
           </Card>
@@ -544,7 +539,6 @@ export function CashFlowPage() {
               value={txAmount}
               onChange={(e) => setTxAmount(e.target.value)}
               placeholder="0"
-              autoFocus
             />
           </FormField>
           <FormField label="Category">

@@ -102,9 +102,11 @@ export function NoteFinder({ isOpen, onClose, onSelectNote, notes }: NoteFinderP
   const selectedNote = results[selectedIndex] ?? null;
 
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: modal overlay handles keyboard navigation
     <div
       className="fixed inset-0 z-50 flex items-start justify-center pt-[10vh]"
       style={{ background: "rgba(0, 0, 0, 0.5)" }}
+      role="presentation"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}

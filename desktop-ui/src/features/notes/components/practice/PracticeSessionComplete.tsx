@@ -1,11 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  gradeBgClass,
-  gradeColorClass,
-  gradeToNumber,
-  isStrongGrade,
-  numberToGrade,
-} from "../../lib/gradeUtils";
+import { gradeBgClass, gradeColorClass, gradeToNumber, numberToGrade } from "../../lib/gradeUtils";
 
 // ── Types ────────────────────────────────────────────────
 

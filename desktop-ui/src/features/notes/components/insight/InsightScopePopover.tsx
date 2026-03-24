@@ -64,9 +64,9 @@ export function InsightScopePopover({ value, onChange }: Props) {
           <div className="flex flex-col gap-3">
             {/* Scope type */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-2xs font-medium text-muted-foreground uppercase tracking-wider">
+              <span className="text-2xs font-medium text-muted-foreground uppercase tracking-wider">
                 Scope
-              </label>
+              </span>
               <div className="grid grid-cols-2 gap-1">
                 {SCOPE_TYPES.map((st) => (
                   <button
@@ -89,11 +89,11 @@ export function InsightScopePopover({ value, onChange }: Props) {
 
             {/* Radius slider (only for semantic) */}
             {value.scopeType === "semantic" && (
-              <div className="flex flex-col gap-1">
+              <label className="flex flex-col gap-1">
                 <div className="flex items-center justify-between">
-                  <label className="text-2xs font-medium text-muted-foreground">
+                  <span className="text-2xs font-medium text-muted-foreground">
                     Similarity Radius
-                  </label>
+                  </span>
                   <span className="text-2xs text-muted">{value.radius.toFixed(2)}</span>
                 </div>
                 <input
@@ -110,7 +110,7 @@ export function InsightScopePopover({ value, onChange }: Props) {
                   }
                   className="w-full accent-brand h-1"
                 />
-              </div>
+              </label>
             )}
 
             {/* Toggles */}

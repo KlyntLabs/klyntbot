@@ -38,7 +38,11 @@ export function ContextRibbon({ date }: Props) {
   return (
     <div className="flex h-1 gap-px mx-12 mb-0.5 shrink-0">
       {hourColors.map((color, i) => (
-        <Tooltip key={i} content={`${i.toString().padStart(2, "0")}:00`}>
+        <Tooltip
+          // biome-ignore lint/suspicious/noArrayIndexKey: fixed 24-hour slots, index is the hour
+          key={i}
+          content={`${i.toString().padStart(2, "0")}:00`}
+        >
           <div
             className="flex-1 rounded-full transition-colors"
             style={{

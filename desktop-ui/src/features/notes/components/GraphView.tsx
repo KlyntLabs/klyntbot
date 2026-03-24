@@ -121,8 +121,8 @@ export function GraphView({
       const tId = typeof link.target === "string" ? link.target : link.target.id;
       if (!adjacency.has(sId)) adjacency.set(sId, new Set());
       if (!adjacency.has(tId)) adjacency.set(tId, new Set());
-      adjacency.get(sId)!.add(tId);
-      adjacency.get(tId)!.add(sId);
+      adjacency.get(sId)?.add(tId);
+      adjacency.get(tId)?.add(sId);
     }
     const hubId = selectHub(
       filteredNodes.map((n) => ({ id: n.id, linkCount: n.linkCount, title: n.title })),
@@ -343,9 +343,12 @@ export function GraphView({
         </div>
 
         {/* Tooltip */}
-        {tooltip && nodeMap.has(tooltip.nodeId) && (
-          <GraphNodeTooltip node={nodeMap.get(tooltip.nodeId)!} x={tooltip.x} y={tooltip.y} />
-        )}
+        {(() => {
+          if (!tooltip) return null;
+          const tooltipNode = nodeMap.get(tooltip.nodeId);
+          if (!tooltipNode) return null;
+          return <GraphNodeTooltip node={tooltipNode} x={tooltip.x} y={tooltip.y} />;
+        })()}
       </div>
     </div>
   );

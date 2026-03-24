@@ -266,16 +266,17 @@ const TreeRow = memo(function TreeRow({
       {item.depth > 0 && item.guides && (
         <>
           {/* Ancestor vertical lines */}
-          {item.guides.map(
-            (continues, d) =>
-              continues && (
-                <div
-                  key={d}
-                  className="absolute top-0 bottom-0 w-px bg-border/40"
-                  style={{ left: d * INDENT + 14 }}
-                />
-              ),
-          )}
+          {item.guides.map((continues, depth) => {
+            if (!continues) return null;
+            const guideKey = `guide-${item.id}-d${depth}`;
+            return (
+              <div
+                key={guideKey}
+                className="absolute top-0 bottom-0 w-px bg-border/40"
+                style={{ left: depth * INDENT + 14 }}
+              />
+            );
+          })}
           {/* Own connector: vertical portion */}
           <div
             className="absolute w-px bg-border/40"
@@ -821,6 +822,7 @@ export function NotebookTree({
   }, []);
 
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: tree area context menu for creating notes/notebooks
     <div className="flex flex-col min-h-0 flex-1" onContextMenu={handleBlankContextMenu}>
       {/* Header */}
       <div className="flex items-center justify-between px-4 pb-1 pt-3">
@@ -876,6 +878,7 @@ export function NotebookTree({
         ))}
 
         {/* Root drop zone — catches drops below all items */}
+        {/* biome-ignore lint/a11y/noStaticElementInteractions: drag-and-drop root drop zone */}
         <div
           className={`flex-1 min-h-[40px] transition-colors ${
             dropOnRoot ? "bg-brand/[0.08] border-t border-dashed border-brand/30" : ""

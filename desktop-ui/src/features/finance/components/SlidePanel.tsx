@@ -25,6 +25,8 @@ export function SlidePanel({ open, onClose, title, children }: SlidePanelProps) 
   return (
     <>
       {/* Backdrop */}
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: modal backdrop dismissal */}
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: Escape key handled via document keydown listener */}
       <div
         className={`fixed inset-0 z-40 bg-overlay transition-opacity duration-300 ${
           open ? "opacity-100" : "opacity-0 pointer-events-none"

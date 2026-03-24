@@ -50,15 +50,16 @@ function TranslationSkeleton() {
       </div>
       {/* Words skeleton */}
       <div className="space-y-1.5 pt-1">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="flex items-center gap-2">
+        {Array.from({ length: 5 }).map((_, idx) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: static skeleton placeholders with no stable id
+          <div key={`skeleton-${idx}`} className="flex items-center gap-2">
             <div
               className="h-3 rounded bg-surface-hover animate-[shimmer_2s_infinite] w-12"
-              style={{ animationDelay: `${i * 0.1}s` }}
+              style={{ animationDelay: `${idx * 0.1}s` }}
             />
             <div
               className="h-2.5 rounded bg-surface-hover/60 animate-[shimmer_2s_infinite] flex-1"
-              style={{ animationDelay: `${i * 0.1 + 0.05}s` }}
+              style={{ animationDelay: `${idx * 0.1 + 0.05}s` }}
             />
           </div>
         ))}

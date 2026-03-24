@@ -7,12 +7,10 @@ export function CoachingCard() {
   const { nudge, handleFeedback } = useCoachingNudge({ autoCollapseMs: 60_000 });
 
   return (
-    <div
-      className="glass-card rounded-xl p-5 cursor-pointer hover:bg-accent/5 transition-colors"
+    <button
+      type="button"
+      className="glass-card rounded-xl p-5 cursor-pointer hover:bg-accent/5 transition-colors w-full text-left"
       onClick={() => navigate("/coaching")}
-      onKeyDown={(e) => e.key === "Enter" && navigate("/coaching")}
-      role="button"
-      tabIndex={0}
     >
       <p className="text-2xs text-muted-foreground uppercase tracking-wider mb-3">Coaching</p>
 
@@ -52,6 +50,6 @@ export function CoachingCard() {
           </p>
         </div>
       )}
-    </div>
+    </button>
   );
 }

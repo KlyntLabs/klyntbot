@@ -42,6 +42,8 @@ export function SlidePanel({
 
   return createPortal(
     <>
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: backdrop overlay — click to dismiss, keyboard handled by Escape listener */}
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: keyboard dismiss handled globally via Escape key */}
       <div
         className={`fixed inset-0 z-40 bg-overlay transition-opacity duration-300 ${
           open ? "opacity-100" : "opacity-0 pointer-events-none"

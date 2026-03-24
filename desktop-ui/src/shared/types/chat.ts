@@ -1,4 +1,5 @@
 import type { DelegationInfo, PlanData } from "./common";
+import type { Task } from "./tasks";
 
 // ── Message Segments ────────────────────────────────────────
 
@@ -349,5 +350,5 @@ export type FormResponse = { Completed: Answer[] } | "Cancelled";
 export interface AgentStatus {
   status: string;
   activeTaskCount: number;
-  focusTask: any; // Task type imported from tasks.ts
+  focusTask: Task | null;
 }

@@ -139,7 +139,7 @@ export class ProseMirrorAdapter {
   // biome-ignore lint/suspicious/noExplicitAny: vim.js reads/writes arbitrary properties on curOp
   curOp: Record<string, any> | null = null;
 
-  private _listeners: Map<string, Set<Function>> = new Map();
+  private _listeners: Map<string, Set<(...args: unknown[]) => void>> = new Map();
   private _lastChange: { from: Pos; to: Pos; text: string[] } | null = null;
   private _inOperation = false;
   private _pendingCursorActivity = false;
@@ -180,13 +180,13 @@ export class ProseMirrorAdapter {
     }
   }
 
-  static on(emitter: unknown, type: string, fn: Function): void {
+  static on(emitter: unknown, type: string, fn: (...args: unknown[]) => void): void {
     if (emitter && typeof emitter === "object" && "on" in emitter) {
       (emitter as ProseMirrorAdapter).on(type, fn);
     }
   }
 
-  static off(emitter: unknown, type: string, fn: Function): void {
+  static off(emitter: unknown, type: string, fn: (...args: unknown[]) => void): void {
     if (emitter && typeof emitter === "object" && "off" in emitter) {
       (emitter as ProseMirrorAdapter).off(type, fn);
     }
@@ -219,12 +219,13 @@ export class ProseMirrorAdapter {
 
   // ── Event system ──────────────────────────────────────────────────
 
-  on(type: string, fn: Function): void {
+  // biome-ignore lint/suspicious/useAdjacentOverloadSignatures: instance on/off/signal are not overloads of static on/off/signal — they have different signatures (CodeMirror compatibility API)
+  on(type: string, fn: (...args: unknown[]) => void): void {
     if (!this._listeners.has(type)) this._listeners.set(type, new Set());
-    this._listeners.get(type)!.add(fn);
+    this._listeners.get(type)?.add(fn);
   }
 
-  off(type: string, fn: Function): void {
+  off(type: string, fn: (...args: unknown[]) => void): void {
     this._listeners.get(type)?.delete(fn);
   }
 
@@ -723,7 +724,7 @@ export class ProseMirrorAdapter {
     return false;
   }
 
-  forEachSelection(fn: Function): void {
+  forEachSelection(fn: (sel: ProseMirrorAdapter) => void): void {
     fn(this);
   }
 

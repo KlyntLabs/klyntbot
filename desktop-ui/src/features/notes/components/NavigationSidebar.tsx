@@ -69,6 +69,7 @@ export function NavigationSidebar({
   const notebookCount = notebooks.length;
 
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: sidebar disables default context menu
     <div
       className="glass-sidebar flex flex-col min-h-0 h-full"
       onContextMenu={(e) => e.preventDefault()}
