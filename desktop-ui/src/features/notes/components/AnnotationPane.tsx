@@ -11,6 +11,7 @@ interface AnnotationPaneProps {
   deleteAnnotation: (id: string) => Promise<void>;
   onClose: () => void;
   onSideNotesChange?: (html: string, markdown: string) => void;
+  onAnnotationClick?: (markId: string) => void;
   sourceLang?: string;
   targetLang?: string;
 }
@@ -22,6 +23,7 @@ export function AnnotationPane({
   deleteAnnotation,
   onClose,
   onSideNotesChange,
+  onAnnotationClick,
   sourceLang,
   targetLang,
 }: AnnotationPaneProps) {
@@ -143,7 +145,7 @@ export function AnnotationPane({
               updateAnnotation={updateAnnotation}
               deleteAnnotation={deleteAnnotation}
               activeAnnotationId={null}
-              onAnnotationClick={() => {}}
+              onAnnotationClick={onAnnotationClick ?? (() => {})}
               sourceLang={sourceLang}
               targetLang={targetLang}
               hideHeader

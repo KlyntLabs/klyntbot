@@ -35,14 +35,10 @@ export function FinanceBasicsForm({ registerSave, onDirty }: FinanceBasicsFormPr
 
   useEffect(() => {
     registerSave(async () => {
-      try {
-        await ipc("config_update_section", {
-          section: "finance",
-          patch: { defaultCurrency: currency, proactivityLevel: proactivity },
-        });
-      } catch (e) {
-        console.error("Failed to save finance basics:", e);
-      }
+      await ipc("config_update_section", {
+        section: "finance",
+        patch: { defaultCurrency: currency, proactivityLevel: proactivity },
+      });
     });
   }, [currency, proactivity, registerSave]);
 

@@ -68,6 +68,9 @@ export function AccountsForm({ registerSave, onDirty }: AccountsFormProps) {
           else
             console.error("Failed to save account:", (results[i] as PromiseRejectedResult).reason);
         }
+        const failCount = results.filter((r) => r.status === "rejected").length;
+        if (failCount > 0)
+          throw new Error(`Failed to save ${failCount} account${failCount === 1 ? "" : "s"}`);
       }
     });
   }, [accounts, registerSave]);

@@ -92,6 +92,9 @@ export function LiabilitiesForm({ registerSave, onDirty }: LiabilitiesFormProps)
               (results[i] as PromiseRejectedResult).reason,
             );
         }
+        const failCount = results.filter((r) => r.status === "rejected").length;
+        if (failCount > 0)
+          throw new Error(`Failed to save ${failCount} liabilit${failCount === 1 ? "y" : "ies"}`);
       }
     });
   }, [liabilities, registerSave]);

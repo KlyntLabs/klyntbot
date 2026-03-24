@@ -123,6 +123,9 @@ pub fn evaluate_salience(event: &DomainEvent) -> SalienceVerdict {
         DomainEvent::TaskHierarchyChanged { .. } => SalienceVerdict::Discard,
         DomainEvent::FlashcardSessionCompleted { .. } => SalienceVerdict::Accumulate,
 
+        // Productivity interventions — accumulate for pattern detection
+        DomainEvent::InterventionTriggered { .. } => SalienceVerdict::Accumulate,
+
         // Memory confirmation events — discard from cognitive (handled by UI/pending queue)
         DomainEvent::MemoryPendingConfirmation { .. } => SalienceVerdict::Discard,
     }

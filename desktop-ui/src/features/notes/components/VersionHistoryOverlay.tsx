@@ -1,5 +1,6 @@
 import { ipc } from "@shared/hooks/useIpc";
 import { useQuery } from "@shared/hooks/useQuery";
+import { formatRelativeTime } from "@shared/lib/dates";
 import type { Note, NoteVersion } from "@shared/types";
 import { diffLines } from "diff";
 import { RotateCcw, X } from "lucide-react";
@@ -22,6 +23,7 @@ export function VersionHistoryOverlay({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showDiff, setShowDiff] = useState(false);
   const [restoring, setRestoring] = useState(false);
+  const [restoreError, setRestoreError] = useState<string | null>(null);
 
   // Auto-select first version
   useEffect(() => {
@@ -50,6 +52,7 @@ export function VersionHistoryOverlay({
   const handleRestore = useCallback(async () => {
     if (!selectedId) return;
     setRestoring(true);
+    setRestoreError(null);
     try {
       const restored = await ipc<Note>("note_version_restore", {
         versionId: selectedId,
@@ -59,6 +62,7 @@ export function VersionHistoryOverlay({
       refetch();
     } catch (e) {
       console.error("Failed to restore version:", e);
+      setRestoreError(e instanceof Error ? e.message : "Failed to restore version");
     } finally {
       setRestoring(false);
     }
@@ -68,20 +72,6 @@ export function VersionHistoryOverlay({
     if (!selectedVersion || !showDiff) return null;
     return diffLines(selectedVersion.body, currentBody);
   }, [selectedVersion, currentBody, showDiff]);
-
-  const formatTime = (iso: string) => {
-    const d = new Date(iso);
-    const now = new Date();
-    const diffMs = now.getTime() - d.getTime();
-    const diffMin = Math.floor(diffMs / 60000);
-    if (diffMin < 1) return "just now";
-    if (diffMin < 60) return `${diffMin} min ago`;
-    const diffHr = Math.floor(diffMin / 60);
-    if (diffHr < 24) return `${diffHr} hour${diffHr !== 1 ? "s" : ""} ago`;
-    const diffDay = Math.floor(diffHr / 24);
-    if (diffDay < 7) return `${diffDay} day${diffDay !== 1 ? "s" : ""} ago`;
-    return d.toLocaleDateString();
-  };
 
   const wordCountDelta = (version: NoteVersion) => {
     const versionWords = version.body.split(/\s+/).filter(Boolean).length;
@@ -157,7 +147,7 @@ export function VersionHistoryOverlay({
                             : "text-muted-foreground"
                         }`}
                       >
-                        {formatTime(v.createdAt)}
+                        {formatRelativeTime(v.createdAt)}
                       </div>
                       <div className="text-xs text-muted-foreground mt-0.5">
                         {wordCountDelta(v)}
@@ -176,15 +166,20 @@ export function VersionHistoryOverlay({
           <div className="shrink-0 flex items-center justify-between px-5 py-4 border-b border-border-subtle">
             <div className="flex items-center gap-3">
               {selectedVersion && (
-                <button
-                  type="button"
-                  onClick={handleRestore}
-                  disabled={restoring}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-brand text-white hover:bg-brand/90 transition-colors disabled:opacity-50"
-                >
-                  <RotateCcw size={14} />
-                  {restoring ? "Restoring..." : "Restore this version"}
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={handleRestore}
+                    disabled={restoring}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-brand text-white hover:bg-brand/90 transition-colors disabled:opacity-50"
+                  >
+                    <RotateCcw size={14} />
+                    {restoring ? "Restoring..." : "Restore this version"}
+                  </button>
+                  {restoreError && (
+                    <span className="text-xs text-destructive ml-2">{restoreError}</span>
+                  )}
+                </>
               )}
             </div>
             <div className="flex items-center gap-2">

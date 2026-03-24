@@ -1,6 +1,7 @@
 import { useEvent } from "@shared/hooks/useEvent";
 import { useMutation } from "@shared/hooks/useMutation";
 import { useQuery } from "@shared/hooks/useQuery";
+import { useToastContext } from "@shared/hooks/useToast";
 import type {
   McpAddServerParams,
   McpConfigResponse,
@@ -15,6 +16,7 @@ import { CustomServerCard, RecommendedServerCard } from "../components/mcp/McpSe
 import { recommendedServers } from "../components/mcp/recommendedServers";
 
 export function McpServersSettings() {
+  const toast = useToastContext();
   const { data: config, refetch } = useQuery<McpConfigResponse>("mcp_get_config", undefined, {
     enabled: true,
     servers: [],
@@ -41,8 +43,13 @@ export function McpServersSettings() {
   );
 
   useEffect(() => {
-    if (oauthError) console.error("[MCP OAuth] Error:", oauthError);
-  }, [oauthError]);
+    if (oauthError) {
+      console.error("[MCP OAuth] Error:", oauthError);
+      toast.show(
+        `OAuth failed: ${oauthError instanceof Error ? oauthError.message : String(oauthError)}`,
+      );
+    }
+  }, [oauthError, toast]);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [prefillServer, setPrefillServer] = useState<RecommendedMcpServer | undefined>();
@@ -54,8 +61,9 @@ export function McpServersSettings() {
     refetch();
   });
 
-  useEvent<{ serverName: string; error: string }>("mcp:oauth_error", () => {
+  useEvent<{ serverName: string; error: string }>("mcp:oauth_error", (payload) => {
     setOauthLoadingServer(null);
+    toast.show(`OAuth error for ${payload.serverName}: ${payload.error}`);
     refetch();
   });
 

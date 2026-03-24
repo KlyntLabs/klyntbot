@@ -120,7 +120,7 @@ function AnnotationCard({
       },
     })
       .then(setEnrichment)
-      .catch(() => {});
+      .catch((e) => console.error("Failed to enrich annotation:", e));
   }, [annotation.id, annotation.quotedText, sourceLang, targetLang]);
 
   return (

@@ -9,6 +9,7 @@ use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
 
 use bus::DomainEventBus;
+use serde::Serialize;
 
 use crate::handler::ProductivityHandler;
 use crate::repos::ProductivityRepos;
@@ -31,6 +32,8 @@ pub struct ProductivityIntelligenceLayer {
     summary_handler: Option<Arc<dyn ProductivityHandler>>,
     /// Session repo for reading/updating session data after scoring.
     session_repo: crate::repos::IntelligenceSessionRepo,
+    /// Event bus for publishing cross-feature events.
+    event_bus: Arc<DomainEventBus>,
 }
 
 impl ProductivityIntelligenceLayer {
@@ -68,7 +71,7 @@ impl ProductivityIntelligenceLayer {
         let quality_scorer = QualityScorer::new(
             repos.intelligence_sessions.clone(),
             repos.quality_scores.clone(),
-            event_bus,
+            event_bus.clone(),
         );
 
         let intervention_router = InterventionRouter::new();
@@ -82,6 +85,7 @@ impl ProductivityIntelligenceLayer {
             cancel,
             summary_handler,
             session_repo,
+            event_bus,
         })
     }
 
@@ -155,7 +159,6 @@ impl ProductivityIntelligenceLayer {
         }
 
         // 4. Check for interventions
-        // TODO: publish via DomainEventBus (e.g. InterventionTriggered) so coaching/UI can react
         if let Some(intervention) = self.intervention_router.evaluate(&classified) {
             info!(
                 intervention_type = ?intervention.intervention_type,
@@ -163,6 +166,13 @@ impl ProductivityIntelligenceLayer {
                 message = %intervention.message,
                 "Productivity intervention triggered"
             );
+            self.event_bus
+                .publish(bus::DomainEvent::InterventionTriggered {
+                    intervention_type: enum_to_snake(&intervention.intervention_type),
+                    urgency: enum_to_snake(&intervention.urgency),
+                    message: intervention.message.clone(),
+                    suggested_action: enum_to_snake(&intervention.suggested_action),
+                });
         }
     }
 
@@ -238,6 +248,14 @@ impl super::categorization::AiClassifier for HandlerClassifier {
 
         Ok((category, session_type))
     }
+}
+
+/// Serialize a `#[serde(rename_all = "snake_case")]` enum to its canonical string form.
+fn enum_to_snake<T: Serialize + std::fmt::Debug>(val: &T) -> String {
+    serde_json::to_value(val)
+        .ok()
+        .and_then(|v| v.as_str().map(String::from))
+        .unwrap_or_else(|| format!("{val:?}"))
 }
 
 #[cfg(test)]

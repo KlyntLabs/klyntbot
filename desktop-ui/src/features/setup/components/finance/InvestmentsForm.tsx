@@ -76,50 +76,47 @@ export function InvestmentsForm({ registerSave, onDirty }: InvestmentsFormProps)
         (i) => (i.symbol.trim() || i.name.trim()) && !savedKeysRef.current.has(i.key),
       );
       if (validInvestments.length > 0 && portfolioName.trim()) {
-        try {
-          // Reuse existing portfolio if already created
-          if (!portfolioIdRef.current) {
-            const portfolio = await ipc<{ id: string }>("finance_portfolio_create", {
-              params: {
-                name: portfolioName.trim(),
-                description: null,
-                currency: null,
-              },
-            });
-            portfolioIdRef.current = portfolio?.id ?? null;
+        // Reuse existing portfolio if already created
+        if (!portfolioIdRef.current) {
+          const portfolio = await ipc<{ id: string }>("finance_portfolio_create", {
+            params: {
+              name: portfolioName.trim(),
+              description: null,
+              currency: null,
+            },
+          });
+          portfolioIdRef.current = portfolio?.id ?? null;
+        }
+        if (portfolioIdRef.current) {
+          const results = await Promise.allSettled(
+            validInvestments.map((inv) =>
+              ipc("finance_investment_create", {
+                params: {
+                  portfolioId: portfolioIdRef.current,
+                  assetType: inv.assetType,
+                  symbol: inv.symbol.trim() || null,
+                  name: inv.name.trim() || null,
+                  quantity: Number.parseFloat(inv.quantity) || 0,
+                  costBasis: inv.costBasis ? Math.round(Number.parseFloat(inv.costBasis) * 100) : 0,
+                  currency: null,
+                  purchaseDate: null,
+                  notes: null,
+                },
+              }),
+            ),
+          );
+          for (let i = 0; i < results.length; i++) {
+            if (results[i].status === "fulfilled")
+              savedKeysRef.current.add(validInvestments[i].key);
+            else
+              console.error(
+                "Failed to save investment:",
+                (results[i] as PromiseRejectedResult).reason,
+              );
           }
-          if (portfolioIdRef.current) {
-            const results = await Promise.allSettled(
-              validInvestments.map((inv) =>
-                ipc("finance_investment_create", {
-                  params: {
-                    portfolioId: portfolioIdRef.current,
-                    assetType: inv.assetType,
-                    symbol: inv.symbol.trim() || null,
-                    name: inv.name.trim() || null,
-                    quantity: Number.parseFloat(inv.quantity) || 0,
-                    costBasis: inv.costBasis
-                      ? Math.round(Number.parseFloat(inv.costBasis) * 100)
-                      : 0,
-                    currency: null,
-                    purchaseDate: null,
-                    notes: null,
-                  },
-                }),
-              ),
-            );
-            for (let i = 0; i < results.length; i++) {
-              if (results[i].status === "fulfilled")
-                savedKeysRef.current.add(validInvestments[i].key);
-              else
-                console.error(
-                  "Failed to save investment:",
-                  (results[i] as PromiseRejectedResult).reason,
-                );
-            }
-          }
-        } catch (e) {
-          console.error("Failed to save investments:", e);
+          const failCount = results.filter((r) => r.status === "rejected").length;
+          if (failCount > 0)
+            throw new Error(`Failed to save ${failCount} investment${failCount === 1 ? "" : "s"}`);
         }
       }
     });

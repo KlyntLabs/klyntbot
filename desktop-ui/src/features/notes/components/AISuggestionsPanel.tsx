@@ -50,7 +50,7 @@ export function AISuggestionsPanel({
       config.languagePair = { ...pair, [field]: code };
       ipc("note_update", {
         params: { id: noteId, perspectiveConfig: JSON.stringify(config) },
-      }).catch(() => {});
+      }).catch((e) => console.error("Failed to update language config:", e));
     },
     [noteId, perspectiveConfig, sourceLang, targetLang],
   );

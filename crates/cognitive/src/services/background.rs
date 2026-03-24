@@ -1095,6 +1095,7 @@ fn event_type_key(event: &DomainEvent) -> String {
         DomainEvent::KnowledgeTransferDetected { .. } => "KnowledgeTransferDetected".into(),
         DomainEvent::CoachingLearningDigest { .. } => "CoachingLearningDigest".into(),
         DomainEvent::FlashcardSessionCompleted { .. } => "FlashcardSessionCompleted".into(),
+        DomainEvent::InterventionTriggered { .. } => "InterventionTriggered".into(),
         DomainEvent::MemoryPendingConfirmation { .. } => "MemoryPendingConfirmation".into(),
     }
 }

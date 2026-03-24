@@ -74,17 +74,20 @@ export function LauncherChat({ sessionKey, initialQuery, onBack, onExpand }: Lau
     [chat.send],
   );
 
-  // Handle Cmd+/ to expand
+  // Handle Escape to go back and Cmd+/ to expand
   useEffect(() => {
-    const handleExpand = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "/") {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onBack();
+      } else if ((e.metaKey || e.ctrlKey) && e.key === "/") {
         e.preventDefault();
         onExpand();
       }
     };
-    window.addEventListener("keydown", handleExpand);
-    return () => window.removeEventListener("keydown", handleExpand);
-  }, [onExpand]);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onBack, onExpand]);
 
   return (
     <div className="flex flex-col" style={{ height: 568 }}>

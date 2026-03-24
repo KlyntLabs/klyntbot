@@ -63,13 +63,15 @@ export function DistractionOverlay() {
     if (!intervention) return;
     await ipc("distraction_dismiss", {
       appName: intervention.appName,
-    }).catch(() => {});
+    }).catch((e) => console.error("Failed to dismiss distraction:", e));
     await hideWindow();
   };
 
   const handleAllowTemp = async () => {
     if (!pattern) return;
-    await ipc("distraction_allow_temp", { pattern }).catch(() => {});
+    await ipc("distraction_allow_temp", { pattern }).catch((e) =>
+      console.error("Failed to allow temp:", e),
+    );
     await hideWindow();
   };
 
@@ -79,7 +81,7 @@ export function DistractionOverlay() {
       appName: intervention.appName,
       windowTitle: intervention.windowTitle,
       classification: verdict?.classification ?? "work_research",
-    }).catch(() => {});
+    }).catch((e) => console.error("Failed to allow session:", e));
     await hideWindow();
   };
 

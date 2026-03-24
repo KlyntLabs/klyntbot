@@ -185,7 +185,7 @@ export function MessageList({
         <div className="flex justify-start">
           <div className="glass-bubble px-4 py-3 flex items-center gap-2">
             <ThinkingDots size="sm" />
-            {statusPhase && <span className="text-xs text-muted">{statusPhase}</span>}
+            {statusPhase && <span className="text-xs text-muted-foreground">{statusPhase}</span>}
           </div>
         </div>
       )}

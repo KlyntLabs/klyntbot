@@ -365,6 +365,14 @@ pub enum DomainEvent {
         weakest_topic: Option<String>,
     },
 
+    // -- Productivity interventions --
+    InterventionTriggered {
+        intervention_type: String,
+        urgency: String,
+        message: String,
+        suggested_action: String,
+    },
+
     // -- Contradiction detection (Phase 3 prep) --
     ContradictionDetected {
         existing_subject: String,

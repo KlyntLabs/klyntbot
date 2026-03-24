@@ -260,7 +260,7 @@ export function WikiLinkMenu({ editor, currentNoteTitle }: WikiLinkMenuProps) {
           setState(null);
         }
       } catch (e) {
-        console.warn("Failed to create note from wiki-link:", e);
+        console.error("Failed to create note from wiki-link:", e);
       }
     },
     [editor, state, currentNoteTitle],

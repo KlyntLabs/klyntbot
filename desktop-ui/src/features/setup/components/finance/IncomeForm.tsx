@@ -54,17 +54,13 @@ export function IncomeForm({ registerSave, onDirty }: IncomeFormProps) {
 
   useEffect(() => {
     registerSave(async () => {
-      try {
-        const patch: Record<string, unknown> = {
-          budgeting: {
-            defaultMethod: method,
-            ...(method === "six_jar" ? { sixJarRatios: ratios } : {}),
-          },
-        };
-        await ipc("config_update_section", { section: "finance", patch });
-      } catch (e) {
-        console.error("Failed to save budgeting config:", e);
-      }
+      const patch: Record<string, unknown> = {
+        budgeting: {
+          defaultMethod: method,
+          ...(method === "six_jar" ? { sixJarRatios: ratios } : {}),
+        },
+      };
+      await ipc("config_update_section", { section: "finance", patch });
     });
   }, [method, ratios, registerSave]);
 

@@ -80,6 +80,9 @@ export function GoalsForm({ registerSave, onDirty }: GoalsFormProps) {
           if (results[i].status === "fulfilled") savedKeysRef.current.add(valid[i].key);
           else console.error("Failed to save goal:", (results[i] as PromiseRejectedResult).reason);
         }
+        const failCount = results.filter((r) => r.status === "rejected").length;
+        if (failCount > 0)
+          throw new Error(`Failed to save ${failCount} goal${failCount === 1 ? "" : "s"}`);
       }
     });
   }, [goals, registerSave]);

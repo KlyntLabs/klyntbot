@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AccountsForm } from "./finance/AccountsForm";
 import { FinanceBasicsForm } from "./finance/FinanceBasicsForm";
 import { FireForm } from "./finance/FireForm";
@@ -33,6 +33,7 @@ interface FinancePanelProps {
 export function FinancePanel({ onComplete }: FinancePanelProps) {
   const [subStep, setSubStep] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const subSaveMap = useRef<Map<number, () => Promise<void>>>(new Map());
 
   const makeRegisterSave = useCallback(
@@ -47,16 +48,33 @@ export function FinancePanel({ onComplete }: FinancePanelProps) {
     [makeRegisterSave],
   );
 
-  const markDirty = useCallback(() => {}, []); // No-op — panel doesn't need dirty tracking
+  const [isDirty, setIsDirty] = useState(false);
+  const markDirty = useCallback(() => setIsDirty(true), []);
+
+  // Warn on page leave when there are unsaved changes
+  useEffect(() => {
+    if (!isDirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isDirty]);
 
   const handleNext = async () => {
     setSaving(true);
+    setSaveError(null);
     try {
       const save = subSaveMap.current.get(subStep);
       await save?.();
-    } finally {
+    } catch (e) {
+      console.error("Failed to save finance step:", e);
+      setSaveError(e instanceof Error ? e.message : "Failed to save. Please try again.");
       setSaving(false);
+      return;
     }
+    setSaving(false);
+    setIsDirty(false);
 
     if (subStep < SUB_STEPS.length - 1) {
       setSubStep((s) => s + 1);
@@ -113,6 +131,9 @@ export function FinancePanel({ onComplete }: FinancePanelProps) {
       <div className={subStep !== 6 ? "hidden" : undefined}>
         <GoalsForm registerSave={registerSaves[6]} onDirty={markDirty} />
       </div>
+
+      {/* Error feedback */}
+      {saveError && <p className="text-xs text-destructive mt-4">{saveError}</p>}
 
       {/* Navigation */}
       <div className="flex items-center justify-between mt-6 pt-4 border-t border-border">

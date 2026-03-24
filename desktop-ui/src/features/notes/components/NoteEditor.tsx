@@ -444,6 +444,17 @@ export function NoteEditor({
     editor?.commands.focus();
   }, [editor]);
 
+  const handleAnnotationClick = useCallback(
+    (markId: string) => {
+      if (!editor) return;
+      const el = editor.view.dom.querySelector(
+        `.annotation-highlight[data-annotation-id="${markId}"]`,
+      );
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    },
+    [editor],
+  );
+
   // Build editor content class — add vim mode class when vim is enabled
   const editorContentClass = vimEnabled
     ? `flex-1 min-h-0 overflow-y-auto vim-${vimMode}`
@@ -530,6 +541,7 @@ export function NoteEditor({
                       deleteAnnotation={deleteAnnotation}
                       onClose={() => setSidePaneOpen(false)}
                       onSideNotesChange={handleSideNotesChange}
+                      onAnnotationClick={handleAnnotationClick}
                       sourceLang={sourceLang}
                       targetLang={targetLang}
                     />
