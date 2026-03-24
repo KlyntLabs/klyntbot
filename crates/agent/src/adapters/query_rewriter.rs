@@ -975,6 +975,54 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn active_view_flows_through_shared_state() {
+        use std::sync::Arc;
+
+        // Simulate the shared state pattern
+        let view_lock = Arc::new(tokio::sync::Mutex::new(None::<context_engine::ActiveView>));
+
+        // Initially None — rewriter should not inject view signals
+        let rewriter = ContextualQueryRewriter::heuristic_only();
+        let ctx_no_view = RetrievalContext::default();
+        let result = rewriter.rewrite("break this down", &ctx_no_view).await;
+        assert!(result.is_none(), "No context → no rewrite");
+
+        // Simulate frontend pushing a view
+        *view_lock.lock().await = Some(context_engine::ActiveView {
+            dashboard: "finance".into(),
+            focused_entity: Some("FIRE projection".into()),
+            description: Some("March 2026 FIRE projection with variance".into()),
+        });
+
+        // Read from shared state (same as runtime Step 5.5 would)
+        let view = view_lock.lock().await.clone();
+        let ctx_with_view = RetrievalContext {
+            active_view: view,
+            ..Default::default()
+        };
+        let result = rewriter.rewrite("break this down", &ctx_with_view).await;
+        assert!(result.is_some(), "View context should produce a rewrite");
+        let enriched = result.unwrap().enriched_query.to_lowercase();
+        assert!(
+            enriched.contains("fire projection"),
+            "Enriched query should include the focused entity, got: {enriched}"
+        );
+
+        // Simulate navigation away (clear view)
+        let view = {
+            let mut g = view_lock.lock().await;
+            *g = None;
+            g.clone()
+        };
+        let ctx_cleared = RetrievalContext {
+            active_view: view,
+            ..Default::default()
+        };
+        let result = rewriter.rewrite("break this down", &ctx_cleared).await;
+        assert!(result.is_none(), "Cleared view → no rewrite");
+    }
+
+    #[tokio::test]
     async fn deadline_pressure_triggers_aggressive_mode() {
         let rewriter = ContextualQueryRewriter::heuristic_only();
         let ctx = RetrievalContext {

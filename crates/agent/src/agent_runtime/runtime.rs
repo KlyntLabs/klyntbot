@@ -99,6 +99,8 @@ pub struct AgentRuntime {
     user_situation: Option<Arc<tokio::sync::Mutex<cognitive::situation::UserSituation>>>,
     /// Task repo for querying the focused task (active_task in RetrievalContext).
     task_repo: Option<storage::TaskRepo>,
+    /// Shared active desktop view for query rewriting context.
+    active_view: Option<Arc<tokio::sync::RwLock<Option<context_engine::ActiveView>>>>,
 }
 
 impl AgentRuntime {
@@ -134,6 +136,7 @@ impl AgentRuntime {
             autotuner_hook: None,
             user_situation: None,
             task_repo: None,
+            active_view: None,
         }
     }
 
@@ -207,6 +210,15 @@ impl AgentRuntime {
     /// Set the task repo for querying the focused task during query rewriting.
     pub fn with_task_repo(mut self, repo: storage::TaskRepo) -> Self {
         self.task_repo = Some(repo);
+        self
+    }
+
+    /// Set the shared active desktop view for RetrievalContext.
+    pub fn with_active_view(
+        mut self,
+        view: Arc<tokio::sync::RwLock<Option<context_engine::ActiveView>>>,
+    ) -> Self {
+        self.active_view = Some(view);
         self
     }
 
@@ -482,7 +494,11 @@ impl AgentRuntime {
                     active_task,
                     recent_user_messages,
                     situation,
-                    active_view: None,
+                    active_view: if let Some(ref view_lock) = self.active_view {
+                        view_lock.read().await.clone()
+                    } else {
+                        None
+                    },
                     recent_correction: correction,
                 })
             };

@@ -21,6 +21,7 @@ mod settings;
 mod squads;
 mod tasks;
 mod timeline;
+pub mod view;
 mod work_context;
 mod workspace;
 

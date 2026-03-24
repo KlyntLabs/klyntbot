@@ -662,6 +662,10 @@ fn run_desktop_app() {
             commands::autotuner::autotuner_set_pace,
             commands::autotuner::autotuner_get_toast_count,
             commands::autotuner::autotuner_increment_toast_count,
+            // Active View
+            commands::view::view_set_active,
+            commands::view::view_clear_active,
+            commands::view::view_get_active,
             // Window
             // Work Contexts
             commands::work_context::list_work_contexts,

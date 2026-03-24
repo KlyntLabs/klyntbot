@@ -72,6 +72,8 @@ pub struct AppCore {
     pub feedback_tracker: Option<Arc<Mutex<FeedbackTracker>>>,
     pub coaching_intervention_log_repo: Option<storage::CoachingInterventionLogRepo>,
     pub user_situation: Option<Arc<Mutex<UserSituation>>>,
+    /// Shared active desktop view for query rewriting context.
+    pub active_view: Option<Arc<RwLock<Option<context_engine::ActiveView>>>>,
     pub coaching_service: Option<Arc<Mutex<feature_coaching::CoachingService>>>,
     /// Cognitive LLM provider — shared across reflection, cron, and status reporting.
     pub cognitive_provider: Option<providers::DynProvider>,

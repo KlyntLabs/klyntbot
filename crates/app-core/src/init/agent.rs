@@ -16,6 +16,7 @@ pub(super) struct AgentResult {
     pub inbound_rx: mpsc::Receiver<bus::InboundMessage>,
     pub pipeline_broadcast_tx: tokio::sync::broadcast::Sender<cognitive::PipelineEvent>,
     pub user_situation: Arc<Mutex<UserSituation>>,
+    pub active_view: Arc<tokio::sync::RwLock<Option<context_engine::ActiveView>>>,
     pub activity_svc: Arc<activity_log::ActivityIngestionService>,
 }
 
@@ -63,6 +64,11 @@ pub(super) async fn init_agent(
     // situational_boost in memory retrieval.
     let user_situation = Arc::new(Mutex::new(UserSituation::default()));
 
+    // Pre-create active view (None until frontend pushes a view).
+    // Shared with AgentRuntime for RetrievalContext.active_view.
+    let active_view: Arc<tokio::sync::RwLock<Option<context_engine::ActiveView>>> =
+        Arc::new(tokio::sync::RwLock::new(None));
+
     // 8. Build AgentLoop
     let (pipeline_broadcast_tx, _) =
         tokio::sync::broadcast::channel::<cognitive::PipelineEvent>(256);
@@ -82,7 +88,8 @@ pub(super) async fn init_agent(
         .with_cognitive_provider(cognitive_provider.clone())
         .with_pipeline_tx(pipeline_tx)
         .with_user_situation(user_situation.clone())
-        .with_activity_service(Arc::clone(&activity_svc));
+        .with_activity_service(Arc::clone(&activity_svc))
+        .with_active_view(active_view.clone());
 
     if let Some(vs) = vector_store {
         builder = builder.with_vector_store(vs);
@@ -109,6 +116,7 @@ pub(super) async fn init_agent(
         inbound_rx,
         pipeline_broadcast_tx,
         user_situation,
+        active_view,
         activity_svc,
     })
 }

@@ -168,6 +168,7 @@ impl AppCore {
             inbound_rx,
             pipeline_broadcast_tx,
             user_situation,
+            active_view,
             activity_svc,
         } = agent::init_agent(
             &config,
@@ -273,6 +274,7 @@ impl AppCore {
             feedback_tracker,
             coaching_intervention_log_repo,
             user_situation: Some(user_situation),
+            active_view: Some(active_view),
             coaching_service: coaching_service.map(|cs| Arc::new(Mutex::new(cs))),
             cognitive_provider,
             pipeline_broadcast: Some(pipeline_broadcast_tx),

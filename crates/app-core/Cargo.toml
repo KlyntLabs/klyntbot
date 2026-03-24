@@ -12,6 +12,7 @@ channels = { workspace = true }
 cognitive = { workspace = true }
 common = { workspace = true }
 config = { workspace = true }
+context_engine = { workspace = true }
 feature-coaching = { workspace = true }
 feature-finance = { workspace = true }
 feature-insights = { workspace = true }

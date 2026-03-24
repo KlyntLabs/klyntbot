@@ -1,4 +1,5 @@
 import { SidebarChat } from "@shared/components/chat/SidebarChat";
+import { useActiveView } from "@shared/hooks/useActiveView";
 import { useEvent } from "@shared/hooks/useEvent";
 import { ipc } from "@shared/hooks/useIpc";
 import type { AppInfoResponse, SidebarItem } from "@shared/types";
@@ -14,6 +15,9 @@ export function AppShell() {
   const [setupState, setSetupState] = useState<"loading" | "needed" | "ready">("loading");
 
   const isOnChatPage = location.pathname.startsWith("/chat");
+
+  // Push active view to backend for contextual query rewriting
+  useActiveView();
 
   useEffect(() => {
     let cancelled = false;

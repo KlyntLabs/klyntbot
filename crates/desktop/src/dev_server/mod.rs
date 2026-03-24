@@ -223,6 +223,7 @@ mod tests {
             commands::knowledge_health::DEV_COMMANDS,
             commands::morning_briefing::DEV_COMMANDS,
             commands::retention_history::DEV_COMMANDS,
+            commands::view::DEV_COMMANDS,
         ];
         // chat_send is handled inline in dev_server.rs
         let mut set: BTreeSet<String> = modules

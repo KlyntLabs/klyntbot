@@ -536,7 +536,6 @@ pub async fn relay_chat_stream(
                         );
                         let meta_value = serde_json::Value::Object(meta);
                         if let Some(ref mid) = message_id {
-                            // Targeted update by message ID — no race condition
                             if let Err(e) = repos.sessions.update_assistant_metadata_by_id(
                                 mid, None, Some(&meta_value),
                             ).await {
