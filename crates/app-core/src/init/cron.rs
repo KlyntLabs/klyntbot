@@ -794,105 +794,74 @@ async fn ensure_cron_jobs(
         .map(|j| j.name)
         .collect();
 
+    // System = protected (can't edit/delete), User = fully editable in the UI.
+    // Creates the job if missing, or fixes origin if it was previously different.
     macro_rules! ensure_job {
-        ($name:expr, $schedule:expr, $msg:expr) => {
+        ($name:expr, $schedule:expr, $msg:expr, $origin:expr) => {
             if !existing.contains($name) {
                 cron_service
-                    .add_job(
-                        $name,
-                        $schedule,
-                        $msg,
-                        false,
-                        None,
-                        None,
-                        false,
-                        scheduling::CronOrigin::System,
-                    )
+                    .add_job($name, $schedule, $msg, false, None, None, false, $origin)
                     .await?;
+            } else {
+                cron_service.set_origin($name, $origin).await;
             }
         };
     }
+    let user = scheduling::CronOrigin::User;
+    let system = scheduling::CronOrigin::System;
+
+    // ── User-editable jobs (notifications, checks, user-facing features) ──
 
     ensure_job!(
         JOB_FOCUS_CHECK,
-        scheduling::CronSchedule::Every {
-            every_ms: 30 * 60 * 1000,
-        },
-        "Check focus task deadlines"
+        scheduling::CronSchedule::Every { every_ms: 30 * 60 * 1000 },
+        "Check focus task deadlines",
+        user.clone()
     );
     ensure_job!(
         JOB_DAILY_DIGEST,
-        scheduling::CronSchedule::Cron {
-            expr: "0 9 * * *".to_string(),
-            tz: None,
-        },
-        "Daily task summary"
+        scheduling::CronSchedule::Cron { expr: "0 9 * * *".to_string(), tz: None },
+        "Daily task summary",
+        user.clone()
     );
     ensure_job!(
         JOB_OVERDUE_CHECK,
-        scheduling::CronSchedule::Every {
-            every_ms: 60 * 60 * 1000,
-        },
-        "Check for overdue focus tasks"
+        scheduling::CronSchedule::Every { every_ms: 60 * 60 * 1000 },
+        "Check for overdue focus tasks",
+        user.clone()
     );
     ensure_job!(
         JOB_WEEKLY_REPORT,
-        scheduling::CronSchedule::Cron {
-            expr: "0 18 * * 0".to_string(),
-            tz: None,
-        },
-        "Generate weekly progress report"
+        scheduling::CronSchedule::Cron { expr: "0 18 * * 0".to_string(), tz: None },
+        "Generate weekly progress report",
+        user.clone()
     );
 
-    // Daily planning
     if config.todo.daily_planning.enabled {
         if let Some(cron_expr) = parse_time_to_cron(&config.todo.daily_planning.planning_time) {
             ensure_job!(
                 JOB_DAILY_PLANNING,
-                scheduling::CronSchedule::Cron {
-                    expr: cron_expr,
-                    tz: None,
-                },
-                "Generate daily planning notification"
+                scheduling::CronSchedule::Cron { expr: cron_expr, tz: None },
+                "Generate daily planning notification",
+                user.clone()
             );
         }
     }
 
-    // Weekly cognitive reflection
-    {
-        let reflection_schedule = config
-            .cognitive
-            .reflection_schedule
-            .as_deref()
-            .unwrap_or("0 9 * * 1"); // Monday 9am default
-        ensure_job!(
-            JOB_WEEKLY_REFLECTION,
-            scheduling::CronSchedule::Cron {
-                expr: reflection_schedule.to_string(),
-                tz: Some(config.timezone.clone()),
-            },
-            "Weekly cognitive reflection"
-        );
-    }
-
-    // Finance cron jobs
     if config.finance.enabled && config.finance.proactivity_level != "reactive" {
         if let Some(cron_expr) = parse_time_to_cron(&config.finance.scheduling.daily_review_time) {
             ensure_job!(
                 JOB_FINANCE_DAILY_REVIEW,
-                scheduling::CronSchedule::Cron {
-                    expr: cron_expr,
-                    tz: None,
-                },
-                "Daily financial review"
+                scheduling::CronSchedule::Cron { expr: cron_expr, tz: None },
+                "Daily financial review",
+                user.clone()
             );
         }
         ensure_job!(
             JOB_FINANCE_BUDGET_CHECK,
-            scheduling::CronSchedule::Every {
-                every_ms: 6 * 60 * 60 * 1000,
-            },
-            "Check budget thresholds"
+            scheduling::CronSchedule::Every { every_ms: 6 * 60 * 60 * 1000 },
+            "Check budget thresholds",
+            user.clone()
         );
         if config.finance.price_refresh.enabled {
             ensure_job!(
@@ -900,62 +869,85 @@ async fn ensure_cron_jobs(
                 scheduling::CronSchedule::Every {
                     every_ms: config.finance.price_refresh.interval_hours as u64 * 60 * 60 * 1000,
                 },
-                "Refresh investment prices"
+                "Refresh investment prices",
+                user.clone()
             );
         }
         ensure_job!(
             JOB_FINANCE_HEALTH_CHECK,
-            scheduling::CronSchedule::Cron {
-                expr: "0 0 * * *".to_string(),
-                tz: None,
-            },
-            "Finance data health check"
+            scheduling::CronSchedule::Cron { expr: "0 0 * * *".to_string(), tz: None },
+            "Finance data health check",
+            user.clone()
         );
     }
 
-    // Daily atom decay (3 AM local)
-    ensure_job!(
-        JOB_ATOM_DECAY,
-        scheduling::CronSchedule::Cron {
-            expr: "0 3 * * *".to_string(),
-            tz: Some(config.timezone.clone()),
-        },
-        "Daily knowledge atom decay"
-    );
-
-    // Morning knowledge health briefing (9 AM local)
     ensure_job!(
         JOB_MORNING_BRIEFING,
         scheduling::CronSchedule::Cron {
             expr: "0 9 * * *".to_string(),
             tz: Some(config.timezone.clone()),
         },
-        "Morning knowledge health briefing"
+        "Morning knowledge health briefing",
+        user.clone()
     );
-
-    // Weekly knowledge health digest (Sunday 6 PM local)
     ensure_job!(
         JOB_WEEKLY_KNOWLEDGE_DIGEST,
         scheduling::CronSchedule::Cron {
             expr: "0 18 * * 0".to_string(),
             tz: Some(config.timezone.clone()),
         },
-        "Weekly knowledge health digest"
+        "Weekly knowledge health digest",
+        user.clone()
     );
 
-    // Proactive suggestion scan (every 4 hours)
     if tasks_config.proactive_suggestions {
         ensure_job!(
             JOB_PROACTIVE_SCAN,
-            scheduling::CronSchedule::Cron {
-                expr: "0 */4 * * *".to_string(),
-                tz: None,
-            },
-            "Proactive task suggestion scan"
+            scheduling::CronSchedule::Cron { expr: "0 */4 * * *".to_string(), tz: None },
+            "Proactive task suggestion scan",
+            user.clone()
         );
     }
 
-    // Autotuner nightly evaluation cycle
+    ensure_job!(
+        JOB_REMINDER_CHECK,
+        scheduling::CronSchedule::Every { every_ms: 5 * 60 * 1000 },
+        "Check task due dates and send reminders",
+        user.clone()
+    );
+    ensure_job!(
+        JOB_RECURRING_TASKS,
+        scheduling::CronSchedule::Every { every_ms: 60 * 1000 },
+        "Spawn recurring task instances from templates",
+        user.clone()
+    );
+    ensure_job!(
+        JOB_INSIGHT_REFRESH,
+        scheduling::CronSchedule::Every { every_ms: 24 * 60 * 60 * 1000 },
+        "Refresh insight progress snapshots",
+        user.clone()
+    );
+
+    // ── Protected system jobs (AI background work, infrastructure) ────────
+
+    // Weekly cognitive reflection
+    {
+        let reflection_schedule = config
+            .cognitive
+            .reflection_schedule
+            .as_deref()
+            .unwrap_or("0 9 * * 1");
+        ensure_job!(
+            JOB_WEEKLY_REFLECTION,
+            scheduling::CronSchedule::Cron {
+                expr: reflection_schedule.to_string(),
+                tz: Some(config.timezone.clone()),
+            },
+            "Weekly cognitive reflection",
+            system.clone()
+        );
+    }
+
     if config.autotuner.enabled {
         agent::autotuner::AutoTunerOrchestrator::ensure_nightly_job(
             cron_service,
@@ -964,69 +956,43 @@ async fn ensure_cron_jobs(
         .await?;
     }
 
-    // ── Background service cron jobs ──────────────────────────────────────
-
-    // Session cleanup (default: every 6 hours)
+    ensure_job!(
+        JOB_ATOM_DECAY,
+        scheduling::CronSchedule::Cron {
+            expr: "0 3 * * *".to_string(),
+            tz: Some(config.timezone.clone()),
+        },
+        "Daily knowledge atom decay",
+        system.clone()
+    );
     ensure_job!(
         JOB_SESSION_CLEANUP,
         scheduling::CronSchedule::Every {
             every_ms: config.conversation.session.cleanup_interval_hours as u64 * 60 * 60 * 1000,
         },
-        "Delete stale sessions"
+        "Delete stale sessions",
+        system.clone()
     );
-
-    // Memory maintenance (default: every 12 hours)
     ensure_job!(
         JOB_MEMORY_MAINTENANCE,
         scheduling::CronSchedule::Every {
             every_ms: config.conversation.memory.maintenance_interval_hours as u64 * 60 * 60 * 1000,
         },
-        "Prune old conversation embeddings"
+        "Prune old conversation embeddings",
+        system.clone()
     );
 
-    // Analytics retention cleanup (daily)
     ensure_job!(
         JOB_ANALYTICS_CLEANUP,
-        scheduling::CronSchedule::Every {
-            every_ms: 24 * 60 * 60 * 1000,
-        },
-        "Clean old analytics records and prune low-salience facts"
+        scheduling::CronSchedule::Every { every_ms: 24 * 60 * 60 * 1000 },
+        "Clean old analytics records and prune low-salience facts",
+        system.clone()
     );
-
-    // Reminder check (every 5 minutes)
-    ensure_job!(
-        JOB_REMINDER_CHECK,
-        scheduling::CronSchedule::Every {
-            every_ms: 5 * 60 * 1000,
-        },
-        "Check task due dates and send reminders"
-    );
-
-    // Recurring task spawner (every 60 seconds)
-    ensure_job!(
-        JOB_RECURRING_TASKS,
-        scheduling::CronSchedule::Every {
-            every_ms: 60 * 1000,
-        },
-        "Spawn recurring task instances from templates"
-    );
-
-    // Insight progress refresh (daily)
-    ensure_job!(
-        JOB_INSIGHT_REFRESH,
-        scheduling::CronSchedule::Every {
-            every_ms: 24 * 60 * 60 * 1000,
-        },
-        "Refresh insight progress snapshots"
-    );
-
-    // Learning analysis (configurable interval)
     ensure_job!(
         JOB_LEARNING_ANALYSIS,
-        scheduling::CronSchedule::Every {
-            every_ms: config.learning.analysis_interval_secs * 1000,
-        },
-        "Analyze tool outcomes and adapt confidence threshold"
+        scheduling::CronSchedule::Every { every_ms: config.learning.analysis_interval_secs * 1000 },
+        "Analyze tool outcomes and adapt confidence threshold",
+        system
     );
 
     Ok(())

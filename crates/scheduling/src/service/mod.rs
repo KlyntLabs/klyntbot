@@ -482,6 +482,19 @@ impl CronService {
         }
     }
 
+    /// Update the origin of a job by name (no-op if not found or already matches).
+    pub async fn set_origin(&self, name: &str, origin: CronOrigin) {
+        let mut store = self.store.write().await;
+        if let Some(job) = store.jobs.iter_mut().find(|j| j.name == name) {
+            if job.origin != origin {
+                job.origin = origin;
+                job.updated_at_ms = now_ms();
+            }
+        }
+        drop(store);
+        let _ = self.save_store().await;
+    }
+
     /// Get service status
     pub async fn status(&self) -> crate::types::CronServiceStatus {
         let store = self.store.read().await;
