@@ -73,7 +73,7 @@ impl FeaturePackage for TasksFeature {
     fn migrations(&self) -> Vec<FeatureMigration> {
         vec![FeatureMigration {
             feature_name: "tasks".to_string(),
-            version: 1,
+            version: 2,
             description: "Create agentic task tables".to_string(),
             sql: Self::migration_sql().to_string(),
         }]
@@ -128,7 +128,7 @@ mod tests {
         let migrations = feature.migrations();
         assert_eq!(migrations.len(), 1);
         assert_eq!(migrations[0].feature_name, "tasks");
-        assert_eq!(migrations[0].version, 1);
+        assert_eq!(migrations[0].version, 2);
     }
 
     #[test]

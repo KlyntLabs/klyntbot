@@ -56,6 +56,8 @@ pub struct Task {
     pub actual_minutes: Option<i32>,
     pub complexity_score: Option<i32>,
     pub completed: bool,
+    pub scheduled_start: Option<DateTime<Utc>>,
+    pub scheduled_end: Option<DateTime<Utc>>,
     // Derived fields (populated by handlers, not stored)
     #[serde(default)]
     pub subtask_count: i64,
@@ -121,6 +123,8 @@ impl Task {
             actual_minutes: None,
             complexity_score: None,
             completed: false,
+            scheduled_start: None,
+            scheduled_end: None,
             subtask_count: 0,
             subtask_completed_count: 0,
             attachments: Vec::new(),
@@ -195,6 +199,8 @@ impl From<TaskRow> for Task {
             actual_minutes: row.actual_minutes,
             complexity_score: row.complexity_score,
             completed: row.completed,
+            scheduled_start: row.scheduled_start,
+            scheduled_end: row.scheduled_end,
             subtask_count: 0,
             subtask_completed_count: 0,
             attachments: Vec::new(),
@@ -254,6 +260,8 @@ impl From<&Task> for TaskRow {
             actual_minutes: task.actual_minutes,
             complexity_score: task.complexity_score,
             completed: task.completed,
+            scheduled_start: task.scheduled_start,
+            scheduled_end: task.scheduled_end,
         }
     }
 }

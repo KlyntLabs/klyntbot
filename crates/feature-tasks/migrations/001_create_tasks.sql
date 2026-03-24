@@ -47,7 +47,9 @@ CREATE TABLE IF NOT EXISTS tasks (
     context_snapshot     TEXT,
     energy_level         TEXT DEFAULT 'medium',
     estimated_focus_blocks INTEGER,
-    complexity_score     INTEGER
+    complexity_score     INTEGER,
+    scheduled_start      TEXT,
+    scheduled_end        TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);

@@ -47,6 +47,8 @@ pub fn row_to_task_response(
         focused_at: row.focused_at.map(|dt| dt.to_rfc3339()),
         created_at: Some(row.created_at.to_rfc3339()),
         updated_at: Some(row.updated_at.to_rfc3339()),
+        scheduled_start: row.scheduled_start.map(|dt| dt.to_rfc3339()),
+        scheduled_end: row.scheduled_end.map(|dt| dt.to_rfc3339()),
     }
 }
 

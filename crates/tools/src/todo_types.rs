@@ -316,6 +316,8 @@ impl From<&Action> for TaskRow {
             complexity_score: None,
             completed: action.status == ActionStatus::Done,
             objective_id: None,
+            scheduled_start: None,
+            scheduled_end: None,
         }
     }
 }

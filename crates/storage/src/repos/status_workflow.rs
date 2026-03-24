@@ -480,7 +480,9 @@ mod tests {
                 context_snapshot TEXT,
                 energy_level TEXT DEFAULT 'medium',
                 estimated_focus_blocks INTEGER,
-                complexity_score INTEGER
+                complexity_score INTEGER,
+                scheduled_start TEXT,
+                scheduled_end TEXT
             )",
         )
         .execute(pool.inner())
@@ -626,6 +628,8 @@ mod tests {
             complexity_score: None,
             completed: false,
             objective_id: None,
+            scheduled_start: None,
+            scheduled_end: None,
         };
         let inserted = repos.tasks.add(&task_row).await.unwrap();
         assert_eq!(inserted.status_label_id, Some(todo_label.id.clone()));

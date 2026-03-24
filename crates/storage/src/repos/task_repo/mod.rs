@@ -75,6 +75,8 @@ pub struct TaskPatch {
     pub completed: Option<bool>,
     pub actual_minutes: Option<Option<i32>>,
     pub objective_id: Option<Option<String>>,
+    pub scheduled_start: Option<Option<DateTime<Utc>>>,
+    pub scheduled_end: Option<Option<DateTime<Utc>>>,
 }
 
 /// A time entry joined with the parent task's title, for timeline display.

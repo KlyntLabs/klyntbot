@@ -51,6 +51,8 @@ pub struct TaskRow {
     pub complexity_score: Option<i32>,
     pub completed: bool,
     pub objective_id: Option<String>,
+    pub scheduled_start: Option<DateTime<Utc>>,
+    pub scheduled_end: Option<DateTime<Utc>>,
 }
 
 /// Row struct for the `task_activity` table.

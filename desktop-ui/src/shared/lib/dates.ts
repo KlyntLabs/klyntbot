@@ -174,6 +174,14 @@ export function minutesSinceMidnight(isoStr: string): number {
   return d.getHours() * 60 + d.getMinutes();
 }
 
+/** Inverse of minutesSinceMidnight: convert a date string + minutes to an ISO UTC datetime. */
+export function minutesToIso(date: string, minutes: number): string {
+  const clamped = Math.max(0, Math.min(1440, minutes));
+  const h = Math.floor(clamped / 60);
+  const m = Math.floor(clamped % 60);
+  return `${date}T${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:00Z`;
+}
+
 /** Format an ISO timestamp as a compact relative time (e.g. "now", "5m", "3h", "2d", "1w", "3mo"). */
 export function formatRelativeTime(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();

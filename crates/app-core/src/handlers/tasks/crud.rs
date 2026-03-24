@@ -139,6 +139,8 @@ impl AppCore {
             complexity_score: None,
             completed: false,
             objective_id: None,
+            scheduled_start: None,
+            scheduled_end: None,
         };
 
         let created = self.repos.tasks.add(&row).await.map_err(map_storage_err)?;
@@ -201,6 +203,12 @@ impl AppCore {
             energy_level: params.energy_level.map(Some),
             execution_state: params.execution_state,
             estimated_minutes: params.estimated_minutes,
+            scheduled_start: params
+                .scheduled_start
+                .map(|opt| opt.and_then(|d| common::parse_datetime(&d, "UTC"))),
+            scheduled_end: params
+                .scheduled_end
+                .map(|opt| opt.and_then(|d| common::parse_datetime(&d, "UTC"))),
             ..Default::default()
         };
 

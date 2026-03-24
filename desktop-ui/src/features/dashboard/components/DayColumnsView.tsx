@@ -11,11 +11,14 @@ import type {
 } from "@shared/types";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTimelineDrag } from "../hooks/useTimelineDrag";
 import { type LayerKey, useEnabledLayers, useSidebarOpen } from "../lib/layers";
 import { computeOverlapLayout } from "../lib/timeline-utils";
 import { ActivityTrack, type SessionBlock } from "./ActivityTrack";
 import { CalendarTrack } from "./CalendarTrack";
 import { ContextRibbon } from "./ContextRibbon";
+import { DraggableTaskBlock } from "./DraggableTaskBlock";
+import { DueTodayTray } from "./DueTodayTray";
 import { ActivityFeed } from "./productivity/ActivityFeed";
 import { SummaryPanel } from "./SummaryPanel";
 
@@ -204,6 +207,28 @@ export function DayColumnsView({
     setHourHeight(DEFAULT_HOUR_HEIGHT);
   }, []);
 
+  // Timeline drag-and-drop for task scheduling
+  const {
+    drag: timelineDrag,
+    ghost,
+    isDragging,
+    startMove,
+    startResize,
+    startTrayDrag,
+    onMouseMove: onDragMouseMove,
+    onMouseUp: onDragMouseUp,
+  } = useTimelineDrag(date, pxPerMin);
+
+  useEffect(() => {
+    if (!isDragging) return;
+    document.addEventListener("mousemove", onDragMouseMove);
+    document.addEventListener("mouseup", onDragMouseUp);
+    return () => {
+      document.removeEventListener("mousemove", onDragMouseMove);
+      document.removeEventListener("mouseup", onDragMouseUp);
+    };
+  }, [isDragging, onDragMouseMove, onDragMouseUp]);
+
   // Group entries by column (skip activity — it has its own track) and compute overlap layouts
   const { columnEntries, columnLayouts } = useMemo(() => {
     const entryMap = new Map<LayerKey, TimelineEntry[]>();
@@ -223,6 +248,23 @@ export function DayColumnsView({
     }
     return { columnEntries: entryMap, columnLayouts: layoutMap };
   }, [entries]);
+
+  // Split task entries into scheduled (timeline blocks) and unscheduled (tray chips)
+  const { scheduledTaskEntries, trayTaskEntries } = useMemo(() => {
+    const taskEntries = columnEntries.get("tasks") ?? [];
+    const scheduled: TimelineEntry[] = [];
+    const tray: TimelineEntry[] = [];
+    for (const entry of taskEntries) {
+      if (entry.entryType === "taskDue") {
+        const meta = entry.metadata as Record<string, unknown> | undefined;
+        if (meta?.scheduled === true) scheduled.push(entry);
+        else tray.push(entry);
+      } else {
+        scheduled.push(entry); // taskCreated, taskCompleted
+      }
+    }
+    return { scheduledTaskEntries: scheduled, trayTaskEntries: tray };
+  }, [columnEntries]);
 
   // Only show columns whose layer is enabled
   const visibleColumns = useMemo(() => COLUMNS.filter((col) => enabled.has(col.key)), [enabled]);
@@ -396,6 +438,66 @@ export function DayColumnsView({
                           } as TimelineEntry)
                         }
                       />
+                    </div>
+                  );
+                }
+
+                // Tasks column: split into tray (unscheduled) and draggable blocks (scheduled)
+                if (col.key === "tasks") {
+                  const layouts = columnLayouts.get(col.key);
+                  return (
+                    <div
+                      key={col.key}
+                      className="relative border-r border-border last:border-r-0 min-w-0 flex flex-col"
+                    >
+                      <DueTodayTray
+                        entries={trayTaskEntries}
+                        onStartDrag={startTrayDrag}
+                        onSelect={handleSelectEntry}
+                        selectedEntryId={selectedEntry?.id ?? null}
+                      />
+                      <div className="relative flex-1">
+                        {scheduledTaskEntries.map((entry) => {
+                          const meta = entry.metadata as Record<string, unknown> | undefined;
+                          const isScheduled = meta?.scheduled === true;
+                          const taskId = (meta?.taskId as string) ?? entry.entityId ?? entry.id;
+                          const startMin = minutesSinceMidnight(entry.startedAt);
+                          const dur = entry.durationSecs ?? 0;
+                          const endMin = dur > 0 ? startMin + dur / 60 : startMin + 30;
+                          const isThisDragging = isDragging && timelineDrag?.taskId === taskId;
+
+                          if (isScheduled) {
+                            return (
+                              <DraggableTaskBlock
+                                key={entry.id}
+                                entry={entry}
+                                pxPerMin={pxPerMin}
+                                selected={selectedEntry?.id === entry.id}
+                                layout={layouts?.get(entry.id)}
+                                isDragging={isThisDragging}
+                                ghostTopMin={isThisDragging ? ghost?.topMin : undefined}
+                                ghostEndMin={isThisDragging ? ghost?.endMin : undefined}
+                                onMouseDownMove={(e) => startMove(e, taskId, startMin, endMin)}
+                                onMouseDownResize={(e) => startResize(e, taskId, startMin, endMin)}
+                                onClick={() => handleSelectEntry(entry)}
+                              />
+                            );
+                          }
+
+                          // taskCreated, taskCompleted — regular ColumnEntry
+                          return (
+                            <ColumnEntry
+                              key={entry.id}
+                              entry={entry}
+                              column={col}
+                              pxPerMin={pxPerMin}
+                              selected={selectedEntry?.id === entry.id}
+                              onClick={() => handleSelectEntry(entry)}
+                              layout={layouts?.get(entry.id)}
+                            />
+                          );
+                        })}
+                      </div>
                     </div>
                   );
                 }

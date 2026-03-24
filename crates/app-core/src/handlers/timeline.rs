@@ -351,8 +351,31 @@ fn normalize_task(t: storage::TaskRow, start: &str, end: &str) -> Vec<TimelineEn
     let end_bound = format!("{end}T23:59:59Z");
     let task_route = format!("/task/{}", t.id);
 
-    // Task due on this date
-    if let Some(ref due) = t.due_date {
+    // Scheduled task — full time block
+    if let (Some(ref sched_start), Some(ref sched_end)) = (&t.scheduled_start, &t.scheduled_end) {
+        let start_str = sched_start.to_rfc3339();
+        let end_str = sched_end.to_rfc3339();
+        let duration = (*sched_end - *sched_start).num_seconds();
+        out.push(TimelineEntry {
+            id: format!("{}-scheduled", t.id),
+            source: TimelineSource::Todo,
+            entry_type: TimelineEntryType::TaskDue,
+            title: t.title.clone(),
+            description: t.description.clone(),
+            started_at: start_str,
+            ended_at: Some(end_str),
+            duration_secs: Some(duration),
+            entity_id: Some(t.id.clone()),
+            entity_route: Some(task_route.clone()),
+            color: "var(--timeline-todo)".into(),
+            metadata: Some(serde_json::json!({
+                "scheduled": true,
+                "taskId": t.id,
+                "status": t.status,
+                "priority": t.priority,
+            })),
+        });
+    } else if let Some(ref due) = t.due_date {
         let due_str = due.to_rfc3339();
         if due_str >= start_bound && due_str <= end_bound {
             out.push(TimelineEntry {
@@ -368,6 +391,8 @@ fn normalize_task(t: storage::TaskRow, start: &str, end: &str) -> Vec<TimelineEn
                 entity_route: Some(task_route.clone()),
                 color: "var(--timeline-todo)".into(),
                 metadata: Some(serde_json::json!({
+                    "scheduled": false,
+                    "taskId": t.id,
                     "status": t.status,
                     "priority": t.priority,
                 })),

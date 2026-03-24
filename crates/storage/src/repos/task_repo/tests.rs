@@ -53,7 +53,9 @@ async fn create_test_tables(db: &sqlx::SqlitePool) {
                 context_snapshot     TEXT,
                 energy_level         TEXT DEFAULT 'medium',
                 estimated_focus_blocks INTEGER,
-                complexity_score     INTEGER
+                complexity_score     INTEGER,
+                scheduled_start      TEXT,
+                scheduled_end        TEXT
             )
             "#,
     )
@@ -277,6 +279,8 @@ fn make_task(id: &str, title: &str) -> TaskRow {
         complexity_score: None,
         completed: false,
         objective_id: None,
+        scheduled_start: None,
+        scheduled_end: None,
     }
 }
 

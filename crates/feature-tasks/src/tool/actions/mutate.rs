@@ -68,6 +68,20 @@ impl TaskTool {
             completed: None,
             actual_minutes: None,
             objective_id: p.optional_str("objective_id")?.map(|s| Some(s.to_string())),
+            scheduled_start: p.optional_str("scheduled_start")?.map(|s| {
+                if s.is_empty() || s == "null" {
+                    None
+                } else {
+                    common::parse_datetime(s, &self.timezone)
+                }
+            }),
+            scheduled_end: p.optional_str("scheduled_end")?.map(|s| {
+                if s.is_empty() || s == "null" {
+                    None
+                } else {
+                    common::parse_datetime(s, &self.timezone)
+                }
+            }),
         };
 
         match self.repo.update(&patch).await {

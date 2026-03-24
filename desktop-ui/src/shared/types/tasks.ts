@@ -31,6 +31,8 @@ export interface Task {
   focusedAt?: string;
   createdAt?: string;
   updatedAt?: string;
+  scheduledStart: string | null;
+  scheduledEnd: string | null;
 }
 
 export interface TodayTask {
@@ -148,6 +150,8 @@ export interface TaskUpdateParams {
   energyLevel?: "low" | "medium" | "high" | "deep";
   executionState?: "idle" | "queued" | "running" | "paused" | "completed" | "failed";
   estimatedMinutes?: number | null;
+  scheduledStart?: string | null;
+  scheduledEnd?: string | null;
 }
 
 export interface TaskCreateParams {

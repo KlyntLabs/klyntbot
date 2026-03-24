@@ -95,6 +95,8 @@ mod tests {
             actual_minutes: None,
             complexity_score: Some(3),
             completed: false,
+            scheduled_start: None,
+            scheduled_end: None,
         };
 
         let task = Task::from(row);

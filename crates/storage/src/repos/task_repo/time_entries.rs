@@ -151,8 +151,9 @@ impl TaskRepo {
                 (due_date >= ?1 AND due_date < ?2)
                 OR (created_at >= ?1 AND created_at < ?2)
                 OR (completed_at >= ?1 AND completed_at < ?2)
+                OR (scheduled_start < ?2 AND scheduled_end > ?1)
             )
-            ORDER BY COALESCE(due_date, created_at) ASC
+            ORDER BY COALESCE(scheduled_start, due_date, created_at) ASC
             "#,
         )
         .bind(&start_bound)
