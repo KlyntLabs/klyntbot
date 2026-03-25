@@ -11,6 +11,26 @@ pub struct MirrorState {
     pub pending_snippets: Vec<NarrativeSnippet>,
     pub active_meta_rules: Vec<MetaRule>,
     pub pending_meta_rules: Vec<MetaRule>,
+    pub latest_brain_version: Option<BrainVersion>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrainVersion {
+    pub version: u32,
+    pub trial_id: Option<String>,
+    pub promoted_at: DateTime<Utc>,
+    pub params: serde_json::Value,
+    pub reason: String,
+    pub parent_version: Option<u32>,
+    pub metrics_at_promotion: serde_json::Value,
+    pub reverted: bool,
+}
+
+#[async_trait::async_trait]
+pub trait AutotunerBridge: Send + Sync {
+    async fn apply_champion(&self, params: serde_json::Value, reason: String) -> common::Result<()>;
+    async fn current_champion_params(&self) -> common::Result<serde_json::Value>;
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -98,6 +118,7 @@ pub enum SuggestedAction {
     ViewDetails,
     ApproveMetaRule { rule_id: Uuid },
     DismissMetaRule { rule_id: Uuid },
+    RevertBrainVersion { version: u32 },
     #[serde(other)]
     Unknown,
 }

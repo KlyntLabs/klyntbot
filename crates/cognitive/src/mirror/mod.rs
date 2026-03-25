@@ -9,7 +9,12 @@ pub use facade::MirrorFacade;
 pub use narratives::{snippet_from_alert, NarrativeHandler};
 pub use repo::MirrorRepo;
 pub use subscribers::{MetaRuleDetector, RoutingMirrorSubscriber};
-pub use types::*;
+pub use types::{
+    AutotunerBridge, BrainVersion, FeedbackTarget, GeneratedNarrative, MetaRule, MetaRuleAction,
+    MetaRuleSource, MetaRuleStatus, MirrorAlert, MirrorAlertType, MirrorResponse, MirrorState,
+    NarrativeContext, NarrativeSnippet, RoutingSnapshot, SkillRouteStats, SuggestedAction,
+    TrendNarrative, UserFeedback,
+};
 
 #[cfg(test)]
 pub(crate) async fn test_mirror_repo() -> MirrorRepo {

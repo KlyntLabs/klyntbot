@@ -67,6 +67,7 @@ impl MirrorFacade {
             pending_snippets,
             active_meta_rules,
             pending_meta_rules,
+            latest_brain_version: None,
         })
     }
 
