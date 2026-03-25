@@ -387,6 +387,11 @@ impl ExecutionEngine for ReactiveEngine {
                                 })
                                 .await;
                         }
+                        // TODO: write episodic memory on loop hard-stop
+                        // Deferred — requires threading EpisodicMemoryRepo into ReactiveEngine,
+                        // which touches 10+ call sites. Content would be:
+                        // "Loop detected: repeated {tools_summary} 5 times during task execution"
+                        // domain: "meta", importance: 0.6
                         break;
                     }
                 }
