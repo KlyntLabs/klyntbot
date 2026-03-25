@@ -6,7 +6,8 @@ use uuid::Uuid;
 
 use crate::mirror::{
     BrainVersion, FeedbackTarget, MetaRule, MetaRuleAction, MetaRuleSource, MetaRuleStatus,
-    NarrativeSnippet, RoutingSnapshot, TrendNarrative, UserFeedback,
+    NarrativeSnippet, PreviewRecommendation, RoutingSnapshot, TrendNarrative, TrialEarlySignals,
+    TrialPreview, UserFeedback,
 };
 
 // ---------------------------------------------------------------------------
@@ -222,6 +223,38 @@ impl TryFrom<BrainVersionRow> for BrainVersion {
             parent_version: row.parent_version.map(|v| v as u32),
             metrics_at_promotion: serde_json::from_str(&row.metrics_json)?,
             reverted: row.reverted != 0,
+        })
+    }
+}
+
+#[derive(Debug, sqlx::FromRow)]
+struct TrialPreviewRow {
+    id: String,
+    trial_id: String,
+    started_at: String,
+    preview_at: String,
+    messages_scored: i64,
+    early_signals_json: String,
+    recommendation: String,
+    narrative: String,
+}
+
+impl TryFrom<TrialPreviewRow> for TrialPreview {
+    type Error = common::KlyntbotError;
+
+    fn try_from(row: TrialPreviewRow) -> Result<Self> {
+        let early_signals: TrialEarlySignals = serde_json::from_str(&row.early_signals_json)?;
+        let recommendation: PreviewRecommendation = str_to_enum(&row.recommendation)?;
+        Ok(TrialPreview {
+            id: Uuid::parse_str(&row.id)
+                .map_err(|e| common::KlyntbotError::Storage(format!("bad uuid: {e}")))?,
+            trial_id: row.trial_id,
+            started_at: parse_rfc3339(&row.started_at)?,
+            preview_at: parse_rfc3339(&row.preview_at)?,
+            messages_scored: row.messages_scored as u32,
+            early_signals,
+            recommendation,
+            narrative: row.narrative,
         })
     }
 }
@@ -638,6 +671,69 @@ impl MirrorRepo {
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         Ok(())
     }
+
+    // -----------------------------------------------------------------------
+    // Trial previews
+    // -----------------------------------------------------------------------
+
+    pub async fn insert_trial_preview(&self, preview: &TrialPreview) -> Result<()> {
+        let early_signals_json = serde_json::to_string(&preview.early_signals)?;
+        let recommendation = enum_to_str(&preview.recommendation)?;
+        sqlx::query(
+            r#"
+            INSERT INTO mirror_trial_previews
+                (id, trial_id, started_at, preview_at, messages_scored,
+                 early_signals_json, recommendation, narrative)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+            "#,
+        )
+        .bind(preview.id.to_string())
+        .bind(&preview.trial_id)
+        .bind(preview.started_at.to_rfc3339())
+        .bind(preview.preview_at.to_rfc3339())
+        .bind(preview.messages_scored as i64)
+        .bind(early_signals_json)
+        .bind(recommendation)
+        .bind(&preview.narrative)
+        .execute(self.db())
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        Ok(())
+    }
+
+    pub async fn get_recent_trial_previews(&self) -> Result<Vec<TrialPreview>> {
+        let rows = sqlx::query_as::<_, TrialPreviewRow>(
+            "SELECT * FROM mirror_trial_previews ORDER BY preview_at DESC LIMIT 10",
+        )
+        .fetch_all(self.db())
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        rows.into_iter().map(TrialPreview::try_from).collect()
+    }
+
+    pub async fn get_trial_preview_by_trial_id(
+        &self,
+        trial_id: &str,
+    ) -> Result<Option<TrialPreview>> {
+        let row = sqlx::query_as::<_, TrialPreviewRow>(
+            "SELECT * FROM mirror_trial_previews WHERE trial_id = ?1",
+        )
+        .bind(trial_id)
+        .fetch_optional(self.db())
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        row.map(TrialPreview::try_from).transpose()
+    }
+
+    pub async fn cleanup_old_trial_previews(&self, max_age_days: u32) -> Result<u64> {
+        let cutoff = Utc::now() - chrono::Duration::days(max_age_days as i64);
+        let result = sqlx::query("DELETE FROM mirror_trial_previews WHERE preview_at < ?1")
+            .bind(cutoff.to_rfc3339())
+            .execute(self.db())
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        Ok(result.rows_affected())
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -649,7 +745,10 @@ mod tests {
     use std::collections::HashMap;
 
     use super::*;
-    use crate::mirror::{MetaRuleAction, MirrorAlertType, SkillRouteStats, SuggestedAction};
+    use crate::mirror::{
+        MetaRuleAction, MirrorAlertType, PreviewRecommendation, SkillRouteStats, SuggestedAction,
+        TrendDirection, TrialEarlySignals, TrialPreview,
+    };
 
     fn make_snapshot() -> RoutingSnapshot {
         let mut distribution = HashMap::new();
@@ -995,5 +1094,44 @@ mod tests {
         assert!(!v1.reverted);
         assert!(v2.reverted);
         assert!(v3.reverted);
+    }
+
+    fn make_trial_preview(trial_id: &str, recommendation: PreviewRecommendation) -> TrialPreview {
+        TrialPreview {
+            id: Uuid::new_v4(),
+            trial_id: trial_id.to_string(),
+            started_at: Utc::now() - chrono::Duration::hours(4),
+            preview_at: Utc::now(),
+            messages_scored: 25,
+            early_signals: TrialEarlySignals {
+                correction_rate_delta: -0.15,
+                confidence_trend: TrendDirection::Falling,
+                dominant_skill_shift: Some("finance-management".to_string()),
+            },
+            recommendation,
+            narrative: "Correction rate worsened 15% vs champion".to_string(),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_insert_and_get_trial_preview() {
+        let repo = crate::mirror::test_mirror_repo().await;
+        let preview = make_trial_preview("trial-abc", PreviewRecommendation::Kill);
+        repo.insert_trial_preview(&preview).await.unwrap();
+        let previews = repo.get_recent_trial_previews().await.unwrap();
+        assert_eq!(previews.len(), 1);
+        assert_eq!(previews[0].trial_id, "trial-abc");
+        assert_eq!(previews[0].recommendation, PreviewRecommendation::Kill);
+    }
+
+    #[tokio::test]
+    async fn test_get_trial_preview_by_trial_id() {
+        let repo = crate::mirror::test_mirror_repo().await;
+        let preview = make_trial_preview("trial-abc", PreviewRecommendation::Kill);
+        repo.insert_trial_preview(&preview).await.unwrap();
+        let found = repo.get_trial_preview_by_trial_id("trial-abc").await.unwrap();
+        assert!(found.is_some());
+        let not_found = repo.get_trial_preview_by_trial_id("trial-xyz").await.unwrap();
+        assert!(not_found.is_none());
     }
 }
