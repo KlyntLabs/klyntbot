@@ -24,6 +24,8 @@ const LOW_CONFIDENCE_THRESHOLD: f64 = 0.4;
 const SAME_SESSION_CORRECTION_THRESHOLD: u32 = 2;
 const CROSS_SESSION_CORRECTION_THRESHOLD: u32 = 3;
 const LOW_CONFIDENCE_STREAK_THRESHOLD: u32 = 3;
+const MAX_TRACKED_SESSIONS: usize = 100;
+const MAX_TRACKED_SKILLS: usize = 50;
 
 // ---------------------------------------------------------------------------
 // MetaRuleDetector
@@ -75,14 +77,20 @@ impl MetaRuleDetector {
         session_key: &str,
         skill_name: &str,
     ) -> Option<MirrorAlert> {
-        // Track per-session corrections.
-        let session_count = self
-            .session_corrections
-            .entry(session_key.to_string())
-            .or_insert(0);
-        *session_count += 1;
+        // Track per-session corrections. Evict if the map grows unbounded.
+        if self.session_corrections.len() > MAX_TRACKED_SESSIONS {
+            self.session_corrections.clear();
+        }
+        let session_count = {
+            let c = self
+                .session_corrections
+                .entry(session_key.to_string())
+                .or_insert(0);
+            *c += 1;
+            *c
+        };
 
-        if *session_count >= SAME_SESSION_CORRECTION_THRESHOLD {
+        if session_count >= SAME_SESSION_CORRECTION_THRESHOLD {
             let rule_id = Uuid::new_v4();
             return Some(MirrorAlert::MetaRuleProposed {
                 rule_id,
@@ -94,14 +102,20 @@ impl MetaRuleDetector {
             });
         }
 
-        // Track per-skill cross-session corrections.
-        let skill_count = self
-            .skill_corrections
-            .entry(skill_name.to_string())
-            .or_insert(0);
-        *skill_count += 1;
+        // Track per-skill cross-session corrections. Evict if unbounded.
+        if self.skill_corrections.len() > MAX_TRACKED_SKILLS {
+            self.skill_corrections.clear();
+        }
+        let skill_count = {
+            let c = self
+                .skill_corrections
+                .entry(skill_name.to_string())
+                .or_insert(0);
+            *c += 1;
+            *c
+        };
 
-        if *skill_count >= CROSS_SESSION_CORRECTION_THRESHOLD {
+        if skill_count >= CROSS_SESSION_CORRECTION_THRESHOLD {
             let rule_id = Uuid::new_v4();
             return Some(MirrorAlert::MetaRuleProposed {
                 rule_id,

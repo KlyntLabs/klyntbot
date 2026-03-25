@@ -1,5 +1,6 @@
 import { useQuery } from "@shared/hooks/useQuery";
 import { Eye } from "lucide-react";
+import type { MetaRule } from "./components/MetaRulesSection";
 import { MetaRulesSection } from "./components/MetaRulesSection";
 import { MirrorInput } from "./components/MirrorInput";
 import type { TrendNarrative } from "./components/NarrativeCard";
@@ -8,16 +9,6 @@ import type { RoutingSnapshot } from "./components/RoutingDonut";
 import { RoutingDonut } from "./components/RoutingDonut";
 import type { NarrativeSnippet } from "./components/SnippetFeed";
 import { SnippetFeed } from "./components/SnippetFeed";
-
-interface MetaRule {
-  id: string;
-  triggerCondition: string;
-  action: Record<string, unknown>;
-  source: string;
-  effectivenessScore: number;
-  status: string;
-  signalCount: number;
-}
 
 interface MirrorState {
   lastRoutingSnapshot: RoutingSnapshot | null;

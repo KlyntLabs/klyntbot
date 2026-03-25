@@ -53,18 +53,18 @@ impl MirrorFacade {
 
     /// Compose the current [`MirrorState`] from the three primary repo queries.
     pub async fn get_state(&self) -> Result<MirrorState> {
-        let active_meta_rules = self
-            .repo
-            .get_meta_rules_by_status(MetaRuleStatus::Active)
-            .await?;
-        let pending_meta_rules = self
-            .repo
-            .get_meta_rules_by_status(MetaRuleStatus::Pending)
-            .await?;
+        let (last_routing_snapshot, latest_trend_narrative, pending_snippets, active_meta_rules, pending_meta_rules) = tokio::try_join!(
+            self.repo.get_latest_routing_snapshot(),
+            self.repo.get_latest_narrative(),
+            self.repo.get_pending_snippets(),
+            self.repo.get_meta_rules_by_status(MetaRuleStatus::Active),
+            self.repo.get_meta_rules_by_status(MetaRuleStatus::Pending),
+        )?;
+
         Ok(MirrorState {
-            last_routing_snapshot: self.repo.get_latest_routing_snapshot().await?,
-            latest_trend_narrative: self.repo.get_latest_narrative().await?,
-            pending_snippets: self.repo.get_pending_snippets().await?,
+            last_routing_snapshot,
+            latest_trend_narrative,
+            pending_snippets,
             active_meta_rules,
             pending_meta_rules,
         })
@@ -272,14 +272,9 @@ mod tests {
     use crate::mirror::{
         MetaRule, MetaRuleAction, MetaRuleSource, MetaRuleStatus, MirrorAlertType, SkillRouteStats,
     };
-    use crate::repos::cognitive_migrations;
 
     async fn setup() -> MirrorFacade {
-        let pool = storage::StoragePool::connect_in_memory().await.unwrap();
-        storage::StoragePool::run_feature_migrations(pool.inner(), &cognitive_migrations())
-            .await
-            .unwrap();
-        MirrorFacade::new(MirrorRepo::new(pool))
+        MirrorFacade::new(crate::mirror::test_mirror_repo().await)
     }
 
     fn make_snapshot() -> RoutingSnapshot {

@@ -67,19 +67,10 @@ impl MirrorEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::repos::cognitive_migrations;
-
-    async fn setup_repo() -> MirrorRepo {
-        let pool = storage::StoragePool::connect_in_memory().await.unwrap();
-        storage::StoragePool::run_feature_migrations(pool.inner(), &cognitive_migrations())
-            .await
-            .unwrap();
-        MirrorRepo::new(pool)
-    }
 
     #[tokio::test]
     async fn test_engine_start_no_handler() {
-        let repo = setup_repo().await;
+        let repo = crate::mirror::test_mirror_repo().await;
         let bus = bus::DomainEventBus::new(16);
 
         let (facade, handles, shutdown) = MirrorEngine::start(repo, &bus, None);
@@ -97,7 +88,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_engine_start_routes_skill_routed_events() {
-        let repo = setup_repo().await;
+        let repo = crate::mirror::test_mirror_repo().await;
         let bus = bus::DomainEventBus::new(16);
 
         let (_facade, handles, shutdown) = MirrorEngine::start(repo, &bus, None);
@@ -122,7 +113,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_engine_subscriber_count() {
-        let repo = setup_repo().await;
+        let repo = crate::mirror::test_mirror_repo().await;
         let bus = bus::DomainEventBus::new(16);
 
         assert_eq!(bus.subscriber_count(), 0);

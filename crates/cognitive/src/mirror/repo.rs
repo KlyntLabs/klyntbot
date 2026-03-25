@@ -10,6 +10,28 @@ use crate::mirror::{
 };
 
 // ---------------------------------------------------------------------------
+// Parsing helpers
+// ---------------------------------------------------------------------------
+
+/// Parse an RFC3339 timestamp string to DateTime<Utc>
+fn parse_rfc3339(s: &str) -> common::Result<DateTime<Utc>> {
+    DateTime::parse_from_rfc3339(s)
+        .map(|d| d.with_timezone(&Utc))
+        .map_err(|e| common::KlyntbotError::Storage(format!("bad timestamp: {e}")))
+}
+
+/// Serialize a serde enum variant to a bare string (strips JSON quotes)
+fn enum_to_str<T: serde::Serialize>(val: &T) -> common::Result<String> {
+    Ok(serde_json::to_string(val)?.trim_matches('"').to_string())
+}
+
+/// Deserialize a bare string back to a serde enum variant
+fn str_to_enum<T: serde::de::DeserializeOwned>(s: &str) -> common::Result<T> {
+    serde_json::from_str(&format!("\"{}\"", s))
+        .map_err(|e| common::KlyntbotError::Storage(format!("bad enum value '{}': {e}", s)))
+}
+
+// ---------------------------------------------------------------------------
 // Row types
 // ---------------------------------------------------------------------------
 
@@ -30,9 +52,7 @@ impl TryFrom<RoutingSnapshotRow> for RoutingSnapshot {
     type Error = common::KlyntbotError;
 
     fn try_from(row: RoutingSnapshotRow) -> Result<Self> {
-        let captured_at = DateTime::parse_from_rfc3339(&row.captured_at)
-            .map_err(|e| common::KlyntbotError::Storage(format!("bad captured_at: {e}")))?
-            .with_timezone(&Utc);
+        let captured_at = parse_rfc3339(&row.captured_at)?;
         let distribution = serde_json::from_str(&row.distribution_json)?;
         let user_feedback = row
             .user_feedback
@@ -72,11 +92,6 @@ impl TryFrom<TrendNarrativeRow> for TrendNarrative {
     type Error = common::KlyntbotError;
 
     fn try_from(row: TrendNarrativeRow) -> Result<Self> {
-        let parse_dt = |s: &str| {
-            DateTime::parse_from_rfc3339(s)
-                .map(|d| d.with_timezone(&Utc))
-                .map_err(|e| common::KlyntbotError::Storage(format!("bad datetime: {e}")))
-        };
         let improvement_highlights = serde_json::from_str(&row.improvement_highlights_json)?;
         let meta_rule_updates = serde_json::from_str(&row.meta_rule_updates_json)?;
         let user_feedback = row
@@ -87,9 +102,9 @@ impl TryFrom<TrendNarrativeRow> for TrendNarrative {
         Ok(TrendNarrative {
             id: Uuid::parse_str(&row.id)
                 .map_err(|e| common::KlyntbotError::Storage(format!("bad uuid: {e}")))?,
-            generated_at: parse_dt(&row.generated_at)?,
-            period_start: parse_dt(&row.period_start)?,
-            period_end: parse_dt(&row.period_end)?,
+            generated_at: parse_rfc3339(&row.generated_at)?,
+            period_start: parse_rfc3339(&row.period_start)?,
+            period_end: parse_rfc3339(&row.period_end)?,
             routing_summary: row.routing_summary,
             improvement_highlights,
             experiment_summary: row.experiment_summary,
@@ -116,10 +131,8 @@ impl TryFrom<SnippetRow> for NarrativeSnippet {
     type Error = common::KlyntbotError;
 
     fn try_from(row: SnippetRow) -> Result<Self> {
-        let created_at = DateTime::parse_from_rfc3339(&row.created_at)
-            .map_err(|e| common::KlyntbotError::Storage(format!("bad created_at: {e}")))?
-            .with_timezone(&Utc);
-        let alert_type = serde_json::from_str(&format!("\"{}\"", row.alert_type))?;
+        let created_at = parse_rfc3339(&row.created_at)?;
+        let alert_type = str_to_enum(&row.alert_type)?;
         let suggested_action = row
             .action_json
             .as_deref()
@@ -133,11 +146,7 @@ impl TryFrom<SnippetRow> for NarrativeSnippet {
         let dismissed_at = row
             .dismissed_at
             .as_deref()
-            .map(|s| {
-                DateTime::parse_from_rfc3339(s)
-                    .map(|d| d.with_timezone(&Utc))
-                    .map_err(|e| common::KlyntbotError::Storage(format!("bad dismissed_at: {e}")))
-            })
+            .map(parse_rfc3339)
             .transpose()?;
         Ok(NarrativeSnippet {
             id: Uuid::parse_str(&row.id)
@@ -170,16 +179,9 @@ impl TryFrom<MetaRuleRow> for MetaRule {
     type Error = common::KlyntbotError;
 
     fn try_from(row: MetaRuleRow) -> Result<Self> {
-        let parse_dt = |s: &str| {
-            DateTime::parse_from_rfc3339(s)
-                .map(|d| d.with_timezone(&Utc))
-                .map_err(|e| common::KlyntbotError::Storage(format!("bad datetime: {e}")))
-        };
         let action: MetaRuleAction = serde_json::from_str(&row.action_json)?;
-        let source: MetaRuleSource =
-            serde_json::from_str(&format!("\"{}\"", row.source))?;
-        let status: MetaRuleStatus =
-            serde_json::from_str(&format!("\"{}\"", row.status))?;
+        let source: MetaRuleSource = str_to_enum(&row.source)?;
+        let status: MetaRuleStatus = str_to_enum(&row.status)?;
         Ok(MetaRule {
             id: Uuid::parse_str(&row.id)
                 .map_err(|e| common::KlyntbotError::Storage(format!("bad uuid: {e}")))?,
@@ -189,8 +191,8 @@ impl TryFrom<MetaRuleRow> for MetaRule {
             effectiveness_score: row.effectiveness_score,
             status,
             signal_count: row.signal_count as u32,
-            created_at: parse_dt(&row.created_at)?,
-            updated_at: parse_dt(&row.updated_at)?,
+            created_at: parse_rfc3339(&row.created_at)?,
+            updated_at: parse_rfc3339(&row.updated_at)?,
         })
     }
 }
@@ -274,9 +276,7 @@ impl MirrorRepo {
     // -----------------------------------------------------------------------
 
     pub async fn insert_snippet(&self, snippet: &NarrativeSnippet) -> Result<()> {
-        let alert_type = serde_json::to_string(&snippet.alert_type)?;
-        // strip surrounding quotes produced by serde_json for unit variants
-        let alert_type = alert_type.trim_matches('"').to_string();
+        let alert_type = enum_to_str(&snippet.alert_type)?;
         let action_json = snippet
             .suggested_action
             .as_ref()
@@ -444,8 +444,8 @@ impl MirrorRepo {
 
     pub async fn insert_meta_rule(&self, rule: &MetaRule) -> Result<()> {
         let action_json = serde_json::to_string(&rule.action)?;
-        let source = serde_json::to_string(&rule.source)?.trim_matches('"').to_string();
-        let status = serde_json::to_string(&rule.status)?.trim_matches('"').to_string();
+        let source = enum_to_str(&rule.source)?;
+        let status = enum_to_str(&rule.status)?;
         sqlx::query(
             r#"
             INSERT INTO mirror_meta_rules
@@ -473,7 +473,7 @@ impl MirrorRepo {
         &self,
         status: MetaRuleStatus,
     ) -> Result<Vec<MetaRule>> {
-        let status_str = serde_json::to_string(&status)?.trim_matches('"').to_string();
+        let status_str = enum_to_str(&status)?;
         let rows = sqlx::query_as::<_, MetaRuleRow>(
             "SELECT * FROM mirror_meta_rules WHERE status = ?1 ORDER BY created_at DESC",
         )
@@ -485,7 +485,7 @@ impl MirrorRepo {
     }
 
     pub async fn update_meta_rule_status(&self, id: Uuid, status: MetaRuleStatus) -> Result<()> {
-        let status_str = serde_json::to_string(&status)?.trim_matches('"').to_string();
+        let status_str = enum_to_str(&status)?;
         sqlx::query(
             "UPDATE mirror_meta_rules SET status = ?1, updated_at = ?2 WHERE id = ?3",
         )
@@ -541,15 +541,6 @@ mod tests {
 
     use super::*;
     use crate::mirror::{MetaRuleAction, MirrorAlertType, SkillRouteStats, SuggestedAction};
-    use crate::repos::cognitive_migrations;
-
-    async fn setup() -> MirrorRepo {
-        let pool = storage::StoragePool::connect_in_memory().await.unwrap();
-        storage::StoragePool::run_feature_migrations(pool.inner(), &cognitive_migrations())
-            .await
-            .unwrap();
-        MirrorRepo::new(pool)
-    }
 
     fn make_snapshot() -> RoutingSnapshot {
         let mut distribution = HashMap::new();
@@ -605,7 +596,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_insert_and_get_routing_snapshot() {
-        let repo = setup().await;
+        let repo = crate::mirror::test_mirror_repo().await;
         let snap = make_snapshot();
         repo.insert_routing_snapshot(&snap).await.unwrap();
 
@@ -625,7 +616,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_insert_and_get_snippet() {
-        let repo = setup().await;
+        let repo = crate::mirror::test_mirror_repo().await;
         let snippet = make_snippet();
         repo.insert_snippet(&snippet).await.unwrap();
 
@@ -639,7 +630,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_insert_and_get_narrative() {
-        let repo = setup().await;
+        let repo = crate::mirror::test_mirror_repo().await;
         let narrative = make_narrative();
         repo.insert_trend_narrative(&narrative).await.unwrap();
 
@@ -656,7 +647,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_feedback_update() {
-        let repo = setup().await;
+        let repo = crate::mirror::test_mirror_repo().await;
 
         // Routing feedback
         let snap = make_snapshot();
@@ -696,7 +687,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_retention_cleanup() {
-        let repo = setup().await;
+        let repo = crate::mirror::test_mirror_repo().await;
 
         // Insert a recent snapshot (should survive cleanup)
         let recent_snap = make_snapshot();
@@ -761,7 +752,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_insert_and_get_meta_rule() {
-        let repo = setup().await;
+        let repo = crate::mirror::test_mirror_repo().await;
         let rule = make_meta_rule();
         repo.insert_meta_rule(&rule).await.unwrap();
 
@@ -778,7 +769,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_approve_meta_rule() {
-        let repo = setup().await;
+        let repo = crate::mirror::test_mirror_repo().await;
         let rule = make_meta_rule();
         repo.insert_meta_rule(&rule).await.unwrap();
 
@@ -794,7 +785,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_dismiss_meta_rule() {
-        let repo = setup().await;
+        let repo = crate::mirror::test_mirror_repo().await;
         let rule = make_meta_rule();
         repo.insert_meta_rule(&rule).await.unwrap();
 
@@ -810,7 +801,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_increment_signal_count() {
-        let repo = setup().await;
+        let repo = crate::mirror::test_mirror_repo().await;
         let rule = make_meta_rule();
         repo.insert_meta_rule(&rule).await.unwrap();
 

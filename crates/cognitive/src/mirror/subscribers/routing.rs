@@ -20,6 +20,12 @@ use crate::mirror::{
 };
 
 // ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const MAX_TRIGGER_PHRASES: usize = 100;
+
+// ---------------------------------------------------------------------------
 // Internal accumulator entry
 // ---------------------------------------------------------------------------
 
@@ -95,8 +101,10 @@ impl RoutingMirrorSubscriber {
             .or_insert_with(SkillRouteAccum::new);
         entry.count += 1;
         entry.confidence_sum += confidence;
-        for phrase in triggers {
-            *entry.trigger_hits.entry(phrase).or_insert(0) += 1;
+        if entry.trigger_hits.len() < MAX_TRIGGER_PHRASES {
+            for trigger in triggers {
+                *entry.trigger_hits.entry(trigger).or_insert(0) += 1;
+            }
         }
     }
 

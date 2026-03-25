@@ -1,7 +1,7 @@
 import { useMutation } from "@shared/hooks/useMutation";
 import { Check, Sparkles, X } from "lucide-react";
 
-interface MetaRule {
+export interface MetaRule {
   id: string;
   triggerCondition: string;
   action: Record<string, unknown>;
