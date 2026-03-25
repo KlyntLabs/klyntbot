@@ -157,6 +157,8 @@ mod tests {
             correction: "No, I prefer mornings".into(),
             kind: bus::CorrectionKind::Reaction,
             strength: 1.0,
+            session_key: "test:session".into(),
+            active_skill: None,
         });
         assert_eq!(verdict, SalienceVerdict::Extract);
     }

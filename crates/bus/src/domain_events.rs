@@ -250,6 +250,8 @@ pub enum DomainEvent {
         correction: String,
         kind: CorrectionKind,
         strength: f64,
+        session_key: String,
+        active_skill: Option<String>,
     },
     AutotunerDecision {
         trial_id: String,
@@ -545,13 +547,23 @@ mod tests {
             correction: "fixed".into(),
             kind: CorrectionKind::Reaction,
             strength: 1.0,
+            session_key: "desktop:main".into(),
+            active_skill: Some("general".into()),
         };
         let json = serde_json::to_string(&event).unwrap();
         let parsed: DomainEvent = serde_json::from_str(&json).unwrap();
         match parsed {
-            DomainEvent::UserCorrectedAI { kind, strength, .. } => {
+            DomainEvent::UserCorrectedAI {
+                kind,
+                strength,
+                session_key,
+                active_skill,
+                ..
+            } => {
                 assert_eq!(kind, CorrectionKind::Reaction);
                 assert!((strength - 1.0).abs() < f64::EPSILON);
+                assert_eq!(session_key, "desktop:main");
+                assert_eq!(active_skill, Some("general".to_string()));
             }
             _ => panic!("Expected UserCorrectedAI"),
         }

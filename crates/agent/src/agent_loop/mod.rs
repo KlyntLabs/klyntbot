@@ -199,6 +199,8 @@ impl AgentLoop {
                 msg.content.clone(),
                 bus::CorrectionKind::Reaction,
                 1.0,
+                session_key.to_string(),
+                None,
             )
             .await;
         }
@@ -207,6 +209,7 @@ impl AgentLoop {
     }
 
     /// Emit a UserCorrectedAI correction signal and mark shadow log entries.
+    #[allow(clippy::too_many_arguments)]
     async fn emit_correction_signal(
         &self,
         chat_id: &str,
@@ -214,6 +217,8 @@ impl AgentLoop {
         correction: String,
         kind: bus::CorrectionKind,
         strength: f64,
+        session_key: String,
+        active_skill: Option<String>,
     ) {
         if let Some(ref bus) = self.domain_event_bus {
             bus.publish(bus::DomainEvent::UserCorrectedAI {
@@ -221,6 +226,8 @@ impl AgentLoop {
                 correction,
                 kind,
                 strength,
+                session_key,
+                active_skill,
             });
         }
         if let Some(ref trial_repo) = self.trial_repo {
@@ -545,6 +552,8 @@ impl AgentLoop {
                         msg.content.clone(),
                         kind,
                         strength,
+                        session_key.to_string(),
+                        None,
                     )
                     .await;
                 }
@@ -558,6 +567,8 @@ impl AgentLoop {
                     msg.content.clone(),
                     bus::CorrectionKind::MemoryMiss,
                     0.8,
+                    session_key.to_string(),
+                    None,
                 )
                 .await;
             }
@@ -958,6 +969,8 @@ impl AgentLoop {
                         content.clone(),
                         kind,
                         strength,
+                        session_key.clone(),
+                        None,
                     )
                     .await;
                     true
@@ -976,6 +989,8 @@ impl AgentLoop {
                     content.clone(),
                     bus::CorrectionKind::MemoryMiss,
                     0.8,
+                    session_key.clone(),
+                    None,
                 )
                 .await;
             }
