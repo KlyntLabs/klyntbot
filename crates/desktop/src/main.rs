@@ -754,6 +754,8 @@ fn run_desktop_app() {
             commands::mirror::dismiss_meta_rule,
             commands::mirror::get_brain_versions,
             commands::mirror::revert_brain_version,
+            commands::mirror::kill_trial,
+            commands::mirror::continue_trial,
             // Active View
             commands::view::view_set_active,
             commands::view::view_clear_active,

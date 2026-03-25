@@ -22,6 +22,8 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "dismiss_meta_rule",
     "get_brain_versions",
     "revert_brain_version",
+    "kill_trial",
+    "continue_trial",
 ];
 
 #[tauri::command]
@@ -109,6 +111,24 @@ pub async fn revert_brain_version(
 ) -> Result<BrainVersion, ApiError> {
     let facade = state.mirror_facade()?;
     Ok(facade.revert_to_version(version).await?)
+}
+
+#[tauri::command]
+pub async fn kill_trial(
+    state: State<'_, Arc<AppCore>>,
+    trial_id: String,
+) -> Result<(), ApiError> {
+    let facade = state.mirror_facade()?;
+    Ok(facade.kill_trial(&trial_id).await?)
+}
+
+#[tauri::command]
+pub async fn continue_trial(
+    state: State<'_, Arc<AppCore>>,
+    trial_id: String,
+) -> Result<(), ApiError> {
+    let facade = state.mirror_facade()?;
+    Ok(facade.continue_trial(&trial_id).await?)
 }
 
 // ── Dev server dispatch ──────────────────────────────────────────────────
@@ -206,6 +226,28 @@ pub(crate) async fn dispatch_dev(
             dev::val(
                 facade
                     .revert_to_version(version)
+                    .await
+                    .map_err(ApiError::from),
+            )
+        }
+        "kill_trial" => {
+            let trial_id: String = try_field!(dev::get(body, "trialId")
+                .or_else(|| dev::get(body, "trial_id"))
+                .ok_or_else(|| ApiError::new("VALIDATION", "missing required field: trialId")));
+            dev::val(
+                facade
+                    .kill_trial(&trial_id)
+                    .await
+                    .map_err(ApiError::from),
+            )
+        }
+        "continue_trial" => {
+            let trial_id: String = try_field!(dev::get(body, "trialId")
+                .or_else(|| dev::get(body, "trial_id"))
+                .ok_or_else(|| ApiError::new("VALIDATION", "missing required field: trialId")));
+            dev::val(
+                facade
+                    .continue_trial(&trial_id)
                     .await
                     .map_err(ApiError::from),
             )
