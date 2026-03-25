@@ -13,6 +13,7 @@ pub mod book_index_wiring;
 pub mod cognitive_embedder;
 pub mod cognitive_handlers;
 pub mod conversation_recall;
+pub mod mirror_handlers;
 pub mod cron;
 pub mod finance;
 pub mod learning;
