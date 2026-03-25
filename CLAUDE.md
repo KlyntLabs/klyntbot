@@ -150,6 +150,8 @@ Klyntbot exposes tools to external AI clients (Claude Code, Cursor, etc.) via MC
 
 **Mid-loop context compression:** During Reactive execution, the `MidLoopCompressor` checks token usage after each iteration. When accumulated message tokens exceed 70% of the context window, older `Message::Tool` results are replaced with extractive summaries (first 150 chars + metadata). System messages and recent iterations (last 8 messages) are always preserved verbatim. Emits `AgentEvent::ContextCompressed` for UI transparency.
 
+**Live context refresh:** During Reactive execution, the `LiveContextRefresher` drains a shared `ContextUpdateQueue` (in the `bus` crate) at each iteration boundary. Context updates (e.g., newly promoted memories) are injected as `Message::ContextUpdate` entries with XML-tagged content. Token budget is respected — standard updates can use up to 80% of remaining context (20% reserved for LLM response); high-priority updates can use 90% (10% reserved). Emits `AgentEvent::ContextReassembled` for transparency. Set `pause_context_updates: true` on `ExecutionParams` for frozen-context mode. Phase 1 producer: cognitive background service pushes on memory promotion.
+
 ## Conventions
 
 - Errors: `common::Result<T>` (alias for `Result<T, KlyntbotError>`). Domain errors auto-convert via `From`.
