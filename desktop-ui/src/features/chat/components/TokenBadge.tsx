@@ -1,28 +1,18 @@
 import { formatCost, formatDuration, formatTokens } from "@shared/lib/utils";
 import type { TransparencyData } from "@shared/types";
-import { ChevronDown, Loader2 } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 
 interface TokenBadgeProps {
   transparency: TransparencyData;
-  isStreaming?: boolean;
 }
 
-export function TokenBadge({ transparency, isStreaming }: TokenBadgeProps) {
+export function TokenBadge({ transparency }: TokenBadgeProps) {
   const [expanded, setExpanded] = useState(false);
   const { usage, cost, timing } = transparency;
 
-  // During streaming, show spinner until usage arrives
-  if (!usage) {
-    if (!isStreaming) return null;
-    return (
-      <div className="flex justify-end mt-1">
-        <div className="flex items-center gap-1 text-2xs font-light text-dim">
-          <Loader2 className="size-2.5 animate-spin" strokeWidth={1.5} />
-        </div>
-      </div>
-    );
-  }
+  // Nothing to show until usage data arrives
+  if (!usage) return null;
 
   return (
     <div className="mt-1.5">

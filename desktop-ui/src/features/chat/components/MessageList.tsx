@@ -115,7 +115,7 @@ export function MessageList({
               ) : msg.role === "interaction" ? (
                 <CollapsedInteraction content={msg.content} />
               ) : (
-                <div className="max-w-[85%]">
+                <div className="w-full">
                   {msg.segments && msg.segments.length > 0 ? (
                     <SegmentedMessage segments={msg.segments} plan={msg.transparency?.plan} />
                   ) : (
@@ -161,7 +161,7 @@ export function MessageList({
       {/* Streaming segments (live) — includes inline tool spinners + cursor */}
       {(segments.length > 0 || activeTools.length > 0) && (
         <div className="flex justify-start">
-          <div className="max-w-[85%]">
+          <div className="w-full">
             <SegmentedMessage
               segments={segments}
               activeTools={activeTools}
@@ -169,9 +169,7 @@ export function MessageList({
               activeDelegateAgent={activeDelegateAgent}
               plan={liveTransparency?.plan}
             />
-            {liveTransparency && (
-              <TokenBadge transparency={liveTransparency} isStreaming={isStreaming} />
-            )}
+            {liveTransparency && <TokenBadge transparency={liveTransparency} />}
           </div>
         </div>
       )}
