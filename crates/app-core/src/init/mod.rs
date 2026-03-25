@@ -276,6 +276,13 @@ impl AppCore {
         // ── Wrap config for shared ownership ─────────────────────────────
         let shared_config = Arc::new(RwLock::new(config));
 
+        // ── Config file watcher (hot-reload) ──────────────────────────────
+        let config_watcher_token = crate::infrastructure::config_watcher::start_config_watcher(
+            Arc::clone(&shared_config),
+            Arc::clone(&hot_config),
+            shutdown_token.clone(),
+        );
+
         // ── Assemble AppCore ─────────────────────────────────────────────
         let core = AppCore {
             mode,
@@ -358,14 +365,8 @@ impl AppCore {
             )),
             autotuner,
             mirror_facade,
+            _config_watcher_token: Some(config_watcher_token),
         };
-
-        // ── Config file watcher (hot-reload) ──────────────────────────────
-        let _config_watcher_token = crate::infrastructure::config_watcher::start_config_watcher(
-            Arc::clone(&shared_config),
-            Arc::clone(&hot_config),
-            shutdown_token.clone(),
-        );
 
         // ── One-time vocab → Knowledge Atoms migration ──────────────────
         {

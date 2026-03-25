@@ -214,16 +214,33 @@ pub async fn init() -> Result<()> {
     Ok(())
 }
 
-/// Reload config from disk and return (new_config, diff) compared to the previous HotConfig.
+/// Reload config from disk and return (new_config, diff, new_hot) compared to the previous HotConfig.
 ///
+/// Uses `last_mtime` to skip re-parsing when the file hasn't been modified.
 /// Returns `None` if the file hasn't changed or can't be parsed (logs a warning).
-pub async fn reload_if_changed(previous: &HotConfig) -> Option<(Config, HotConfigDiff)> {
+pub async fn reload_if_changed(
+    previous_hot: &HotConfig,
+    last_mtime: &mut Option<std::time::SystemTime>,
+) -> Option<(Config, HotConfigDiff, HotConfig)> {
+    // Quick mtime check to avoid unnecessary full parse
+    let path = match config_path() {
+        Ok(p) => p,
+        Err(_) => return None,
+    };
+    let current_mtime = std::fs::metadata(&path)
+        .ok()
+        .and_then(|m| m.modified().ok());
+    if current_mtime.is_some() && current_mtime == *last_mtime {
+        return None; // File hasn't been modified
+    }
+    *last_mtime = current_mtime;
+
     match load().await {
         Ok(config) => {
             let new_hot = HotConfig::from(&config);
-            let diff = previous.diff(&new_hot);
+            let diff = previous_hot.diff(&new_hot);
             if diff.has_changes() {
-                Some((config, diff))
+                Some((config, diff, new_hot))
             } else {
                 None
             }

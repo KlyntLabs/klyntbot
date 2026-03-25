@@ -304,8 +304,8 @@ impl AgentRuntime {
     ) -> Result<RuntimeResult> {
         let pipeline_start = Instant::now();
 
-        // Read hot-reloadable config for this message
-        let hot = self.hot_config.read().await.clone();
+        // Read only the hot-reloadable timeout (avoids cloning the full HotConfig with its String fields)
+        let hot_timeout_secs = self.hot_config.read().await.pipeline_timeout_secs;
 
         // Emit pipeline start immediately for frontend progress indication
         if let Some(ref tx) = event_tx {
@@ -700,9 +700,8 @@ impl AgentRuntime {
             params = params.with_planning_prompt(prompt);
         }
 
-        let timeout_secs = hot.pipeline_timeout_secs;
-        if timeout_secs > 0 {
-            params = params.with_pipeline_timeout(Duration::from_secs(timeout_secs));
+        if hot_timeout_secs > 0 {
+            params = params.with_pipeline_timeout(Duration::from_secs(hot_timeout_secs));
         }
 
         let retrieved_memory_count = assembled.retrieved_memory_count;

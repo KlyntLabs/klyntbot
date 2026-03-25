@@ -127,6 +127,8 @@ pub struct AppCore {
     pub autotuner: Option<Arc<agent::autotuner::AutoTunerOrchestrator>>,
     /// Mirror self-reflection facade (None when cognitive provider is unavailable).
     pub mirror_facade: Option<Arc<cognitive::mirror::MirrorFacade>>,
+    /// Cancellation token for the config file watcher background service.
+    pub _config_watcher_token: Option<CancellationToken>,
 }
 
 impl AppCore {

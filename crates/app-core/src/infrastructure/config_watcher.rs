@@ -25,6 +25,8 @@ pub fn start_config_watcher(
     tokio::spawn(async move {
         info!("config watcher started (5s poll interval)");
         let mut interval = tokio::time::interval(std::time::Duration::from_secs(5));
+        interval.tick().await; // Skip immediate first tick (config was just loaded at init)
+        let mut last_mtime: Option<std::time::SystemTime> = None;
 
         loop {
             tokio::select! {
@@ -34,7 +36,7 @@ pub fn start_config_watcher(
                 }
                 _ = interval.tick() => {
                     let previous = hot_config.read().await.clone();
-                    if let Some((new_config, diff)) = config::reload_if_changed(&previous).await {
+                    if let Some((new_config, diff, new_hot)) = config::reload_if_changed(&previous, &mut last_mtime).await {
                         info!(
                             model_changed = diff.model_changed,
                             temp_changed = diff.temperature_changed,
@@ -48,7 +50,7 @@ pub fn start_config_watcher(
                         // Update shared HotConfig (read by agent pipeline)
                         {
                             let mut guard = hot_config.write().await;
-                            *guard = HotConfig::from(&new_config);
+                            *guard = new_hot;
                         }
 
                         // Update full config in AppCore (read by settings handlers)
