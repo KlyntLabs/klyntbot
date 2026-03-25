@@ -75,6 +75,9 @@ impl AppCore {
             provider,
         } = storage::init_storage(config_override).await?;
 
+        // ── Hot-reloadable config subset (shared between agent + AppCore) ──
+        let hot_config = Arc::new(RwLock::new(config::HotConfig::from(&config)));
+
         // ── Shared: Bus + cognitive provider + domain event bus ──────────
         // Created once here in the orchestrator. Both cron and agent receive
         // references to the same instances (matches the original single-fn flow).
@@ -184,6 +187,7 @@ impl AppCore {
             &notification_dispatcher,
             &notification_sender,
             autotuner.as_ref(),
+            Arc::clone(&hot_config),
         )
         .await?;
 
@@ -269,6 +273,16 @@ impl AppCore {
             Some(Arc::new(facade))
         };
 
+        // ── Wrap config for shared ownership ─────────────────────────────
+        let shared_config = Arc::new(RwLock::new(config));
+
+        // ── Config file watcher (hot-reload) ──────────────────────────────
+        let config_watcher_token = crate::infrastructure::config_watcher::start_config_watcher(
+            Arc::clone(&shared_config),
+            Arc::clone(&hot_config),
+            shutdown_token.clone(),
+        );
+
         // ── Assemble AppCore ─────────────────────────────────────────────
         let core = AppCore {
             mode,
@@ -277,7 +291,8 @@ impl AppCore {
             agent: Arc::clone(&agent),
             bus: bus.clone(),
             persona_manager,
-            config: RwLock::new(config),
+            config: Arc::clone(&shared_config),
+            hot_config: Arc::clone(&hot_config),
             channel_manager: channel_manager.clone(),
             cron_service: cron_service.clone(),
             shutdown_token: shutdown_token.clone(),
@@ -350,6 +365,7 @@ impl AppCore {
             )),
             autotuner,
             mirror_facade,
+            _config_watcher_token: Some(config_watcher_token),
         };
 
         // ── One-time vocab → Knowledge Atoms migration ──────────────────

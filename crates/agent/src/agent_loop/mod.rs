@@ -92,6 +92,8 @@ pub struct AgentLoop {
     pub(crate) skill_router: Arc<RwLock<skill_system::router::SkillRouter>>,
     /// Shared embedding engine — reused for hot-reload embedding recomputation.
     pub(crate) embedding_engine: Arc<tools::EmbeddingEngine>,
+    /// Shared hot-reloadable config — updated by ConfigWatcherService without restart.
+    pub(crate) hot_config: Arc<RwLock<config::HotConfig>>,
 }
 
 impl AgentLoop {
@@ -105,6 +107,11 @@ impl AgentLoop {
     /// Used by `klyntbot-server` to expose active skills via MCP resources.
     pub fn skill_catalog(&self) -> Arc<RwLock<skill_system::types::SkillCatalog>> {
         Arc::clone(&self.skill_catalog)
+    }
+
+    /// Public accessor for the shared hot-reloadable config.
+    pub fn hot_config(&self) -> Arc<RwLock<config::HotConfig>> {
+        Arc::clone(&self.hot_config)
     }
 
     /// Reload skill packages from workspace (hot-reload after UI edits).

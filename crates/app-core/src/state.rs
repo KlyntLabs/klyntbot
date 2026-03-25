@@ -41,7 +41,9 @@ pub struct AppCore {
     pub agent: Arc<AgentLoop>,
     pub bus: Arc<MessageBus>,
     pub persona_manager: Arc<RwLock<PersonaManager>>,
-    pub config: RwLock<config::Config>,
+    pub config: Arc<RwLock<config::Config>>,
+    /// Shared hot-reloadable config subset — updated by file watcher and settings handlers.
+    pub hot_config: Arc<RwLock<config::HotConfig>>,
 
     pub channel_manager: Arc<Mutex<ChannelManager>>,
     pub cron_service: Arc<CronService>,
@@ -125,6 +127,8 @@ pub struct AppCore {
     pub autotuner: Option<Arc<agent::autotuner::AutoTunerOrchestrator>>,
     /// Mirror self-reflection facade (None when cognitive provider is unavailable).
     pub mirror_facade: Option<Arc<cognitive::mirror::MirrorFacade>>,
+    /// Cancellation token for the config file watcher background service.
+    pub _config_watcher_token: Option<CancellationToken>,
 }
 
 impl AppCore {

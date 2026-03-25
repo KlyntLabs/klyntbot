@@ -149,7 +149,7 @@ Klyntbot exposes tools to external AI clients (Claude Code, Cursor, etc.) via MC
 - **MSRV 1.75** — don't use APIs stabilized after 1.75 (e.g., `Option::is_none_or` requires 1.82). Use `map_or`/`map_or_else` instead. Clippy catches this.
 - **New Tauri command modules need `DEV_COMMANDS`** — every `crates/desktop/src/commands/*.rs` module with `#[tauri::command]` functions must export `pub const DEV_COMMANDS: &[&str]` and be added to `dev_server/mod.rs` test coverage list. The `dev_server_covers_all_tauri_commands` test enforces this.
 - **`StoragePool::from_existing()` skips migrations** — only for already-migrated pools. Tests must use `connect_in_memory()`.
-- **Config changes require restart** of the desktop app.
+- **Config hot-reload**: Model, temperature, max_tokens, max_iterations, pipeline_timeout, and monthly_budget changes take effect within 5 seconds (file watcher) or immediately (via settings UI). Structural changes (channels, provider init, feature enable/disable) still require restart.
 - **Dependency inversion** — new tools needing agent context must inject via `Arc<dyn Trait>` to avoid circular deps.
 - **`email` feature** (on by default) gates IMAP/SMTP deps in `channels` crate.
 - **`tauri.conf.json` uses `bun`** in `beforeBuildCommand`. Ensure `bun` is installed globally.
