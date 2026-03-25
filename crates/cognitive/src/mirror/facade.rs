@@ -13,9 +13,9 @@ use uuid::Uuid;
 use common::Result;
 
 use crate::mirror::{
-    AutotunerBridge, BrainVersion, FeedbackTarget, MetaRule, MetaRuleStatus, MirrorRepo,
-    MirrorResponse, MirrorState, NarrativeContext, NarrativeHandler, NarrativeSnippet,
-    RoutingSnapshot, TrendNarrative, TrialPreview, UserFeedback,
+    AutotunerBridge, BrainVersion, FeedbackTarget, MetaRule, MetaRuleAction, MetaRuleSource,
+    MetaRuleStatus, MirrorRepo, MirrorResponse, MirrorState, NarrativeContext, NarrativeHandler,
+    NarrativeSnippet, RoutingSnapshot, TrendNarrative, TrialPreview, UserFeedback,
 };
 use crate::repos::EpisodicMemoryRepo;
 
@@ -207,6 +207,24 @@ impl MirrorFacade {
             self.repo.get_meta_rules_by_status(MetaRuleStatus::Pending),
         )?;
         Ok((active, pending))
+    }
+
+    /// Create a user-authored meta-rule from free-form text.
+    /// The rule starts in Pending status with default effectiveness.
+    pub async fn create_meta_rule_from_text(&self, text: String) -> Result<MetaRule> {
+        let rule = MetaRule {
+            id: Uuid::new_v4(),
+            trigger_condition: text,
+            action: MetaRuleAction::SurfaceInsight { message: String::new() },
+            source: MetaRuleSource::UserCreated,
+            effectiveness_score: 0.5,
+            status: MetaRuleStatus::Pending,
+            signal_count: 0,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+        self.repo.insert_meta_rule(&rule).await?;
+        Ok(rule)
     }
 
     // -----------------------------------------------------------------------
