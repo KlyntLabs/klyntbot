@@ -73,6 +73,12 @@ impl ExecutionEngine for ReactiveEngine {
             Arc::clone(self.core.token_counter()),
             params.context_window,
         );
+        let refresher = params.context_update_queue.as_ref().map(|queue| {
+            crate::execution::LiveContextRefresher::new(
+                Arc::clone(self.core.token_counter()),
+                Arc::clone(queue),
+            )
+        });
         // Use per-request max_iterations from params, fall back to engine default
         let max_iterations = if params.max_iterations > 0 {
             params.max_iterations
@@ -349,6 +355,24 @@ impl ExecutionEngine for ReactiveEngine {
                             iteration: iteration as usize,
                         })
                         .await;
+                }
+            }
+
+            // Live context refresh: inject pending updates from cognitive/productivity systems
+            if !params.pause_context_updates {
+                if let Some(ref refresher) = refresher {
+                    let injected = refresher.inject_pending(&mut messages, params.context_window);
+                    if !injected.is_empty() {
+                        let tokens_added: usize = injected.iter().map(|u| u.tokens).sum();
+                        if let Some(ref tx) = event_tx {
+                            let _ = tx
+                                .send(crate::events::AgentEvent::ContextReassembled {
+                                    updates: injected,
+                                    tokens_added,
+                                })
+                                .await;
+                        }
+                    }
                 }
             }
         }
