@@ -72,9 +72,7 @@ impl NarrativeHandler for LlmNarrativeHandler {
 
     async fn generate_mirror_response(&self, query: &str, ctx: NarrativeContext) -> Result<String> {
         let context_summary = format_narrative_context(&ctx);
-        let user_msg = format!(
-            "## Context\n{context_summary}\n\n## User Question\n{query}"
-        );
+        let user_msg = format!("## Context\n{context_summary}\n\n## User Question\n{query}");
 
         let messages = vec![
             Message::system(MIRROR_RESPONSE_SYSTEM_PROMPT),

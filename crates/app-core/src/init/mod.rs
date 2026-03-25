@@ -246,28 +246,25 @@ impl AppCore {
 
         // ── Phase 9: Mirror self-reflection layer ────────────────────────
         let mirror_facade = {
-            let mirror_repo =
-                ::cognitive::mirror::MirrorRepo::new(storage_pool.clone());
-            let narrative_handler: Option<
-                Arc<dyn ::cognitive::mirror::NarrativeHandler>,
-            > = cognitive_provider.as_ref().map(|cp| {
-                let model = config
-                    .cognitive
-                    .model
-                    .as_deref()
-                    .unwrap_or(&config.agents.defaults.model)
-                    .to_string();
-                Arc::new(::agent::mirror_handlers::LlmNarrativeHandler::new(
-                    cp.clone(),
-                    model,
-                )) as Arc<dyn ::cognitive::mirror::NarrativeHandler>
-            });
-            let (facade, _handles, _mirror_shutdown) =
-                ::cognitive::mirror::MirrorEngine::start(
-                    mirror_repo,
-                    &domain_event_bus,
-                    narrative_handler,
-                );
+            let mirror_repo = ::cognitive::mirror::MirrorRepo::new(storage_pool.clone());
+            let narrative_handler: Option<Arc<dyn ::cognitive::mirror::NarrativeHandler>> =
+                cognitive_provider.as_ref().map(|cp| {
+                    let model = config
+                        .cognitive
+                        .model
+                        .as_deref()
+                        .unwrap_or(&config.agents.defaults.model)
+                        .to_string();
+                    Arc::new(::agent::mirror_handlers::LlmNarrativeHandler::new(
+                        cp.clone(),
+                        model,
+                    )) as Arc<dyn ::cognitive::mirror::NarrativeHandler>
+                });
+            let (facade, _handles, _mirror_shutdown) = ::cognitive::mirror::MirrorEngine::start(
+                mirror_repo,
+                &domain_event_bus,
+                narrative_handler,
+            );
             info!("mirror self-reflection engine started");
             Some(Arc::new(facade))
         };
@@ -408,7 +405,10 @@ impl AppCore {
                             rt.block_on(async move {
                                 match facade.generate_weekly_narrative().await {
                                     Ok(narrative) => {
-                                        info!("Mirror weekly narrative generated: {}", narrative.id);
+                                        info!(
+                                            "Mirror weekly narrative generated: {}",
+                                            narrative.id
+                                        );
                                         Ok(Some(format!(
                                             "Mirror narrative generated: {}",
                                             narrative.id
@@ -427,8 +427,7 @@ impl AppCore {
 
             // Cleanup old snapshots and snippets (retain 90 days)
             {
-                let mirror_repo =
-                    ::cognitive::mirror::MirrorRepo::new(storage_pool.clone());
+                let mirror_repo = ::cognitive::mirror::MirrorRepo::new(storage_pool.clone());
                 cron_service.register_handler(
                     cron::JOB_MIRROR_CLEANUP,
                     Arc::new(move |_job: &scheduling::CronJob| {

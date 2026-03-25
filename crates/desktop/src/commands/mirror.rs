@@ -120,12 +120,7 @@ pub(crate) async fn dispatch_dev(
                 Ok(f) => f,
                 Err(e) => return Some(Err(e)),
             };
-            dev::val(
-                facade
-                    .get_pending_snippets()
-                    .await
-                    .map_err(ApiError::from),
-            )
+            dev::val(facade.get_pending_snippets().await.map_err(ApiError::from))
         }
         "submit_mirror_feedback" => {
             let facade = match core.mirror_facade() {
