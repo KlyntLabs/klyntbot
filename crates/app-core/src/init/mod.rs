@@ -244,6 +244,34 @@ impl AppCore {
         let launcher::LauncherResult { launcher_engine } =
             launcher::init_launcher(&config, &storage_pool, &shutdown_token).await;
 
+        // ── Phase 9: Mirror self-reflection layer ────────────────────────
+        let mirror_facade = {
+            let mirror_repo =
+                ::cognitive::mirror::MirrorRepo::new(storage_pool.clone());
+            let narrative_handler: Option<
+                Arc<dyn ::cognitive::mirror::NarrativeHandler>,
+            > = cognitive_provider.as_ref().map(|cp| {
+                let model = config
+                    .cognitive
+                    .model
+                    .as_deref()
+                    .unwrap_or(&config.agents.defaults.model)
+                    .to_string();
+                Arc::new(::agent::mirror_handlers::LlmNarrativeHandler::new(
+                    cp.clone(),
+                    model,
+                )) as Arc<dyn ::cognitive::mirror::NarrativeHandler>
+            });
+            let (facade, _handles, _mirror_shutdown) =
+                ::cognitive::mirror::MirrorEngine::start(
+                    mirror_repo,
+                    &domain_event_bus,
+                    narrative_handler,
+                );
+            info!("mirror self-reflection engine started");
+            Some(Arc::new(facade))
+        };
+
         // ── Assemble AppCore ─────────────────────────────────────────────
         let core = AppCore {
             mode,
@@ -324,6 +352,7 @@ impl AppCore {
                 storage_pool.inner().clone(),
             )),
             autotuner,
+            mirror_facade,
         };
 
         // ── One-time vocab → Knowledge Atoms migration ──────────────────
@@ -361,6 +390,63 @@ impl AppCore {
                     })
                 }),
             );
+        }
+
+        // ── Mirror cron jobs (registered post-init — needs mirror_facade) ──
+        if let Some(ref facade) = core.mirror_facade {
+            let rt = tokio::runtime::Handle::current();
+
+            // Weekly narrative generation
+            {
+                let facade = Arc::clone(facade);
+                let rt = rt.clone();
+                cron_service.register_handler(
+                    cron::JOB_MIRROR_WEEKLY_NARRATIVE,
+                    Arc::new(move |_job: &scheduling::CronJob| {
+                        let facade = Arc::clone(&facade);
+                        tokio::task::block_in_place(|| {
+                            rt.block_on(async move {
+                                match facade.generate_weekly_narrative().await {
+                                    Ok(narrative) => {
+                                        info!("Mirror weekly narrative generated: {}", narrative.id);
+                                        Ok(Some(format!(
+                                            "Mirror narrative generated: {}",
+                                            narrative.id
+                                        )))
+                                    }
+                                    Err(e) => {
+                                        tracing::warn!("Mirror weekly narrative failed: {e}");
+                                        Ok(Some(format!("Mirror narrative failed: {e}")))
+                                    }
+                                }
+                            })
+                        })
+                    }),
+                );
+            }
+
+            // Cleanup old snapshots and snippets (retain 90 days)
+            {
+                let mirror_repo =
+                    ::cognitive::mirror::MirrorRepo::new(storage_pool.clone());
+                cron_service.register_handler(
+                    cron::JOB_MIRROR_CLEANUP,
+                    Arc::new(move |_job: &scheduling::CronJob| {
+                        let mirror_repo = mirror_repo.clone();
+                        tokio::task::block_in_place(|| {
+                            rt.block_on(async move {
+                                let snap_count =
+                                    mirror_repo.cleanup_old_snapshots(90).await.unwrap_or(0);
+                                let snip_count =
+                                    mirror_repo.cleanup_old_snippets(90).await.unwrap_or(0);
+                                Ok(Some(format!(
+                                    "Mirror cleanup: deleted {snap_count} snapshots, {snip_count} snippets"
+                                )))
+                            })
+                        })
+                    }),
+                );
+            }
         }
 
         // ── Background note embedding catch-up ────────────────────────────

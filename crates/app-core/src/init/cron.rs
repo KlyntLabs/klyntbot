@@ -215,6 +215,8 @@ const JOB_REMINDER_CHECK: &str = "__klyntbot_reminder_check";
 const JOB_RECURRING_TASKS: &str = "__klyntbot_recurring_tasks";
 pub(super) const JOB_INSIGHT_REFRESH: &str = "__klyntbot_insight_refresh";
 pub(super) const JOB_LEARNING_ANALYSIS: &str = "__klyntbot_learning_analysis";
+pub(super) const JOB_MIRROR_WEEKLY_NARRATIVE: &str = "__klyntbot_mirror_weekly_narrative";
+pub(super) const JOB_MIRROR_CLEANUP: &str = "__klyntbot_mirror_cleanup";
 
 /// Register individual cron handlers.
 #[allow(clippy::too_many_arguments)]
@@ -1067,6 +1069,24 @@ async fn ensure_cron_jobs(
             every_ms: config.learning.analysis_interval_secs * 1000
         },
         "Analyze tool outcomes and adapt confidence threshold",
+        system.clone()
+    );
+    ensure_job!(
+        JOB_MIRROR_WEEKLY_NARRATIVE,
+        scheduling::CronSchedule::Cron {
+            expr: "0 10 * * 0".to_string(),
+            tz: Some(config.timezone.clone()),
+        },
+        "Generate weekly Mirror self-reflection narrative",
+        system.clone()
+    );
+    ensure_job!(
+        JOB_MIRROR_CLEANUP,
+        scheduling::CronSchedule::Cron {
+            expr: "0 4 * * 0".to_string(),
+            tz: Some(config.timezone.clone()),
+        },
+        "Clean old Mirror routing snapshots and snippets",
         system
     );
 

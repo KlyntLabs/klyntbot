@@ -123,6 +123,8 @@ pub struct AppCore {
     pub deck_preference_repo: Option<cognitive::DeckPreferenceRepo>,
     /// AutoTuner orchestrator (None when autotuner is disabled).
     pub autotuner: Option<Arc<agent::autotuner::AutoTunerOrchestrator>>,
+    /// Mirror self-reflection facade (None when cognitive provider is unavailable).
+    pub mirror_facade: Option<Arc<cognitive::mirror::MirrorFacade>>,
 }
 
 impl AppCore {
@@ -257,6 +259,13 @@ impl AppCore {
     /// Return autotuner orchestrator or `None` when disabled.
     pub fn autotuner_orchestrator(&self) -> Option<&agent::autotuner::AutoTunerOrchestrator> {
         self.autotuner.as_deref()
+    }
+
+    /// Return mirror facade or a "not available" error.
+    pub fn mirror_facade(&self) -> Result<&cognitive::mirror::MirrorFacade, ApiError> {
+        self.mirror_facade
+            .as_deref()
+            .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "Mirror facade not available"))
     }
 
     /// Return proactive handler or a "not initialized" error.
