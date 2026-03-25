@@ -264,12 +264,26 @@ impl AppCore {
                         model,
                     )) as Arc<dyn ::cognitive::mirror::NarrativeHandler>
                 });
+            let autotuner_bridge: Option<Arc<dyn ::cognitive::mirror::AutotunerBridge>> =
+                autotuner.as_ref().map(|orch| {
+                    Arc::new(crate::adapters::autotuner_bridge::AppAutotunerBridge::new(
+                        Arc::clone(orch),
+                    )) as Arc<dyn ::cognitive::mirror::AutotunerBridge>
+                });
             let (facade, _handles, _mirror_shutdown) = ::cognitive::mirror::MirrorEngine::start(
                 mirror_repo,
                 &domain_event_bus,
                 narrative_handler,
-                None,
+                autotuner_bridge,
             );
+
+            // Bootstrap brain version 1 on first run
+            let bootstrap_repo = ::cognitive::mirror::MirrorRepo::new(storage_pool.clone());
+            let bootstrap_archiver = ::cognitive::mirror::ConfigArchiver::new(bootstrap_repo, None);
+            tokio::spawn(async move {
+                let _ = bootstrap_archiver.bootstrap(serde_json::json!({})).await;
+            });
+
             info!("mirror self-reflection engine started");
             Some(Arc::new(facade))
         };
