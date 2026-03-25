@@ -430,17 +430,6 @@ impl AgentRuntime {
                 .await;
         }
 
-        // Emit SkillRouted domain event for Mirror self-reflection layer
-        if let Some(ref domain_bus) = self.domain_event_bus {
-            domain_bus.publish(bus::DomainEvent::SkillRouted {
-                skill_name: agent_name.clone(),
-                confidence: analysis.confidence as f64,
-                source: format!("{:?}", analysis.source),
-                trigger_phrases: vec![],
-                session_key: format!("{}:{}", ctx.channel, ctx.chat_id),
-            });
-        }
-
         // Step 3b: Orchestration override — route multi-agent intents to orchestrator
         if analysis.needs_orchestration {
             let general = {
@@ -480,6 +469,18 @@ impl AgentRuntime {
                         .max(crate::intent_pipeline::analysis::ORCHESTRATION_MIN_ITERATIONS);
                 }
             }
+        }
+
+        // Emit SkillRouted domain event for Mirror self-reflection layer.
+        // Placed after orchestration override so agent_name reflects the final routing.
+        if let Some(ref domain_bus) = self.domain_event_bus {
+            domain_bus.publish(bus::DomainEvent::SkillRouted {
+                skill_name: agent_name.clone(),
+                confidence: analysis.confidence as f64,
+                source: format!("{:?}", analysis.source),
+                trigger_phrases: vec![],
+                session_key: common::SessionKey::new(&ctx.channel, &ctx.chat_id).to_string(),
+            });
         }
 
         // Step 4: Cap max_iterations from agent profile (skip for orchestrator —
