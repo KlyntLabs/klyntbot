@@ -9,6 +9,7 @@ use std::collections::{BTreeMap, HashSet, VecDeque};
 use std::hash::{Hash, Hasher};
 
 /// Signature of a single iteration in the ReAct loop.
+#[derive(Debug)]
 pub struct IterationSignature {
     /// Hash of the (sorted) tool calls made in this iteration.
     pub hash: u64,
@@ -41,6 +42,7 @@ pub enum LoopStatus {
 /// Session-scoped — the internal `DefaultHasher` is not stable across process
 /// restarts, which is fine since the detector lives for the duration of a single
 /// agent execution.
+#[derive(Debug)]
 pub struct LoopDetector {
     history: VecDeque<IterationSignature>,
     warned_hashes: HashSet<u64>,

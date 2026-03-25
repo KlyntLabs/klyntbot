@@ -330,14 +330,14 @@ impl ExecutionEngine for ReactiveEngine {
                 }
             }
 
-            // Oscillation detection: if the agent repeats the same action pattern, break early
-            if scratchpad.detect_oscillation(3) {
-                tracing::warn!(
-                    "ReactiveEngine: oscillation detected at iteration {} — breaking loop",
-                    iteration
-                );
-                break;
-            }
+            // TODO: replaced by loop_detector in Task 4
+            // if scratchpad.detect_oscillation(3) {
+            //     tracing::warn!(
+            //         "ReactiveEngine: oscillation detected at iteration {} — breaking loop",
+            //         iteration
+            //     );
+            //     break;
+            // }
 
             // Mid-loop compression: compress older tool results if approaching context limit
             if let Some((before, after)) = compressor.compress_if_needed(&mut messages) {

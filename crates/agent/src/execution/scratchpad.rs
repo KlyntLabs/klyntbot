@@ -5,6 +5,8 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::sync::OnceLock;
 
+use super::loop_detector::LoopDetector;
+
 fn plan_step_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
     RE.get_or_init(|| {
@@ -77,11 +79,16 @@ pub struct ReasoningTrace {
 pub struct Scratchpad {
     traces: Vec<ReasoningTrace>,
     plan: Option<ExecutionPlan>,
+    pub loop_detector: LoopDetector,
 }
 
 impl Scratchpad {
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            traces: Vec::new(),
+            plan: None,
+            loop_detector: LoopDetector::new(),
+        }
     }
 
     /// Append a reasoning trace.
@@ -194,24 +201,6 @@ impl Scratchpad {
 
         // Fallback to name-only matching
         self.mark_step_completed(tool_name)
-    }
-
-    /// Detect if the agent is oscillating between tool calls without progress.
-    /// Returns true if the last `window*2` traces show a repeating pattern.
-    pub fn detect_oscillation(&self, window: usize) -> bool {
-        if self.traces.len() < window * 2 {
-            return false;
-        }
-        let recent = &self.traces[self.traces.len() - window * 2..];
-        let first_half: Vec<&str> = recent[..window]
-            .iter()
-            .map(|t| t.actual_action.as_str())
-            .collect();
-        let second_half: Vec<&str> = recent[window..]
-            .iter()
-            .map(|t| t.actual_action.as_str())
-            .collect();
-        first_half == second_half
     }
 
     /// (completed, total) plan progress. None if no plan.
@@ -528,36 +517,4 @@ mod tests {
         assert_eq!(result.map(|r| r.0), Some(0));
     }
 
-    #[test]
-    fn detect_oscillation_finds_repeating_pattern() {
-        let mut pad = Scratchpad::new();
-        // Create pattern: A, B, A, B
-        pad.add(make_trace(1, "think", "action_a"));
-        pad.add(make_trace(2, "think", "action_b"));
-        pad.add(make_trace(3, "think", "action_a"));
-        pad.add(make_trace(4, "think", "action_b"));
-
-        assert!(pad.detect_oscillation(2));
-    }
-
-    #[test]
-    fn detect_oscillation_no_repeat() {
-        let mut pad = Scratchpad::new();
-        pad.add(make_trace(1, "think", "action_a"));
-        pad.add(make_trace(2, "think", "action_b"));
-        pad.add(make_trace(3, "think", "action_c"));
-        pad.add(make_trace(4, "think", "action_d"));
-
-        assert!(!pad.detect_oscillation(2));
-    }
-
-    #[test]
-    fn detect_oscillation_too_few_traces() {
-        let mut pad = Scratchpad::new();
-        pad.add(make_trace(1, "think", "action_a"));
-        pad.add(make_trace(2, "think", "action_a"));
-
-        // window=2 needs 4 traces, we only have 2
-        assert!(!pad.detect_oscillation(2));
-    }
 }
