@@ -17,6 +17,7 @@ use providers::Message;
 use tools::RoutingContext;
 
 use super::{EngineResult, ExecutionEngine};
+use crate::execution::loop_detector::LoopStatus;
 use crate::execution::scratchpad::{ExecutionPlan, ReasoningTrace, Scratchpad};
 use crate::execution::types::{accumulate_usage, CycleOutcome, ExecutionParams};
 use crate::execution::ExecutionCore;
@@ -84,6 +85,8 @@ impl ExecutionEngine for ReactiveEngine {
         let max_fabrication_retries = params.max_fabrication_retries;
         let mut seen_tool_calls: HashSet<String> = HashSet::new();
         let mut last_tool_name: Option<String> = None;
+
+        let mut last_tool_calls: Vec<(String, serde_json::Value)> = Vec::new();
 
         // Planning: inject planning prompt before iteration 1
         if let Some(ref prompt) = params.planning_prompt {
@@ -212,6 +215,11 @@ impl ExecutionEngine for ReactiveEngine {
                 }
 
                 CycleOutcome::ToolsExecuted { results } => {
+                    last_tool_calls = results
+                        .iter()
+                        .map(|r| (r.tool_name.clone(), r.arguments.clone()))
+                        .collect();
+
                     let tool_names: Vec<String> =
                         results.iter().map(|r| r.tool_name.clone()).collect();
                     if let Some(name) = tool_names.last() {
@@ -330,14 +338,60 @@ impl ExecutionEngine for ReactiveEngine {
                 }
             }
 
-            // TODO: replaced by loop_detector in Task 4
-            // if scratchpad.detect_oscillation(3) {
-            //     tracing::warn!(
-            //         "ReactiveEngine: oscillation detected at iteration {} — breaking loop",
-            //         iteration
-            //     );
-            //     break;
-            // }
+            // Loop detection: hash-based iteration signature comparison
+            if !last_tool_calls.is_empty() {
+                match scratchpad
+                    .loop_detector
+                    .record_iteration(iteration as usize, &last_tool_calls)
+                {
+                    LoopStatus::NoLoop => {}
+                    LoopStatus::Warning {
+                        tools_summary, ..
+                    } => {
+                        let suggestion = format!(
+                            "I'm noticing I've been repeating the same set of tools ({}) \
+                             for the last 3 steps without finding new information. Would you \
+                             like me to summarize what I've found so far, try a different \
+                             approach, or keep going?",
+                            tools_summary
+                        );
+                        tracing::warn!(
+                            iteration,
+                            tools_summary = %tools_summary,
+                            "ReactiveEngine: loop warning — repeating tool pattern"
+                        );
+                        if let Some(ref tx) = event_tx {
+                            let _ = tx
+                                .send(crate::events::AgentEvent::LoopDetected {
+                                    iteration: iteration as usize,
+                                    tools_summary,
+                                    suggestion: suggestion.clone(),
+                                })
+                                .await;
+                        }
+                        messages.push(Message::user(&suggestion));
+                    }
+                    LoopStatus::HardStop {
+                        tools_summary, ..
+                    } => {
+                        tracing::warn!(
+                            iteration,
+                            tools_summary = %tools_summary,
+                            "ReactiveEngine: loop hard-stop — forcing synthesis"
+                        );
+                        if let Some(ref tx) = event_tx {
+                            let _ = tx
+                                .send(crate::events::AgentEvent::LoopHardStop {
+                                    iteration: iteration as usize,
+                                    tools_summary,
+                                })
+                                .await;
+                        }
+                        break;
+                    }
+                }
+                last_tool_calls.clear();
+            }
 
             // Mid-loop compression: compress older tool results if approaching context limit
             if let Some((before, after)) = compressor.compress_if_needed(&mut messages) {
