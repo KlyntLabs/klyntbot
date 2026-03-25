@@ -1,5 +1,6 @@
 import { useQuery } from "@shared/hooks/useQuery";
 import { Eye } from "lucide-react";
+import { MetaRulesSection } from "./components/MetaRulesSection";
 import { MirrorInput } from "./components/MirrorInput";
 import type { TrendNarrative } from "./components/NarrativeCard";
 import { NarrativeCard } from "./components/NarrativeCard";
@@ -8,16 +9,30 @@ import { RoutingDonut } from "./components/RoutingDonut";
 import type { NarrativeSnippet } from "./components/SnippetFeed";
 import { SnippetFeed } from "./components/SnippetFeed";
 
+interface MetaRule {
+  id: string;
+  triggerCondition: string;
+  action: Record<string, unknown>;
+  source: string;
+  effectivenessScore: number;
+  status: string;
+  signalCount: number;
+}
+
 interface MirrorState {
   lastRoutingSnapshot: RoutingSnapshot | null;
   latestTrendNarrative: TrendNarrative | null;
   pendingSnippets: NarrativeSnippet[];
+  activeMetaRules: MetaRule[];
+  pendingMetaRules: MetaRule[];
 }
 
 const DEFAULT_MIRROR_STATE: MirrorState = {
   lastRoutingSnapshot: null,
   latestTrendNarrative: null,
   pendingSnippets: [],
+  activeMetaRules: [],
+  pendingMetaRules: [],
 };
 
 export function MirrorPage() {
@@ -41,6 +56,12 @@ export function MirrorPage() {
 
         {/* Recent Insights */}
         <SnippetFeed snippets={mirrorState?.pendingSnippets ?? []} />
+
+        {/* Meta-Rules */}
+        <MetaRulesSection
+          activeRules={mirrorState?.activeMetaRules ?? []}
+          pendingRules={mirrorState?.pendingMetaRules ?? []}
+        />
 
         {/* Skill Routing */}
         <RoutingDonut snapshot={mirrorState?.lastRoutingSnapshot} />
