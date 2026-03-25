@@ -6,4 +6,5 @@ mod cognitive;
 mod finance;
 mod learning;
 mod memory;
+mod mirror;
 mod sessions;

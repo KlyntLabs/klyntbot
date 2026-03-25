@@ -1654,6 +1654,7 @@ dependencies = [
  "common",
  "config",
  "context_engine",
+ "dashmap",
  "futures-util",
  "providers",
  "serde",
