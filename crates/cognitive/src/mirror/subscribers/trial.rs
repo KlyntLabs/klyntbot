@@ -82,17 +82,9 @@ impl TrialPreviewSubscriber {
             let signals = if let Some(eval) = &evaluator {
                 eval.evaluate_trial_early(&trial_id, started_at)
                     .await
-                    .unwrap_or(TrialEarlySignals {
-                        correction_rate_delta: 0.0,
-                        confidence_trend: TrendDirection::Stable,
-                        dominant_skill_shift: None,
-                    })
+                    .unwrap_or_default()
             } else {
-                TrialEarlySignals {
-                    correction_rate_delta: 0.0,
-                    confidence_trend: TrendDirection::Stable,
-                    dominant_skill_shift: None,
-                }
+                TrialEarlySignals::default()
             };
 
             let messages_scored = 0; // TODO: get from evaluator in Phase 5
@@ -134,6 +126,10 @@ impl TrialPreviewSubscriber {
             timers.remove(&trial_id);
         });
 
+        // Abort any existing timer for this trial before inserting the new one
+        if let Some((_, old_handle)) = self.active_timers.remove(&tid) {
+            old_handle.abort();
+        }
         self.active_timers.insert(tid, handle);
     }
 }

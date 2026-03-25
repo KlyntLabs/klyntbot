@@ -73,3 +73,5 @@ CREATE TABLE IF NOT EXISTS mirror_trial_previews (
     recommendation TEXT NOT NULL,
     narrative TEXT NOT NULL
 );
+CREATE INDEX IF NOT EXISTS idx_trial_previews_time ON mirror_trial_previews(preview_at);
+CREATE INDEX IF NOT EXISTS idx_trial_previews_trial_id ON mirror_trial_previews(trial_id);

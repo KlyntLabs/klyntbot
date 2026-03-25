@@ -1013,8 +1013,8 @@ async fn run_llm_generation(orch: &AutoTunerOrchestrator) -> common::Result<Vec<
         let trial_row = TrialRow {
             id: trial_id.to_string(),
             experiment_id: experiment_id.to_string(),
-            params: params_json.clone(),
-            generation_reasoning: variant.hypothesis.clone(),
+            params: params_json,
+            generation_reasoning: variant.hypothesis,
             status: autotuner::TrialStatus::Active.as_str().to_string(),
             created_at: now.clone(),
             completed_at: None,
@@ -1024,10 +1024,11 @@ async fn run_llm_generation(orch: &AutoTunerOrchestrator) -> common::Result<Vec<
             .create_trial(&trial_row)
             .await
             .map_err(|e| common::KlyntbotError::Storage(format!("create trial: {e}")))?;
+        // Move values out of trial_row after create_trial borrows it
         created_trials.push(CreatedTrial {
-            id: trial_id.to_string(),
-            hypothesis: variant.hypothesis,
-            params_summary: params_json,
+            id: trial_row.id,
+            hypothesis: trial_row.generation_reasoning,
+            params_summary: trial_row.params,
         });
     }
 

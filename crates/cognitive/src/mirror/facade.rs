@@ -30,7 +30,7 @@ pub struct MirrorFacade {
     pub(crate) repo: MirrorRepo,
     narrative_handler: Option<Arc<dyn NarrativeHandler>>,
     autotuner_bridge: Option<Arc<dyn AutotunerBridge>>,
-    pub active_timers: Option<Arc<DashMap<String, JoinHandle<()>>>>,
+    pub(crate) active_timers: Option<Arc<DashMap<String, JoinHandle<()>>>>,
 }
 
 impl MirrorFacade {

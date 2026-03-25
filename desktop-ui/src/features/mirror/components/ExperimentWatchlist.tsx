@@ -1,7 +1,7 @@
 import { useMutation } from "@shared/hooks/useMutation";
 import { FlaskConical, Play, X } from "lucide-react";
 
-interface TrialPreview {
+export interface TrialPreview {
   id: string;
   trialId: string;
   startedAt: string;

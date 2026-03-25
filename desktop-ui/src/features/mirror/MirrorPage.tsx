@@ -2,6 +2,7 @@ import { useQuery } from "@shared/hooks/useQuery";
 import { Eye } from "lucide-react";
 import type { BrainVersion } from "./components/BrainTimeline";
 import { BrainTimeline } from "./components/BrainTimeline";
+import type { TrialPreview } from "./components/ExperimentWatchlist";
 import { ExperimentWatchlist } from "./components/ExperimentWatchlist";
 import type { MetaRule } from "./components/MetaRulesSection";
 import { MetaRulesSection } from "./components/MetaRulesSection";
@@ -12,21 +13,6 @@ import type { RoutingSnapshot } from "./components/RoutingDonut";
 import { RoutingDonut } from "./components/RoutingDonut";
 import type { NarrativeSnippet } from "./components/SnippetFeed";
 import { SnippetFeed } from "./components/SnippetFeed";
-
-interface TrialPreview {
-  id: string;
-  trialId: string;
-  startedAt: string;
-  previewAt: string;
-  messagesScored: number;
-  earlySignals: {
-    correctionRateDelta: number;
-    confidenceTrend: string;
-    dominantSkillShift: string | null;
-  };
-  recommendation: string;
-  narrative: string;
-}
 
 interface MirrorState {
   lastRoutingSnapshot: RoutingSnapshot | null;

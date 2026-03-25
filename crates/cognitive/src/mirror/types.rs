@@ -219,7 +219,7 @@ pub struct TrialPreview {
     pub narrative: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TrialEarlySignals {
     pub correction_rate_delta: f64,
@@ -234,10 +234,11 @@ pub enum PreviewRecommendation {
     NeedMoreData,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub enum TrendDirection {
     Rising,
     Falling,
+    #[default]
     Stable,
 }
 
