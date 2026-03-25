@@ -5,7 +5,8 @@
 
 use klyntbot::cognitive::mirror::{
     BrainVersion, MetaRule, MetaRuleAction, MetaRuleSource, MetaRuleStatus, MirrorFacade,
-    MirrorRepo, RoutingSnapshot, SkillRouteStats,
+    MirrorRepo, PreviewRecommendation, RoutingSnapshot, SkillRouteStats, TrendDirection,
+    TrialEarlySignals, TrialPreview,
 };
 use klyntbot::cognitive::repos::cognitive_migrations;
 use klyntbot::storage::StoragePool;
@@ -180,4 +181,37 @@ async fn test_mirror_brain_version_lifecycle() {
     assert!(!versions.iter().find(|v| v.version == 1).unwrap().reverted);
     assert!(versions.iter().find(|v| v.version == 2).unwrap().reverted);
     assert!(!versions.iter().find(|v| v.version == 3).unwrap().reverted);
+}
+
+#[tokio::test]
+async fn test_mirror_trial_preview_lifecycle() {
+    let pool = mirror_pool().await;
+    let repo = MirrorRepo::new(pool.clone());
+    let facade = MirrorFacade::new(repo.clone());
+
+    // Insert a trial preview
+    let preview = TrialPreview {
+        id: Uuid::new_v4(),
+        trial_id: "trial-test-001".to_string(),
+        started_at: Utc::now() - chrono::Duration::hours(4),
+        preview_at: Utc::now(),
+        messages_scored: 25,
+        early_signals: TrialEarlySignals {
+            correction_rate_delta: -0.15,
+            confidence_trend: TrendDirection::Falling,
+            dominant_skill_shift: None,
+        },
+        recommendation: PreviewRecommendation::Kill,
+        narrative: "Correction rate worsened".to_string(),
+    };
+    repo.insert_trial_preview(&preview).await.unwrap();
+
+    // Verify in state
+    let state = facade.get_state().await.unwrap();
+    assert_eq!(state.recent_trial_previews.len(), 1);
+    assert_eq!(
+        state.recent_trial_previews[0].recommendation,
+        PreviewRecommendation::Kill
+    );
+    assert_eq!(state.recent_trial_previews[0].trial_id, "trial-test-001");
 }
