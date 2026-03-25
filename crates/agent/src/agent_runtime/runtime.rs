@@ -428,9 +428,11 @@ impl AgentRuntime {
             .await;
         let prefetch_engine = Arc::clone(&self.context_engine);
         let prefetch_message = message.to_string();
+        let prefetch_session_key =
+            Some(common::SessionKey::new(&ctx.channel, &ctx.chat_id).to_string());
         let prefetch_handle = tokio::spawn(async move {
             prefetch_engine
-                .prefetch_memory(&prefetch_message, prefetch_retrieval_ctx)
+                .prefetch_memory(&prefetch_message, prefetch_session_key, prefetch_retrieval_ctx)
                 .await
         });
 
@@ -538,12 +540,13 @@ impl AgentRuntime {
 
         // Step 6: Assemble context (AgentContextSource injects agent instructions + skills)
         // Await the pre-fetched memory from the concurrent task spawned in Step 3c.
-        let prefetched_memory = match prefetch_handle.await {
-            Ok(result) => result,
-            Err(e) => {
-                warn!("Memory pre-fetch task failed: {e}");
-                None
-            }
+        // If orchestration override changed the profile, the prefetch used the
+        // wrong RetrievalContext — discard it and let assemble do a fresh retrieval.
+        let prefetched_memory = if analysis.needs_orchestration {
+            let _ = prefetch_handle.await;
+            None
+        } else {
+            prefetch_handle.await.ok().flatten()
         };
 
         let prompt = system_prompt.unwrap_or(&self.config.system_prompt);

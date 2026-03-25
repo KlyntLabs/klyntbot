@@ -208,6 +208,7 @@ impl ContextEngine {
     pub async fn prefetch_memory(
         &self,
         message: &str,
+        session_key: Option<String>,
         retrieval_context: Option<crate::RetrievalContext>,
     ) -> Option<(String, usize, bool, Option<String>)> {
         let request = ContextRequest {
@@ -217,7 +218,7 @@ impl ContextEngine {
             strategy: ExecutionStrategy::ToolAssisted { max_iterations: 5 },
             tool_definitions: vec![],
             context_window: 0,
-            session_key: None,
+            session_key,
             retrieval_context,
         };
         self.retrieve_memory(&request).await
