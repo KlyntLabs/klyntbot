@@ -8,6 +8,9 @@ export function useReviewSession() {
   const [revealed, setRevealed] = useState(false);
   const [totalReviewed, setTotalReviewed] = useState(0);
   const [correctCount, setCorrectCount] = useState(0);
+  const [socraticExplanation, setSocraticExplanation] = useState<string | null>(null);
+  const [socraticLoading, setSocraticLoading] = useState(false);
+  const [showSocratic, setShowSocratic] = useState(false);
   const startTime = useRef(Date.now());
   const cardShownAt = useRef(Date.now());
 
@@ -38,6 +41,23 @@ export function useReviewSession() {
       });
       setTotalReviewed((n) => n + 1);
       if (quality !== "again") setCorrectCount((n) => n + 1);
+
+      // Auto-trigger Socratic explanation on weak answers
+      setSocraticExplanation(null);
+      setShowSocratic(false);
+      if (quality === "again" || quality === "hard") {
+        setShowSocratic(true);
+        setSocraticLoading(true);
+        ipc<{ explanation: string }>("flashcard_explain_answer", {
+          cardId: card.id,
+          userAnswer: `(self-rated as ${quality} after seeing the answer)`,
+          gradeExplanation: `Student self-assessed as '${quality}' — they may not fully understand the concept.`,
+        })
+          .then((r) => setSocraticExplanation(r.explanation))
+          .catch(() => setShowSocratic(false))
+          .finally(() => setSocraticLoading(false));
+      }
+
       setRevealed(false);
       const nextIndex = currentIndex + 1;
       setCurrentIndex(nextIndex);
@@ -45,6 +65,11 @@ export function useReviewSession() {
     },
     [cards, currentIndex],
   );
+
+  const dismissSocratic = useCallback(() => {
+    setShowSocratic(false);
+    setSocraticExplanation(null);
+  }, []);
 
   const current = cards[currentIndex] ?? null;
   const remaining = Math.max(0, cards.length - currentIndex);
@@ -64,5 +89,9 @@ export function useReviewSession() {
     startReview,
     reveal,
     rate,
+    socraticExplanation,
+    socraticLoading,
+    showSocratic,
+    dismissSocratic,
   };
 }

@@ -17,7 +17,21 @@ export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
   const navigate = useNavigate();
 
   const session = useReviewSession();
-  const { current, revealed, reveal, rate, cards, currentIndex, done: sessionDone } = session;
+  const {
+    current,
+    revealed,
+    reveal,
+    rate,
+    cards,
+    currentIndex,
+    done: sessionDone,
+    socraticExplanation,
+    socraticLoading,
+    showSocratic,
+    dismissSocratic,
+  } = session;
+
+  const [socraticOpen, setSocraticOpen] = useState(false);
 
   // Start review on mount — intentionally excludes session.startReview to avoid re-triggering
   // biome-ignore lint/correctness/useExhaustiveDependencies: only run on mount/deck change
@@ -69,6 +83,11 @@ export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
   }, [revealed, current, reveal, rate, onExit, navigate]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset socratic panel when card advances
+  useEffect(() => {
+    setSocraticOpen(false);
+  }, [currentIndex]);
 
   if (loading) {
     return (
@@ -143,6 +162,38 @@ export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
         )}
       </div>
 
+      {/* Socratic explanation */}
+      {showSocratic && (socraticLoading || socraticExplanation) && (
+        <div className="px-6 animate-[fade-in-up_0.2s_ease-out]">
+          {socraticLoading ? (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground justify-center py-2">
+              <Lightbulb size={14} strokeWidth={1.5} className="animate-pulse" />
+              Thinking...
+            </div>
+          ) : socraticExplanation && !socraticOpen ? (
+            <button
+              type="button"
+              onClick={() => setSocraticOpen(true)}
+              className="mx-auto flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors py-2"
+            >
+              <Lightbulb size={14} strokeWidth={1.5} />
+              Let's understand why
+            </button>
+          ) : socraticExplanation ? (
+            <div className="glass-card p-4 text-sm text-foreground whitespace-pre-wrap animate-[fade-in-up_0.2s_ease-out]">
+              {socraticExplanation}
+              <button
+                type="button"
+                onClick={dismissSocratic}
+                className="block mt-2 text-xs text-muted-foreground hover:text-foreground"
+              >
+                Dismiss
+              </button>
+            </div>
+          ) : null}
+        </div>
+      )}
+
       {/* Bottom area: Show Answer or Rating buttons */}
       <div className="px-6 pb-4 space-y-3">
         {!revealed ? (
@@ -162,14 +213,6 @@ export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
 
         {/* Footer actions */}
         <div className="flex items-center justify-center gap-4">
-          <button
-            type="button"
-            className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors opacity-50 cursor-not-allowed"
-            disabled
-          >
-            <Lightbulb size={12} strokeWidth={1.5} />
-            Ask AI
-          </button>
           <button
             type="button"
             className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors opacity-50 cursor-not-allowed"
