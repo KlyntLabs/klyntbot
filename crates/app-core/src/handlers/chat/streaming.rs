@@ -915,6 +915,14 @@ pub async fn relay_chat_stream(
                             }
                         );
                     }
+                    AgentEvent::ContextCompressed { before_tokens, after_tokens, iteration } => {
+                        tracing::info!(
+                            before_tokens,
+                            after_tokens,
+                            iteration,
+                            "mid-loop context compression applied"
+                        );
+                    }
                 }
             }
             else => break,
