@@ -1,6 +1,7 @@
 //! Execution engine — drives LLM-tool cycles.
 
 pub mod core;
+pub mod mid_loop_compressor;
 pub mod scratchpad;
 pub mod types;
 
