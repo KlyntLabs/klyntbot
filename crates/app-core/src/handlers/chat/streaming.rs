@@ -612,8 +612,24 @@ pub async fn relay_chat_stream(
                             }
                         );
                     }
-                    AgentEvent::ContextAssembled { duration_ms, .. } => {
+                    AgentEvent::PipelineStarted => {
+                        emit!(
+                            AGENT_PIPELINE_STARTED,
+                            PipelineStartedPayload {
+                                session_key: sk.clone(),
+                            }
+                        );
+                    }
+                    AgentEvent::ContextAssembled { total_tokens, budget: _, duration_ms } => {
                         transparency.timing.get_or_insert_with(Default::default).context_assembly_ms = Some(duration_ms);
+                        emit!(
+                            AGENT_CONTEXT_ASSEMBLED,
+                            ContextAssembledPayload {
+                                session_key: sk.clone(),
+                                total_tokens,
+                                duration_ms,
+                            }
+                        );
                     }
                     AgentEvent::IterationStart { iteration, max } => {
                         if let Some(ref mut exec) = transparency.execution {

@@ -300,6 +300,11 @@ impl AgentRuntime {
     ) -> Result<RuntimeResult> {
         let pipeline_start = Instant::now();
 
+        // Emit pipeline start immediately for frontend progress indication
+        if let Some(ref tx) = event_tx {
+            let _ = tx.send(AgentEvent::PipelineStarted).await;
+        }
+
         // Step 0a: AutoTuner hook — shadow classification before live processing.
         if let Some(ref hook) = self.autotuner_hook {
             hook.on_message_received(message, ctx.chat_id.as_str())

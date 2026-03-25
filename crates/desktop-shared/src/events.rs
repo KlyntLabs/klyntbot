@@ -34,6 +34,8 @@ pub const AGENT_TOOL_END: &str = "agent:tool_end";
 pub const AGENT_ERROR: &str = "agent:error";
 pub const AGENT_ENTITY_CREATED: &str = "agent:entity_created";
 pub const AGENT_INTERACTION_REQUEST: &str = "agent:interaction_request";
+pub const AGENT_PIPELINE_STARTED: &str = "agent:pipeline_started";
+pub const AGENT_CONTEXT_ASSEMBLED: &str = "agent:context_assembled";
 pub const AGENT_CLASSIFICATION_COMPLETE: &str = "agent:classification_complete";
 pub const AGENT_EXECUTION_STARTED: &str = "agent:execution_started";
 pub const AGENT_ITERATION_START: &str = "agent:iteration_start";
@@ -167,6 +169,20 @@ pub struct EntityCreatedPayload {
 pub struct EntityUpdatedPayload {
     pub entity_kind: EntityKind,
     pub id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PipelineStartedPayload {
+    pub session_key: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContextAssembledPayload {
+    pub session_key: String,
+    pub total_tokens: usize,
+    pub duration_ms: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

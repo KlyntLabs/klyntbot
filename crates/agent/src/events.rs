@@ -12,6 +12,9 @@ pub enum AgentEvent {
     /// A chunk of content streamed from the LLM.
     ContentChunk { data: String },
 
+    /// Pipeline processing has begun (emitted immediately, before classification).
+    PipelineStarted,
+
     /// A tool execution has started.
     ToolStart {
         name: String,
