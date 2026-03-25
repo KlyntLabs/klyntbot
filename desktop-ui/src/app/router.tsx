@@ -46,6 +46,11 @@ const TargetsPage = lazy(() =>
   import("../features/finance").then((m) => ({ default: m.TargetsPage })),
 );
 
+// ── Mirror Feature ───────────────────────────────────────────
+const MirrorPage = lazy(() =>
+  import("../features/mirror").then((m) => ({ default: m.MirrorPage })),
+);
+
 // ── Coaching Feature ────────────────────────────────────────
 const CoachingLayout = lazy(() =>
   import("../features/coaching").then((m) => ({ default: m.CoachingLayout })),
@@ -218,6 +223,7 @@ export const router = createHashRouter([
       { path: "/learn", element: <LearnPage /> },
       { path: "/learn/knowledge", element: <KnowledgeHealthPage /> },
       { path: "/learn/review/:topicId?", element: <FocusedReviewPage /> },
+      { path: "/mirror", element: <MirrorPage /> },
       { path: "/automations", element: <AutomationsPage /> },
       { path: "/categories", element: <Navigate to="/system/categories" replace /> },
       { path: "/finance", element: <FinanceOverviewPage /> },
