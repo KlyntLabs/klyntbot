@@ -25,7 +25,14 @@ metadata:
       - add todo
       - add a task
       - plan my day
+      - plan my morning
+      - plan my evening
+      - plan my week
       - morning plan
+      - morning routine
+      - evening routine
+      - daily routine
+      - routine
       - break this down
       - decompose
       - weekly review
@@ -43,11 +50,13 @@ metadata:
       - project status
       - how are my projects
       - what should I do today
+      - what should I do
       - what's on my plate
       - what's next
       - prioritize
-      - I need to
-      - remind me to do
+      - help me plan
+      - schedule my day
+      - organize my
       - daily plan
       - evening review
       - what's due
@@ -59,6 +68,8 @@ metadata:
       - objective
       - goal
       - focus
+      - productive
+      - productivity
       - what tasks
       - show my tasks
       - to do list
