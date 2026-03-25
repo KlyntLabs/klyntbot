@@ -101,7 +101,7 @@ Klyntbot exposes tools to external AI clients (Claude Code, Cursor, etc.) via MC
 
 **Architecture:** `ToolRegistryBridge` translates MCP calls → internal `Tool::execute()`. The `agent` tool delegates natural language to the full AI pipeline via `AgentBridge`. Tool names must match the `ToolRegistry` key exactly (e.g. `tasks` not `task`, `notes` not `note`).
 
-**Currently exposed tools:** `tasks`, `project`, `area`, `notes`, `memory`, `okr`, `finance`, `productivity`, `work_context`, `agent` — configured in `default_exposed_tools()` at `crates/config/src/schema/mcp.rs`.
+**Currently exposed tools:** `tasks`, `project`, `area`, `notes`, `memory`, `okr`, `finance`, `productivity`, `work_context`, `agent`, `annotate`, `learning`, `cron`, `mirror` — configured in `default_exposed_tools()` at `crates/config/src/schema/mcp.rs`.
 
 **To expose a new feature tool via MCP:**
 
@@ -129,6 +129,20 @@ Klyntbot exposes tools to external AI clients (Claude Code, Cursor, etc.) via MC
 ### Tray countdown
 
 `tray_countdown.rs` shows the next upcoming calendar event or task deadline in the macOS menu bar with a live countdown (e.g. "« 24:57 · Standup"). Only shows items due today (local timezone). Polls the DB every 30s, ticks every 1s. Coordinates with the focus timer via `FOCUS_ACTIVE` atomic flag — when a focus session is running, the focus timer owns the tray title and the countdown yields. On focus end, `notify_focus_ended()` clears the flag and the countdown resumes. Uses `tauri::async_runtime::spawn` (not `tokio::spawn`) because it starts during Tauri's `setup` hook before the tokio runtime is available.
+
+### Mirror self-reflection layer
+
+`crates/cognitive/src/mirror/` — event-driven self-awareness system. Four subscribers watch domain events reactively, a facade provides the public API, cron jobs handle weekly narrative generation and retention cleanup.
+
+**Subscribers:** `RoutingMirrorSubscriber` (hourly routing snapshots + drift detection), `MetaRuleDetector` (correction streaks → pending rule proposals), `ConfigArchiver` (autotuner promotions → brain version timeline), `TrialPreviewSubscriber` (4h early trial evaluation + kill/continue). All started by `MirrorEngine::start()` which returns `(MirrorFacade, Vec<JoinHandle>, CancellationToken)`.
+
+**MirrorFacade:** Public API for state queries, user actions (approve/dismiss rules, kill/continue trials, revert brain versions), weekly narrative generation, and conversational mirror responses. Wired with optional `EpisodicMemoryRepo` (cross-feature memory ripple) and `Arc<DomainEventBus>` (auto-note on trial kill). Stored as `Option<Arc<MirrorFacade>>` in `AppCore`.
+
+**Storage:** 6 tables in `crates/cognitive/migrations/003_mirror_tables.sql` (routing_snapshots, trend_narratives, snippets, meta_rules, brain_versions, trial_previews). Migration version managed via `cognitive_mirror` feature migration.
+
+**MCP:** `MirrorTool` (multi-action, read-only) registered post-init via `agent.tool_registry()`. Actions: `get_state`, `get_narratives`, `get_routing_history`, `get_brain_versions`, `get_meta_rules`.
+
+**Cron:** `JOB_MIRROR_WEEKLY_NARRATIVE` (Sunday 10am UTC), `JOB_MIRROR_CLEANUP` (Sunday 4am UTC — cleans snapshots, snippets, trial previews older than 90 days).
 
 ### Agent runtime
 
@@ -158,4 +172,5 @@ Klyntbot exposes tools to external AI clients (Claude Code, Cursor, etc.) via MC
 - **`email` feature** (on by default) gates IMAP/SMTP deps in `channels` crate.
 - **`tauri.conf.json` uses `bun`** in `beforeBuildCommand`. Ensure `bun` is installed globally.
 - **Timestamps are UTC, display in local time** — Rust stores `chrono::Utc::now().to_rfc3339()`. For user-facing display strings formatted in Rust (e.g. `due_display` in `TodayTaskResponse`), convert to local first via `d.with_timezone(&chrono::Local)`. In the frontend, never `.slice()` ISO strings — parse via `new Date(iso)` and use `toLocaleTimeString()`. Shared helper: `formatTime()` in `desktop-ui/src/shared/lib/dates.ts`.
+- **`MirrorEngine::start` takes `Arc<DomainEventBus>`** — not `&DomainEventBus`. The bus is cloned into the facade for `MirrorTrialKilled` event emission. Signature: `start(repo, bus: Arc<DomainEventBus>, narrative_handler, autotuner_bridge, episodic_repo)`. Handles and shutdown token must be stored in `AppCore` (not dropped).
 - **Pre-release — no user data to migrate.** All schema changes can be made directly (alter tables, drop and recreate) without writing migration scripts. No need for backwards-compatible migrations until first release. When a migration is consolidated, update the `FeatureMigration` version and SQL in-place rather than adding incremental migration files. After first release, all schema changes require proper versioned migrations with `INSERT OR IGNORE` for idempotency.
