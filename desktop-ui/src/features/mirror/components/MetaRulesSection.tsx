@@ -1,4 +1,5 @@
 import { useMutation } from "@shared/hooks/useMutation";
+import { invalidateQueries } from "@shared/hooks/useQuery";
 import { Check, Sparkles, X } from "lucide-react";
 
 export interface MetaRule {
@@ -38,7 +39,10 @@ export function MetaRulesSection({ activeRules, pendingRules }: MetaRulesSection
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => approve({ ruleId: rule.id })}
+              onClick={async () => {
+                await approve({ ruleId: rule.id });
+                invalidateQueries("get_mirror");
+              }}
               className="flex items-center gap-1 px-2.5 py-1 rounded-md text-2xs text-success bg-success/10 hover:bg-success/20 transition-colors"
             >
               <Check className="size-3" />
@@ -46,7 +50,10 @@ export function MetaRulesSection({ activeRules, pendingRules }: MetaRulesSection
             </button>
             <button
               type="button"
-              onClick={() => dismiss({ ruleId: rule.id })}
+              onClick={async () => {
+                await dismiss({ ruleId: rule.id });
+                invalidateQueries("get_mirror");
+              }}
               className="flex items-center gap-1 px-2.5 py-1 rounded-md text-2xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
             >
               <X className="size-3" />
