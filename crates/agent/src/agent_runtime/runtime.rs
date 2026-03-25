@@ -1891,6 +1891,7 @@ mod tests {
                 scope: SkillScope::BuiltIn,
                 location: PathBuf::new(),
                 body: String::new(),
+                summary: String::new(),
                 metadata: SkillMetadata {
                     klyntbot: Some(KlyntbotMeta {
                         tools,

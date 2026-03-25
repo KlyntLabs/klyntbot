@@ -37,6 +37,8 @@ pub struct SkillPackage {
     pub resources: Vec<String>,
     pub loaded_at: SystemTime,
     pub trusted: bool,
+    /// One-line summary for progressive skill catalog. From frontmatter or first sentence of body.
+    pub summary: String,
 }
 
 impl SkillPackage {
@@ -119,6 +121,8 @@ pub struct KlyntbotMeta {
     pub invokes: Vec<String>,
     /// Trigger phrases that boost this skill during routing.
     pub triggers: Vec<String>,
+    /// Short summary for progressive skill loading (Tier 1 catalog).
+    pub summary: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -171,6 +175,7 @@ mod tests {
             resources: Vec::new(),
             loaded_at: SystemTime::now(),
             trusted: true,
+            summary: String::new(),
         };
         assert!(pkg.allowed_tool_names().is_none());
     }
@@ -194,6 +199,7 @@ mod tests {
             resources: Vec::new(),
             loaded_at: SystemTime::now(),
             trusted: true,
+            summary: String::new(),
         };
         let allowed = pkg.allowed_tool_names().unwrap();
         assert!(allowed.contains("tasks"));
@@ -221,6 +227,7 @@ mod tests {
             resources: Vec::new(),
             loaded_at: SystemTime::now(),
             trusted: true,
+            summary: String::new(),
         };
         assert!(pkg.allows_mcp_server("anything"));
     }
@@ -238,6 +245,7 @@ mod tests {
             resources: Vec::new(),
             loaded_at: SystemTime::now(),
             trusted: true,
+            summary: String::new(),
         };
         assert!(!pkg.allows_mcp_server("linear"));
     }

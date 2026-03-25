@@ -11,4 +11,5 @@ pub mod learning_tool;
 pub mod memory_tool;
 pub mod okr_tool;
 pub mod project_tool;
+pub mod skill_reference;
 pub mod spawn;

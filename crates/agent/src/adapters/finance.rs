@@ -308,7 +308,11 @@ impl FinanceHandler for FinanceHandlerImpl {
         lines.push(String::new());
         for (cat, amount) in &rows {
             let pct = amount * 100 / total;
-            lines.push(format!("- {cat}: {:.2} {} ({pct}%)", *amount as f64 / 100.0, currency));
+            lines.push(format!(
+                "- {cat}: {:.2} {} ({pct}%)",
+                *amount as f64 / 100.0,
+                currency
+            ));
         }
         Ok(lines.join("\n"))
     }

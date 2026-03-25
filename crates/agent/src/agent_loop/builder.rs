@@ -264,6 +264,28 @@ impl AgentLoopBuilder {
         // Build reference files map for SkillContextSource
         let reference_files = Arc::new(skill_system::discovery::builtin_reference_map());
 
+        // Build skill reference index for progressive loading
+        let skill_reference_index = {
+            let mut skill_bodies = std::collections::HashMap::new();
+            let mut ref_files = std::collections::HashMap::new();
+
+            for pkg in skill_catalog.all_skills() {
+                skill_bodies.insert(pkg.name.clone(), pkg.body.clone());
+            }
+
+            // Re-key reference files from "builtin::skill/references/name.md" to "skill/name"
+            for (key, content) in reference_files.iter() {
+                if let Some((skill_name, ref_name)) = parse_reference_key(key) {
+                    ref_files.insert(format!("{}/{}", skill_name, ref_name), content.clone());
+                }
+            }
+
+            Arc::new(tools::SkillReferenceIndex {
+                skill_bodies,
+                reference_files: ref_files,
+            })
+        };
+
         // Shared active profile — written by AgentRuntime, read by SkillContextSource
         let active_profile: Arc<
             tokio::sync::RwLock<Option<Arc<skill_system::types::SkillPackage>>>,
@@ -1230,6 +1252,11 @@ impl AgentLoopBuilder {
             None
         };
 
+        // ── Skill reference tool (progressive loading) ───────────────────
+        tool_registry.register(tools::SkillReferenceTool::new(Arc::clone(
+            &skill_reference_index,
+        )));
+
         // ── Confidence evaluator ──────────────────────────────────────────
         let confidence_evaluator = if config.confidence.enabled {
             if config.confidence.tool_overrides.is_empty() {
@@ -1607,4 +1634,28 @@ impl AgentLoop {
     ) -> AgentLoopBuilder {
         AgentLoopBuilder::new(bus, provider, config)
     }
+}
+
+/// Parse a reference file key into (skill_name, reference_name).
+fn parse_reference_key(key: &str) -> Option<(String, String)> {
+    // Format: "builtin::{skill}/references/{name}.md"
+    if let Some(rest) = key.strip_prefix("builtin::") {
+        let parts: Vec<&str> = rest.splitn(2, "/references/").collect();
+        if parts.len() == 2 {
+            let name = parts[1].strip_suffix(".md").unwrap_or(parts[1]);
+            return Some((parts[0].to_string(), name.to_string()));
+        }
+    }
+    // Format: "{path}/references/{name}.md"
+    if let Some(idx) = key.find("/references/") {
+        let skill_path = &key[..idx];
+        let skill_name = std::path::Path::new(skill_path)
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or(skill_path);
+        let name = &key[idx + "/references/".len()..];
+        let name = name.strip_suffix(".md").unwrap_or(name);
+        return Some((skill_name.to_string(), name.to_string()));
+    }
+    None
 }
