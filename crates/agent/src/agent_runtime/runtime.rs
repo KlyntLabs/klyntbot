@@ -492,7 +492,8 @@ impl AgentRuntime {
 
         let mut params = ExecutionParams::new(&self.config.execution_model)
             .with_max_iterations(analysis.mode.max_iterations())
-            .with_original_message(message.to_string());
+            .with_original_message(message.to_string())
+            .with_context_window(self.config.context_window);
 
         if let Some(token) = cancel_token {
             params = params.with_cancel_token(token);
@@ -1042,7 +1043,8 @@ impl tools::DelegationHandler for AgentRuntime {
         };
         let params = ExecutionParams::new(&self.config.execution_model)
             .with_max_iterations(max_iters)
-            .with_original_message(query.to_string());
+            .with_original_message(query.to_string())
+            .with_context_window(self.config.context_window);
 
         // Build delegated routing context with incremented depth
         let mut delegated_ctx = ctx.clone();
