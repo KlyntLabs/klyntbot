@@ -471,8 +471,10 @@ impl AppCore {
                                     mirror_repo.cleanup_old_snapshots(90).await.unwrap_or(0);
                                 let snip_count =
                                     mirror_repo.cleanup_old_snippets(90).await.unwrap_or(0);
+                                let preview_count =
+                                    mirror_repo.cleanup_old_trial_previews(90).await.unwrap_or(0);
                                 Ok(Some(format!(
-                                    "Mirror cleanup: deleted {snap_count} snapshots, {snip_count} snippets"
+                                    "Mirror cleanup: deleted {snap_count} snapshots, {snip_count} snippets, {preview_count} trial previews"
                                 )))
                             })
                         })
