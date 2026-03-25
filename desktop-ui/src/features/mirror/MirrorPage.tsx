@@ -1,5 +1,6 @@
 import { useQuery } from "@shared/hooks/useQuery";
 import { Eye } from "lucide-react";
+import { BrainTimeline } from "./components/BrainTimeline";
 import type { MetaRule } from "./components/MetaRulesSection";
 import { MetaRulesSection } from "./components/MetaRulesSection";
 import { MirrorInput } from "./components/MirrorInput";
@@ -16,6 +17,7 @@ interface MirrorState {
   pendingSnippets: NarrativeSnippet[];
   activeMetaRules: MetaRule[];
   pendingMetaRules: MetaRule[];
+  latestBrainVersion: { version: number } | null;
 }
 
 const DEFAULT_MIRROR_STATE: MirrorState = {
@@ -24,6 +26,7 @@ const DEFAULT_MIRROR_STATE: MirrorState = {
   pendingSnippets: [],
   activeMetaRules: [],
   pendingMetaRules: [],
+  latestBrainVersion: null,
 };
 
 export function MirrorPage() {
@@ -54,6 +57,9 @@ export function MirrorPage() {
           pendingRules={mirrorState?.pendingMetaRules ?? []}
           onRuleAction={refetch}
         />
+
+        {/* Brain Versions */}
+        <BrainTimeline />
 
         {/* Skill Routing */}
         <RoutingDonut snapshot={mirrorState?.lastRoutingSnapshot} />
