@@ -750,6 +750,8 @@ fn run_desktop_app() {
             commands::mirror::get_pending_snippets,
             commands::mirror::submit_mirror_feedback,
             commands::mirror::generate_mirror_response,
+            commands::mirror::approve_meta_rule,
+            commands::mirror::dismiss_meta_rule,
             // Active View
             commands::view::view_set_active,
             commands::view::view_clear_active,

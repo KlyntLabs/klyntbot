@@ -18,6 +18,8 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "get_pending_snippets",
     "submit_mirror_feedback",
     "generate_mirror_response",
+    "approve_meta_rule",
+    "dismiss_meta_rule",
 ];
 
 #[tauri::command]
@@ -70,6 +72,24 @@ pub async fn generate_mirror_response(
 ) -> Result<MirrorResponse, ApiError> {
     let facade = state.mirror_facade()?;
     Ok(facade.generate_mirror_response(query, None).await?)
+}
+
+#[tauri::command]
+pub async fn approve_meta_rule(
+    state: State<'_, Arc<AppCore>>,
+    rule_id: Uuid,
+) -> Result<(), ApiError> {
+    let facade = state.mirror_facade()?;
+    Ok(facade.approve_meta_rule(rule_id).await?)
+}
+
+#[tauri::command]
+pub async fn dismiss_meta_rule(
+    state: State<'_, Arc<AppCore>>,
+    rule_id: Uuid,
+) -> Result<(), ApiError> {
+    let facade = state.mirror_facade()?;
+    Ok(facade.dismiss_meta_rule(rule_id).await?)
 }
 
 // ── Dev server dispatch ──────────────────────────────────────────────────
@@ -146,6 +166,32 @@ pub(crate) async fn dispatch_dev(
             dev::val(
                 facade
                     .generate_mirror_response(query, None)
+                    .await
+                    .map_err(ApiError::from),
+            )
+        }
+        "approve_meta_rule" => {
+            let facade = match core.mirror_facade() {
+                Ok(f) => f,
+                Err(e) => return Some(Err(e)),
+            };
+            let rule_id: Uuid = try_field!(dev::require(body, "rule_id"));
+            dev::val(
+                facade
+                    .approve_meta_rule(rule_id)
+                    .await
+                    .map_err(ApiError::from),
+            )
+        }
+        "dismiss_meta_rule" => {
+            let facade = match core.mirror_facade() {
+                Ok(f) => f,
+                Err(e) => return Some(Err(e)),
+            };
+            let rule_id: Uuid = try_field!(dev::require(body, "rule_id"));
+            dev::val(
+                facade
+                    .dismiss_meta_rule(rule_id)
                     .await
                     .map_err(ApiError::from),
             )
