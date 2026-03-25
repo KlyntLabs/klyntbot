@@ -26,6 +26,9 @@ use super::types::{AnalysisSource, ComplexitySignals, ExecutionMode, FailureRisk
 /// Minimum iteration budget for orchestration and MCP-tool overrides.
 pub const ORCHESTRATION_MIN_ITERATIONS: u32 = 15;
 
+/// Moderate iteration budget for shadow-deferred fallback (Layer 1-2 inconclusive).
+const SHADOW_MODE_FALLBACK_ITERATIONS: u32 = 5;
+
 /// Confidence floor applied when multi-agent triggers are detected post-classification.
 const ORCHESTRATION_MIN_CONFIDENCE: f32 = 0.75;
 
@@ -1386,7 +1389,9 @@ impl IntentAnalyzer {
                     ..partial.clone()
                 },
                 None => IntentAnalysis {
-                    mode: ExecutionMode::Reactive { max_iterations: 5 },
+                    mode: ExecutionMode::Reactive {
+                        max_iterations: SHADOW_MODE_FALLBACK_ITERATIONS,
+                    },
                     signals: ComplexitySignals {
                         estimated_tool_calls: 1,
                         has_sequential_deps: false,

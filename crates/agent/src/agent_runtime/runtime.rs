@@ -431,6 +431,7 @@ impl AgentRuntime {
         let prefetch_retrieval_ctx = self
             .build_retrieval_context(&profile.name, &history, correction.clone())
             .await;
+        let prefetch_retrieval_ctx_for_spawn = prefetch_retrieval_ctx.clone();
         let prefetch_engine = Arc::clone(&self.context_engine);
         let prefetch_message = message.to_string();
         let prefetch_session_key =
@@ -440,7 +441,7 @@ impl AgentRuntime {
                 .prefetch_memory(
                     &prefetch_message,
                     prefetch_session_key,
-                    prefetch_retrieval_ctx,
+                    prefetch_retrieval_ctx_for_spawn,
                 )
                 .await
         });
@@ -542,17 +543,21 @@ impl AgentRuntime {
             }
         }
 
-        // Step 5.5: Build retrieval context for query rewriting (uses final profile)
-        let retrieval_context = self
-            .build_retrieval_context(&profile.name, &history, correction)
-            .await;
+        // Step 5.5: Reuse the preliminary retrieval context when the profile didn't change
+        // (no orchestration override). Only rebuild when the profile was swapped.
+        let retrieval_context = if analysis.needs_orchestration {
+            self.build_retrieval_context(&profile.name, &history, correction)
+                .await
+        } else {
+            prefetch_retrieval_ctx
+        };
 
         // Step 6: Assemble context (AgentContextSource injects agent instructions + skills)
         // Await the pre-fetched memory from the concurrent task spawned in Step 3c.
         // If orchestration override changed the profile, the prefetch used the
         // wrong RetrievalContext — discard it and let assemble do a fresh retrieval.
         let prefetched_memory = if analysis.needs_orchestration {
-            let _ = prefetch_handle.await;
+            prefetch_handle.abort();
             None
         } else {
             prefetch_handle.await.ok().flatten()

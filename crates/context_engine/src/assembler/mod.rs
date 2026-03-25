@@ -181,24 +181,7 @@ impl ContextEngine {
     }
 
     pub async fn assemble(&self, request: ContextRequest) -> AssembledContext {
-        // Check cache first
-        let cache_key = Self::compute_cache_key(&request);
-        {
-            let cache = self.cache.lock().await;
-            if let Some(cached) = cache.get(&cache_key) {
-                return cached.clone();
-            }
-        }
-
-        let result = self.assemble_uncached(&request).await;
-
-        // Store in cache
-        {
-            let mut cache = self.cache.lock().await;
-            cache.insert(cache_key, result.clone());
-        }
-
-        result
+        self.assemble_with_prefetched(request, None).await
     }
 
     /// Run the expensive memory retrieval independently, before full context assembly.
