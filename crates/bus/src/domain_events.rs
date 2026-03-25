@@ -411,6 +411,10 @@ pub enum DomainEvent {
     },
 
     // -- Mirror self-reflection --
+    /// Emitted when user kills an experiment trial via the Mirror UI.
+    MirrorTrialKilled {
+        trial_id: String,
+    },
     /// Emitted when the Mirror layer creates a new NarrativeSnippet for the user.
     MirrorSnippetCreated {
         snippet_id: String,

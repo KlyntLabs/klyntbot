@@ -135,7 +135,8 @@ pub fn evaluate_salience(event: &DomainEvent) -> SalienceVerdict {
         // Trial activation — discard from cognitive (Mirror handles via TrialPreviewSubscriber)
         DomainEvent::TrialActivated { .. } => SalienceVerdict::Discard,
 
-        // Mirror snippet events — discard from cognitive (Mirror handles its own storage)
+        // Mirror events — discard from cognitive (Mirror handles its own storage)
+        DomainEvent::MirrorTrialKilled { .. } => SalienceVerdict::Discard,
         DomainEvent::MirrorSnippetCreated { .. } => SalienceVerdict::Discard,
     }
 }

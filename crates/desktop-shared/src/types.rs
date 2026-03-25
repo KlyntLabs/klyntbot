@@ -59,6 +59,7 @@ pub enum EntityKind {
     Source,
     Conversation,
     MirrorSnippet,
+    BrainVersion,
 }
 
 impl EntityKind {
@@ -85,6 +86,7 @@ impl EntityKind {
             "source" => Some(Self::Source),
             "conversation" => Some(Self::Conversation),
             "mirrorsnippet" | "mirror_snippet" => Some(Self::MirrorSnippet),
+            "brainversion" | "brain_version" => Some(Self::BrainVersion),
             _ => None,
         }
     }
