@@ -743,6 +743,13 @@ fn run_desktop_app() {
             commands::autotuner::autotuner_set_pace,
             commands::autotuner::autotuner_get_toast_count,
             commands::autotuner::autotuner_increment_toast_count,
+            // Mirror
+            commands::mirror::get_mirror_state,
+            commands::mirror::get_routing_history,
+            commands::mirror::get_mirror_narratives,
+            commands::mirror::get_pending_snippets,
+            commands::mirror::submit_mirror_feedback,
+            commands::mirror::generate_mirror_response,
             // Active View
             commands::view::view_set_active,
             commands::view::view_clear_active,

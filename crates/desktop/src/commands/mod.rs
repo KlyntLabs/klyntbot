@@ -18,6 +18,7 @@ pub mod key_results;
 pub mod knowledge_health;
 pub mod language;
 pub mod launcher;
+pub mod mirror;
 pub mod morning_briefing;
 pub mod notes;
 pub mod objectives;
