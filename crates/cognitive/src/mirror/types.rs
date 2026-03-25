@@ -12,6 +12,7 @@ pub struct MirrorState {
     pub active_meta_rules: Vec<MetaRule>,
     pub pending_meta_rules: Vec<MetaRule>,
     pub latest_brain_version: Option<BrainVersion>,
+    pub recent_trial_previews: Vec<TrialPreview>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -118,6 +119,8 @@ pub enum SuggestedAction {
     ViewDetails,
     ApproveMetaRule { rule_id: Uuid },
     DismissMetaRule { rule_id: Uuid },
+    KillTrial { trial_id: String },
+    ContinueTrial { trial_id: String },
     RevertBrainVersion { version: u32 },
     #[serde(other)]
     Unknown,
@@ -148,6 +151,10 @@ pub enum MirrorAlert {
         skill: String,
         delta: f64,
         suggestion: String,
+    },
+    TrialUnpromising {
+        trial_id: String,
+        reason: String,
     },
     MetaRuleProposed {
         rule_id: Uuid,
@@ -192,4 +199,55 @@ pub enum MetaRuleStatus {
     Pending,
     Active,
     Disabled,
+}
+
+// ---------------------------------------------------------------------------
+// Trial Preview types
+// ---------------------------------------------------------------------------
+
+/// 4-hour early evaluation of an autotuner trial
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrialPreview {
+    pub id: Uuid,
+    pub trial_id: String,
+    pub started_at: DateTime<Utc>,
+    pub preview_at: DateTime<Utc>,
+    pub messages_scored: u32,
+    pub early_signals: TrialEarlySignals,
+    pub recommendation: PreviewRecommendation,
+    pub narrative: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrialEarlySignals {
+    pub correction_rate_delta: f64,
+    pub confidence_trend: TrendDirection,
+    pub dominant_skill_shift: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum PreviewRecommendation {
+    Continue,
+    Kill,
+    NeedMoreData,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum TrendDirection {
+    Rising,
+    Falling,
+    Stable,
+}
+
+/// Trait for querying early trial metrics at the 4-hour mark.
+/// Defined in cognitive (L3-L4), implemented in app-core (L7).
+#[async_trait::async_trait]
+pub trait EarlyTrialEvaluator: Send + Sync {
+    async fn evaluate_trial_early(
+        &self,
+        trial_id: &str,
+        since: DateTime<Utc>,
+    ) -> common::Result<TrialEarlySignals>;
 }

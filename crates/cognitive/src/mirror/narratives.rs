@@ -85,6 +85,21 @@ pub fn snippet_from_alert(alert: &MirrorAlert) -> NarrativeSnippet {
                 dismissed_at: None,
             }
         }
+        MirrorAlert::TrialUnpromising { trial_id, reason } => NarrativeSnippet {
+            id: Uuid::new_v4(),
+            created_at: Utc::now(),
+            alert_type: MirrorAlertType::TrialUnpromising,
+            headline: "An experiment isn't looking great".to_string(),
+            body: format!(
+                "After 4 hours, this experiment is {}. Want to kill it early or let it finish?",
+                reason
+            ),
+            suggested_action: Some(SuggestedAction::KillTrial {
+                trial_id: trial_id.clone(),
+            }),
+            user_feedback: None,
+            dismissed_at: None,
+        },
         MirrorAlert::MetaRuleProposed {
             rule_id,
             rule_text,

@@ -10,10 +10,11 @@ pub use narratives::{snippet_from_alert, NarrativeHandler};
 pub use repo::MirrorRepo;
 pub use subscribers::{ConfigArchiver, MetaRuleDetector, RoutingMirrorSubscriber};
 pub use types::{
-    AutotunerBridge, BrainVersion, FeedbackTarget, GeneratedNarrative, MetaRule, MetaRuleAction,
-    MetaRuleSource, MetaRuleStatus, MirrorAlert, MirrorAlertType, MirrorResponse, MirrorState,
-    NarrativeContext, NarrativeSnippet, RoutingSnapshot, SkillRouteStats, SuggestedAction,
-    TrendNarrative, UserFeedback,
+    AutotunerBridge, BrainVersion, EarlyTrialEvaluator, FeedbackTarget, GeneratedNarrative,
+    MetaRule, MetaRuleAction, MetaRuleSource, MetaRuleStatus, MirrorAlert, MirrorAlertType,
+    MirrorResponse, MirrorState, NarrativeContext, NarrativeSnippet, PreviewRecommendation,
+    RoutingSnapshot, SkillRouteStats, SuggestedAction, TrendDirection, TrendNarrative,
+    TrialEarlySignals, TrialPreview, UserFeedback,
 };
 
 #[cfg(test)]

@@ -85,6 +85,7 @@ impl MirrorFacade {
             active_meta_rules,
             pending_meta_rules,
             latest_brain_version,
+            recent_trial_previews: vec![],
         })
     }
 
