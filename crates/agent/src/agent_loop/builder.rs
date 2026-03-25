@@ -85,6 +85,7 @@ pub struct AgentLoopBuilder {
     activity_svc: Option<Arc<activity_log::ActivityIngestionService>>,
     autotuner: Option<Arc<crate::autotuner::AutoTunerOrchestrator>>,
     active_view: Option<Arc<tokio::sync::RwLock<Option<context_engine::ActiveView>>>>,
+    hot_config: Option<Arc<RwLock<config::HotConfig>>>,
 }
 
 impl AgentLoopBuilder {
@@ -105,6 +106,7 @@ impl AgentLoopBuilder {
             activity_svc: None,
             autotuner: None,
             active_view: None,
+            hot_config: None,
         }
     }
 
@@ -183,6 +185,11 @@ impl AgentLoopBuilder {
         self
     }
 
+    pub fn with_hot_config(mut self, hot_config: Arc<RwLock<config::HotConfig>>) -> Self {
+        self.hot_config = Some(hot_config);
+        self
+    }
+
     /// Consume the builder and construct an [`AgentLoop`].
     pub async fn build(mut self) -> Result<AgentLoop> {
         let bus = self.bus;
@@ -199,6 +206,10 @@ impl AgentLoopBuilder {
                 e
             )))
         })?;
+
+        let hot_config = self.hot_config.unwrap_or_else(|| {
+            Arc::new(tokio::sync::RwLock::new(config::HotConfig::from(&config)))
+        });
 
         // ── Create repos from pool (real or in-memory fallback) ──────────
         // Storage-dependent features (todo, finance, sessions) are disabled via
@@ -1443,6 +1454,7 @@ impl AgentLoopBuilder {
             cost_tracker,
             runtime_config,
             Arc::clone(&active_profile),
+            Arc::clone(&hot_config),
         )
         .with_strategy_repo(repos.strategies.clone())
         .with_activated_skills(Arc::clone(&activated_skills))
@@ -1581,6 +1593,7 @@ impl AgentLoopBuilder {
             skill_catalog,
             skill_router,
             embedding_engine,
+            hot_config,
         })
     }
 }

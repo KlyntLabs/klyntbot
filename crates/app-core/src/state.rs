@@ -41,7 +41,9 @@ pub struct AppCore {
     pub agent: Arc<AgentLoop>,
     pub bus: Arc<MessageBus>,
     pub persona_manager: Arc<RwLock<PersonaManager>>,
-    pub config: RwLock<config::Config>,
+    pub config: Arc<RwLock<config::Config>>,
+    /// Shared hot-reloadable config subset — updated by file watcher and settings handlers.
+    pub hot_config: Arc<RwLock<config::HotConfig>>,
 
     pub channel_manager: Arc<Mutex<ChannelManager>>,
     pub cron_service: Arc<CronService>,

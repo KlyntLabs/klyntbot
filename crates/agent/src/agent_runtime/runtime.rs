@@ -108,6 +108,8 @@ pub struct AgentRuntime {
     embedding_engine: Option<Arc<tools::EmbeddingEngine>>,
     /// Domain event bus for publishing cross-feature events (e.g. SkillRouted).
     domain_event_bus: Option<Arc<DomainEventBus>>,
+    /// Shared hot-reloadable config — read per-message for model, temperature, iterations.
+    hot_config: Arc<RwLock<config::HotConfig>>,
 }
 
 impl AgentRuntime {
@@ -121,6 +123,7 @@ impl AgentRuntime {
         cost_tracker: Arc<CostTracker>,
         config: PipelineConfig,
         active_profile: Arc<RwLock<Option<Arc<SkillPackage>>>>,
+        hot_config: Arc<RwLock<config::HotConfig>>,
     ) -> Self {
         Self {
             skill_catalog,
@@ -147,6 +150,7 @@ impl AgentRuntime {
             activated_skills: None,
             embedding_engine: None,
             domain_event_bus: None,
+            hot_config,
         }
     }
 
@@ -299,6 +303,9 @@ impl AgentRuntime {
         correction: Option<context_engine::CorrectionContext>,
     ) -> Result<RuntimeResult> {
         let pipeline_start = Instant::now();
+
+        // Read hot-reloadable config for this message
+        let hot = self.hot_config.read().await.clone();
 
         // Emit pipeline start immediately for frontend progress indication
         if let Some(ref tx) = event_tx {
@@ -693,7 +700,7 @@ impl AgentRuntime {
             params = params.with_planning_prompt(prompt);
         }
 
-        let timeout_secs = self.config.pipeline_timeout_secs;
+        let timeout_secs = hot.pipeline_timeout_secs;
         if timeout_secs > 0 {
             params = params.with_pipeline_timeout(Duration::from_secs(timeout_secs));
         }
@@ -1565,6 +1572,9 @@ mod tests {
         let active_profile = Arc::new(RwLock::new(None));
         let (skill_catalog, skill_router) = make_skill_catalog_and_router();
 
+        let hot_config = Arc::new(RwLock::new(config::HotConfig::from(
+            &config::Config::default(),
+        )));
         let runtime = AgentRuntime::new(
             skill_catalog,
             skill_router,
@@ -1574,6 +1584,7 @@ mod tests {
             cost_tracker,
             PipelineConfig::default(),
             active_profile,
+            hot_config,
         );
         (runtime, registry)
     }

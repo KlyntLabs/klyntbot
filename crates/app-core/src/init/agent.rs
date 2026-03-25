@@ -38,6 +38,7 @@ pub(super) async fn init_agent(
     notification_dispatcher: &Arc<agent::NotificationDispatcher>,
     notification_sender: &Option<Arc<dyn common::NotificationSender>>,
     autotuner: Option<&Arc<agent::autotuner::AutoTunerOrchestrator>>,
+    hot_config: Arc<RwLock<config::HotConfig>>,
 ) -> Result<AgentResult, String> {
     // 7. Load personas
     let data_dir = config.data_dir_path();
@@ -89,7 +90,8 @@ pub(super) async fn init_agent(
         .with_pipeline_tx(pipeline_tx)
         .with_user_situation(user_situation.clone())
         .with_activity_service(Arc::clone(&activity_svc))
-        .with_active_view(active_view.clone());
+        .with_active_view(active_view.clone())
+        .with_hot_config(hot_config);
 
     if let Some(vs) = vector_store {
         builder = builder.with_vector_store(vs);
