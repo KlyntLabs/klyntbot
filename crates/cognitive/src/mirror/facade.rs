@@ -329,6 +329,7 @@ impl MirrorFacade {
         Ok(MirrorResponse {
             answer,
             data_sources_used: vec!["routing_snapshots".to_string()],
+            proposed_meta_rule: None,
         })
     }
 

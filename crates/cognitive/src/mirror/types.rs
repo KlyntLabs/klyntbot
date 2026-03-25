@@ -90,6 +90,7 @@ pub struct NarrativeSnippet {
 pub struct MirrorResponse {
     pub answer: String,
     pub data_sources_used: Vec<String>,
+    pub proposed_meta_rule: Option<MetaRule>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
