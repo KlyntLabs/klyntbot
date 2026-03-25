@@ -12,11 +12,21 @@ use crate::RoutingContext;
 
 /// Read-only index of skill bodies and reference files.
 pub struct SkillReferenceIndex {
-    pub skill_bodies: HashMap<String, String>,
-    pub reference_files: HashMap<String, String>,
+    skill_bodies: HashMap<String, String>,
+    reference_files: HashMap<String, String>,
 }
 
 impl SkillReferenceIndex {
+    pub fn new(
+        skill_bodies: HashMap<String, String>,
+        reference_files: HashMap<String, String>,
+    ) -> Self {
+        Self {
+            skill_bodies,
+            reference_files,
+        }
+    }
+
     pub fn get_skill_body(&self, skill_name: &str) -> Option<&str> {
         self.skill_bodies.get(skill_name).map(|s| s.as_str())
     }
@@ -27,12 +37,22 @@ impl SkillReferenceIndex {
     }
 
     pub fn list_available(&self) -> String {
+        use std::collections::BTreeMap;
+        // Group references by skill name in a single pass
+        let mut grouped: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
+        for ref_key in self.reference_files.keys() {
+            if let Some(slash_idx) = ref_key.find('/') {
+                let skill = &ref_key[..slash_idx];
+                let name = &ref_key[slash_idx + 1..];
+                grouped.entry(skill).or_default().push(name);
+            }
+        }
+
         let mut lines = vec!["Available skill content:".to_string()];
         for name in self.skill_bodies.keys() {
             lines.push(format!("  - skill_body: {name}"));
-            for ref_key in self.reference_files.keys() {
-                if ref_key.starts_with(&format!("{name}/")) {
-                    let ref_name = ref_key.strip_prefix(&format!("{name}/")).unwrap_or(ref_key);
+            if let Some(refs) = grouped.get(name.as_str()) {
+                for ref_name in refs {
                     lines.push(format!("    - reference: {ref_name}"));
                 }
             }
@@ -148,10 +168,7 @@ mod tests {
             "task-management".to_string(),
             "Full task management instructions...".to_string(),
         );
-        let index = SkillReferenceIndex {
-            skill_bodies: bodies,
-            reference_files: HashMap::new(),
-        };
+        let index = SkillReferenceIndex::new(bodies, HashMap::new());
         assert_eq!(
             index.get_skill_body("task-management"),
             Some("Full task management instructions...")
@@ -165,10 +182,7 @@ mod tests {
             "task-management/todo".to_string(),
             "# Todo workflow".to_string(),
         );
-        let index = SkillReferenceIndex {
-            skill_bodies: HashMap::new(),
-            reference_files: refs,
-        };
+        let index = SkillReferenceIndex::new(HashMap::new(), refs);
         assert_eq!(
             index.get_reference("task-management", "todo"),
             Some("# Todo workflow")
@@ -179,10 +193,7 @@ mod tests {
     fn test_list_available() {
         let mut bodies = HashMap::new();
         bodies.insert("general".to_string(), "body".to_string());
-        let index = SkillReferenceIndex {
-            skill_bodies: bodies,
-            reference_files: HashMap::new(),
-        };
+        let index = SkillReferenceIndex::new(bodies, HashMap::new());
         let listing = index.list_available();
         assert!(listing.contains("general"));
     }

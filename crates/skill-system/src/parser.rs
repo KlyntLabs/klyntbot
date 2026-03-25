@@ -226,15 +226,26 @@ fn parse_metadata_block(
 /// Extract the first sentence from a text body.
 pub(crate) fn extract_first_sentence(body: &str) -> String {
     let trimmed = body.trim();
+    // Period followed by space (mid-text sentence boundary)
     if let Some(idx) = trimmed.find(". ") {
         return trimmed[..=idx].to_string();
     }
+    // Period followed by newline
+    if let Some(idx) = trimmed.find(".\n") {
+        return trimmed[..=idx].to_string();
+    }
+    // Period at end of string
+    if trimmed.ends_with('.') {
+        return trimmed.to_string();
+    }
+    // First line
     if let Some(idx) = trimmed.find('\n') {
         let first_line = trimmed[..idx].trim();
         if !first_line.is_empty() {
             return first_line.to_string();
         }
     }
+    // Fallback: truncate
     trimmed.chars().take(200).collect()
 }
 

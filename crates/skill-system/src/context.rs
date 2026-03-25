@@ -188,7 +188,7 @@ impl ContextSource for SkillContextSource {
             .activated_skills
             .try_read()
             .ok()
-            .map(|guard| guard.iter().map(|pkg| pkg.body.len() / 4).sum::<usize>())
+            .map(|guard| guard.iter().map(|pkg| pkg.summary.len() / 4).sum::<usize>())
             .unwrap_or(0);
 
         // Add overhead for XML tags, headings, resource listings
@@ -201,12 +201,15 @@ impl ContextSource for SkillContextSource {
 /// Single-token references (no hyphens) are always loaded.
 /// Multi-token references require at least one token match.
 fn is_reference_relevant(reference_name: &str, message_lower: &str) -> bool {
-    let tokens: Vec<&str> = reference_name.split('-').collect();
-    if tokens.len() == 1 {
+    let mut tokens = reference_name.split('-');
+    let first = tokens.next().unwrap_or("");
+    // Single-token references always load
+    if tokens.next().is_none() {
         return true;
     }
-    tokens
-        .iter()
+    // Multi-token: check if any token (including first) appears in the message
+    std::iter::once(first)
+        .chain(tokens)
         .any(|t| t.len() > 2 && message_lower.contains(t))
 }
 

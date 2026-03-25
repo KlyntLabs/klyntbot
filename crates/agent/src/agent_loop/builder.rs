@@ -280,10 +280,7 @@ impl AgentLoopBuilder {
                 }
             }
 
-            Arc::new(tools::SkillReferenceIndex {
-                skill_bodies,
-                reference_files: ref_files,
-            })
+            Arc::new(tools::SkillReferenceIndex::new(skill_bodies, ref_files))
         };
 
         // Shared active profile — written by AgentRuntime, read by SkillContextSource
