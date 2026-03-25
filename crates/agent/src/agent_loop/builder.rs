@@ -86,6 +86,7 @@ pub struct AgentLoopBuilder {
     autotuner: Option<Arc<crate::autotuner::AutoTunerOrchestrator>>,
     active_view: Option<Arc<tokio::sync::RwLock<Option<context_engine::ActiveView>>>>,
     hot_config: Option<Arc<RwLock<config::HotConfig>>>,
+    context_update_queue: Option<Arc<bus::ContextUpdateQueue>>,
 }
 
 impl AgentLoopBuilder {
@@ -107,6 +108,7 @@ impl AgentLoopBuilder {
             autotuner: None,
             active_view: None,
             hot_config: None,
+            context_update_queue: None,
         }
     }
 
@@ -187,6 +189,11 @@ impl AgentLoopBuilder {
 
     pub fn with_hot_config(mut self, hot_config: Arc<RwLock<config::HotConfig>>) -> Self {
         self.hot_config = Some(hot_config);
+        self
+    }
+
+    pub fn with_context_update_queue(mut self, queue: Arc<bus::ContextUpdateQueue>) -> Self {
+        self.context_update_queue = Some(queue);
         self
     }
 
@@ -541,9 +548,7 @@ impl AgentLoopBuilder {
             provider.clone(),
             config.agents.defaults.model.clone(),
         ));
-        let token_counter = context_engine::token_counter_for_model(
-            &config.agents.defaults.model,
-        );
+        let token_counter = context_engine::token_counter_for_model(&config.agents.defaults.model);
         let context_engine = context_engine::ContextEngine::new()
             .with_sources(sources)
             .with_token_counter(Arc::clone(&token_counter))
@@ -1569,6 +1574,11 @@ impl AgentLoopBuilder {
         // Inject domain event bus for SkillRouted event emission
         if let Some(ref domain_bus) = self.domain_event_bus {
             runtime = runtime.with_domain_bus(Arc::clone(domain_bus));
+        }
+
+        // Inject context update queue for live context refresher
+        if let Some(ref queue) = self.context_update_queue {
+            runtime = runtime.with_context_update_queue(Arc::clone(queue));
         }
 
         let runtime = Arc::new(runtime);
