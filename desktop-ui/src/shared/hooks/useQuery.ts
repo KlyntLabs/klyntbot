@@ -19,6 +19,9 @@ interface CacheEntry {
 const cache = new Map<string, CacheEntry>();
 const DEFAULT_STALE_TIME = 30_000;
 
+// Listener set for cache invalidation — hooks subscribe to get notified when their cache entry is cleared.
+const invalidationListeners = new Set<(prefix: string) => void>();
+
 function cacheKey(cmd: string, args?: Record<string, unknown> | null): string | null {
   if (args === null) return null;
   return args === undefined ? cmd : `${cmd}:${JSON.stringify(args)}`;
@@ -108,12 +111,26 @@ export function useQuery<T>(
     if (isStale) doFetch();
   }, [doFetch, argsKey]);
 
+  // Re-fetch when cache is externally invalidated for this command
+  useEffect(() => {
+    const listener = (prefix: string) => {
+      if (cmd.startsWith(prefix)) doFetch(true);
+    };
+    invalidationListeners.add(listener);
+    return () => {
+      invalidationListeners.delete(listener);
+    };
+  }, [cmd, doFetch]);
+
   return { data, loading, error, refetch };
 }
 
-/** Invalidate all cache entries matching a command prefix. */
+/** Invalidate all cache entries matching a command prefix and notify mounted hooks. */
 export function invalidateQueries(cmdPrefix: string) {
   for (const k of cache.keys()) {
     if (k.startsWith(cmdPrefix)) cache.delete(k);
+  }
+  for (const listener of invalidationListeners) {
+    listener(cmdPrefix);
   }
 }

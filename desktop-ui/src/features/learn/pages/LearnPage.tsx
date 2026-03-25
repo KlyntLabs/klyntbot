@@ -74,6 +74,7 @@ export default function LearnPage() {
         onCreated={() => {
           setQuickAddOpen(false);
           invalidateQueries("flashcard_");
+          invalidateQueries("review_stats_");
         }}
       />
       <CardGenerationModal
