@@ -214,6 +214,17 @@ impl AppCore {
             )
             .await
             .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?;
+
+        // Fire-and-forget: re-embed updated card for semantic grading accuracy.
+        if let (Some(engine), Some(vs)) = (self.embedding_engine.clone(), self.vector_store.clone())
+        {
+            let row_for_embed = row.clone();
+            let repo_opt = self.flashcard_repo.clone();
+            tokio::spawn(async move {
+                embed_flashcard_batch(engine, &vs, &[row_for_embed], repo_opt.as_ref()).await;
+            });
+        }
+
         Ok(flashcard_to_response(row))
     }
 
