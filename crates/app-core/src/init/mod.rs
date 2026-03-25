@@ -94,6 +94,9 @@ impl AppCore {
         // can capture it and emit ProactiveSuggestionCreated after persisting.
         let domain_event_bus = Arc::new(bus::DomainEventBus::new(256));
 
+        // Context update queue for live context refresher (shared between agent + background services).
+        let context_update_queue = Arc::new(bus::ContextUpdateQueue::new());
+
         // ── Phase 2: Cron ────────────────────────────────────────────────
         let cron::CronResult {
             cron_service,
@@ -188,6 +191,7 @@ impl AppCore {
             &notification_sender,
             autotuner.as_ref(),
             Arc::clone(&hot_config),
+            Some(Arc::clone(&context_update_queue)),
         )
         .await?;
 

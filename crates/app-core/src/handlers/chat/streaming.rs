@@ -961,6 +961,13 @@ pub async fn relay_chat_stream(
                             "loop hard-stop: forcing synthesis"
                         );
                     }
+                    AgentEvent::ContextReassembled { updates, tokens_added } => {
+                        tracing::info!(
+                            updates_count = updates.len(),
+                            tokens_added,
+                            "live context reassembled during execution"
+                        );
+                    }
                 }
             }
             else => break,

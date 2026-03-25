@@ -254,6 +254,13 @@ pub enum AgentEvent {
         summary: String,
     },
 
+    /// Live context was injected mid-execution (e.g., memory promoted during ReAct loop).
+    ContextReassembled {
+        updates: Vec<crate::execution::live_context_refresher::ContextReassembledUpdate>,
+        #[serde(rename = "tokensAdded")]
+        tokens_added: usize,
+    },
+
     /// Mid-loop context compression was triggered during a reactive execution.
     ContextCompressed {
         #[serde(rename = "beforeTokens")]

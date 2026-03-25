@@ -25,6 +25,10 @@ pub struct ExecutionParams {
     pub pipeline_timeout: Option<Duration>,
     /// Context window size in tokens. Used for mid-loop compression threshold.
     pub context_window: usize,
+    /// Shared queue for mid-execution context updates from cognitive/productivity systems.
+    pub context_update_queue: Option<std::sync::Arc<bus::ContextUpdateQueue>>,
+    /// When true, the LiveContextRefresher skips injection (frozen-context mode).
+    pub pause_context_updates: bool,
 }
 
 impl ExecutionParams {
@@ -39,6 +43,8 @@ impl ExecutionParams {
             planning_prompt: None,
             pipeline_timeout: None,
             context_window: 128_000,
+            context_update_queue: None,
+            pause_context_updates: false,
         }
     }
 
@@ -79,6 +85,19 @@ impl ExecutionParams {
 
     pub fn with_context_window(mut self, tokens: usize) -> Self {
         self.context_window = tokens;
+        self
+    }
+
+    pub fn with_context_update_queue(
+        mut self,
+        queue: std::sync::Arc<bus::ContextUpdateQueue>,
+    ) -> Self {
+        self.context_update_queue = Some(queue);
+        self
+    }
+
+    pub fn with_pause_context_updates(mut self, pause: bool) -> Self {
+        self.pause_context_updates = pause;
         self
     }
 }
@@ -181,5 +200,19 @@ mod tests {
     fn execution_params_default_no_pipeline_timeout() {
         let params = ExecutionParams::new("test-model");
         assert!(params.pipeline_timeout.is_none());
+    }
+
+    #[test]
+    fn execution_params_default_no_context_queue() {
+        let params = ExecutionParams::new("mock");
+        assert!(params.context_update_queue.is_none());
+        assert!(!params.pause_context_updates);
+    }
+
+    #[test]
+    fn execution_params_with_context_queue() {
+        let queue = std::sync::Arc::new(bus::ContextUpdateQueue::new());
+        let params = ExecutionParams::new("mock").with_context_update_queue(queue);
+        assert!(params.context_update_queue.is_some());
     }
 }

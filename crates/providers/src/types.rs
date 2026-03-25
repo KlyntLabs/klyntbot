@@ -350,6 +350,13 @@ pub enum Message {
         name: String,
         content: String,
     },
+    /// A mid-execution context update injected by LiveContextRefresher.
+    /// Serialized as system role with XML tags when sent to the LLM.
+    #[serde(rename = "context_update")]
+    ContextUpdate {
+        reason: String,
+        content: String,
+    },
 }
 
 /// Tool call in a message
@@ -447,6 +454,20 @@ impl Message {
         }
     }
 
+    /// Create a mid-execution context update message.
+    pub fn context_update(reason: impl Into<String>, content: impl Into<String>) -> Self {
+        Self::ContextUpdate {
+            reason: reason.into(),
+            content: content.into(),
+        }
+    }
+
+    /// Format a `ContextUpdate` as XML-tagged content for LLM APIs.
+    /// Shared by both OpenAI and Anthropic adapters for consistent wire format.
+    pub fn format_context_update_tag(reason: &str, content: &str) -> String {
+        format!("<context_update reason=\"{reason}\">\n{content}\n</context_update>")
+    }
+
     /// Get the role of this message
     pub fn role(&self) -> MessageRole {
         match self {
@@ -454,6 +475,7 @@ impl Message {
             Message::User { .. } => MessageRole::User,
             Message::Assistant { .. } => MessageRole::Assistant,
             Message::Tool { .. } => MessageRole::Tool,
+            Message::ContextUpdate { .. } => MessageRole::System,
         }
     }
 }
@@ -533,5 +555,20 @@ mod tests {
             }
             _ => panic!("Expected JsonSchema variant"),
         }
+    }
+
+    #[test]
+    fn context_update_role_is_system() {
+        let msg = Message::context_update("memory_promoted", "User likes coffee");
+        assert_eq!(msg.role(), MessageRole::System);
+    }
+
+    #[test]
+    fn context_update_serde_round_trip() {
+        let msg = Message::context_update("memory_promoted", "User likes coffee");
+        let json = serde_json::to_value(&msg).unwrap();
+        assert_eq!(json["role"], "context_update");
+        assert_eq!(json["reason"], "memory_promoted");
+        assert_eq!(json["content"], "User likes coffee");
     }
 }

@@ -177,9 +177,30 @@ impl OpenAiCompatProvider {
     ) -> Value {
         let overrides = ProviderRegistry::get_model_overrides(&params.model);
 
+        let has_context_updates = messages
+            .iter()
+            .any(|m| matches!(m, Message::ContextUpdate { .. }));
+        let api_messages: Value = if has_context_updates {
+            let mapped: Vec<Value> = messages
+                .iter()
+                .map(|msg| match msg {
+                    Message::ContextUpdate { reason, content } => {
+                        json!({
+                            "role": "system",
+                            "content": Message::format_context_update_tag(reason, content)
+                        })
+                    }
+                    other => serde_json::to_value(other).expect("Message serialization"),
+                })
+                .collect();
+            json!(mapped)
+        } else {
+            json!(messages)
+        };
+
         let mut body = json!({
             "model": params.model,
-            "messages": messages,
+            "messages": api_messages,
         });
 
         if stream {

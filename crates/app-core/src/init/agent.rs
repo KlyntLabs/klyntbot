@@ -39,6 +39,7 @@ pub(super) async fn init_agent(
     notification_sender: &Option<Arc<dyn common::NotificationSender>>,
     autotuner: Option<&Arc<agent::autotuner::AutoTunerOrchestrator>>,
     hot_config: Arc<RwLock<config::HotConfig>>,
+    context_update_queue: Option<Arc<bus::ContextUpdateQueue>>,
 ) -> Result<AgentResult, String> {
     // 7. Load personas
     let data_dir = config.data_dir_path();
@@ -99,6 +100,10 @@ pub(super) async fn init_agent(
 
     if let Some(orchestrator) = autotuner {
         builder = builder.with_autotuner(Arc::clone(orchestrator));
+    }
+
+    if let Some(queue) = context_update_queue {
+        builder = builder.with_context_update_queue(queue);
     }
 
     let mut agent_loop_raw = builder

@@ -168,6 +168,12 @@ impl AnthropicNativeProvider {
                         }]
                     }));
                 }
+                Message::ContextUpdate { reason, content } => {
+                    result.push(json!({
+                        "role": "user",
+                        "content": [{"type": "text", "text": Message::format_context_update_tag(reason, content)}]
+                    }));
+                }
             }
         }
 

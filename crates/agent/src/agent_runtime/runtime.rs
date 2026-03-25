@@ -110,6 +110,8 @@ pub struct AgentRuntime {
     domain_event_bus: Option<Arc<DomainEventBus>>,
     /// Shared hot-reloadable config — read per-message for model, temperature, iterations.
     hot_config: Arc<RwLock<config::HotConfig>>,
+    /// Shared context update queue for live context refresher.
+    context_update_queue: Option<Arc<bus::ContextUpdateQueue>>,
 }
 
 impl AgentRuntime {
@@ -151,6 +153,7 @@ impl AgentRuntime {
             embedding_engine: None,
             domain_event_bus: None,
             hot_config,
+            context_update_queue: None,
         }
     }
 
@@ -254,6 +257,12 @@ impl AgentRuntime {
     /// Set the domain event bus for publishing SkillRouted and other cross-feature events.
     pub fn with_domain_bus(mut self, bus: Arc<DomainEventBus>) -> Self {
         self.domain_event_bus = Some(bus);
+        self
+    }
+
+    /// Set the context update queue for live context refresher.
+    pub fn with_context_update_queue(mut self, queue: Arc<bus::ContextUpdateQueue>) -> Self {
+        self.context_update_queue = Some(queue);
         self
     }
 
@@ -703,6 +712,10 @@ impl AgentRuntime {
 
         if hot_timeout_secs > 0 {
             params = params.with_pipeline_timeout(Duration::from_secs(hot_timeout_secs));
+        }
+
+        if let Some(ref queue) = self.context_update_queue {
+            params = params.with_context_update_queue(Arc::clone(queue));
         }
 
         let retrieved_memory_count = assembled.retrieved_memory_count;
@@ -1380,10 +1393,14 @@ impl tools::DelegationHandler for AgentRuntime {
         let mode = crate::intent_pipeline::types::ExecutionMode::Reactive {
             max_iterations: max_iters,
         };
-        let params = ExecutionParams::new(&self.config.execution_model)
+        let mut params = ExecutionParams::new(&self.config.execution_model)
             .with_max_iterations(max_iters)
             .with_original_message(query.to_string())
             .with_context_window(self.config.context_window);
+
+        if let Some(ref queue) = self.context_update_queue {
+            params = params.with_context_update_queue(Arc::clone(queue));
+        }
 
         // Build delegated routing context with incremented depth
         let mut delegated_ctx = ctx.clone();
