@@ -3,6 +3,7 @@ import { ArrowLeft, Edit3, ExternalLink, Lightbulb } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { useReviewSession } from "../hooks/useReviewSession";
+import { CardEditor } from "./CardEditor";
 import { CardRenderer } from "./CardRenderer";
 import { PostSession } from "./PostSession";
 import { RatingButtons } from "./RatingButtons";
@@ -14,6 +15,7 @@ interface ImmersiveReviewProps {
 
 export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
   const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
   const navigate = useNavigate();
 
   const session = useReviewSession();
@@ -24,6 +26,7 @@ export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
     rate,
     cards,
     currentIndex,
+    updateCard,
     done: sessionDone,
     socraticExplanation,
     socraticLoading,
@@ -58,6 +61,12 @@ export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
         return;
       }
 
+      if ((e.key === "e" || e.key === "E") && revealed && current && !editing) {
+        e.preventDefault();
+        setEditing(true);
+        return;
+      }
+
       if (revealed && current) {
         const ratingMap: Record<string, "again" | "hard" | "good" | "easy"> = {
           "1": "again",
@@ -82,11 +91,12 @@ export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [revealed, current, reveal, rate, onExit, navigate]);
+  }, [revealed, current, reveal, rate, onExit, navigate, editing]);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: reset socratic panel when card advances
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset state when card advances
   useEffect(() => {
     setSocraticOpen(false);
+    setEditing(false);
   }, [currentIndex]);
 
   if (loading) {
@@ -155,9 +165,20 @@ export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-8">
         {current && (
           <div className="w-full max-w-lg">
-            <div className="glass-card p-8">
-              <CardRenderer card={current} revealed={revealed} />
-            </div>
+            {editing ? (
+              <CardEditor
+                card={current}
+                onSaved={(updated) => {
+                  updateCard(currentIndex, updated);
+                  setEditing(false);
+                }}
+                onCancel={() => setEditing(false)}
+              />
+            ) : (
+              <div className="glass-card p-8">
+                <CardRenderer card={current} revealed={revealed} />
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -215,11 +236,17 @@ export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
         <div className="flex items-center justify-center gap-4">
           <button
             type="button"
-            className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors opacity-50 cursor-not-allowed"
-            disabled
+            onClick={() => setEditing(true)}
+            disabled={!revealed || !current}
+            className={`flex items-center gap-1 text-[11px] transition-colors ${
+              revealed && current
+                ? "text-muted-foreground hover:text-foreground cursor-pointer"
+                : "text-muted-foreground opacity-50 cursor-not-allowed"
+            }`}
           >
             <Edit3 size={12} strokeWidth={1.5} />
             Edit
+            <span className="text-2xs text-muted-foreground ml-0.5">E</span>
           </button>
           <button
             type="button"

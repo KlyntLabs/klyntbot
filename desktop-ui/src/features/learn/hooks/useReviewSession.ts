@@ -71,6 +71,10 @@ export function useReviewSession() {
     setSocraticExplanation(null);
   }, []);
 
+  const updateCard = useCallback((index: number, updated: Partial<Flashcard>) => {
+    setCards((prev) => prev.map((c, i) => (i === index ? { ...c, ...updated } : c)));
+  }, []);
+
   const current = cards[currentIndex] ?? null;
   const remaining = Math.max(0, cards.length - currentIndex);
   const done = currentIndex >= cards.length && cards.length > 0;
@@ -93,5 +97,6 @@ export function useReviewSession() {
     socraticLoading,
     showSocratic,
     dismissSocratic,
+    updateCard,
   };
 }
