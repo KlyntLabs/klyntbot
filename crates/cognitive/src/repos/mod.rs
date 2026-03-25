@@ -93,6 +93,13 @@ pub fn cognitive_migrations() -> Vec<FeatureMigration> {
             description: "Add BookIndex tree nodes and GT-Link tables".to_string(),
             sql: include_str!("../../migrations/002_book_index_tables.sql").to_string(),
         },
+        FeatureMigration {
+            feature_name: "cognitive_mirror".to_string(),
+            version: 1,
+            description: "Mirror Phase 1 tables (routing snapshots, trend narratives, snippets)"
+                .to_string(),
+            sql: include_str!("../../migrations/003_mirror_tables.sql").to_string(),
+        },
     ]
 }
 
