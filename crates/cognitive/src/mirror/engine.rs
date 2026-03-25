@@ -9,7 +9,9 @@ use std::sync::Arc;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
-use crate::mirror::{MirrorFacade, MirrorRepo, NarrativeHandler, RoutingMirrorSubscriber};
+use crate::mirror::{
+    MetaRuleDetector, MirrorFacade, MirrorRepo, NarrativeHandler, RoutingMirrorSubscriber,
+};
 
 // ---------------------------------------------------------------------------
 // MirrorEngine
@@ -40,10 +42,14 @@ impl MirrorEngine {
     ) -> (MirrorFacade, Vec<JoinHandle<()>>, CancellationToken) {
         let shutdown = CancellationToken::new();
 
+        let meta_rule_repo = repo.clone();
+
         let routing_sub = Arc::new(RoutingMirrorSubscriber::new(repo.clone()));
-        let handles = vec![tokio::spawn(
-            routing_sub.run(bus.subscribe(), shutdown.clone()),
-        )];
+        let meta_rule_detector = MetaRuleDetector::new(meta_rule_repo);
+        let handles = vec![
+            tokio::spawn(routing_sub.run(bus.subscribe(), shutdown.clone())),
+            tokio::spawn(meta_rule_detector.run(bus.subscribe(), shutdown.clone())),
+        ];
 
         let mut facade = MirrorFacade::new(repo);
         if let Some(handler) = narrative_handler {
@@ -121,8 +127,8 @@ mod tests {
 
         assert_eq!(bus.subscriber_count(), 0);
         let (_facade, handles, shutdown) = MirrorEngine::start(repo, &bus, None);
-        // One subscriber registered (routing_sub).
-        assert_eq!(bus.subscriber_count(), 1);
+        // Two subscribers registered (routing_sub + meta_rule_detector).
+        assert_eq!(bus.subscriber_count(), 2);
 
         shutdown.cancel();
         for handle in handles {
