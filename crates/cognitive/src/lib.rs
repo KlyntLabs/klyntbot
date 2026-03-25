@@ -2,6 +2,7 @@
 //! Mem0-style consolidation, and weekly reflection.
 
 pub mod embedder;
+pub mod mirror;
 pub mod repos;
 pub mod search;
 pub mod services;
