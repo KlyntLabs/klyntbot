@@ -25,6 +25,7 @@ mod conversation;
 pub(crate) mod core;
 mod finance;
 mod gateway;
+pub mod hot;
 mod integrations;
 mod language;
 mod launcher;
