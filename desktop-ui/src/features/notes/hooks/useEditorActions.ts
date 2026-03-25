@@ -23,6 +23,7 @@ export function useEditorActions(
   noteId: string | null,
   createAnnotation: ReturnType<typeof useAnnotations>["createAnnotation"],
   onGenerateCards?: (selectedText?: string) => void,
+  onAskAI?: (selectedText: string, rect?: { top: number; left: number }) => void,
 ) {
   const handleAnnotate = useCallback(() => {
     if (!noteId) return;
@@ -51,9 +52,14 @@ export function useEditorActions(
     onGenerateCards?.(selectedText);
   }, [editor, onGenerateCards]);
 
-  const handleAskAI = useCallback(() => {
-    // TODO: Open inline AI prompt input
-  }, []);
+  const handleAskAI = useCallback(
+    (selectedText: string, rect?: { top: number; left: number }) => {
+      const text = selectedText || getSelectedText(editor) || "";
+      if (!text.trim()) return;
+      onAskAI?.(text, rect);
+    },
+    [editor, onAskAI],
+  );
 
   return { handleAnnotate, handleFlashcard, handleAskAI };
 }

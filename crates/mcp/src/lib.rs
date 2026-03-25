@@ -11,6 +11,7 @@ pub mod server;
 pub use config::McpConfig;
 
 pub use client::events::McpStartupEvent;
-pub use client::manager::McpManager;
+pub use client::handler::SamplingDelegate;
+pub use client::manager::{McpClientOptions, McpManager};
 pub use client::sanitize;
 pub use server::security;

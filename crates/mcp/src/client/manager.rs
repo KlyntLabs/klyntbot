@@ -32,6 +32,15 @@ struct McpConnection {
     tools: Vec<Arc<McpTool>>,
 }
 
+/// Options for MCP client handler capabilities.
+#[derive(Default)]
+pub struct McpClientOptions {
+    /// Data directory path for roots listing.
+    pub data_dir: Option<String>,
+    /// Sampling delegate for LLM completion requests from MCP servers.
+    pub sampling_delegate: Option<Arc<dyn super::handler::SamplingDelegate>>,
+}
+
 /// Manages all MCP server connections and their tools.
 pub struct McpManager {
     connections: HashMap<String, McpConnection>,
@@ -42,6 +51,9 @@ pub struct McpManager {
     tool_list_changed_tx: tokio::sync::mpsc::UnboundedSender<String>,
     /// Receiver for tool-list-changed notifications (taken by `start_health_check`).
     tool_list_changed_rx: Option<tokio::sync::mpsc::UnboundedReceiver<String>>,
+    /// Client handler options (retained for reconnect).
+    client_data_dir: Option<String>,
+    client_sampling: Option<Arc<dyn super::handler::SamplingDelegate>>,
 }
 
 impl McpManager {
@@ -55,6 +67,7 @@ impl McpManager {
     pub async fn connect_all(
         config: &McpConfig,
         event_tx: Option<tokio::sync::mpsc::Sender<McpStartupEvent>>,
+        options: McpClientOptions,
     ) -> Self {
         let circuit_breaker = Arc::new(McpCircuitBreaker::new(3, 60));
         let (tool_list_changed_tx, tool_list_changed_rx) =
@@ -63,6 +76,10 @@ impl McpManager {
         let mut ready_count = 0usize;
         let mut failed_count = 0usize;
         let mut skipped_count = 0usize;
+
+        // Retain client options for reconnect; clone per-server for initial connect
+        let retained_data_dir = options.data_dir;
+        let retained_sampling = options.sampling_delegate;
 
         // Connect to all enabled servers in parallel
         let mut join_set = tokio::task::JoinSet::new();
@@ -83,6 +100,8 @@ impl McpManager {
             let tx = event_tx.clone();
             let cb = Arc::clone(&circuit_breaker);
             let tlc_tx = tool_list_changed_tx.clone();
+            let opts_data_dir = retained_data_dir.clone();
+            let opts_sampling = retained_sampling.clone();
             join_set.spawn(async move {
                 let name = def.name.clone();
                 if let Some(ref tx) = tx {
@@ -92,7 +111,8 @@ impl McpManager {
                         })
                         .await;
                 }
-                let result = Self::connect_one(&def, &cb, Some(&tlc_tx)).await;
+                let result =
+                    Self::connect_one(&def, &cb, Some(&tlc_tx), opts_data_dir, opts_sampling).await;
                 (name, result, tx)
             });
         }
@@ -148,6 +168,8 @@ impl McpManager {
             config: config.clone(),
             tool_list_changed_tx,
             tool_list_changed_rx: Some(tool_list_changed_rx),
+            client_data_dir: retained_data_dir,
+            client_sampling: retained_sampling,
         }
     }
 
@@ -159,6 +181,8 @@ impl McpManager {
         server_def: &config::McpServerDef,
         circuit_breaker: &Arc<McpCircuitBreaker>,
         tool_list_changed_tx: Option<&tokio::sync::mpsc::UnboundedSender<String>>,
+        data_dir: Option<String>,
+        sampling_delegate: Option<Arc<dyn super::handler::SamplingDelegate>>,
     ) -> anyhow::Result<McpConnection> {
         let startup_timeout = Duration::from_secs(server_def.startup_timeout_sec);
         let tool_timeout = Duration::from_secs(server_def.tool_timeout_sec);
@@ -170,6 +194,8 @@ impl McpManager {
                 tool_timeout,
                 circuit_breaker,
                 tool_list_changed_tx,
+                data_dir,
+                sampling_delegate,
             ),
         )
         .await
@@ -192,15 +218,22 @@ impl McpManager {
         tool_timeout: Duration,
         circuit_breaker: &Arc<McpCircuitBreaker>,
         tool_list_changed_tx: Option<&tokio::sync::mpsc::UnboundedSender<String>>,
+        data_dir: Option<String>,
+        sampling_delegate: Option<Arc<dyn super::handler::SamplingDelegate>>,
     ) -> anyhow::Result<McpConnection> {
         let name = &server_def.name;
         let handler = {
-            let h = KlyntbotClientHandler::new(name);
+            let mut h = KlyntbotClientHandler::new(name);
             if let Some(tx) = tool_list_changed_tx {
-                h.with_tool_list_changed_tx(tx.clone())
-            } else {
-                h
+                h = h.with_tool_list_changed_tx(tx.clone());
             }
+            if let Some(dir) = data_dir {
+                h = h.with_data_dir(dir);
+            }
+            if let Some(delegate) = sampling_delegate {
+                h = h.with_sampling_delegate(delegate);
+            }
+            h
         };
 
         let service: McpService = match &server_def.transport {
@@ -327,11 +360,13 @@ impl McpManager {
             }
         }
 
-        // Connect fresh
+        // Connect fresh — reuse the original client handler options
         match Self::connect_one(
             server_def,
             &self.circuit_breaker,
             Some(&self.tool_list_changed_tx),
+            self.client_data_dir.clone(),
+            self.client_sampling.clone(),
         )
         .await
         {
@@ -533,7 +568,7 @@ mod tests {
     #[tokio::test]
     async fn test_connect_all_with_no_servers() {
         let config = McpConfig::default();
-        let manager = McpManager::connect_all(&config, None).await;
+        let manager = McpManager::connect_all(&config, None, McpClientOptions::default()).await;
         assert_eq!(manager.connected_count(), 0);
         assert!(manager.tools().is_empty());
     }
@@ -545,7 +580,7 @@ mod tests {
             servers: vec![test_server_def("disabled", "nonexistent", false)],
             server: Default::default(),
         };
-        let manager = McpManager::connect_all(&config, None).await;
+        let manager = McpManager::connect_all(&config, None, McpClientOptions::default()).await;
         assert_eq!(manager.connected_count(), 0);
     }
 
@@ -561,7 +596,7 @@ mod tests {
             server: Default::default(),
         };
         // Should not panic — logs warning and skips
-        let manager = McpManager::connect_all(&config, None).await;
+        let manager = McpManager::connect_all(&config, None, McpClientOptions::default()).await;
         assert_eq!(manager.connected_count(), 0);
     }
 
@@ -577,7 +612,7 @@ mod tests {
             server: Default::default(),
         };
 
-        let _manager = McpManager::connect_all(&config, Some(tx)).await;
+        let _manager = McpManager::connect_all(&config, Some(tx), McpClientOptions::default()).await;
 
         let mut events = Vec::new();
         while let Ok(event) = rx.try_recv() {

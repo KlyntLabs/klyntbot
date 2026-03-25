@@ -12,7 +12,7 @@ function ProjectCard({ project }: { project: Project }) {
   const navigate = useNavigate();
   const { data: objectives } = useProjectObjectives(project.id);
   const tasks: never[] = []; // Lightweight — don't fetch tasks per card
-  const health = useHealthScore(objectives, tasks);
+  const health = useHealthScore(objectives, tasks, project.id);
 
   return (
     <button

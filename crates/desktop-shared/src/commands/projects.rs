@@ -22,6 +22,16 @@ pub struct ProjectResponse {
     pub settings: Option<serde_json::Value>,
 }
 
+/// Health metrics for a project (focus quality, insight freshness).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectHealthMetricsResponse {
+    /// Average focus session quality score (0-1), or null if no sessions.
+    pub focus_quality: Option<f64>,
+    /// Average insight freshness across linked notes (0-1), or null if no linked notes.
+    pub insight_freshness: Option<f64>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectCreateParams {

@@ -1,29 +1,5 @@
 [
   {
-    "id": "BACK-006",
-    "title": "Semantic skill routing bypassed \u2014 keyword-only",
-    "description": "activate_skills() is called with an empty embedding slice (&[]), bypassing the semantic scoring path entirely. Only keyword routing is active despite semantic routing being implemented in SkillRouter.",
-    "file": "crates/agent/src/agent_runtime/runtime.rs",
-    "line": 330,
-    "severity": "medium",
-    "category": "not-implemented",
-    "effort": "large",
-    "effortNote": "AgentRuntime has no EmbeddingEngine. Needs to thread it through the builder + runtime init. Reclassified from medium.",
-    "status": "open"
-  },
-  {
-    "id": "BACK-023",
-    "title": "Health score insightFreshness and focusQuality hardcoded at 0.5",
-    "description": "Both values are hardcoded 0.5 ('placeholder for iteration 1'). These are 30% of the health score formula, so project health scores are always partially wrong.",
-    "file": "desktop-ui/src/features/projects/hooks/useHealthScore.ts",
-    "line": 19,
-    "severity": "medium",
-    "category": "hardcoded",
-    "effort": "large",
-    "effortNote": "Requires new backend IPC endpoints for insight freshness and focus quality per project. Frontend is trivial once backend exists. Reclassified from medium.",
-    "status": "open"
-  },
-  {
     "id": "BACK-021",
     "title": "Peak hours hardcoded instead of learned from data",
     "description": "Coaching peak hour detection hardcodes 9-12 and 14-17. Comment says 'a future enhancement could read this from semantic facts'. Affects UserSituation coaching signals.",
@@ -36,18 +12,6 @@
     "status": "open"
   },
   {
-    "id": "BACK-008",
-    "title": "Session CRUD handlers file is empty placeholder",
-    "description": "app-core/src/handlers/chat/sessions.rs contains only a one-line module doc comment. No session-specific handlers exist despite session list/get/delete commands being defined in desktop-shared.",
-    "file": "crates/app-core/src/handlers/chat/sessions.rs",
-    "line": 1,
-    "severity": "medium",
-    "category": "not-implemented",
-    "effort": "large",
-    "effortNote": "Implement full CRUD: list_sessions, get_session, delete_session. Need to match desktop-shared command types, wire through AppCore, add Tauri command adapters. ~100+ lines across 3 files.",
-    "status": "open"
-  },
-  {
     "id": "BACK-004",
     "title": "Subagent spawning not wired in execution handler",
     "description": "execute_task() creates an execution DB record and returns ExecuteResult::Started but never actually spawns a subagent. The SpawnHandler injection point exists but is not connected.",
@@ -57,30 +21,6 @@
     "category": "not-implemented",
     "effort": "large",
     "effortNote": "Wire SpawnHandler into ExecutionHandler, implement spawn logic (new agent loop instance with task context). Touches execution.rs + agent builder init. Needs careful design for task isolation.",
-    "status": "open"
-  },
-  {
-    "id": "BACK-009",
-    "title": "MCP client handler missing sampling, elicitation, and roots",
-    "description": "KlyntbotClientHandler uses all default implementations which return errors. Sampling, elicitation, and roots capabilities are completely unimplemented.",
-    "file": "crates/mcp/src/client/handler.rs",
-    "line": 41,
-    "severity": "medium",
-    "category": "not-implemented",
-    "effort": "large",
-    "effortNote": "Each capability (sampling, elicitation, roots) is a distinct implementation. Sampling requires LLM delegation, elicitation requires UI bridge, roots requires workspace config. ~50+ lines each.",
-    "status": "open"
-  },
-  {
-    "id": "BACK-024",
-    "title": "Ask AI editor action is a no-op",
-    "description": "handleAskAI callback in useEditorActions is completely empty with TODO comment. The AI button in the note editor toolbar does nothing when clicked.",
-    "file": "desktop-ui/src/features/notes/hooks/useEditorActions.ts",
-    "line": 55,
-    "severity": "medium",
-    "category": "todo",
-    "effort": "large",
-    "effortNote": "Needs new InlineAIPrompt component (input field, send to agent, stream response back into editor). Full feature: UI + IPC + agent integration. ~150+ lines.",
     "status": "open"
   },
   {

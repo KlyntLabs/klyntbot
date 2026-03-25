@@ -12,7 +12,7 @@ const STATUS_TEXT: Record<string, string> = {
 export function HealthScoreCard() {
   const navigate = useNavigate();
   const { project, objectives, tasks } = useProjectContext();
-  const health = useHealthScore(objectives, tasks);
+  const health = useHealthScore(objectives, tasks, project?.id);
 
   const allKrs = objectives.flatMap((o) => o.keyResults ?? []);
 

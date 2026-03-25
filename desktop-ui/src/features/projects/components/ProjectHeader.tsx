@@ -9,7 +9,7 @@ import { useHealthScore } from "../hooks/useHealthScore";
 export function ProjectHeader() {
   const navigate = useNavigate();
   const { project, objectives, tasks } = useProjectContext();
-  const health = useHealthScore(objectives, tasks);
+  const health = useHealthScore(objectives, tasks, project?.id);
 
   if (!project) return null;
 

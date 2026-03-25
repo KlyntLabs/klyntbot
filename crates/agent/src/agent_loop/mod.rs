@@ -365,7 +365,14 @@ impl AgentLoop {
             Some(m) => m,
             None => {
                 // No MCP manager yet — create one using the agent's actual config
-                *manager_guard = Some(mcp::McpManager::connect_all(&self.config.mcp, None).await);
+                *manager_guard = Some(
+                    mcp::McpManager::connect_all(
+                        &self.config.mcp,
+                        None,
+                        mcp::McpClientOptions::default(),
+                    )
+                    .await,
+                );
                 manager_guard.as_mut().unwrap()
             }
         };

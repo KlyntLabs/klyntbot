@@ -18,7 +18,7 @@ interface EditorContextMenuProps {
   onAnnotate: () => void;
   onFlashcard: () => void;
   onTranslate: (selectedText: string, rect?: { top: number; left: number }) => void;
-  onAskAI: () => void;
+  onAskAI: (selectedText: string, rect?: { top: number; left: number }) => void;
   onRemoveAnnotation?: (annotationId: string) => void;
 }
 
@@ -125,7 +125,10 @@ export function EditorContextMenu({
           <ContextMenu.Label className="px-2 py-1 text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
             AI Actions
           </ContextMenu.Label>
-          <MenuItem onClick={onAskAI} shortcut="⌥I">
+          <MenuItem
+            onClick={() => onAskAI(selectionTextRef.current, selectionRectRef.current)}
+            shortcut="⌥I"
+          >
             Ask AI
           </MenuItem>
         </ContextMenu.Content>

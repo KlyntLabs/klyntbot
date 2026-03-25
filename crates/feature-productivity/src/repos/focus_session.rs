@@ -190,6 +190,26 @@ impl FocusSessionRepo {
         Ok(rows.into_iter().map(FocusSession::from).collect())
     }
 
+    /// Average quality score for focus sessions in a project over the last N days.
+    /// Returns `None` if no qualifying sessions exist.
+    pub async fn avg_quality_by_project(
+        &self,
+        project_id: &str,
+        days: i64,
+    ) -> common::Result<Option<f64>> {
+        let cutoff = chrono::Utc::now() - chrono::Duration::days(days);
+        let row: (Option<f64>,) = sqlx::query_as(
+            "SELECT AVG(quality_score) FROM productivity_sessions
+             WHERE project_id = ?1 AND quality_score IS NOT NULL AND started_at >= ?2",
+        )
+        .bind(project_id)
+        .bind(cutoff)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        Ok(row.0)
+    }
+
     pub async fn list_by_action(&self, action_id: &str) -> common::Result<Vec<FocusSession>> {
         let rows = sqlx::query_as::<_, SessionRow>(
             &format!("SELECT {SESSION_COLUMNS} FROM productivity_sessions WHERE action_id = ?1 ORDER BY started_at DESC"),

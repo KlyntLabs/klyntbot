@@ -1199,7 +1199,12 @@ impl AgentLoopBuilder {
         // ── MCP tools (Model Context Protocol) ──────────────────────────
         let mcp_manager = if config.mcp.has_active_servers() {
             // connect_all logs startup progress internally via tracing
-            let manager = mcp::McpManager::connect_all(&config.mcp, None).await;
+            let manager = mcp::McpManager::connect_all(
+                &config.mcp,
+                None,
+                mcp::McpClientOptions::default(),
+            )
+            .await;
             let mcp_tools = manager.tools();
             let tool_count = mcp_tools.len();
             for tool in mcp_tools {
@@ -1442,7 +1447,8 @@ impl AgentLoopBuilder {
             Arc::clone(&active_profile),
         )
         .with_strategy_repo(repos.strategies.clone())
-        .with_activated_skills(Arc::clone(&activated_skills));
+        .with_activated_skills(Arc::clone(&activated_skills))
+        .with_embedding_engine(Arc::clone(&embedding_engine));
 
         if let Some(evaluator) = confidence_evaluator {
             runtime = runtime.with_confidence_evaluator(Arc::new(evaluator));

@@ -4,13 +4,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router";
 import { type AnnotationResponse, useAnnotations } from "../hooks/useAnnotations";
+import { useAskAI } from "../hooks/useAskAI";
 import { useEditorActions } from "../hooks/useEditorActions";
 import { useLanguageConfig } from "../hooks/useLanguageConfig";
-
 import { useQuickTranslate } from "../hooks/useQuickTranslate";
 import { useVocabularySave } from "../hooks/useVocabularySave";
 import { AnnotationPane } from "./AnnotationPane";
 import { AnnotationPopover } from "./AnnotationPopover";
+import { AskAIPopup } from "./editor/AskAIPopup";
 import { EditorContextMenu } from "./editor/EditorContextMenu";
 import { EditorContentWrapper, useEntityResolution, useNoteEditor } from "./editor/EditorCore";
 import { EditorToolbar } from "./editor/EditorToolbar";
@@ -187,11 +188,13 @@ export function NoteEditor({
     note.id,
     editor,
   );
+  const askAI = useAskAI(note.id);
   const { handleAnnotate, handleFlashcard, handleAskAI } = useEditorActions(
     editor,
     note.id,
     createAnnotation,
     onGenerateCards,
+    askAI.trigger,
   );
 
   // ── Quick-translate popup ──────────────────────────────────────────
@@ -325,7 +328,15 @@ export function NoteEditor({
         }
         handleTranslate(text, rect);
       } else if (action === "ask-ai") {
-        handleAskAI();
+        const sel = window.getSelection();
+        const text = sel?.toString().trim() ?? "";
+        if (!text) return;
+        let rect: { top: number; left: number } | undefined;
+        if (sel && sel.rangeCount > 0) {
+          const r = sel.getRangeAt(0).getBoundingClientRect();
+          rect = { top: r.bottom + 8, left: r.left };
+        }
+        handleAskAI(text, rect);
       }
     };
     window.addEventListener("editor-action", handler);
@@ -620,6 +631,18 @@ export function NoteEditor({
           position={quickTranslate.position}
           loading={quickTranslate.loading}
           onDismiss={quickTranslate.dismiss}
+        />
+      )}
+
+      {/* Ask AI popup */}
+      {askAI.selectedText && askAI.position && (
+        <AskAIPopup
+          selectedText={askAI.selectedText}
+          position={askAI.position}
+          response={askAI.response}
+          loading={askAI.loading}
+          onSubmit={askAI.submit}
+          onDismiss={askAI.dismiss}
         />
       )}
 

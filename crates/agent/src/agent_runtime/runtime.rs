@@ -103,6 +103,8 @@ pub struct AgentRuntime {
     active_view: Option<Arc<tokio::sync::RwLock<Option<context_engine::ActiveView>>>>,
     /// Shared activated skills — written per-message, read by SkillContextSource.
     activated_skills: Option<Arc<tokio::sync::RwLock<Vec<Arc<SkillPackage>>>>>,
+    /// Embedding engine for generating query embeddings (semantic skill routing).
+    embedding_engine: Option<Arc<tools::EmbeddingEngine>>,
 }
 
 impl AgentRuntime {
@@ -140,6 +142,7 @@ impl AgentRuntime {
             task_repo: None,
             active_view: None,
             activated_skills: None,
+            embedding_engine: None,
         }
     }
 
@@ -234,6 +237,12 @@ impl AgentRuntime {
         self
     }
 
+    /// Set the embedding engine for semantic skill routing.
+    pub fn with_embedding_engine(mut self, engine: Arc<tools::EmbeddingEngine>) -> Self {
+        self.embedding_engine = Some(engine);
+        self
+    }
+
     /// Set the self-reference for delegation support (called after Arc wrapping).
     pub fn set_delegation_self_ref(&self, handler: Arc<dyn tools::DelegationHandler>) {
         let _ = self.delegation_self_ref.set(handler);
@@ -287,6 +296,13 @@ impl AgentRuntime {
                 .await;
         }
 
+        // Step 0b: Generate query embedding for semantic skill routing
+        let query_embedding: Vec<f32> = if let Some(ref engine) = self.embedding_engine {
+            engine.clone().embed_async(message.to_string()).await.unwrap_or_default()
+        } else {
+            vec![]
+        };
+
         // Step 1: Match message to orchestrator skill via SkillRouter
         let mut profile = {
             let catalog = self.skill_catalog.read().await;
@@ -295,7 +311,11 @@ impl AgentRuntime {
                 .autotuner_hook
                 .as_ref()
                 .and_then(|h| h.current_champion_params());
-            Arc::clone(router.select_orchestrator(message, &catalog, champion_params.as_ref()))
+            let (kw_w, sem_w) = champion_params
+                .as_ref()
+                .map(|p| (p.skill_keyword_weight, p.skill_semantic_weight))
+                .unwrap_or((None, None));
+            Arc::clone(router.select_orchestrator_blended(message, &query_embedding, &catalog, kw_w, sem_w))
         };
         let mut agent_name = profile.name.clone();
         debug!("AgentRuntime: matched skill '{}'", agent_name);
@@ -327,11 +347,11 @@ impl AgentRuntime {
             *guard = Some(Arc::clone(&profile));
         }
 
-        // Step 2a: Activate per-message skills (keyword-only for now)
+        // Step 2a: Activate per-message skills (keyword + semantic)
         if let Some(ref activated_skills) = self.activated_skills {
             let catalog = self.skill_catalog.read().await;
             let router = self.skill_router.read().await;
-            let activated = router.activate_skills(message, &[], &catalog, None);
+            let activated = router.activate_skills(message, &query_embedding, &catalog, None);
             if !activated.is_empty() {
                 let mut lock = activated_skills.write().await;
                 lock.clear();

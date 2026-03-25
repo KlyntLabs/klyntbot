@@ -508,6 +508,7 @@ fn run_desktop_app() {
             commands::projects::project_archive,
             commands::projects::project_update_instructions,
             commands::projects::project_update_role,
+            commands::projects::project_health_metrics,
             // Entities (knowledge graph)
             commands::entities::entity_search,
             commands::entities::entity_merge,
@@ -538,6 +539,9 @@ fn run_desktop_app() {
             // Chat
             commands::chat::chat_threads,
             commands::chat::chat_messages,
+            commands::chat::chat_get_session,
+            commands::chat::chat_list_sessions_by_project,
+            commands::chat::chat_delete_stale_sessions,
             commands::chat::chat_send,
             commands::chat::chat_pin_thread,
             commands::chat::chat_rename_thread,

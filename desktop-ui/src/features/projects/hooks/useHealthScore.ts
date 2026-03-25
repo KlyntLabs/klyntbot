@@ -1,8 +1,24 @@
+import { useQuery } from "@shared/hooks/useQuery";
 import type { Objective, Task } from "@shared/types";
 import { useMemo } from "react";
 import { computeHealthScore, type HealthScoreResult } from "../lib/health-score";
 
-export function useHealthScore(objectives: Objective[], tasks: Task[]): HealthScoreResult {
+interface ProjectHealthMetrics {
+  focusQuality: number | null;
+  insightFreshness: number | null;
+}
+
+export function useHealthScore(
+  objectives: Objective[],
+  tasks: Task[],
+  projectId?: string,
+): HealthScoreResult {
+  const { data: metrics } = useQuery<ProjectHealthMetrics>(
+    "project_health_metrics",
+    projectId ? { projectId } : undefined,
+    { enabled: !!projectId, focusQuality: null, insightFreshness: null },
+  );
+
   return useMemo(() => {
     // OKR progress: weighted avg of all KR progress values
     const allKrs = objectives.flatMap((o) => o.keyResults ?? []);
@@ -16,11 +32,10 @@ export function useHealthScore(objectives: Objective[], tasks: Task[]): HealthSc
     const completed = tasks.filter((t) => t.completed).length;
     const taskVelocity = completed / total;
 
-    // Insight freshness and focus quality — placeholder for iteration 1
-    // These require additional data sources (dashboard intelligence, insight cache)
-    const insightFreshness = 0.5;
-    const focusQuality = 0.5;
+    // Use real data from backend, fall back to 0.5 when no data available
+    const insightFreshness = metrics.insightFreshness ?? 0.5;
+    const focusQuality = metrics.focusQuality ?? 0.5;
 
     return computeHealthScore({ okrProgress, taskVelocity, insightFreshness, focusQuality });
-  }, [objectives, tasks]);
+  }, [objectives, tasks, metrics]);
 }

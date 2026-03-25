@@ -1,4 +1,6 @@
-use desktop_shared::commands::{ProjectCreateParams, ProjectResponse, ProjectUpdateParams};
+use desktop_shared::commands::{
+    ProjectCreateParams, ProjectHealthMetricsResponse, ProjectResponse, ProjectUpdateParams,
+};
 use desktop_shared::errors::ApiError;
 use desktop_shared::types::EntityKind;
 use storage::{ProjectPatch, ProjectRow};
@@ -251,5 +253,102 @@ impl AppCore {
             id,
         }];
         Ok((response, updates))
+    }
+
+    /// Compute focus quality and insight freshness metrics for a project.
+    pub async fn project_health_metrics(
+        &self,
+        project_id: String,
+    ) -> Result<ProjectHealthMetricsResponse, ApiError> {
+        // Focus quality: average quality_score from focus sessions in this project (last 30 days)
+        let focus_quality = if let Some(ref pr) = self.productivity_repos {
+            pr.sessions
+                .avg_quality_by_project(&project_id, 30)
+                .await
+                .unwrap_or(None)
+        } else {
+            None
+        };
+
+        // Insight freshness: find linked notes, check how recently each was reviewed
+        let insight_freshness = self
+            .compute_insight_freshness(&project_id)
+            .await
+            .unwrap_or(None);
+
+        Ok(ProjectHealthMetricsResponse {
+            focus_quality,
+            insight_freshness,
+        })
+    }
+
+    /// Compute average insight freshness across notes linked to a project.
+    /// Freshness = max(0, 1.0 - days_since_review / 7.0), averaged.
+    async fn compute_insight_freshness(
+        &self,
+        project_id: &str,
+    ) -> Result<Option<f64>, ApiError> {
+        let links = self
+            .repos
+            .entity_links
+            .get_project_links(project_id)
+            .await
+            .map_err(map_storage_err)?;
+
+        // Extract note IDs from entity links (either source or target)
+        let note_ids: Vec<&str> = links
+            .iter()
+            .filter_map(|link| {
+                if link.target_kind == "note" {
+                    Some(link.target_id.as_str())
+                } else if link.source_kind == "note" {
+                    Some(link.source_id.as_str())
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        if note_ids.is_empty() {
+            return Ok(None);
+        }
+
+        // Batch query: latest generated_at per note in a single round-trip
+        let pool = self.storage_pool.inner();
+        let placeholders: Vec<String> = (1..=note_ids.len()).map(|i| format!("?{i}")).collect();
+        let sql = format!(
+            "SELECT note_id, MAX(generated_at) as generated_at FROM insight_reviews
+             WHERE note_id IN ({}) AND superseded_at IS NULL
+             GROUP BY note_id",
+            placeholders.join(", ")
+        );
+        let mut query = sqlx::query_as::<_, (String, String)>(&sql);
+        for note_id in &note_ids {
+            query = query.bind(*note_id);
+        }
+        let rows = query.fetch_all(pool).await.unwrap_or_default();
+
+        if rows.is_empty() {
+            return Ok(None);
+        }
+
+        let now = chrono::Utc::now();
+        let mut total_freshness = 0.0f64;
+        let mut count = 0usize;
+        for (_note_id, generated_at_str) in &rows {
+            if let Ok(generated_at) = chrono::DateTime::parse_from_rfc3339(generated_at_str) {
+                let days = (now - generated_at.with_timezone(&chrono::Utc))
+                    .num_days()
+                    .max(0) as f64;
+                total_freshness += (1.0 - days / 7.0).max(0.0);
+                count += 1;
+            }
+        }
+
+        if count == 0 {
+            return Ok(None);
+        }
+
+        Ok(Some(total_freshness / count as f64))
     }
 }
