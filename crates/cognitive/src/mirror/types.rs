@@ -9,6 +9,8 @@ pub struct MirrorState {
     pub last_routing_snapshot: Option<RoutingSnapshot>,
     pub latest_trend_narrative: Option<TrendNarrative>,
     pub pending_snippets: Vec<NarrativeSnippet>,
+    pub active_meta_rules: Vec<MetaRule>,
+    pub pending_meta_rules: Vec<MetaRule>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -94,6 +96,8 @@ pub enum MirrorAlertType {
 pub enum SuggestedAction {
     BoostSkill { skill: String },
     ViewDetails,
+    ApproveMetaRule { rule_id: Uuid },
+    DismissMetaRule { rule_id: Uuid },
     #[serde(other)]
     Unknown,
 }
@@ -124,4 +128,47 @@ pub enum MirrorAlert {
         delta: f64,
         suggestion: String,
     },
+    MetaRuleProposed {
+        rule_id: Uuid,
+        rule_text: String,
+        source: MetaRuleSource,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MetaRule {
+    pub id: Uuid,
+    pub trigger_condition: String,
+    pub action: MetaRuleAction,
+    pub source: MetaRuleSource,
+    pub effectiveness_score: f64,
+    pub status: MetaRuleStatus,
+    pub signal_count: u32,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum MetaRuleAction {
+    AdjustRouting { skill: String, direction: String },
+    ForceClarification,
+    SwitchMode { mode: String },
+    CreateExperiment { hypothesis: String },
+    SurfaceInsight { message: String },
+    Custom { payload: serde_json::Value },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum MetaRuleSource {
+    UserCreated,
+    ReflectionGenerated,
+    CorrectionDerived,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum MetaRuleStatus {
+    Pending,
+    Active,
+    Disabled,
 }

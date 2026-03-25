@@ -56,6 +56,8 @@ impl MirrorFacade {
             last_routing_snapshot: self.repo.get_latest_routing_snapshot().await?,
             latest_trend_narrative: self.repo.get_latest_narrative().await?,
             pending_snippets: self.repo.get_pending_snippets().await?,
+            active_meta_rules: vec![],
+            pending_meta_rules: vec![],
         })
     }
 

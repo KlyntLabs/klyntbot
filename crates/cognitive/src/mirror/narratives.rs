@@ -61,6 +61,23 @@ pub fn snippet_from_alert(alert: &MirrorAlert) -> NarrativeSnippet {
                 dismissed_at: None,
             }
         }
+        MirrorAlert::MetaRuleProposed {
+            rule_id,
+            rule_text,
+            source: _,
+        } => NarrativeSnippet {
+            id: Uuid::new_v4(),
+            created_at: Utc::now(),
+            alert_type: MirrorAlertType::MetaRuleProposed,
+            headline: "I learned something about how I think".to_string(),
+            body: format!(
+                "Based on recent patterns, I think I should: \"{}\". Does this sound right?",
+                rule_text
+            ),
+            suggested_action: Some(SuggestedAction::ApproveMetaRule { rule_id: *rule_id }),
+            user_feedback: None,
+            dismissed_at: None,
+        },
     }
 }
 
