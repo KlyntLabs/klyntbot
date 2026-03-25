@@ -299,6 +299,7 @@ async fn call_provider_streaming(
                         + r.as_deref().map_or(0, |t| counter.estimate_text(t))
                 }
                 Message::Tool { content: c, .. } => counter.estimate_text(c),
+                Message::ContextUpdate { content: c, .. } => counter.estimate_text(c),
             })
             .sum::<usize>() as u32;
         let est_output = counter.estimate_text(&content) as u32;

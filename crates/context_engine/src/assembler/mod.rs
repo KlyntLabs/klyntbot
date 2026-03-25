@@ -598,6 +598,7 @@ impl ContextEngine {
                     + 20
             }
             Message::Tool { content, .. } => self.estimate_text(content) + 10,
+            Message::ContextUpdate { content, .. } => self.estimate_text(content) + 10,
         }
     }
 

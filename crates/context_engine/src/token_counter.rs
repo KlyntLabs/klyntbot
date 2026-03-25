@@ -87,6 +87,7 @@ pub fn estimate_message_tokens(counter: &dyn TokenCounter, msg: &providers::Mess
                 + 20
         }
         providers::Message::Tool { content, .. } => counter.estimate_text(content) + 10,
+        providers::Message::ContextUpdate { content, .. } => counter.estimate_text(content) + 10,
     }
 }
 

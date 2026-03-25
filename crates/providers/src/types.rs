@@ -350,6 +350,13 @@ pub enum Message {
         name: String,
         content: String,
     },
+    /// A mid-execution context update injected by LiveContextRefresher.
+    /// Serialized as system role with XML tags when sent to the LLM.
+    #[serde(rename = "context_update")]
+    ContextUpdate {
+        reason: String,
+        content: String,
+    },
 }
 
 /// Tool call in a message
@@ -447,6 +454,14 @@ impl Message {
         }
     }
 
+    /// Create a mid-execution context update message.
+    pub fn context_update(reason: impl Into<String>, content: impl Into<String>) -> Self {
+        Self::ContextUpdate {
+            reason: reason.into(),
+            content: content.into(),
+        }
+    }
+
     /// Get the role of this message
     pub fn role(&self) -> MessageRole {
         match self {
@@ -454,6 +469,7 @@ impl Message {
             Message::User { .. } => MessageRole::User,
             Message::Assistant { .. } => MessageRole::Assistant,
             Message::Tool { .. } => MessageRole::Tool,
+            Message::ContextUpdate { .. } => MessageRole::System,
         }
     }
 }
