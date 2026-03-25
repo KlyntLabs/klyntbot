@@ -402,6 +402,14 @@ pub enum DomainEvent {
         session_key: String,
     },
 
+    // -- Autotuner trials --
+    /// Emitted when the autotuner creates a new trial for evaluation.
+    TrialActivated {
+        trial_id: String,
+        hypothesis: String,
+        params_summary: String,
+    },
+
     // -- Mirror self-reflection --
     /// Emitted when the Mirror layer creates a new NarrativeSnippet for the user.
     MirrorSnippetCreated {

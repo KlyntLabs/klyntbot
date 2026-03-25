@@ -496,8 +496,21 @@ impl AutoTunerOrchestrator {
                     }
 
                     // ── GENERATE step: create new trials via LLM ─────────────
-                    if let Err(e) = run_llm_generation(&orch).await {
-                        error!("autotuner LLM generation failed (non-fatal): {e}");
+                    match run_llm_generation(&orch).await {
+                        Ok(created_trials) => {
+                            if let Some(ref bus) = domain_event_bus {
+                                for trial in &created_trials {
+                                    bus.publish(bus::DomainEvent::TrialActivated {
+                                        trial_id: trial.id.clone(),
+                                        hypothesis: trial.hypothesis.clone(),
+                                        params_summary: trial.params_summary.clone(),
+                                    });
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            error!("autotuner LLM generation failed (non-fatal): {e}");
+                        }
                     }
 
                     Ok(Some(format!(
@@ -855,7 +868,14 @@ fn build_memory_snapshot(memories: &[cognitive::EpisodicMemory]) -> String {
 
 /// Run the LLM generation step: build context, call the LLM, parse the response,
 /// and create an experiment + trial records.
-async fn run_llm_generation(orch: &AutoTunerOrchestrator) -> common::Result<()> {
+/// Info about a trial created during LLM generation, for emitting domain events.
+struct CreatedTrial {
+    id: String,
+    hypothesis: String,
+    params_summary: String,
+}
+
+async fn run_llm_generation(orch: &AutoTunerOrchestrator) -> common::Result<Vec<CreatedTrial>> {
     let champion = orch.champion().await;
 
     // Build recent trial history for the prompt.
@@ -986,14 +1006,15 @@ async fn run_llm_generation(orch: &AutoTunerOrchestrator) -> common::Result<()> 
 
     // Create trial records for each variant (up to 3).
     let variant_count = generation.variants.len().min(3);
+    let mut created_trials = Vec::new();
     for variant in generation.variants.into_iter().take(3) {
         let trial_id = uuid::Uuid::new_v4();
         let params_json = serde_json::to_string(&variant.params).unwrap_or_default();
         let trial_row = TrialRow {
             id: trial_id.to_string(),
             experiment_id: experiment_id.to_string(),
-            params: params_json,
-            generation_reasoning: variant.hypothesis,
+            params: params_json.clone(),
+            generation_reasoning: variant.hypothesis.clone(),
             status: autotuner::TrialStatus::Active.as_str().to_string(),
             created_at: now.clone(),
             completed_at: None,
@@ -1003,6 +1024,11 @@ async fn run_llm_generation(orch: &AutoTunerOrchestrator) -> common::Result<()> 
             .create_trial(&trial_row)
             .await
             .map_err(|e| common::KlyntbotError::Storage(format!("create trial: {e}")))?;
+        created_trials.push(CreatedTrial {
+            id: trial_id.to_string(),
+            hypothesis: variant.hypothesis,
+            params_summary: params_json,
+        });
     }
 
     info!(
@@ -1011,7 +1037,7 @@ async fn run_llm_generation(orch: &AutoTunerOrchestrator) -> common::Result<()> 
         "generated new experiment with LLM"
     );
 
-    Ok(())
+    Ok(created_trials)
 }
 
 #[cfg(test)]

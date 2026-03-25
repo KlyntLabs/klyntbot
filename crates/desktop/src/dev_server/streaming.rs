@@ -278,6 +278,7 @@ fn domain_for_event(event: &bus::DomainEvent) -> &'static str {
         bus::DomainEvent::InterventionTriggered { .. } => "productivity",
         bus::DomainEvent::MemoryPendingConfirmation { .. } => "memory",
         bus::DomainEvent::SkillRouted { .. } => "agent",
+        bus::DomainEvent::TrialActivated { .. } => "autotuner",
         bus::DomainEvent::MirrorSnippetCreated { .. } => "mirror",
     }
 }
