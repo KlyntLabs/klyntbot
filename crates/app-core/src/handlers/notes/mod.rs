@@ -16,5 +16,6 @@ mod notebooks;
 mod persona_chat;
 mod practice;
 pub mod practice_prompts;
+mod recent_learning;
 mod review_session;
 mod suggestions;

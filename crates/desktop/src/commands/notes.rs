@@ -12,8 +12,8 @@ use desktop_shared::commands::{
     KnowledgeGrowthResponse, NoteCreateParams, NoteLinkResponse, NoteResponse,
     NoteSuggestionsResponse, NoteUpdateParams, NoteVersionResponse, NotebookCreateParams,
     NotebookResponse, NotebookUpdateParams, PersonaChatParams, PersonaChatResponse,
-    PersonaResponse, RatePersonaParams, ScenarioChallengeResponse, SetPersonaPinsParams,
-    TabContent, UpdatePersonaParams,
+    PersonaResponse, RatePersonaParams, RecentLearningSession, ScenarioChallengeResponse,
+    SetPersonaPinsParams, TabContent, UpdatePersonaParams,
 };
 use desktop_shared::errors::ApiError;
 use tauri::State;
@@ -635,6 +635,16 @@ pub async fn flashcard_save_session(
     state.flashcard_save_session(params).await
 }
 
+#[tauri::command]
+pub async fn flashcard_recent_learning_sessions(
+    state: State<'_, Arc<AppCore>>,
+    limit: Option<usize>,
+) -> Result<Vec<RecentLearningSession>, ApiError> {
+    state
+        .flashcard_recent_learning_sessions(limit.unwrap_or(3))
+        .await
+}
+
 // ── Dev server dispatch ─────────────────────────────────────────────
 
 #[cfg(test)]
@@ -707,6 +717,7 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "flashcard_get_mode_preference",
     "flashcard_get_prerequisites",
     "flashcard_save_session",
+    "flashcard_recent_learning_sessions",
 ];
 
 #[cfg(debug_assertions)]
@@ -1004,6 +1015,10 @@ pub(crate) async fn dispatch_dev(
             >(body)))
                 .await,
         ),
+        "flashcard_recent_learning_sessions" => {
+            let limit = body.get("limit").and_then(|v| v.as_u64()).map(|l| l as usize);
+            dev::val(core.flashcard_recent_learning_sessions(limit.unwrap_or(3)).await)
+        }
         _ => return None,
     })
 }

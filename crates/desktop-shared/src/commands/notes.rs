@@ -636,6 +636,17 @@ pub struct PersonaChatResponse {
     pub reply: String,
 }
 
+// ── Recent Learning Sessions ─────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecentLearningSession {
+    pub session_key: String,
+    pub title: String,
+    pub updated_at: String,
+    pub preview: String,
+}
+
 // ── Review Session ────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
