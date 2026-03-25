@@ -1,5 +1,4 @@
 import { useMutation } from "@shared/hooks/useMutation";
-import { invalidateQueries } from "@shared/hooks/useQuery";
 import { Check, Sparkles, X } from "lucide-react";
 
 export interface MetaRule {
@@ -15,9 +14,14 @@ export interface MetaRule {
 interface MetaRulesSectionProps {
   activeRules: MetaRule[];
   pendingRules: MetaRule[];
+  onRuleAction?: () => void;
 }
 
-export function MetaRulesSection({ activeRules, pendingRules }: MetaRulesSectionProps) {
+export function MetaRulesSection({
+  activeRules,
+  pendingRules,
+  onRuleAction,
+}: MetaRulesSectionProps) {
   const { mutate: approve } = useMutation<void, { ruleId: string }>("approve_meta_rule");
   const { mutate: dismiss } = useMutation<void, { ruleId: string }>("dismiss_meta_rule");
 
@@ -41,7 +45,7 @@ export function MetaRulesSection({ activeRules, pendingRules }: MetaRulesSection
               type="button"
               onClick={async () => {
                 await approve({ ruleId: rule.id });
-                invalidateQueries("get_mirror");
+                onRuleAction?.();
               }}
               className="flex items-center gap-1 px-2.5 py-1 rounded-md text-2xs text-success bg-success/10 hover:bg-success/20 transition-colors"
             >
@@ -52,7 +56,7 @@ export function MetaRulesSection({ activeRules, pendingRules }: MetaRulesSection
               type="button"
               onClick={async () => {
                 await dismiss({ ruleId: rule.id });
-                invalidateQueries("get_mirror");
+                onRuleAction?.();
               }}
               className="flex items-center gap-1 px-2.5 py-1 rounded-md text-2xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
             >

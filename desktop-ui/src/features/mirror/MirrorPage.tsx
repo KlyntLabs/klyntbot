@@ -27,7 +27,7 @@ const DEFAULT_MIRROR_STATE: MirrorState = {
 };
 
 export function MirrorPage() {
-  const { data: mirrorState } = useQuery<MirrorState>(
+  const { data: mirrorState, refetch } = useQuery<MirrorState>(
     "get_mirror_state",
     undefined,
     DEFAULT_MIRROR_STATE,
@@ -52,6 +52,7 @@ export function MirrorPage() {
         <MetaRulesSection
           activeRules={mirrorState?.activeMetaRules ?? []}
           pendingRules={mirrorState?.pendingMetaRules ?? []}
+          onRuleAction={refetch}
         />
 
         {/* Skill Routing */}
