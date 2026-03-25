@@ -120,19 +120,17 @@ pub(crate) async fn dispatch_dev(
     body: &serde_json::Value,
 ) -> Option<Result<serde_json::Value, ApiError>> {
     use super::dev_helpers::{self as dev, try_field};
+
+    let facade = match core.mirror_facade() {
+        Ok(f) => f,
+        Err(e) => return Some(Err(e)),
+    };
+
     Some(match cmd {
         "get_mirror_state" => {
-            let facade = match core.mirror_facade() {
-                Ok(f) => f,
-                Err(e) => return Some(Err(e)),
-            };
             dev::val(facade.get_state().await.map_err(ApiError::from))
         }
         "get_routing_history" => {
-            let facade = match core.mirror_facade() {
-                Ok(f) => f,
-                Err(e) => return Some(Err(e)),
-            };
             let days: Option<u32> = dev::get(body, "days");
             dev::val(
                 facade
@@ -142,10 +140,6 @@ pub(crate) async fn dispatch_dev(
             )
         }
         "get_mirror_narratives" => {
-            let facade = match core.mirror_facade() {
-                Ok(f) => f,
-                Err(e) => return Some(Err(e)),
-            };
             let limit: Option<u32> = dev::get(body, "limit");
             dev::val(
                 facade
@@ -155,17 +149,9 @@ pub(crate) async fn dispatch_dev(
             )
         }
         "get_pending_snippets" => {
-            let facade = match core.mirror_facade() {
-                Ok(f) => f,
-                Err(e) => return Some(Err(e)),
-            };
             dev::val(facade.get_pending_snippets().await.map_err(ApiError::from))
         }
         "submit_mirror_feedback" => {
-            let facade = match core.mirror_facade() {
-                Ok(f) => f,
-                Err(e) => return Some(Err(e)),
-            };
             let item_id: Uuid = try_field!(dev::get(body, "itemId")
                 .or_else(|| dev::get(body, "item_id"))
                 .ok_or_else(|| ApiError::new("VALIDATION", "missing required field: itemId")));
@@ -179,10 +165,6 @@ pub(crate) async fn dispatch_dev(
             )
         }
         "generate_mirror_response" => {
-            let facade = match core.mirror_facade() {
-                Ok(f) => f,
-                Err(e) => return Some(Err(e)),
-            };
             let query = try_field!(dev::get_str(body, "query"));
             dev::val(
                 facade
@@ -192,10 +174,6 @@ pub(crate) async fn dispatch_dev(
             )
         }
         "approve_meta_rule" => {
-            let facade = match core.mirror_facade() {
-                Ok(f) => f,
-                Err(e) => return Some(Err(e)),
-            };
             // Accept both camelCase (Tauri frontend) and snake_case (API)
             let rule_id: Uuid = try_field!(dev::get(body, "ruleId")
                 .or_else(|| dev::get(body, "rule_id"))
@@ -208,10 +186,6 @@ pub(crate) async fn dispatch_dev(
             )
         }
         "dismiss_meta_rule" => {
-            let facade = match core.mirror_facade() {
-                Ok(f) => f,
-                Err(e) => return Some(Err(e)),
-            };
             // Accept both camelCase (Tauri frontend) and snake_case (API)
             let rule_id: Uuid = try_field!(dev::get(body, "ruleId")
                 .or_else(|| dev::get(body, "rule_id"))
@@ -224,17 +198,9 @@ pub(crate) async fn dispatch_dev(
             )
         }
         "get_brain_versions" => {
-            let facade = match core.mirror_facade() {
-                Ok(f) => f,
-                Err(e) => return Some(Err(e)),
-            };
             dev::val(facade.get_brain_versions().await.map_err(ApiError::from))
         }
         "revert_brain_version" => {
-            let facade = match core.mirror_facade() {
-                Ok(f) => f,
-                Err(e) => return Some(Err(e)),
-            };
             let version: u32 = try_field!(dev::get(body, "version")
                 .ok_or_else(|| ApiError::new("VALIDATION", "missing required field: version")));
             dev::val(

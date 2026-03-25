@@ -169,8 +169,8 @@ async fn test_mirror_brain_version_lifecycle() {
     let versions = facade.get_brain_versions().await.unwrap();
     assert_eq!(versions.len(), 2);
 
-    // 4. Revert to v1 (DB only)
-    let new_v = facade.revert_to_version_db_only(1).await.unwrap();
+    // 4. Revert to v1 (no bridge configured, so DB-only path is taken)
+    let new_v = facade.revert_to_version(1).await.unwrap();
     assert_eq!(new_v.version, 3);
     assert_eq!(new_v.reason, "Reverted to v1");
 

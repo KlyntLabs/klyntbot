@@ -61,8 +61,11 @@ impl ConfigArchiver {
         reason: String,
         metrics: serde_json::Value,
     ) -> Result<()> {
-        let params = self.get_current_params().await;
-        let next = self.repo.get_next_version_number().await?;
+        let (params, next) = tokio::join!(
+            self.get_current_params(),
+            self.repo.get_next_version_number()
+        );
+        let next = next?;
         let parent = if next > 1 { Some(next - 1) } else { None };
         let v = BrainVersion {
             version: next,

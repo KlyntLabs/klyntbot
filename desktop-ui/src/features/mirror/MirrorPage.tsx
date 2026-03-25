@@ -1,5 +1,6 @@
 import { useQuery } from "@shared/hooks/useQuery";
 import { Eye } from "lucide-react";
+import type { BrainVersion } from "./components/BrainTimeline";
 import { BrainTimeline } from "./components/BrainTimeline";
 import type { MetaRule } from "./components/MetaRulesSection";
 import { MetaRulesSection } from "./components/MetaRulesSection";
@@ -17,7 +18,7 @@ interface MirrorState {
   pendingSnippets: NarrativeSnippet[];
   activeMetaRules: MetaRule[];
   pendingMetaRules: MetaRule[];
-  latestBrainVersion: { version: number } | null;
+  latestBrainVersion: BrainVersion | null;
 }
 
 const DEFAULT_MIRROR_STATE: MirrorState = {

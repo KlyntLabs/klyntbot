@@ -600,7 +600,7 @@ impl MirrorRepo {
 
     pub async fn get_brain_versions(&self) -> Result<Vec<BrainVersion>> {
         let rows = sqlx::query_as::<_, BrainVersionRow>(
-            "SELECT * FROM mirror_brain_versions ORDER BY version DESC",
+            "SELECT * FROM mirror_brain_versions ORDER BY version DESC LIMIT 50",
         )
         .fetch_all(self.db())
         .await

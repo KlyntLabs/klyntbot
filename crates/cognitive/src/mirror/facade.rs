@@ -113,7 +113,7 @@ impl MirrorFacade {
     }
 
     /// Revert DB state only — used in tests without autotuner bridge.
-    pub async fn revert_to_version_db_only(&self, target: u32) -> Result<BrainVersion> {
+    pub(crate) async fn revert_to_version_db_only(&self, target: u32) -> Result<BrainVersion> {
         let target_v = self
             .repo
             .get_brain_version(target)
@@ -170,14 +170,10 @@ impl MirrorFacade {
 
     /// Return active and pending meta-rules as `(active, pending)`.
     pub async fn get_meta_rules(&self) -> Result<(Vec<MetaRule>, Vec<MetaRule>)> {
-        let active = self
-            .repo
-            .get_meta_rules_by_status(MetaRuleStatus::Active)
-            .await?;
-        let pending = self
-            .repo
-            .get_meta_rules_by_status(MetaRuleStatus::Pending)
-            .await?;
+        let (active, pending) = tokio::try_join!(
+            self.repo.get_meta_rules_by_status(MetaRuleStatus::Active),
+            self.repo.get_meta_rules_by_status(MetaRuleStatus::Pending),
+        )?;
         Ok((active, pending))
     }
 

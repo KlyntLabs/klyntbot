@@ -36,8 +36,7 @@ impl cognitive::mirror::AutotunerBridge for AppAutotunerBridge {
     async fn current_champion_params(&self) -> common::Result<serde_json::Value> {
         let params = self.orchestrator.current_champion_params().await;
         match params {
-            Some(p) => serde_json::to_value(p)
-                .map_err(|e| common::KlyntbotError::Json(e)),
+            Some(p) => Ok(serde_json::to_value(p)?),
             None => Ok(serde_json::json!({})),
         }
     }

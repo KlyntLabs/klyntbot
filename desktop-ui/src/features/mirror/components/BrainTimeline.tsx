@@ -3,7 +3,7 @@ import { useQuery } from "@shared/hooks/useQuery";
 import { GitBranch, RotateCcw } from "lucide-react";
 import { useState } from "react";
 
-interface BrainVersion {
+export interface BrainVersion {
   version: number;
   trialId: string | null;
   promotedAt: string;
