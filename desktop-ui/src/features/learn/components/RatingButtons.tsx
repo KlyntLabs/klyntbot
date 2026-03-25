@@ -2,6 +2,7 @@ import type { ReviewQuality } from "../../notes/hooks/useFlashcards";
 
 interface RatingButtonsProps {
   onRate: (quality: ReviewQuality) => void;
+  suggestedRating?: string;
 }
 
 const ratings: {
@@ -41,20 +42,27 @@ const ratings: {
   },
 ];
 
-export function RatingButtons({ onRate }: RatingButtonsProps) {
+export function RatingButtons({ onRate, suggestedRating }: RatingButtonsProps) {
   return (
     <div className="flex items-center gap-2 justify-center">
-      {ratings.map((r) => (
-        <button
-          key={r.quality}
-          type="button"
-          onClick={() => onRate(r.quality)}
-          className={`glass-button px-4 py-2.5 flex flex-col items-center gap-0.5 min-w-[72px] transition-all duration-200 ${r.hoverBg}`}
-        >
-          <span className={`text-sm font-medium ${r.color}`}>{r.label}</span>
-          <span className="text-2xs text-muted-foreground">{r.key}</span>
-        </button>
-      ))}
+      {ratings.map((r) => {
+        const isSuggested = suggestedRating === r.quality;
+        return (
+          <button
+            key={r.quality}
+            type="button"
+            onClick={() => onRate(r.quality)}
+            className={`glass-button px-4 py-2.5 flex flex-col items-center gap-0.5 min-w-[72px] transition-all duration-200 ${r.hoverBg} ${
+              isSuggested ? "ring-1 ring-white/20" : ""
+            }`}
+          >
+            <span className={`text-sm font-medium ${r.color}`}>{r.label}</span>
+            <span className="text-2xs text-muted-foreground">
+              {isSuggested ? `${r.key} \u2022 suggested` : r.key}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }

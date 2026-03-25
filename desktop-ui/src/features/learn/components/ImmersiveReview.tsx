@@ -1,10 +1,12 @@
 import { ThinkingDots } from "@shared/ui/ThinkingDots";
-import { ArrowLeft, Edit3, ExternalLink, Lightbulb } from "lucide-react";
+import { ArrowLeft, Edit3, ExternalLink, Keyboard, Lightbulb, RotateCcw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { useReviewSession } from "../hooks/useReviewSession";
+import { AnswerInput } from "./AnswerInput";
 import { CardEditor } from "./CardEditor";
 import { CardRenderer } from "./CardRenderer";
+import { GradeDisplay } from "./GradeDisplay";
 import { PostSession } from "./PostSession";
 import { RatingButtons } from "./RatingButtons";
 
@@ -16,6 +18,8 @@ interface ImmersiveReviewProps {
 export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
+  const [answerMode, setAnswerMode] = useState<"flip" | "type">("flip");
+  const [typedAnswer, setTypedAnswer] = useState("");
   const navigate = useNavigate();
 
   const session = useReviewSession();
@@ -28,6 +32,9 @@ export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
     currentIndex,
     updateCard,
     done: sessionDone,
+    submitAnswer,
+    gradeResult,
+    grading,
     socraticExplanation,
     socraticLoading,
     showSocratic,
@@ -55,7 +62,7 @@ export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
         return;
       }
 
-      if (e.key === " " && !revealed && current) {
+      if (e.key === " " && !revealed && current && answerMode === "flip") {
         e.preventDefault();
         reveal();
         return;
@@ -91,12 +98,13 @@ export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [revealed, current, reveal, rate, onExit, navigate, editing]);
+  }, [revealed, current, reveal, rate, onExit, navigate, editing, answerMode]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset state when card advances
   useEffect(() => {
     setSocraticOpen(false);
     setEditing(false);
+    setTypedAnswer("");
   }, [currentIndex]);
 
   if (loading) {
@@ -155,6 +163,33 @@ export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
         <span className="text-xs text-muted-foreground tabular-nums">
           {currentIndex + 1} / {cards.length}
         </span>
+
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setAnswerMode("flip")}
+            className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] transition-colors ${
+              answerMode === "flip"
+                ? "bg-white/10 text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <RotateCcw size={12} strokeWidth={1.5} />
+            Flip
+          </button>
+          <button
+            type="button"
+            onClick={() => setAnswerMode("type")}
+            className={`flex items-center gap-1 px-2 py-1 rounded text-[11px] transition-colors ${
+              answerMode === "type"
+                ? "bg-white/10 text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Keyboard size={12} strokeWidth={1.5} />
+            Type
+          </button>
+        </div>
 
         <span className="text-xs text-muted-foreground truncate max-w-[120px]">
           {current?.deck ?? deck ?? "All decks"}
@@ -215,21 +250,41 @@ export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
         </div>
       )}
 
-      {/* Bottom area: Show Answer or Rating buttons */}
+      {/* Grade display (typed mode) */}
+      {answerMode === "type" && gradeResult && revealed && (
+        <div className="px-6 animate-[fade-in-up_0.2s_ease-out]">
+          <GradeDisplay result={gradeResult} userAnswer={typedAnswer} />
+        </div>
+      )}
+
+      {/* Bottom area: Show Answer / Answer Input / Rating buttons */}
       <div className="px-6 pb-4 space-y-3">
-        {!revealed ? (
-          <div className="flex justify-center">
-            <button
-              type="button"
-              onClick={reveal}
-              className="glass-button px-8 py-2.5 text-sm text-foreground"
-            >
-              Show Answer
-              <span className="text-2xs text-muted-foreground ml-2">Space</span>
-            </button>
-          </div>
+        {answerMode === "flip" ? (
+          !revealed ? (
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={reveal}
+                className="glass-button px-8 py-2.5 text-sm text-foreground"
+              >
+                Show Answer
+                <span className="text-2xs text-muted-foreground ml-2">Space</span>
+              </button>
+            </div>
+          ) : (
+            <RatingButtons onRate={rate} />
+          )
+        ) : !revealed ? (
+          <AnswerInput
+            onSubmit={(answer) => {
+              setTypedAnswer(answer);
+              submitAnswer(answer);
+            }}
+            grading={grading}
+            disabled={!current}
+          />
         ) : (
-          <RatingButtons onRate={rate} />
+          <RatingButtons onRate={rate} suggestedRating={gradeResult?.suggestedRating} />
         )}
 
         {/* Footer actions */}

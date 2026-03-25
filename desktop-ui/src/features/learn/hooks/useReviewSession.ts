@@ -2,6 +2,18 @@ import { ipc } from "@shared/hooks/useIpc";
 import { useCallback, useRef, useState } from "react";
 import type { Flashcard, ReviewQuality } from "../../notes/hooks/useFlashcards";
 
+export interface GradeResult {
+  score: number | null;
+  suggestedRating: string;
+  gradingMethod: string;
+  explanation: string | null;
+  diffHighlights: { text: string; status: string }[];
+  expectedAnswer: string;
+  coachingNudge: string | null;
+  keyConceptsPresent: string[];
+  keyConceptsMissing: string[];
+}
+
 export function useReviewSession() {
   const [cards, setCards] = useState<Flashcard[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -11,6 +23,8 @@ export function useReviewSession() {
   const [socraticExplanation, setSocraticExplanation] = useState<string | null>(null);
   const [socraticLoading, setSocraticLoading] = useState(false);
   const [showSocratic, setShowSocratic] = useState(false);
+  const [gradeResult, setGradeResult] = useState<GradeResult | null>(null);
+  const [grading, setGrading] = useState(false);
   const startTime = useRef(Date.now());
   const cardShownAt = useRef(Date.now());
 
@@ -23,11 +37,36 @@ export function useReviewSession() {
     setRevealed(false);
     setTotalReviewed(0);
     setCorrectCount(0);
+    setGradeResult(null);
+    setGrading(false);
     startTime.current = Date.now();
     cardShownAt.current = Date.now();
   }, []);
 
   const reveal = useCallback(() => setRevealed(true), []);
+
+  const submitAnswer = useCallback(
+    async (userAnswer: string) => {
+      const card = cards[currentIndex];
+      if (!card) return;
+      setGrading(true);
+      setGradeResult(null);
+      try {
+        const result = await ipc<GradeResult>("flashcard_submit_answer", {
+          cardId: card.id,
+          userAnswer,
+          mode: "typed",
+        });
+        setGradeResult(result);
+        setRevealed(true);
+      } catch {
+        setRevealed(true);
+      } finally {
+        setGrading(false);
+      }
+    },
+    [cards, currentIndex],
+  );
 
   const rate = useCallback(
     async (quality: ReviewQuality) => {
@@ -59,6 +98,8 @@ export function useReviewSession() {
       }
 
       setRevealed(false);
+      setGradeResult(null);
+      setGrading(false);
       const nextIndex = currentIndex + 1;
       setCurrentIndex(nextIndex);
       cardShownAt.current = Date.now();
@@ -93,6 +134,9 @@ export function useReviewSession() {
     startReview,
     reveal,
     rate,
+    submitAnswer,
+    gradeResult,
+    grading,
     socraticExplanation,
     socraticLoading,
     showSocratic,
