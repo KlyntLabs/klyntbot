@@ -21,6 +21,42 @@ The Mirror is a self-awareness layer inside the cognitive system that turns invi
 
 ---
 
+## Prerequisites: New Domain Events
+
+The Mirror depends on two events that do not yet exist in `DomainEvent`. These must be added to `crates/bus/src/domain_events.rs` before any Mirror subscriber can function.
+
+### `SkillRouted` (new variant)
+
+Emitted by `AgentRuntime` after skill selection (step 1) and intent classification (step 5):
+
+```rust
+SkillRouted {
+    skill_name: String,
+    confidence: f64,
+    source: String,              // "heuristic" | "embedding" | "llm" | "cognitive"
+    trigger_phrases: Vec<String>,
+    session_key: String,
+}
+```
+
+**Emit site:** `crates/agent/src/agent_runtime/runtime.rs`, after `select_orchestrator()` returns and intent classification completes. This is the same point where `AgentSelected` transparency event is already emitted — add a `DomainEvent::SkillRouted` publish alongside it.
+
+### `TrialActivated` (new variant)
+
+Emitted when the autotuner activates a new trial for shadow evaluation:
+
+```rust
+TrialActivated {
+    trial_id: String,
+    hypothesis: String,
+    params_summary: String,      // human-readable summary of changed params
+}
+```
+
+**Emit site:** `crates/agent/src/autotuner/mod.rs`, in the trial activation path where new trials are registered. Currently only `AutotunerDecision` is emitted on promotion — this new event fires on trial *start*.
+
+---
+
 ## Architecture
 
 ### Home: `crates/cognitive/src/mirror/`
@@ -49,9 +85,9 @@ mirror/
 
 ```
 DomainEventBus
-  ├── ClassificationComplete → RoutingMirrorSubscriber → mirror_routing_snapshots
-  ├── AutotunerDecision      → TrialPreviewSubscriber  → mirror_trial_previews
-  ├── UserCorrectedAI        → MetaRuleDetector         → procedural_rules (domain="meta")
+  ├── SkillRouted (new)      → RoutingMirrorSubscriber → mirror_routing_snapshots
+  ├── TrialActivated (new)   → TrialPreviewSubscriber  → mirror_trial_previews
+  ├── UserCorrectedAI        → MetaRuleDetector         → mirror_meta_rules
   ├── AutotunerDecision      → ConfigArchiver            → mirror_brain_versions
   └── MirrorAlert (any)      → NarrativeSnippet          → mirror_snippets
 
@@ -165,12 +201,19 @@ pub enum SuggestedAction {
 
 pub enum UserFeedback { Helpful, NotHelpful, Dismissed }
 
-/// Meta-rule stored as ProceduralRule with domain="meta"
+/// Meta-rule — stored in dedicated mirror_meta_rules table (not procedural_rules)
+/// because the structured action enum and pending/active state machine don't fit
+/// the simple rule_text + confidence schema of procedural_rules.
 pub struct MetaRule {
+    pub id: Uuid,
     pub trigger_condition: String,
     pub action: MetaRuleAction,
     pub source: MetaRuleSource,                   // UserCreated | ReflectionGenerated | CorrectionDerived
     pub effectiveness_score: f64,
+    pub status: MetaRuleStatus,                   // Pending | Active | Disabled
+    pub signal_count: u32,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
 pub enum MetaRuleAction {
@@ -183,6 +226,7 @@ pub enum MetaRuleAction {
 }
 
 pub enum MetaRuleSource { UserCreated, ReflectionGenerated, CorrectionDerived }
+pub enum MetaRuleStatus { Pending, Active, Disabled }
 ```
 
 ### Storage (`mirror/repo.rs`)
@@ -239,6 +283,19 @@ CREATE TABLE IF NOT EXISTS mirror_trend_narratives (
 );
 CREATE INDEX idx_trend_narratives_time ON mirror_trend_narratives(generated_at);
 
+CREATE TABLE IF NOT EXISTS mirror_meta_rules (
+    id TEXT PRIMARY KEY,
+    trigger_condition TEXT NOT NULL,
+    action_json TEXT NOT NULL,             -- serialized MetaRuleAction enum
+    source TEXT NOT NULL,                  -- 'user_created' | 'reflection_generated' | 'correction_derived'
+    effectiveness_score REAL NOT NULL DEFAULT 0.5,
+    status TEXT NOT NULL DEFAULT 'pending', -- 'pending' | 'active' | 'disabled'
+    signal_count INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX idx_meta_rules_status ON mirror_meta_rules(status);
+
 CREATE TABLE IF NOT EXISTS mirror_snippets (
     id TEXT PRIMARY KEY,
     created_at TEXT NOT NULL,
@@ -252,7 +309,7 @@ CREATE TABLE IF NOT EXISTS mirror_snippets (
 CREATE INDEX idx_snippets_created ON mirror_snippets(created_at);
 ```
 
-**Meta-rules** reuse the existing `procedural_rules` table with `domain = "meta"`. No new table needed. Effectiveness tracked via existing `confidence` + `signal_count` fields.
+**Meta-rules** get their own `mirror_meta_rules` table rather than reusing `procedural_rules`. The structured `MetaRuleAction` enum (with variants like `AdjustRouting`, `ForceClarification`, `CreateExperiment`) and the pending/active/disabled state machine don't fit the simple `rule_text + confidence` schema of procedural rules. However, active meta-rules are still loaded alongside procedural rules during context assembly via a unified query in `MirrorRepo`.
 
 **Retention policy:** Hourly routing snapshots kept 30 days, daily aggregates kept forever. Trial previews kept 90 days. Snippets kept 90 days (dismissed ones cleaned after 30 days).
 
@@ -262,17 +319,18 @@ CREATE INDEX idx_snippets_created ON mirror_snippets(created_at);
 
 ### RoutingMirrorSubscriber (`subscribers/routing.rs`)
 
-**Listens to:** `ClassificationComplete`
+**Listens to:** `SkillRouted` (new event, see Prerequisites)
 
 **Behavior:**
 - In-memory `DashMap<String, SkillRouteAccum>` accumulates classification events (counts, confidence sums, trigger phrase frequencies)
 - Hourly flush via `tokio::time::interval(3600s)` writes a `RoutingSnapshot` with `window_hours=1`
-- **Drift detection** on each flush: compares current distribution to rolling 7-day average. If any skill's share shifted >15 percentage points or `fallback_rate` exceeds 0.70, emits `MirrorAlert::RoutingDrift`
-- Retention cleanup on flush: deletes hourly snapshots older than 30 days
+- **Daily aggregation:** At midnight flush, also writes a `window_hours=24` aggregate snapshot summarizing the day. Weekly aggregates (`window_hours=168`) are computed by the narrative generator from daily snapshots.
+- **Drift detection** on each flush: compares current distribution to rolling 7-day average (from daily aggregates). If any skill's share shifted >15 percentage points or `fallback_rate` exceeds 0.70, emits `MirrorAlert::RoutingDrift`
+- **No cleanup in flush** — retention cleanup is owned exclusively by `JOB_MIRROR_CLEANUP` cron to avoid dual code paths
 
 ### TrialPreviewSubscriber (`subscribers/trial.rs`)
 
-**Listens to:** `AutotunerDecision` (trial activation/completion)
+**Listens to:** `TrialActivated` (new event, see Prerequisites)
 
 **Behavior:**
 - On `TrialActivated`, spawns a 4-hour delayed task
@@ -283,11 +341,11 @@ CREATE INDEX idx_snippets_created ON mirror_snippets(created_at);
   - `NeedMoreData` — everything else
 - Writes `TrialPreview` and emits `MirrorAlert::TrialUnpromising` if Kill
 - **Kill does NOT auto-stop** — surfaces the recommendation. User or nightly cycle decides.
-- Tracks active timers in `HashMap<Uuid, JoinHandle<()>>` for early cancellation
+- **Concurrency:** Active timers stored in `Arc<DashMap<Uuid, JoinHandle<()>>>` shared between the subscriber task and `MirrorFacade` (which needs to cancel timers on `kill_trial`). The `DashMap` is created during `MirrorEngine` construction and cloned into both the subscriber and the facade.
 
 ### MetaRuleDetector (`subscribers/meta_rule.rs`)
 
-**Listens to:** `UserCorrectedAI`, `ClassificationComplete` (low confidence), `MirrorAlert`
+**Listens to:** `UserCorrectedAI`, `SkillRouted` (low confidence), `MirrorAlert`
 
 **Behavior:**
 - **Correction streak detection:** ≥2 corrections in one session, or ≥3 corrections involving same skill across sessions → propose meta-rule
@@ -307,31 +365,51 @@ CREATE INDEX idx_snippets_created ON mirror_snippets(created_at);
 - `parent_version` is always the current latest version (linear chain)
 - **Bootstrap:** First run creates Version 1 from current config defaults with reason "Initial brain state"
 - **Revert logic** (via facade): marks versions after target as `reverted=true`, creates a NEW version with the target's params (timeline always moves forward). Applies params via `AutotunerBridge` trait.
+- **Reconciliation with existing revert:** `app-core/src/handlers/autotuner.rs` has an existing `autotuner_revert()` that restores from `PREVIOUS_CHAMPION_KEY`. The `AutotunerBridge::apply_champion()` implementation must update both paths — writing to `PREVIOUS_CHAMPION_KEY` AND creating a `BrainVersion`. The existing autotuner revert UI should be deprecated in favor of the Mirror's richer timeline-based revert. During transition, both paths update the same champion state.
 
 ### Subscriber Lifecycle
 
-All four started by `MirrorEngine` during app initialization:
+All four started by `MirrorEngine` during app initialization. The engine produces both the subscriber tasks and the `MirrorFacade`, sharing state between them:
 
 ```rust
-pub struct MirrorEngine {
-    routing: RoutingMirrorSubscriber,
-    trial: TrialPreviewSubscriber,
-    meta_rule: MetaRuleDetector,
-    version: ConfigArchiver,
-    shutdown: CancellationToken,
-}
+pub struct MirrorEngine { ... }
 
 impl MirrorEngine {
-    pub fn start(self, bus: &DomainEventBus) -> Vec<JoinHandle<()>> {
-        vec![
-            tokio::spawn(self.routing.run(bus.subscribe())),
-            tokio::spawn(self.trial.run(bus.subscribe())),
-            tokio::spawn(self.meta_rule.run(bus.subscribe())),
-            tokio::spawn(self.version.run(bus.subscribe())),
-        ]
+    /// Build and start the Mirror system. Returns the facade (for UI/Tauri)
+    /// and the subscriber join handles (for lifecycle management).
+    pub fn start(
+        self,
+        bus: &DomainEventBus,
+        repo: MirrorRepo,
+        narrative_handler: Arc<dyn NarrativeHandler>,
+        autotuner_bridge: Arc<dyn AutotunerBridge>,
+    ) -> (MirrorFacade, Vec<JoinHandle<()>>) {
+        let shutdown = CancellationToken::new();
+
+        // Shared state between subscribers and facade
+        let active_timers: Arc<DashMap<Uuid, JoinHandle<()>>> = Arc::new(DashMap::new());
+
+        let handles = vec![
+            tokio::spawn(self.routing.run(bus.subscribe(), shutdown.clone())),
+            tokio::spawn(self.trial.run(bus.subscribe(), active_timers.clone(), shutdown.clone())),
+            tokio::spawn(self.meta_rule.run(bus.subscribe(), shutdown.clone())),
+            tokio::spawn(self.version.run(bus.subscribe(), shutdown.clone())),
+        ];
+
+        let facade = MirrorFacade {
+            repo,
+            narrative_handler,
+            autotuner_bridge,
+            active_timers,  // shared with TrialPreviewSubscriber
+            shutdown,
+        };
+
+        (facade, handles)
     }
 }
 ```
+
+Each subscriber's `run()` accepts a `CancellationToken` for clean shutdown. The facade and `TrialPreviewSubscriber` share the `active_timers` DashMap for trial cancellation.
 
 ---
 
@@ -386,9 +464,10 @@ User types questions in the MirrorInput box → calls `MirrorFacade::generate_mi
 ```rust
 pub struct MirrorFacade {
     repo: MirrorRepo,
-    rule_repo: ProceduralRuleRepo,
     narrative_handler: Arc<dyn NarrativeHandler>,
     autotuner_bridge: Arc<dyn AutotunerBridge>,
+    active_timers: Arc<DashMap<Uuid, JoinHandle<()>>>,  // shared with TrialPreviewSubscriber
+    shutdown: CancellationToken,
 }
 
 impl MirrorFacade {
@@ -405,12 +484,39 @@ impl MirrorFacade {
     pub async fn dismiss_meta_rule(&self, rule_id: Uuid) -> Result<()>;
     pub async fn kill_trial(&self, trial_id: Uuid) -> Result<()>;
     pub async fn continue_trial(&self, trial_id: Uuid) -> Result<()>;
-    pub async fn submit_feedback(&self, item_id: Uuid, feedback: UserFeedback) -> Result<()>;
-    pub async fn create_meta_rule_from_text(&self, text: String) -> Result<ProceduralRule>;
+    pub async fn submit_feedback(&self, item_id: Uuid, target: FeedbackTarget, feedback: UserFeedback) -> Result<()>;
+    pub async fn create_meta_rule_from_text(&self, text: String) -> Result<MetaRule>;
 
-    // On-demand
-    pub async fn generate_mirror_response(&self, query: String, period: Option<(DateTime<Utc>, DateTime<Utc>)>) -> Result<TrendNarrative>;
+    // On-demand (conversational mirror)
+    pub async fn generate_mirror_response(
+        &self, query: String, period: Option<(DateTime<Utc>, DateTime<Utc>)>
+    ) -> Result<MirrorResponse>;
 }
+
+/// Conversational response from the Mirror — distinct from TrendNarrative
+/// because it answers a freeform question rather than synthesizing a period.
+pub struct MirrorResponse {
+    pub answer: String,                          // first-person LLM response
+    pub data_sources_used: Vec<String>,          // which mirror tables were queried
+    pub proposed_meta_rule: Option<MetaRule>,     // if the answer surfaced a new rule
+}
+```
+
+**Feedback routing:** `submit_feedback(item_id, item_type, feedback)` uses a `FeedbackTarget` enum to disambiguate which table to update:
+
+```rust
+pub enum FeedbackTarget {
+    Narrative,    // mirror_trend_narratives
+    Snippet,      // mirror_snippets
+    Routing,      // mirror_routing_snapshots
+}
+
+pub async fn submit_feedback(
+    &self, item_id: Uuid, target: FeedbackTarget, feedback: UserFeedback
+) -> Result<()>;
+```
+
+This replaces the earlier untyped `submit_feedback(item_id, feedback)` which had no way to determine the target table.
 ```
 
 ---
@@ -423,7 +529,7 @@ impl MirrorFacade {
 - `JOB_MIRROR_WEEKLY_NARRATIVE` — Sunday 7pm local, generates weekly narrative
 - `JOB_MIRROR_CLEANUP` — Daily midnight, retention cleanup (30d hourly snapshots, 90d previews/snippets)
 
-**MCP exposure:** Add `mirror` to `default_exposed_tools()` in `config/schema/mcp.rs`. Read-only: `get_state`, `get_routing_history`, `get_brain_versions`, `get_narratives`.
+**MCP exposure:** Implement a `MirrorTool` via `#[derive(Tool)]` in the cognitive or a thin wrapper crate, registered in `ToolRegistry` via `FeaturePackage::tools()`. The tool name `mirror` is added to `default_exposed_tools()` in `config/schema/mcp.rs`. Actions: `get_state`, `get_routing_history`, `get_brain_versions`, `get_narratives` (all read-only). The tool delegates to `MirrorFacade` methods.
 
 **Cross-feature ripple:**
 - User kills trial → auto-creates note ("Decided to kill trial X because...") + episodic memory
@@ -459,7 +565,7 @@ MirrorPage
     └── on submit → ipc("generate_mirror_response", { query, period })
 ```
 
-**Data fetching:** `useQuery("get_mirror_state")` on mount. Individual sections use targeted queries when expanded. Real-time snippet updates via SSE `PipelineEvent` stream.
+**Data fetching:** `useQuery("get_mirror_state")` on mount. Individual sections use targeted queries when expanded. Real-time snippet updates via a new `MirrorEvent` variant on the `DomainEventBus` (not `PipelineEvent`, which is scoped to consolidation debug). The `MirrorEvent::SnippetCreated` event is forwarded to the frontend via the existing SSE entity-update mechanism used by other domain events.
 
 **Styling:** `glass-panel` for cards, theme tokens for colors, skill-specific donut colors derived from skill name hash.
 
