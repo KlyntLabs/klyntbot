@@ -30,6 +30,7 @@ pub mod project_memories;
 pub mod project_sources;
 pub mod projects;
 pub mod retention_history;
+pub mod review_stats;
 pub mod settings;
 pub mod shortcuts;
 pub mod squads;

@@ -224,6 +224,7 @@ mod tests {
             commands::mirror::DEV_COMMANDS,
             commands::morning_briefing::DEV_COMMANDS,
             commands::retention_history::DEV_COMMANDS,
+            commands::review_stats::DEV_COMMANDS,
             commands::view::DEV_COMMANDS,
         ];
         // chat_send is handled inline in dev_server.rs

@@ -494,6 +494,8 @@ fn run_desktop_app() {
             commands::morning_briefing::morning_briefing_summary,
             // Retention History
             commands::retention_history::retention_history,
+            // Review Stats
+            commands::review_stats::review_stats_summary,
             // Areas
             commands::areas::area_list,
             commands::areas::area_create,
