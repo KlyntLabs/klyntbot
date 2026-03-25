@@ -2,6 +2,7 @@ import { useQuery } from "@shared/hooks/useQuery";
 import { Eye } from "lucide-react";
 import type { BrainVersion } from "./components/BrainTimeline";
 import { BrainTimeline } from "./components/BrainTimeline";
+import { ExperimentWatchlist } from "./components/ExperimentWatchlist";
 import type { MetaRule } from "./components/MetaRulesSection";
 import { MetaRulesSection } from "./components/MetaRulesSection";
 import { MirrorInput } from "./components/MirrorInput";
@@ -12,6 +13,21 @@ import { RoutingDonut } from "./components/RoutingDonut";
 import type { NarrativeSnippet } from "./components/SnippetFeed";
 import { SnippetFeed } from "./components/SnippetFeed";
 
+interface TrialPreview {
+  id: string;
+  trialId: string;
+  startedAt: string;
+  previewAt: string;
+  messagesScored: number;
+  earlySignals: {
+    correctionRateDelta: number;
+    confidenceTrend: string;
+    dominantSkillShift: string | null;
+  };
+  recommendation: string;
+  narrative: string;
+}
+
 interface MirrorState {
   lastRoutingSnapshot: RoutingSnapshot | null;
   latestTrendNarrative: TrendNarrative | null;
@@ -19,6 +35,7 @@ interface MirrorState {
   activeMetaRules: MetaRule[];
   pendingMetaRules: MetaRule[];
   latestBrainVersion: BrainVersion | null;
+  recentTrialPreviews: TrialPreview[];
 }
 
 const DEFAULT_MIRROR_STATE: MirrorState = {
@@ -28,6 +45,7 @@ const DEFAULT_MIRROR_STATE: MirrorState = {
   activeMetaRules: [],
   pendingMetaRules: [],
   latestBrainVersion: null,
+  recentTrialPreviews: [],
 };
 
 export function MirrorPage() {
@@ -51,6 +69,9 @@ export function MirrorPage() {
 
         {/* Recent Insights */}
         <SnippetFeed snippets={mirrorState?.pendingSnippets ?? []} />
+
+        {/* Experiment Watchlist */}
+        <ExperimentWatchlist previews={mirrorState?.recentTrialPreviews ?? []} onAction={refetch} />
 
         {/* Meta-Rules */}
         <MetaRulesSection
