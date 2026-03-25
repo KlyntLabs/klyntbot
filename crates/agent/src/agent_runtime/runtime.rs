@@ -437,7 +437,11 @@ impl AgentRuntime {
             Some(common::SessionKey::new(&ctx.channel, &ctx.chat_id).to_string());
         let prefetch_handle = tokio::spawn(async move {
             prefetch_engine
-                .prefetch_memory(&prefetch_message, prefetch_session_key, prefetch_retrieval_ctx)
+                .prefetch_memory(
+                    &prefetch_message,
+                    prefetch_session_key,
+                    prefetch_retrieval_ctx,
+                )
                 .await
         });
 

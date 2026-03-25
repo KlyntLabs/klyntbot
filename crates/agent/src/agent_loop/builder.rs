@@ -1199,12 +1199,9 @@ impl AgentLoopBuilder {
         // ── MCP tools (Model Context Protocol) ──────────────────────────
         let mcp_manager = if config.mcp.has_active_servers() {
             // connect_all logs startup progress internally via tracing
-            let manager = mcp::McpManager::connect_all(
-                &config.mcp,
-                None,
-                mcp::McpClientOptions::default(),
-            )
-            .await;
+            let manager =
+                mcp::McpManager::connect_all(&config.mcp, None, mcp::McpClientOptions::default())
+                    .await;
             let mcp_tools = manager.tools();
             let tool_count = mcp_tools.len();
             for tool in mcp_tools {

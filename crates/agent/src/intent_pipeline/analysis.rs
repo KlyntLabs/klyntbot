@@ -1386,9 +1386,7 @@ impl IntentAnalyzer {
                     ..partial.clone()
                 },
                 None => IntentAnalysis {
-                    mode: ExecutionMode::Reactive {
-                        max_iterations: 5,
-                    },
+                    mode: ExecutionMode::Reactive { max_iterations: 5 },
                     signals: ComplexitySignals {
                         estimated_tool_calls: 1,
                         has_sequential_deps: false,
@@ -1399,7 +1397,9 @@ impl IntentAnalyzer {
                     },
                     confidence: 0.5,
                     source: AnalysisSource::ShadowDeferred,
-                    reasoning: "Shadow mode — Layer 1-2 inconclusive, using moderate reactive default".to_string(),
+                    reasoning:
+                        "Shadow mode — Layer 1-2 inconclusive, using moderate reactive default"
+                            .to_string(),
                     needs_orchestration: false,
                 },
             };
@@ -2610,7 +2610,9 @@ mod tests {
         .with_shadow_mode();
 
         // Completely ambiguous — L1 returns None, L2 has no embedder
-        let result = analyzer.analyze("hmm interesting thought about life", &[]).await;
+        let result = analyzer
+            .analyze("hmm interesting thought about life", &[])
+            .await;
         assert_eq!(result.source, AnalysisSource::ShadowDeferred);
         match result.mode {
             ExecutionMode::Reactive { max_iterations } => {
