@@ -11,8 +11,6 @@ import { DebateView } from "../components/DebateView";
 import { MessageList } from "../components/MessageList";
 import { ThreadContextMenu } from "../components/ThreadContextMenu";
 import { type AreaGroup, featurePrefix, ThreadList } from "../components/ThreadList";
-import { TransparencyPanel } from "../components/TransparencyPanel";
-import { TransparencyToggle } from "../components/TransparencyToggle";
 import type { VoiceMode } from "../components/VoiceToggle";
 import { useChatSession } from "../hooks/useChatSession";
 
@@ -89,23 +87,6 @@ export function ChatPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chat ref is unstable; didApplyResume guards double-apply
   }, [resumeContext, chat.setInput]);
 
-  const [showTransparency, setShowTransparency] = useState(() => {
-    try {
-      return localStorage.getItem("chat:transparency") === "true";
-    } catch {
-      return false;
-    }
-  });
-  const toggleTransparency = useCallback(() => {
-    setShowTransparency((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem("chat:transparency", String(next));
-      } catch {}
-      return next;
-    });
-  }, []);
-
   // ── Autotuner promotion toast ──────────────────────────────────────────
   const [promotionImpact, setPromotionImpact] = useState<string | null>(null);
   usePromotionListener((impact) => setPromotionImpact(impact));
@@ -114,16 +95,6 @@ export function ChatPage() {
     const timer = setTimeout(() => setPromotionImpact(null), 15_000);
     return () => clearTimeout(timer);
   }, [promotionImpact]);
-
-  const lastAssistantTransparency = useMemo(() => {
-    for (let i = chat.messages.length - 1; i >= 0; i--) {
-      const m = chat.messages[i];
-      if (m.role === "assistant" && m.transparency) return m.transparency;
-    }
-    return null;
-  }, [chat.messages]);
-  const activeTransparency =
-    chat.isStreaming && chat.transparency ? chat.transparency : lastAssistantTransparency;
 
   // Auto-select first thread on initial load (skip if URL already has a thread)
   const didAutoSelect = useRef(!!searchParams.get("thread"));
@@ -322,7 +293,6 @@ export function ChatPage() {
           )}
           <div className="flex items-center gap-2">
             <AmbientIndicator onClick={() => navigate("/settings/general")} />
-            <TransparencyToggle enabled={showTransparency} onToggle={toggleTransparency} />
           </div>
         </div>
 
@@ -365,7 +335,6 @@ export function ChatPage() {
                     chat.clearInteraction();
                     refetchThreads();
                   }}
-                  showTransparency={showTransparency}
                   liveTransparency={chat.transparency}
                   activeDelegateAgent={chat.activeDelegateAgent}
                   statusPhase={chat.statusPhase}
@@ -397,16 +366,6 @@ export function ChatPage() {
           onSelectDefault={handleNewThread}
           onVoiceModeChange={setVoiceMode}
         />
-
-        {/* Floating transparency overlay */}
-        {showTransparency && activeTransparency && (
-          <div
-            className="absolute top-12 right-3 z-30"
-            style={{ animation: "fade-in 0.15s ease-out" }}
-          >
-            <TransparencyPanel transparency={activeTransparency} />
-          </div>
-        )}
       </div>
     </>
   );

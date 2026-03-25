@@ -22,7 +22,6 @@ interface MessageListProps {
   activeInteraction: ActiveInteraction | null;
   sessionKey: string;
   onInteractionSubmitted: () => void;
-  showTransparency: boolean;
   liveTransparency: TransparencyData | null;
   activeDelegateAgent?: string | null;
   personaMessages?: PersonaSegment[];
@@ -38,7 +37,6 @@ export function MessageList({
   activeInteraction,
   sessionKey,
   onInteractionSubmitted,
-  showTransparency,
   liveTransparency,
   activeDelegateAgent,
   personaMessages,
@@ -123,9 +121,7 @@ export function MessageList({
                   ) : (
                     <MarkdownContent content={msg.content} />
                   )}
-                  {showTransparency && msg.transparency && (
-                    <TokenBadge transparency={msg.transparency} />
-                  )}
+                  {msg.transparency && <TokenBadge transparency={msg.transparency} />}
                 </div>
               )}
             </div>
@@ -173,7 +169,7 @@ export function MessageList({
               activeDelegateAgent={activeDelegateAgent}
               plan={liveTransparency?.plan}
             />
-            {showTransparency && liveTransparency && (
+            {liveTransparency && (
               <TokenBadge transparency={liveTransparency} isStreaming={isStreaming} />
             )}
           </div>
