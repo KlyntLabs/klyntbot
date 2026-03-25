@@ -6,6 +6,8 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Duration, Utc};
+use dashmap::DashMap;
+use tokio::task::JoinHandle;
 use uuid::Uuid;
 
 use common::Result;
@@ -13,7 +15,7 @@ use common::Result;
 use crate::mirror::{
     AutotunerBridge, BrainVersion, FeedbackTarget, MetaRule, MetaRuleStatus, MirrorRepo,
     MirrorResponse, MirrorState, NarrativeContext, NarrativeHandler, NarrativeSnippet,
-    RoutingSnapshot, TrendNarrative, UserFeedback,
+    RoutingSnapshot, TrendNarrative, TrialPreview, UserFeedback,
 };
 
 // ---------------------------------------------------------------------------
@@ -28,6 +30,7 @@ pub struct MirrorFacade {
     pub(crate) repo: MirrorRepo,
     narrative_handler: Option<Arc<dyn NarrativeHandler>>,
     autotuner_bridge: Option<Arc<dyn AutotunerBridge>>,
+    pub active_timers: Option<Arc<DashMap<String, JoinHandle<()>>>>,
 }
 
 impl MirrorFacade {
@@ -39,6 +42,7 @@ impl MirrorFacade {
             repo,
             narrative_handler: None,
             autotuner_bridge: None,
+            active_timers: None,
         }
     }
 
@@ -56,6 +60,12 @@ impl MirrorFacade {
         self
     }
 
+    /// Attach shared active timers for trial preview cancellation.
+    pub fn with_active_timers(mut self, timers: Arc<DashMap<String, JoinHandle<()>>>) -> Self {
+        self.active_timers = Some(timers);
+        self
+    }
+
     // -----------------------------------------------------------------------
     // State queries
     // -----------------------------------------------------------------------
@@ -69,6 +79,7 @@ impl MirrorFacade {
             active_meta_rules,
             pending_meta_rules,
             latest_brain_version,
+            recent_trial_previews,
         ) = tokio::try_join!(
             self.repo.get_latest_routing_snapshot(),
             self.repo.get_latest_narrative(),
@@ -76,6 +87,7 @@ impl MirrorFacade {
             self.repo.get_meta_rules_by_status(MetaRuleStatus::Active),
             self.repo.get_meta_rules_by_status(MetaRuleStatus::Pending),
             self.repo.get_latest_brain_version(),
+            self.repo.get_recent_trial_previews(),
         )?;
 
         Ok(MirrorState {
@@ -85,7 +97,7 @@ impl MirrorFacade {
             active_meta_rules,
             pending_meta_rules,
             latest_brain_version,
-            recent_trial_previews: vec![],
+            recent_trial_previews,
         })
     }
 
@@ -176,6 +188,30 @@ impl MirrorFacade {
             self.repo.get_meta_rules_by_status(MetaRuleStatus::Pending),
         )?;
         Ok((active, pending))
+    }
+
+    // -----------------------------------------------------------------------
+    // Trial preview actions
+    // -----------------------------------------------------------------------
+
+    pub async fn kill_trial(&self, trial_id: &str) -> Result<()> {
+        if let Some(timers) = &self.active_timers {
+            if let Some((_, handle)) = timers.remove(trial_id) {
+                handle.abort();
+            }
+        }
+        Ok(())
+    }
+
+    pub async fn continue_trial(&self, trial_id: &str) -> Result<()> {
+        if let Some(timers) = &self.active_timers {
+            timers.remove(trial_id);
+        }
+        Ok(())
+    }
+
+    pub async fn get_trial_previews(&self) -> Result<Vec<TrialPreview>> {
+        self.repo.get_recent_trial_previews().await
     }
 
     // -----------------------------------------------------------------------
