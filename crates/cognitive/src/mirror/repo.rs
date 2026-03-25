@@ -5,8 +5,8 @@ use common::Result;
 use uuid::Uuid;
 
 use crate::mirror::{
-    FeedbackTarget, MetaRule, MetaRuleAction, MetaRuleSource, MetaRuleStatus, NarrativeSnippet,
-    RoutingSnapshot, TrendNarrative, UserFeedback,
+    BrainVersion, FeedbackTarget, MetaRule, MetaRuleAction, MetaRuleSource, MetaRuleStatus,
+    NarrativeSnippet, RoutingSnapshot, TrendNarrative, UserFeedback,
 };
 
 // ---------------------------------------------------------------------------
@@ -193,6 +193,35 @@ impl TryFrom<MetaRuleRow> for MetaRule {
             signal_count: row.signal_count as u32,
             created_at: parse_rfc3339(&row.created_at)?,
             updated_at: parse_rfc3339(&row.updated_at)?,
+        })
+    }
+}
+
+#[derive(sqlx::FromRow)]
+struct BrainVersionRow {
+    version: i32,
+    trial_id: Option<String>,
+    promoted_at: String,
+    params_json: String,
+    reason: String,
+    parent_version: Option<i32>,
+    metrics_json: String,
+    reverted: i32,
+}
+
+impl TryFrom<BrainVersionRow> for BrainVersion {
+    type Error = common::KlyntbotError;
+
+    fn try_from(row: BrainVersionRow) -> Result<Self> {
+        Ok(BrainVersion {
+            version: row.version as u32,
+            trial_id: row.trial_id,
+            promoted_at: parse_rfc3339(&row.promoted_at)?,
+            params: serde_json::from_str(&row.params_json)?,
+            reason: row.reason,
+            parent_version: row.parent_version.map(|v| v as u32),
+            metrics_at_promotion: serde_json::from_str(&row.metrics_json)?,
+            reverted: row.reverted != 0,
         })
     }
 }
@@ -529,6 +558,86 @@ impl MirrorRepo {
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         Ok(())
     }
+
+    // -----------------------------------------------------------------------
+    // Brain versions
+    // -----------------------------------------------------------------------
+
+    pub async fn insert_brain_version(&self, v: &BrainVersion) -> Result<()> {
+        let params_json = serde_json::to_string(&v.params)?;
+        let metrics_json = serde_json::to_string(&v.metrics_at_promotion)?;
+        sqlx::query(
+            r#"
+            INSERT INTO mirror_brain_versions
+                (version, trial_id, promoted_at, params_json, reason,
+                 parent_version, metrics_json, reverted)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+            "#,
+        )
+        .bind(v.version as i64)
+        .bind(&v.trial_id)
+        .bind(v.promoted_at.to_rfc3339())
+        .bind(params_json)
+        .bind(&v.reason)
+        .bind(v.parent_version.map(|p| p as i64))
+        .bind(metrics_json)
+        .bind(v.reverted as i64)
+        .execute(self.db())
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        Ok(())
+    }
+
+    pub async fn get_latest_brain_version(&self) -> Result<Option<BrainVersion>> {
+        let row = sqlx::query_as::<_, BrainVersionRow>(
+            "SELECT * FROM mirror_brain_versions ORDER BY version DESC LIMIT 1",
+        )
+        .fetch_optional(self.db())
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        row.map(BrainVersion::try_from).transpose()
+    }
+
+    pub async fn get_brain_versions(&self) -> Result<Vec<BrainVersion>> {
+        let rows = sqlx::query_as::<_, BrainVersionRow>(
+            "SELECT * FROM mirror_brain_versions ORDER BY version DESC",
+        )
+        .fetch_all(self.db())
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        rows.into_iter().map(BrainVersion::try_from).collect()
+    }
+
+    pub async fn get_brain_version(&self, version: u32) -> Result<Option<BrainVersion>> {
+        let row = sqlx::query_as::<_, BrainVersionRow>(
+            "SELECT * FROM mirror_brain_versions WHERE version = ?1",
+        )
+        .bind(version as i64)
+        .fetch_optional(self.db())
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        row.map(BrainVersion::try_from).transpose()
+    }
+
+    pub async fn get_next_version_number(&self) -> Result<u32> {
+        let row: (i64,) =
+            sqlx::query_as("SELECT COALESCE(MAX(version), 0) FROM mirror_brain_versions")
+                .fetch_one(self.db())
+                .await
+                .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        Ok((row.0 + 1) as u32)
+    }
+
+    pub async fn mark_versions_reverted_after(&self, target_version: u32) -> Result<()> {
+        sqlx::query(
+            "UPDATE mirror_brain_versions SET reverted = 1 WHERE version > ?1",
+        )
+        .bind(target_version as i64)
+        .execute(self.db())
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        Ok(())
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -811,5 +920,80 @@ mod tests {
         let rules = repo.get_meta_rules_by_status(MetaRuleStatus::Pending).await.unwrap();
         assert_eq!(rules.len(), 1);
         assert_eq!(rules[0].signal_count, 2);
+    }
+
+    fn make_brain_version(version: u32, parent: Option<u32>) -> BrainVersion {
+        BrainVersion {
+            version,
+            trial_id: Some(format!("trial-{version}")),
+            promoted_at: Utc::now(),
+            params: serde_json::json!({"temperature": 0.7}),
+            reason: format!("reason-{version}"),
+            parent_version: parent,
+            metrics_at_promotion: serde_json::json!({"improvement_pct": 5.0}),
+            reverted: false,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_insert_and_get_brain_version() {
+        let repo = crate::mirror::test_mirror_repo().await;
+        let v = make_brain_version(1, None);
+        repo.insert_brain_version(&v).await.unwrap();
+
+        let latest = repo.get_latest_brain_version().await.unwrap();
+        assert!(latest.is_some());
+        let got = latest.unwrap();
+        assert_eq!(got.version, 1);
+        assert_eq!(got.reason, "reason-1");
+        assert_eq!(got.trial_id, Some("trial-1".to_string()));
+        assert!(!got.reverted);
+    }
+
+    #[tokio::test]
+    async fn test_get_brain_versions_ordered() {
+        let repo = crate::mirror::test_mirror_repo().await;
+        repo.insert_brain_version(&make_brain_version(1, None)).await.unwrap();
+        repo.insert_brain_version(&make_brain_version(2, Some(1))).await.unwrap();
+        repo.insert_brain_version(&make_brain_version(3, Some(2))).await.unwrap();
+
+        let versions = repo.get_brain_versions().await.unwrap();
+        assert_eq!(versions.len(), 3);
+        // Should be DESC order
+        assert_eq!(versions[0].version, 3);
+        assert_eq!(versions[1].version, 2);
+        assert_eq!(versions[2].version, 1);
+    }
+
+    #[tokio::test]
+    async fn test_get_next_version_number() {
+        let repo = crate::mirror::test_mirror_repo().await;
+
+        // Empty table → next is 1
+        let next = repo.get_next_version_number().await.unwrap();
+        assert_eq!(next, 1);
+
+        // After inserting version 1 → next is 2
+        repo.insert_brain_version(&make_brain_version(1, None)).await.unwrap();
+        let next = repo.get_next_version_number().await.unwrap();
+        assert_eq!(next, 2);
+    }
+
+    #[tokio::test]
+    async fn test_mark_versions_reverted() {
+        let repo = crate::mirror::test_mirror_repo().await;
+        repo.insert_brain_version(&make_brain_version(1, None)).await.unwrap();
+        repo.insert_brain_version(&make_brain_version(2, Some(1))).await.unwrap();
+        repo.insert_brain_version(&make_brain_version(3, Some(2))).await.unwrap();
+
+        repo.mark_versions_reverted_after(1).await.unwrap();
+
+        let v1 = repo.get_brain_version(1).await.unwrap().unwrap();
+        let v2 = repo.get_brain_version(2).await.unwrap().unwrap();
+        let v3 = repo.get_brain_version(3).await.unwrap().unwrap();
+
+        assert!(!v1.reverted);
+        assert!(v2.reverted);
+        assert!(v3.reverted);
     }
 }
