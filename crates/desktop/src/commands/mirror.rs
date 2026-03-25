@@ -147,7 +147,9 @@ pub(crate) async fn dispatch_dev(
                 Ok(f) => f,
                 Err(e) => return Some(Err(e)),
             };
-            let item_id: Uuid = try_field!(dev::require(body, "item_id"));
+            let item_id: Uuid = try_field!(dev::get(body, "itemId")
+                .or_else(|| dev::get(body, "item_id"))
+                .ok_or_else(|| ApiError::new("VALIDATION", "missing required field: itemId")));
             let target: FeedbackTarget = try_field!(dev::require(body, "target"));
             let feedback: UserFeedback = try_field!(dev::require(body, "feedback"));
             dev::val(
@@ -175,7 +177,10 @@ pub(crate) async fn dispatch_dev(
                 Ok(f) => f,
                 Err(e) => return Some(Err(e)),
             };
-            let rule_id: Uuid = try_field!(dev::require(body, "rule_id"));
+            // Accept both camelCase (Tauri frontend) and snake_case (API)
+            let rule_id: Uuid = try_field!(dev::get(body, "ruleId")
+                .or_else(|| dev::get(body, "rule_id"))
+                .ok_or_else(|| ApiError::new("VALIDATION", "missing required field: ruleId")));
             dev::val(
                 facade
                     .approve_meta_rule(rule_id)
@@ -188,7 +193,10 @@ pub(crate) async fn dispatch_dev(
                 Ok(f) => f,
                 Err(e) => return Some(Err(e)),
             };
-            let rule_id: Uuid = try_field!(dev::require(body, "rule_id"));
+            // Accept both camelCase (Tauri frontend) and snake_case (API)
+            let rule_id: Uuid = try_field!(dev::get(body, "ruleId")
+                .or_else(|| dev::get(body, "rule_id"))
+                .ok_or_else(|| ApiError::new("VALIDATION", "missing required field: ruleId")));
             dev::val(
                 facade
                     .dismiss_meta_rule(rule_id)
