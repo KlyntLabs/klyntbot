@@ -1,9 +1,100 @@
+import { ipc } from "@shared/hooks/useIpc";
 import { ThinkingDots } from "@shared/ui/ThinkingDots";
 import { Clipboard, FileText, MessageSquare } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { NotePicker } from "./NotePicker";
 
-type QuickGenMode = null | "note" | "clipboard";
+type QuickGenMode = null | "note" | "clipboard" | "conversations";
+
+function ConversationPicker({
+  onSelect,
+  onCancel,
+}: {
+  onSelect: (text: string) => void;
+  onCancel: () => void;
+}) {
+  const [sessions, setSessions] = useState<
+    { sessionKey: string; title: string; updatedAt: string; preview: string }[]
+  >([]);
+  const [loading, setLoading] = useState(true);
+  const [selecting, setSelecting] = useState(false);
+
+  useEffect(() => {
+    ipc<typeof sessions>("flashcard_recent_learning_sessions", { limit: 3 })
+      .then(setSessions)
+      .catch(() => setSessions([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleSelect = useCallback(
+    async (sessionKey: string) => {
+      setSelecting(true);
+      try {
+        const messages = await ipc<{ role: string; content: string }[]>("chat_messages", {
+          sessionKey,
+          limit: 50,
+        });
+        const text = messages
+          .filter((m) => m.role === "user" || m.role === "assistant")
+          .map((m) => m.content)
+          .join("\n\n");
+        onSelect(text);
+      } catch {
+        setSelecting(false);
+      }
+    },
+    [onSelect],
+  );
+
+  if (loading || selecting) {
+    return (
+      <div className="glass-card p-4 text-center">
+        <p className="text-xs text-muted-foreground">
+          {selecting ? "Loading conversation..." : "Loading conversations..."}
+        </p>
+      </div>
+    );
+  }
+
+  if (sessions.length === 0) {
+    return (
+      <div className="glass-card p-4 space-y-2">
+        <p className="text-xs text-muted-foreground">No recent conversations found.</p>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="text-xs text-muted-foreground hover:text-foreground"
+        >
+          Back
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="glass-card p-4 space-y-2">
+      <p className="text-xs text-muted-foreground mb-2">Select a conversation:</p>
+      {sessions.map((s) => (
+        <button
+          key={s.sessionKey}
+          type="button"
+          onClick={() => handleSelect(s.sessionKey)}
+          className="w-full text-left px-3 py-2 rounded-lg hover:bg-accent transition-colors"
+        >
+          <p className="text-sm font-medium text-foreground truncate">{s.title}</p>
+          <p className="text-[11px] text-muted-foreground truncate mt-0.5">{s.preview}</p>
+        </button>
+      ))}
+      <button
+        type="button"
+        onClick={onCancel}
+        className="text-xs text-muted-foreground hover:text-foreground mt-1"
+      >
+        Cancel
+      </button>
+    </div>
+  );
+}
 
 interface QuickGenerateProps {
   onGenerateFromNote: (noteId: string) => void;
@@ -18,6 +109,14 @@ export function QuickGenerate({
 }: QuickGenerateProps) {
   const [mode, setMode] = useState<QuickGenMode>(null);
   const [clipboardText, setClipboardText] = useState("");
+
+  const handleSelectConversation = useCallback(
+    (text: string) => {
+      setMode(null);
+      onGenerateFromText(text);
+    },
+    [onGenerateFromText],
+  );
 
   if (generating) {
     return (
@@ -80,6 +179,12 @@ export function QuickGenerate({
     );
   }
 
+  if (mode === "conversations") {
+    return (
+      <ConversationPicker onSelect={handleSelectConversation} onCancel={() => setMode(null)} />
+    );
+  }
+
   return (
     <div className="glass-card p-4 text-left">
       <p className="text-sm font-medium text-foreground mb-3">Quick Generate</p>
@@ -102,12 +207,11 @@ export function QuickGenerate({
         </button>
         <button
           type="button"
-          disabled
-          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground opacity-50 cursor-not-allowed text-left"
+          onClick={() => setMode("conversations")}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-accent transition-colors text-left"
         >
           <MessageSquare size={14} strokeWidth={1.5} />
-          From last chat...
-          <span className="ml-auto text-2xs">Soon</span>
+          From recent conversations...
         </button>
       </div>
     </div>
