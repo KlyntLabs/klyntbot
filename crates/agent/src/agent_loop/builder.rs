@@ -491,9 +491,10 @@ impl AgentLoopBuilder {
             provider.clone(),
             config.agents.defaults.model.clone(),
         ));
+        let token_counter = context_engine::best_token_counter();
         let context_engine = context_engine::ContextEngine::new()
             .with_sources(sources)
-            .with_token_counter(context_engine::best_token_counter())
+            .with_token_counter(Arc::clone(&token_counter))
             .with_summary_provider(summary_provider);
 
         // ── Session manager (SQL-backed) ──────────────────────────────────
@@ -1280,7 +1281,8 @@ impl AgentLoopBuilder {
         // ── Agent Runtime ─────────────────────────────────────────────────
         let tool_registry = Arc::new(RwLock::new(tool_registry));
         let mut execution_core =
-            crate::execution::ExecutionCore::new(provider.clone(), Arc::clone(&tool_registry));
+            crate::execution::ExecutionCore::new(provider.clone(), Arc::clone(&tool_registry))
+                .with_token_counter(Arc::clone(&token_counter));
         if let Some(ref recorder) = outcome_recorder {
             execution_core = execution_core.with_outcome_recorder(Arc::clone(recorder));
         }
