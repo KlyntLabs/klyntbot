@@ -475,6 +475,7 @@ impl AgentLoopBuilder {
                             promote_threshold: config.cognitive.accumulate_promote_threshold,
                             min_days: config.cognitive.accumulate_min_days,
                             domain_bus: self.domain_event_bus.clone(),
+                            context_update_queue: self.context_update_queue.clone(),
                         },
                     );
                     info!("Cognitive background consolidation service started");

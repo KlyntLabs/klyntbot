@@ -200,6 +200,7 @@ pub struct BackgroundServiceConfig {
     pub promote_threshold: usize,
     pub min_days: usize,
     pub domain_bus: Option<Arc<bus::DomainEventBus>>,
+    pub context_update_queue: Option<Arc<bus::ContextUpdateQueue>>,
 }
 
 /// Background service that processes domain events into cognitive memory.
@@ -225,6 +226,7 @@ impl BackgroundConsolidationService {
             promote_threshold,
             min_days,
             domain_bus,
+            context_update_queue,
         } = config;
         let cancel_clone = cancel.clone();
         let handle = tokio::spawn(async move {
@@ -434,6 +436,29 @@ impl BackgroundConsolidationService {
                             embedder.as_deref(),
                         )
                         .await;
+
+                        // ── Live context update: push promoted facts ─────────
+                        if let Some(ref queue) = context_update_queue {
+                            for (candidate, op) in candidates.iter().zip(ops.iter()) {
+                                match op {
+                                    crate::types::MemoryOp::Add { .. }
+                                    | crate::types::MemoryOp::Update { .. } => {
+                                        let fact = &candidate.candidate;
+                                        queue.push(bus::ContextUpdate {
+                                            reason: bus::ContextUpdateReason::MemoryPromoted,
+                                            content: Some(format!(
+                                                "{} — {}",
+                                                fact.subject, fact.predicate
+                                            )),
+                                            metadata: None,
+                                            priority: bus::UpdatePriority::Normal,
+                                            timestamp: chrono::Utc::now(),
+                                        });
+                                    }
+                                    _ => {}
+                                }
+                            }
+                        }
 
                         // ── Contradiction detection ──────────────────────────
                         if let Some(ref bus) = domain_bus {
