@@ -14,6 +14,7 @@ use crate::mirror::{
     AutotunerBridge, ConfigArchiver, MetaRuleDetector, MirrorFacade, MirrorRepo, NarrativeHandler,
     RoutingMirrorSubscriber, TrialPreviewSubscriber,
 };
+use crate::repos::EpisodicMemoryRepo;
 
 // ---------------------------------------------------------------------------
 // MirrorEngine
@@ -42,6 +43,7 @@ impl MirrorEngine {
         bus: &bus::DomainEventBus,
         narrative_handler: Option<Arc<dyn NarrativeHandler>>,
         autotuner_bridge: Option<Arc<dyn AutotunerBridge>>,
+        episodic_repo: Option<EpisodicMemoryRepo>,
     ) -> (MirrorFacade, Vec<JoinHandle<()>>, CancellationToken) {
         let shutdown = CancellationToken::new();
 
@@ -76,6 +78,9 @@ impl MirrorEngine {
         if let Some(bridge) = autotuner_bridge {
             facade = facade.with_autotuner_bridge(bridge);
         }
+        if let Some(episodic) = episodic_repo {
+            facade = facade.with_episodic_repo(episodic);
+        }
 
         (facade, handles, shutdown)
     }
@@ -94,7 +99,7 @@ mod tests {
         let repo = crate::mirror::test_mirror_repo().await;
         let bus = bus::DomainEventBus::new(16);
 
-        let (facade, handles, shutdown) = MirrorEngine::start(repo, &bus, None, None);
+        let (facade, handles, shutdown) = MirrorEngine::start(repo, &bus, None, None, None);
 
         // Facade is usable.
         let state = facade.get_state().await.unwrap();
@@ -112,7 +117,7 @@ mod tests {
         let repo = crate::mirror::test_mirror_repo().await;
         let bus = bus::DomainEventBus::new(16);
 
-        let (_facade, handles, shutdown) = MirrorEngine::start(repo, &bus, None, None);
+        let (_facade, handles, shutdown) = MirrorEngine::start(repo, &bus, None, None, None);
 
         // Publish a SkillRouted event — the subscriber should accumulate it.
         bus.publish(bus::DomainEvent::SkillRouted {
@@ -138,7 +143,7 @@ mod tests {
         let bus = bus::DomainEventBus::new(16);
 
         assert_eq!(bus.subscriber_count(), 0);
-        let (_facade, handles, shutdown) = MirrorEngine::start(repo, &bus, None, None);
+        let (_facade, handles, shutdown) = MirrorEngine::start(repo, &bus, None, None, None);
         // Four subscribers (routing + meta_rule + config_archiver + trial_preview).
         assert_eq!(bus.subscriber_count(), 4);
 

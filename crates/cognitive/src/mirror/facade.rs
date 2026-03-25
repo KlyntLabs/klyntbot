@@ -17,6 +17,7 @@ use crate::mirror::{
     MirrorResponse, MirrorState, NarrativeContext, NarrativeHandler, NarrativeSnippet,
     RoutingSnapshot, TrendNarrative, TrialPreview, UserFeedback,
 };
+use crate::repos::EpisodicMemoryRepo;
 
 // ---------------------------------------------------------------------------
 // MirrorFacade
@@ -31,6 +32,7 @@ pub struct MirrorFacade {
     narrative_handler: Option<Arc<dyn NarrativeHandler>>,
     autotuner_bridge: Option<Arc<dyn AutotunerBridge>>,
     pub(crate) active_timers: Option<Arc<DashMap<String, JoinHandle<()>>>>,
+    episodic_repo: Option<EpisodicMemoryRepo>,
 }
 
 impl MirrorFacade {
@@ -43,6 +45,7 @@ impl MirrorFacade {
             narrative_handler: None,
             autotuner_bridge: None,
             active_timers: None,
+            episodic_repo: None,
         }
     }
 
@@ -63,6 +66,14 @@ impl MirrorFacade {
     /// Attach shared active timers for trial preview cancellation.
     pub fn with_active_timers(mut self, timers: Arc<DashMap<String, JoinHandle<()>>>) -> Self {
         self.active_timers = Some(timers);
+        self
+    }
+
+    /// Attach an [`EpisodicMemoryRepo`] so that key mirror actions (weekly
+    /// narrative, meta-rule approval, trial kill) are persisted as episodic
+    /// memories. Returns `self` for builder-style chaining.
+    pub fn with_episodic_repo(mut self, repo: EpisodicMemoryRepo) -> Self {
+        self.episodic_repo = Some(repo);
         self
     }
 
@@ -171,7 +182,15 @@ impl MirrorFacade {
     pub async fn approve_meta_rule(&self, rule_id: Uuid) -> Result<()> {
         self.repo
             .update_meta_rule_status(rule_id, MetaRuleStatus::Active)
-            .await
+            .await?;
+
+        self.write_episodic(
+            format!("Approved meta-rule: {rule_id}"),
+            None,
+            0.8,
+        );
+
+        Ok(())
     }
 
     /// Dismiss a pending meta-rule, transitioning it to [`MetaRuleStatus::Disabled`].
@@ -200,6 +219,13 @@ impl MirrorFacade {
                 handle.abort();
             }
         }
+
+        self.write_episodic(
+            format!("Killed experiment trial {trial_id}"),
+            None,
+            0.7,
+        );
+
         Ok(())
     }
 
@@ -263,6 +289,12 @@ impl MirrorFacade {
 
         self.repo.insert_trend_narrative(&narrative).await?;
 
+        self.write_episodic(
+            format!("Weekly reflection: {}", narrative.full_narrative),
+            Some(narrative.routing_summary.clone()),
+            0.9,
+        );
+
         Ok(narrative)
     }
 
@@ -310,6 +342,34 @@ impl MirrorFacade {
                 "NarrativeHandler not configured".to_string(),
             ))
         })
+    }
+
+    /// Fire-and-forget write of an episodic memory with `domain = "mirror"`.
+    fn write_episodic(&self, content: String, summary: Option<String>, importance: f64) {
+        if let Some(ref episodic) = self.episodic_repo {
+            let repo = episodic.clone();
+            let now = Utc::now().to_rfc3339();
+            tokio::spawn(async move {
+                let mem = crate::types::EpisodicMemory {
+                    id: Uuid::new_v4().to_string(),
+                    domain: "mirror".to_string(),
+                    content,
+                    summary,
+                    importance,
+                    occurred_at: now.clone(),
+                    recorded_at: now,
+                    stability: 1.0,
+                    last_accessed: None,
+                    access_count: 0,
+                    project_id: None,
+                    scope_type: "system".to_string(),
+                    scope_id: None,
+                };
+                if let Err(e) = repo.insert(&mem).await {
+                    tracing::warn!("mirror: failed to write episodic memory: {e}");
+                }
+            });
+        }
     }
 }
 

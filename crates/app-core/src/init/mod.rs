@@ -270,11 +270,15 @@ impl AppCore {
                         Arc::clone(orch),
                     )) as Arc<dyn ::cognitive::mirror::AutotunerBridge>
                 });
+            let episodic_repo = Some(::cognitive::EpisodicMemoryRepo::new(
+                storage_pool.inner().clone(),
+            ));
             let (facade, handles, shutdown) = ::cognitive::mirror::MirrorEngine::start(
                 mirror_repo,
                 &domain_event_bus,
                 narrative_handler,
                 autotuner_bridge,
+                episodic_repo,
             );
 
             // Bootstrap brain version 1 on first run
