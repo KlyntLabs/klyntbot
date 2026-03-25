@@ -1,6 +1,7 @@
 import { Activity, Focus, GraduationCap, Play, Plus } from "lucide-react";
 import { Link } from "react-router";
 import { useLearnDashboard } from "../hooks/useLearnDashboard";
+import { useReviewStats } from "../hooks/useReviewStats";
 import { DeckList } from "./DeckList";
 import { QuickGenerate } from "./QuickGenerate";
 import { StatsBar } from "./StatsBar";
@@ -21,6 +22,7 @@ export function DashboardHome({
   generating,
 }: DashboardHomeProps) {
   const { decks, totalDue, loading } = useLearnDashboard();
+  const { data: stats } = useReviewStats();
 
   if (loading) {
     return (
@@ -82,7 +84,12 @@ export function DashboardHome({
       </div>
 
       {/* Stats */}
-      <StatsBar totalDue={totalDue} />
+      <StatsBar
+        totalDue={totalDue}
+        streak={stats.streak}
+        retention={stats.retention}
+        weekly={stats.weekly}
+      />
 
       {/* Action cards */}
       <div className="grid grid-cols-2 gap-3">
