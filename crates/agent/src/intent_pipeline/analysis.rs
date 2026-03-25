@@ -2076,6 +2076,22 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn shadow_mode_skips_llm_for_ambiguous_messages() {
+        let analyzer = IntentAnalyzer::new(
+            Arc::new(PanickingProvider),
+            "model",
+            &OrchestratorConfig::default(),
+        )
+        .with_shadow_mode();
+
+        // Ambiguous message — L1 heuristics return None, L2 has no embedder → would normally fall through to L3 LLM
+        let result = analyzer
+            .analyze("I need help with something complex", &[])
+            .await;
+        assert_eq!(result.source, AnalysisSource::ShadowDeferred);
+    }
+
+    #[tokio::test]
     async fn ambiguous_uses_llm() {
         let response = r#"{"mode":"reactive","estimated_tool_calls":2,"has_sequential_deps":false,"failure_risk":"low","requires_state_tracking":false,"requires_retries":false,"confidence":0.8,"reasoning":"Needs search"}"#;
         let analyzer = IntentAnalyzer::new(

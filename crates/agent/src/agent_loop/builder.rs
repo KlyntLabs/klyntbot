@@ -1402,7 +1402,8 @@ impl AgentLoopBuilder {
             &config.agents.defaults.model,
             &config.orchestrator,
         )
-        .with_strategy_repo(repos.strategies.clone());
+        .with_strategy_repo(repos.strategies.clone())
+        .with_shadow_mode();
 
         // Wire live autotuner reference into IntentAnalyzer for per-message threshold reads
         if let Some(ref orchestrator) = self.autotuner {
